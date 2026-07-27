@@ -9,12 +9,16 @@
  * would be lying.
  */
 import { localIdentity, Relay } from '../../lib/nostr/relay'
+import { addrToNaddr } from '../../lib/nostr/nip19'
 import { ISSUE_STATUSES, lookupStatus, PROJECT_STATUSES } from '../../src/kinds'
 import { nextRef, refPrefix, Store } from '../../src/store'
 import type { Change, FolderState, Issue } from '../../src/fold'
 
 const RELAY_URL = 'http://localhost:3000'
 const FOLDER_KEY = 'linear-lite.folder'
+
+/** Which issues have their comment thread open. Purely local view state. */
+const openThreads = new Set<string>()
 
 const identity = localIdentity('linear-lite.secretkey')
 const store = new Store(new Relay(RELAY_URL, identity), identity)
@@ -171,6 +175,100 @@ function assigneeButton(issue: Issue) {
   return button
 }
 
+/**
+ * Copy `nostr:naddr1…` for an issue.
+ *
+ * This is the handoff to every other app. NIP-21's URI scheme wrapping a NIP-19
+ * pointer, which is what Peek scans message bodies for (NIP-27). Nothing about
+ * it is Linear-lite-specific — any app that can decode an naddr can resolve it,
+ * including apps that do not exist yet.
+ */
+function copyRefButton(issue: Issue) {
+  const button = document.createElement('button')
+  button.textContent = 'Copy ref'
+  button.title = 'Copy a nostr: reference to paste into another app'
+  button.onclick = async () => {
+    // The relay hint travels with the pointer, so the consumer does not have to
+    // already know where this object lives.
+    const uri = `nostr:${addrToNaddr(issue.addr, [RELAY_URL])}`
+    try {
+      await navigator.clipboard.writeText(uri)
+      say('Reference copied — paste it into Peek.')
+    } catch {
+      // Clipboard access needs a secure context or a user gesture, and fails
+      // silently often enough that a visible fallback is worth the four lines.
+      window.prompt('Copy this reference:', uri)
+    }
+  }
+  return button
+}
+
+function commentsButton(issue: Issue) {
+  const count = state.comments.get(issue.addr)?.length ?? 0
+  const button = document.createElement('button')
+  button.textContent = `Comments${count ? ` (${count})` : ''}`
+  button.onclick = () => {
+    if (openThreads.has(issue.addr)) openThreads.delete(issue.addr)
+    else openThreads.add(issue.addr)
+    render()
+  }
+  return button
+}
+
+/**
+ * The comment thread — NIP-22 `kind:1111`, not a Linear-lite kind.
+ *
+ * That is the point of using it: Peek reads and writes these same events, so
+ * commenting works across apps without either one owning the format.
+ */
+function thread(issue: Issue) {
+  const panel = document.createElement('div')
+  panel.className = 'thread'
+  const comments = state.comments.get(issue.addr) ?? []
+
+  if (!comments.length) {
+    const empty = document.createElement('div')
+    empty.className = 'empty'
+    empty.textContent = 'No comments yet.'
+    panel.append(empty)
+  }
+  for (const comment of comments) {
+    const item = document.createElement('div')
+    item.className = 'comment'
+    const byline = document.createElement('div')
+    byline.className = 'byline'
+    byline.textContent = `${who(comment.author)} · ${new Date(comment.createdAt * 1000).toLocaleString()}`
+    const body = document.createElement('div')
+    body.textContent = comment.body
+    item.append(byline, body)
+    panel.append(item)
+  }
+
+  const form = document.createElement('form')
+  const input = document.createElement('input')
+  input.placeholder = 'Write a comment…'
+  input.required = true
+  const submit = document.createElement('button')
+  submit.className = 'primary'
+  submit.type = 'submit'
+  submit.textContent = 'Comment'
+  form.append(input, submit)
+  form.onsubmit = async (event) => {
+    event.preventDefault()
+    submit.disabled = true
+    const ok = await publish('Comment', () =>
+      store.comment({ folder, target: issue.addr, body: input.value }),
+    )
+    if (ok) {
+      input.value = ''
+      await load()
+    }
+    submit.disabled = false
+  }
+  panel.append(form)
+  return panel
+}
+
 function renderIssues() {
   const project = state.projects.find((p) => p.addr === selectedProject)
   el.issuesHeading.textContent = project ? `Issues · ${project.title}` : 'Issues · all'
@@ -213,8 +311,16 @@ function renderIssues() {
     if (statusField) meta.append(pill(`status set by ${who(statusField.by)}`))
     grow.append(meta)
 
-    row.append(grow, statusPicker(issue), assigneeButton(issue))
-    el.issues.append(row)
+    const toolbar = document.createElement('div')
+    toolbar.className = 'toolbar'
+    toolbar.append(statusPicker(issue), assigneeButton(issue), commentsButton(issue), copyRefButton(issue))
+    row.append(grow, toolbar)
+
+    const block = document.createElement('div')
+    block.className = 'issue'
+    block.append(row)
+    if (openThreads.has(issue.addr)) block.append(thread(issue))
+    el.issues.append(block)
   }
 }
 
@@ -291,6 +397,11 @@ async function openFolder(id: string, { create = false } = {}) {
     )
     if (ok) say(`Folder ready — ${folder}`)
   }
+  // Publish this user's NIP-89 recommendation: "for kinds 30850/30851, I use
+  // Linear-lite". Addressable, so this replaces rather than accumulating, and
+  // it is what lets a consumer pick this manifest over any other claiming the
+  // same kinds. Best-effort — failing to recommend must not block the app.
+  void store.recommendHandler(RELAY_URL).catch(() => {})
   await load()
 }
 

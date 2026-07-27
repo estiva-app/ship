@@ -107,6 +107,22 @@
       .status-green { color: var(--green); }
       .status-muted { color: var(--muted); }
       .empty { color: var(--dim); font-style: italic; padding: 6px 0; }
+      .issue { margin-bottom: 8px; }
+      .issue .row { margin-bottom: 0; }
+      .thread {
+        border: 1px solid var(--line);
+        border-top: none;
+        border-radius: 0 0 8px 8px;
+        background: var(--panel-2);
+        padding: 10px 12px;
+      }
+      .comment { padding: 6px 0; border-bottom: 1px solid var(--line); }
+      .comment:last-of-type { border-bottom: none; }
+      .comment .byline { font-size: 11px; color: var(--dim); margin-bottom: 2px; }
+      .thread form { display: flex; gap: 8px; margin: 8px 0 0; }
+      .thread form input { flex: 1; }
+      .toolbar { display: flex; gap: 6px; align-items: center; }
+      .toolbar button { padding: 4px 8px; font-size: 12px; }
       .feed { display: grid; gap: 10px; }
       .feed-item { border-left: 2px solid var(--line); padding-left: 10px; }
       .feed-item .when { font-size: 11px; color: var(--dim); }
