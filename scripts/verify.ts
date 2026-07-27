@@ -220,6 +220,42 @@ async function main() {
   )
   check('the relay rejects a Change with no Folder', !rejected.ok, rejected.reason ?? 'accepted!')
 
+  // ── 6. Comments, and the handler recommendation ────────────────────────────
+  // Both are what Peek needs: something to render, and a way to know which
+  // manifest renders it.
+  await must('Ana comments on her own issue', () =>
+    ana.store.comment({ folder, target: billing.addr, body: 'Blocked on the Stripe key.' }),
+  )
+  await must('Ravi comments on Ana\'s issue', () =>
+    ravi.store.comment({ folder, target: billing.addr, body: 'Key is in 1Password now.' }),
+  )
+
+  const withComments = foldFolder(await ravi.store.rawFolder(folder))
+  const thread = withComments.comments.get(billing.addr) ?? []
+  check('both comments attach to the issue', thread.length === 2, `${thread.length} on PAY-1`)
+  check('  …oldest first', thread[0]?.body.startsWith('Blocked'), thread[0]?.body)
+  check('  …by two different people', thread[0]?.author !== thread[1]?.author)
+  check('a comment-free issue has no thread', !withComments.comments.has(webhook.addr))
+
+  await must('Ana recommends a handler for her kinds', async () => {
+    const [first, second] = await ana.store.recommendHandler(RELAY_URL)
+    return first.ok ? second : first
+  })
+
+  // Resolve it the way Peek will: given an object authored by Ana, find Ana's
+  // recommendation for that kind. This is the tie-break that makes `#k`
+  // discovery usable when several manifests claim the same kind.
+  const [recommendation] = await new Relay(RELAY_URL, ravi.identity).query([
+    { kinds: [31989], authors: [ana.identity.pubkey], '#d': [String(KIND.ISSUE)], limit: 1 },
+  ])
+  check('a consumer finds the issue author\'s recommendation', !!recommendation)
+  const recommended = recommendation?.tags.find((t) => t[0] === 'a')?.[1]
+  check(
+    '  …and it points at a kind:31990 manifest',
+    !!recommended && recommended.startsWith('31990:'),
+    recommended,
+  )
+
   console.log(
     failures === 0
       ? '\nAll checks passed. Ravi changed Ana\'s issue without rewriting her event.'

@@ -160,6 +160,64 @@ export function buildChange(
   }
 }
 
+/**
+ * kind:1111 NIP-22 comment, scoped to an addressable Linear-lite object.
+ *
+ * The tag shape is the part worth getting right, because NIP-22 splits case:
+ *
+ *   UPPERCASE (`A`/`E`/`I`, `K`, `P`) — the **root** of the thread
+ *   lowercase (`a`/`e`/`i`, `k`, `p`) — the **immediate parent**
+ *
+ * For a top-level comment both point at the same object, which looks redundant
+ * and is not: it is what lets a reply to *this comment* keep pointing at the
+ * issue as its root while pointing at the comment as its parent. A client that
+ * emits only one case produces threads other clients read differently.
+ *
+ * `K`/`k` carry the *kind* of the root and parent, so a consumer can tell it is
+ * looking at a comment on a `30851` without fetching the target first — which
+ * is what makes cross-app comment rendering possible at all.
+ *
+ * Scoping to an **addressable** event rather than an event id is the reason
+ * NIP-22 is used here instead of a NIP-10 reply: an issue's root event can be
+ * replaced by its author, and a comment must survive that.
+ */
+export function buildComment(
+  pubkey: string,
+  createdAtMs: number,
+  args: {
+    /** Address of the object being commented on, `<kind>:<pubkey>:<d>`. */
+    target: string
+    body: string
+    folder: string
+  },
+): UnsignedEvent {
+  assertFolderId(args.folder)
+  const [targetKind, targetAuthor] = args.target.split(':')
+  return {
+    pubkey,
+    created_at: toNostrSeconds(createdAtMs),
+    kind: KIND.COMMENT,
+    tags: [
+      // Root: the issue or project.
+      ['A', args.target],
+      ['K', targetKind],
+      ['P', targetAuthor],
+      // Parent: the same object, for a top-level comment.
+      ['a', args.target],
+      ['k', targetKind],
+      ['p', targetAuthor],
+      ['h', args.folder],
+      // Same `ts` as a change event, for the same reason and found the same
+      // way: two comments posted in one second sorted by event id, so the
+      // thread read back in the wrong order. The one-second resolution of
+      // `created_at` is not a change-event problem, it is a property of every
+      // append-only stream on this relay (FRICTION.md A6).
+      ['ts', String(Math.floor(createdAtMs))],
+    ],
+    content: args.body,
+  }
+}
+
 /** Address of a Project: `30850:<pubkey>:<d>`. */
 export function projectAddr(pubkey: string, projectId: string): string {
   return addr(KIND.PROJECT, pubkey, projectId)

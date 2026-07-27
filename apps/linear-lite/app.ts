@@ -21,7 +21,7 @@ const store = new Store(new Relay(RELAY_URL, identity), identity)
 
 let folder = localStorage.getItem(FOLDER_KEY) ?? ''
 let selectedProject: string | null = null
-let state: FolderState = { projects: [], issues: [], activity: [] }
+let state: FolderState = { projects: [], issues: [], activity: [], comments: new Map() }
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
 const el = {
@@ -263,7 +263,7 @@ function render() {
 
 async function load() {
   if (!folder) {
-    state = { projects: [], issues: [], activity: [] }
+    state = { projects: [], issues: [], activity: [], comments: new Map() }
     render()
     return
   }

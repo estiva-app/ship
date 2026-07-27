@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit",
     "probe": "tsx scripts/probe-kinds.ts",
     "verify": "tsx scripts/verify.ts",
-    "manifest": "tsx scripts/publish-manifest.ts"
+    "manifest": "tsx scripts/publish-manifest.ts",
+    "test:nip19": "tsx scripts/nip19.test.ts"
   },
   "dependencies": {
     "@noble/curves": "1.9.2",

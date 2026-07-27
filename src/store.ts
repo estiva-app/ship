@@ -10,12 +10,20 @@
 import { signEvent } from '../lib/nostr/sign'
 import type { Identity, PublishResult, Relay } from '../lib/nostr/relay'
 import { buildCreateChannel, type SignedEvent, type UnsignedEvent } from '../lib/nostr/events'
-import { assertFolderId, buildChange, buildIssue, buildProject, issueAddr, projectAddr } from './events'
+import { assertFolderId, buildChange, buildComment, buildIssue, buildProject, issueAddr, projectAddr } from './events'
 import { foldFolder, type FolderState } from './fold'
 import { KIND } from './kinds'
+import { buildRecommendation } from './manifest'
+import { MANIFEST_ADDRESS } from './manifest-address'
 
-/** Kinds the reader pulls for a Folder. */
-const FOLDER_KINDS = [KIND.PROJECT, KIND.ISSUE, KIND.CHANGE]
+/**
+ * Kinds the reader pulls for a Folder.
+ *
+ * Comments are included: they live in the Folder like everything else, and
+ * pulling them in the same round trip is what makes the comment count on an
+ * issue row free rather than a query per issue.
+ */
+const FOLDER_KINDS = [KIND.PROJECT, KIND.ISSUE, KIND.CHANGE, KIND.COMMENT]
 
 export class Store {
   constructor(
@@ -75,6 +83,40 @@ export class Store {
       buildIssue(this.identity.pubkey, Date.now(), { issueId: id, ...args }),
     )
     return { result, addr: issueAddr(this.identity.pubkey, id), id }
+  }
+
+  /**
+   * Comment on an Issue or Project.
+   *
+   * NIP-22, so this needs no Linear-lite kind at all — which is the whole
+   * reason to use it. Peek can read and write the same comments without either
+   * app owning the format.
+   */
+  comment(args: { folder: string; target: string; body: string }): Promise<PublishResult> {
+    return this.publish(buildComment(this.identity.pubkey, Date.now(), args))
+  }
+
+  /**
+   * Tell the world which app handles Linear-lite's kinds.
+   *
+   * Published from the *user's* key, not the app's. A `#k` query returns every
+   * manifest claiming a kind and NIP-89 does not rank them; this is what lets a
+   * consumer choose. Idempotent — kind:31989 is addressable by
+   * `(pubkey, kind, d)`, so calling this on every load replaces rather than
+   * accumulates.
+   */
+  async recommendHandler(relayHint?: string): Promise<PublishResult[]> {
+    return Promise.all(
+      [KIND.PROJECT, KIND.ISSUE].map((kind) =>
+        this.publish(
+          buildRecommendation(this.identity.pubkey, Date.now(), {
+            kind,
+            manifestAddr: MANIFEST_ADDRESS,
+            relayHint,
+          }),
+        ),
+      ),
+    )
   }
 
   /**

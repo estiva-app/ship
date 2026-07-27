@@ -192,6 +192,50 @@ export function manifestContent(): ManifestContent {
  * application, not a Folder's contents, and discovery has to work before the
  * reader is a member of anything.
  */
+/**
+ * kind:31989 handler recommendation — "for this kind, I use that app".
+ *
+ * Signed by **the user**, not by Linear-lite, and that is the point. A `#k`
+ * query for kind 30851 returns every manifest claiming to handle issues, and
+ * nothing in NIP-89 ranks them (LINEAR_LITE_SPEC.md §7.3 — which stopped being
+ * hypothetical the moment a throwaway probe published a competing manifest by
+ * accident). The recommendation is the tie-break.
+ *
+ * The trust anchor it gives a consumer is a real one rather than configuration:
+ * *the person who authored the object told you which app renders it.* Peek
+ * holds an issue authored by Ana, looks for Ana's recommendation for kind
+ * 30851, and follows it. Nobody has to pin an address into Peek's config, and
+ * a workspace that switches trackers switches by republishing, not by
+ * redeploying.
+ *
+ * `d` is the kind being recommended for, so one event per kind. Both are
+ * addressable, so re-publishing replaces rather than accumulating.
+ */
+export function buildRecommendation(
+  pubkey: string,
+  createdAtMs: number,
+  args: {
+    /** The kind this recommendation is about. */
+    kind: number
+    /** Address of the `31990` being recommended. */
+    manifestAddr: string
+    /** Where to find it. NIP-19/NIP-89 both carry relay hints. */
+    relayHint?: string
+  },
+): UnsignedEvent {
+  return {
+    pubkey,
+    created_at: toNostrSeconds(createdAtMs),
+    kind: 31989,
+    tags: [
+      ['d', String(args.kind)],
+      // NIP-89's `a` tag carries a relay hint and a platform marker.
+      ['a', args.manifestAddr, args.relayHint ?? '', 'web'],
+    ],
+    content: '',
+  }
+}
+
 export function buildManifest(pubkey: string, createdAtMs: number): UnsignedEvent {
   const tags: NostrTag[] = [
     ['d', MANIFEST_D_TAG],
