@@ -1,0 +1,189 @@
+/**
+ * Publish Linear-lite's NIP-89 manifest, then read it back and check it.
+ *
+ * Build-order step 3: "Still no consumer; just an event." So the check here is
+ * deliberately the consumer's check — resolve the manifest the way Peek will
+ * (query `kind:31990` filtered by `#k`), then confirm every projection it
+ * declares can actually be satisfied by a real object.
+ *
+ * That last part is the one worth having. A manifest that references a tag the
+ * events do not carry is still valid JSON and still publishes fine; it fails
+ * only in the consumer, days later, as an empty widget.
+ *
+ *   npx tsx scripts/publish-manifest.ts
+ *
+ * Identity: reuses `.manifest-key` so republishing replaces the same
+ * addressable event rather than creating a second competing manifest.
+ */
+import { randomUUID } from 'node:crypto'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { Relay } from '../lib/nostr/relay'
+import { publicKeyFromSecret, signEvent } from '../lib/nostr/sign'
+import { buildManifest, MANIFEST_D_TAG, type ManifestContent, type SlotSource } from '../src/manifest'
+import { Store } from '../src/store'
+import { foldFolder } from '../src/fold'
+import { KIND } from '../src/kinds'
+
+const RELAY_URL = process.env.RELAY_URL ?? 'http://localhost:3000'
+const KEY_FILE = new URL('../.manifest-key', import.meta.url).pathname
+
+/**
+ * A stable identity for the manifest.
+ *
+ * NIP-33 addresses are `(pubkey, kind, d)`, so a fresh key every run would
+ * publish a *new* manifest each time rather than replacing the old one, and a
+ * consumer filtering on `#k` would find several and have to pick. Keeping the
+ * key on disk is what makes "publish again" mean "update".
+ */
+function manifestIdentity() {
+  let secretKeyHex = existsSync(KEY_FILE) ? readFileSync(KEY_FILE, 'utf8').trim() : ''
+  if (!/^[0-9a-f]{64}$/.test(secretKeyHex)) {
+    secretKeyHex = Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('hex')
+    writeFileSync(KEY_FILE, `${secretKeyHex}\n`, { mode: 0o600 })
+    console.log('generated a new manifest key → .manifest-key (gitignored)')
+  }
+  return { secretKeyHex, pubkey: publicKeyFromSecret(secretKeyHex) }
+}
+
+let failures = 0
+function check(label: string, condition: boolean, detail = '') {
+  console.log(`${condition ? '✅' : '❌'} ${label}${detail ? ` — ${detail}` : ''}`)
+  if (!condition) failures++
+}
+
+/** Resolve a slot against a real event the way a consumer would. */
+function resolveSlot(
+  slot: SlotSource,
+  event: { tags: string[][]; content: string },
+  folded: Record<string, { value: string }>,
+): string | undefined {
+  if ('tag' in slot) return event.tags.find((t) => t[0] === slot.tag)?.[1]
+  if ('field' in slot) return event.content
+  return folded[slot.fold]?.value ?? slot.default
+}
+
+async function main() {
+  const identity = manifestIdentity()
+  const relay = new Relay(RELAY_URL, identity)
+
+  console.log(`relay    ${RELAY_URL}`)
+  console.log(`manifest ${identity.pubkey.slice(0, 16)}…  (31990:<pubkey>:${MANIFEST_D_TAG})\n`)
+
+  const event = buildManifest(identity.pubkey, Date.now())
+  const published = await relay.publish(signEvent(event, identity.secretKeyHex))
+  check('the relay accepts kind:31990', published.ok, published.reason ?? '')
+  if (!published.ok) process.exit(1)
+
+  // ── Resolve it the way a consumer will ────────────────────────────────────
+  // Peek will not know Linear-lite's pubkey. It will hold an object of some
+  // kind and ask "who handles this?" — which is a `#k` filter, NIP-89's own
+  // discovery mechanism.
+  for (const kind of [KIND.PROJECT, KIND.ISSUE]) {
+    const found = await relay.query([{ kinds: [31990], '#k': [String(kind)], limit: 20 }])
+    check(
+      `a consumer holding a kind:${kind} finds a handler by #k`,
+      found.some((e) => e.pubkey === identity.pubkey),
+      `${found.length} manifest(s) declare kind ${kind}`,
+    )
+  }
+
+  const [stored] = await relay.query([
+    { kinds: [31990], authors: [identity.pubkey], '#d': [MANIFEST_D_TAG], limit: 1 },
+  ])
+  check('the manifest reads back', !!stored)
+  if (!stored) process.exit(1)
+
+  let manifest: ManifestContent
+  try {
+    manifest = JSON.parse(stored.content)
+  } catch (error) {
+    check('the manifest content is valid JSON', false, (error as Error).message)
+    process.exit(1)
+  }
+
+  check('it declares how to fold a record', manifest.records?.changeKind === KIND.CHANGE, `changeKind=${manifest.records?.changeKind}`)
+  check('it declares the ordering rule', Array.isArray(manifest.records?.order) && manifest.records.order[0] === 'ts', manifest.records?.order?.join(' → '))
+
+  // ── The check that matters: can the projections be satisfied? ─────────────
+  // Publish one real project and one real issue, move the issue's status, then
+  // resolve every declared slot against the actual events.
+  const store = new Store(relay, identity)
+  const folder = randomUUID()
+  await store.ensureFolder(folder, `manifest-${folder.slice(0, 8)}`)
+  const project = await store.createProject({ folder, title: 'Payment integration', description: 'Stripe Checkout.' })
+  const issue = await store.createIssue({ folder, title: 'Billing entry', description: 'Settings entry point.', projectAddr: project.addr, ref: 'PAY-1' })
+  await store.setField({ folder, target: issue.addr, field: 'status', value: 'in_progress' })
+  await store.setField({ folder, target: issue.addr, field: 'assignee', value: identity.pubkey })
+
+  const raw = await store.rawFolder(folder)
+  const state = foldFolder(raw)
+  console.log('')
+
+  for (const [kindStr, projection] of Object.entries(manifest.projections)) {
+    const kind = Number(kindStr)
+    const object = kind === KIND.PROJECT ? state.projects[0] : state.issues[0]
+    const rootEvent = raw.find((e) => e.kind === kind)
+    if (!rootEvent || !object) {
+      check(`kind:${kind} has a real object to project`, false)
+      continue
+    }
+    for (const [slotName, source] of Object.entries(projection.slots)) {
+      const sources = Array.isArray(source) ? source : [source]
+      for (const slot of sources) {
+        const value = resolveSlot(slot, rootEvent, object.fields)
+        const sourceLabel = 'tag' in slot ? `tag:${slot.tag}` : 'field' in slot ? 'content' : `fold:${slot.fold}`
+        // `meta` slots are legitimately optional — an issue with no ref is
+        // fine. Required slots are not.
+        const required = slotName === 'title' || slotName === 'status'
+        if (required) {
+          check(`kind:${kind} slot "${slotName}" (${sourceLabel}) resolves`, value !== undefined && value !== '', String(value))
+        } else {
+          console.log(`   kind:${kind} slot "${slotName}" (${sourceLabel}) → ${value ?? '(empty, optional)'}`)
+        }
+      }
+    }
+  }
+
+  // The whole reason `fold` exists as a slot source. If this passes with
+  // `{"tag":"status"}` instead, something has quietly regressed.
+  const issueProjection = manifest.projections[String(KIND.ISSUE)]
+  const statusSlot = issueProjection?.slots.status as SlotSource
+  check(
+    'the issue status slot reads from the fold, not a tag',
+    !!statusSlot && 'fold' in statusSlot,
+    JSON.stringify(statusSlot),
+  )
+  check(
+    'and it resolves to the folded value',
+    resolveSlot(statusSlot, raw.find((e) => e.kind === KIND.ISSUE)!, state.issues[0].fields) === 'in_progress',
+  )
+
+  // Every `map` must name a vocabulary that exists, or a consumer cannot render
+  // the value it was handed.
+  const vocabNames = new Set(Object.keys(manifest.vocabularies ?? {}))
+  const referenced = new Set<string>()
+  for (const projection of Object.values(manifest.projections)) {
+    for (const source of Object.values(projection.slots)) {
+      for (const slot of Array.isArray(source) ? source : [source]) {
+        if ('map' in slot && slot.map) referenced.add(slot.map)
+      }
+    }
+  }
+  check(
+    'every referenced vocabulary is declared',
+    [...referenced].every((name) => vocabNames.has(name)),
+    `${[...referenced].join(', ')} ⊆ ${[...vocabNames].join(', ')}`,
+  )
+
+  console.log(
+    failures === 0
+      ? `\nManifest published and satisfiable. Address: 31990:${identity.pubkey}:${MANIFEST_D_TAG}`
+      : `\n${failures} check(s) FAILED.`,
+  )
+  process.exit(failures === 0 ? 0 : 1)
+}
+
+main().catch((error) => {
+  console.error(error)
+  process.exit(1)
+})

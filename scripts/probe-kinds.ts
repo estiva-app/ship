@@ -92,13 +92,18 @@ async function main() {
         'a comment on an issue',
       ),
     ),
+    // `k` is deliberately a kind nobody handles. NIP-89 discovery is a `#k`
+    // query, so a probe claiming `k=30851` makes itself a competing handler for
+    // real issues — which happened, and briefly turned spec §7.3 ("which
+    // manifest wins?") from an open question into a live one. A probe should
+    // test that the kind is accepted without joining the registry.
     await probe(
       'kind:31990 NIP-89 handler info',
-      unsigned(31990, [['d', 'linear-lite-probe'], ['k', '30851']], '{"name":"probe"}'),
+      unsigned(31990, [['d', 'linear-lite-probe'], ['k', '65535']], '{"name":"probe"}'),
     ),
     await probe(
       'kind:31989 NIP-89 recommendation',
-      unsigned(31989, [['d', '30851'], ['a', `31990:${identity.pubkey}:linear-lite-probe`]]),
+      unsigned(31989, [['d', '65535'], ['a', `31990:${identity.pubkey}:linear-lite-probe`]]),
     ),
 
     // ── Linear-lite's own provisional kinds ──

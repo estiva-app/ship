@@ -8,7 +8,8 @@
     "serve": "node build.mjs && python3 -m http.server 5190 --directory dist",
     "typecheck": "tsc --noEmit",
     "probe": "tsx scripts/probe-kinds.ts",
-    "verify": "tsx scripts/verify.ts"
+    "verify": "tsx scripts/verify.ts",
+    "manifest": "tsx scripts/publish-manifest.ts"
   },
   "dependencies": {
     "@noble/curves": "1.9.2",
