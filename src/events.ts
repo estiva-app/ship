@@ -218,6 +218,33 @@ export function buildComment(
   }
 }
 
+/**
+ * A shareable Folder link: `folder:<uuid>`.
+ *
+ * Deliberately not a URL. A Folder is not owned by any one app, so a link
+ * pointing at `localhost:5190` would be a Linear-lite link to a shared
+ * container — exactly the framing the projection principle rejects. This says
+ * "the Folder with this id" and nothing about who renders it.
+ *
+ * Accepts a bare UUID too, because that is what someone who dug the id out of a
+ * database will paste, and refusing it would be pedantry.
+ */
+export const FOLDER_LINK_PREFIX = 'folder:'
+
+export function folderLink(folder: string): string {
+  assertFolderId(folder)
+  return `${FOLDER_LINK_PREFIX}${folder}`
+}
+
+/** Pull a Folder id out of a pasted link, bare UUID, or URL containing one. */
+export function parseFolderLink(input: string): string | null {
+  const match = input
+    .trim()
+    .toLowerCase()
+    .match(/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/)
+  return match ? match[0] : null
+}
+
 /** Address of a Project: `30850:<pubkey>:<d>`. */
 export function projectAddr(pubkey: string, projectId: string): string {
   return addr(KIND.PROJECT, pubkey, projectId)

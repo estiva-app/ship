@@ -11,6 +11,7 @@
 import { localIdentity, Relay } from '../../lib/nostr/relay'
 import { addrToNaddr } from '../../lib/nostr/nip19'
 import { ISSUE_STATUSES, lookupStatus, PROJECT_STATUSES } from '../../src/kinds'
+import { folderLink, parseFolderLink } from '../../src/events'
 import { nextRef, refPrefix, Store } from '../../src/store'
 import type { Change, FolderState, Issue } from '../../src/fold'
 
@@ -38,11 +39,16 @@ const el = {
   activity: $<HTMLDivElement>('activity'),
   newProject: $<HTMLFormElement>('new-project'),
   newIssue: $<HTMLFormElement>('new-issue'),
+  folderNote: $<HTMLDivElement>('folder-note'),
 }
 
 const short = (pubkey: string) => `${pubkey.slice(0, 8)}…`
 const isMe = (pubkey: string) => pubkey === identity.pubkey
 const who = (pubkey: string) => (isMe(pubkey) ? 'you' : short(pubkey))
+
+function note(message: string) {
+  el.folderNote.textContent = message
+}
 
 function say(message: string, kind: 'ok' | 'error' = 'ok') {
   el.banner.textContent = message
@@ -384,8 +390,21 @@ async function load() {
   }
 }
 
+/**
+ * Open a Folder.
+ *
+ * `create: true` makes a brand-new one. Pasting an existing id — typically a
+ * Peek topic's — **adopts** it instead: the container already exists, and
+ * re-creating it would fork one thing into two. That is the case RFC_UPDATES.md
+ * §1.1 actually describes: the Peek topic and the Linear project are the same
+ * Folder, projected differently.
+ */
 async function openFolder(id: string, { create = false } = {}) {
-  folder = id.trim().toLowerCase()
+  const parsed = parseFolderLink(id)
+  if (!parsed) {
+    return say('That does not look like a Folder link or a UUID.', 'error')
+  }
+  folder = parsed
   el.folder.value = folder
   localStorage.setItem(FOLDER_KEY, folder)
   selectedProject = null
@@ -395,7 +414,19 @@ async function openFolder(id: string, { create = false } = {}) {
     const ok = await publish('Folder create', () =>
       store.ensureFolder(folder, `linear-lite-${folder.slice(0, 8)}`),
     )
-    if (ok) say(`Folder ready — ${folder}`)
+    if (ok) {
+      say(`Folder ready — ${folder}`)
+      // Open, so other apps can actually see it — and open on this relay also
+      // means writable by anyone. Said out loud rather than left in a comment,
+      // because it is a real property of the container the user just made.
+      note('New Folder — open, so any app on this relay can read and write it. Paste an existing Folder link to use one with real membership instead.')
+    }
+  } else {
+    const adopted = await store.adoptFolder(folder)
+    if (!adopted.ok) {
+      say(`Cannot read that Folder — ${adopted.reason ?? 'unknown'}`, 'error')
+    }
+    note(`Paired with an existing Folder. Objects here carry the same h as everything else in it — one container, many projections.`)
   }
   // Publish this user's NIP-89 recommendation: "for kinds 30850/30851, I use
   // Linear-lite". Addressable, so this replaces rather than accumulating, and
@@ -409,13 +440,23 @@ el.whoami.textContent = `you: ${short(identity.pubkey)}`
 el.folder.value = folder
 
 $('open').onclick = () => {
-  // Opening an existing Folder still runs the create, because a Folder someone
-  // else made is one we are not a member of, and the relay would reject our
-  // writes with a membership error rather than an obvious one. A duplicate
-  // create is harmless; a missing one is a confusing failure ten steps later.
-  if (el.folder.value.trim()) void openFolder(el.folder.value, { create: true })
+  // Adopt rather than create: a pasted id is almost always somebody else's
+  // Folder, and creating over it would fork one container into two.
+  if (el.folder.value.trim()) void openFolder(el.folder.value)
 }
 $('new-folder').onclick = () => void openFolder(crypto.randomUUID(), { create: true })
+$('copy-folder').onclick = async () => {
+  if (!folder) return say('Open or create a Folder first.', 'error')
+  // A `folder:<uuid>` link, not a URL. A Folder belongs to no single app, so a
+  // link pointing at Linear-lite's own port would misdescribe what it is.
+  const link = folderLink(folder)
+  try {
+    await navigator.clipboard.writeText(link)
+    say('Folder link copied — paste it into another app.')
+  } catch {
+    window.prompt('Copy this Folder link:', link)
+  }
+}
 $('reload').onclick = () => void load()
 
 el.newProject.onsubmit = async (event) => {

@@ -126,6 +126,14 @@
       .feed { display: grid; gap: 10px; }
       .feed-item { border-left: 2px solid var(--line); padding-left: 10px; }
       .feed-item .when { font-size: 11px; color: var(--dim); }
+      #folder-note {
+        padding: 6px 18px;
+        font-size: 12px;
+        color: var(--dim);
+        border-bottom: 1px solid var(--line);
+        background: var(--panel);
+      }
+      #folder-note:empty { display: none; }
       #banner { padding: 8px 18px; font-size: 13px; display: none; }
       #banner.error { display: block; background: #3a1d24; color: #f2b8c1; }
       #banner.ok { display: block; background: #16302a; color: #9fe3c4; }
@@ -136,14 +144,16 @@
     <header>
       <h1>Linear-lite</h1>
       <label class="dim" for="folder">Folder</label>
-      <input id="folder" class="mono" size="38" placeholder="uuid-v4" />
+      <input id="folder" class="mono" size="40" placeholder="paste a Folder link, or uuid-v4" />
       <button id="open">Open</button>
       <button id="new-folder">New Folder</button>
+      <button id="copy-folder" title="Copy this Folder's link to share with another app">Copy Folder link</button>
       <span class="spacer"></span>
       <span class="dim mono" id="whoami"></span>
       <button id="reload">Reload</button>
     </header>
     <div id="banner"></div>
+    <div id="folder-note"></div>
     <main>
       <section>
         <h2>Projects</h2>

@@ -44,6 +44,20 @@ export class Store {
    * it first is cheap, and a duplicate create is reported as
    * `accepted:false, "duplicate: channel already exists"`, which `relay.ts`
    * already maps to success (FRICTION.md A2).
+   *
+   * **Open, not private.** A private Folder is invisible to every other app: a
+   * non-member's query returns zero rows rather than an error, so a Linear-lite
+   * issue in one silently fails to render anywhere else (FRICTION.md A7). Buzz
+   * treats `open` as accessible to everyone — `get_accessible_channel_ids`
+   * unions members with all open channels — which is what makes a Folder a
+   * *shared* container rather than this app's private storage. Peek creates its
+   * own topics open for the same reason.
+   *
+   * The trade-off is real and belongs in the UI rather than buried here: on this
+   * relay `open` also bypasses the write gate, so anyone on the relay can write
+   * into the Folder, not just read it. For a Folder that should be restricted,
+   * pair with an existing one (`adoptFolder`) whose membership already means
+   * something.
    */
   async ensureFolder(folder: string, name: string): Promise<PublishResult> {
     assertFolderId(folder)
@@ -51,11 +65,38 @@ export class Store {
       buildCreateChannel(this.identity.pubkey, Date.now(), {
         channelUuid: folder,
         name,
-        visibility: 'private',
+        visibility: 'open',
         channelType: 'forum',
         about: 'Linear-lite Folder',
       }),
     )
+  }
+
+  /**
+   * Open a Folder somebody else already created — typically a Peek topic.
+   *
+   * This is the case the RFC actually describes: "the Peek topic, the Linear
+   * project, the messages all carry the same `h`. One container, many
+   * projections" (RFC_UPDATES.md §1.1). Creating a *new* Folder for a project
+   * that already has a Peek topic produces two containers for one thing, and
+   * then nobody in the topic can see the issues.
+   *
+   * Deliberately does NOT publish a `kind:9007`. The channel exists; re-creating
+   * it would either be a no-op duplicate or, worse, hand ownership questions to
+   * whoever clicked last. Access is whatever the Folder's owner already decided,
+   * which is the point of pairing rather than forking.
+   */
+  async adoptFolder(folder: string): Promise<{ ok: boolean; reason?: string }> {
+    assertFolderId(folder)
+    // A read is the honest membership test: if this returns rows we can see the
+    // Folder, and if it throws or returns nothing we say so rather than
+    // discovering it three publishes later.
+    try {
+      await this.relay.query([{ kinds: [KIND.ISSUE], '#h': [folder], limit: 1 }])
+      return { ok: true }
+    } catch (error) {
+      return { ok: false, reason: (error as Error).message }
+    }
   }
 
   async createProject(args: {

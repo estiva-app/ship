@@ -36,8 +36,9 @@ async function main() {
   await store.ensureFolder(folder, `peek-demo-${folder.slice(0, 8)}`)
   await store.recommendHandler(RELAY_URL)
 
-  // Every Peek user with a key can end up being the reader (sync.ts picks the
-  // first), so all of them need membership or the widget is a coin flip.
+  // Optional now that Folders are open. Kept because an explicitly-membered
+  // Folder is the realistic shape for anything private, and this is the only
+  // place that demonstrates it.
   for (const pubkey of PEEK_READERS) {
     const r = await relay.publish(
       signEvent(
