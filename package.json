@@ -10,7 +10,8 @@
     "probe": "tsx scripts/probe-kinds.ts",
     "verify": "tsx scripts/verify.ts",
     "manifest": "tsx scripts/publish-manifest.ts",
-    "test:nip19": "tsx scripts/nip19.test.ts"
+    "test:nip19": "tsx scripts/nip19.test.ts",
+    "seed:peek": "tsx scripts/seed-for-peek.ts"
   },
   "dependencies": {
     "@noble/curves": "1.9.2",
