@@ -5,7 +5,7 @@
   "description": "A minimal issue tracker on Nostr — projects, issues, comments",
   "scripts": {
     "build": "node build.mjs",
-    "serve": "node build.mjs && python3 -m http.server 5190 --directory dist",
+    "serve": "node build.mjs && node scripts/serve.mjs",
     "typecheck": "tsc --noEmit",
     "probe": "tsx scripts/probe-kinds.ts",
     "verify": "tsx scripts/verify.ts",
