@@ -1,0 +1,141 @@
+/**
+ * Linear-lite's data layer: publish and read, over `lib/nostr/relay.ts`.
+ *
+ * There is no database here and no cache. Every read is a query against the
+ * relay and a fresh fold — which is slower than it could be and is the honest
+ * shape for the claim being made. If Linear-lite kept its own materialised copy
+ * of the state, "two apps agree on the data" would be measuring Linear-lite's
+ * cache rather than the shared record.
+ */
+import { signEvent } from '../lib/nostr/sign'
+import type { Identity, PublishResult, Relay } from '../lib/nostr/relay'
+import { buildCreateChannel, type SignedEvent, type UnsignedEvent } from '../lib/nostr/events'
+import { assertFolderId, buildChange, buildIssue, buildProject, issueAddr, projectAddr } from './events'
+import { foldFolder, type FolderState } from './fold'
+import { KIND } from './kinds'
+
+/** Kinds the reader pulls for a Folder. */
+const FOLDER_KINDS = [KIND.PROJECT, KIND.ISSUE, KIND.CHANGE]
+
+export class Store {
+  constructor(
+    private readonly relay: Relay,
+    readonly identity: Identity,
+  ) {}
+
+  private publish(unsigned: UnsignedEvent): Promise<PublishResult> {
+    return this.relay.publish(signEvent(unsigned, this.identity.secretKeyHex))
+  }
+
+  /**
+   * Make sure the Folder exists, and that we can write into it.
+   *
+   * FRICTION.md A4: ordering is enforced. Publishing into a channel the relay
+   * has never heard of comes back `restricted: not a channel member` — which
+   * reads as a permission problem and is actually a missing container. Creating
+   * it first is cheap, and a duplicate create is reported as
+   * `accepted:false, "duplicate: channel already exists"`, which `relay.ts`
+   * already maps to success (FRICTION.md A2).
+   */
+  async ensureFolder(folder: string, name: string): Promise<PublishResult> {
+    assertFolderId(folder)
+    return this.publish(
+      buildCreateChannel(this.identity.pubkey, Date.now(), {
+        channelUuid: folder,
+        name,
+        visibility: 'private',
+        channelType: 'forum',
+        about: 'Linear-lite Folder',
+      }),
+    )
+  }
+
+  async createProject(args: {
+    folder: string
+    title: string
+    description?: string
+    lead?: string
+  }): Promise<{ result: PublishResult; addr: string; id: string }> {
+    const id = crypto.randomUUID()
+    const result = await this.publish(
+      buildProject(this.identity.pubkey, Date.now(), { projectId: id, ...args }),
+    )
+    return { result, addr: projectAddr(this.identity.pubkey, id), id }
+  }
+
+  async createIssue(args: {
+    folder: string
+    title: string
+    description?: string
+    projectAddr?: string
+    ref?: string
+  }): Promise<{ result: PublishResult; addr: string; id: string }> {
+    const id = crypto.randomUUID()
+    const result = await this.publish(
+      buildIssue(this.identity.pubkey, Date.now(), { issueId: id, ...args }),
+    )
+    return { result, addr: issueAddr(this.identity.pubkey, id), id }
+  }
+
+  /**
+   * Set one field on one object.
+   *
+   * Deliberately takes an *address*, not an object we loaded — the caller may
+   * be acting on something another app created, and this path must not care.
+   */
+  setField(args: {
+    folder: string
+    target: string
+    field: string
+    value: string
+    note?: string
+  }): Promise<PublishResult> {
+    return this.publish(buildChange(this.identity.pubkey, Date.now(), args))
+  }
+
+  /**
+   * Read a Folder's whole state.
+   *
+   * One query, three kinds, filtered by `#h`. `POST /query` takes a **bare
+   * array** of filters — a single filter object gets
+   * `invalid type: map, expected a sequence` (FRICTION.md A5).
+   *
+   * `limit` is generous rather than paged: the fold needs the *complete* change
+   * stream to be correct, and a truncated stream would silently produce a stale
+   * status rather than an error. Paging this properly means folding
+   * incrementally, which the MVP does not need.
+   */
+  async loadFolder(folder: string, limit = 2000): Promise<FolderState> {
+    assertFolderId(folder)
+    const events = await this.relay.query([{ kinds: FOLDER_KINDS, '#h': [folder], limit }])
+    return foldFolder(events)
+  }
+
+  /** Raw events for a Folder — for debugging and for the verification script. */
+  async rawFolder(folder: string, limit = 2000): Promise<SignedEvent[]> {
+    assertFolderId(folder)
+    return this.relay.query([{ kinds: FOLDER_KINDS, '#h': [folder], limit }])
+  }
+}
+
+/**
+ * Next display key for a project, e.g. `LL-7`.
+ *
+ * Display-only, per the spec: never used for addressing, never authoritative.
+ * It is derived from what we can currently see, so two people creating an issue
+ * at the same moment can produce the same key. That is a cosmetic collision and
+ * fixing it would need a counter nobody owns — the address is the identity.
+ */
+export function nextRef(prefix: string, existingRefs: (string | undefined)[]): string {
+  const used = existingRefs
+    .filter((ref): ref is string => !!ref && ref.startsWith(`${prefix}-`))
+    .map((ref) => Number.parseInt(ref.slice(prefix.length + 1), 10))
+    .filter((n) => Number.isFinite(n))
+  return `${prefix}-${used.length ? Math.max(...used) + 1 : 1}`
+}
+
+/** A short, stable prefix from a project title: "Payment integration" → "PAY". */
+export function refPrefix(title: string): string {
+  const letters = title.toUpperCase().replace(/[^A-Z]/g, '')
+  return letters.slice(0, 3) || 'LL'
+}

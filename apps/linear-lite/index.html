@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Linear-lite</title>
+    <style>
+      :root {
+        --bg: #0e0f13;
+        --panel: #16181f;
+        --panel-2: #1c1f28;
+        --line: #272b36;
+        --text: #e6e8ee;
+        --dim: #8b91a1;
+        --accent: #6c8cff;
+        --neutral: #8b91a1;
+        --blue: #6c8cff;
+        --green: #46c08a;
+        --muted: #5b6070;
+        --danger: #e5697a;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        padding: 12px 18px;
+        border-bottom: 1px solid var(--line);
+        background: var(--panel);
+      }
+      header h1 { font-size: 15px; margin: 0 12px 0 0; letter-spacing: 0.2px; }
+      header .spacer { flex: 1; }
+      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+      .dim { color: var(--dim); }
+      input, select, button, textarea {
+        font: inherit;
+        color: var(--text);
+        background: var(--panel-2);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 6px 9px;
+      }
+      input:focus, select:focus, textarea:focus { outline: 1px solid var(--accent); }
+      button { cursor: pointer; }
+      button:hover:not(:disabled) { border-color: var(--accent); }
+      button:disabled { opacity: 0.5; cursor: default; }
+      button.primary { background: var(--accent); border-color: var(--accent); color: #0b0d12; font-weight: 600; }
+      main {
+        display: grid;
+        grid-template-columns: 300px minmax(0, 1fr) 340px;
+        gap: 1px;
+        background: var(--line);
+        min-height: calc(100vh - 53px);
+      }
+      section { background: var(--bg); padding: 16px; min-width: 0; }
+      section > h2 {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.9px;
+        color: var(--dim);
+        margin: 0 0 12px;
+        font-weight: 600;
+      }
+      form { display: grid; gap: 8px; margin-bottom: 18px; }
+      form input, form textarea { width: 100%; }
+      textarea { resize: vertical; min-height: 52px; }
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 10px 12px;
+        margin-bottom: 8px;
+        cursor: pointer;
+      }
+      .card.selected { border-color: var(--accent); }
+      .card h3 { margin: 0 0 4px; font-size: 14px; font-weight: 600; }
+      .row {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 10px 12px;
+        margin-bottom: 8px;
+      }
+      .row .grow { flex: 1; min-width: 0; }
+      .row h3 { margin: 0; font-size: 14px; font-weight: 600; }
+      .meta { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 12px;
+        color: var(--dim);
+      }
+      .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+      .status-neutral { color: var(--neutral); }
+      .status-blue { color: var(--blue); }
+      .status-green { color: var(--green); }
+      .status-muted { color: var(--muted); }
+      .empty { color: var(--dim); font-style: italic; padding: 6px 0; }
+      .feed { display: grid; gap: 10px; }
+      .feed-item { border-left: 2px solid var(--line); padding-left: 10px; }
+      .feed-item .when { font-size: 11px; color: var(--dim); }
+      #banner { padding: 8px 18px; font-size: 13px; display: none; }
+      #banner.error { display: block; background: #3a1d24; color: #f2b8c1; }
+      #banner.ok { display: block; background: #16302a; color: #9fe3c4; }
+      @media (max-width: 1000px) { main { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Linear-lite</h1>
+      <label class="dim" for="folder">Folder</label>
+      <input id="folder" class="mono" size="38" placeholder="uuid-v4" />
+      <button id="open">Open</button>
+      <button id="new-folder">New Folder</button>
+      <span class="spacer"></span>
+      <span class="dim mono" id="whoami"></span>
+      <button id="reload">Reload</button>
+    </header>
+    <div id="banner"></div>
+    <main>
+      <section>
+        <h2>Projects</h2>
+        <form id="new-project">
+          <input name="title" placeholder="New project title" required />
+          <textarea name="description" placeholder="Description (optional)"></textarea>
+          <button class="primary" type="submit">Create project</button>
+        </form>
+        <div id="projects"></div>
+      </section>
+      <section>
+        <h2 id="issues-heading">Issues</h2>
+        <form id="new-issue">
+          <input name="title" placeholder="New issue title" required />
+          <textarea name="description" placeholder="Description (optional)"></textarea>
+          <button class="primary" type="submit">Create issue</button>
+        </form>
+        <div id="issues"></div>
+      </section>
+      <section>
+        <h2>Activity</h2>
+        <div id="activity" class="feed"></div>
+      </section>
+    </main>
+    <script type="module" src="./bundle.js"></script>
+  </body>
+</html>

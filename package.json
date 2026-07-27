@@ -5,13 +5,17 @@
   "description": "A minimal issue tracker on Nostr — projects, issues, comments",
   "scripts": {
     "build": "node build.mjs",
-    "serve": "node build.mjs && python3 -m http.server 5190 --directory dist"
+    "serve": "node build.mjs && python3 -m http.server 5190 --directory dist",
+    "typecheck": "tsc --noEmit",
+    "probe": "tsx scripts/probe-kinds.ts",
+    "verify": "tsx scripts/verify.ts"
   },
   "dependencies": {
     "@noble/curves": "1.9.2",
     "@noble/hashes": "1.8.0"
   },
   "devDependencies": {
+    "@types/node": "^24.13.3",
     "esbuild": "^0.25.0",
     "tsx": "^4.19.0",
     "typescript": "~5.9.3"
