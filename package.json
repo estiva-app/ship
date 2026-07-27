@@ -1,0 +1,19 @@
+{
+  "name": "linear-lite",
+  "private": true,
+  "type": "module",
+  "description": "A minimal issue tracker on Nostr — projects, issues, comments",
+  "scripts": {
+    "build": "node build.mjs",
+    "serve": "node build.mjs && python3 -m http.server 5190 --directory dist"
+  },
+  "dependencies": {
+    "@noble/curves": "1.9.2",
+    "@noble/hashes": "1.8.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "tsx": "^4.19.0",
+    "typescript": "~5.9.3"
+  }
+}
