@@ -226,49 +226,128 @@ function foldChanges(changes: Change[]): Map<string, FoldedFields> {
   return byTarget
 }
 
-/** A NIP-22 comment on an Issue or Project. */
-export interface Comment {
+/** One message: either a conversation root, or a reply inside one. */
+export interface Message {
   id: string
   author: string
   createdAt: number
   /** Epoch ms from the `ts` tag, when present and consistent with `created_at`. */
   ts?: number
-  /** Address of the object commented on, from the lowercase `a` (parent) tag. */
-  target: string
   body: string
+  /** The Folder it was posted in — needed to reply into the same container. */
+  folder: string
+  /** Thread root event id. Undefined on a root message. */
+  rootId?: string
+  /** Direct parent event id. Equals `rootId` for a direct reply. */
+  parentId?: string
+  /** Object addresses this message is about — `a` tags plus naddrs in the body. */
+  about: string[]
 }
 
 /**
- * Parse a kind:1111 into a Comment.
+ * A conversation: a root message and its replies, oldest first.
  *
- * Reads the **lowercase** `a` — the immediate parent — because that is what a
- * comment is attached to. The uppercase `A` names the thread root, which for a
- * top-level comment is the same object but for a reply is not.
+ * The same shape Peek shows in a topic, because it is the same events. Peek
+ * calls the root a "message" and the rest "replies"; the wire format is
+ * identical and so is this.
  */
-export function parseComment(event: SignedEvent): Comment | null {
-  if (event.kind !== KIND.COMMENT) return null
-  const target = tag(event, 'a') ?? tag(event, 'A')
-  if (!target) return null
+export interface Conversation {
+  /** Event id of the root message, which is what replies point at. */
+  id: string
+  root: Message
+  /** Replies, oldest first. */
+  replies: Message[]
+  /**
+   * Every object anyone in the thread referenced.
+   *
+   * Thread-wide on purpose: a discussion that mentions an issue halfway through
+   * is, from then on, about that issue, and the earlier messages are the
+   * context somebody needs. Attaching only the message that carried the
+   * reference would show the answer without the question.
+   */
+  about: string[]
+  createdAt: number
+  /** Newest message in the thread — what a list should sort on. */
+  lastAt: number
+}
+
+/**
+ * Parse a kind:9 into a Message.
+ *
+ * Thread tags are Buzz's own: no `e` is a root; `['e', id, '', 'reply']` alone
+ * is a direct reply; a `root`/`reply` pair is a reply to a reply. Markers are
+ * honoured when present and positions used when they are not, because a message
+ * written by a client that omits markers still has to thread.
+ */
+export function parseMessage(event: SignedEvent, resolveRefs: (body: string) => string[]): Message | null {
+  if (event.kind !== KIND.MESSAGE) return null
+  const es = event.tags.filter((t) => t[0] === 'e')
+  const marked = (name: string) => es.find((t) => t[3] === name)?.[1]
+  const rootId = marked('root') ?? (es.length > 1 ? es[0]?.[1] : undefined) ?? marked('reply') ?? es[0]?.[1]
+  const parentId = marked('reply') ?? es[es.length - 1]?.[1] ?? rootId
+
   const rawTs = Number.parseInt(tag(event, 'ts') ?? '', 10)
   return {
     id: event.id,
     author: event.pubkey,
     createdAt: event.created_at,
     ts: Number.isFinite(rawTs) ? rawTs : undefined,
-    target,
     body: event.content,
+    folder: tag(event, 'h') ?? '',
+    rootId,
+    parentId,
+    // Both routes to "what is this about": an explicit `a` tag, and a
+    // `nostr:naddr…` typed into the body by a person in Peek.
+    about: [...new Set([...tags(event, 'a'), ...resolveRefs(event.content)])],
   }
 }
 
+/** Group messages into conversations. */
+function foldConversations(messages: Message[]): Conversation[] {
+  const threads = new Map<string, Message[]>()
+  for (const message of messages) {
+    const key = message.rootId ?? message.id
+    threads.set(key, [...(threads.get(key) ?? []), message])
+  }
+
+  const conversations: Conversation[] = []
+  for (const [id, group] of threads) {
+    group.sort(byOrder)
+    // The root is the message whose id is the thread key. It can be absent —
+    // truncated history, or a reply that arrived before its parent — and a
+    // thread with no visible root is still worth showing, so the earliest
+    // message stands in rather than the whole conversation disappearing.
+    const root = group.find((message) => message.id === id) ?? group[0]
+    const replies = group.filter((message) => message !== root)
+    conversations.push({
+      id,
+      root,
+      replies,
+      about: [...new Set(group.flatMap((message) => message.about))],
+      createdAt: root.createdAt,
+      lastAt: group[group.length - 1].createdAt,
+    })
+  }
+  conversations.sort((a, b) => b.lastAt - a.lastAt)
+  return conversations
+}
+
+/** Conversations that concern a particular object. */
+export function conversationsAbout(
+  conversations: Conversation[],
+  address: string,
+): Conversation[] {
+  return conversations.filter((conversation) => conversation.about.includes(address))
+}
+
 /**
- * Every content Folder a project has ever pointed at, oldest first.
+ * Every Folder a project has ever pointed at, oldest first.
  *
  * Not just the current one. Re-linking a project to a different Folder — say,
  * to the Peek topic it should have been paired with from the start — does not
  * move the issues already filed under the old `h`; nothing can, because an
- * event is immutable and its author may be long gone. Reading the union is the
- * difference between "the issues are still there" and "the issues vanished when
- * we linked the topic".
+ * event is immutable. Reading the union is the difference between "the issues
+ * are still there" and "the issues vanished when we linked the topic".
  *
  * Takes the change stream rather than querying, so it stays pure and the caller
  * decides how much history it has.
@@ -278,9 +357,6 @@ export function projectFolders(project: Project, activity: Change[]): string[] {
   const add = (value?: string) => {
     if (value && !seen.includes(value)) seen.push(value)
   }
-  // Where the record was written first, then each re-link in the order it
-  // happened, then the folded winner — which is usually the last change but is
-  // not guaranteed to be, since `activity` may be truncated.
   add(project.originFolder)
   for (const change of activity) {
     if (change.target === project.addr && change.field === 'folder') add(change.value)
@@ -295,8 +371,8 @@ export interface FolderState {
   issues: Issue[]
   /** Every change, oldest first. This is the activity feed. */
   activity: Change[]
-  /** Comments, oldest first, keyed by the address they are attached to. */
-  comments: Map<string, Comment[]>
+  /** Conversations in these Folders, most recently active first. */
+  conversations: Conversation[]
 }
 
 /**
@@ -306,7 +382,17 @@ export interface FolderState {
  * than issuing a query per object — one round trip, and the change stream has
  * to be read in full anyway to fold it.
  */
-export function foldFolder(events: SignedEvent[]): FolderState {
+export function foldFolder(
+  events: SignedEvent[],
+  /**
+   * How to turn `nostr:naddr…` in a message body into addresses.
+   *
+   * Injected rather than imported so this module stays free of bech32 and
+   * remains a pure fold over already-fetched events. `store.ts` supplies the
+   * real decoder; a caller that does not care can omit it.
+   */
+  resolveRefs: (body: string) => string[] = () => [],
+): FolderState {
   const changes: Change[] = []
   for (const event of events) {
     const change = parseChange(event)
@@ -369,22 +455,16 @@ export function foldFolder(events: SignedEvent[]): FolderState {
     })
   }
 
-  const comments = new Map<string, Comment[]>()
+  const messages: Message[] = []
   for (const event of events) {
-    const comment = parseComment(event)
-    if (!comment) continue
-    const thread = comments.get(comment.target) ?? []
-    thread.push(comment)
-    comments.set(comment.target, thread)
+    const message = parseMessage(event, resolveRefs)
+    if (message) messages.push(message)
   }
-  // Oldest first — a comment thread reads top-down, unlike the activity feed.
-  // Same total order as the change fold: two comments in one second are the
-  // normal case, not a race.
-  for (const thread of comments.values()) thread.sort(byOrder)
+  const conversations = foldConversations(messages)
 
   const byNewest = (a: { createdAt: number }, b: { createdAt: number }) => b.createdAt - a.createdAt
   projects.sort(byNewest)
   issues.sort(byNewest)
 
-  return { projects, issues, activity: changes, comments }
+  return { projects, issues, activity: changes, conversations }
 }

@@ -8,7 +8,15 @@
  * Tag order is fixed per builder and matches LINEAR_LITE_SPEC.md §1. It is part
  * of the NIP-01 id preimage, so reordering a tag changes the event id.
  */
-import { addr, toNostrSeconds, type NostrTag, type UnsignedEvent } from '../lib/nostr/events'
+import {
+  addr,
+  buildMessage,
+  threadTags,
+  toNostrSeconds,
+  type NostrTag,
+  type ThreadRef,
+  type UnsignedEvent,
+} from '../lib/nostr/events'
 import { KIND } from './kinds'
 
 /**
@@ -188,61 +196,59 @@ export function buildChange(
 }
 
 /**
- * kind:1111 NIP-22 comment, scoped to an addressable Linear-lite object.
+ * kind:9 conversation message — the same kind Peek writes for a topic message.
  *
- * The tag shape is the part worth getting right, because NIP-22 splits case:
+ * This is the whole of "better commenting", and it needed no new protocol. A
+ * project *is* a Folder, and a Peek topic *is* that Folder, so a conversation
+ * on the project and a conversation in the topic are one event read twice
+ * rather than two records to reconcile. Peek's sync already imports a foreign
+ * pubkey's `kind:9` as a message, and one carrying an `e` tag as a reply into
+ * the right thread — so writing this shape makes Linear-lite's conversations
+ * appear in Peek with no change on Peek's side at all.
  *
- *   UPPERCASE (`A`/`E`/`I`, `K`, `P`) — the **root** of the thread
- *   lowercase (`a`/`e`/`i`, `k`, `p`) — the **immediate parent**
+ * Threading is Buzz's own: no `e` tag is a root message and starts a
+ * conversation; `['e', root, '', 'reply']` is a direct reply; a root/reply pair
+ * is a reply to a reply. `threadTags` is the byte-verified builder.
  *
- * For a top-level comment both point at the same object, which looks redundant
- * and is not: it is what lets a reply to *this comment* keep pointing at the
- * issue as its root while pointing at the comment as its parent. A client that
- * emits only one case produces threads other clients read differently.
+ * `about` names the object the conversation concerns, and is what puts a thread
+ * under an issue rather than only on the project. Two ways in, because two apps
+ * write these:
  *
- * `K`/`k` carry the *kind* of the root and parent, so a consumer can tell it is
- * looking at a comment on a `30851` without fetching the target first — which
- * is what makes cross-app comment rendering possible at all.
+ *  - an `a` tag, which Linear-lite and Peek's widget set explicitly;
+ *  - a `nostr:naddr…` in the body, which is what a person typing in Peek does.
  *
- * Scoping to an **addressable** event rather than an event id is the reason
- * NIP-22 is used here instead of a NIP-10 reply: an issue's root event can be
- * replaced by its author, and a comment must survive that.
+ * The naddr is appended to the body when Linear-lite starts a conversation
+ * about an issue, so Peek renders the issue widget above the message instead of
+ * showing a bare comment with no indication of what it refers to.
  */
-export function buildComment(
+export function buildConversationMessage(
   pubkey: string,
   createdAtMs: number,
   args: {
-    /** Address of the object being commented on, `<kind>:<pubkey>:<d>`. */
-    target: string
-    body: string
     folder: string
+    body: string
+    /** Omit to start a conversation; pass to reply into an existing one. */
+    replyTo?: ThreadRef
+    /** Address of the Issue or Project this conversation is about. */
+    about?: string
   },
 ): UnsignedEvent {
   assertFolderId(args.folder)
-  const [targetKind, targetAuthor] = args.target.split(':')
-  return {
-    pubkey,
-    created_at: toNostrSeconds(createdAtMs),
-    kind: KIND.COMMENT,
-    tags: [
-      // Root: the issue or project.
-      ['A', args.target],
-      ['K', targetKind],
-      ['P', targetAuthor],
-      // Parent: the same object, for a top-level comment.
-      ['a', args.target],
-      ['k', targetKind],
-      ['p', targetAuthor],
-      ['h', args.folder],
-      // Same `ts` as a change event, for the same reason and found the same
-      // way: two comments posted in one second sorted by event id, so the
-      // thread read back in the wrong order. The one-second resolution of
-      // `created_at` is not a change-event problem, it is a property of every
-      // append-only stream on this relay (FRICTION.md A6).
-      ['ts', String(Math.floor(createdAtMs))],
-    ],
+  const event = buildMessage(pubkey, createdAtMs, {
+    channelUuid: args.folder,
     content: args.body,
-  }
+  })
+  const tags: NostrTag[] = [...event.tags]
+  if (args.replyTo) tags.push(...threadTags(args.replyTo))
+  if (args.about) tags.push(['a', args.about])
+  // Same `ts` as a change event, for the same reason and found the same way:
+  // `created_at` is seconds, two messages posted in one second sorted by event
+  // id, and the thread read back in the wrong order. A conversation is the one
+  // place where wrong order is not a subtle bug — it is an unreadable exchange
+  // (FRICTION.md A6). An app that does not know `ts` ignores it and still
+  // threads, just at one-second resolution.
+  tags.push(['ts', String(Math.floor(createdAtMs))])
+  return { ...event, tags }
 }
 
 /**

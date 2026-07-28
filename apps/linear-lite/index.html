@@ -202,13 +202,22 @@
       .kanban-card:hover { border-color: var(--accent); }
       .kanban-card.dragging { opacity: 0.4; }
 
-      .thread { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); padding: 10px 12px; }
-      .comment { padding: 7px 0; border-bottom: 1px solid var(--line); }
-      .comment:last-of-type { border-bottom: none; }
-      .comment .byline { font-size: 11px; color: var(--dim); margin-bottom: 2px; }
-      .comment-body { white-space: pre-wrap; }
-      .comment-form { display: flex; gap: 8px; margin-top: 10px; }
-      .comment-form input { flex: 1; }
+      .conversations { display: grid; gap: 10px; }
+      .composer { display: flex; gap: 8px; margin: 0 0 4px; }
+      .composer input { flex: 1; }
+      .conversation {
+        border: 1px solid var(--line); border-radius: 8px;
+        background: var(--panel); padding: 10px 12px;
+      }
+      .message { padding: 5px 0; }
+      .byline { font-size: 11px; color: var(--dim); margin-bottom: 2px; }
+      .message-body { white-space: pre-wrap; }
+      /* Replies indent under the message that started the thread, the same way
+         Peek shows them — the nesting is the only thing distinguishing a
+         conversation from a list of comments. */
+      .message.reply { margin-left: 14px; padding-left: 10px; border-left: 2px solid var(--line); }
+      .reply-form { display: flex; gap: 8px; margin: 8px 0 0 14px; }
+      .reply-form input { flex: 1; font-size: 13px; }
 
       .feed { display: grid; gap: 9px; }
       .feed-item { border-left: 2px solid var(--line); padding-left: 10px; font-size: 13px; }

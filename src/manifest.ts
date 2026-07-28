@@ -159,11 +159,20 @@ export function manifestContent(): ManifestContent {
       {
         id: 'comment',
         label: 'Comment',
-        // NIP-22, so this needs no Linear-lite-specific kind at all. Declared
-        // anyway: a consumer should not have to guess that comments are
-        // welcome, or which kind carries them.
+        /**
+         * Emits `kind:9` — Peek's own topic message — not a Linear-lite kind.
+         *
+         * A project is a Folder and a Peek topic is that Folder, so a comment
+         * on one of these objects is a conversation in the container. Declaring
+         * kind:9 means a consumer's comment starts a real conversation that
+         * both apps show, rather than a NIP-22 note only this app renders.
+         *
+         * `scope: 'address'` still makes the consumer put an `a` tag on it,
+         * which is what attaches the thread to *this* object rather than to the
+         * project at large.
+         */
         appliesTo: [String(KIND.PROJECT), String(KIND.ISSUE)],
-        emits: { kind: KIND.COMMENT, scope: 'address' },
+        emits: { kind: KIND.MESSAGE, scope: 'address' },
         input: { type: 'string' },
       },
       {

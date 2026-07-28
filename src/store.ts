@@ -9,17 +9,24 @@
  */
 import { signEvent } from '../lib/nostr/sign'
 import type { Identity, PublishResult, Relay } from '../lib/nostr/relay'
-import { buildCreateChannel, type SignedEvent, type UnsignedEvent } from '../lib/nostr/events'
+import {
+  buildCreateChannel,
+  buildProfile,
+  type SignedEvent,
+  type ThreadRef,
+  type UnsignedEvent,
+} from '../lib/nostr/events'
 import {
   assertFolderId,
   buildChange,
-  buildComment,
+  buildConversationMessage,
   buildDeletion,
   buildIssue,
   buildProject,
   issueAddr,
   projectAddr,
 } from './events'
+import { findNaddrs, naddrToAddr } from '../lib/nostr/nip19'
 import { foldFolder, projectFolders, type FolderState } from './fold'
 import { KIND } from './kinds'
 import { buildRecommendation } from './manifest'
@@ -28,11 +35,31 @@ import { MANIFEST_ADDRESS } from './manifest-address'
 /**
  * Kinds the reader pulls for a Folder.
  *
- * Comments are included: they live in the Folder like everything else, and
- * pulling them in the same round trip is what makes the comment count on an
- * issue row free rather than a query per issue.
+ * `kind:9` is Peek's topic message, and it is here because a project is that
+ * Folder — the topic's conversations *are* the project's, read in one round
+ * trip alongside everything else.
  */
-const FOLDER_KINDS = [KIND.PROJECT, KIND.ISSUE, KIND.CHANGE, KIND.COMMENT]
+const FOLDER_KINDS = [KIND.PROJECT, KIND.ISSUE, KIND.CHANGE, KIND.MESSAGE]
+
+/**
+ * Turn `nostr:naddr…` in a message body into addresses.
+ *
+ * This is what makes a Peek conversation land under the issue it mentions: a
+ * person typing in Peek writes a reference, not an `a` tag, and that reference
+ * is the only thing saying what the thread is about. Undecodable pointers are
+ * dropped rather than thrown — a message is free text and may contain anything.
+ */
+function referencedAddresses(body: string): string[] {
+  const out: string[] = []
+  for (const naddr of findNaddrs(body)) {
+    try {
+      out.push(naddrToAddr(naddr))
+    } catch {
+      // Not a pointer we can read. Nothing to attach it to.
+    }
+  }
+  return out
+}
 
 export class Store {
   constructor(
@@ -242,14 +269,51 @@ export class Store {
   }
 
   /**
-   * Comment on an Issue or Project.
+   * Start a conversation, or reply in one.
    *
-   * NIP-22, so this needs no Linear-lite kind at all — which is the whole
-   * reason to use it. Peek can read and write the same comments without either
-   * app owning the format.
+   * A `kind:9` in the Folder — the same kind and shape Peek writes for a topic
+   * message. That is the entire integration: Peek's sync imports a foreign
+   * pubkey's root message as a conversation and one carrying an `e` tag as a
+   * reply, so anything posted here appears there without Peek changing.
+   *
+   * `about` names the Issue or Project the conversation concerns. When it is an
+   * issue, its `nostr:naddr` is appended to the body as well — Peek renders that
+   * as the issue's widget above the message, so a comment arriving in the topic
+   * says what it is about instead of being a bare line of text.
    */
-  comment(args: { folder: string; target: string; body: string }): Promise<PublishResult> {
-    return this.publish(buildComment(this.identity.pubkey, Date.now(), args))
+  postMessage(args: {
+    folder: string
+    body: string
+    replyTo?: ThreadRef
+    about?: string
+    /** Reference to append so other apps can see what this is about. */
+    aboutRef?: string
+  }): Promise<PublishResult> {
+    const body = args.aboutRef ? `${args.body}\n\n${args.aboutRef}` : args.body
+    return this.publish(
+      buildConversationMessage(this.identity.pubkey, Date.now(), {
+        folder: args.folder,
+        body,
+        replyTo: args.replyTo,
+        about: args.about,
+      }),
+    )
+  }
+
+  /**
+   * Publish this identity's profile.
+   *
+   * Peek looks up `kind:0` for every author it has not seen (`sync.ts`), so
+   * without one a conversation started here shows up in the topic as 64 hex
+   * characters. Idempotent — kind:0 is replaceable.
+   */
+  publishProfile(name: string, about?: string): Promise<PublishResult> {
+    return this.publish(
+      buildProfile(this.identity.pubkey, Date.now(), {
+        name,
+        about: about ?? 'Posting from Linear-lite',
+      }),
+    )
   }
 
   /**
@@ -304,7 +368,7 @@ export class Store {
    * incrementally, which the MVP does not need.
    */
   async loadFolder(folder: string, limit = 2000): Promise<FolderState> {
-    return foldFolder(await this.rawFolders([folder], limit))
+    return foldFolder(await this.rawFolders([folder], limit), referencedAddresses)
   }
 
   /**
@@ -315,7 +379,7 @@ export class Store {
    * doing that serially would make the issue list N round trips deep.
    */
   async loadFolders(folders: string[], limit = 2000): Promise<FolderState> {
-    return foldFolder(await this.rawFolders(folders, limit))
+    return foldFolder(await this.rawFolders(folders, limit), referencedAddresses)
   }
 
   /**
@@ -358,7 +422,7 @@ export class Store {
      * rather than an unbounded fan-out.
      */
     for (let pass = 0; pass < 4; pass++) {
-      const state = foldFolder(events)
+      const state = foldFolder(events, referencedAddresses)
       const wanted = new Set<string>()
       for (const project of state.projects) {
         for (const folder of projectFolders(project, state.activity)) {
@@ -370,7 +434,7 @@ export class Store {
       events = [...events, ...(await this.rawFolders([...wanted], limit))]
     }
 
-    return foldFolder(events)
+    return foldFolder(events, referencedAddresses)
   }
 
   /**

@@ -6,7 +6,7 @@
  * because on a shared relay the titles are written by other people.
  */
 import { ISSUE_STATUSES, lookupStatus, type VocabEntry } from '../../src/kinds'
-import type { Comment, Issue, Project } from '../../src/fold'
+import type { Conversation, Issue, Project } from '../../src/fold'
 
 /** Element factory: `h('div', {class: 'row'}, child, 'text')`. */
 export function h<K extends keyof HTMLElementTagNameMap>(
@@ -94,7 +94,7 @@ export function vocabSelect(args: {
 export function participants(args: {
   projects: Project[]
   issues: Issue[]
-  comments: Map<string, Comment[]>
+  conversations: Conversation[]
   changes: { author: string; field: string; value: string }[]
 }): string[] {
   const seen = new Set<string>()
@@ -106,7 +106,10 @@ export function participants(args: {
     seen.add(issue.author)
     if (issue.assignee) seen.add(issue.assignee)
   }
-  for (const thread of args.comments.values()) for (const c of thread) seen.add(c.author)
+  for (const conversation of args.conversations) {
+    seen.add(conversation.root.author)
+    for (const reply of conversation.replies) seen.add(reply.author)
+  }
   for (const change of args.changes) {
     seen.add(change.author)
     // An assignee that has since been changed away from is still a person who

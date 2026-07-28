@@ -92,6 +92,44 @@ Two consequences worth knowing:
 - **An issue cannot exist without a project**, because the only Folders in this
   app are projects and every event needs an `h`.
 
+## Conversations
+
+Linear-lite does not have its own comment kind. A conversation is a **`kind:9`**
+— the same NIP-29 stream message Peek writes for a topic message — posted into
+the project's Folder.
+
+That is the whole integration, and it needed no new protocol. A project is a
+Folder and a Peek topic is that Folder, so a conversation on the project and a
+conversation in the topic are *one event read twice*, not two records to
+reconcile. Peek's sync already imports a foreign pubkey's root message as a
+conversation and one carrying an `e` tag as a reply, so a thread started here
+appears there with no change on Peek's side.
+
+| | |
+| --- | --- |
+| No `e` tag | a root message — starts a conversation |
+| `['e', root, '', 'reply']` | a reply in that conversation |
+| `a` tag | the Issue or Project the thread is about |
+| `nostr:naddr…` in the body | the same thing, as a person types it in Peek |
+
+**A thread belongs to whatever anyone in it referenced, at any point.** A
+discussion that mentions an issue halfway through is, from then on, about that
+issue — and the earlier messages are the context somebody needs, so the whole
+thread attaches, not just the message carrying the reference.
+
+Threads appear in **both** places: on the project *and* under the issue they
+mention. Duplicated on purpose — hiding a thread from the project because it
+mentions an issue only makes people wonder where it went.
+
+Linear-lite appends the issue's `nostr:naddr` when you start a thread about one,
+so Peek renders the issue's widget above the message rather than showing a bare
+line with nothing saying what it refers to. The reference is stripped when
+displayed here.
+
+Messages carry `ts` for the same reason change events do: `created_at` is
+seconds, and two messages in one second read back in the wrong order. In a
+conversation that is not a subtle bug, it is an unreadable exchange.
+
 ## Archiving vs deleting
 
 Two operations with genuinely different reach, which is why they are not two

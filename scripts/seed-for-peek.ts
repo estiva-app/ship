@@ -70,8 +70,8 @@ async function main() {
   await store.setField({ folder, target: issue.addr, field: 'status', value: 'in_progress' })
   await store.setField({ folder, target: issue.addr, field: 'assignee', value: identity.pubkey })
   await store.setField({ folder, target: issue.addr, field: 'status', value: 'done' })
-  await store.comment({ folder, target: issue.addr, body: 'Blocked on the Stripe key.' })
-  await store.comment({ folder, target: issue.addr, body: 'Key is in 1Password now.' })
+  await store.publishProfile('Linear-lite demo')
+  await store.postMessage({ folder, about: issue.addr, body: 'Blocked on the Stripe key.' })
 
   console.log(`\nfolder  ${folder}   (the project IS this Folder — pair a Peek topic with it)`)
   console.log(`ISSUE   nostr:${addrToNaddr(issue.addr, [RELAY_URL])}`)

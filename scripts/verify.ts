@@ -26,8 +26,9 @@
 import { randomUUID } from 'node:crypto'
 import { Relay } from '../lib/nostr/relay'
 import { publicKeyFromSecret } from '../lib/nostr/sign'
+import { addrToNaddr } from '../lib/nostr/nip19'
 import { Store } from '../src/store'
-import { foldFolder, projectFolders } from '../src/fold'
+import { conversationsAbout, foldFolder, projectFolders } from '../src/fold'
 import { KIND } from '../src/kinds'
 
 const RELAY_URL = process.env.RELAY_URL ?? 'http://localhost:3000'
@@ -250,19 +251,55 @@ async function main() {
   // ── 6. Comments, and the handler recommendation ────────────────────────────
   // Both are what Peek needs: something to render, and a way to know which
   // manifest renders it.
-  await must('Ana comments on her own issue', () =>
-    ana.store.comment({ folder, target: billing.addr, body: 'Blocked on the Stripe key.' }),
+  await must('Ana starts a conversation on her issue', () =>
+    ana.store.postMessage({ folder, about: billing.addr, body: 'Blocked on the Stripe key.' }),
   )
-  await must('Ravi comments on Ana\'s issue', () =>
-    ravi.store.comment({ folder, target: billing.addr, body: 'Key is in 1Password now.' }),
+  const [started] = await ravi.store.rawFolders([folder]).then((raw) =>
+    raw.filter((e) => e.kind === KIND.MESSAGE),
+  )
+  await must('Ravi replies in it', () =>
+    ravi.store.postMessage({
+      folder,
+      body: 'Key is in 1Password now.',
+      replyTo: { rootId: started.id, parentId: started.id },
+    }),
   )
 
-  const withComments = foldFolder(await ravi.store.rawFolders([folder]))
-  const thread = withComments.comments.get(billing.addr) ?? []
-  check('both comments attach to the issue', thread.length === 2, `${thread.length} on PAY-1`)
-  check('  …oldest first', thread[0]?.body.startsWith('Blocked'), thread[0]?.body)
-  check('  …by two different people', thread[0]?.author !== thread[1]?.author)
-  check('a comment-free issue has no thread', !withComments.comments.has(webhook.addr))
+  const talked = await ravi.store.loadFolder(folder)
+  const onIssue = conversationsAbout(talked.conversations, billing.addr)
+  check('the conversation attaches to the issue', onIssue.length === 1)
+  check('  …with the reply threaded under it', onIssue[0]?.replies.length === 1)
+  check('  …root first', onIssue[0]?.root.body.startsWith('Blocked'))
+  check('  …by two different people', onIssue[0]?.root.author !== onIssue[0]?.replies[0]?.author)
+  check(
+    'an issue nobody discussed has no conversation',
+    conversationsAbout(talked.conversations, webhook.addr).length === 0,
+  )
+
+  // Scenario 4: a thread that mentions an issue only partway through belongs to
+  // that issue in full, so the context arrives with the answer.
+  await must('someone starts an unrelated conversation', () =>
+    ana.store.postMessage({ folder, body: 'Anyone looking at billing this week?' }),
+  )
+  const afterUnrelated = await ravi.store.rawFolders([folder])
+  const unrelated = afterUnrelated
+    .filter((e) => e.kind === KIND.MESSAGE)
+    .find((e) => e.content.startsWith('Anyone looking'))!
+  await must('and later mentions the issue in a reply', () =>
+    ravi.store.postMessage({
+      folder,
+      body: `that is ${`nostr:${addrToNaddr(webhook.addr, [RELAY_URL])}`}`,
+      replyTo: { rootId: unrelated.id, parentId: unrelated.id },
+    }),
+  )
+  const afterMention = await ravi.store.loadFolder(folder)
+  const pulled = conversationsAbout(afterMention.conversations, webhook.addr)
+  check('a mention mid-thread attaches the WHOLE conversation', pulled.length === 1)
+  check(
+    '  …including the message posted before the mention',
+    pulled[0]?.root.body.startsWith('Anyone looking'),
+    pulled[0]?.root.body,
+  )
 
   // ── Discovery, not an index ───────────────────────────────────────────────
   // How the project list is actually built: ask the relay for the kind, with no
@@ -317,8 +354,8 @@ async function main() {
     })
     return result
   })
-  await must('and a comment on the project goes there too', () =>
-    ana.store.comment({ folder: topic, target: project.addr, body: 'After pairing' }),
+  await must('and a conversation on the project goes there too', () =>
+    ana.store.postMessage({ folder: topic, about: project.addr, body: 'After pairing' }),
   )
 
   const relinked = await ravi.store.loadAll()
@@ -329,8 +366,10 @@ async function main() {
     relinked.issues.some((issue) => issue.title === 'Filed after pairing'),
   )
   check(
-    'a comment made after pairing is read back',
-    (relinked.comments.get(project.addr) ?? []).some((c) => c.body === 'After pairing'),
+    'a conversation started after pairing is read back',
+    conversationsAbout(relinked.conversations, project.addr).some(
+      (c) => c.root.body === 'After pairing',
+    ),
   )
   check(
     '  …and the issues filed BEFORE pairing did not disappear',

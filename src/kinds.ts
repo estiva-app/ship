@@ -24,8 +24,18 @@ export const KIND = {
   ISSUE: 30851,
   /** Change — append-only, sets one field on one object. The important one. */
   CHANGE: 1851,
-  /** NIP-22 comment. Registered on the relay; not used by the MVP UI yet. */
-  COMMENT: 1111,
+  /**
+   * NIP-29 stream message — a conversation, or a reply in one.
+   *
+   * The same kind Peek writes for a topic message, deliberately. A project *is*
+   * a Folder, so a conversation in the topic and a conversation on the project
+   * are not two things to reconcile — they are one event read twice. A root
+   * message (no `e` tag) starts a conversation; an `e` tag makes it a reply.
+   *
+   * An optional `a` tag names the object a conversation is *about*, which is
+   * what puts it under an issue rather than only on the project.
+   */
+  MESSAGE: 9,
   /**
    * NIP-09 deletion request.
    *

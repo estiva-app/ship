@@ -27,9 +27,14 @@ import {
 } from '../ui'
 import { issueBoard, issueTable } from './issue-list'
 import { addIssueButton } from './new-issue'
-import { thread } from './thread'
+import { conversations } from './conversations'
 
-export function projectView(ctx: Ctx, addr: string, view: ProjectView): HTMLElement {
+export function projectView(
+  ctx: Ctx,
+  addr: string,
+  view: ProjectView,
+  relayUrl: string,
+): HTMLElement {
   const project = ctx.state.projects.find((candidate) => candidate.addr === addr)
   if (!project) {
     return h(
@@ -113,11 +118,20 @@ export function projectView(ctx: Ctx, addr: string, view: ProjectView): HTMLElem
         }),
         h('div', { class: 'section-head' }, h('h2', { text: 'Issues' }), toggle),
         view === 'board' ? issueBoard(ctx, issues) : issueTable(ctx, issues),
-        h('h2', { text: 'Comments' }),
-        // The project's conversation lives in the project's Folder — the same
-        // container as the Peek topic, when one is paired. That is what makes a
-        // comment here and a message there part of one thread rather than two.
-        thread(ctx, { target: project.addr, folder: contentFolder }),
+        h('h2', { text: 'Conversations' }),
+        // Everything in the Folder, including threads that also appear under an
+        // issue. Deliberately duplicated rather than moved: hiding a thread
+        // from the project because it mentions an issue just makes people
+        // wonder where it went.
+        conversations(ctx, {
+          list: ctx.state.conversations.filter((c) => c.root.folder === contentFolder),
+          folder: contentFolder,
+          about: project.addr,
+          // A project conversation is already in the topic it belongs to, so a
+          // reference would be noise.
+          withReference: false,
+          relayUrl,
+        }),
       ),
       h(
         'aside',

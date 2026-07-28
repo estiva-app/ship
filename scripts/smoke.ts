@@ -182,8 +182,8 @@ async function main() {
   await page.waitForSelector('[data-surface="project"][data-view="table"]')
   check('the project opens on one page, issues in table view', page.url().includes('/project/'))
   check(
-    '  …with the description and comments on the same page',
-    (await page.locator('[data-surface="project"] .thread').count()) === 1,
+    '  …with the description and conversations on the same page',
+    (await page.locator('[data-surface="project"] .conversations').count()) === 1,
   )
 
   await page.getByRole('button', { name: 'Add issue' }).click()
@@ -206,7 +206,10 @@ async function main() {
 
   await page.getByRole('link', { name: 'Board' }).click()
   await page.waitForSelector('[data-view="board"] .board .column')
-  check('the toggle swaps the list in place, same page', (await page.locator('[data-surface="project"] .thread').count()) === 1)
+  check(
+    'the toggle swaps the list in place, same page',
+    (await page.locator('[data-surface="project"] .conversations').count()) === 1,
+  )
   check('the board renders a column per status', (await page.locator('.board .column').count()) === 4)
   check('the issue starts in the first column', (await page.locator('.column').first().locator('.kanban-card').count()) === 1)
   await shot(page, '05-project-board')
@@ -230,10 +233,27 @@ async function main() {
   )
 
   // ── Comment, assignee ─────────────────────────────────────────────────────
-  await page.locator('.comment-form input').fill('Blocked on the Stripe key.')
-  await page.getByRole('button', { name: 'Comment' }).click()
-  await page.waitForSelector('.comment-body')
-  check('a NIP-22 kind:1111 comment was published', stored.some((e) => e.kind === 1111))
+  await page.locator('.composer input').fill('Blocked on the Stripe key.')
+  await page.getByRole('button', { name: 'Post' }).click()
+  await page.waitForSelector('.message-body')
+  const message = stored.find((e) => e.kind === 9)
+  check('a conversation is a kind:9 — the same kind Peek writes', !!message)
+  check(
+    '  …attached to the issue by an `a` tag',
+    tagValue(message!, 'a') === `30851:${issue!.pubkey}:${tagValue(issue!, 'd')}`,
+  )
+  check(
+    '  …carrying the issue reference so Peek can render it',
+    message!.content.includes('nostr:naddr'),
+  )
+  check('  …and it is a root message, not a reply', !message!.tags.some((t) => t[0] === 'e'))
+
+  await page.locator('.reply-form input').first().fill('Key is in 1Password now.')
+  await page.getByRole('button', { name: 'Reply' }).click()
+  await page.waitForSelector('.message.reply')
+  const reply = stored.filter((e) => e.kind === 9).at(-1)
+  check('replying threads under the root', reply!.tags.some((t) => t[0] === 'e' && t[1] === message!.id))
+  check('  …and renders nested', (await page.locator('.message.reply').count()) === 1)
 
   const assignee = page.locator('.detail-side select').nth(1)
   await assignee.selectOption({ index: 1 })

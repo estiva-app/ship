@@ -9,11 +9,11 @@
  */
 import { ISSUE_STATUSES, PROJECT_STATUSES } from '../../../src/kinds'
 import { addrToNaddr } from '../../../lib/nostr/nip19'
-import type { Issue } from '../../../src/fold'
+import { conversationsAbout, type Issue } from '../../../src/fold'
 import type { Ctx } from '../context'
 import { href } from '../router'
 import { ago, assigneeSelect, editableText, empty, h, pill, short, statusPill, vocabSelect } from '../ui'
-import { thread } from './thread'
+import { conversations } from './conversations'
 
 export function issueView(ctx: Ctx, addr: string, relayUrl: string): HTMLElement {
   const issue = ctx.state.issues.find((candidate) => candidate.addr === addr)
@@ -78,8 +78,16 @@ export function issueView(ctx: Ctx, addr: string, relayUrl: string): HTMLElement
       h('div', { class: 'detail-body' },
         h('h1', {}, title),
         description,
-        h('h2', { text: 'Comments' }),
-        thread(ctx, { target: issue.addr, folder }),
+        h('h2', { text: 'Conversations' }),
+        // Threads that mention this issue anywhere — including ones started in
+        // Peek before the issue came up, which is the context somebody needs.
+        conversations(ctx, {
+          list: conversationsAbout(ctx.state.conversations, issue.addr),
+          folder,
+          about: issue.addr,
+          withReference: true,
+          relayUrl,
+        }),
         h('h2', { text: 'Activity' }),
         activity(ctx, issue),
       ),

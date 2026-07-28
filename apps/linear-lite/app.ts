@@ -44,10 +44,30 @@ const RELAY_URL = 'http://localhost:3000'
  */
 const POLL_MS = 5000
 
+const DISPLAY_NAME_KEY = 'linear-lite.name'
+
 const identity = localIdentity('linear-lite.secretkey')
 const store = new Store(new Relay(RELAY_URL, identity), identity)
 
-let state: FolderState = { projects: [], issues: [], activity: [], comments: new Map() }
+/**
+ * The name other apps show for this key.
+ *
+ * Peek looks up `kind:0` for every author it has not seen, so without one a
+ * conversation started here arrives in the topic as 64 hex characters. Kept in
+ * `localStorage` because the key is too — this identity is per-browser.
+ */
+function displayName(): string {
+  return localStorage.getItem(DISPLAY_NAME_KEY) ?? `linear-lite-${identity.pubkey.slice(0, 6)}`
+}
+
+async function saveDisplayName(name: string) {
+  localStorage.setItem(DISPLAY_NAME_KEY, name)
+  const ok = await publish('Profile', () => store.publishProfile(name))
+  if (ok) say(`Others will see you as “${name}”.`)
+  renderProfile()
+}
+
+let state: FolderState = { projects: [], issues: [], activity: [], conversations: [] }
 let route: Route = { name: 'issues' }
 let poll: ReturnType<typeof setInterval> | undefined
 
@@ -95,7 +115,7 @@ function context(): Ctx {
     people: participants({
       projects: state.projects,
       issues: state.issues,
-      comments: state.comments,
+      conversations: state.conversations,
       changes: state.activity,
     }),
     say,
@@ -200,6 +220,14 @@ function renderProfile() {
             text: 'Everyone on this relay shares this workspace, in every app.',
           }),
         )
+        const rename = h('button', { class: 'menu-item', text: `Change name (${displayName()})` })
+        rename.onclick = () => {
+          close()
+          const next = window.prompt('Name other apps should show for you:', displayName())
+          if (next?.trim()) void saveDisplayName(next.trim())
+        }
+        panel.append(rename)
+
         const copy = h('button', { class: 'menu-item', text: 'Copy my public key' })
         copy.onclick = async () => {
           close()
@@ -250,12 +278,12 @@ async function refresh(): Promise<void> {
 }
 
 function fingerprint(snapshot: FolderState): string {
-  const comments = [...snapshot.comments.values()].reduce((total, t) => total + t.length, 0)
+  const messages = snapshot.conversations.reduce((n, c) => n + 1 + c.replies.length, 0)
   return [
     snapshot.projects.length,
     snapshot.issues.length,
     snapshot.activity.length,
-    comments,
+    messages,
     // Counts alone miss an edit that replaced a root event in place.
     snapshot.activity.at(-1)?.id ?? '',
     snapshot.issues.map((issue) => `${issue.status}${issue.assignee ?? ''}`).join(),
@@ -271,7 +299,7 @@ function render() {
     route.name === 'projects'
       ? projectsView(ctx, route.archived)
       : route.name === 'project'
-        ? projectView(ctx, route.addr, route.view)
+        ? projectView(ctx, route.addr, route.view, RELAY_URL)
         : route.name === 'issue'
           ? issueView(ctx, route.addr, RELAY_URL)
           : issuesView(ctx)
@@ -328,6 +356,9 @@ async function resolveInbound(naddr: string) {
 // ── Boot ────────────────────────────────────────────────────────────────────
 
 renderProfile()
+// Published once per load, and idempotent — kind:0 is replaceable. Without it
+// this key is a stranger everywhere else in the ecosystem.
+void store.publishProfile(displayName()).catch(() => {})
 
 start(async (next) => {
   route = next

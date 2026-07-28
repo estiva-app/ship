@@ -8,7 +8,7 @@
  * alone.
  */
 import { ISSUE_STATUSES } from '../../../src/kinds'
-import type { Issue } from '../../../src/fold'
+import { conversationsAbout, type Issue } from '../../../src/fold'
 import type { Ctx } from '../context'
 import { href } from '../router'
 import { ago, empty, h, pill, short, statusPill } from '../ui'
@@ -49,8 +49,8 @@ export function issueRow(ctx: Ctx, issue: Issue): HTMLElement {
   if (issue.assignee) meta.append(pill(`@${ctx.who(issue.assignee)}`))
   meta.append(pill(`opened by ${ctx.who(issue.author)} · ${ago(issue.createdAt)}`))
 
-  const thread = ctx.state.comments.get(issue.addr)?.length ?? 0
-  if (thread) meta.append(pill(`${thread} comment${thread === 1 ? '' : 's'}`))
+  const threads = conversationsAbout(ctx.state.conversations, issue.addr).length
+  if (threads) meta.append(pill(`${threads} conversation${threads === 1 ? '' : 's'}`))
 
   return h(
     'div',
