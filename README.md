@@ -43,16 +43,54 @@ to be independent implementations, not siblings sharing a package.
 - `events.ts` — builders for Project (30850), Issue (30851) and Change (1851)
 - `fold.ts` — root + change events → current state. Read the comment on
   `orderingMs` before touching the ordering rule
-- `store.ts` — publish and read against the relay. No cache, deliberately
+- `store.ts` — publish and read against the relay. No cache, deliberately.
+  `loadAll` is the discovery read described below
 
-`apps/linear-lite/` — the UI. Plain DOM, no framework.
+`apps/linear-lite/` — the UI. Plain DOM, no framework. `router.ts` is hash
+routing, `views/` is one module per surface, `ui.ts` the shared primitives.
 
 `scripts/` — `probe-kinds.ts` asks the relay which kinds it will accept;
-`verify.ts` is the end-to-end check that Ravi can close Ana's issue.
+`verify.ts` is the end-to-end check that Ravi can close Ana's issue;
+`app.test.ts` pins the things that fail silently; `smoke.ts` drives the real UI
+in a browser against an in-memory relay.
 
-## What is not here
+## The Folder *is* the project
 
-The manifest. That is build-order step 3.
+This is the one structural thing to understand before reading any of it.
+
+A project's `h` is its own Folder. Its record, its issues, their change events
+and its conversation all carry that same `h`. There is nothing above it.
+
+| Event | `h` |
+| --- | --- |
+| `30850` Project | the project's Folder |
+| `30851` Issue | the same Folder |
+| `1851` change to either | the same Folder |
+| `1111` comment on either | the same Folder |
+
+**There is no workspace object, deliberately.** Buzz already answers "what is
+the organisation", and the answer is not an event: a *community* is resolved
+from the request host before a connection is authenticated, so **the relay URL
+is the workspace** (`~/buzz/ARCHITECTURE.md` §1 and §3 Step 0). Everyone pointed
+at the same relay is in the same workspace, in every app in the ecosystem. An
+index Folder invented here would be a second, app-private notion of the same
+thing — invisible to Peek, which is precisely the failure this project exists to
+argue against.
+
+So projects are **discovered, not indexed**: `store.loadAll` asks the relay for
+`kind:30850` with no `#h` at all and lets access control decide what comes back.
+A project in a Folder you are not a member of, and which is not open, simply is
+not there.
+
+Two consequences worth knowing:
+
+- **Pairing with a Peek topic is not a linking step.** You create the project
+  *in* the topic's Folder, and they are one container from the first event.
+  `store.linkProjectFolder` exists only to re-point a project that already
+  exists somewhere else — an event cannot change its own `h` — and readers take
+  the union of every Folder a project has pointed at, so nothing disappears.
+- **An issue cannot exist without a project**, because the only Folders in this
+  app are projects and every event needs an `h`.
 
 ## Running
 
@@ -63,13 +101,25 @@ npm install
 npm run serve      # builds and serves dist/ on :5190
 ```
 
-Then open **http://localhost:5190/linear-lite/**, click *New Folder*, and create
-a project.
+Then open **http://localhost:5190/linear-lite/** and add a project. It gets its
+own Folder; the *Folder* panel on the project's page is what you paste into Peek
+to pair a topic with it — or paste a topic's Folder link when creating the
+project, and they are the same container from the start.
 
 ```bash
 npm run typecheck  # tsc --noEmit
+npm test           # pure logic: Folder placement, routing, grouping
 npm run probe      # does the relay accept our kinds?
 npm run verify     # full round trip against the relay, two identities
+npm run manifest   # publish the NIP-89 manifest and check it is satisfiable
+npm run smoke      # drive the UI in chromium against an in-memory relay
+```
+
+`npm run smoke` needs chromium's system libraries, which Playwright does not
+bundle:
+
+```bash
+sudo npx playwright install-deps chromium
 ```
 
 ## The fold, in one paragraph

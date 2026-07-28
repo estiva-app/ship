@@ -4,8 +4,8 @@
  * This is the script that has to pass for the design claim to be true, so it is
  * written to fail loudly rather than to look good:
  *
- *  1. A Folder is created, and every object goes into it.
- *  2. **Ana** creates a project and two issues.
+ *  1. **Ana** creates a project, which creates the Folder the project *is*.
+ *  2. She files two issues into it.
  *  3. **Ravi** — a different keypair, who authored none of them — moves an
  *     issue to `in_progress`, assigns it to himself and then closes it.
  *  4. Everything is read back **from the relay** and folded. The check is that
@@ -15,13 +15,18 @@
  * Step 3 is the one that cannot be done with mutable records: NIP-33 addresses
  * are `(pubkey, kind, d)`, so Ravi has no way to replace Ana's event.
  *
+ * Steps 1–2 pin the container model: a project **is** a Folder, and there is no
+ * workspace object above it — Buzz already scopes the organisation by relay
+ * host. Projects are found by discovery rather than by reading an index, which
+ * is asserted here too, because an index would work in a test and quietly fail
+ * for anyone who was not in it.
+ *
  *   npx tsx scripts/verify.ts
  */
-import { randomUUID } from 'node:crypto'
 import { Relay } from '../lib/nostr/relay'
 import { publicKeyFromSecret } from '../lib/nostr/sign'
 import { Store } from '../src/store'
-import { foldFolder } from '../src/fold'
+import { foldFolder, projectFolders } from '../src/fold'
 import { KIND } from '../src/kinds'
 
 const RELAY_URL = process.env.RELAY_URL ?? 'http://localhost:3000'
@@ -50,18 +55,18 @@ async function must(label: string, action: () => Promise<{ ok: boolean; reason?:
 async function main() {
   const ana = person('Ana')
   const ravi = person('Ravi')
-  const folder = randomUUID()
 
   console.log(`relay  ${RELAY_URL}`)
-  console.log(`folder ${folder}`)
   console.log(`Ana    ${ana.identity.pubkey.slice(0, 16)}…`)
   console.log(`Ravi   ${ravi.identity.pubkey.slice(0, 16)}…\n`)
 
-  // ── 1. The Folder ──────────────────────────────────────────────────────────
-  await must('Folder create', () => ana.store.ensureFolder(folder, `verify-${folder.slice(0, 8)}`))
-  // Ravi has to be a member before he can write into Ana's Folder. Access is
-  // the Folder — grouping and permission are the same mechanism (RFC §1.1).
-  await must('Add Ravi to the Folder', async () => {
+  /**
+   * Ravi has to be a member before he can write into one of Ana's Folders.
+   * Access *is* the Folder — grouping and permission are the same mechanism
+   * (RFC §1.1) — which is why this has to happen once per Folder rather than
+   * once per person.
+   */
+  const addRavi = async (folder: string) => {
     const { buildAddMember } = await import('../lib/nostr/events')
     const { signEvent } = await import('../lib/nostr/sign')
     return new Relay(RELAY_URL, ana.identity).publish(
@@ -74,15 +79,18 @@ async function main() {
         ana.identity.secretKeyHex,
       ),
     )
-  })
+  }
 
-  // ── 2. Ana authors the objects ─────────────────────────────────────────────
+  // ── 1. Ana authors the objects ─────────────────────────────────────────────
+  // createProject publishes two events: the Folder, then the record inside it.
   const project = await ana.store.createProject({
-    folder,
     title: 'Payment integration',
     description: 'Stripe Checkout for workspace billing — redirect flow, no custom card form.',
   })
   await must('Ana creates the project', async () => project.result)
+  const folder = project.folder
+  console.log(`project Folder ${folder}\n`)
+  await must('Add Ravi to the project Folder', () => addRavi(folder))
 
   const billing = await ana.store.createIssue({
     folder,
@@ -117,7 +125,7 @@ async function main() {
 
   // ── 4. Read back and fold ──────────────────────────────────────────────────
   // Read as Ravi, to prove this is the shared record and not one client's cache.
-  const raw = await ravi.store.rawFolder(folder)
+  const raw = await ravi.store.rawFolders([folder])
   const state = foldFolder(raw)
 
   console.log(`\nread back ${raw.length} events from the relay\n`)
@@ -128,6 +136,24 @@ async function main() {
     `${raw.filter((e) => e.kind === KIND.PROJECT).length} project, ` +
       `${raw.filter((e) => e.kind === KIND.ISSUE).length} issues, ` +
       `${raw.filter((e) => e.kind === KIND.CHANGE).length} changes`,
+  )
+
+  // ── One container per project ──────────────────────────────────────────────
+  // The claim being pinned: the project and everything in it share one `h`, so
+  // pairing with a Peek topic is just "create it there" and access to the topic
+  // is access to the work.
+  const h = (event: { tags: string[][] }) => event.tags.find((t) => t[0] === 'h')?.[1]
+  check(
+    'every event lives in the one project Folder',
+    raw.every((e) => h(e) === folder),
+    `${new Set(raw.map(h)).size} distinct h across ${raw.length} events`,
+  )
+
+  const foldedProject = state.projects.find((p) => p.addr === project.addr)
+  check('the project reports that Folder as its own', foldedProject?.contentFolder === folder)
+  check(
+    'a reader can find the issues from the project alone',
+    projectFolders(foldedProject!, state.activity).includes(folder),
   )
 
   const folded = state.issues.find((issue) => issue.addr === billing.addr)
@@ -196,7 +222,7 @@ async function main() {
   await must('Ravi then honestly sets it to done', () =>
     ravi.store.setField({ folder, target: webhook.addr, field: 'status', value: 'done' }),
   )
-  const afterLie = foldFolder(await ravi.store.rawFolder(folder)).issues.find(
+  const afterLie = foldFolder(await ravi.store.rawFolders([folder])).issues.find(
     (issue) => issue.addr === webhook.addr,
   )
   check(
@@ -230,12 +256,25 @@ async function main() {
     ravi.store.comment({ folder, target: billing.addr, body: 'Key is in 1Password now.' }),
   )
 
-  const withComments = foldFolder(await ravi.store.rawFolder(folder))
+  const withComments = foldFolder(await ravi.store.rawFolders([folder]))
   const thread = withComments.comments.get(billing.addr) ?? []
   check('both comments attach to the issue', thread.length === 2, `${thread.length} on PAY-1`)
   check('  …oldest first', thread[0]?.body.startsWith('Blocked'), thread[0]?.body)
   check('  …by two different people', thread[0]?.author !== thread[1]?.author)
   check('a comment-free issue has no thread', !withComments.comments.has(webhook.addr))
+
+  // ── Discovery, not an index ───────────────────────────────────────────────
+  // How the project list is actually built: ask the relay for the kind, with no
+  // `#h` at all, and let access control decide. If this ever stops working the
+  // sidebar goes empty for everyone who is not the author.
+  const discovered = await new Relay(RELAY_URL, ravi.identity).query([
+    { kinds: [KIND.PROJECT], limit: 200 },
+  ])
+  check(
+    'a reader discovers the project with no Folder filter',
+    discovered.some((e) => e.id === raw.find((r) => r.kind === KIND.PROJECT)?.id),
+    `${discovered.length} project(s) visible to Ravi`,
+  )
 
   await must('Ana recommends a handler for her kinds', async () => {
     const [first, second] = await ana.store.recommendHandler(RELAY_URL)

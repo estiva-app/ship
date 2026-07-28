@@ -16,7 +16,6 @@
  *
  *   npm run seed:peek -- <pubkey> [<pubkey> …]
  */
-import { randomUUID } from 'node:crypto'
 import { Relay } from '/home/miky/linear-lite/lib/nostr/relay'
 import { publicKeyFromSecret, signEvent } from '/home/miky/linear-lite/lib/nostr/sign'
 import { buildAddMember } from '/home/miky/linear-lite/lib/nostr/events'
@@ -31,33 +30,36 @@ async function main() {
   const identity = { secretKeyHex, pubkey: publicKeyFromSecret(secretKeyHex) }
   const relay = new Relay(RELAY_URL, identity)
   const store = new Store(relay, identity)
-  const folder = randomUUID()
-
-  await store.ensureFolder(folder, `peek-demo-${folder.slice(0, 8)}`)
   await store.recommendHandler(RELAY_URL)
 
-  // Optional now that Folders are open. Kept because an explicitly-membered
-  // Folder is the realistic shape for anything private, and this is the only
-  // place that demonstrates it.
-  for (const pubkey of PEEK_READERS) {
-    const r = await relay.publish(
-      signEvent(
-        buildAddMember(identity.pubkey, Date.now(), {
-          channelUuid: folder,
-          targetPubkey: pubkey,
-          role: 'member',
-        }),
-        secretKeyHex,
-      ),
-    )
-    console.log(`member ${pubkey.slice(0, 12)}… ${r.ok ? 'ok' : `FAILED ${r.reason}`}`)
+  /**
+   * Optional now that Folders are open. Kept because an explicitly-membered
+   * Folder is the realistic shape for anything private, and this is the only
+   * place that demonstrates it.
+   *
+   * A project is a Folder, so this is granted once per project.
+   */
+  const grant = async (folder: string, label: string) => {
+    for (const pubkey of PEEK_READERS) {
+      const r = await relay.publish(
+        signEvent(
+          buildAddMember(identity.pubkey, Date.now(), {
+            channelUuid: folder,
+            targetPubkey: pubkey,
+            role: 'member',
+          }),
+          secretKeyHex,
+        ),
+      )
+      console.log(`member ${pubkey.slice(0, 12)}… → ${label} ${r.ok ? 'ok' : `FAILED ${r.reason}`}`)
+    }
   }
-
   const project = await store.createProject({
-    folder,
     title: 'Payment integration',
     description: 'Stripe Checkout for workspace billing — redirect flow, no custom card form.',
   })
+  const folder = project.folder
+  await grant(folder, 'project')
   const issue = await store.createIssue({
     folder,
     title: 'Billing entry + add payment method',
@@ -71,7 +73,7 @@ async function main() {
   await store.comment({ folder, target: issue.addr, body: 'Blocked on the Stripe key.' })
   await store.comment({ folder, target: issue.addr, body: 'Key is in 1Password now.' })
 
-  console.log(`\nfolder  ${folder}`)
+  console.log(`\nfolder  ${folder}   (the project IS this Folder — pair a Peek topic with it)`)
   console.log(`ISSUE   nostr:${addrToNaddr(issue.addr, [RELAY_URL])}`)
   console.log(`PROJECT nostr:${addrToNaddr(project.addr, [RELAY_URL])}`)
 }

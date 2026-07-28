@@ -25,7 +25,33 @@ export function assertFolderId(folder: string): void {
   }
 }
 
-/** kind:30850 Project. Tag order: d, title, h, [lead]. */
+/**
+ * kind:30850 Project. Tag order: d, title, h, [lead].
+ *
+ * ## The Folder *is* the project
+ *
+ * A project's `h` is its own Folder — the same container its issues, their
+ * change events and its conversation live in. That is the whole model, and it
+ * is what RFC_UPDATES.md §1.1 already described: "the Peek topic and the Linear
+ * project are the same Folder, projected differently."
+ *
+ * There is deliberately **no workspace Folder** above this. Buzz already has an
+ * answer for "the organisation" and it is not an event: a *community* is
+ * resolved from the request host, so the relay URL is the workspace
+ * (`ARCHITECTURE.md` §1, §3 Step 0). An index Folder invented here would be a
+ * second, app-private notion of the same thing — invisible to every other app,
+ * which is exactly what this ecosystem is trying not to do. Projects are found
+ * by asking the relay for `kind:30850`; access control decides what comes back.
+ *
+ * Pairing with an existing Peek topic is therefore just *creating the project
+ * in that topic's Folder*. No linking step, no second container.
+ *
+ * `folder` is written as a foldable **field** only when a project is later
+ * re-pointed at a different Folder (`store.linkProjectFolder`). An event cannot
+ * change its own `h`, so that override is the only way to express "this project
+ * now lives in that topic" after the fact — and the reader takes the union, so
+ * issues already filed do not disappear.
+ */
 export function buildProject(
   pubkey: string,
   createdAtMs: number,
@@ -33,6 +59,7 @@ export function buildProject(
     /** Stable project id — the `d` tag. */
     projectId: string
     title: string
+    /** The project's Folder. Its issues and conversation live here too. */
     folder: string
     /** Optional pubkey of the project lead. */
     lead?: string

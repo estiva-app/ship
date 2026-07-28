@@ -15,11 +15,10 @@
  * Identity: reuses `.manifest-key` so republishing replaces the same
  * addressable event rather than creating a second competing manifest.
  */
-import { randomUUID } from 'node:crypto'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { Relay } from '../lib/nostr/relay'
 import { publicKeyFromSecret, signEvent } from '../lib/nostr/sign'
-import { buildManifest, MANIFEST_D_TAG, type ManifestContent, type SlotSource } from '../src/manifest'
+import { buildManifest, DEFAULT_APP_URL, MANIFEST_D_TAG, type ManifestContent, type SlotSource } from '../src/manifest'
 import { Store } from '../src/store'
 import { foldFolder } from '../src/fold'
 import { KIND } from '../src/kinds'
@@ -69,7 +68,9 @@ async function main() {
   console.log(`relay    ${RELAY_URL}`)
   console.log(`manifest ${identity.pubkey.slice(0, 16)}…  (31990:<pubkey>:${MANIFEST_D_TAG})\n`)
 
-  const event = buildManifest(identity.pubkey, Date.now())
+  // Overridable so a deployment somewhere other than the dev port publishes a
+  // `web` tag that actually resolves for whoever follows it.
+  const event = buildManifest(identity.pubkey, Date.now(), process.env.APP_URL)
   const published = await relay.publish(signEvent(event, identity.secretKeyHex))
   check('the relay accepts kind:31990', published.ok, published.reason ?? '')
   if (!published.ok) process.exit(1)
@@ -113,18 +114,32 @@ async function main() {
   check('it declares how to fold a record', manifest.records?.changeKind === KIND.CHANGE, `changeKind=${manifest.records?.changeKind}`)
   check('it declares the ordering rule', Array.isArray(manifest.records?.order) && manifest.records.order[0] === 'ts', manifest.records?.order?.join(' → '))
 
+  // ── The way back ──────────────────────────────────────────────────────────
+  // A consumer that can render an object but cannot open it has half a
+  // reference. This is a tag rather than manifest content because that is where
+  // NIP-89 puts it, so it has to be checked on the stored *event*.
+  const web = stored.tags.find((t) => t[0] === 'web')
+  check('it publishes a web URL for opening an object', !!web, web?.[1])
+  check('  …with a <bech32> placeholder the consumer substitutes', web?.[1]?.includes('<bech32>') ?? false)
+  check('  …declared as an naddr, since both kinds are addressable', web?.[2] === 'naddr')
+  check(
+    '  …pointing at the inbound route, which resolves the Folder itself',
+    web?.[1]?.includes('#/o/') ?? false,
+    `base ${process.env.APP_URL ?? DEFAULT_APP_URL}`,
+  )
+
   // ── The check that matters: can the projections be satisfied? ─────────────
   // Publish one real project and one real issue, move the issue's status, then
   // resolve every declared slot against the actual events.
   const store = new Store(relay, identity)
-  const folder = randomUUID()
-  await store.ensureFolder(folder, `manifest-${folder.slice(0, 8)}`)
-  const project = await store.createProject({ folder, title: 'Payment integration', description: 'Stripe Checkout.' })
+  // createProject makes the Folder too — a project *is* a Folder.
+  const project = await store.createProject({ title: 'Payment integration', description: 'Stripe Checkout.' })
+  const folder = project.folder
   const issue = await store.createIssue({ folder, title: 'Billing entry', description: 'Settings entry point.', projectAddr: project.addr, ref: 'PAY-1' })
   await store.setField({ folder, target: issue.addr, field: 'status', value: 'in_progress' })
   await store.setField({ folder, target: issue.addr, field: 'assignee', value: identity.pubkey })
 
-  const raw = await store.rawFolder(folder)
+  const raw = await store.rawFolders([folder])
   const state = foldFolder(raw)
   console.log('')
 

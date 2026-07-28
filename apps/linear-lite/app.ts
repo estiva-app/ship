@@ -1,53 +1,62 @@
 /**
- * Linear-lite — the UI.
+ * Linear-lite — the shell.
  *
- * Plain DOM, no framework, no client-side state beyond "which project is
- * selected". Every mutation publishes an event and then re-reads the Folder
+ * Plain DOM, no framework. Every mutation publishes an event and then re-reads
  * from the relay, so what you see is always the folded shared record rather
  * than an optimistic local guess. That is slower than a real tracker would be,
  * and it is the point: if the screen and the relay ever disagreed, the demo
  * would be lying.
+ *
+ * ## One container per project, and no workspace object
+ *
+ * A project **is** a Folder: its record, its issues, their change events and its
+ * conversation all carry the same `h`. There is no workspace above that, because
+ * Buzz already has one — a *community*, resolved from the relay host before a
+ * request is authenticated, so the relay URL is the workspace
+ * (`~/buzz/ARCHITECTURE.md` §1). `store.loadAll` discovers projects by asking
+ * the relay for `kind:30850` and lets access control decide what comes back.
+ *
+ * Everything below this line works on the folded result and does not think
+ * about Folders again, except when publishing, where the `h` has to match the
+ * object being written to.
  */
 import { localIdentity, Relay } from '../../lib/nostr/relay'
-import { addrToNaddr } from '../../lib/nostr/nip19'
-import { ISSUE_STATUSES, lookupStatus, PROJECT_STATUSES } from '../../src/kinds'
-import { folderLink, parseFolderLink } from '../../src/events'
-import { nextRef, refPrefix, Store } from '../../src/store'
-import type { Change, FolderState, Issue } from '../../src/fold'
+import { naddrToAddr } from '../../lib/nostr/nip19'
+import { Store } from '../../src/store'
+import type { FolderState, Issue, Project } from '../../src/fold'
+import type { Ctx } from './context'
+import { href, parse, replace, start, type Route } from './router'
+import { dropdown, h, participants, short } from './ui'
+import { issuesView } from './views/issues'
+import { projectsView } from './views/projects'
+import { projectView } from './views/project'
+import { issueView } from './views/issue'
 
 const RELAY_URL = 'http://localhost:3000'
-const FOLDER_KEY = 'linear-lite.folder'
-
-/** Which issues have their comment thread open. Purely local view state. */
-const openThreads = new Set<string>()
+/**
+ * How often a detail surface re-reads.
+ *
+ * The whole product claim is that acting on an issue in Peek shows up here, and
+ * a claim you have to press Reload to observe reads as two apps rather than
+ * one. Scoped to detail views: a list is usually not what somebody is staring
+ * at while a colleague acts, and polling every surface would be chatter for its
+ * own sake.
+ */
+const POLL_MS = 5000
 
 const identity = localIdentity('linear-lite.secretkey')
 const store = new Store(new Relay(RELAY_URL, identity), identity)
 
-let folder = localStorage.getItem(FOLDER_KEY) ?? ''
-let selectedProject: string | null = null
 let state: FolderState = { projects: [], issues: [], activity: [], comments: new Map() }
+let route: Route = { name: 'issues' }
+let poll: ReturnType<typeof setInterval> | undefined
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
 const el = {
-  folder: $<HTMLInputElement>('folder'),
   banner: $<HTMLDivElement>('banner'),
-  whoami: $<HTMLSpanElement>('whoami'),
-  projects: $<HTMLDivElement>('projects'),
-  issues: $<HTMLDivElement>('issues'),
-  issuesHeading: $<HTMLHeadingElement>('issues-heading'),
-  activity: $<HTMLDivElement>('activity'),
-  newProject: $<HTMLFormElement>('new-project'),
-  newIssue: $<HTMLFormElement>('new-issue'),
-  folderNote: $<HTMLDivElement>('folder-note'),
-}
-
-const short = (pubkey: string) => `${pubkey.slice(0, 8)}…`
-const isMe = (pubkey: string) => pubkey === identity.pubkey
-const who = (pubkey: string) => (isMe(pubkey) ? 'you' : short(pubkey))
-
-function note(message: string) {
-  el.folderNote.textContent = message
+  sidebar: $<HTMLElement>('sidebar'),
+  main: $<HTMLElement>('main'),
+  profile: $<HTMLDivElement>('profile'),
 }
 
 function say(message: string, kind: 'ok' | 'error' = 'ok') {
@@ -57,7 +66,10 @@ function say(message: string, kind: 'ok' | 'error' = 'ok') {
 }
 
 /** Every publish goes through here, because HTTP 200 does not mean accepted. */
-async function publish(what: string, action: () => Promise<{ ok: boolean; reason?: string }>) {
+async function publish(
+  what: string,
+  action: () => Promise<{ ok: boolean; reason?: string }>,
+): Promise<boolean> {
   try {
     const result = await action()
     if (!result.ok) {
@@ -71,434 +83,263 @@ async function publish(what: string, action: () => Promise<{ ok: boolean; reason
   }
 }
 
-function statusPill(status: string, vocab = ISSUE_STATUSES) {
-  const entry = lookupStatus(vocab, status)
-  const span = document.createElement('span')
-  span.className = `pill status-${entry.colour}`
-  span.innerHTML = `<span class="dot"></span>${entry.label}`
-  return span
+const isMe = (pubkey: string) => pubkey === identity.pubkey
+const who = (pubkey: string) => (isMe(pubkey) ? 'you' : short(pubkey))
+
+function context(): Ctx {
+  return {
+    store,
+    identity,
+    state,
+    route,
+    people: participants({
+      projects: state.projects,
+      issues: state.issues,
+      comments: state.comments,
+      changes: state.activity,
+    }),
+    say,
+    publish,
+    reload: () => load(),
+    isMe,
+    who,
+    // An issue's events must carry the issue's own `h` — the Folder it is
+    // already in, which is not necessarily the project's current one if the
+    // project has since been re-linked.
+    folderOf: (issue: Issue) => issue.folder,
+    folderForProject: (project: Project) => project.contentFolder,
+  }
 }
 
-function pill(text: string) {
-  const span = document.createElement('span')
-  span.className = 'pill'
-  span.textContent = text
-  return span
-}
+// ── Sidebar ─────────────────────────────────────────────────────────────────
 
-function renderProjects() {
-  el.projects.replaceChildren()
-  if (!state.projects.length) {
-    el.projects.innerHTML = '<div class="empty">No projects yet.</div>'
-    return
-  }
-  const all = document.createElement('div')
-  all.className = `card${selectedProject === null ? ' selected' : ''}`
-  all.innerHTML = `<h3>All issues</h3><div class="pill">${state.issues.length} total</div>`
-  all.onclick = () => {
-    selectedProject = null
-    render()
-  }
-  el.projects.append(all)
+function renderSidebar() {
+  el.sidebar.replaceChildren()
 
-  for (const project of state.projects) {
-    const count = state.issues.filter((i) => i.projectAddr === project.addr).length
-    const card = document.createElement('div')
-    card.className = `card${selectedProject === project.addr ? ' selected' : ''}`
-    const heading = document.createElement('h3')
-    heading.textContent = project.title
-    const meta = document.createElement('div')
-    meta.className = 'meta'
-    meta.append(statusPill(project.status, PROJECT_STATUSES), pill(`${count} issue${count === 1 ? '' : 's'}`))
-    if (!isMe(project.author)) meta.append(pill(`by ${short(project.author)}`))
-    card.append(heading, meta)
-    card.onclick = () => {
-      selectedProject = project.addr
-      render()
+  const link = (label: string, target: Route, count?: number, active = false) =>
+    h(
+      'a',
+      { class: `nav-item${active ? ' active' : ''}`, href: href(target) },
+      h('span', { text: label }),
+      count !== undefined && h('span', { class: 'count', text: String(count) }),
+    )
+
+  const open = state.issues.filter(
+    (issue) => issue.status !== 'done' && issue.status !== 'cancelled',
+  ).length
+
+  el.sidebar.append(
+    h(
+      'div',
+      { class: 'nav-group' },
+      link('Issues', { name: 'issues' }, open, route.name === 'issues'),
+      link('Projects', { name: 'projects' }, state.projects.length, route.name === 'projects'),
+    ),
+  )
+
+  // Projects are listed individually because a project is the unit of work in
+  // this app — and, since a project *is* a Folder, the unit of sharing too.
+  if (state.projects.length) {
+    const group = h('div', { class: 'nav-group' }, h('div', { class: 'nav-label', text: 'Projects' }))
+    for (const project of state.projects) {
+      const count = state.issues.filter((issue) => issue.projectAddr === project.addr).length
+      group.append(
+        link(
+          project.title,
+          { name: 'project', addr: project.addr, view: 'table' },
+          count,
+          route.name === 'project' && route.addr === project.addr,
+        ),
+      )
     }
-    el.projects.append(card)
+    el.sidebar.append(group)
   }
-}
 
-/** The status picker is the one control that publishes a kind:1851. */
-function statusPicker(issue: Issue) {
-  const select = document.createElement('select')
-  for (const entry of ISSUE_STATUSES) {
-    const option = document.createElement('option')
-    option.value = entry.value
-    option.textContent = entry.label
-    option.selected = entry.value === issue.status
-    select.append(option)
-  }
-  // A status Linear-lite does not know about still has to be selectable-away
-  // from, so show it rather than silently snapping to Todo.
-  if (!ISSUE_STATUSES.some((entry) => entry.value === issue.status)) {
-    const option = document.createElement('option')
-    option.value = issue.status
-    option.textContent = `${issue.status} (unknown)`
-    option.selected = true
-    select.prepend(option)
-  }
-  select.onchange = async () => {
-    select.disabled = true
-    const ok = await publish('Status change', () =>
-      store.setField({
-        folder,
-        target: issue.addr,
-        field: 'status',
-        value: select.value,
-        note: `status → ${select.value}`,
-      }),
-    )
-    if (ok) await load()
-    else select.disabled = false
-  }
-  return select
-}
-
-function assigneeButton(issue: Issue) {
-  const button = document.createElement('button')
-  const assigned = issue.assignee && issue.assignee !== ''
-  button.textContent = assigned ? (isMe(issue.assignee!) ? 'Unassign me' : `Take from ${short(issue.assignee!)}`) : 'Assign to me'
-  button.onclick = async () => {
-    button.disabled = true
-    // Unassigning writes an empty value rather than deleting the change. An
-    // append-only stream has no "undo"; "set to nothing" is a fact like any
-    // other, and it keeps the activity feed truthful about what happened.
-    const value = assigned && isMe(issue.assignee!) ? '' : identity.pubkey
-    const ok = await publish('Assignment', () =>
-      store.setField({
-        folder,
-        target: issue.addr,
-        field: 'assignee',
-        value,
-        note: value ? 'assigned' : 'unassigned',
-      }),
-    )
-    if (ok) await load()
-    else button.disabled = false
-  }
-  return button
 }
 
 /**
- * Copy `nostr:naddr1…` for an issue.
+ * The profile menu.
  *
- * This is the handoff to every other app. NIP-21's URI scheme wrapping a NIP-19
- * pointer, which is what Peek scans message bodies for (NIP-27). Nothing about
- * it is Linear-lite-specific — any app that can decode an naddr can resolve it,
- * including apps that do not exist yet.
+ * Identity and workspace both live here rather than in the sidebar: they are
+ * the two things you look at once and then stop thinking about.
+ *
+ * The workspace shown is **the relay**, because that is what a workspace is on
+ * this substrate — Buzz resolves a community from the request host before a
+ * connection is even authenticated, so everyone pointed at this URL is in the
+ * same organisation, across every app. There is nothing here to switch or
+ * create; pointing the app at a different relay is what "another workspace"
+ * means, and that is a deployment concern rather than a button.
  */
-function copyRefButton(issue: Issue) {
-  const button = document.createElement('button')
-  button.textContent = 'Copy ref'
-  button.title = 'Copy a nostr: reference to paste into another app'
-  button.onclick = async () => {
-    // The relay hint travels with the pointer, so the consumer does not have to
-    // already know where this object lives.
-    const uri = `nostr:${addrToNaddr(issue.addr, [RELAY_URL])}`
-    try {
-      await navigator.clipboard.writeText(uri)
-      say('Reference copied — paste it into Peek.')
-    } catch {
-      // Clipboard access needs a secure context or a user gesture, and fails
-      // silently often enough that a visible fallback is worth the four lines.
-      window.prompt('Copy this reference:', uri)
-    }
-  }
-  return button
+function renderProfile() {
+  el.profile.replaceChildren(
+    dropdown({
+      label: `you: ${short(identity.pubkey)}`,
+      build: (close) => {
+        const panel = h(
+          'div',
+          {},
+          h('div', { class: 'menu-label', text: 'Signed in as' }),
+          h('div', { class: 'mono tiny dim break menu-value', text: identity.pubkey }),
+          h('div', { class: 'menu-label', text: 'Workspace' }),
+          h('div', { class: 'mono tiny dim break menu-value', text: RELAY_URL }),
+          h('div', {
+            class: 'dim tiny menu-value',
+            text: 'Everyone on this relay shares this workspace, in every app.',
+          }),
+        )
+        const copy = h('button', { class: 'menu-item', text: 'Copy my public key' })
+        copy.onclick = async () => {
+          close()
+          try {
+            await navigator.clipboard.writeText(identity.pubkey)
+            say('Public key copied.')
+          } catch {
+            window.prompt('Copy your public key:', identity.pubkey)
+          }
+        }
+        panel.append(copy)
+        return panel
+      },
+    }),
+  )
 }
 
-function commentsButton(issue: Issue) {
-  const count = state.comments.get(issue.addr)?.length ?? 0
-  const button = document.createElement('button')
-  button.textContent = `Comments${count ? ` (${count})` : ''}`
-  button.onclick = () => {
-    if (openThreads.has(issue.addr)) openThreads.delete(issue.addr)
-    else openThreads.add(issue.addr)
-    render()
+// ── Loading and rendering ───────────────────────────────────────────────────
+
+async function load(): Promise<void> {
+  try {
+    state = await store.loadAll()
+  } catch (error) {
+    say(`Could not read from the relay — ${(error as Error).message}`, 'error')
   }
-  return button
+  render()
 }
 
 /**
- * The comment thread — NIP-22 `kind:1111`, not a Linear-lite kind.
+ * Re-read without redrawing unless something actually changed.
  *
- * That is the point of using it: Peek reads and writes these same events, so
- * commenting works across apps without either one owning the format.
+ * The poll runs while a detail surface is open, and a blind re-render every
+ * five seconds would close any dropdown the user had open and discard a
+ * half-typed comment. Comparing a cheap fingerprint first means the common case
+ * — nothing happened — costs one query and no DOM work.
  */
-function thread(issue: Issue) {
-  const panel = document.createElement('div')
-  panel.className = 'thread'
-  const comments = state.comments.get(issue.addr) ?? []
-
-  if (!comments.length) {
-    const empty = document.createElement('div')
-    empty.className = 'empty'
-    empty.textContent = 'No comments yet.'
-    panel.append(empty)
-  }
-  for (const comment of comments) {
-    const item = document.createElement('div')
-    item.className = 'comment'
-    const byline = document.createElement('div')
-    byline.className = 'byline'
-    byline.textContent = `${who(comment.author)} · ${new Date(comment.createdAt * 1000).toLocaleString()}`
-    const body = document.createElement('div')
-    body.textContent = comment.body
-    item.append(byline, body)
-    panel.append(item)
-  }
-
-  const form = document.createElement('form')
-  const input = document.createElement('input')
-  input.placeholder = 'Write a comment…'
-  input.required = true
-  const submit = document.createElement('button')
-  submit.className = 'primary'
-  submit.type = 'submit'
-  submit.textContent = 'Comment'
-  form.append(input, submit)
-  form.onsubmit = async (event) => {
-    event.preventDefault()
-    submit.disabled = true
-    const ok = await publish('Comment', () =>
-      store.comment({ folder, target: issue.addr, body: input.value }),
-    )
-    if (ok) {
-      input.value = ''
-      await load()
-    }
-    submit.disabled = false
-  }
-  panel.append(form)
-  return panel
-}
-
-function renderIssues() {
-  const project = state.projects.find((p) => p.addr === selectedProject)
-  el.issuesHeading.textContent = project ? `Issues · ${project.title}` : 'Issues · all'
-
-  const visible = selectedProject
-    ? state.issues.filter((issue) => issue.projectAddr === selectedProject)
-    : state.issues
-
-  el.issues.replaceChildren()
-  if (!visible.length) {
-    el.issues.innerHTML = '<div class="empty">No issues yet.</div>'
-    return
-  }
-
-  for (const issue of visible) {
-    const row = document.createElement('div')
-    row.className = 'row'
-
-    const grow = document.createElement('div')
-    grow.className = 'grow'
-    const heading = document.createElement('h3')
-    heading.textContent = issue.title
-    grow.append(heading)
-    if (issue.description) {
-      const description = document.createElement('div')
-      description.className = 'dim'
-      description.textContent = issue.description
-      grow.append(description)
-    }
-
-    const meta = document.createElement('div')
-    meta.className = 'meta'
-    if (issue.ref) meta.append(pill(issue.ref))
-    meta.append(statusPill(issue.status))
-    if (issue.assignee) meta.append(pill(`@${who(issue.assignee)}`))
-    meta.append(pill(`opened by ${who(issue.author)}`))
-    // Provenance from the fold: who actually set the status, which is usually
-    // not the person who opened the issue. This is the visible payoff of §1.3.
-    const statusField = issue.fields.status
-    if (statusField) meta.append(pill(`status set by ${who(statusField.by)}`))
-    grow.append(meta)
-
-    const toolbar = document.createElement('div')
-    toolbar.className = 'toolbar'
-    toolbar.append(statusPicker(issue), assigneeButton(issue), commentsButton(issue), copyRefButton(issue))
-    row.append(grow, toolbar)
-
-    const block = document.createElement('div')
-    block.className = 'issue'
-    block.append(row)
-    if (openThreads.has(issue.addr)) block.append(thread(issue))
-    el.issues.append(block)
+async function refresh(): Promise<void> {
+  if (document.hidden) return
+  try {
+    const next = await store.loadAll()
+    if (fingerprint(next) === fingerprint(state)) return
+    state = next
+    render()
+  } catch {
+    // A failed poll is not worth a banner: the user did not ask for it, and the
+    // next tick will either succeed or the next explicit action will report it.
   }
 }
 
-function describe(change: Change) {
-  const target =
-    state.issues.find((issue) => issue.addr === change.target) ??
-    state.projects.find((project) => project.addr === change.target)
-  const name = target ? target.title : change.target
-  // A pubkey is a value like any other to the fold, but 64 hex characters in a
-  // feed is unreadable. The manifest will say `as: "pubkey"` for exactly this
-  // reason (LINEAR_LITE_SPEC.md §2); until then, recognise the shape.
-  const value =
-    change.value === ''
-      ? '(none)'
-      : /^[0-9a-f]{64}$/.test(change.value)
-        ? who(change.value)
-        : change.value
-  return `${who(change.author)} set ${change.field} to ${value} on ${name}`
-}
-
-function renderActivity() {
-  el.activity.replaceChildren()
-  if (!state.activity.length) {
-    el.activity.innerHTML = '<div class="empty">Nothing has changed yet.</div>'
-    return
-  }
-  // Newest first for reading; the fold itself consumes them oldest first.
-  for (const change of [...state.activity].reverse()) {
-    const item = document.createElement('div')
-    item.className = 'feed-item'
-    const text = document.createElement('div')
-    text.textContent = describe(change)
-    const when = document.createElement('div')
-    when.className = 'when'
-    when.textContent = new Date(change.createdAt * 1000).toLocaleString()
-    item.append(text, when)
-    el.activity.append(item)
-  }
+function fingerprint(snapshot: FolderState): string {
+  const comments = [...snapshot.comments.values()].reduce((total, t) => total + t.length, 0)
+  return [
+    snapshot.projects.length,
+    snapshot.issues.length,
+    snapshot.activity.length,
+    comments,
+    // Counts alone miss an edit that replaced a root event in place.
+    snapshot.activity.at(-1)?.id ?? '',
+    snapshot.issues.map((issue) => `${issue.status}${issue.assignee ?? ''}`).join(),
+  ].join('|')
 }
 
 function render() {
-  renderProjects()
-  renderIssues()
-  renderActivity()
+  renderSidebar()
+  renderProfile()
+  const ctx = context()
+
+  const view =
+    route.name === 'projects'
+      ? projectsView(ctx)
+      : route.name === 'project'
+        ? projectView(ctx, route.addr, route.view)
+        : route.name === 'issue'
+          ? issueView(ctx, route.addr, RELAY_URL)
+          : issuesView(ctx)
+
+  el.main.replaceChildren(view)
 }
 
-async function load() {
-  if (!folder) {
-    state = { projects: [], issues: [], activity: [], comments: new Map() }
-    render()
-    return
-  }
-  try {
-    state = await store.loadFolder(folder)
-    if (selectedProject && !state.projects.some((p) => p.addr === selectedProject)) {
-      selectedProject = null
-    }
-    render()
-  } catch (error) {
-    say(`Could not read the Folder — ${(error as Error).message}`, 'error')
-  }
-}
+// ── Inbound references ──────────────────────────────────────────────────────
 
 /**
- * Open a Folder.
+ * Land an inbound `nostr:naddr…` on the right surface.
  *
- * `create: true` makes a brand-new one. Pasting an existing id — typically a
- * Peek topic's — **adopts** it instead: the container already exists, and
- * re-creating it would fork one thing into two. That is the case RFC_UPDATES.md
- * §1.1 actually describes: the Peek topic and the Linear project are the same
- * Folder, projected differently.
+ * The pointer carries kind, author and `d` but not the Folder, so the object
+ * has to be resolved before it can be routed — and resolving it tells us the
+ * Folder, which tells us whether the current workspace can even see it.
+ *
+ * This is the return leg of the roundtrip. Getting it wrong does not error; it
+ * shows an empty screen, which is why every failure below says something
+ * specific instead.
  */
-async function openFolder(id: string, { create = false } = {}) {
-  const parsed = parseFolderLink(id)
-  if (!parsed) {
-    return say('That does not look like a Folder link or a UUID.', 'error')
-  }
-  folder = parsed
-  el.folder.value = folder
-  localStorage.setItem(FOLDER_KEY, folder)
-  selectedProject = null
-  if (create) {
-    // FRICTION.md A4: the Folder has to exist before anything can go into it,
-    // and a duplicate create is reported as success.
-    const ok = await publish('Folder create', () =>
-      store.ensureFolder(folder, `linear-lite-${folder.slice(0, 8)}`),
-    )
-    if (ok) {
-      say(`Folder ready — ${folder}`)
-      // Open, so other apps can actually see it — and open on this relay also
-      // means writable by anyone. Said out loud rather than left in a comment,
-      // because it is a real property of the container the user just made.
-      note('New Folder — open, so any app on this relay can read and write it. Paste an existing Folder link to use one with real membership instead.')
-    }
-  } else {
-    const adopted = await store.adoptFolder(folder)
-    if (!adopted.ok) {
-      say(`Cannot read that Folder — ${adopted.reason ?? 'unknown'}`, 'error')
-    }
-    note(`Paired with an existing Folder. Objects here carry the same h as everything else in it — one container, many projections.`)
-  }
-  // Publish this user's NIP-89 recommendation: "for kinds 30850/30851, I use
-  // Linear-lite". Addressable, so this replaces rather than accumulating, and
-  // it is what lets a consumer pick this manifest over any other claiming the
-  // same kinds. Best-effort — failing to recommend must not block the app.
-  void store.recommendHandler(RELAY_URL).catch(() => {})
-  await load()
-}
-
-el.whoami.textContent = `you: ${short(identity.pubkey)}`
-el.folder.value = folder
-
-$('open').onclick = () => {
-  // Adopt rather than create: a pasted id is almost always somebody else's
-  // Folder, and creating over it would fork one container into two.
-  if (el.folder.value.trim()) void openFolder(el.folder.value)
-}
-$('new-folder').onclick = () => void openFolder(crypto.randomUUID(), { create: true })
-$('copy-folder').onclick = async () => {
-  if (!folder) return say('Open or create a Folder first.', 'error')
-  // A `folder:<uuid>` link, not a URL. A Folder belongs to no single app, so a
-  // link pointing at Linear-lite's own port would misdescribe what it is.
-  const link = folderLink(folder)
+async function resolveInbound(naddr: string) {
+  el.main.replaceChildren(
+    h('div', { class: 'surface' }, h('div', { class: 'empty', text: 'Resolving reference…' })),
+  )
+  let address: string
   try {
-    await navigator.clipboard.writeText(link)
-    say('Folder link copied — paste it into another app.')
+    address = naddrToAddr(naddr)
   } catch {
-    window.prompt('Copy this Folder link:', link)
+    say('That reference is not a valid nostr address.', 'error')
+    return replace({ name: 'issues' })
   }
-}
-$('reload').onclick = () => void load()
 
-el.newProject.onsubmit = async (event) => {
-  event.preventDefault()
-  if (!folder) return say('Open or create a Folder first.', 'error')
-  const form = new FormData(el.newProject)
-  const ok = await publish('Project', async () => {
-    const { result } = await store.createProject({
-      folder,
-      title: String(form.get('title')),
-      description: String(form.get('description') ?? ''),
-    })
-    return result
-  })
-  if (ok) {
-    el.newProject.reset()
-    await load()
+  // Resolving is what tells us the Folder — the pointer does not carry one — and
+  // it is also the honest access check: if this comes back empty the object is
+  // in a Folder this identity cannot read, which is a different problem from a
+  // bad link and deserves a different message.
+  const resolved = await store.resolveObject(address).catch(() => null)
+  if (!resolved) {
+    say('Could not resolve that reference — you may not have access to its Folder.', 'error')
+    return replace({ name: 'issues' })
   }
-}
 
-el.newIssue.onsubmit = async (event) => {
-  event.preventDefault()
-  if (!folder) return say('Open or create a Folder first.', 'error')
-  const form = new FormData(el.newIssue)
-  const project = state.projects.find((p) => p.addr === selectedProject)
-  const ok = await publish('Issue', async () => {
-    const { result } = await store.createIssue({
-      folder,
-      title: String(form.get('title')),
-      description: String(form.get('description') ?? ''),
-      projectAddr: project?.addr,
-      ref: nextRef(
-        project ? refPrefix(project.title) : 'LL',
-        state.issues.map((issue) => issue.ref),
-      ),
-    })
-    return result
-  })
-  if (ok) {
-    el.newIssue.reset()
-    await load()
-  }
+  await load()
+  const [kind] = address.split(':')
+  replace(
+    kind === String(30850)
+      ? { name: 'project', addr: address, view: 'table' }
+      : { name: 'issue', addr: address },
+  )
+  route = parse(location.hash)
+  render()
 }
 
-void load()
+// ── Boot ────────────────────────────────────────────────────────────────────
+
+renderProfile()
+
+start(async (next) => {
+  route = next
+
+  if (next.name === 'inbound') return void resolveInbound(next.naddr)
+
+  // Normalise the address bar to the canonical form of wherever we ended up —
+  // an empty or misspelt hash renders the issue list, and the URL should say so
+  // rather than leaving something unshareable on screen. `replace` does not
+  // fire `hashchange`, so this cannot loop.
+  if (location.hash !== href(next)) replace(next)
+
+  clearInterval(poll)
+  poll = undefined
+  await load()
+  // Polling only on detail surfaces: a list is rarely what somebody is staring
+  // at while a colleague acts on something, and polling everywhere would be
+  // relay chatter for its own sake.
+  if (next.name === 'issue' || next.name === 'project') {
+    poll = setInterval(() => void refresh(), POLL_MS)
+  }
+})
+
+// A tab that was hidden for ten minutes should not show ten-minute-old state
+// the moment it is looked at again.
+addEventListener('visibilitychange', () => {
+  if (!document.hidden && poll) void refresh()
+})

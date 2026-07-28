@@ -236,11 +236,40 @@ export function buildRecommendation(
   }
 }
 
-export function buildManifest(pubkey: string, createdAtMs: number): UnsignedEvent {
+/**
+ * Where Linear-lite is served.
+ *
+ * Only ever used to build the `web` tag below. It is a *hint* for other apps,
+ * not something this app reads — Linear-lite never needs to know its own URL to
+ * function, and hardcoding a port into the data layer would be a lie the first
+ * time somebody deploys it anywhere else.
+ */
+export const DEFAULT_APP_URL = 'http://localhost:5190/linear-lite/'
+
+export function buildManifest(
+  pubkey: string,
+  createdAtMs: number,
+  appUrl = DEFAULT_APP_URL,
+): UnsignedEvent {
   const tags: NostrTag[] = [
     ['d', MANIFEST_D_TAG],
     ['k', String(KIND.PROJECT)],
     ['k', String(KIND.ISSUE)],
+    /**
+     * NIP-89's `web` tag: how to open one of these objects in the app that owns
+     * it. `<bech32>` is substituted by the consumer with the entity it is
+     * holding — here always an `naddr`, since both kinds are addressable.
+     *
+     * This is the return leg of the roundtrip, and until it existed the loop was
+     * one-directional: Peek could render a Linear-lite issue and change its
+     * status, and the only way back to the issue itself was to alt-tab and hunt
+     * for the row. A reference you cannot follow is a screenshot.
+     *
+     * It points at `#/o/…` rather than a direct issue route on purpose — the
+     * naddr does not carry the Folder, so the app has to resolve the object
+     * before it knows which container, and therefore which URL, it belongs to.
+     */
+    ['web', `${appUrl.replace(/\/+$/, '')}/#/o/<bech32>`, 'naddr'],
   ]
   return {
     pubkey,
