@@ -23,6 +23,7 @@
  *
  *   npx tsx scripts/verify.ts
  */
+import { randomUUID } from 'node:crypto'
 import { Relay } from '../lib/nostr/relay'
 import { publicKeyFromSecret } from '../lib/nostr/sign'
 import { Store } from '../src/store'
@@ -295,7 +296,48 @@ async function main() {
     recommended,
   )
 
-  // ── 7. Archive and delete ─────────────────────────────────────────────────
+  // ── 7. Re-linking a project to an existing Peek topic ─────────────────────
+  // The regression guard for a bug that looked like "creating a ticket is
+  // broken". Discovery asks for kind:30850 only, so it cannot contain the
+  // kind:1851 that re-points a project — a single-pass read finds the project,
+  // misses the re-link, and never queries the topic. Writes landed correctly
+  // and were then never read back.
+  const topic = randomUUID()
+  await must('A Peek-style topic Folder exists', () =>
+    ana.store.ensureFolder(topic, `topic-${topic.slice(0, 8)}`),
+  )
+  await must('Ravi pairs Ana\'s project with it', () =>
+    ravi.store.linkProjectFolder({ recordFolder: folder, project: project.addr, folder: topic }),
+  )
+  await must('an issue filed after pairing goes to the topic', async () => {
+    const { result } = await ana.store.createIssue({
+      folder: topic,
+      title: 'Filed after pairing',
+      projectAddr: project.addr,
+    })
+    return result
+  })
+  await must('and a comment on the project goes there too', () =>
+    ana.store.comment({ folder: topic, target: project.addr, body: 'After pairing' }),
+  )
+
+  const relinked = await ravi.store.loadAll()
+  const relinkedProject = relinked.projects.find((p) => p.addr === project.addr)
+  check('the project now reports the topic as its Folder', relinkedProject?.contentFolder === topic)
+  check(
+    'an issue filed after pairing is read back',
+    relinked.issues.some((issue) => issue.title === 'Filed after pairing'),
+  )
+  check(
+    'a comment made after pairing is read back',
+    (relinked.comments.get(project.addr) ?? []).some((c) => c.body === 'After pairing'),
+  )
+  check(
+    '  …and the issues filed BEFORE pairing did not disappear',
+    relinked.issues.some((issue) => issue.addr === billing.addr),
+  )
+
+  // ── 8. Archive and delete ─────────────────────────────────────────────────
   // Two operations with different reach, and the difference is the point.
   // Archiving is a change event, so anyone in the Folder can do it and it can
   // be undone. Deleting is NIP-09, author-scoped, and irreversible.

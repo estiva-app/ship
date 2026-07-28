@@ -338,19 +338,39 @@ export class Store {
    * different Folders, and folding those separately would drop changes.
    */
   async loadAll(limit = 2000): Promise<FolderState> {
-    const projectEvents = await this.relay.query([{ kinds: [KIND.PROJECT], limit }])
-    const discovered = foldFolder(projectEvents)
+    let events = await this.relay.query([{ kinds: [KIND.PROJECT], limit }])
+    const fetched = new Set<string>()
 
-    const folders = new Set<string>()
-    for (const project of discovered.projects) {
-      for (const folder of projectFolders(project, discovered.activity)) folders.add(folder)
+    /**
+     * Widen until no new Folder appears.
+     *
+     * Not a loop for elegance — a re-linked project genuinely cannot be resolved
+     * in one pass. The discovery query asks for `kind:30850` only, so it cannot
+     * contain the `kind:1851` that re-points a project at a Peek topic; that
+     * change lives in the Folder the *record* is in, which is only learned in
+     * the first pass. Reading once therefore finds the project, misses the
+     * re-link, and never queries the topic — so issues filed after pairing are
+     * written correctly and then never read back, which looks exactly like
+     * "creating a ticket is broken".
+     *
+     * Two passes settle the normal case and the re-linked one. The bound is
+     * four, so a pathological chain of re-links degrades to a partial read
+     * rather than an unbounded fan-out.
+     */
+    for (let pass = 0; pass < 4; pass++) {
+      const state = foldFolder(events)
+      const wanted = new Set<string>()
+      for (const project of state.projects) {
+        for (const folder of projectFolders(project, state.activity)) {
+          if (!fetched.has(folder)) wanted.add(folder)
+        }
+      }
+      if (!wanted.size) break
+      for (const folder of wanted) fetched.add(folder)
+      events = [...events, ...(await this.rawFolders([...wanted], limit))]
     }
 
-    // The project records came back above, but their *changes* and issues did
-    // not — that first query asked for one kind. Re-reading the Folders picks up
-    // everything, project records included, so the fold sees one complete stream.
-    const contentEvents = folders.size ? await this.rawFolders([...folders], limit) : []
-    return foldFolder([...projectEvents, ...contentEvents])
+    return foldFolder(events)
   }
 
   /**

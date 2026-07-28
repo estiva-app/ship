@@ -294,6 +294,27 @@ export function dropdown(args: { label: string; className?: string; build: (clos
   return wrap
 }
 
+/**
+ * Turn the relay's rejection into something actionable.
+ *
+ * `restricted: not a channel member` reads as a permissions problem and is
+ * usually a *missing container* (FRICTION.md A4). It is the single most likely
+ * failure when pairing with a Peek topic, because Peek creates a topic in its
+ * own database and only publishes the `kind:9007` when the topic is first
+ * synced — so a brand-new topic's Folder link points at something the relay has
+ * never heard of. Sending one message in the topic fixes it.
+ */
+export function explainRejection(reason: string | undefined, folder: string): string {
+  if (reason?.includes('not a channel member')) {
+    return (
+      `The relay does not know Folder ${folder.slice(0, 8)}… — most likely the Peek topic ` +
+      'has not been published yet. Send a message in that topic, then try again. ' +
+      '(If it is somebody else\'s private topic, you need to be added to it.)'
+    )
+  }
+  return reason ?? 'no reason given'
+}
+
 /** Relative time, because an activity feed reads better in "3m ago". */
 export function ago(seconds: number): string {
   const delta = Math.max(0, Date.now() / 1000 - seconds)

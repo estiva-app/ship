@@ -9,7 +9,7 @@ import { PROJECT_STATUSES } from '../../../src/kinds'
 import { parseFolderLink } from '../../../src/events'
 import type { Ctx } from '../context'
 import { href } from '../router'
-import { ago, empty, h, openModal, pill, statusPill } from '../ui'
+import { ago, empty, explainRejection, h, openModal, pill, statusPill } from '../ui'
 
 export function projectsView(ctx: Ctx, showArchived: boolean): HTMLElement {
   const active = ctx.state.projects.filter((project) => !project.archived)
@@ -139,6 +139,11 @@ function newProjectForm(ctx: Ctx, onDone?: () => void): HTMLFormElement {
         description: description.value.trim(),
         folder,
       })
+      // A paired create is the one place a rejection has a specific, fixable
+      // cause worth naming.
+      if (!result.ok && folder) {
+        return { ok: false, reason: explainRejection(result.reason, folder) }
+      }
       return result
     })
     submit.disabled = false

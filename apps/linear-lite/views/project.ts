@@ -14,7 +14,17 @@ import { folderLink, parseFolderLink } from '../../../src/events'
 import type { Issue, Project } from '../../../src/fold'
 import type { Ctx } from '../context'
 import { go, href, type ProjectView } from '../router'
-import { ago, assigneeSelect, editableText, empty, h, pill, statusPill, vocabSelect } from '../ui'
+import {
+  ago,
+  assigneeSelect,
+  editableText,
+  empty,
+  explainRejection,
+  h,
+  pill,
+  statusPill,
+  vocabSelect,
+} from '../ui'
 import { issueBoard, issueTable } from './issue-list'
 import { addIssueButton } from './new-issue'
 import { thread } from './thread'
@@ -267,13 +277,14 @@ function folderPanel(ctx: Ctx, project: Project, contentFolder: string): HTMLEle
     const parsed = parseFolderLink(pasted)
     if (!parsed) return ctx.say('That does not look like a Folder link or a UUID.', 'error')
     if (parsed === contentFolder) return ctx.say('Already paired with that Folder.')
-    const ok = await ctx.publish('Folder link', () =>
-      ctx.store.linkProjectFolder({
+    const ok = await ctx.publish('Folder link', async () => {
+      const result = await ctx.store.linkProjectFolder({
         recordFolder: project.originFolder,
         project: project.addr,
         folder: parsed,
-      }),
-    )
+      })
+      return result.ok ? result : { ok: false, reason: explainRejection(result.reason, parsed) }
+    })
     if (ok) {
       ctx.say('Paired. New issues will land in that Folder.')
       await ctx.reload()
