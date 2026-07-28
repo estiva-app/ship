@@ -84,6 +84,8 @@ export interface ManifestContent {
     order: string[]
     rule: 'last-write-wins-per-field'
     orderingTrust: string
+    /** A folded field whose value means "do not show this object". */
+    hiddenWhen?: { field: string; equals: string }
   }
   projections: Record<string, Projection>
   vocabularies: Record<string, { value: string; label: string; colour: string }[]>
@@ -112,6 +114,22 @@ export function manifestContent(): ManifestContent {
         'otherwise use created_at*1000. Ties broken by lowest event id. ' +
         'The relay validates created_at, so a ts pinned inside that second inherits that check ' +
         'and cannot move an event outside it.',
+      /**
+       * Archiving, said out loud.
+       *
+       * Archived is a *folded field*, not a deletion, so an archived project is
+       * still perfectly readable — it comes back from every query and renders
+       * fine. Linear-lite drops it from its own lists; a consumer with no way to
+       * know that shows it as though it were live, which is what PEEK-24 found:
+       * a Peek topic whose Folder held three archived projects showed one of
+       * them, chosen by nothing.
+       *
+       * A rule rather than a field name so it says what the value *means*.
+       * Nothing here is specific to archiving — an app with a "hidden" or
+       * "deleted" field declares its own, and a consumer honours it without
+       * knowing what the word means.
+       */
+      hiddenWhen: { field: 'archived', equals: 'true' },
     },
 
     // ── How MY objects look in YOUR app ───────────────────────────────────
