@@ -27,6 +27,14 @@
  * disagree the first time two changes land in one second — which is the common
  * case, not the rare one (FRICTION.md A6). So the fold rule is declared, not
  * assumed.
+ *
+ * **3. A slot may be *both* `fold` and `tag`.** A project's lead starts life as
+ * a tag on the root event and is then overridden by change events — exactly
+ * what `fold.ts` does with `fields.lead?.value ?? tag(event, 'lead')`. Declaring
+ * it as a tag alone was true only until somebody reassigned it, at which point
+ * a consumer kept rendering the original author's choice forever; declaring it
+ * as a fold alone loses the value the project was created with. Surfaced by
+ * PEEK-24, where Peek offers the reassignment and then has to show the result.
  */
 import { toNostrSeconds, type NostrTag, type UnsignedEvent } from '../lib/nostr/events'
 import {
@@ -44,10 +52,12 @@ export type SlotSource =
   /** A top-level event field — in practice only `content`. */
   | { field: 'content'; truncate?: number; label?: string }
   /**
-   * A field produced by folding change events, not present on the root.
-   * `default` is what to show when nobody has set it yet.
+   * A field produced by folding change events.
+   *
+   * `default` is what to show when nobody has set it yet. `tag` names a tag on
+   * the root event to seed the field from — see addition 3 below.
    */
-  | { fold: string; map?: string; as?: 'pubkey'; label?: string; default?: string }
+  | { fold: string; tag?: string; map?: string; as?: 'pubkey'; label?: string; default?: string }
 
 export interface Projection {
   /** One of the predefined widget types. The consumer owns the layout. */
@@ -112,7 +122,9 @@ export function manifestContent(): ManifestContent {
           title: { tag: 'title' },
           subtitle: { field: 'content', truncate: 120 },
           status: { fold: 'status', map: 'statuses', default: DEFAULT_PROJECT_STATUS },
-          meta: [{ label: 'Lead', tag: 'lead', as: 'pubkey' }],
+          // Seeded by the root's `lead` tag, overridden by a change — the same
+          // rule `fold.ts` applies, now stated where a consumer can read it.
+          meta: [{ label: 'Lead', fold: 'lead', tag: 'lead', as: 'pubkey' }],
         },
       },
       [KIND.ISSUE]: {
@@ -154,6 +166,30 @@ export function manifestContent(): ManifestContent {
         label: 'Assign',
         appliesTo: String(KIND.ISSUE),
         emits: { kind: KIND.CHANGE, field: 'assignee' },
+        input: { type: 'pubkey' },
+      },
+      /**
+       * The same two operations, on a project.
+       *
+       * Absent until PEEK-24 asked a consumer to render a project's properties
+       * as controls rather than as text, and their absence was the whole answer
+       * to why it could not: a consumer may only offer what the owner declares.
+       * Nothing in Linear-lite had to change to support them — `fold.ts` already
+       * reads both fields off the change stream. They were simply never said out
+       * loud, which is the failure mode this manifest exists to prevent.
+       */
+      {
+        id: 'set-project-status',
+        label: 'Change status',
+        appliesTo: String(KIND.PROJECT),
+        emits: { kind: KIND.CHANGE, field: 'status' },
+        input: { type: 'string', enum: 'statuses' },
+      },
+      {
+        id: 'assign-project',
+        label: 'Assign',
+        appliesTo: String(KIND.PROJECT),
+        emits: { kind: KIND.CHANGE, field: 'lead' },
         input: { type: 'pubkey' },
       },
       {
