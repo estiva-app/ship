@@ -24,7 +24,8 @@
 
 export type Route =
   | { name: 'issues' }
-  | { name: 'projects' }
+  /** `archived` shows the archived list instead of the active one. */
+  | { name: 'projects'; archived: boolean }
   | { name: 'project'; addr: string; view: ProjectView }
   | { name: 'issue'; addr: string }
   /** An inbound `nostr:naddr…`, not yet resolved to an object. */
@@ -54,7 +55,7 @@ export function href(route: Route): string {
     case 'issues':
       return '#/issues'
     case 'projects':
-      return '#/projects'
+      return route.archived ? '#/projects?archived' : '#/projects'
     case 'project': {
       const base = `#/project/${encodeURIComponent(route.addr)}`
       // The default is left out — a shared link should be the short one unless
@@ -74,7 +75,9 @@ export function parse(hash: string): Route {
   const parts = path.split('/').filter(Boolean).map(decodeURIComponent)
 
   if (parts[0] === 'o' && parts[1]) return { name: 'inbound', naddr: parts[1] }
-  if (parts[0] === 'projects') return { name: 'projects' }
+  if (parts[0] === 'projects') {
+    return { name: 'projects', archived: new URLSearchParams(query ?? '').has('archived') }
+  }
   if (parts[0] === 'project' && parts[1]) {
     const requested = new URLSearchParams(query ?? '').get('view')
     const view = PROJECT_VIEWS.includes(requested as ProjectView)

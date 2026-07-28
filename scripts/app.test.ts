@@ -128,7 +128,8 @@ console.log('\n# routes survive a round trip through the URL\n')
 
 const routes = [
   { name: 'issues' },
-  { name: 'projects' },
+  { name: 'projects', archived: false },
+  { name: 'projects', archived: true },
   { name: 'project', addr: `30850:${PK}:p1`, view: 'table' },
   { name: 'project', addr: `30850:${PK}:p1`, view: 'board' },
   { name: 'issue', addr: `30851:${PK}:i1` },

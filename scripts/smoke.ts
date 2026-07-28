@@ -269,6 +269,31 @@ async function main() {
   )
   await shot(page, '08-issues-list')
 
+  // ── Archive, and getting it back ──────────────────────────────────────────
+  await page.goto(`http://localhost:${PORT}/linear-lite/#/project/${encodeURIComponent(
+    `30850:${project!.pubkey}:${tagValue(project!, 'd')}`,
+  )}`)
+  await page.waitForSelector('[data-surface="project"]')
+  await page.getByRole('button', { name: 'Archive project' }).click()
+  await page.waitForSelector('.crumbs .pill')
+  check(
+    'archiving publishes a change, not a deletion',
+    stored.some((e) => e.kind === 1851 && tagValue(e, 'field') === 'archived'),
+  )
+  check('  …and is reversible from the same control',
+    await page.getByRole('button', { name: 'Unarchive project' }).isVisible())
+
+  // Scoped to the sidebar: the project detail's breadcrumb also says "Projects".
+  await page.locator('#sidebar').getByRole('link', { name: /^Projects/ }).click()
+  await page.waitForSelector('[data-surface="projects"]')
+  check('an archived project leaves the sidebar', (await page.locator('.nav-item').count()) === 2)
+  check('  …and the active list', (await page.locator('.card').count()) === 0)
+  check('  …but is reachable behind a tab', await page.getByRole('link', { name: /^Archived/ }).isVisible())
+  await page.getByRole('link', { name: /^Archived/ }).click()
+  await page.waitForSelector('.card')
+  check('  …which shows it', (await page.locator('.card').count()) === 1)
+  await shot(page, '10-archived')
+
   // ── The profile menu ──────────────────────────────────────────────────────
   await page.locator('.dropdown-trigger').click()
   await page.waitForSelector('.dropdown-panel')

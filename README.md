@@ -92,6 +92,30 @@ Two consequences worth knowing:
 - **An issue cannot exist without a project**, because the only Folders in this
   app are projects and every event needs an `h`.
 
+## Archiving vs deleting
+
+Two operations with genuinely different reach, which is why they are not two
+styles of the same button.
+
+**Archive** is a `kind:1851` on an `archived` field. Reversible, attributable,
+and available to anyone in the Folder — measured: a non-author can archive
+somebody else's project and the feed says who did it. It hides the project from
+the navigation and the active list, nothing more.
+
+**Delete** is a NIP-09 `kind:5`, and three things about it are load-bearing:
+
+- It is a **request**. Relays may decline; a copy held elsewhere is untouched.
+  Buzz accepts and honours it, so the record does stop coming back.
+- It is **author-scoped**. A relay honours a deletion only from the pubkey that
+  signed the original — verified: Ravi's attempt to delete Ana's project has no
+  effect. So the control is absent for everyone but the author rather than
+  present and failing.
+- It removes the **record**, not the work. Issues are separate events with their
+  own authors; they stay in the Folder and simply stop being reachable from here
+  once the project they hung off is gone.
+
+All four properties are pinned in `npm run verify`.
+
 ## Running
 
 Needs a Buzz relay on `:3000` — see `RUNNING.md` above.

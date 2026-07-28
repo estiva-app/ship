@@ -13,7 +13,7 @@ import { PROJECT_STATUSES } from '../../../src/kinds'
 import { folderLink, parseFolderLink } from '../../../src/events'
 import type { Issue, Project } from '../../../src/fold'
 import type { Ctx } from '../context'
-import { href, type ProjectView } from '../router'
+import { go, href, type ProjectView } from '../router'
 import { ago, assigneeSelect, editableText, empty, h, pill, statusPill, vocabSelect } from '../ui'
 import { issueBoard, issueTable } from './issue-list'
 import { addIssueButton } from './new-issue'
@@ -72,9 +72,10 @@ export function projectView(ctx: Ctx, addr: string, view: ProjectView): HTMLElem
     h(
       'div',
       { class: 'crumbs' },
-      h('a', { href: href({ name: 'projects' }), text: 'Projects' }),
+      h('a', { href: href({ name: 'projects', archived: false }), text: 'Projects' }),
       h('span', { class: 'sep', text: '/' }),
       h('span', { class: 'dim', text: project.title }),
+      project.archived && pill('Archived'),
     ),
     h(
       'div',
@@ -127,6 +128,7 @@ export function projectView(ctx: Ctx, addr: string, view: ProjectView): HTMLElem
         })),
         progress(issues),
         folderPanel(ctx, project, contentFolder),
+        dangerZone(ctx, project, issues),
       ),
     ),
   )
@@ -134,6 +136,84 @@ export function projectView(ctx: Ctx, addr: string, view: ProjectView): HTMLElem
 
 function field(label: string, control: Node): HTMLElement {
   return h('div', { class: 'field' }, h('label', { text: label }), control)
+}
+
+/**
+ * Archive and delete.
+ *
+ * Two operations with genuinely different reach, so they are not two styles of
+ * the same button:
+ *
+ * **Archive** is a `kind:1851` — reversible, attributable, and available to
+ * anyone in the Folder. It hides the project from the lists and nothing more.
+ * This is the one almost everybody wants.
+ *
+ * **Delete** is a NIP-09 `kind:5`, and three things about it have to be said
+ * rather than discovered. It is a *request*: relays may decline, and a copy
+ * elsewhere is untouched. It is **author-only**, because NIP-09 is scoped to
+ * the pubkey that signed the original — so it is simply absent for everyone
+ * else rather than present and failing. And it removes the project *record*,
+ * not the issues, which are separate events with their own authors; they stay
+ * in the Folder and stop being reachable from here.
+ *
+ * Rendered as quiet links, not buttons. Nothing in this panel is a thing you
+ * do often, and a red button in a sidebar reads as an invitation.
+ */
+function dangerZone(ctx: Ctx, project: Project, issues: Issue[]): HTMLElement {
+  const panel = h('div', { class: 'danger-zone' })
+
+  const archive = h('button', {
+    class: 'link-button',
+    text: project.archived ? 'Unarchive project' : 'Archive project',
+  })
+  archive.onclick = async () => {
+    archive.disabled = true
+    const ok = await ctx.publish(project.archived ? 'Unarchive' : 'Archive', () =>
+      ctx.store.archiveProject({
+        recordFolder: project.originFolder,
+        project: project.addr,
+        archived: !project.archived,
+      }),
+    )
+    if (ok) {
+      ctx.say(project.archived ? 'Project restored.' : 'Project archived.')
+      await ctx.reload()
+    } else archive.disabled = false
+  }
+  panel.append(archive)
+
+  // NIP-09 only honours a deletion from the pubkey that signed the original, so
+  // offering this to anyone else would be a button that always fails.
+  if (ctx.isMe(project.author)) {
+    const remove = h('button', { class: 'link-button danger', text: 'Delete project' })
+    remove.onclick = async () => {
+      const warning =
+        `Delete “${project.title}”?\n\n` +
+        'This publishes a NIP-09 deletion request. Relays may decline it, and copies ' +
+        'held elsewhere are unaffected.\n\n' +
+        (issues.length
+          ? `Its ${issues.length} issue${issues.length === 1 ? '' : 's'} are separate events and are NOT deleted — ` +
+            'they stay in the Folder and stop being reachable from here.\n\n'
+          : '') +
+        'Archiving is reversible and usually what you want.'
+      if (!window.confirm(warning)) return
+      remove.disabled = true
+      const ok = await ctx.publish('Delete', () =>
+        ctx.store.deleteProject({
+          recordFolder: project.originFolder,
+          project: project.addr,
+        }),
+      )
+      if (ok) {
+        ctx.say('Deletion requested.')
+        // Nothing left to render here.
+        go({ name: 'projects', archived: false })
+      } else remove.disabled = false
+    }
+    panel.append(remove)
+  }
+
+  return panel
 }
 
 function progress(issues: Issue[]): HTMLElement {

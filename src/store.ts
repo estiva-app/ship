@@ -10,7 +10,16 @@
 import { signEvent } from '../lib/nostr/sign'
 import type { Identity, PublishResult, Relay } from '../lib/nostr/relay'
 import { buildCreateChannel, type SignedEvent, type UnsignedEvent } from '../lib/nostr/events'
-import { assertFolderId, buildChange, buildComment, buildIssue, buildProject, issueAddr, projectAddr } from './events'
+import {
+  assertFolderId,
+  buildChange,
+  buildComment,
+  buildDeletion,
+  buildIssue,
+  buildProject,
+  issueAddr,
+  projectAddr,
+} from './events'
 import { foldFolder, projectFolders, type FolderState } from './fold'
 import { KIND } from './kinds'
 import { buildRecommendation } from './manifest'
@@ -140,6 +149,50 @@ export class Store {
       }),
     )
     return { result, addr: projectAddr(this.identity.pubkey, id), id, folder }
+  }
+
+  /**
+   * Hide a project from the lists, or bring it back.
+   *
+   * A change event, so it is reversible, attributable and available to anyone
+   * in the Folder rather than only the project's author. This is the operation
+   * that should be reached for; `deleteProject` is the narrow one.
+   */
+  archiveProject(args: {
+    recordFolder: string
+    project: string
+    archived: boolean
+  }): Promise<PublishResult> {
+    return this.setField({
+      folder: args.recordFolder,
+      target: args.project,
+      field: 'archived',
+      value: args.archived ? 'true' : '',
+      note: args.archived ? 'archived' : 'unarchived',
+    })
+  }
+
+  /**
+   * Ask the relay to drop a project's record.
+   *
+   * Only the project's author can do this — NIP-09 is author-scoped — and it
+   * only removes the *record*. The issues in the Folder are separate events
+   * with their own authors; they survive, and simply stop being reachable from
+   * this app once the project they hung off is gone. Callers should say that
+   * out loud before publishing.
+   */
+  deleteProject(args: {
+    recordFolder: string
+    project: string
+    reason?: string
+  }): Promise<PublishResult> {
+    return this.publish(
+      buildDeletion(this.identity.pubkey, Date.now(), {
+        target: args.project,
+        folder: args.recordFolder,
+        reason: args.reason,
+      }),
+    )
   }
 
   /**

@@ -295,6 +295,59 @@ async function main() {
     recommended,
   )
 
+  // ── 7. Archive and delete ─────────────────────────────────────────────────
+  // Two operations with different reach, and the difference is the point.
+  // Archiving is a change event, so anyone in the Folder can do it and it can
+  // be undone. Deleting is NIP-09, author-scoped, and irreversible.
+  await must('Ravi archives Ana\'s project', () =>
+    ravi.store.archiveProject({
+      recordFolder: folder,
+      project: project.addr,
+      archived: true,
+    }),
+  )
+  const archivedState = foldFolder(await ravi.store.rawFolders([folder]))
+  const archivedProject = archivedState.projects.find((p) => p.addr === project.addr)
+  check('a non-author can archive', archivedProject?.archived === true)
+  check(
+    '  …and it is attributed to him',
+    archivedProject?.fields.archived?.by === ravi.identity.pubkey,
+  )
+
+  await must('Ravi unarchives it again', () =>
+    ravi.store.archiveProject({ recordFolder: folder, project: project.addr, archived: false }),
+  )
+  check(
+    'archiving is reversible',
+    foldFolder(await ravi.store.rawFolders([folder])).projects.find(
+      (p) => p.addr === project.addr,
+    )?.archived === false,
+  )
+
+  // NIP-09 is scoped to the pubkey that signed the original. Ravi asking for
+  // Ana's project to go away must not work, or "delete" would be an attack.
+  await ravi.store.deleteProject({ recordFolder: folder, project: project.addr })
+  const afterRavi = await ravi.store.rawFolders([folder])
+  check(
+    'a non-author CANNOT delete somebody else\'s project',
+    afterRavi.some((e) => e.kind === KIND.PROJECT),
+  )
+
+  await must('Ana deletes her own project', () =>
+    ana.store.deleteProject({ recordFolder: folder, project: project.addr }),
+  )
+  const afterAna = await ana.store.rawFolders([folder])
+  check(
+    'the author\'s deletion is honoured',
+    !afterAna.some((e) => e.kind === KIND.PROJECT),
+    `${afterAna.filter((e) => e.kind === KIND.PROJECT).length} project event(s) left`,
+  )
+  check(
+    '  …but the issues are separate events and survive',
+    afterAna.filter((e) => e.kind === KIND.ISSUE).length === 2,
+    `${afterAna.filter((e) => e.kind === KIND.ISSUE).length} issue(s) still in the Folder`,
+  )
+
   console.log(
     failures === 0
       ? '\nAll checks passed. Ravi changed Ana\'s issue without rewriting her event.'

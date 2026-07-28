@@ -124,8 +124,15 @@ function renderSidebar() {
       count !== undefined && h('span', { class: 'count', text: String(count) }),
     )
 
+  const active = state.projects.filter((project) => !project.archived)
+  const archivedAddrs = new Set(
+    state.projects.filter((project) => project.archived).map((project) => project.addr),
+  )
   const open = state.issues.filter(
-    (issue) => issue.status !== 'done' && issue.status !== 'cancelled',
+    (issue) =>
+      issue.status !== 'done' &&
+      issue.status !== 'cancelled' &&
+      !archivedAddrs.has(issue.projectAddr ?? ''),
   ).length
 
   el.sidebar.append(
@@ -133,15 +140,21 @@ function renderSidebar() {
       'div',
       { class: 'nav-group' },
       link('Issues', { name: 'issues' }, open, route.name === 'issues'),
-      link('Projects', { name: 'projects' }, state.projects.length, route.name === 'projects'),
+      link(
+        'Projects',
+        { name: 'projects', archived: false },
+        active.length,
+        route.name === 'projects',
+      ),
     ),
   )
 
-  // Projects are listed individually because a project is the unit of work in
-  // this app — and, since a project *is* a Folder, the unit of sharing too.
-  if (state.projects.length) {
+  // Archived projects are out of the navigation entirely. They are still one
+  // click away from the Projects surface, which is where you go when you are
+  // looking for something rather than working on it.
+  if (active.length) {
     const group = h('div', { class: 'nav-group' }, h('div', { class: 'nav-label', text: 'Projects' }))
-    for (const project of state.projects) {
+    for (const project of active) {
       const count = state.issues.filter((issue) => issue.projectAddr === project.addr).length
       group.append(
         link(
@@ -256,7 +269,7 @@ function render() {
 
   const view =
     route.name === 'projects'
-      ? projectsView(ctx)
+      ? projectsView(ctx, route.archived)
       : route.name === 'project'
         ? projectView(ctx, route.addr, route.view)
         : route.name === 'issue'

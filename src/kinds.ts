@@ -26,6 +26,13 @@ export const KIND = {
   CHANGE: 1851,
   /** NIP-22 comment. Registered on the relay; not used by the MVP UI yet. */
   COMMENT: 1111,
+  /**
+   * NIP-09 deletion request.
+   *
+   * A request rather than a delete, and honoured only for the pubkey that
+   * signed the original. Buzz accepts it and stops returning the target.
+   */
+  DELETION: 5,
 } as const
 
 /** A status value plus how to render it. */

@@ -11,14 +11,23 @@ import type { Ctx } from '../context'
 import { href } from '../router'
 import { ago, empty, h, openModal, pill, statusPill } from '../ui'
 
-export function projectsView(ctx: Ctx): HTMLElement {
+export function projectsView(ctx: Ctx, showArchived: boolean): HTMLElement {
+  const active = ctx.state.projects.filter((project) => !project.archived)
+  const archived = ctx.state.projects.filter((project) => project.archived)
+  const shown = showArchived ? archived : active
   const list = h('div', { class: 'cards' })
 
-  if (!ctx.state.projects.length) {
-    list.append(empty('No projects yet. Create one to get a Folder you can share with Peek.'))
+  if (!shown.length) {
+    list.append(
+      empty(
+        showArchived
+          ? 'Nothing archived.'
+          : 'No projects yet. Create one to get a Folder you can share with Peek.',
+      ),
+    )
   }
 
-  for (const project of ctx.state.projects) {
+  for (const project of shown) {
     const issues = ctx.state.issues.filter((issue) => issue.projectAddr === project.addr)
     const done = issues.filter((issue) => issue.status === 'done').length
     const meta = h(
@@ -28,6 +37,7 @@ export function projectsView(ctx: Ctx): HTMLElement {
       pill(`${issues.length} issue${issues.length === 1 ? '' : 's'}`),
       issues.length > 0 && pill(`${done}/${issues.length} done`),
       pill(`by ${ctx.who(project.author)} · ${ago(project.createdAt)}`),
+      project.archived && pill('Archived'),
     )
     list.append(
       h(
@@ -43,6 +53,24 @@ export function projectsView(ctx: Ctx): HTMLElement {
     )
   }
 
+  // The toggle only appears when there is something behind it — an
+  // "Archived (0)" control is noise on the common path.
+  const tabs = h('div', { class: 'tabs' })
+  if (archived.length) {
+    for (const [label, wantArchived] of [
+      [`Active (${active.length})`, false],
+      [`Archived (${archived.length})`, true],
+    ] as [string, boolean][]) {
+      tabs.append(
+        h('a', {
+          class: `tab${showArchived === wantArchived ? ' active' : ''}`,
+          href: href({ name: 'projects', archived: wantArchived }),
+          text: label,
+        }),
+      )
+    }
+  }
+
   return h(
     'div',
     { class: 'surface', 'data-surface': 'projects' },
@@ -52,6 +80,7 @@ export function projectsView(ctx: Ctx): HTMLElement {
       h('h1', { class: 'grow', text: 'Projects' }),
       addProjectButton(ctx),
     ),
+    archived.length ? tabs : h('div'),
     list,
   )
 }

@@ -246,6 +246,43 @@ export function buildComment(
 }
 
 /**
+ * kind:5 NIP-09 deletion request.
+ *
+ * A *request*, not a delete. Nothing on Nostr can unpublish an event: this asks
+ * the relays that hold it to drop it, and they may decline. Measured against
+ * Buzz it is accepted and honoured — the addressable event stops coming back —
+ * but a copy on another relay, or in another app's cache, is untouched.
+ *
+ * NIP-09 is **author-scoped**: a relay honours a deletion only from the pubkey
+ * that signed the original. That is the same constraint `kind:1851` exists to
+ * work around, and here it cannot be worked around, which is why archiving is
+ * the operation offered to everyone and this one is offered only to the author.
+ *
+ * `a` names the addressable event; `k` its kind, which NIP-09 requires so a
+ * relay can act without fetching the target first. `h` because the relay
+ * channel-scopes ingest and would otherwise reject this outright.
+ */
+export function buildDeletion(
+  pubkey: string,
+  createdAtMs: number,
+  args: { target: string; folder: string; reason?: string },
+): UnsignedEvent {
+  assertFolderId(args.folder)
+  const [targetKind] = args.target.split(':')
+  return {
+    pubkey,
+    created_at: toNostrSeconds(createdAtMs),
+    kind: KIND.DELETION,
+    tags: [
+      ['a', args.target],
+      ['k', targetKind],
+      ['h', args.folder],
+    ],
+    content: args.reason ?? '',
+  }
+}
+
+/**
  * A shareable Folder link: `folder:<uuid>`.
  *
  * Deliberately not a URL. A Folder is not owned by any one app, so a link
