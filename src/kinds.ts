@@ -43,6 +43,14 @@ export const KIND = {
    * signed the original. Buzz accepts it and stops returning the target.
    */
   DELETION: 5,
+  /**
+   * NIP-01 profile metadata — who a pubkey is.
+   *
+   * Not Linear-lite's own kind and not in its manifest: it is the ecosystem's
+   * one answer to "who wrote this", published by whichever app a key signs in
+   * and read by all of them. See `profiles.ts`.
+   */
+  PROFILE: 0,
 } as const
 
 /** A status value plus how to render it. */

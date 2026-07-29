@@ -13,9 +13,11 @@
  */
 import { buildChange, buildIssue, buildProject } from '../src/events'
 import { foldFolder, projectFolders, type Change, type Project } from '../src/fold'
+import { directoryFrom, initials, parseProfile } from '../src/profiles'
 import { href, parse } from '../apps/linear-lite/router'
 import { byStatus } from '../apps/linear-lite/views/issue-list'
 import type { Issue } from '../src/fold'
+import type { SignedEvent } from '../lib/nostr/events'
 
 let failures = 0
 function check(label: string, condition: boolean, detail = '') {
@@ -184,6 +186,58 @@ check(
   'every issue appears exactly once',
   groups.reduce((total, group) => total + group.issues.length, 0) === 3,
 )
+
+// ── Profiles ────────────────────────────────────────────────────────────────
+
+// A kind:0 is a JSON blob written by another app, and a malformed one must cost
+// a name rather than a screen: `parseProfile` throwing anywhere would take the
+// whole directory — and with it every author line — down with it.
+
+console.log('\n# who a pubkey is\n')
+
+const PK2 = 'b'.repeat(64)
+const profileEvent = (
+  pubkey: string,
+  content: string,
+  createdAt = 1000,
+  id = 'p',
+): SignedEvent => ({ id, pubkey, kind: 0, created_at: createdAt, tags: [], content, sig: '' })
+
+check(
+  'display_name wins over name',
+  parseProfile(profileEvent(PK, '{"name":"ana-ll","display_name":"Ana"}'))?.name === 'Ana',
+)
+check(
+  'name is used when there is no display_name',
+  parseProfile(profileEvent(PK, '{"name":"ana-ll"}'))?.name === 'ana-ll',
+)
+check(
+  'picture and nip05 come through',
+  parseProfile(profileEvent(PK, '{"picture":"http://x/a.png","nip05":"ana@relay"}'))?.nip05 ===
+    'ana@relay',
+)
+check('empty strings are not names', parseProfile(profileEvent(PK, '{"name":"  "}'))?.name === undefined)
+check('malformed JSON is dropped, not thrown', parseProfile(profileEvent(PK, '{"name":')) === null)
+check('a non-object profile is dropped', parseProfile(profileEvent(PK, '"Ana"')) === null)
+check(
+  'a number where a name should be is ignored',
+  parseProfile(profileEvent(PK, '{"name":42}'))?.name === undefined,
+)
+check(
+  'a non-profile event is not a profile',
+  parseProfile({ ...profileEvent(PK, '{}'), kind: 9 }) === null,
+)
+
+const directory = directoryFrom([
+  profileEvent(PK, '{"name":"Old"}', 1000, 'e1'),
+  profileEvent(PK, '{"name":"New"}', 2000, 'e2'),
+  profileEvent(PK2, 'not json', 1000, 'e3'),
+])
+check('the newest profile per key wins', directory.get(PK)?.name === 'New')
+check('one bad profile does not lose the good ones', directory.size === 1)
+
+check('initials come from a two-word name', initials({ pubkey: PK, name: 'Ana Silva', createdAt: 0 }, PK) === 'AS')
+check('initials fall back to the key', initials(undefined, PK) === 'AA')
 
 console.log(failures === 0 ? '\nApp logic OK.' : `\n${failures} check(s) FAILED.`)
 process.exit(failures === 0 ? 0 : 1)

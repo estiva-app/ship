@@ -8,6 +8,7 @@
  */
 import type { Identity } from '../../lib/nostr/relay'
 import type { FolderState, Issue, Project } from '../../src/fold'
+import type { Profile } from '../../src/profiles'
 import type { Store } from '../../src/store'
 import type { Route } from './router'
 
@@ -27,8 +28,12 @@ export interface Ctx {
   reload(): Promise<void>
   /** True when the pubkey is the local identity. */
   isMe(pubkey: string): boolean
-  /** "you" or a truncated pubkey. */
+  /** "you", a name from `kind:0`, or a truncated pubkey — in that order. */
   who(pubkey: string): string
+  /** A name from `kind:0`, or a truncated pubkey. Never "you". */
+  nameOf(pubkey: string): string
+  /** The `kind:0` profile behind a pubkey, when the relay had one. */
+  profile(pubkey: string): Profile | undefined
   /** The Folder an issue's events must carry — the one it already lives in. */
   folderOf(issue: Issue): string
   /** Where a new issue in this project belongs. */

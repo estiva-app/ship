@@ -148,6 +148,7 @@ export function projectView(
           people: ctx.people,
           value: project.lead,
           me: ctx.identity.pubkey,
+          nameOf: ctx.nameOf,
           onChange: (value) => set('lead', value, value ? 'Assign project' : 'Unassign project'),
         })),
         progress(issues),

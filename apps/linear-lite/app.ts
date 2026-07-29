@@ -24,9 +24,10 @@ import { localIdentity, Relay } from '../../lib/nostr/relay'
 import { naddrToAddr } from '../../lib/nostr/nip19'
 import { Store } from '../../src/store'
 import type { FolderState, Issue, Project } from '../../src/fold'
+import type { Directory } from '../../src/profiles'
 import type { Ctx } from './context'
 import { href, parse, replace, start, type Route } from './router'
-import { dropdown, h, participants, short } from './ui'
+import { avatar, dropdown, h, participants, short } from './ui'
 import { issuesView } from './views/issues'
 import { projectsView } from './views/projects'
 import { projectView } from './views/project'
@@ -64,12 +65,23 @@ async function saveDisplayName(name: string) {
   localStorage.setItem(DISPLAY_NAME_KEY, name)
   const ok = await publish('Profile', () => store.publishProfile(name))
   if (ok) say(`Others will see you as “${name}”.`)
-  renderProfile()
+  rememberSelf()
+  render()
 }
 
 let state: FolderState = { projects: [], issues: [], activity: [], conversations: [] }
 let route: Route = { name: 'issues' }
 let poll: ReturnType<typeof setInterval> | undefined
+
+/**
+ * Who everyone is, from `kind:0`.
+ *
+ * Populated from the relay, not from anything this app stores — the names in
+ * here were mostly written by Peek, about people who have never opened
+ * Linear-lite. That is the entire mechanism behind "the same person in both
+ * apps": neither app has the other's user table, both read the same profiles.
+ */
+let directory: Directory = new Map()
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
 const el = {
@@ -104,7 +116,56 @@ async function publish(
 }
 
 const isMe = (pubkey: string) => pubkey === identity.pubkey
-const who = (pubkey: string) => (isMe(pubkey) ? 'you' : short(pubkey))
+const nameOf = (pubkey: string) => directory.get(pubkey)?.name ?? short(pubkey)
+const who = (pubkey: string) => (isMe(pubkey) ? 'you' : nameOf(pubkey))
+
+/**
+ * Learn who a set of pubkeys are.
+ *
+ * `refresh` distinguishes the two callers. A navigation or an explicit reload
+ * re-reads every profile, so a rename made in Peek shows up on the next screen
+ * you open. The five-second poll asks only about keys it has never seen, so
+ * sitting on an issue does not re-query the whole cast every tick for names
+ * that almost never change.
+ *
+ * Failure is swallowed: a missing name degrades to a truncated pubkey, which is
+ * where this app started, and is not worth a banner over an issue list that
+ * loaded fine.
+ */
+async function learn(pubkeys: string[], refresh: boolean): Promise<void> {
+  const wanted = refresh ? pubkeys : pubkeys.filter((pubkey) => !directory.has(pubkey))
+  if (!wanted.length) return
+  try {
+    for (const [pubkey, profile] of await store.profiles(wanted)) directory.set(pubkey, profile)
+  } catch {
+    // Names are a nicety; the record is what matters and it already loaded.
+  }
+}
+
+/** Everyone visible in the current state — the directory's fetch list. */
+function peopleIn(snapshot: FolderState): string[] {
+  return participants({
+    projects: snapshot.projects,
+    issues: snapshot.issues,
+    conversations: snapshot.conversations,
+    changes: snapshot.activity,
+  })
+}
+
+/**
+ * Put our own name in the directory without waiting for a round trip.
+ *
+ * We know what we just published, and re-reading it to render our own name
+ * would make the profile menu lag a rename by a network call.
+ */
+function rememberSelf() {
+  directory.set(identity.pubkey, {
+    ...directory.get(identity.pubkey),
+    pubkey: identity.pubkey,
+    name: displayName(),
+    createdAt: Math.floor(Date.now() / 1000),
+  })
+}
 
 function context(): Ctx {
   return {
@@ -112,17 +173,16 @@ function context(): Ctx {
     identity,
     state,
     route,
-    people: participants({
-      projects: state.projects,
-      issues: state.issues,
-      conversations: state.conversations,
-      changes: state.activity,
-    }),
+    // Sorted by how they are labelled rather than by key: a picker ordered by
+    // hex is ordered by nothing a person can see.
+    people: peopleIn(state).sort((a, b) => nameOf(a).localeCompare(nameOf(b))),
     say,
     publish,
     reload: () => load(),
     isMe,
     who,
+    nameOf,
+    profile: (pubkey: string) => directory.get(pubkey),
     // An issue's events must carry the issue's own `h` — the Folder it is
     // already in, which is not necessarily the project's current one if the
     // project has since been re-linked.
@@ -204,14 +264,17 @@ function renderSidebar() {
  * means, and that is a deployment concern rather than a button.
  */
 function renderProfile() {
+  const me = directory.get(identity.pubkey)
   el.profile.replaceChildren(
     dropdown({
-      label: `you: ${short(identity.pubkey)}`,
+      label: displayName(),
+      icon: avatar({ pubkey: identity.pubkey, profile: me, title: 'you', size: 20 }),
       build: (close) => {
         const panel = h(
           'div',
           {},
           h('div', { class: 'menu-label', text: 'Signed in as' }),
+          h('div', { class: 'menu-value', text: displayName() }),
           h('div', { class: 'mono tiny dim break menu-value', text: identity.pubkey }),
           h('div', { class: 'menu-label', text: 'Workspace' }),
           h('div', { class: 'mono tiny dim break menu-value', text: RELAY_URL }),
@@ -250,6 +313,7 @@ function renderProfile() {
 async function load(): Promise<void> {
   try {
     state = await store.loadAll()
+    await learn(peopleIn(state), true)
   } catch (error) {
     say(`Could not read from the relay — ${(error as Error).message}`, 'error')
   }
@@ -270,6 +334,9 @@ async function refresh(): Promise<void> {
     const next = await store.loadAll()
     if (fingerprint(next) === fingerprint(state)) return
     state = next
+    // Only the newcomers: whoever just commented is very likely the one author
+    // on screen we have no name for yet.
+    await learn(peopleIn(next), false)
     render()
   } catch {
     // A failed poll is not worth a banner: the user did not ask for it, and the
@@ -355,6 +422,7 @@ async function resolveInbound(naddr: string) {
 
 // ── Boot ────────────────────────────────────────────────────────────────────
 
+rememberSelf()
 renderProfile()
 // Published once per load, and idempotent — kind:0 is replaceable. Without it
 // this key is a stranger everywhere else in the ecosystem.

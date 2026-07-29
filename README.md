@@ -45,6 +45,10 @@ to be independent implementations, not siblings sharing a package.
   `orderingMs` before touching the ordering rule
 - `store.ts` — publish and read against the relay. No cache, deliberately.
   `loadAll` is the discovery read described below
+- `profiles.ts` — `kind:0` in, people out. Not Linear-lite's own idea of a user:
+  the names and avatars here were mostly written by Peek, about people who have
+  never opened this app. Neither app has the other's user table and both read
+  the same profiles, which is the whole of cross-app identity
 
 `apps/linear-lite/` — the UI. Plain DOM, no framework. `router.ts` is hash
 routing, `views/` is one module per surface, `ui.ts` the shared primitives.

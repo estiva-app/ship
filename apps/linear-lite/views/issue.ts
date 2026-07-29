@@ -101,6 +101,7 @@ export function issueView(ctx: Ctx, addr: string, relayUrl: string): HTMLElement
           people: ctx.people,
           value: issue.assignee,
           me: ctx.identity.pubkey,
+          nameOf: ctx.nameOf,
           onChange: (value) => set('assignee', value, value ? 'Assign' : 'Unassign'),
         })),
         field('Project', projectSelect(ctx, issue, set)),

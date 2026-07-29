@@ -28,6 +28,7 @@ import {
 } from './events'
 import { findNaddrs, naddrToAddr } from '../lib/nostr/nip19'
 import { foldFolder, projectFolders, type FolderState } from './fold'
+import { directoryFrom, type Directory } from './profiles'
 import { KIND } from './kinds'
 import { buildRecommendation } from './manifest'
 import { MANIFEST_ADDRESS } from './manifest-address'
@@ -314,6 +315,32 @@ export class Store {
         about: about ?? 'Posting from Linear-lite',
       }),
     )
+  }
+
+  /**
+   * Who these pubkeys are.
+   *
+   * The mirror of `publishProfile`: this app publishes one profile and reads
+   * everyone else's, which is the whole of cross-app identity. Without it every
+   * author here renders as 64 hex characters even though Peek has published a
+   * name for that key — the data was always there, nobody was asking for it.
+   *
+   * **One filter, `authors` as an array.** The `#h` OR-ing bug documented on
+   * `rawFolders` is specific to *tag* filters; `authors` is a top-level NIP-01
+   * field and the relay does OR it. Peek issues exactly this query shape
+   * against the same bridge (`convex/nostr/sync.ts`), so this is proven rather
+   * than assumed.
+   *
+   * Returns whatever came back — a key with no profile is simply absent, which
+   * the caller renders as a truncated pubkey.
+   */
+  async profiles(pubkeys: string[]): Promise<Directory> {
+    const authors = [...new Set(pubkeys)].filter((pubkey) => /^[0-9a-f]{64}$/.test(pubkey))
+    if (!authors.length) return new Map()
+    const events = await this.relay.query([
+      { kinds: [KIND.PROFILE], authors, limit: authors.length },
+    ])
+    return directoryFrom(events)
   }
 
   /**

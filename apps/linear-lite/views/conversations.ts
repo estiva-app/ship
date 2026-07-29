@@ -13,7 +13,7 @@
 import type { Conversation, Message } from '../../../src/fold'
 import type { Ctx } from '../context'
 import { addrToNaddr } from '../../../lib/nostr/nip19'
-import { ago, empty, h } from '../ui'
+import { ago, avatar, empty, h } from '../ui'
 
 export function conversations(
   ctx: Ctx,
@@ -126,10 +126,19 @@ function messageRow(ctx: Ctx, message: Message, kind: 'root' | 'reply'): HTMLEle
   return h(
     'div',
     { class: `message ${kind}` },
-    h('div', {
-      class: 'byline',
-      text: `${ctx.who(message.author)} · ${ago(message.createdAt)}`,
-    }),
+    h(
+      'div',
+      { class: 'byline' },
+      // The one surface where an avatar earns its place: a thread is people
+      // talking, and most of these people are in Peek rather than here.
+      avatar({
+        pubkey: message.author,
+        profile: ctx.profile(message.author),
+        title: ctx.isMe(message.author) ? 'you' : message.author,
+        size: 18,
+      }),
+      h('span', { text: `${ctx.who(message.author)} · ${ago(message.createdAt)}` }),
+    ),
     // The trailing reference is machinery, not something anyone wrote to be
     // read — it is stripped here and shown as context by the surface instead.
     h('div', { class: 'message-body', text: stripReferences(message.body) }),

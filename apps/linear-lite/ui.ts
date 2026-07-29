@@ -7,6 +7,7 @@
  */
 import { ISSUE_STATUSES, lookupStatus, type VocabEntry } from '../../src/kinds'
 import type { Conversation, Issue, Project } from '../../src/fold'
+import { initials, type Profile } from '../../src/profiles'
 
 /** Element factory: `h('div', {class: 'row'}, child, 'text')`. */
 export function h<K extends keyof HTMLElementTagNameMap>(
@@ -29,6 +30,43 @@ export function h<K extends keyof HTMLElementTagNameMap>(
 }
 
 export const short = (pubkey: string) => `${pubkey.slice(0, 8)}…`
+
+/**
+ * A person's avatar.
+ *
+ * The image comes from `kind:0` and is therefore a URL some other app chose,
+ * which is why the fallback matters more than the image: most keys have no
+ * picture, and every key must still render as something a person can tell
+ * apart. Initials on a colour derived from the pubkey do that deterministically
+ * — the same key is the same colour in every session, without storing anything.
+ *
+ * `onerror` falls back too. A picture URL can rot (an app's storage moves, a
+ * host goes away) and a broken-image glyph is worse than initials.
+ */
+export function avatar(args: {
+  pubkey: string
+  profile?: Profile
+  /** Tooltip — the caller knows whether this is "you". */
+  title?: string
+  size?: number
+}): HTMLElement {
+  const size = args.size ?? 22
+  const hue = Number.parseInt(args.pubkey.slice(0, 2) || '0', 16) * 1.41
+  const node = h('span', {
+    class: 'avatar',
+    style: `width:${size}px;height:${size}px;font-size:${Math.round(size * 0.42)}px;background:hsl(${hue.toFixed(0)} 45% 42%)`,
+    title: args.title ?? args.profile?.nip05 ?? args.pubkey,
+    text: initials(args.profile, args.pubkey),
+  })
+  if (args.profile?.picture) {
+    const img = h('img', { src: args.profile.picture, alt: '' })
+    // Keep the initials underneath rather than replacing them: if the image
+    // never loads, removing it reveals a filled avatar instead of a hole.
+    img.onerror = () => img.remove()
+    node.append(img)
+  }
+  return node
+}
 
 /** A status chip, coloured from the vocabulary the manifest publishes. */
 export function statusPill(status: string, vocab: VocabEntry[] = ISSUE_STATUSES): HTMLElement {
@@ -131,6 +169,8 @@ export function assigneeSelect(args: {
   people: string[]
   value: string | undefined
   me: string
+  /** How to label a key — a `kind:0` name where there is one, else a short key. */
+  nameOf: (pubkey: string) => string
   onChange: (value: string) => Promise<boolean>
 }): HTMLSelectElement {
   const current = args.value ?? ''
@@ -138,10 +178,15 @@ export function assigneeSelect(args: {
   select.append(h('option', { value: '', text: 'Unassigned' }))
   const people = args.people.includes(current) || !current ? args.people : [...args.people, current]
   for (const pubkey of people) {
+    // The key stays in the label even when a name is known. Names on a relay
+    // are self-declared and not unique — two people can both publish "Ana" —
+    // so the thing that actually identifies the assignee stays on screen.
+    const name = args.nameOf(pubkey)
+    const label = name === short(pubkey) ? name : `${name} (${short(pubkey)})`
     select.append(
       h('option', {
         value: pubkey,
-        text: pubkey === args.me ? `you (${short(pubkey)})` : short(pubkey),
+        text: pubkey === args.me ? `you (${short(pubkey)})` : label,
       }),
     )
   }
@@ -265,9 +310,15 @@ export function openModal(args: { title: string; body: HTMLElement }): () => voi
  * that stays open after you have chosen something reads as a menu that did not
  * register the choice.
  */
-export function dropdown(args: { label: string; className?: string; build: (close: () => void) => HTMLElement }): HTMLElement {
+export function dropdown(args: {
+  label: string
+  /** Optional element shown before the label — an avatar, in practice. */
+  icon?: HTMLElement
+  className?: string
+  build: (close: () => void) => HTMLElement
+}): HTMLElement {
   const wrap = h('div', { class: `dropdown ${args.className ?? ''}`.trim() })
-  const trigger = h('button', { class: 'dropdown-trigger', text: args.label })
+  const trigger = h('button', { class: 'dropdown-trigger' }, args.icon, h('span', { text: args.label }))
   let panel: HTMLElement | undefined
 
   const close = () => {
