@@ -33,7 +33,16 @@ import { projectsView } from './views/projects'
 import { projectView } from './views/project'
 import { issueView } from './views/issue'
 
-const RELAY_URL = 'http://localhost:3000'
+/**
+ * Substituted by esbuild at build time — see `build.mjs`.
+ *
+ * Declared rather than imported because the value belongs to the deployment,
+ * not to the source: a build for the hosted relay and a build for a laptop are
+ * the same code pointed at two different workspaces.
+ */
+declare const __RELAY_URL__: string
+
+const RELAY_URL = __RELAY_URL__
 /**
  * How often a detail surface re-reads.
  *
