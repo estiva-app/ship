@@ -5,4 +5,4 @@
  * kind:31989 pointing here on the user's behalf, which is how a consumer picks
  * this manifest over any other claiming the same kinds.
  */
-export const MANIFEST_ADDRESS = '31990:88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13:linear-lite'
+export const MANIFEST_ADDRESS = '31990:88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13:estiva-ship'

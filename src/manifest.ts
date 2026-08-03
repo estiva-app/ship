@@ -92,7 +92,7 @@ export interface ManifestContent {
   actions: unknown[]
 }
 
-export const MANIFEST_D_TAG = 'linear-lite'
+export const MANIFEST_D_TAG = 'estiva-ship'
 
 export function manifestContent(): ManifestContent {
   return {
