@@ -202,7 +202,7 @@ function activity(ctx: Ctx, issue: Issue): HTMLElement {
  * Copy `nostr:naddr1…` — the handoff to every other app.
  *
  * NIP-21's URI scheme wrapping a NIP-19 pointer, which is what Peek scans
- * message bodies for (NIP-27). Nothing about it is Linear-lite-specific: any
+ * message bodies for (NIP-27). Nothing about it is Ship-specific: any
  * app that can decode an naddr can resolve it, including apps that do not exist
  * yet. The relay hint travels with the pointer so the consumer does not have to
  * already know where this object lives.

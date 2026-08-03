@@ -271,7 +271,7 @@ function folderPanel(ctx: Ctx, project: Project, contentFolder: string): HTMLEle
   const copy = h('button', { class: 'tiny-button', text: 'Copy Folder link' })
   copy.onclick = async () => {
     // A `folder:<uuid>` link, not a URL. A Folder belongs to no single app, so
-    // a link pointing at Linear-lite's own port would misdescribe what it is.
+    // a link pointing at Estiva Ship's own port would misdescribe what it is.
     const link = folderLink(contentFolder)
     try {
       await navigator.clipboard.writeText(link)

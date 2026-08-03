@@ -40,10 +40,10 @@ const decodedNpub = bech32Decode(SPEC_NPUB)
 const decodedHex = Buffer.from(convertBits(decodedNpub.data, 5, 8, false)).toString('hex')
 check('decodes it back to the right pubkey', decodedHex === SPEC_PUBKEY, decodedHex.slice(0, 16))
 
-// A realistic Linear-lite issue: UUID `d` tag, well past bech32's 90-char cap.
+// A realistic Estiva Ship issue: UUID `d` tag, well past bech32's 90-char cap.
 const address = '30851:88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13:9f1b4a2c-7e3d-4c8a-9b2e-1d5f6a7b8c9d'
 const naddr = addrToNaddr(address, ['http://localhost:3000'])
-check('round-trips a Linear-lite issue address', naddrToAddr(naddr) === address, `${naddr.length} chars`)
+check('round-trips a Ship issue address', naddrToAddr(naddr) === address, `${naddr.length} chars`)
 check('carries the relay hint', decodeNaddr(naddr).relays[0] === 'http://localhost:3000')
 check('exceeds bech32\'s 90-char cap, as NIP-19 allows', naddr.length > 90)
 

@@ -1,13 +1,13 @@
 /**
- * Linear-lite's NIP-89 manifest — build-order step 3.
+ * Estiva Ship's NIP-89 manifest — build-order step 3.
  *
  * This is the part that is genuinely new protocol, and the reason the app
  * exists (RFC_UPDATES.md §3). NIP-89's `kind:31990` already says how to *open*
  * an object in its owning app; it says nothing about how to **render** one
  * inline, or what another app may **do** to it. This adds both.
  *
- * The principle it encodes: **the owner defines the projection.** Linear-lite
- * decides which fields of a Linear-lite issue matter; the consumer decides how
+ * The principle it encodes: **the owner defines the projection.** Ship
+ * decides which fields of a Ship issue matter; the consumer decides how
  * they look. That inverts normal integration, where every consumer picks fields
  * itself and each gets it wrong differently.
  *
@@ -99,7 +99,7 @@ export function manifestContent(): ManifestContent {
     name: 'Estiva Ship',
     about: 'Projects and issues',
 
-    // ── How to read a Linear-lite record ──────────────────────────────────
+    // ── How to read a Ship record ─────────────────────────────────────────
     // Without this a consumer can fetch an Issue and still not know its
     // status, because the status is not on the Issue.
     records: {
@@ -119,7 +119,7 @@ export function manifestContent(): ManifestContent {
        *
        * Archived is a *folded field*, not a deletion, so an archived project is
        * still perfectly readable — it comes back from every query and renders
-       * fine. Linear-lite drops it from its own lists; a consumer with no way to
+       * fine. Ship drops it from its own lists; a consumer with no way to
        * know that shows it as though it were live, which is what PEEK-24 found:
        * a Peek topic whose Folder held three archived projects showed one of
        * them, chosen by nothing.
@@ -161,7 +161,7 @@ export function manifestContent(): ManifestContent {
 
     // ── Vocabularies, so a consumer can render and validate ───────────────
     // Declared once and used for both. These are the same arrays the
-    // Linear-lite UI renders from — not a copy that can drift.
+    // Ship UI renders from — not a copy that can drift.
     vocabularies: {
       statuses: PROJECT_STATUSES,
       issueStatuses: ISSUE_STATUSES,
@@ -192,7 +192,7 @@ export function manifestContent(): ManifestContent {
        * Absent until PEEK-24 asked a consumer to render a project's properties
        * as controls rather than as text, and their absence was the whole answer
        * to why it could not: a consumer may only offer what the owner declares.
-       * Nothing in Linear-lite had to change to support them — `fold.ts` already
+       * Nothing in Ship had to change to support them — `fold.ts` already
        * reads both fields off the change stream. They were simply never said out
        * loud, which is the failure mode this manifest exists to prevent.
        */
@@ -214,7 +214,7 @@ export function manifestContent(): ManifestContent {
         id: 'comment',
         label: 'Comment',
         /**
-         * Emits `kind:9` — Peek's own topic message — not a Linear-lite kind.
+         * Emits `kind:9` — Peek's own topic message — not a Ship kind.
          *
          * A project is a Folder and a Peek topic is that Folder, so a comment
          * on one of these objects is a conversation in the container. Declaring
@@ -258,7 +258,7 @@ export function manifestContent(): ManifestContent {
 /**
  * kind:31989 handler recommendation — "for this kind, I use that app".
  *
- * Signed by **the user**, not by Linear-lite, and that is the point. A `#k`
+ * Signed by **the user**, not by Ship, and that is the point. A `#k`
  * query for kind 30851 returns every manifest claiming to handle issues, and
  * nothing in NIP-89 ranks them (LINEAR_LITE_SPEC.md §7.3 — which stopped being
  * hypothetical the moment a throwaway probe published a competing manifest by
@@ -300,10 +300,10 @@ export function buildRecommendation(
 }
 
 /**
- * Where Linear-lite is served.
+ * Where Ship is served.
  *
  * Only ever used to build the `web` tag below. It is a *hint* for other apps,
- * not something this app reads — Linear-lite never needs to know its own URL to
+ * not something this app reads — Ship never needs to know its own URL to
  * function, and hardcoding a port into the data layer would be a lie the first
  * time somebody deploys it anywhere else.
  */
@@ -324,7 +324,7 @@ export function buildManifest(
      * holding — here always an `naddr`, since both kinds are addressable.
      *
      * This is the return leg of the roundtrip, and until it existed the loop was
-     * one-directional: Peek could render a Linear-lite issue and change its
+     * one-directional: Peek could render a Ship issue and change its
      * status, and the only way back to the issue itself was to alt-tab and hunt
      * for the row. A reference you cannot follow is a screenshot.
      *

@@ -1,5 +1,5 @@
 /**
- * Linear-lite's kinds and vocabularies.
+ * Estiva Ship's kinds and vocabularies.
  *
  * Kind numbers are **provisional** — 30820–30899 and 185x are unused in the NIP
  * repository and in Buzz. They are not accepted by a stock Buzz relay either;
@@ -12,7 +12,7 @@ export const KIND = {
   /**
    * NIP-29 create group — this is how a **Folder** comes into existence.
    *
-   * Buzz calls it a channel; the RFC calls it a Folder and Linear-lite shows it
+   * Buzz calls it a channel; the RFC calls it a Folder and Ship shows it
    * as a workspace. One container, many projections
    * (RFC_UPDATES.md §1.1). Mechanically it is the `h` tag, and it is required
    * on every object below.
@@ -46,7 +46,7 @@ export const KIND = {
   /**
    * NIP-01 profile metadata — who a pubkey is.
    *
-   * Not Linear-lite's own kind and not in its manifest: it is the ecosystem's
+   * Not Ship's own kind and not in its manifest: it is the ecosystem's
    * one answer to "who wrote this", published by whichever app a key signs in
    * and read by all of them. See `profiles.ts`.
    */
@@ -66,8 +66,8 @@ export interface VocabEntry {
  *
  * These live here rather than being scattered through the UI because they are
  * about to be published: step 3 of the build order puts them in the NIP-89
- * manifest verbatim, so another app can render and validate Linear-lite's
- * objects without knowing anything about Linear-lite. Declared once, used for
+ * manifest verbatim, so another app can render and validate Ship's
+ * objects without knowing anything about Ship. Declared once, used for
  * rendering, for the status picker, and (at step 3) for cross-app validation.
  */
 export const PROJECT_STATUSES: VocabEntry[] = [

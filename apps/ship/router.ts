@@ -1,7 +1,7 @@
 /**
  * Hash routing.
  *
- * The hash rather than the History API because Linear-lite is served as static
+ * The hash rather than the History API because Estiva Ship is served as static
  * files with no rewrite rule — a real path would 404 on reload, and "the link I
  * pasted into Peek is broken when someone opens it" is the exact failure this
  * whole layer exists to prevent.

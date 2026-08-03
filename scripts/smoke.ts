@@ -266,7 +266,7 @@ async function main() {
 
   // ── The inbound leg: a reference pasted from Peek ─────────────────────────
   // Encoded with the app's own encoder, so this cannot pass against a shape
-  // Linear-lite would never itself produce.
+  // Estiva Ship would never itself produce.
   const addr = `30851:${issue!.pubkey}:${tagValue(issue!, 'd')}`
   const naddr = addrToNaddr(addr, ['http://localhost:3000'])
   await page.goto(`http://localhost:${PORT}/ship/#/o/${naddr}`)

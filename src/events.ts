@@ -1,5 +1,5 @@
 /**
- * Event builders for Linear-lite's three kinds.
+ * Event builders for Estiva Ship's three kinds.
  *
  * Same discipline as `lib/nostr/events.ts`: pure functions, no I/O, no
  * randomness, so the shapes are unit-testable and the caller owns identity and
@@ -203,7 +203,7 @@ export function buildChange(
  * on the project and a conversation in the topic are one event read twice
  * rather than two records to reconcile. Peek's sync already imports a foreign
  * pubkey's `kind:9` as a message, and one carrying an `e` tag as a reply into
- * the right thread — so writing this shape makes Linear-lite's conversations
+ * the right thread — so writing this shape makes Ship's conversations
  * appear in Peek with no change on Peek's side at all.
  *
  * Threading is Buzz's own: no `e` tag is a root message and starts a
@@ -214,10 +214,10 @@ export function buildChange(
  * under an issue rather than only on the project. Two ways in, because two apps
  * write these:
  *
- *  - an `a` tag, which Linear-lite and Peek's widget set explicitly;
+ *  - an `a` tag, which Ship and Peek's widget set explicitly;
  *  - a `nostr:naddr…` in the body, which is what a person typing in Peek does.
  *
- * The naddr is appended to the body when Linear-lite starts a conversation
+ * The naddr is appended to the body when Ship starts a conversation
  * about an issue, so Peek renders the issue widget above the message instead of
  * showing a bare comment with no indication of what it refers to.
  */
@@ -292,7 +292,7 @@ export function buildDeletion(
  * A shareable Folder link: `folder:<uuid>`.
  *
  * Deliberately not a URL. A Folder is not owned by any one app, so a link
- * pointing at `localhost:5190` would be a Linear-lite link to a shared
+ * pointing at `localhost:5190` would be a Ship link to a shared
  * container — exactly the framing the projection principle rejects. This says
  * "the Folder with this id" and nothing about who renders it.
  *

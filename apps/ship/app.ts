@@ -1,5 +1,5 @@
 /**
- * Linear-lite — the shell.
+ * Estiva Ship — the shell.
  *
  * Plain DOM, no framework. Every mutation publishes an event and then re-reads
  * from the relay, so what you see is always the folded shared record rather
@@ -87,7 +87,7 @@ let poll: ReturnType<typeof setInterval> | undefined
  *
  * Populated from the relay, not from anything this app stores — the names in
  * here were mostly written by Peek, about people who have never opened
- * Linear-lite. That is the entire mechanism behind "the same person in both
+ * Ship. That is the entire mechanism behind "the same person in both
  * apps": neither app has the other's user table, both read the same profiles.
  */
 let directory: Directory = new Map()

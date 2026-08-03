@@ -1,10 +1,10 @@
 /**
- * Linear-lite's data layer: publish and read, over `lib/nostr/relay.ts`.
+ * Estiva Ship's data layer: publish and read, over `lib/nostr/relay.ts`.
  *
  * There is no database here and no cache. Every read is a query against the
  * relay and a fresh fold — which is slower than it could be and is the honest
- * shape for the claim being made. If Linear-lite kept its own materialised copy
- * of the state, "two apps agree on the data" would be measuring Linear-lite's
+ * shape for the claim being made. If Ship kept its own materialised copy
+ * of the state, "two apps agree on the data" would be measuring Ship's
  * cache rather than the shared record.
  */
 import { signEvent } from '../lib/nostr/sign'
@@ -83,7 +83,7 @@ export class Store {
    * already maps to success (FRICTION.md A2).
    *
    * **Open, not private.** A private Folder is invisible to every other app: a
-   * non-member's query returns zero rows rather than an error, so a Linear-lite
+   * non-member's query returns zero rows rather than an error, so a Ship
    * issue in one silently fails to render anywhere else (FRICTION.md A7). Buzz
    * treats `open` as accessible to everyone — `get_accessible_channel_ids`
    * unions members with all open channels — which is what makes a Folder a
@@ -344,7 +344,7 @@ export class Store {
   }
 
   /**
-   * Tell the world which app handles Linear-lite's kinds.
+   * Tell the world which app handles Ship's kinds.
    *
    * Published from the *user's* key, not the app's. A `#k` query returns every
    * manifest claiming a kind and NIP-89 does not rank them; this is what lets a

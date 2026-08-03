@@ -1,7 +1,7 @@
 /**
  * Ask the live relay, one kind at a time, "would you accept this?".
  *
- * Run before and after patching Buzz. Before, every Linear-lite kind should come
+ * Run before and after patching Buzz. Before, every Estiva Ship kind should come
  * back `restricted: unknown event kind`; after, every one should be accepted.
  * The point is to have the relay's own words rather than an assumption about
  * what the allowlist contains.
@@ -106,7 +106,7 @@ async function main() {
       unsigned(31989, [['d', '65535'], ['a', `31990:${identity.pubkey}:ship-probe`]]),
     ),
 
-    // ── Linear-lite's own provisional kinds ──
+    // ── Ship's own provisional kinds ──
     await probe(
       'kind:30850 Project',
       unsigned(
@@ -140,7 +140,7 @@ async function main() {
     ),
   ]
 
-  // The Folder is required on every Linear-lite object (RFC_UPDATES §1.1). Prove
+  // The Folder is required on every Ship object (RFC_UPDATES §1.1). Prove
   // the relay enforces that rather than trusting clients to remember.
   console.log('\nFolder enforcement — these SHOULD be rejected:')
   const hless = [

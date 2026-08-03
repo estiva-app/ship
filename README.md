@@ -1,4 +1,4 @@
-# Linear-lite
+# Estiva Ship
 
 A deliberately minimal issue tracker — **projects, issues, comments** — built on
 Nostr as the second real app in the Nostr for Business ecosystem.
@@ -36,7 +36,7 @@ debugging time — the NIP-98 nonce requirement, `HTTP 200` not meaning accepted
 The duplication from `~/nfb-demos` is deliberate: apps in this ecosystem are meant
 to be independent implementations, not siblings sharing a package.
 
-`src/` — Linear-lite's own data layer:
+`src/` — Ship's own data layer:
 
 - `kinds.ts` — the three kinds and the status vocabularies. The vocabularies get
   published verbatim in the manifest at build-order step 3
@@ -45,12 +45,12 @@ to be independent implementations, not siblings sharing a package.
   `orderingMs` before touching the ordering rule
 - `store.ts` — publish and read against the relay. No cache, deliberately.
   `loadAll` is the discovery read described below
-- `profiles.ts` — `kind:0` in, people out. Not Linear-lite's own idea of a user:
+- `profiles.ts` — `kind:0` in, people out. Not Ship's own idea of a user:
   the names and avatars here were mostly written by Peek, about people who have
   never opened this app. Neither app has the other's user table and both read
   the same profiles, which is the whole of cross-app identity
 
-`apps/linear-lite/` — the UI. Plain DOM, no framework. `router.ts` is hash
+`apps/ship/` — the UI. Plain DOM, no framework. `router.ts` is hash
 routing, `views/` is one module per surface, `ui.ts` the shared primitives.
 
 `scripts/` — `probe-kinds.ts` asks the relay which kinds it will accept;
@@ -98,7 +98,7 @@ Two consequences worth knowing:
 
 ## Conversations
 
-Linear-lite does not have its own comment kind. A conversation is a **`kind:9`**
+Ship does not have its own comment kind. A conversation is a **`kind:9`**
 — the same NIP-29 stream message Peek writes for a topic message — posted into
 the project's Folder.
 
@@ -125,7 +125,7 @@ Threads appear in **both** places: on the project *and* under the issue they
 mention. Duplicated on purpose — hiding a thread from the project because it
 mentions an issue only makes people wonder where it went.
 
-Linear-lite appends the issue's `nostr:naddr` when you start a thread about one,
+Ship appends the issue's `nostr:naddr` when you start a thread about one,
 so Peek renders the issue's widget above the message rather than showing a bare
 line with nothing saying what it refers to. The reference is stripped when
 displayed here.
@@ -167,7 +167,7 @@ npm install
 npm run serve      # builds and serves dist/ on :5190
 ```
 
-Then open **http://localhost:5190/linear-lite/** and add a project. It gets its
+Then open **http://localhost:5190/ship/** and add a project. It gets its
 own Folder; the *Folder* panel on the project's page is what you paste into Peek
 to pair a topic with it — or paste a topic's Folder link when creating the
 project, and they are the same container from the start.
@@ -219,7 +219,7 @@ patches on the `nfb-demo-kinds` branch to copy the shape from.
 This applies to **ratified NIPs too** — NIP-89 and NIP-22 are standard and Buzz
 still rejects them.
 
-**This is already done** for the six kinds Linear-lite needs, in two commits on
+**This is already done** for the six kinds Ship needs, in two commits on
 `nfb-demo-kinds`: one for the ratified kinds (1111, 31989/31990), which is
 upstreamable on its own, and one for the provisional ones (30850/30851/1851).
 `npm run probe` will tell you whether the relay you are pointed at has them.

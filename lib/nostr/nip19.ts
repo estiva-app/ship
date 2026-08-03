@@ -1,7 +1,7 @@
 /**
  * NIP-19 `naddr` — bech32-encoded pointers to addressable events.
  *
- * This is how a Linear-lite issue gets *into* another app: someone pastes
+ * This is how an Estiva Ship issue gets *into* another app: someone pastes
  * `nostr:naddr1…` into a Peek message (NIP-21 for the URI scheme, NIP-27 for
  * the convention of embedding one in a text body), and Peek resolves it.
  *

@@ -1,7 +1,7 @@
 /**
  * Who a pubkey is: `kind:0` profiles, read from the relay.
  *
- * Nothing here is Linear-lite's own idea of a person. A profile is NIP-01
+ * Nothing here is Estiva Ship's own idea of a person. A profile is NIP-01
  * metadata published by whichever app that key signs in — Peek publishes one
  * for every account it holds, and this app publishes one for its local key —
  * so reading `kind:0` is how one app renders another app's people without
