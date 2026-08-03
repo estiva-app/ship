@@ -67,7 +67,7 @@ const store = new Store(new Relay(RELAY_URL, identity), identity)
  * `localStorage` because the key is too — this identity is per-browser.
  */
 function displayName(): string {
-  return localStorage.getItem(DISPLAY_NAME_KEY) ?? `linear-lite-${identity.pubkey.slice(0, 6)}`
+  return localStorage.getItem(DISPLAY_NAME_KEY) ?? `ship-${identity.pubkey.slice(0, 6)}`
 }
 
 async function saveDisplayName(name: string) {

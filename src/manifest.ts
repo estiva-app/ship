@@ -96,7 +96,7 @@ export const MANIFEST_D_TAG = 'linear-lite'
 
 export function manifestContent(): ManifestContent {
   return {
-    name: 'Linear-lite',
+    name: 'Estiva Ship',
     about: 'Projects and issues',
 
     // ── How to read a Linear-lite record ──────────────────────────────────

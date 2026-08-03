@@ -104,7 +104,7 @@ export class Store {
         name,
         visibility: 'open',
         channelType: 'forum',
-        about: 'Linear-lite Folder',
+        about: 'Ship Folder',
       }),
     )
   }
@@ -312,7 +312,7 @@ export class Store {
     return this.publish(
       buildProfile(this.identity.pubkey, Date.now(), {
         name,
-        about: about ?? 'Posting from Linear-lite',
+        about: about ?? 'Posting from Estiva Ship',
       }),
     )
   }
