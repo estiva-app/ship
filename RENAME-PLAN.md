@@ -86,20 +86,26 @@ point at. Both are handled deliberately below, not by find-and-replace.
 - App directory → **`apps/ship/`**; served path becomes `/ship/`.
 - localStorage keys → **renamed outright, no migration**. Every existing browser loses
   its stored secret key and identity.
-- Manifest → **display name only** (`name: 'Estiva Ship'`). `MANIFEST_D_TAG` stays
-  `'linear-lite'` so the published address and existing kind:31989 recommendations stay
-  valid; `src/manifest-address.ts` is untouched and no re-publish is needed.
+- Manifest display name → **`'Estiva Ship'`**.
+- `MANIFEST_D_TAG` → **`'estiva-ship'`**, decided after the first four commits. The
+  manifest now addresses as `31990:88ac…d13:estiva-ship`. `src/manifest-address.ts` is
+  normally generated; with no relay available it was hand-written to exactly what
+  `publish-manifest.ts` emits, verified byte-identical.
+- `scripts/seed-for-peek.ts` → **relative imports**, decided at the same time.
+- The `from-Linear half of PEEK-17` comments → **`from-Ship`**; both meant the tracker
+  side of the pairing.
 
-## Needs a decision
+## Outstanding
 
-1. **`MANIFEST_D_TAG` / `MANIFEST_ADDRESS`** stay `linear-lite`. Changing them means
-   publishing at a new address with `npm run manifest` (needs `.manifest-key` and a live
-   relay) and re-pointing consumers. That is a migration, not a rename.
-2. **`scripts/seed-for-peek.ts` absolute imports** — five `/home/miky/linear-lite/…`
-   paths hardcoding the checkout directory. Left absolute; converting them to relative
-   imports is a behaviour-adjacent fix.
-3. **Old localStorage identities** are dropped. Any secret key in a browser that matters
+1. **Nothing is published at the new manifest address.** `npm run manifest` has to run
+   against the live relay, or the app recommends a `kind:31990` that does not exist and
+   consumers resolve nothing. The old `…:linear-lite` manifest still exists on any relay
+   that already has it.
+2. **Old localStorage identities are dropped.** Any secret key in a browser that matters
    must be exported before this ships.
+3. **The UI has not been rendered in a browser.** `npm run smoke` cannot launch Chromium
+   here — `libnspr4.so` is missing (`sudo apt install libnspr4 libnss3`). Coverage so far
+   is typecheck, the 50 unit assertions, and a successful build.
 
 ## Left to do outside this repo
 
