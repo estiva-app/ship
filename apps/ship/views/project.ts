@@ -5,7 +5,7 @@
  * already folded by the time this renders, so flipping the toggle is a redraw
  * rather than a round trip. That is what makes the board usable at all.
  *
- * The Folder panel in the sidebar is the from-Linear half of PEEK-17. A project
+ * The Folder panel in the sidebar is the from-Ship half of PEEK-17. A project
  * *is* a Folder's worth of work, so the id is not plumbing to hide — it is the
  * handle you paste into Peek to make the topic and the project one container.
  */

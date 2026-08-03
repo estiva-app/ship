@@ -97,7 +97,7 @@ export function addProjectButton(ctx: Ctx): HTMLButtonElement {
 /**
  * Create a project — and, unless told otherwise, its Folder.
  *
- * The "pair with an existing Folder" field is PEEK-17's from-Linear half, and
+ * The "pair with an existing Folder" field is PEEK-17's from-Ship half, and
  * with a project being a Folder there is nothing more to it than that: paste a
  * Peek topic's Folder link and the project is created *in* the topic, so they
  * are one container from the first event. No linking step to forget. Leaving it
