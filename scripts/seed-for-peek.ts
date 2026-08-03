@@ -16,11 +16,11 @@
  *
  *   npm run seed:peek -- <pubkey> [<pubkey> …]
  */
-import { Relay } from '/home/miky/linear-lite/lib/nostr/relay'
-import { publicKeyFromSecret, signEvent } from '/home/miky/linear-lite/lib/nostr/sign'
-import { buildAddMember } from '/home/miky/linear-lite/lib/nostr/events'
-import { Store } from '/home/miky/linear-lite/src/store'
-import { addrToNaddr } from '/home/miky/linear-lite/lib/nostr/nip19'
+import { Relay } from '../lib/nostr/relay'
+import { publicKeyFromSecret, signEvent } from '../lib/nostr/sign'
+import { buildAddMember } from '../lib/nostr/events'
+import { Store } from '../src/store'
+import { addrToNaddr } from '../lib/nostr/nip19'
 
 const RELAY_URL = 'http://localhost:3000'
 const PEEK_READERS = process.argv.slice(2)
