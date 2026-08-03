@@ -12,7 +12,7 @@ import { spawn } from 'node:child_process'
 import { createServer } from 'node:net'
 
 const PORT = Number(process.env.PORT ?? 5190)
-const URL = `http://localhost:${PORT}/linear-lite/`
+const URL = `http://localhost:${PORT}/ship/`
 
 /** Is something already listening? Bind and release rather than guess. */
 function portInUse(port) {

@@ -307,7 +307,7 @@ export function buildRecommendation(
  * function, and hardcoding a port into the data layer would be a lie the first
  * time somebody deploys it anywhere else.
  */
-export const DEFAULT_APP_URL = 'http://localhost:5190/linear-lite/'
+export const DEFAULT_APP_URL = 'http://localhost:5190/ship/'
 
 export function buildManifest(
   pubkey: string,

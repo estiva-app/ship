@@ -14,8 +14,8 @@
 import { buildChange, buildIssue, buildProject } from '../src/events'
 import { foldFolder, projectFolders, type Change, type Project } from '../src/fold'
 import { directoryFrom, initials, parseProfile } from '../src/profiles'
-import { href, parse } from '../apps/linear-lite/router'
-import { byStatus } from '../apps/linear-lite/views/issue-list'
+import { href, parse } from '../apps/ship/router'
+import { byStatus } from '../apps/ship/views/issue-list'
 import type { Issue } from '../src/fold'
 import type { SignedEvent } from '../lib/nostr/events'
 

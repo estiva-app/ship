@@ -6,7 +6,7 @@ import { cpSync, mkdirSync, readdirSync, existsSync, rmSync } from 'node:fs'
  * The relay the built bundle talks to, baked in at build time.
  *
  * Deployment is the only thing that decides this — the relay URL *is* the
- * workspace (see the header comment in apps/linear-lite/app.ts), so it is not
+ * workspace (see the header comment in apps/ship/app.ts), so it is not
  * something a user picks at runtime. CI sets `RELAY_URL` to the public origin;
  * everything else gets the local default.
  *

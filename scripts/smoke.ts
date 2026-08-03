@@ -139,7 +139,7 @@ async function main() {
     })
   })
 
-  await page.goto(`http://localhost:${PORT}/linear-lite/`)
+  await page.goto(`http://localhost:${PORT}/ship/`)
 
   // ── Lands straight on the issue list; there is no workspace to choose ─────
   await page.waitForSelector('[data-surface="issues"]')
@@ -269,7 +269,7 @@ async function main() {
   // Linear-lite would never itself produce.
   const addr = `30851:${issue!.pubkey}:${tagValue(issue!, 'd')}`
   const naddr = addrToNaddr(addr, ['http://localhost:3000'])
-  await page.goto(`http://localhost:${PORT}/linear-lite/#/o/${naddr}`)
+  await page.goto(`http://localhost:${PORT}/ship/#/o/${naddr}`)
   await page.waitForSelector('[data-surface="issue"]', { timeout: 10000 })
   check('an inbound naddr resolves to the issue surface', page.url().includes('/issue/'))
   check(
@@ -290,7 +290,7 @@ async function main() {
   await shot(page, '08-issues-list')
 
   // ── Archive, and getting it back ──────────────────────────────────────────
-  await page.goto(`http://localhost:${PORT}/linear-lite/#/project/${encodeURIComponent(
+  await page.goto(`http://localhost:${PORT}/ship/#/project/${encodeURIComponent(
     `30850:${project!.pubkey}:${tagValue(project!, 'd')}`,
   )}`)
   await page.waitForSelector('[data-surface="project"]')
