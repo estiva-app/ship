@@ -99,11 +99,11 @@ async function main() {
     // test that the kind is accepted without joining the registry.
     await probe(
       'kind:31990 NIP-89 handler info',
-      unsigned(31990, [['d', 'linear-lite-probe'], ['k', '65535']], '{"name":"probe"}'),
+      unsigned(31990, [['d', 'ship-probe'], ['k', '65535']], '{"name":"probe"}'),
     ),
     await probe(
       'kind:31989 NIP-89 recommendation',
-      unsigned(31989, [['d', '65535'], ['a', `31990:${identity.pubkey}:linear-lite-probe`]]),
+      unsigned(31989, [['d', '65535'], ['a', `31990:${identity.pubkey}:ship-probe`]]),
     ),
 
     // ── Linear-lite's own provisional kinds ──

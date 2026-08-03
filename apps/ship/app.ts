@@ -54,9 +54,9 @@ const RELAY_URL = __RELAY_URL__
  */
 const POLL_MS = 5000
 
-const DISPLAY_NAME_KEY = 'linear-lite.name'
+const DISPLAY_NAME_KEY = 'ship.name'
 
-const identity = localIdentity('linear-lite.secretkey')
+const identity = localIdentity('ship.secretkey')
 const store = new Store(new Relay(RELAY_URL, identity), identity)
 
 /**

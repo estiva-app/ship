@@ -1,5 +1,5 @@
 {
-  "name": "linear-lite",
+  "name": "estiva-ship",
   "private": true,
   "type": "module",
   "description": "A minimal issue tracker on Nostr — projects, issues, comments",
