@@ -18,8 +18,28 @@ import { Relay } from '../lib/nostr/relay'
 
 const RELAY_URL = process.env.RELAY_URL ?? 'http://localhost:3000'
 
-/** A fresh throwaway key per run — these are props, not products. */
+/**
+ * A fresh throwaway key per run — these are props, not products.
+ *
+ * `PROBE_SECRET_KEY` overrides it, which is what makes this usable against a
+ * relay running closed (`BUZZ_REQUIRE_RELAY_MEMBERSHIP=true`). There the author
+ * must already be a member, and a key invented at runtime can never be one:
+ *
+ *   buzz-admin add-member <pubkey>
+ *   PROBE_SECRET_KEY=<hex> RELAY_URL=https://<relay> npx tsx scripts/probe-kinds.ts
+ *   buzz-admin remove-member <pubkey>
+ *
+ * Still a throwaway — admit it for the run and remove it afterwards rather than
+ * leaving a standing member that exists only to run tests.
+ */
 function newIdentity() {
+  const fromEnv = process.env.PROBE_SECRET_KEY?.trim()
+  if (fromEnv) {
+    if (!/^[0-9a-f]{64}$/i.test(fromEnv)) {
+      throw new Error('PROBE_SECRET_KEY must be 64 hex characters')
+    }
+    return { secretKeyHex: fromEnv.toLowerCase(), pubkey: publicKeyFromSecret(fromEnv.toLowerCase()) }
+  }
   const secretKeyHex = Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('hex')
   return { secretKeyHex, pubkey: publicKeyFromSecret(secretKeyHex) }
 }
