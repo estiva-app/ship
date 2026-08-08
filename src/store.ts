@@ -7,8 +7,8 @@
  * of the state, "two apps agree on the data" would be measuring Ship's
  * cache rather than the shared record.
  */
-import { signEvent } from '../lib/nostr/sign'
-import type { Identity, PublishResult, Relay } from '../lib/nostr/relay'
+import type { PublishResult, Relay } from '../lib/nostr/relay'
+import type { Signer } from '../lib/nostr/signer'
 import {
   buildCreateChannel,
   buildProfile,
@@ -65,11 +65,19 @@ function referencedAddresses(body: string): string[] {
 export class Store {
   constructor(
     private readonly relay: Relay,
-    readonly identity: Identity,
+    readonly signer: Signer,
   ) {}
 
-  private publish(unsigned: UnsignedEvent): Promise<PublishResult> {
-    return this.relay.publish(signEvent(unsigned, this.identity.secretKeyHex))
+  /**
+   * Sign and publish.
+   *
+   * The store does not know how signing happens — a local key, the identity
+   * service, or a browser extension all look the same from here (PEEK-44). That
+   * is the point: this app works for anyone with a signer, not only for people
+   * with an Estiva account.
+   */
+  private async publish(unsigned: UnsignedEvent): Promise<PublishResult> {
+    return this.relay.publish(await this.signer.sign(unsigned))
   }
 
   /**
@@ -99,7 +107,7 @@ export class Store {
   async ensureFolder(folder: string, name: string): Promise<PublishResult> {
     assertFolderId(folder)
     return this.publish(
-      buildCreateChannel(this.identity.pubkey, Date.now(), {
+      buildCreateChannel(this.signer.pubkey, Date.now(), {
         channelUuid: folder,
         name,
         visibility: 'open',
@@ -163,12 +171,12 @@ export class Store {
     if (!args.folder) {
       const created = await this.ensureFolder(folder, `project-${folder.slice(0, 8)}`)
       if (!created.ok) {
-        return { result: created, addr: projectAddr(this.identity.pubkey, id), id, folder }
+        return { result: created, addr: projectAddr(this.signer.pubkey, id), id, folder }
       }
     }
 
     const result = await this.publish(
-      buildProject(this.identity.pubkey, Date.now(), {
+      buildProject(this.signer.pubkey, Date.now(), {
         projectId: id,
         title: args.title,
         description: args.description,
@@ -176,7 +184,7 @@ export class Store {
         folder,
       }),
     )
-    return { result, addr: projectAddr(this.identity.pubkey, id), id, folder }
+    return { result, addr: projectAddr(this.signer.pubkey, id), id, folder }
   }
 
   /**
@@ -215,7 +223,7 @@ export class Store {
     reason?: string
   }): Promise<PublishResult> {
     return this.publish(
-      buildDeletion(this.identity.pubkey, Date.now(), {
+      buildDeletion(this.signer.pubkey, Date.now(), {
         target: args.project,
         folder: args.recordFolder,
         reason: args.reason,
@@ -264,9 +272,9 @@ export class Store {
   }): Promise<{ result: PublishResult; addr: string; id: string }> {
     const id = crypto.randomUUID()
     const result = await this.publish(
-      buildIssue(this.identity.pubkey, Date.now(), { issueId: id, ...args }),
+      buildIssue(this.signer.pubkey, Date.now(), { issueId: id, ...args }),
     )
-    return { result, addr: issueAddr(this.identity.pubkey, id), id }
+    return { result, addr: issueAddr(this.signer.pubkey, id), id }
   }
 
   /**
@@ -292,7 +300,7 @@ export class Store {
   }): Promise<PublishResult> {
     const body = args.aboutRef ? `${args.body}\n\n${args.aboutRef}` : args.body
     return this.publish(
-      buildConversationMessage(this.identity.pubkey, Date.now(), {
+      buildConversationMessage(this.signer.pubkey, Date.now(), {
         folder: args.folder,
         body,
         replyTo: args.replyTo,
@@ -323,7 +331,7 @@ export class Store {
    */
   publishProfile(name: string, about?: string): Promise<PublishResult> {
     return this.publish(
-      buildProfile(this.identity.pubkey, Date.now(), {
+      buildProfile(this.signer.pubkey, Date.now(), {
         name,
         about: about ?? 'Posting from Estiva Ship',
       }),
@@ -369,7 +377,7 @@ export class Store {
     return Promise.all(
       [KIND.PROJECT, KIND.ISSUE].map((kind) =>
         this.publish(
-          buildRecommendation(this.identity.pubkey, Date.now(), {
+          buildRecommendation(this.signer.pubkey, Date.now(), {
             kind,
             manifestAddr: MANIFEST_ADDRESS,
             relayHint,
@@ -392,7 +400,7 @@ export class Store {
     value: string
     note?: string
   }): Promise<PublishResult> {
-    return this.publish(buildChange(this.identity.pubkey, Date.now(), args))
+    return this.publish(buildChange(this.signer.pubkey, Date.now(), args))
   }
 
   /**

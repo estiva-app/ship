@@ -20,7 +20,8 @@
  * about Folders again, except when publishing, where the `h` has to match the
  * object being written to.
  */
-import { localIdentity, Relay } from '../../lib/nostr/relay'
+import { Relay } from '../../lib/nostr/relay'
+import { localSigner } from '../../lib/nostr/signer'
 import { naddrToAddr } from '../../lib/nostr/nip19'
 import { Store } from '../../src/store'
 import type { FolderState, Issue, Project } from '../../src/fold'
@@ -56,8 +57,8 @@ const POLL_MS = 5000
 
 const DISPLAY_NAME_KEY = 'ship.name'
 
-const identity = localIdentity('ship.secretkey')
-const store = new Store(new Relay(RELAY_URL, identity), identity)
+const signer = localSigner('ship.secretkey')
+const store = new Store(new Relay(RELAY_URL, signer), signer)
 
 /**
  * The name other apps show for this key.
@@ -67,7 +68,7 @@ const store = new Store(new Relay(RELAY_URL, identity), identity)
  * `localStorage` because the key is too — this identity is per-browser.
  */
 function displayName(): string {
-  return localStorage.getItem(DISPLAY_NAME_KEY) ?? `ship-${identity.pubkey.slice(0, 6)}`
+  return localStorage.getItem(DISPLAY_NAME_KEY) ?? `ship-${signer.pubkey.slice(0, 6)}`
 }
 
 async function saveDisplayName(name: string) {
@@ -124,7 +125,7 @@ async function publish(
   }
 }
 
-const isMe = (pubkey: string) => pubkey === identity.pubkey
+const isMe = (pubkey: string) => pubkey === signer.pubkey
 const nameOf = (pubkey: string) => directory.get(pubkey)?.name ?? short(pubkey)
 const who = (pubkey: string) => (isMe(pubkey) ? 'you' : nameOf(pubkey))
 
@@ -168,9 +169,9 @@ function peopleIn(snapshot: FolderState): string[] {
  * would make the profile menu lag a rename by a network call.
  */
 function rememberSelf() {
-  directory.set(identity.pubkey, {
-    ...directory.get(identity.pubkey),
-    pubkey: identity.pubkey,
+  directory.set(signer.pubkey, {
+    ...directory.get(signer.pubkey),
+    pubkey: signer.pubkey,
     name: displayName(),
     createdAt: Math.floor(Date.now() / 1000),
   })
@@ -179,7 +180,7 @@ function rememberSelf() {
 function context(): Ctx {
   return {
     store,
-    identity,
+    signer,
     state,
     route,
     // Sorted by how they are labelled rather than by key: a picker ordered by
@@ -273,18 +274,18 @@ function renderSidebar() {
  * means, and that is a deployment concern rather than a button.
  */
 function renderProfile() {
-  const me = directory.get(identity.pubkey)
+  const me = directory.get(signer.pubkey)
   el.profile.replaceChildren(
     dropdown({
       label: displayName(),
-      icon: avatar({ pubkey: identity.pubkey, profile: me, title: 'you', size: 20 }),
+      icon: avatar({ pubkey: signer.pubkey, profile: me, title: 'you', size: 20 }),
       build: (close) => {
         const panel = h(
           'div',
           {},
           h('div', { class: 'menu-label', text: 'Signed in as' }),
           h('div', { class: 'menu-value', text: displayName() }),
-          h('div', { class: 'mono tiny dim break menu-value', text: identity.pubkey }),
+          h('div', { class: 'mono tiny dim break menu-value', text: signer.pubkey }),
           h('div', { class: 'menu-label', text: 'Workspace' }),
           h('div', { class: 'mono tiny dim break menu-value', text: RELAY_URL }),
           h('div', {
@@ -304,10 +305,10 @@ function renderProfile() {
         copy.onclick = async () => {
           close()
           try {
-            await navigator.clipboard.writeText(identity.pubkey)
+            await navigator.clipboard.writeText(signer.pubkey)
             say('Public key copied.')
           } catch {
-            window.prompt('Copy your public key:', identity.pubkey)
+            window.prompt('Copy your public key:', signer.pubkey)
           }
         }
         panel.append(copy)

@@ -1,0 +1,138 @@
+/**
+ * The signer seam (PEEK-44).
+ *
+ * `Store` and `Relay` now take a signer rather than a key, which is what keeps
+ * this app usable by anyone with their own signer instead of only by people
+ * with an Estiva account. That indirection is only worth anything if two
+ * properties hold, and neither is visible at a glance:
+ *
+ *  1. **A signer cannot sign as somebody else.** Every implementation attributes
+ *     the event to its own pubkey and ignores what the caller asked for. Without
+ *     this the interface is just a function pointer.
+ *  2. **The NIP-98 auth event goes through the same signer.** Buzz's bridge
+ *     authenticates with NIP-98, so a keyless signer that could sign content but
+ *     not auth would publish nothing — the seam would look built and not be.
+ *
+ *   npx tsx scripts/signer.test.ts
+ */
+import { schnorr } from '@noble/curves/secp256k1'
+import { hexToBytes } from '@noble/hashes/utils'
+import { computeEventId, type UnsignedEvent } from '../lib/nostr/events'
+import { authorizationHeader } from '../lib/nostr/nip98'
+import { estivaIdSigner, secretKeySigner, SignerTokenExpired } from '../lib/nostr/signer'
+
+let failures = 0
+function check(label: string, condition: boolean, detail = '') {
+  console.log(`${condition ? '✅' : '❌'} ${label}${detail ? ` — ${detail}` : ''}`)
+  if (!condition) failures++
+}
+
+const SECRET = '11'.repeat(32)
+const SOMEONE_ELSE = 'f'.repeat(64)
+
+const unsigned = (pubkey: string): UnsignedEvent => ({
+  pubkey,
+  created_at: 1_753_300_200,
+  kind: 30851,
+  tags: [['h', '22222222-2222-4222-8222-222222222222']],
+  content: 'An issue.',
+})
+
+function verifies(event: { id: string; sig: string; pubkey: string }): boolean {
+  try {
+    return schnorr.verify(event.sig, hexToBytes(event.id), hexToBytes(event.pubkey))
+  } catch {
+    return false
+  }
+}
+
+async function main() {
+  const signer = secretKeySigner(SECRET)
+
+  // ── The guarantee ──────────────────────────────────────────────────────────
+  const honest = await signer.sign(unsigned(signer.pubkey))
+  check('a signer signs its own events', honest.pubkey === signer.pubkey)
+  check('  …and the signature verifies', verifies(honest))
+  check('  …and the id is the hash of what was signed', honest.id === computeEventId(honest))
+
+  // The property the whole indirection rests on: asking for someone else's
+  // attribution does not get it. `/sign` makes the same promise server-side.
+  const attempted = await signer.sign(unsigned(SOMEONE_ELSE))
+  check('a caller cannot choose whose signature it gets', attempted.pubkey === signer.pubkey)
+  check('  …and the forged pubkey is gone, not just unsigned', attempted.pubkey !== SOMEONE_ELSE)
+  check('  …and the result still verifies', verifies(attempted))
+
+  // ── NIP-98 goes through the signer ─────────────────────────────────────────
+  const header = await authorizationHeader(signer, {
+    url: 'http://localhost:3000/events',
+    method: 'POST',
+    body: '{"hello":"world"}',
+  })
+  check('the header carries the Nostr scheme', header.startsWith('Nostr '))
+
+  const auth = JSON.parse(
+    Buffer.from(header.slice('Nostr '.length), 'base64').toString('utf8'),
+  ) as { kind: number; pubkey: string; id: string; sig: string; tags: string[][] }
+  const tag = (name: string) => auth.tags.find((t) => t[0] === name)?.[1]
+
+  check('the auth event is kind:27235', auth.kind === 27235)
+  check('signed by the same signer as the content', auth.pubkey === signer.pubkey)
+  check('  …and it verifies', verifies(auth))
+  check('it names the URL it authorises', tag('u') === 'http://localhost:3000/events')
+  check('it names the method', tag('method') === 'POST')
+  check('it hashes the body', typeof tag('payload') === 'string')
+
+  // Without a nonce, two identical requests inside the same second produce a
+  // byte-identical event and the relay refuses the second as a replay. The
+  // one-second resolution of `created_at` is what makes this a real hazard
+  // rather than a theoretical one.
+  const again = await authorizationHeader(signer, {
+    url: 'http://localhost:3000/events',
+    method: 'POST',
+    body: '{"hello":"world"}',
+  })
+  check('two identical requests produce different auth events', header !== again)
+
+  // ── The keyless implementation ─────────────────────────────────────────────
+  const realFetch = globalThis.fetch
+  try {
+    let seen: { url: string; body: string; authorization: string } | undefined
+    globalThis.fetch = (async (url: string, init: RequestInit) => {
+      seen = {
+        url,
+        body: init.body as string,
+        authorization: (init.headers as Record<string, string>).authorization ?? '',
+      }
+      return new Response(JSON.stringify({ event: { ...unsigned(SOMEONE_ELSE), id: 'x', sig: 'y' } }))
+    }) as typeof fetch
+
+    const remote = estivaIdSigner({
+      base: 'https://id.estiva.app/',
+      pubkey: SOMEONE_ELSE,
+      token: 'a-token',
+    })
+    await remote.sign(unsigned(SOMEONE_ELSE))
+
+    check('the remote signer calls /sign', seen?.url === 'https://id.estiva.app/sign')
+    check('  …with the bearer token', seen?.authorization === 'Bearer a-token')
+    check('  …and holds no key of its own', !JSON.stringify(seen?.body).includes(SECRET))
+
+    // A token expires every ten minutes. "Sign in again" and "that event was
+    // refused" need different handling, so they are different errors.
+    globalThis.fetch = (async () => new Response('{}', { status: 401 })) as typeof fetch
+    let expired = false
+    try {
+      await remote.sign(unsigned(SOMEONE_ELSE))
+    } catch (error) {
+      expired = error instanceof SignerTokenExpired
+    }
+    check('an expired token is distinguishable from a refusal', expired)
+  } finally {
+    globalThis.fetch = realFetch
+  }
+
+  console.log(failures === 0 ? '\nSigner seam OK.' : `\n${failures} check(s) failed.`)
+  if (failures > 0) process.exit(1)
+}
+
+await main()

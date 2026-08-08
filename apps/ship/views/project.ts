@@ -147,7 +147,7 @@ export function projectView(
         field('Assignee', assigneeSelect({
           people: ctx.people,
           value: project.lead,
-          me: ctx.identity.pubkey,
+          me: ctx.signer.pubkey,
           nameOf: ctx.nameOf,
           onChange: (value) => set('lead', value, value ? 'Assign project' : 'Unassign project'),
         })),

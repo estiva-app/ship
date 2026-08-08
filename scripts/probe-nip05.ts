@@ -19,6 +19,7 @@
  */
 import { publicKeyFromSecret, signEvent } from '../lib/nostr/sign'
 import { Relay } from '../lib/nostr/relay'
+import { secretKeySigner } from '../lib/nostr/signer'
 import type { UnsignedEvent } from '../lib/nostr/events'
 
 const RELAY_URL = process.env.RELAY_URL ?? 'http://localhost:3000'
@@ -26,7 +27,7 @@ const SECRET = process.env.PROBE_SECRET_KEY
 if (!SECRET) throw new Error('PROBE_SECRET_KEY is required')
 
 const identity = { secretKeyHex: SECRET, pubkey: publicKeyFromSecret(SECRET) }
-const relay = new Relay(RELAY_URL, identity)
+const relay = new Relay(RELAY_URL, secretKeySigner(identity.secretKeyHex))
 
 /** The handle domain must equal the relay's community host, or Buzz drops it. */
 const HOST = new URL(RELAY_URL).host

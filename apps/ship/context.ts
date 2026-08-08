@@ -6,7 +6,7 @@
  * shell and the shell imports every view, and the bundler resolves the cycle by
  * handing somebody an undefined at load time.
  */
-import type { Identity } from '../../lib/nostr/relay'
+import type { Signer } from '../../lib/nostr/signer'
 import type { FolderState, Issue, Project } from '../../src/fold'
 import type { Profile } from '../../src/profiles'
 import type { Store } from '../../src/store'
@@ -14,7 +14,14 @@ import type { Route } from './router'
 
 export interface Ctx {
   store: Store
-  identity: Identity
+  /**
+   * Who is acting, and how they sign.
+   *
+   * Views only ever read `pubkey` — how a signature is produced is the data
+   * layer's problem (PEEK-44). Handing views the signer rather than a key means
+   * a signed-in person and an anonymous one look identical from here.
+   */
+  signer: Signer
   /** Every project this identity can see, and everything in them, folded. */
   state: FolderState
   route: Route

@@ -17,6 +17,7 @@
  *   npm run seed:peek -- <pubkey> [<pubkey> …]
  */
 import { Relay } from '../lib/nostr/relay'
+import { secretKeySigner } from '../lib/nostr/signer'
 import { publicKeyFromSecret, signEvent } from '../lib/nostr/sign'
 import { buildAddMember } from '../lib/nostr/events'
 import { Store } from '../src/store'
@@ -28,8 +29,9 @@ const PEEK_READERS = process.argv.slice(2)
 async function main() {
   const secretKeyHex = Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('hex')
   const identity = { secretKeyHex, pubkey: publicKeyFromSecret(secretKeyHex) }
-  const relay = new Relay(RELAY_URL, identity)
-  const store = new Store(relay, identity)
+  const signer = secretKeySigner(secretKeyHex)
+  const relay = new Relay(RELAY_URL, signer)
+  const store = new Store(relay, signer)
   await store.recommendHandler(RELAY_URL)
 
   /**

@@ -11,7 +11,7 @@ import { issueRows } from './issue-list'
 import { addIssueButton } from './new-issue'
 
 export function issuesView(ctx: Ctx): HTMLElement {
-  const mine = ctx.state.issues.filter((issue) => issue.assignee === ctx.identity.pubkey)
+  const mine = ctx.state.issues.filter((issue) => issue.assignee === ctx.signer.pubkey)
   const open = ctx.state.issues.filter(
     (issue) => issue.status !== 'done' && issue.status !== 'cancelled',
   )
