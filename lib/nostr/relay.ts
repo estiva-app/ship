@@ -14,13 +14,8 @@
  *  - **`/query` takes a bare ARRAY of filters**, not a single filter object.
  */
 import { authorizationHeader } from './nip98'
-import { publicKeyFromSecret } from './sign'
+import type { Signer } from './signer'
 import type { SignedEvent } from './events'
-
-export interface Identity {
-  pubkey: string
-  secretKeyHex: string
-}
 
 export interface PublishResult {
   ok: boolean
@@ -33,7 +28,7 @@ export interface PublishResult {
 export class Relay {
   constructor(
     private readonly url: string,
-    private readonly identity: Identity,
+    private readonly signer: Signer,
   ) {
     this.url = url.replace(/\/+$/, '')
   }
@@ -48,7 +43,7 @@ export class Relay {
         // Rebuilt per request AND unique per request — identical requests in the
         // same second would otherwise collide on the auth event id and the
         // relay rejects the second as a replay. See nip98.ts on the nonce.
-        authorization: authorizationHeader({ ...this.identity, url, method: 'POST', body }),
+        authorization: await authorizationHeader(this.signer, { url, method: 'POST', body }),
       },
       body,
     })
@@ -80,21 +75,4 @@ export class Relay {
     const parsed = JSON.parse(text)
     return Array.isArray(parsed) ? parsed : []
   }
-}
-
-/**
- * A per-app identity, generated in the browser and kept in localStorage.
- *
- * Each demo app is a different person on the relay — that is the point. Keys
- * are throwaway: these apps are props, not products.
- */
-export function localIdentity(storageKey: string): Identity {
-  let secretKeyHex = localStorage.getItem(storageKey)
-  if (!secretKeyHex) {
-    secretKeyHex = Array.from(crypto.getRandomValues(new Uint8Array(32)))
-      .map((b) => b.toString(16).padStart(2, '0'))
-      .join('')
-    localStorage.setItem(storageKey, secretKeyHex)
-  }
-  return { pubkey: publicKeyFromSecret(secretKeyHex), secretKeyHex }
 }

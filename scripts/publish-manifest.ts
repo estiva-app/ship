@@ -17,6 +17,7 @@
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { Relay } from '../lib/nostr/relay'
+import { secretKeySigner } from '../lib/nostr/signer'
 import { publicKeyFromSecret, signEvent } from '../lib/nostr/sign'
 import { buildManifest, DEFAULT_APP_URL, MANIFEST_D_TAG, type ManifestContent, type SlotSource } from '../src/manifest'
 import { Store } from '../src/store'
@@ -63,7 +64,7 @@ function resolveSlot(
 
 async function main() {
   const identity = manifestIdentity()
-  const relay = new Relay(RELAY_URL, identity)
+  const relay = new Relay(RELAY_URL, secretKeySigner(identity.secretKeyHex))
 
   console.log(`relay    ${RELAY_URL}`)
   console.log(`manifest ${identity.pubkey.slice(0, 16)}…  (31990:<pubkey>:${MANIFEST_D_TAG})\n`)
@@ -131,7 +132,7 @@ async function main() {
   // ── The check that matters: can the projections be satisfied? ─────────────
   // Publish one real project and one real issue, move the issue's status, then
   // resolve every declared slot against the actual events.
-  const store = new Store(relay, identity)
+  const store = new Store(relay, secretKeySigner(identity.secretKeyHex))
   // createProject makes the Folder too — a project *is* a Folder.
   const project = await store.createProject({ title: 'Payment integration', description: 'Stripe Checkout.' })
   const folder = project.folder

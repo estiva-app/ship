@@ -31,7 +31,7 @@
 import { sha256 } from '@noble/hashes/sha256'
 import { bytesToHex, randomBytes, utf8ToBytes } from '@noble/hashes/utils'
 import { KIND, type NostrTag, type UnsignedEvent } from './events'
-import { signEvent } from './sign'
+import type { Signer } from './signer'
 
 /** The relay rejects auth events outside ±60s (`TIMESTAMP_TOLERANCE_SECS`). */
 export const TIMESTAMP_TOLERANCE_SECS = 60
@@ -59,7 +59,6 @@ export function normalizeUrl(raw: string): string {
  */
 export function buildAuthEvent(args: {
   pubkey: string
-  secretKeyHex: string
   url: string
   method: string
   /** Request body, when there is one — adds the `payload` tag. */
@@ -68,7 +67,7 @@ export function buildAuthEvent(args: {
   nowMs?: number
   /** Override for tests; defaults to random. Must differ per request. */
   nonce?: string
-}): UnsignedEvent & { id: string; sig: string } {
+}): UnsignedEvent {
   const tags: NostrTag[] = [
     ['u', normalizeUrl(args.url)],
     ['method', args.method.toUpperCase()],
@@ -81,14 +80,13 @@ export function buildAuthEvent(args: {
   if (args.body !== undefined) {
     tags.push(['payload', bytesToHex(sha256(utf8ToBytes(args.body)))])
   }
-  const unsigned: UnsignedEvent = {
+  return {
     pubkey: args.pubkey,
     created_at: Math.floor((args.nowMs ?? Date.now()) / 1000),
     kind: KIND.HTTP_AUTH,
     tags,
     content: '',
   }
-  return signEvent(unsigned, args.secretKeyHex)
 }
 
 /** Base64 without Node's Buffer, so this works in the browser. */
@@ -102,7 +100,20 @@ function base64(input: string): string {
 /**
  * The full header value: `Nostr <base64(signed kind-27235 event JSON)>`
  * (bridge.rs:81-93 strips the `Nostr ` prefix and base64-decodes the rest).
+ *
+ * **The auth event is signed by the same signer as the content**, which is what
+ * makes a keyless signer work at all: Buzz's bridge authenticates with NIP-98,
+ * so an app holding a perfectly signed issue and no way to sign a `27235` can
+ * still publish nothing. Signing content but not auth would leave the seam
+ * half-built (PEEK-44).
+ *
+ * Async for the same reason `Signer.sign` is — a remote signer or an extension
+ * cannot answer synchronously.
  */
-export function authorizationHeader(args: Parameters<typeof buildAuthEvent>[0]): string {
-  return `Nostr ${base64(JSON.stringify(buildAuthEvent(args)))}`
+export async function authorizationHeader(
+  signer: Signer,
+  args: { url: string; method: string; body?: string; nowMs?: number; nonce?: string },
+): Promise<string> {
+  const signed = await signer.sign(buildAuthEvent({ ...args, pubkey: signer.pubkey }))
+  return `Nostr ${base64(JSON.stringify(signed))}`
 }

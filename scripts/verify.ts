@@ -25,7 +25,7 @@
  */
 import { randomUUID } from 'node:crypto'
 import { Relay } from '../lib/nostr/relay'
-import { publicKeyFromSecret } from '../lib/nostr/sign'
+import { secretKeySigner } from '../lib/nostr/signer'
 import { addrToNaddr } from '../lib/nostr/nip19'
 import { Store } from '../src/store'
 import { conversationsAbout, foldFolder, projectFolders } from '../src/fold'
@@ -33,10 +33,16 @@ import { KIND } from '../src/kinds'
 
 const RELAY_URL = process.env.RELAY_URL ?? 'http://localhost:3000'
 
+/**
+ * The raw key is kept alongside the signer on purpose: the forgery checks below
+ * sign an event whose `pubkey` is somebody else's, and a signer will not do
+ * that — attributing to its own key is the guarantee it exists to make.
+ */
 function person(name: string) {
   const secretKeyHex = Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('hex')
-  const identity = { secretKeyHex, pubkey: publicKeyFromSecret(secretKeyHex) }
-  return { name, identity, store: new Store(new Relay(RELAY_URL, identity), identity) }
+  const signer = secretKeySigner(secretKeyHex)
+  const identity = { secretKeyHex, pubkey: signer.pubkey }
+  return { name, identity, signer, store: new Store(new Relay(RELAY_URL, signer), signer) }
 }
 
 let failures = 0
@@ -71,7 +77,7 @@ async function main() {
   const addRavi = async (folder: string) => {
     const { buildAddMember } = await import('../lib/nostr/events')
     const { signEvent } = await import('../lib/nostr/sign')
-    return new Relay(RELAY_URL, ana.identity).publish(
+    return new Relay(RELAY_URL, ana.signer).publish(
       signEvent(
         buildAddMember(ana.identity.pubkey, Date.now(), {
           channelUuid: folder,
@@ -216,7 +222,7 @@ async function main() {
     tags: liar.tags.map((t) => (t[0] === 'ts' ? ['ts', String(2 ** 52)] : t)),
   }
   await must('Ravi publishes a change with a far-future ts', () =>
-    new Relay(RELAY_URL, ravi.identity).publish(signEvent(forged, ravi.identity.secretKeyHex)),
+    new Relay(RELAY_URL, ravi.signer).publish(signEvent(forged, ravi.identity.secretKeyHex)),
   )
   // A full second later, so this one wins on `created_at` alone and the result
   // does not depend on a millisecond tie-break.
@@ -243,7 +249,7 @@ async function main() {
     folder,
   })
   const stripped = { ...orphan, tags: orphan.tags.filter((t) => t[0] !== 'h') }
-  const rejected = await new Relay(RELAY_URL, ravi.identity).publish(
+  const rejected = await new Relay(RELAY_URL, ravi.signer).publish(
     signEvent(stripped, ravi.identity.secretKeyHex),
   )
   check('the relay rejects a Change with no Folder', !rejected.ok, rejected.reason ?? 'accepted!')
@@ -305,7 +311,7 @@ async function main() {
   // How the project list is actually built: ask the relay for the kind, with no
   // `#h` at all, and let access control decide. If this ever stops working the
   // sidebar goes empty for everyone who is not the author.
-  const discovered = await new Relay(RELAY_URL, ravi.identity).query([
+  const discovered = await new Relay(RELAY_URL, ravi.signer).query([
     { kinds: [KIND.PROJECT], limit: 200 },
   ])
   check(
@@ -322,7 +328,7 @@ async function main() {
   // Resolve it the way Peek will: given an object authored by Ana, find Ana's
   // recommendation for that kind. This is the tie-break that makes `#k`
   // discovery usable when several manifests claim the same kind.
-  const [recommendation] = await new Relay(RELAY_URL, ravi.identity).query([
+  const [recommendation] = await new Relay(RELAY_URL, ravi.signer).query([
     { kinds: [31989], authors: [ana.identity.pubkey], '#d': [String(KIND.ISSUE)], limit: 1 },
   ])
   check('a consumer finds the issue author\'s recommendation', !!recommendation)

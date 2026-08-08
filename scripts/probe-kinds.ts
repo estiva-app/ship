@@ -15,6 +15,7 @@ import { randomUUID } from 'node:crypto'
 import { buildCreateChannel, type NostrTag, type UnsignedEvent } from '../lib/nostr/events'
 import { signEvent, publicKeyFromSecret } from '../lib/nostr/sign'
 import { Relay } from '../lib/nostr/relay'
+import { secretKeySigner } from '../lib/nostr/signer'
 
 const RELAY_URL = process.env.RELAY_URL ?? 'http://localhost:3000'
 
@@ -45,7 +46,7 @@ function newIdentity() {
 }
 
 const identity = newIdentity()
-const relay = new Relay(RELAY_URL, identity)
+const relay = new Relay(RELAY_URL, secretKeySigner(identity.secretKeyHex))
 const folder = randomUUID() // `h_grammar: uuid-v4-lowercase` per the relay's NIP-11
 
 function unsigned(kind: number, tags: NostrTag[], content = ''): UnsignedEvent {
