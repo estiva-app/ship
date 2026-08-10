@@ -1,0 +1,11 @@
+# The build stage installs from the lockfile; a host node_modules would be both
+# large and wrong (possibly a different platform).
+node_modules
+dist
+.git
+.github
+.smoke
+
+# Never let the manifest key reach an image layer. It is the identity the
+# published NIP-89 manifest is signed with, and a layer is not a secret.
+.manifest-key
