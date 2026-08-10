@@ -7,6 +7,7 @@
  */
 import { ISSUE_STATUSES, lookupStatus, type VocabEntry } from '../../src/kinds'
 import type { Conversation, Issue, Project } from '../../src/fold'
+import type { Member } from '../../lib/estiva-id/directory'
 import { initials, type Profile } from '../../src/profiles'
 
 /** Element factory: `h('div', {class: 'row'}, child, 'text')`. */
@@ -30,6 +31,50 @@ export function h<K extends keyof HTMLElementTagNameMap>(
 }
 
 export const short = (pubkey: string) => `${pubkey.slice(0, 8)}…`
+
+/**
+ * Who somebody is, from both halves (PEEK-50).
+ *
+ * The avatar and name come from `kind:0` on the relay — public, and readable by
+ * any app including ones nobody here wrote. The **email comes from Estiva ID's
+ * private directory and has never been published anywhere**, which is the whole
+ * point: a relay is shared and a published event cannot be taken back, so a
+ * contact address on one is given away permanently.
+ *
+ * Renders whatever it has. A person with no Estiva ID account — every anonymous
+ * key, and everybody at all when this browser is signed out — gets the public
+ * profile alone, which is exactly what this app showed before the directory
+ * existed.
+ */
+export function personCard(args: {
+  pubkey: string
+  profile?: Profile
+  member?: Member
+  /** What the caller already calls them, so the card agrees with the picker. */
+  label: string
+}): HTMLElement {
+  const facts: string[] = []
+  if (args.profile?.nip05) facts.push(args.profile.nip05)
+  if (args.member?.email) facts.push(args.member.email)
+  // Only when it is not the ordinary one: a "member" tag on everybody trains
+  // people past the column where "admin" and "offboarded" have to be noticed.
+  if (args.member && args.member.role !== 'member') facts.push(args.member.role)
+  if (args.member && args.member.status !== 'active') facts.push(args.member.status)
+
+  return h(
+    'div',
+    { class: 'person-card' },
+    avatar({ pubkey: args.pubkey, profile: args.profile, size: 26 }),
+    h(
+      'div',
+      {},
+      h('div', { text: args.label }),
+      facts.length
+        ? h('div', { class: 'dim tiny', text: facts.join(' · ') })
+        : h('div', { class: 'dim tiny', text: short(args.pubkey) }),
+    ),
+  )
+}
 
 /**
  * A person's avatar.
@@ -169,8 +214,16 @@ export function assigneeSelect(args: {
   people: string[]
   value: string | undefined
   me: string
-  /** How to label a key — a `kind:0` name where there is one, else a short key. */
-  nameOf: (pubkey: string) => string
+  /**
+   * How to label a key: a name plus whatever identifies the person.
+   *
+   * Was a bare `kind:0` name with a truncated key appended. It is now
+   * `ctx.label`, which prefers the `nip05` handle where there is one (PEEK-50)
+   * — both disambiguate, but a handle is readable *and* unique by construction,
+   * whereas eight hex characters are unique only in practice and say nothing to
+   * whoever is choosing an assignee.
+   */
+  labelOf: (pubkey: string) => string
   onChange: (value: string) => Promise<boolean>
 }): HTMLSelectElement {
   const current = args.value ?? ''
@@ -178,15 +231,13 @@ export function assigneeSelect(args: {
   select.append(h('option', { value: '', text: 'Unassigned' }))
   const people = args.people.includes(current) || !current ? args.people : [...args.people, current]
   for (const pubkey of people) {
-    // The key stays in the label even when a name is known. Names on a relay
-    // are self-declared and not unique — two people can both publish "Ana" —
-    // so the thing that actually identifies the assignee stays on screen.
-    const name = args.nameOf(pubkey)
-    const label = name === short(pubkey) ? name : `${name} (${short(pubkey)})`
+    // The identifier stays on screen even when a name is known. Names on a
+    // relay are self-declared and not unique — two people can both publish
+    // "Ana" — so the thing that actually picks somebody out has to be visible.
     select.append(
       h('option', {
         value: pubkey,
-        text: pubkey === args.me ? `you (${short(pubkey)})` : label,
+        text: pubkey === args.me ? `you (${short(pubkey)})` : args.labelOf(pubkey),
       }),
     )
   }

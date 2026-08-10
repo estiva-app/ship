@@ -23,6 +23,7 @@
 import { Relay } from '../../lib/nostr/relay'
 import { estivaIdSigner, localSigner, type Signer } from '../../lib/nostr/signer'
 import { beginSignIn, completeSignIn, currentSession, signOut } from '../../lib/auth/estiva-id'
+import { lookupMembers, type MemberDirectory } from '../../lib/estiva-id/directory'
 import { naddrToAddr } from '../../lib/nostr/nip19'
 import { Store } from '../../src/store'
 import type { FolderState, Issue, Project } from '../../src/fold'
@@ -115,6 +116,21 @@ let poll: ReturnType<typeof setInterval> | undefined
  */
 let directory: Directory = new Map()
 
+/**
+ * Who among them has an Estiva ID account, and what it knows (PEEK-50).
+ *
+ * Separate from `directory` because the two have different sources, different
+ * audiences and different lifetimes. `directory` is `kind:0` off the relay and
+ * is readable by anyone, including apps nobody here wrote. This is the private
+ * half — email, role, status — behind a bearer token, and it stays empty for
+ * an anonymous browser because an anonymous browser is not a member of the
+ * workspace and has no business reading colleagues' contact details.
+ *
+ * Merging them into one map would lose exactly that distinction, which is the
+ * distinction the whole two-channel design exists to make.
+ */
+let members: MemberDirectory = new Map()
+
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
 const el = {
   banner: $<HTMLDivElement>('banner'),
@@ -152,6 +168,25 @@ const nameOf = (pubkey: string) => directory.get(pubkey)?.name ?? short(pubkey)
 const who = (pubkey: string) => (isMe(pubkey) ? 'you' : nameOf(pubkey))
 
 /**
+ * A name plus whatever actually identifies the person (PEEK-50).
+ *
+ * The handle wins over a truncated key when there is one. Both disambiguate, but
+ * a handle is readable and is unique *by construction* — Buzz canonicalises
+ * `nip05` to the relay's own domain and will not let two people claim the same
+ * one — whereas eight hex characters are unique only in practice and mean
+ * nothing to a person reading them.
+ *
+ * Somebody with no name at all is already shown as a short key, and appending
+ * their handle to it would be two identifiers and no name.
+ */
+function label(pubkey: string): string {
+  const name = nameOf(pubkey)
+  if (name === short(pubkey)) return name
+  const handle = directory.get(pubkey)?.nip05
+  return `${name} (${handle ?? short(pubkey)})`
+}
+
+/**
  * Learn who a set of pubkeys are.
  *
  * `refresh` distinguishes the two callers. A navigation or an explicit reload
@@ -172,16 +207,35 @@ async function learn(pubkeys: string[], refresh: boolean): Promise<void> {
   } catch {
     // Names are a nicety; the record is what matters and it already loaded.
   }
+
+  // The private half, and only when there is a token to ask with. Not chained
+  // to the `kind:0` fetch succeeding: they are independent sources, and a relay
+  // that failed to return profiles says nothing about whether Estiva ID can
+  // answer.
+  if (ID_CONFIG && estivaSession) {
+    for (const [pubkey, member] of await lookupMembers(ID_CONFIG, estivaSession, wanted)) {
+      members.set(pubkey, member)
+    }
+  }
 }
 
-/** Everyone visible in the current state — the directory's fetch list. */
+/**
+ * Everyone visible in the current state — the directory's fetch list.
+ *
+ * **Always including yourself**, even when you appear nowhere. Without that, a
+ * person who has not yet touched anything is never looked up, so the profile
+ * menu shows their raw key and — since PEEK-50 — none of their contact details,
+ * on the one screen whose entire job is saying who you are. Somebody's first
+ * visit is exactly when that looks broken.
+ */
 function peopleIn(snapshot: FolderState): string[] {
-  return participants({
+  const seen = participants({
     projects: snapshot.projects,
     issues: snapshot.issues,
     conversations: snapshot.conversations,
     changes: snapshot.activity,
   })
+  return seen.includes(signer.pubkey) ? seen : [signer.pubkey, ...seen]
 }
 
 function context(): Ctx {
@@ -192,7 +246,7 @@ function context(): Ctx {
     route,
     // Sorted by how they are labelled rather than by key: a picker ordered by
     // hex is ordered by nothing a person can see.
-    people: peopleIn(state).sort((a, b) => nameOf(a).localeCompare(nameOf(b))),
+    people: peopleIn(state).sort((a, b) => label(a).localeCompare(label(b))),
     say,
     publish,
     reload: () => load(),
@@ -200,6 +254,8 @@ function context(): Ctx {
     who,
     nameOf,
     profile: (pubkey: string) => directory.get(pubkey),
+    member: (pubkey: string) => members.get(pubkey),
+    label,
     // An issue's events must carry the issue's own `h` — the Folder it is
     // already in, which is not necessarily the project's current one if the
     // project has since been re-linked.
@@ -298,6 +354,16 @@ function renderProfile() {
               ? 'Your Estiva ID. The same person you are in Estiva Peek.'
               : 'A key held by this browser only. Nobody else knows who you are.',
           }),
+          // Your own private half (PEEK-50). Shown here because this menu is
+          // already the "who am I" surface, and seeing your email next to a
+          // profile that demonstrably does not contain it is the clearest way
+          // to understand the two-channel split.
+          members.get(signer.pubkey)?.email
+            ? h('div', {
+                class: 'dim tiny menu-value',
+                text: `${members.get(signer.pubkey)?.email} · known to Estiva, never published to the relay`,
+              })
+            : null,
           h('div', { class: 'mono tiny dim break menu-value', text: signer.pubkey }),
           h('div', { class: 'menu-label', text: 'Workspace' }),
           h('div', { class: 'mono tiny dim break menu-value', text: RELAY_URL }),

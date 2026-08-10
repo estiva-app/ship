@@ -6,6 +6,7 @@
  * shell and the shell imports every view, and the bundler resolves the cycle by
  * handing somebody an undefined at load time.
  */
+import type { Member } from '../../lib/estiva-id/directory'
 import type { Signer } from '../../lib/nostr/signer'
 import type { FolderState, Issue, Project } from '../../src/fold'
 import type { Profile } from '../../src/profiles'
@@ -41,6 +42,25 @@ export interface Ctx {
   nameOf(pubkey: string): string
   /** The `kind:0` profile behind a pubkey, when the relay had one. */
   profile(pubkey: string): Profile | undefined
+  /**
+   * What Estiva ID knows that the relay does not — email, role, status.
+   *
+   * `undefined` for anyone who is not a member, which includes every anonymous
+   * key, and for *everyone* when this browser is signed out. Views render the
+   * public profile in that case, exactly as they did before this existed.
+   */
+  member(pubkey: string): Member | undefined
+  /**
+   * A person, disambiguated: their name plus the thing that actually identifies
+   * them.
+   *
+   * Names on a relay are self-declared and not unique — two people can both
+   * publish "Ana" — so a name alone is not an identifier. The handle is
+   * preferred over a truncated key because it is human-readable *and* unique
+   * within the workspace: Buzz canonicalises `nip05` to the relay's own domain
+   * and refuses a second claim on it.
+   */
+  label(pubkey: string): string
   /** The Folder an issue's events must carry — the one it already lives in. */
   folderOf(issue: Issue): string
   /** Where a new issue in this project belongs. */
