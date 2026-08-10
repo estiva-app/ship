@@ -1,8 +1,7 @@
 # Deploying Estiva Ship
 
 Target: the Hetzner box, reached through the `estiva-prod` Cloudflare Tunnel.
-Public URL `https://estiva.estiva.app/ship/` — the **same origin as the relay**,
-which is the whole point of serving it here rather than on Pages or Vercel.
+Public URL `https://ship.estiva.app`.
 
 ## How this deploy works, and why
 
@@ -21,41 +20,52 @@ push to main → CI: typecheck, test → build image → ghcr.io/estiva-app/ship
 No migrations here — a static bundle has no schema — so `update.sh` is Estiva
 ID's minus that step.
 
-## Same origin is a requirement, not a preference
+## Its own hostname, not a path under the relay
 
-Ship talks to the relay from the browser. Serving it anywhere other than
-`estiva.estiva.app` reintroduces CORS on every request, which is exactly what
-the project decided against. The relay claims `/upload`, `/media`, `/info`,
-`/health`, `/events`, `/query`, `/count`, `/api/*`, `/moderation/*`, `/hooks/*`
-and `/_*`; `/ship/` is free.
+An earlier version of this served `/ship/` under `estiva.estiva.app`, on the
+theory that sharing an origin with the relay removed CORS "by construction".
 
-**Cloudflare Tunnel forwards the matched path unchanged.** A route for
-`estiva.estiva.app/ship/*` arrives at the container still asking for
-`/ship/...`, so the files are baked in at `/usr/share/nginx/html/ship` rather
-than at the document root. Moving them to `/` and expecting the prefix to be
-stripped is the obvious mistake here.
+It does. But the relay already has `BUZZ_CORS_ORIGINS`, and `peek.estiva.app`
+was always going to be a separate origin regardless — so the constraint bought
+nothing, and cost a tunnel path-ordering rule that had to sit *above* the
+relay's catch-all. Mis-ordered, every request went to the relay and returned a
+404 that looked like a broken nginx config. A dedicated hostname has no ordering
+to get wrong.
+
+Ship talks to the relay from the browser, so the relay must name this origin:
+
+```
+BUZZ_CORS_ORIGINS=https://estiva.estiva.app,https://peek.estiva.app,https://ship.estiva.app
+```
+
+in `/opt/buzz/.env`, followed by a relay restart. **Omit it and the app loads
+fine and then fails every request**, which is a slow thing to diagnose.
 
 ## First deploy, by hand
 
-### 1. Add the tunnel route — before the catch-all
+### 1. Add the tunnel hostname
 
-In https://one.dash.cloudflare.com → **Networks** → **Tunnels** →
-**estiva-prod** → **Published application routes**:
+https://one.dash.cloudflare.com → **Networks** → **Tunnels** → **estiva-prod** →
+**Published application routes**:
 
 | Field | Value |
 | -- | -- |
-| Subdomain | `estiva` |
+| Subdomain | `ship` |
 | Domain | `estiva.app` |
-| Path | `ship/*` |
+| Path | *(empty)* |
 | Type | `HTTP` |
 | URL | `localhost:8081` |
 
-**Order matters.** The existing `estiva.estiva.app` route sends everything to
-the relay; a path route evaluated after it never matches. Put this one above it.
+`HTTP`, not `HTTPS`: that is the hop from `cloudflared` to the local container,
+which has no certificate. The public side is HTTPS regardless — Cloudflare
+terminates it at the edge. Adding the hostname creates the DNS record
+automatically.
 
-Do **not** set `httpHostHeader`. Buzz binds each request to its community from
-the original `Host`, and overriding it breaks tenant resolution with an empty
-response rather than an error.
+Order does not matter: this is a distinct hostname, so nothing else can shadow
+it. That is the point.
+
+Do **not** set `HTTP Host Header`. It does nothing useful here and breaks tenant
+resolution if it ever gets copied to a relay route.
 
 ### 2. Make the image pullable
 
@@ -88,12 +98,14 @@ docker compose up -d
 ### 5. Verify through the tunnel
 
 ```bash
-curl -I https://estiva.estiva.app/ship/
-curl -sI https://estiva.estiva.app/health   # the relay still answers
+curl -I https://ship.estiva.app/
+curl -s https://estiva.estiva.app/health   # the relay is untouched
 ```
 
-Both must work: the first proves the path route landed, the second proves it did
-not shadow the relay.
+If `/` returns 404, check whether the request reached nginx at all —
+`docker logs estiva-ship-estiva-ship-1`. Only the `Wget` healthcheck in the log
+means the tunnel never routed here, which is a Cloudflare problem, not an nginx
+one.
 
 ### 6. Turn on automatic deploys
 
@@ -107,15 +119,21 @@ systemctl enable --now estiva-ship-update.timer
 
 Both live on the box, not in this repo, and neither fails loudly.
 
-**`SHIP_REDIRECT_URIS` must contain the production URL.** Estiva ID matches
-redirect URIs exactly (`src/config.ts`), and the seed reads this env var. Until
-`https://estiva.estiva.app/ship/` is in `/opt/estiva-id/.env` and
-`node dist/db/seed.js` has been re-run, `/authorize` refuses to send anyone back
-and sign-in is broken while the app itself looks fine.
+**`SHIP_REDIRECT_URIS` must contain `https://ship.estiva.app/`.** Estiva ID
+matches redirect URIs exactly (`src/config.ts`), and the seed reads this env
+var. Until it is set in `/opt/estiva-id/.env` and `node dist/db/seed.js` has
+been re-run, `/authorize` refuses to send anyone back and sign-in is broken
+while the app itself looks fine.
 
 **The signing key must be a relay member.** `BUZZ_REQUIRE_RELAY_MEMBERSHIP=true`
 in production, and Ship mints a fresh keypair per browser. See PEEK-55 — this is
-per browser, not per person.
+per browser, not per person:
+
+```bash
+docker compose exec relay buzz-admin add-member --pubkey <hex> --role member
+```
+
+Note `--pubkey` is a named flag, not positional.
 
 ## Operating it
 
@@ -138,7 +156,7 @@ docker build -t estiva-ship:local \
   --build-arg RELAY_URL=https://estiva.estiva.app \
   --build-arg ID_BASE=https://id.estiva.app .
 docker run -d --name ship-verify estiva-ship:local
-docker exec ship-verify wget -q -S -O /dev/null http://127.0.0.1/ship/
+docker exec ship-verify wget -q -S -O /dev/null http://127.0.0.1/
 ```
 
 Check from inside the container: on Docker Desktop under WSL, ports published to
