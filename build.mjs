@@ -21,7 +21,9 @@ const RELAY_URL = process.env.RELAY_URL ?? 'http://localhost:3000'
 // the app is anonymous-only — the same fail-closed shape as RELAY_URL, and the
 // right default for a build that has no identity service to point at.
 const ID_BASE = process.env.ID_BASE ?? ''
-const CLIENT_ID = process.env.CLIENT_ID ?? 'linear-lite'
+// Must match a `client_id` seeded in Estiva ID, which knows this app as
+// `estiva-ship` (PEEK-98).
+const CLIENT_ID = process.env.CLIENT_ID ?? 'estiva-ship'
 
 const apps = readdirSync('apps', { withFileTypes: true })
   .filter((d) => d.isDirectory())

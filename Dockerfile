@@ -22,8 +22,10 @@ WORKDIR /app
 ARG RELAY_URL=http://localhost:3000
 ARG ID_BASE=
 # Must match a `client_id` seeded in Estiva ID (`src/db/seed.ts`), or /sign
-# refuses every request as an unknown app. Still `linear-lite` post-rename.
-ARG CLIENT_ID=linear-lite
+# refuses every request as an unknown app. Estiva ID seeds this alongside the
+# old `linear-lite` while PEEK-98 retires the latter, so a build carrying
+# either name works and this could flip without waiting on a deploy window.
+ARG CLIENT_ID=estiva-ship
 
 COPY package.json package-lock.json ./
 RUN npm ci

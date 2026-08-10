@@ -15,7 +15,7 @@ function check(label: string, condition: boolean, detail = '') {
   if (!condition) failures++
 }
 
-const CONFIG = { base: 'https://id.test', clientId: 'linear-lite' }
+const CONFIG = { base: 'https://id.test', clientId: 'estiva-ship' }
 const SESSION = { token: 'a-token', pubkey: 'ff'.repeat(32), expiresAt: Date.now() + 600_000 }
 
 const key = (n: number) => n.toString(16).padStart(64, '0')
