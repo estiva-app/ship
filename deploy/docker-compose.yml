@@ -1,0 +1,18 @@
+# Estiva Ship on the box. Lives at /opt/estiva-ship/docker-compose.yml.
+#
+# Bound to loopback, like everything else here: `cloudflared` reaches it
+# locally, and binding wider would expose it past the Hetzner firewall.
+
+name: estiva-ship
+
+services:
+  estiva-ship:
+    image: ${ESTIVA_SHIP_IMAGE:-ghcr.io/estiva-app/ship:main}
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:8081:80'
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
