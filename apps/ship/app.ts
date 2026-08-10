@@ -21,7 +21,8 @@
  * object being written to.
  */
 import { Relay } from '../../lib/nostr/relay'
-import { localSigner } from '../../lib/nostr/signer'
+import { estivaIdSigner, localSigner, type Signer } from '../../lib/nostr/signer'
+import { beginSignIn, completeSignIn, currentSession, signOut } from '../../lib/auth/estiva-id'
 import { naddrToAddr } from '../../lib/nostr/nip19'
 import { Store } from '../../src/store'
 import type { FolderState, Issue, Project } from '../../src/fold'
@@ -42,8 +43,20 @@ import { issueView } from './views/issue'
  * the same code pointed at two different workspaces.
  */
 declare const __RELAY_URL__: string
+declare const __ID_BASE__: string
+declare const __CLIENT_ID__: string
 
 const RELAY_URL = __RELAY_URL__
+
+/**
+ * Estiva ID, when this build has one (PEEK-47).
+ *
+ * Empty means sign-in is not offered and the app runs anonymous-only. That is
+ * not a degraded mode — it is the path that demonstrates an independent client
+ * with no account participating in the shared record, which is a large part of
+ * what this app is for.
+ */
+const ID_CONFIG = __ID_BASE__ ? { base: __ID_BASE__, clientId: __CLIENT_ID__ } : null
 /**
  * How often a detail surface re-reads.
  *
@@ -57,7 +70,20 @@ const POLL_MS = 5000
 
 const DISPLAY_NAME_KEY = 'ship.name'
 
-const signer = localSigner('ship.secretkey')
+/**
+ * Who is signing, decided once at boot.
+ *
+ * Signed in: Estiva ID holds the key and this process never sees one. Signed
+ * out: a throwaway per-browser key, exactly as before. `Store` cannot tell the
+ * difference, which is the whole point of the signer seam (PEEK-44).
+ */
+let estivaSession = ID_CONFIG ? currentSession() : null
+const signer: Signer =
+  ID_CONFIG && estivaSession
+    ? estivaIdSigner({ base: ID_CONFIG.base, pubkey: estivaSession.pubkey, token: estivaSession.token })
+    : localSigner('ship.secretkey')
+
+const signedIn = () => estivaSession !== null
 const store = new Store(new Relay(RELAY_URL, signer), signer)
 
 /**
@@ -283,8 +309,14 @@ function renderProfile() {
         const panel = h(
           'div',
           {},
-          h('div', { class: 'menu-label', text: 'Signed in as' }),
+          h('div', { class: 'menu-label', text: signedIn() ? 'Signed in as' : 'Acting as' }),
           h('div', { class: 'menu-value', text: displayName() }),
+          h('div', {
+            class: 'dim tiny menu-value',
+            text: signedIn()
+              ? 'Your Estiva ID. The same person you are in Estiva Peek.'
+              : 'A key held by this browser only. Nobody else knows who you are.',
+          }),
           h('div', { class: 'mono tiny dim break menu-value', text: signer.pubkey }),
           h('div', { class: 'menu-label', text: 'Workspace' }),
           h('div', { class: 'mono tiny dim break menu-value', text: RELAY_URL }),
@@ -293,13 +325,32 @@ function renderProfile() {
             text: 'Everyone on this relay shares this workspace, in every app.',
           }),
         )
-        const rename = h('button', { class: 'menu-item', text: `Change name (${displayName()})` })
-        rename.onclick = () => {
-          close()
-          const next = window.prompt('Name other apps should show for you:', displayName())
-          if (next?.trim()) void saveDisplayName(next.trim())
+        /**
+         * Renaming is only this app's business while anonymous.
+         *
+         * Signed in, the profile belongs to Estiva ID — it is the sole
+         * publisher of `kind:0` and `/sign` refuses one for every app, always
+         * (PEEK-31). Offering a rename here would either fail or, worse, imply
+         * this app owns something it does not.
+         */
+        if (signedIn()) {
+          const account = h('a', {
+            class: 'menu-item',
+            text: 'Edit your profile in Estiva ID',
+          }) as HTMLAnchorElement
+          account.href = ID_CONFIG?.base ?? '#'
+          account.target = '_blank'
+          account.rel = 'noreferrer'
+          panel.append(account)
+        } else {
+          const rename = h('button', { class: 'menu-item', text: `Change name (${displayName()})` })
+          rename.onclick = () => {
+            close()
+            const next = window.prompt('Name other apps should show for you:', displayName())
+            if (next?.trim()) void saveDisplayName(next.trim())
+          }
+          panel.append(rename)
         }
-        panel.append(rename)
 
         const copy = h('button', { class: 'menu-item', text: 'Copy my public key' })
         copy.onclick = async () => {
@@ -312,6 +363,32 @@ function renderProfile() {
           }
         }
         panel.append(copy)
+
+        /**
+         * Signing out returns to the anonymous key, not to an error screen.
+         *
+         * That path is not a fallback for when identity is unavailable — it is
+         * the demonstration that an independent client with no account can
+         * still take part in the shared record, which is a large part of what
+         * this app is for (PEEK-47).
+         */
+        if (ID_CONFIG) {
+          const auth = h('button', {
+            class: 'menu-item',
+            text: signedIn() ? 'Sign out' : 'Sign in with Estiva ID',
+          })
+          auth.onclick = () => {
+            close()
+            if (signedIn()) {
+              signOut()
+              location.reload()
+            } else {
+              void beginSignIn(ID_CONFIG)
+            }
+          }
+          panel.append(auth)
+        }
+
         return panel
       },
     }),
@@ -432,13 +509,53 @@ async function resolveInbound(naddr: string) {
 
 // ── Boot ────────────────────────────────────────────────────────────────────
 
-rememberSelf()
-renderProfile()
-// Published once per load, and idempotent — kind:0 is replaceable. Without it
-// this key is a stranger everywhere else in the ecosystem.
-void store.publishProfile(displayName()).catch(() => {})
+/**
+ * Coming back from Estiva ID.
+ *
+ * Handled before anything else runs, and it ends in a reload rather than
+ * continuing: the signer is chosen once, at module load, from whatever session
+ * exists then. Exchanging the code and carrying on would leave the app holding
+ * the anonymous signer for the rest of the page's life, having just signed in.
+ *
+ * One extra load, only on the callback, in exchange for not threading async
+ * identity through every module-level consumer of `signer`.
+ */
+async function finishSignIn(): Promise<boolean> {
+  if (!ID_CONFIG) return false
+  const params = new URLSearchParams(location.search)
+  if (!params.has('code') && !params.has('error')) return false
 
-start(async (next) => {
+  el.main.replaceChildren(h('p', { class: 'dim', text: 'Signing you in…' }))
+  const outcome = await completeSignIn(ID_CONFIG)
+  if (outcome.kind === 'failed') {
+    // Not a reload: the person should read this rather than watch it flash past.
+    el.main.replaceChildren(
+      h('p', { class: 'error', text: outcome.reason }),
+      h('p', { class: 'dim tiny', text: 'You can keep using the app signed out.' }),
+    )
+    return true
+  }
+  location.reload()
+  return true
+}
+
+function boot() {
+  rememberSelf()
+  renderProfile()
+
+  /**
+   * Anonymous identities publish their own `kind:0`; signed-in ones must not.
+   *
+   * Estiva ID is the sole publisher of profiles and `/sign` refuses `kind:0`
+   * for every app, always (PEEK-31) — so attempting this while signed in earns
+   * a `kind_profile_forbidden` and nothing else. Removing the anonymous half
+   * too is PEEK-48, once there is no anonymous half left to serve.
+   */
+  if (!signedIn()) {
+    void store.publishProfile(displayName()).catch(() => {})
+  }
+
+  start(async (next) => {
   route = next
 
   if (next.name === 'inbound') return void resolveInbound(next.naddr)
@@ -458,6 +575,13 @@ start(async (next) => {
   if (next.name === 'issue' || next.name === 'project') {
     poll = setInterval(() => void refresh(), POLL_MS)
   }
+  })
+}
+
+// The callback path renders its own thing and reloads, so the app only boots
+// when this page load is not the tail of a sign-in.
+void finishSignIn().then((handled) => {
+  if (!handled) boot()
 })
 
 // A tab that was hidden for ten minutes should not show ten-minute-old state
