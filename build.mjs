@@ -17,6 +17,11 @@ import { cpSync, mkdirSync, readdirSync, existsSync, rmSync } from 'node:fs'
  * pointed somewhere else.
  */
 const RELAY_URL = process.env.RELAY_URL ?? 'http://localhost:3000'
+// Estiva ID (PEEK-47). Empty ID_BASE means sign-in is not offered at all and
+// the app is anonymous-only — the same fail-closed shape as RELAY_URL, and the
+// right default for a build that has no identity service to point at.
+const ID_BASE = process.env.ID_BASE ?? ''
+const CLIENT_ID = process.env.CLIENT_ID ?? 'linear-lite'
 
 const apps = readdirSync('apps', { withFileTypes: true })
   .filter((d) => d.isDirectory())
@@ -32,8 +37,12 @@ for (const app of apps) {
     format: 'esm',
     outfile: `dist/${app}/bundle.js`,
     logLevel: 'warning',
-    define: { __RELAY_URL__: JSON.stringify(RELAY_URL) },
+    define: {
+      __RELAY_URL__: JSON.stringify(RELAY_URL),
+      __ID_BASE__: JSON.stringify(ID_BASE),
+      __CLIENT_ID__: JSON.stringify(CLIENT_ID),
+    },
   })
   cpSync(`apps/${app}/index.html`, `dist/${app}/index.html`)
-  console.log(`built ${app} → ${RELAY_URL}`)
+  console.log(`built ${app} → ${RELAY_URL}${ID_BASE ? `  (sign-in via ${ID_BASE})` : '  (anonymous only)'}`)
 }
