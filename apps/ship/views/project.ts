@@ -148,7 +148,7 @@ export function projectView(
           people: ctx.people,
           value: project.lead,
           me: ctx.signer.pubkey,
-          nameOf: ctx.nameOf,
+          labelOf: ctx.label,
           onChange: (value) => set('lead', value, value ? 'Assign project' : 'Unassign project'),
         })),
         progress(issues),

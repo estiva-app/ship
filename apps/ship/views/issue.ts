@@ -12,7 +12,18 @@ import { addrToNaddr } from '../../../lib/nostr/nip19'
 import { conversationsAbout, type Issue } from '../../../src/fold'
 import type { Ctx } from '../context'
 import { href } from '../router'
-import { ago, assigneeSelect, editableText, empty, h, pill, short, statusPill, vocabSelect } from '../ui'
+import {
+  ago,
+  assigneeSelect,
+  editableText,
+  empty,
+  h,
+  personCard,
+  pill,
+  short,
+  statusPill,
+  vocabSelect,
+} from '../ui'
 import { conversations } from './conversations'
 
 export function issueView(ctx: Ctx, addr: string, relayUrl: string): HTMLElement {
@@ -101,9 +112,21 @@ export function issueView(ctx: Ctx, addr: string, relayUrl: string): HTMLElement
           people: ctx.people,
           value: issue.assignee,
           me: ctx.signer.pubkey,
-          nameOf: ctx.nameOf,
+          labelOf: ctx.label,
           onChange: (value) => set('assignee', value, value ? 'Assign' : 'Unassign'),
         })),
+        // Who that actually is, including the email the relay has never seen
+        // (PEEK-50). Under the picker rather than inside it: a select shows one
+        // line and this is the place somebody looks to check they assigned the
+        // right person.
+        issue.assignee
+          ? personCard({
+              pubkey: issue.assignee,
+              profile: ctx.profile(issue.assignee),
+              member: ctx.member(issue.assignee),
+              label: ctx.label(issue.assignee),
+            })
+          : null,
         field('Project', projectSelect(ctx, issue, set)),
         provenance(ctx, issue),
         h('div', { class: 'side-actions' }, copyRefButton(ctx, issue, relayUrl)),
