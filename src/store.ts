@@ -11,7 +11,6 @@ import type { PublishResult, Relay } from '../lib/nostr/relay'
 import type { Signer } from '../lib/nostr/signer'
 import {
   buildCreateChannel,
-  buildProfile,
   type SignedEvent,
   type ThreadRef,
   type UnsignedEvent,
@@ -310,33 +309,20 @@ export class Store {
   }
 
   /**
-   * Publish this identity's profile.
+   * **Ship does not publish `kind:0`. Estiva ID does, and it is the only
+   * writer** (PEEK-48).
    *
-   * Peek looks up `kind:0` for every author it has not seen (`sync.ts`), so
-   * without one a conversation started here shows up in the topic as 64 hex
-   * characters. Idempotent — kind:0 is replaceable.
+   * There was a `publishProfile` here, and Peek had one too; each built a
+   * profile from its own idea of a person, which is why one human could arrive
+   * in the two apps as two different people. Two writers and no agreement is
+   * the shape, not a bug in either publisher — one writer is the fix.
    *
-   * **This has to go, and it cannot go yet (PEEK-31).** Estiva ID is the sole
-   * publisher of `kind:0`; Peek's publisher is already removed. Ship's cannot
-   * follow until Ship has Estiva ID identities, because `apps/ship/app.ts`
-   * mints its key with `localIdentity('ship.secretkey')` — per-browser, in
-   * localStorage. Estiva ID does not custody that key and has never heard of
-   * it, so it cannot publish a profile for it.
-   *
-   * Deleting this before that lands would not move the writer, it would remove
-   * the only one: every Ship author renders as 64 hex characters everywhere
-   * else, which is the failure this whole ticket exists to fix. The prerequisite
-   * is Ship's equivalent of Peek's `Accept Estiva ID tokens alongside Convex
-   * Auth`; then this method comes out and nothing regresses.
+   * Nothing could put it back by accident: `/sign` refuses `kind:0` for every
+   * app, always, so an app cannot get a profile signed even if it asks. The
+   * anonymous key could technically still sign one locally, and deliberately
+   * does not — see `displayName` in `apps/ship/app.ts` for why an anonymous
+   * participant has no profile rather than a made-up one.
    */
-  publishProfile(name: string, about?: string): Promise<PublishResult> {
-    return this.publish(
-      buildProfile(this.signer.pubkey, Date.now(), {
-        name,
-        about: about ?? 'Posting from Estiva Ship',
-      }),
-    )
-  }
 
   /**
    * Who these pubkeys are.
