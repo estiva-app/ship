@@ -327,10 +327,14 @@ export class Store {
   /**
    * Who these pubkeys are.
    *
-   * The mirror of `publishProfile`: this app publishes one profile and reads
-   * everyone else's, which is the whole of cross-app identity. Without it every
-   * author here renders as 64 hex characters even though Peek has published a
-   * name for that key — the data was always there, nobody was asking for it.
+   * **Ship reads profiles and writes none** (PEEK-48). This is the half that
+   * was always right: without it every author renders as 64 hex characters even
+   * though Estiva ID has published a name for that key — the data was there,
+   * nobody was asking for it.
+   *
+   * A key with no profile stays 64 hex characters, and that is correct rather
+   * than missing: an anonymous participant is anonymous. See `displayName` in
+   * `apps/ship/app.ts`.
    *
    * **One filter, `authors` as an array.** The `#h` OR-ing bug documented on
    * `rawFolders` is specific to *tag* filters; `authors` is a top-level NIP-01
