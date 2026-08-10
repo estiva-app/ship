@@ -68,8 +68,6 @@ const ID_CONFIG = __ID_BASE__ ? { base: __ID_BASE__, clientId: __CLIENT_ID__ } :
  */
 const POLL_MS = 5000
 
-const DISPLAY_NAME_KEY = 'ship.name'
-
 /**
  * Who is signing, decided once at boot.
  *
@@ -87,22 +85,20 @@ const signedIn = () => estivaSession !== null
 const store = new Store(new Relay(RELAY_URL, signer), signer)
 
 /**
- * The name other apps show for this key.
+ * The name to show for whoever is using this app.
  *
- * Peek looks up `kind:0` for every author it has not seen, so without one a
- * conversation started here arrives in the topic as 64 hex characters. Kept in
- * `localStorage` because the key is too — this identity is per-browser.
+ * Read from the relay's `kind:0` exactly like anybody else's — Estiva ID
+ * publishes it and this app does not (PEEK-48).
+ *
+ * **Signed out there is no name, and a truncated pubkey is the right answer.**
+ * That was the open question on the ticket, decided here rather than left to
+ * fall out: an anonymous participant genuinely is anonymous, and a
+ * locally-invented nickname would be this app asserting an identity no other
+ * app can see — the exact confusion the single-writer rule exists to remove.
+ * You are either somebody the ecosystem knows, or a key.
  */
 function displayName(): string {
-  return localStorage.getItem(DISPLAY_NAME_KEY) ?? `ship-${signer.pubkey.slice(0, 6)}`
-}
-
-async function saveDisplayName(name: string) {
-  localStorage.setItem(DISPLAY_NAME_KEY, name)
-  const ok = await publish('Profile', () => store.publishProfile(name))
-  if (ok) say(`Others will see you as “${name}”.`)
-  rememberSelf()
-  render()
+  return directory.get(signer.pubkey)?.name ?? `${signer.pubkey.slice(0, 8)}…`
 }
 
 let state: FolderState = { projects: [], issues: [], activity: [], conversations: [] }
@@ -185,21 +181,6 @@ function peopleIn(snapshot: FolderState): string[] {
     issues: snapshot.issues,
     conversations: snapshot.conversations,
     changes: snapshot.activity,
-  })
-}
-
-/**
- * Put our own name in the directory without waiting for a round trip.
- *
- * We know what we just published, and re-reading it to render our own name
- * would make the profile menu lag a rename by a network call.
- */
-function rememberSelf() {
-  directory.set(signer.pubkey, {
-    ...directory.get(signer.pubkey),
-    pubkey: signer.pubkey,
-    name: displayName(),
-    createdAt: Math.floor(Date.now() / 1000),
   })
 }
 
@@ -326,30 +307,23 @@ function renderProfile() {
           }),
         )
         /**
-         * Renaming is only this app's business while anonymous.
+         * Renaming is not this app's business at all any more (PEEK-48).
          *
-         * Signed in, the profile belongs to Estiva ID — it is the sole
-         * publisher of `kind:0` and `/sign` refuses one for every app, always
-         * (PEEK-31). Offering a rename here would either fail or, worse, imply
-         * this app owns something it does not.
+         * Signed in, the profile belongs to Estiva ID — sole publisher of
+         * `kind:0`, and `/sign` refuses one for every app regardless. Signed
+         * out there is nobody to rename: the key has no profile, by decision.
+         * Offering a rename in either case would imply this app owns something
+         * it does not.
          */
-        if (signedIn()) {
+        if (signedIn() && ID_CONFIG) {
           const account = h('a', {
             class: 'menu-item',
             text: 'Edit your profile in Estiva ID',
           }) as HTMLAnchorElement
-          account.href = ID_CONFIG?.base ?? '#'
+          account.href = ID_CONFIG.base
           account.target = '_blank'
           account.rel = 'noreferrer'
           panel.append(account)
-        } else {
-          const rename = h('button', { class: 'menu-item', text: `Change name (${displayName()})` })
-          rename.onclick = () => {
-            close()
-            const next = window.prompt('Name other apps should show for you:', displayName())
-            if (next?.trim()) void saveDisplayName(next.trim())
-          }
-          panel.append(rename)
         }
 
         const copy = h('button', { class: 'menu-item', text: 'Copy my public key' })
@@ -540,20 +514,7 @@ async function finishSignIn(): Promise<boolean> {
 }
 
 function boot() {
-  rememberSelf()
   renderProfile()
-
-  /**
-   * Anonymous identities publish their own `kind:0`; signed-in ones must not.
-   *
-   * Estiva ID is the sole publisher of profiles and `/sign` refuses `kind:0`
-   * for every app, always (PEEK-31) — so attempting this while signed in earns
-   * a `kind_profile_forbidden` and nothing else. Removing the anonymous half
-   * too is PEEK-48, once there is no anonymous half left to serve.
-   */
-  if (!signedIn()) {
-    void store.publishProfile(displayName()).catch(() => {})
-  }
 
   start(async (next) => {
   route = next

@@ -19,7 +19,7 @@
 import { Relay } from '../lib/nostr/relay'
 import { secretKeySigner } from '../lib/nostr/signer'
 import { publicKeyFromSecret, signEvent } from '../lib/nostr/sign'
-import { buildAddMember } from '../lib/nostr/events'
+import { buildAddMember, buildProfile } from '../lib/nostr/events'
 import { Store } from '../src/store'
 import { addrToNaddr } from '../lib/nostr/nip19'
 
@@ -72,7 +72,20 @@ async function main() {
   await store.setField({ folder, target: issue.addr, field: 'status', value: 'in_progress' })
   await store.setField({ folder, target: issue.addr, field: 'assignee', value: identity.pubkey })
   await store.setField({ folder, target: issue.addr, field: 'status', value: 'done' })
-  await store.publishProfile('Estiva Ship demo')
+  /**
+   * A profile for the throwaway identity above, so the demo author renders as
+   * a name rather than 64 hex characters.
+   *
+   * **Here and not on `Store`.** Estiva ID is the sole publisher of `kind:0`
+   * (PEEK-48), and the app must have no way to write one — leaving a
+   * `publishProfile` on the data layer is exactly the affordance that lets it
+   * creep back. This key is minted by `crypto.getRandomValues` a few lines up
+   * and lives for the length of this script, so no identity service could know
+   * about it and nothing here competes with a real person's profile.
+   */
+  await relay.publish(
+    signEvent(buildProfile(identity.pubkey, Date.now(), { name: 'Estiva Ship demo' }), secretKeyHex),
+  )
   await store.postMessage({ folder, about: issue.addr, body: 'Blocked on the Stripe key.' })
 
   console.log(`\nfolder  ${folder}   (the project IS this Folder — pair a Peek topic with it)`)
