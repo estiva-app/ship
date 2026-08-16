@@ -27,6 +27,7 @@ import {
   beginSignOut,
   completeSignIn,
   currentSession,
+  renewAccessToken,
   restoreRoute,
 } from '../../lib/auth/estiva-id'
 import {
@@ -93,7 +94,17 @@ const POLL_MS = 5000
 let estivaSession = ID_CONFIG ? currentSession() : null
 const signer: Signer =
   ID_CONFIG && estivaSession
-    ? estivaIdSigner({ base: ID_CONFIG.base, pubkey: estivaSession.pubkey, token: estivaSession.token })
+    ? estivaIdSigner({
+        base: ID_CONFIG.base,
+        pubkey: estivaSession.pubkey,
+        token: estivaSession.token,
+        // An expired token renews itself rather than surfacing as a failed
+        // action (PEEK-108). The signer is chosen once at module load and holds
+        // its token, so without this a session outliving ten minutes would
+        // start refusing to sign with nothing on screen explaining why —
+        // `SignerTokenExpired` has never had a handler here.
+        renew: () => renewAccessToken(ID_CONFIG),
+      })
     : localSigner('ship.secretkey')
 
 const signedIn = () => estivaSession !== null

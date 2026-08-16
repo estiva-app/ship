@@ -127,6 +127,79 @@ async function main() {
       expired = error instanceof SignerTokenExpired
     }
     check('an expired token is distinguishable from a refusal', expired)
+
+    /**
+     * Renewal (PEEK-108). Access tokens live ten minutes, so any session of
+     * real length crosses an expiry — and `SignerTokenExpired` has never had a
+     * handler in the app, so without this a signature would simply fail.
+     */
+    let attempts = 0
+    let lastAuth = ''
+    globalThis.fetch = (async (_url: string, init: RequestInit) => {
+      attempts++
+      lastAuth = (init.headers as Record<string, string>).authorization ?? ''
+      // First call: the held token is expired. After renewal it is accepted.
+      if (lastAuth === 'Bearer stale') return new Response('{}', { status: 401 })
+      return new Response(JSON.stringify({ event: { id: 'ok' } }), { status: 200 })
+    }) as typeof fetch
+
+    let renewals = 0
+    const renewing = estivaIdSigner({
+      base: 'https://id.estiva.app/',
+      pubkey: SOMEONE_ELSE,
+      token: 'stale',
+      renew: async () => {
+        renewals++
+        return 'fresh'
+      },
+    })
+    await renewing.sign(unsigned(SOMEONE_ELSE))
+    check('a 401 renews the token and retries', renewals === 1 && attempts === 2)
+    check('  …and the retry carries the new token', lastAuth === 'Bearer fresh')
+
+    // A later signature uses the renewed token rather than retrying the dead
+    // one, or every subsequent call would cost two round trips and a renewal.
+    attempts = 0
+    await renewing.sign(unsigned(SOMEONE_ELSE))
+    check('the renewed token is kept for later signatures', attempts === 1)
+
+    /**
+     * A second 401 after a successful renewal is not an expiry — it is a token
+     * the service will not accept. Retrying that in a loop is how one refused
+     * signature becomes a hot loop against the identity service.
+     */
+    globalThis.fetch = (async () => new Response('{}', { status: 401 })) as typeof fetch
+    let renewAttempts = 0
+    const stubborn = estivaIdSigner({
+      base: 'https://id.estiva.app/',
+      pubkey: SOMEONE_ELSE,
+      token: 'stale',
+      renew: async () => {
+        renewAttempts++
+        return 'also-rejected'
+      },
+    })
+    let stillExpired = false
+    try {
+      await stubborn.sign(unsigned(SOMEONE_ELSE))
+    } catch (error) {
+      stillExpired = error instanceof SignerTokenExpired
+    }
+    check('renewal is attempted once, never in a loop', renewAttempts === 1 && stillExpired)
+
+    // No renewer configured is the old behaviour, unchanged.
+    let withoutRenew = false
+    const plain = estivaIdSigner({
+      base: 'https://id.estiva.app/',
+      pubkey: SOMEONE_ELSE,
+      token: 'stale',
+    })
+    try {
+      await plain.sign(unsigned(SOMEONE_ELSE))
+    } catch (error) {
+      withoutRenew = error instanceof SignerTokenExpired
+    }
+    check('without a renewer, an expiry still surfaces', withoutRenew)
   } finally {
     globalThis.fetch = realFetch
   }

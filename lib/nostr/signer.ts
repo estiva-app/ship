@@ -94,6 +94,17 @@ export interface EstivaIdSignerOptions {
   pubkey: string
   /** A bearer token from `POST /token`, audience-bound to this app. */
   token: string
+  /**
+   * Renew the token, once, when `/sign` says it has expired (PEEK-108).
+   *
+   * Optional: without it the signer behaves exactly as before and a `401`
+   * surfaces as `SignerTokenExpired` for the caller to deal with. With it, an
+   * expiry is invisible — which matters much more now that access tokens live
+   * ten minutes rather than an hour, so a session of any length crosses one.
+   *
+   * Returning `null` means renewal failed and the expiry is real.
+   */
+  renew?: () => Promise<string | null>
 }
 
 /**
@@ -111,27 +122,49 @@ export interface EstivaIdSignerOptions {
  * obtain a new one rather than treat it as a signing failure — hence the
  * distinct error.
  */
-export function estivaIdSigner({ base, pubkey, token }: EstivaIdSignerOptions): Signer {
+export function estivaIdSigner({ base, pubkey, token, renew }: EstivaIdSignerOptions): Signer {
   const origin = base.replace(/\/+$/, '')
+  // The live token. Reassigned by a renewal so later signatures use the new one
+  // rather than retrying the expired one every time.
+  let bearer = token
+
   return {
     pubkey,
     kind: 'estiva-id',
     async sign(unsigned) {
-      const response = await fetch(`${origin}/sign`, {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          event: {
-            kind: unsigned.kind,
-            created_at: unsigned.created_at,
-            tags: unsigned.tags,
-            content: unsigned.content,
+      const post = (auth: string) =>
+        fetch(`${origin}/sign`, {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            authorization: `Bearer ${auth}`,
           },
-        }),
-      })
+          body: JSON.stringify({
+            event: {
+              kind: unsigned.kind,
+              created_at: unsigned.created_at,
+              tags: unsigned.tags,
+              content: unsigned.content,
+            },
+          }),
+        })
+
+      let response = await post(bearer)
+
+      /**
+       * Renew once and retry, never twice.
+       *
+       * A second `401` after a successful renewal is not an expiry — it is a
+       * token the service will not accept, and retrying that in a loop is how
+       * one refused signature becomes a hot loop against the identity service.
+       */
+      if (response.status === 401 && renew) {
+        const renewed = await renew()
+        if (renewed) {
+          bearer = renewed
+          response = await post(bearer)
+        }
+      }
 
       const text = await response.text()
       if (response.status === 401) throw new SignerTokenExpired()
