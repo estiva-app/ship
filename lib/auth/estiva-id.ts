@@ -39,6 +39,17 @@ const SESSION_KEY = 'ship.estiva-id.session'
 /** The PKCE verifier, in flight. Per-tab: the flow starts and ends in one tab. */
 const VERIFIER_KEY = 'ship.estiva-id.verifier'
 const STATE_KEY = 'ship.estiva-id.state'
+/**
+ * The hash route to restore afterwards.
+ *
+ * Ship routes on `location.hash`, and `redirectUri()` deliberately carries no
+ * fragment because it has to match the registered URI exactly. The fragment is
+ * lost at the first navigation to `/authorize` — not through the redirect
+ * chain, so nothing brings it back — which meant every deep link into Ship
+ * dropped its route on entry. Harmless when only a sign-in click did it;
+ * unmissable once the shell probes on every cold load (PEEK-123).
+ */
+const ROUTE_KEY = 'ship.estiva-id.route'
 
 export interface EstivaIdSession {
   token: string
@@ -136,6 +147,38 @@ export async function beginSignIn(
     markGuard(sessionStorage, Date.now())
   }
 
+  // Kept locally for the same reason `state` is not widened into a payload:
+  // what comes back from the identity service is compared, never trusted.
+  if (window.location.hash) sessionStorage.setItem(ROUTE_KEY, window.location.hash)
+
+  window.location.assign(url.toString())
+}
+
+/**
+ * Put the person back on the route they opened.
+ *
+ * Single-use, and applied before the app boots so the router reads the restored
+ * hash rather than the default. Assigning `location.hash` does not reload.
+ */
+export function restoreRoute(): void {
+  const hash = sessionStorage.getItem(ROUTE_KEY)
+  if (!hash) return
+  sessionStorage.removeItem(ROUTE_KEY)
+  if (!window.location.hash) window.history.replaceState({}, '', `${window.location.pathname}${hash}`)
+}
+
+/**
+ * Leave for Estiva ID to end the session there (PEEK-122).
+ *
+ * `signOut()` only forgets this app's token; the `estiva_id_session` cookie is
+ * untouched, so the shell's silent probe succeeds on the next boot and puts the
+ * person straight back in. The cookie can only be reached by going there.
+ */
+export function beginSignOut(config: EstivaIdConfig): void {
+  signOut()
+  const url = new URL('/logout', config.base)
+  url.searchParams.set('client_id', config.clientId)
+  url.searchParams.set('post_logout_redirect_uri', redirectUri())
   window.location.assign(url.toString())
 }
 
