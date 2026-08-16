@@ -241,6 +241,17 @@
 
       .welcome { max-width: 520px; margin-top: 40px; }
 
+      /* The auth shell (PEEK-116). Bootstrap, not a login page: centred, quiet,
+         and the same canvas whether it is waiting or asking for a passkey. */
+      #auth-shell {
+        position: fixed; inset: 0; z-index: 50; background: var(--bg);
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center; gap: 12px; padding: 24px;
+        text-align: center;
+      }
+      #auth-shell h1 { font-size: 15px; font-weight: 600; letter-spacing: 0.2px; margin: 0; }
+      #auth-shell p { margin: 0; max-width: 34em; }
+
       @media (max-width: 900px) {
         .shell { grid-template-columns: 1fr; }
         #sidebar { border-right: none; border-bottom: 1px solid var(--line); }

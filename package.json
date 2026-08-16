@@ -10,7 +10,7 @@
     "probe": "tsx scripts/probe-kinds.ts",
     "verify": "tsx scripts/verify.ts",
     "manifest": "tsx scripts/publish-manifest.ts",
-    "test": "tsx scripts/nip19.test.ts && tsx scripts/app.test.ts && tsx scripts/signer.test.ts && tsx scripts/directory.test.ts",
+    "test": "tsx scripts/nip19.test.ts && tsx scripts/app.test.ts && tsx scripts/signer.test.ts && tsx scripts/directory.test.ts && tsx scripts/auth-shell.test.ts",
     "test:directory": "tsx scripts/directory.test.ts",
     "test:nip19": "tsx scripts/nip19.test.ts",
     "test:app": "tsx scripts/app.test.ts",

@@ -23,6 +23,14 @@
 import { Relay } from '../../lib/nostr/relay'
 import { estivaIdSigner, localSigner, type Signer } from '../../lib/nostr/signer'
 import { beginSignIn, completeSignIn, currentSession, signOut } from '../../lib/auth/estiva-id'
+import {
+  type ShellReason,
+  type ShellState,
+  decideBoot,
+  logShellEvent,
+  readGuard,
+} from '../../lib/auth/shell/contract'
+import { clearAuthShell, renderAuthShell } from '../../lib/auth/shell/shell'
 import { lookupMembers, type MemberDirectory } from '../../lib/estiva-id/directory'
 import { naddrToAddr } from '../../lib/nostr/nip19'
 import { Store } from '../../src/store'
@@ -413,18 +421,25 @@ function renderProfile() {
          * this app is for (PEEK-47).
          */
         if (ID_CONFIG) {
-          const auth = h('button', {
-            class: 'menu-item',
-            text: signedIn() ? 'Sign out' : 'Sign in with Estiva ID',
-          })
+          /**
+           * Only "Sign out" now, because "Sign in" became unreachable here
+           * (PEEK-119): a build with an identity service enters through the
+           * shell, so anyone looking at this menu is already signed in.
+           *
+           * **It does not reload.** A reload would run the shell's silent
+           * probe, and the Estiva ID session cookie is untouched by this — so
+           * the probe would succeed and put the person straight back in, which
+           * reads as a button that does nothing. Showing the shell instead is
+           * the honest outcome: this app has forgotten your token, and getting
+           * back in is one tap because your identity session is still live.
+           *
+           * Ending *that* session is a different act and belongs to Estiva ID.
+           */
+          const auth = h('button', { class: 'menu-item', text: 'Sign out' })
           auth.onclick = () => {
             close()
-            if (signedIn()) {
-              signOut()
-              location.reload()
-            } else {
-              void beginSignIn(ID_CONFIG)
-            }
+            signOut()
+            showShell({ phase: 'authenticating', reason: 'no_session' })
           }
           panel.append(auth)
         }
@@ -565,14 +580,14 @@ async function finishSignIn(): Promise<boolean> {
   const params = new URLSearchParams(location.search)
   if (!params.has('code') && !params.has('error')) return false
 
-  el.main.replaceChildren(h('p', { class: 'dim', text: 'Signing you in…' }))
+  showShell({ phase: 'checking' })
   const outcome = await completeSignIn(ID_CONFIG)
   if (outcome.kind === 'failed') {
     // Not a reload: the person should read this rather than watch it flash past.
-    el.main.replaceChildren(
-      h('p', { class: 'error', text: outcome.reason }),
-      h('p', { class: 'dim tiny', text: 'You can keep using the app signed out.' }),
-    )
+    // The shell renders it, so a refusal looks like the rest of entry instead of
+    // a second error surface — and `login_required`, the expected answer to a
+    // silent probe, becomes the passkey affordance rather than an error at all.
+    showShell(shellStateFor(outcome.shellReason))
     return true
   }
   location.reload()
@@ -605,11 +620,76 @@ function boot() {
   })
 }
 
-// The callback path renders its own thing and reloads, so the app only boots
-// when this page load is not the tail of a sign-in.
-void finishSignIn().then((handled) => {
-  if (!handled) boot()
-})
+/**
+ * Entry, through the shell (PEEK-119).
+ *
+ * A build with an identity service configured is a protected app: it enters
+ * through the shell, and with a live Estiva ID session that is one silent
+ * round trip nobody sees. Without one it asks for a passkey in place — one tap,
+ * which is the floor, because WebAuthn needs a user activation.
+ *
+ * **A build with no `__ID_BASE__` still runs anonymous, and that is not a
+ * fallback.** It is the demonstration that an independent client with no
+ * account can take part in the shared record (PEEK-44). What changed is that
+ * the hosted build no longer offers both from one screen: on `ship.estiva.app`
+ * there is an identity service and entering means using it.
+ */
+const shellStartedAt = Date.now()
+
+function showShell(state: ShellState): void {
+  logShellEvent({
+    app: ID_CONFIG?.clientId ?? 'estiva-ship',
+    phase: state.phase,
+    ...('reason' in state ? { reason: state.reason } : {}),
+    elapsedMs: Date.now() - shellStartedAt,
+  })
+  renderAuthShell(state, () => {
+    if (!ID_CONFIG) return
+    showShell({ phase: 'checking' })
+    void beginSignIn(ID_CONFIG).catch(() => showShell({ phase: 'failed', reason: 'network' }))
+  })
+}
+
+/** A reason a passkey can clear is a step, not a dead end. */
+function shellStateFor(reason: ShellReason): ShellState {
+  const offersPasskey =
+    reason === 'no_session' || reason === 'session_expired' || reason === 'loop_guard'
+  return offersPasskey ? { phase: 'authenticating', reason } : { phase: 'failed', reason }
+}
+
+async function enter(): Promise<void> {
+  // No identity service in this build: anonymous, immediately, as before.
+  if (!ID_CONFIG) return void boot()
+
+  // The tail of a sign-in. Reloads on success, so nothing after it runs.
+  const handled = await finishSignIn()
+  if (handled) return
+
+  const action = decideBoot({
+    callback: null,
+    hasValidToken: estivaSession !== null,
+    guardAttemptedAt: readGuard(sessionStorage),
+    now: Date.now(),
+  })
+
+  switch (action.do) {
+    case 'enter':
+      clearAuthShell()
+      boot()
+      return
+    case 'probe_silently':
+      showShell({ phase: 'checking' })
+      // Navigates away; nothing after this runs unless it could not.
+      await beginSignIn(ID_CONFIG, { silent: true }).catch(() =>
+        showShell({ phase: 'failed', reason: 'network' }),
+      )
+      return
+    default:
+      showShell(shellStateFor(action.do === 'prompt_passkey' ? action.reason : 'no_session'))
+  }
+}
+
+void enter()
 
 // A tab that was hidden for ten minutes should not show ten-minute-old state
 // the moment it is looked at again.

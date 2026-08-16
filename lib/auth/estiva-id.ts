@@ -15,15 +15,24 @@
  *
  * ## Tokens are short-lived and there is no refresh
  *
- * `JWT_TTL_SECONDS` is ten minutes and PEEK-90 issues no refresh token. When
- * one expires the answer is to run the redirect again — which is silent, since
- * the Estiva ID session lasts far longer, so `/authorize` bounces straight back
- * without asking anything. It costs a page navigation and nothing else.
+ * `JWT_TTL_SECONDS` is an hour and PEEK-90 issues no refresh token, so when one
+ * expires the answer is to run the redirect again. That is silent when the
+ * Estiva ID session is still live — `/authorize` bounces straight back without
+ * asking anything — and it costs a page navigation and whatever was on screen.
+ * PEEK-108 is what removes that cost; until it lands, an expiry mid-session is
+ * an interruption the shell can make quiet but cannot make free.
  *
  * A hidden iframe would avoid the navigation and does not work: `SameSite=Lax`
  * withholds the cookie from anything that is not a top-level navigation, which
  * is precisely the property that makes the redirect flow necessary.
+ *
+ * ## The shell drives this now (PEEK-119)
+ *
+ * `beginSignIn(config, { silent: true })` is the probe an app boots on. See
+ * `shell/contract.ts` and `estiva-id/docs/AUTH-SHELL.md`.
  */
+
+import { clearGuard, markGuard, reasonForCallbackError, type ShellReason } from './shell/contract'
 
 /** Where the token and its metadata live between page loads. */
 const SESSION_KEY = 'ship.estiva-id.session'
@@ -97,7 +106,10 @@ export function signOut(): void {
  * back — it is what stops somebody feeding this app a code they obtained
  * elsewhere.
  */
-export async function beginSignIn(config: EstivaIdConfig): Promise<void> {
+export async function beginSignIn(
+  config: EstivaIdConfig,
+  { silent = false }: { silent?: boolean } = {},
+): Promise<void> {
   const verifier = randomUrlSafe(32)
   const state = randomUrlSafe(16)
   sessionStorage.setItem(VERIFIER_KEY, verifier)
@@ -111,13 +123,32 @@ export async function beginSignIn(config: EstivaIdConfig): Promise<void> {
   url.searchParams.set('code_challenge_method', 'S256')
   url.searchParams.set('state', state)
 
+  /**
+   * A silent attempt asks not to be prompted (PEEK-117): a browser with no
+   * session comes straight back with `error=login_required` rather than
+   * landing on the identity origin's sign-in page.
+   *
+   * The guard is marked **before** navigating, because nothing after this line
+   * runs. That marker is what makes this one attempt instead of a bounce.
+   */
+  if (silent) {
+    url.searchParams.set('prompt', 'none')
+    markGuard(sessionStorage, Date.now())
+  }
+
   window.location.assign(url.toString())
 }
 
 export type SignInOutcome =
   | { kind: 'none' }
   | { kind: 'signed-in'; session: EstivaIdSession }
-  | { kind: 'failed'; reason: string }
+  /**
+   * `reason` is for a person; `shellReason` is for the shell, which decides
+   * from it whether to offer a passkey or say that nobody here can help.
+   * `login_required` arrives on this path too — it is the expected negative
+   * answer to a silent probe, not a fault.
+   */
+  | { kind: 'failed'; reason: string; shellReason: ShellReason }
 
 /**
  * Finish the flow if this page load is the one coming back.
@@ -142,12 +173,20 @@ export async function completeSignIn(config: EstivaIdConfig): Promise<SignInOutc
 
   // Estiva ID sends people back with `?error=` for anything it can attribute to
   // the app rather than to the request — a suspended identity, most likely.
-  if (error) return { kind: 'failed', reason: params.get('error_description') ?? error }
+  if (error) {
+    return {
+      kind: 'failed',
+      reason: params.get('error_description') ?? error,
+      shellReason: reasonForCallbackError(error),
+    }
+  }
 
   if (!expectedState || state !== expectedState) {
-    return { kind: 'failed', reason: 'That sign-in did not start here.' }
+    return { kind: 'failed', reason: 'That sign-in did not start here.', shellReason: 'exchange_failed' }
   }
-  if (!verifier) return { kind: 'failed', reason: 'That sign-in did not start here.' }
+  if (!verifier) {
+    return { kind: 'failed', reason: 'That sign-in did not start here.', shellReason: 'exchange_failed' }
+  }
 
   const response = await fetch(`${config.base.replace(/\/+$/, '')}/token`, {
     method: 'POST',
@@ -164,7 +203,11 @@ export async function completeSignIn(config: EstivaIdConfig): Promise<SignInOutc
   if (!response.ok) {
     // Every refusal is `invalid_grant` by design — the specific reason is in
     // Estiva ID's audit log, not in this reply.
-    return { kind: 'failed', reason: 'Could not complete sign-in. Try again.' }
+    return {
+      kind: 'failed',
+      reason: 'Could not complete sign-in. Try again.',
+      shellReason: 'exchange_failed',
+    }
   }
 
   const body = (await response.json()) as { access_token: string; pubkey: string; expires_in: number }
@@ -174,6 +217,8 @@ export async function completeSignIn(config: EstivaIdConfig): Promise<SignInOutc
     expiresAt: Date.now() + body.expires_in * 1000,
   }
   localStorage.setItem(SESSION_KEY, JSON.stringify(session))
+  // The attempt worked, so the next boot is entitled to a fresh silent one.
+  clearGuard(sessionStorage)
   return { kind: 'signed-in', session }
 }
 
