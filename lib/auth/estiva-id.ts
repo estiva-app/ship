@@ -56,6 +56,15 @@ export interface EstivaIdSession {
   pubkey: string
   /** Epoch ms. Checked before use — a token past this is not offered. */
   expiresAt: number
+  /**
+   * Renews the access token without a redirect (PEEK-108).
+   *
+   * Absent against a deployment that issues none, in which case an expiry
+   * behaves as it always did. **Single-use** — Estiva ID rotates it on every
+   * redemption and reads a replay as theft, so it is replaced, never kept
+   * beside its successor.
+   */
+  refreshToken?: string
 }
 
 export interface EstivaIdConfig {
@@ -101,6 +110,23 @@ export function currentSession(): EstivaIdSession | null {
     // refreshed slightly early, and re-running the flow is silent anyway.
     if (session.expiresAt - 60_000 <= Date.now()) return null
     return session
+  } catch {
+    return null
+  }
+}
+
+/**
+ * The stored session as written, expired or not.
+ *
+ * `currentSession` deliberately hides an expired one, which is precisely the
+ * case a renewal exists to handle — the access token is dead and the refresh
+ * token beside it is the way out.
+ */
+function currentSessionRaw(): EstivaIdSession | null {
+  const raw = localStorage.getItem(SESSION_KEY)
+  if (!raw) return null
+  try {
+    return JSON.parse(raw) as EstivaIdSession
   } catch {
     return null
   }
@@ -152,6 +178,61 @@ export async function beginSignIn(
   if (window.location.hash) sessionStorage.setItem(ROUTE_KEY, window.location.hash)
 
   window.location.assign(url.toString())
+}
+
+/**
+ * Renew the access token without leaving the page (PEEK-108).
+ *
+ * Handed to `estivaIdSigner` as its `renew`, so a `401` from `/sign` becomes an
+ * invisible retry rather than an error the person sees. That matters more than
+ * it used to: access tokens live ten minutes now, so any session of real length
+ * crosses an expiry.
+ *
+ * Returns the new bearer token, or `null` if renewal is not possible — no
+ * refresh token, or Estiva ID refused it because the session ended. The stored
+ * session is dropped on refusal so a spent refresh token is never presented
+ * twice; a replay is what Estiva ID treats as theft.
+ */
+export async function renewAccessToken(config: EstivaIdConfig): Promise<string | null> {
+  const current = currentSessionRaw()
+  if (!current?.refreshToken) return null
+
+  let response: Response
+  try {
+    response = await fetch(`${config.base.replace(/\/+$/, '')}/token`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        grantType: 'refresh_token',
+        refreshToken: current.refreshToken,
+        clientId: config.clientId,
+      }),
+    })
+  } catch {
+    // Unreachable, not refused. The session may still be perfectly good, so
+    // this must not sign anybody out.
+    return null
+  }
+
+  if (!response.ok) {
+    signOut()
+    return null
+  }
+
+  const body = (await response.json()) as {
+    access_token: string
+    pubkey?: string
+    expires_in: number
+    refresh_token?: string
+  }
+  const next: EstivaIdSession = {
+    token: body.access_token,
+    pubkey: body.pubkey ?? current.pubkey,
+    expiresAt: Date.now() + body.expires_in * 1000,
+    ...(body.refresh_token ? { refreshToken: body.refresh_token } : {}),
+  }
+  localStorage.setItem(SESSION_KEY, JSON.stringify(next))
+  return next.token
 }
 
 /**
@@ -253,11 +334,17 @@ export async function completeSignIn(config: EstivaIdConfig): Promise<SignInOutc
     }
   }
 
-  const body = (await response.json()) as { access_token: string; pubkey: string; expires_in: number }
+  const body = (await response.json()) as {
+    access_token: string
+    pubkey: string
+    expires_in: number
+    refresh_token?: string
+  }
   const session: EstivaIdSession = {
     token: body.access_token,
     pubkey: body.pubkey,
     expiresAt: Date.now() + body.expires_in * 1000,
+    ...(body.refresh_token ? { refreshToken: body.refresh_token } : {}),
   }
   localStorage.setItem(SESSION_KEY, JSON.stringify(session))
   // The attempt worked, so the next boot is entitled to a fresh silent one.
