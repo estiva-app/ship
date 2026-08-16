@@ -22,7 +22,13 @@
  */
 import { Relay } from '../../lib/nostr/relay'
 import { estivaIdSigner, localSigner, type Signer } from '../../lib/nostr/signer'
-import { beginSignIn, completeSignIn, currentSession, signOut } from '../../lib/auth/estiva-id'
+import {
+  beginSignIn,
+  beginSignOut,
+  completeSignIn,
+  currentSession,
+  restoreRoute,
+} from '../../lib/auth/estiva-id'
 import {
   type ShellReason,
   type ShellState,
@@ -438,8 +444,10 @@ function renderProfile() {
           const auth = h('button', { class: 'menu-item', text: 'Sign out' })
           auth.onclick = () => {
             close()
-            signOut()
-            showShell({ phase: 'authenticating', reason: 'no_session' })
+            // Ends the Estiva ID session, not just this app's token (PEEK-122).
+            // Forgetting the token alone left the cookie intact, so the next
+            // boot's silent probe succeeded and put the person straight back in.
+            beginSignOut(ID_CONFIG)
           }
           panel.append(auth)
         }
@@ -669,11 +677,17 @@ async function enter(): Promise<void> {
     callback: null,
     hasValidToken: estivaSession !== null,
     guardAttemptedAt: readGuard(sessionStorage),
+    // Ship reloads on entry, so a boot is always a boot — the token cannot die
+    // between mounting and rendering the way it can in a long-lived SPA view.
+    enteredThisPageLoad: false,
     now: Date.now(),
   })
 
   switch (action.do) {
     case 'enter':
+      // Before boot: the router reads the hash on start, so restoring it after
+      // would render the default surface first and then jump.
+      restoreRoute()
       clearAuthShell()
       boot()
       return

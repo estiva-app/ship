@@ -31,7 +31,14 @@ function check(label: string, condition: boolean, detail = '') {
 
 const NOW = 1_700_000_000_000
 const decide = (o: Partial<Parameters<typeof decideBoot>[0]> = {}) =>
-  decideBoot({ callback: null, hasValidToken: false, guardAttemptedAt: null, now: NOW, ...o })
+  decideBoot({
+    callback: null,
+    hasValidToken: false,
+    guardAttemptedAt: null,
+    enteredThisPageLoad: false,
+    now: NOW,
+    ...o,
+  })
 
 const eq = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
 
@@ -98,6 +105,18 @@ check(
   !/sign in/i.test(CONTINUE_LABEL) && /passkey/i.test(CONTINUE_LABEL),
 )
 check('unrecognised errors stay retryable', reasonForCallbackError('server_error') === 'exchange_failed')
+
+// A cold boot and a token dying under somebody's hands look identical — no
+// valid token — and treating them the same navigated the page away mid-work.
+check(
+  'mid-session expiry asks before navigating',
+  eq(decide({ enteredThisPageLoad: true }), { do: 'prompt_passkey', reason: 'session_expired' }),
+)
+check('a cold boot still enters silently', eq(decide(), { do: 'probe_silently' }))
+check(
+  'a code still wins over mid-session expiry',
+  eq(decide({ enteredThisPageLoad: true, callback: { code: 'abc' } }), { do: 'complete_callback' }),
+)
 
 console.log(failures === 0 ? '\nAll auth-shell checks passed.' : `\n${failures} failed.`)
 process.exit(failures === 0 ? 0 : 1)
