@@ -28,46 +28,12 @@
  * server-side — which is what makes "read-only" a property of the credential
  * rather than a promise about this file.
  */
+import { clientCredentialsToken, credentialsFromEnv } from '../lib/agent/credentials'
 import { Relay } from '../lib/nostr/relay'
 import { estivaIdSigner } from '../lib/nostr/signer'
 import { KIND } from '../src/kinds'
 
-const ID_BASE = (process.env.ESTIVA_ID_BASE ?? 'https://id.estiva.app').replace(/\/+$/, '')
 const RELAY_URL = (process.env.RELAY_URL ?? 'https://estiva.estiva.app').replace(/\/+$/, '')
-
-const CLIENT_ID = process.env.ESTIVA_ID_CLIENT_ID
-const CLIENT_SECRET = process.env.ESTIVA_ID_CLIENT_SECRET
-
-interface TokenResponse {
-  access_token: string
-  token_type: string
-  pubkey: string
-  expires_in?: number
-}
-
-/**
- * Leg 1. Exported because the renewal path needs exactly this call again —
- * tokens live ten minutes, so anything longer than a probe crosses an expiry.
- */
-export async function clientCredentialsToken(
-  clientId: string,
-  clientSecret: string,
-): Promise<TokenResponse> {
-  const response = await fetch(`${ID_BASE}/token`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ grantType: 'client_credentials', clientId, clientSecret }),
-  })
-
-  const text = await response.text()
-  if (!response.ok) {
-    // The refusals worth telling apart: 401 is a wrong or rotated secret —
-    // re-issuing a credential replaces the old one, so a secret that worked
-    // yesterday is a normal way to arrive here.
-    throw new Error(`POST /token → ${response.status} ${text.slice(0, 200)}`)
-  }
-  return JSON.parse(text) as TokenResponse
-}
 
 /** What to count, and what to call it when printing. */
 const FILTERS: ReadonlyArray<{ label: string; kinds: number[] }> = [
@@ -78,21 +44,23 @@ const FILTERS: ReadonlyArray<{ label: string; kinds: number[] }> = [
 ]
 
 async function main() {
-  if (!CLIENT_ID || !CLIENT_SECRET) {
-    console.error('Set ESTIVA_ID_CLIENT_ID and ESTIVA_ID_CLIENT_SECRET.')
-    console.error('  set -a; . ~/.estiva-agent.env; set +a')
-    process.exit(1)
-  }
+  const credentials = credentialsFromEnv()
 
-  console.log(`identity  ${ID_BASE}`)
+  console.log(`identity  ${credentials.base}`)
   console.log(`relay     ${RELAY_URL}`)
-  console.log(`client    ${CLIENT_ID}\n`)
+  console.log(`client    ${credentials.clientId}\n`)
 
-  const token = await clientCredentialsToken(CLIENT_ID, CLIENT_SECRET)
+  /*
+    Deliberately *not* `serviceIdentitySigner`, which would hide the token
+    exchange inside the signer. This script exists to report which hop broke,
+    and a wrapper that renews on failure would mask the very distinction it is
+    here to draw.
+  */
+  const token = await clientCredentialsToken(credentials)
   console.log(`✅ token   signs as ${token.pubkey}`)
 
   const signer = estivaIdSigner({
-    base: ID_BASE,
+    base: credentials.base,
     pubkey: token.pubkey,
     token: token.access_token,
   })
