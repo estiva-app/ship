@@ -24,6 +24,7 @@ import {
 } from '../../../src/kinds'
 import type { Directory } from '../../../src/profiles'
 import { BadRequest, flagValue, type AgentApp, type AgentContext } from '../cli'
+import { resolveOne } from '../resolve'
 
 const store = (context: AgentContext) => new Store(context.relay, context.signer)
 
@@ -132,27 +133,57 @@ async function coverage(
  * ticket, and that mistake is invisible afterwards.
  */
 export function findIssue(issues: Issue[], reference: string): Issue {
-  const needle = reference.trim().toLowerCase()
-  if (!needle) throw new BadRequest('Which issue? Pass a ref, an address or part of a title.')
+  return resolveOne(issues, reference, {
+    noun: 'issue',
+    exact: (issue) => [issue.addr, issue.id, issue.ref],
+    text: (issue) => issue.title,
+    label: (issue) => `${issue.ref ?? issue.addr} — ${issue.title}`,
+    hint: 'Pass a ref, an address or part of a title.',
+  })
+}
 
-  const exact = issues.filter(
-    (issue) =>
-      issue.addr.toLowerCase() === needle ||
-      issue.id.toLowerCase() === needle ||
-      issue.ref?.toLowerCase() === needle,
+/**
+ * The same rule, for projects.
+ *
+ * This did not exist. The `--project` filter used `.find()` and silently
+ * returned the first of however many matched, which on prod meant
+ * `--project "Feedback"` answering about Ship's project when three contain the
+ * word (PEEK-162). Exact still wins, so `"Peek: Feedback"` — what a person
+ * actually types — keeps working.
+ */
+export function findProject(projects: Project[], reference: string): Project {
+  return resolveOne(projects, reference, {
+    noun: 'project',
+    exact: (project) => [project.addr, project.id, project.title],
+    text: (project) => project.title,
+    label: (project) => project.title,
+    hint: 'Pass a project name or part of one.',
+  })
+}
+
+/**
+ * `open` is not a status the relay knows; it is what people mean.
+ *
+ * Asked "what issues are open", Desktop picked `todo` from the vocabulary and
+ * left out everything In Progress — defensible from the enum, and not what was
+ * asked. The vocabulary is the wire format's, and "open work" is the question,
+ * so the mapping belongs here rather than in whoever is asking.
+ */
+const OPEN_STATUSES = ['todo', 'in_progress'] as const
+const STATUS_ALIASES: Record<string, readonly string[]> = { open: OPEN_STATUSES }
+
+export function statusesFor(requested: string): readonly string[] {
+  const alias = STATUS_ALIASES[requested]
+  if (alias) return alias
+  if (ISSUE_STATUSES.some((entry) => entry.value === requested)) return [requested]
+
+  // Refused rather than returned empty: "no issues" and "you asked for a status
+  // that does not exist" look identical in an empty array, and only one of them
+  // means the work is done.
+  throw new BadRequest(
+    `Unknown status "${requested}". Try: ${ISSUE_STATUSES.map((s) => s.value).join(', ')}, ` +
+      `or "open" for ${OPEN_STATUSES.join(' and ')}.`,
   )
-  if (exact.length === 1) return exact[0]
-
-  const byTitle = issues.filter((issue) => issue.title.toLowerCase().includes(needle))
-  if (byTitle.length === 1) return byTitle[0]
-
-  if (byTitle.length > 1) {
-    const candidates = byTitle.slice(0, 8).map((issue) => `${issue.ref ?? issue.addr} — ${issue.title}`)
-    throw new BadRequest(
-      `"${reference}" matches ${byTitle.length} issues:\n  ${candidates.join('\n  ')}`,
-    )
-  }
-  throw new BadRequest(`Nothing matches "${reference}".`)
 }
 
 export const shipApp: AgentApp = {
@@ -188,29 +219,17 @@ export const shipApp: AgentApp = {
         const wantedProject = flagValue(args, 'project')
         const wantedStatus = flagValue(args, 'status')?.toLowerCase()
 
-        if (wantedStatus && !ISSUE_STATUSES.some((entry) => entry.value === wantedStatus)) {
-          // Refused rather than returned empty: "no issues" and "you asked for a
-          // status that does not exist" look identical in an empty array, and
-          // only one of them means the work is done.
-          throw new BadRequest(
-            `Unknown status "${wantedStatus}". Try: ${ISSUE_STATUSES.map((s) => s.value).join(', ')}`,
-          )
-        }
+        const wantedStatuses = wantedStatus ? statusesFor(wantedStatus) : null
 
         let issues = state.issues
         if (wantedProject) {
-          const needle = wantedProject.toLowerCase()
-          const project = state.projects.find(
-            (candidate) =>
-              candidate.addr.toLowerCase() === needle ||
-              candidate.id.toLowerCase() === needle ||
-              candidate.title.toLowerCase().includes(needle),
-          )
-          if (!project) throw new BadRequest(`No project matches "${wantedProject}".`)
+          const project = findProject(state.projects, wantedProject)
           issues = issues.filter((issue) => issue.projectAddr === project.addr)
         }
-        if (wantedStatus) {
-          issues = issues.filter((issue) => (issue.status || DEFAULT_ISSUE_STATUS) === wantedStatus)
+        if (wantedStatuses) {
+          issues = issues.filter((issue) =>
+            wantedStatuses.includes(issue.status || DEFAULT_ISSUE_STATUS),
+          )
         }
 
         const directory = await directoryFor(

@@ -7,7 +7,7 @@ explains the design. This file is only about **reading the live workspace**.
 
 ```bash
 npx tsx scripts/agent.ts ship projects
-npx tsx scripts/agent.ts ship issues --project "Peek: Feedback" --status todo
+npx tsx scripts/agent.ts ship issues --project "Peek: Feedback" --status open
 npx tsx scripts/agent.ts ship show PEE-1
 ```
 
@@ -19,10 +19,16 @@ something and that is the bug.
 Output is indented JSON on stdout and nothing else, so it pipes. Diagnostics go
 to stderr. Every failure exits non-zero.
 
-`show` takes a display ref (`PEE-1`), a full address, or part of a title. **An
-ambiguous fragment is refused with the candidates listed, never resolved to a
+`--status open` means todo **and** in_progress — use it for any question about
+outstanding work. The individual values are for when somebody asks for one
+specifically.
+
+`show` and `--project` both take an exact identifier or part of a name. **An
+ambiguous reference is refused with the candidates listed, never resolved to a
 guess** — if you get that refusal, pick from the list rather than adding words
-until something matches.
+until something matches. All three lookups go through `resolveOne` in
+`lib/agent/resolve.ts`; a fourth should use it too rather than reimplementing
+the rule, which is how the project filter spent a week silently guessing.
 
 Credentials come from `~/.estiva-agent.env` automatically — no `source` step.
 Environment variables override the file when both are set.

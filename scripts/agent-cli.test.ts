@@ -14,7 +14,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { BadRequest, flagValue, parseArgs } from '../lib/agent/cli'
 import { loadCredentials } from '../lib/agent/credentials'
-import { findIssue } from '../lib/agent/apps/ship'
+import { findIssue, findProject, statusesFor } from '../lib/agent/apps/ship'
+import type { Project } from '../src/fold'
 import { findTopic, type Topic } from '../lib/agent/apps/peek'
 import type { Issue } from '../src/fold'
 
@@ -91,7 +92,7 @@ check('finds by a unique title fragment', findIssue(issues, 'assignee picker').i
 */
 refuses('refuses an ambiguous fragment rather than guessing', () => findIssue(issues, 'topics'), 'matches 2 issues')
 refuses('names the candidates when it refuses', () => findIssue(issues, 'topics'), 'PEE-2')
-refuses('refuses nothing at all', () => findIssue(issues, 'nothing-like-this'), 'Nothing matches')
+refuses('refuses nothing at all', () => findIssue(issues, 'nothing-like-this'), 'No issue matches')
 refuses('refuses an empty reference', () => findIssue(issues, '   '))
 
 /*
@@ -101,6 +102,49 @@ refuses('refuses an empty reference', () => findIssue(issues, '   '))
 */
 const withDecoy = [...issues, issue({ id: 'd', addr: '30851:abc:d', ref: 'PEE-9', title: 'Follow-up to PEE-1' })]
 check('an exact ref beats a title containing it', findIssue(withDecoy, 'PEE-1').id === 'a')
+
+console.log('\n— resolving a project (the one that used to guess) —')
+
+/*
+  The real collision, reproduced. Three projects on prod contain "Feedback", and
+  `--project "Feedback"` silently answered about Ship's for over a week because
+  the filter used `.find()` while the issue and topic lookups beside it refused.
+  A rule kept in two places out of three is worse than no rule, since a reader
+  assumes it holds everywhere.
+*/
+const project = (over: Partial<Project>): Project => ({
+  addr: '30850:abc:x',
+  id: 'x',
+  author: 'abc',
+  createdAt: 0,
+  title: 'Untitled',
+  description: '',
+  contentFolder: 'f',
+  originFolder: 'f',
+  status: 'planned',
+  archived: false,
+  fields: {},
+  ...over,
+})
+
+const projects = [
+  project({ id: 'ship', addr: '30850:abc:ship', title: 'Ship: Feedback & Bugs' }),
+  project({ id: 'id', addr: '30850:abc:id', title: 'Estiva ID: Feedback & Bugs' }),
+  project({ id: 'peek', addr: '30850:abc:peek', title: 'Peek: Feedback & Bugs' }),
+  project({ id: 'other', addr: '30850:abc:other', title: 'Other' }),
+]
+
+refuses('refuses a word three projects share', () => findProject(projects, 'Feedback'), 'matches 3 projects')
+refuses('and names every one of them', () => findProject(projects, 'Feedback'), 'Peek: Feedback & Bugs')
+
+/*
+  The fix must not become "be stricter". "Peek: Feedback" is what a person types
+  and it has to keep working, so a *unique* partial still resolves.
+*/
+check('a unique partial still resolves', findProject(projects, 'Peek: Feedback').id === 'peek')
+check('an exact title resolves', findProject(projects, 'Other').id === 'other')
+check('an address resolves', findProject(projects, '30850:abc:id').id === 'id')
+refuses('refuses a project that is not there', () => findProject(projects, 'Nope'), 'No project matches')
 
 console.log('\n— resolving a topic (second app, same rules) —')
 
@@ -136,6 +180,19 @@ check('an exact name beats names containing it', findTopic(topics, 'test').folde
 check('a unique fragment still resolves', findTopic(topics, 'sequencing').folder === 'ddd')
 refuses('refuses an ambiguous topic fragment', () => findTopic(topics, 'tes'), 'matches 3 topics')
 refuses('refuses an unknown topic', () => findTopic(topics, 'nope'), 'No topic matches')
+
+console.log('\n— what "open" means —')
+
+/*
+  Asked "what issues are open", Desktop chose `todo` from the vocabulary and
+  left out everything In Progress. Defensible from the enum offered, and not
+  what was asked — so the alias exists to stop the most natural question having
+  the narrowest answer.
+*/
+check('open covers todo and in_progress', statusesFor('open').join(',') === 'todo,in_progress')
+check('a real status stays itself', statusesFor('done').join(',') === 'done')
+refuses('an unknown status is refused', () => statusesFor('wibble'), 'Unknown status')
+refuses('and the refusal mentions open', () => statusesFor('wibble'), 'open')
 
 console.log('\n— credentials —')
 

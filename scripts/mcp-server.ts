@@ -92,6 +92,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         'List issues in Estiva Ship, the team\'s issue tracker, newest first. Optionally filter by project or status. ' +
         'Returns { issues, coverage }. **Read `coverage` before summarising**: some issues are unreachable because the project they belonged to no longer resolves, and the list is not the whole workspace when `coverage.unreachable` is above zero. Say so rather than implying completeness. ' +
         'Issue refs such as PEE-1 are display keys and are not unique across projects; the `addr` field is the real identity. ' +
+        'If `project` matches more than one project this returns the candidates instead of choosing — pick one and ask again rather than guessing. ' +
         READ_ONLY_NOTE,
       inputSchema: {
         type: 'object',
@@ -102,8 +103,9 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
           },
           status: {
             type: 'string',
-            enum: ['todo', 'in_progress', 'done', 'cancelled'],
-            description: 'Filter by status. Omit for all statuses.',
+            enum: ['open', 'todo', 'in_progress', 'done', 'cancelled'],
+            description:
+              'Filter by status. Use "open" for work that is not finished — it covers both todo and in_progress, and is almost always what a question about open or outstanding issues means. The individual values are for when someone asks for one specifically. Omit for all statuses.',
           },
         },
         additionalProperties: false,
