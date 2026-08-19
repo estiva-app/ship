@@ -13,6 +13,11 @@ npx tsx scripts/agent.ts ship issues --project "Peek: Feedback" --status todo
 npx tsx scripts/agent.ts ship show PEE-1
 ```
 
+Claude Desktop reaches the same commands through `scripts/mcp-server.ts`. Both
+front-ends dispatch the same `AgentCommand` objects, so their output is
+identical — if they ever disagree, one of them has grown its own copy of
+something and that is the bug.
+
 Output is indented JSON on stdout and nothing else, so it pipes. Diagnostics go
 to stderr. Every failure exits non-zero.
 
@@ -47,12 +52,25 @@ query — and says which one broke. Run it before debugging anything else.
 
 ## Two things that will mislead you
 
-**`issues` does not list every issue.** Discovery starts from projects and
-widens into their Folders, so an issue whose project record no longer exists is
-unreachable. On prod that was 13 of 27. `ship.estiva.app` has the same blind
-spot — this is not a CLI defect — but it means **"all issues" means "all
-discoverable issues"**, and answering "what is still open?" from this output
-alone will be confidently incomplete. See PEEK-154.
+**`issues` does not list every issue — but it now tells you so.** Discovery
+starts from projects and widens into their Folders, so an issue whose project
+record no longer exists is unreachable. `ship.estiva.app` has the same blind
+spot; this is not a CLI defect. See PEEK-154.
+
+The command returns `{ issues, coverage }`, and `coverage` is the part to read
+before summarising:
+
+```json
+"coverage": { "reachable": 14, "unreachable": 13, "total": 27, "note": "..." }
+```
+
+`unreachable` is counted against the **whole workspace**, not the filtered
+slice — an unreachable issue has no project or status this read can see, so it
+cannot be attributed to a filter, and dropping the count under `--project`
+would hide the gap in exactly the narrow queries people trust most.
+
+When `unreachable` is above zero, say so rather than implying the list is
+complete.
 
 **Display refs are not unique.** `nextRef` derives them from what a client could
 see at the time, so the workspace contains two `PEE-1`, two `NEW-1` and two
