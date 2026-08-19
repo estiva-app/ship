@@ -11,6 +11,7 @@
  */
 import { BadRequest, flagValue, parseArgs } from '../lib/agent/cli'
 import { findIssue } from '../lib/agent/apps/ship'
+import { findTopic, type Topic } from '../lib/agent/apps/peek'
 import type { Issue } from '../src/fold'
 
 let failures = 0
@@ -96,6 +97,41 @@ refuses('refuses an empty reference', () => findIssue(issues, '   '))
 */
 const withDecoy = [...issues, issue({ id: 'd', addr: '30851:abc:d', ref: 'PEE-9', title: 'Follow-up to PEE-1' })]
 check('an exact ref beats a title containing it', findIssue(withDecoy, 'PEE-1').id === 'a')
+
+console.log('\n— resolving a topic (second app, same rules) —')
+
+/*
+  The guard has to hold per app, not per codebase. Peek's topics are named by
+  people rather than generated, so near-duplicates are the norm rather than the
+  exception — the live workspace has "test", "test 2", "test 3", "test 4" and
+  "test 5" side by side, which is exactly where a substring match would guess.
+*/
+const topic = (over: Partial<Topic>): Topic => ({
+  folder: 'f',
+  name: 'Untitled',
+  createdBy: 'abc',
+  createdAt: 0,
+  ...over,
+})
+
+const topics = [
+  topic({ folder: 'aaa', name: 'test' }),
+  topic({ folder: 'bbb', name: 'test 2' }),
+  topic({ folder: 'ccc', name: 'test 3' }),
+  topic({ folder: 'ddd', name: 'Planning and sequencing' }),
+]
+
+check('finds a topic by exact name', findTopic(topics, 'Planning and sequencing').folder === 'ddd')
+check('finds a topic by folder id', findTopic(topics, 'ccc').folder === 'ccc')
+
+/*
+  "test" is both an exact name and a prefix of two others. Exact must win, or
+  every topic whose name is a prefix of another becomes unreachable.
+*/
+check('an exact name beats names containing it', findTopic(topics, 'test').folder === 'aaa')
+check('a unique fragment still resolves', findTopic(topics, 'sequencing').folder === 'ddd')
+refuses('refuses an ambiguous topic fragment', () => findTopic(topics, 'tes'), 'matches 3 topics')
+refuses('refuses an unknown topic', () => findTopic(topics, 'nope'), 'No topic matches')
 
 console.log(failures === 0 ? '\nAll agent CLI checks passed.' : `\n${failures} failed.`)
 process.exit(failures === 0 ? 0 : 1)
