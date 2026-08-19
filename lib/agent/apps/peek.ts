@@ -38,6 +38,7 @@
 import { foldFolder } from '../../../src/fold'
 import type { SignedEvent } from '../../nostr/events'
 import { BadRequest, flagValue, type AgentApp, type AgentContext } from '../cli'
+import { resolveOne } from '../resolve'
 import { Store } from '../../../src/store'
 import type { Directory } from '../../../src/profiles'
 
@@ -100,21 +101,13 @@ function who(directory: Directory, pubkey: string): string {
  * wrong conversation, and nothing afterwards reveals it did.
  */
 export function findTopic(topics: Topic[], reference: string): Topic {
-  const needle = reference.trim().toLowerCase()
-  if (!needle) throw new BadRequest('Which topic? Pass a name or a folder id.')
-
-  const exact = topics.filter(
-    (topic) => topic.folder.toLowerCase() === needle || topic.name.toLowerCase() === needle,
-  )
-  if (exact.length === 1) return exact[0]
-
-  const partial = topics.filter((topic) => topic.name.toLowerCase().includes(needle))
-  if (partial.length === 1) return partial[0]
-  if (partial.length > 1) {
-    const names = partial.slice(0, 8).map((topic) => `${topic.folder.slice(0, 8)} — ${topic.name}`)
-    throw new BadRequest(`"${reference}" matches ${partial.length} topics:\n  ${names.join('\n  ')}`)
-  }
-  throw new BadRequest(`No topic matches "${reference}".`)
+  return resolveOne(topics, reference, {
+    noun: 'topic',
+    exact: (topic) => [topic.folder, topic.name],
+    text: (topic) => topic.name,
+    label: (topic) => `${topic.folder.slice(0, 8)} — ${topic.name}`,
+    hint: 'Pass a topic name or a folder id.',
+  })
 }
 
 export const peekApp: AgentApp = {
