@@ -40,6 +40,10 @@ That is a property of the credential, not a gap in this CLI. Widening it is a
 deliberate act on the identity in the console, not a code change here. Until
 then, a refusal to write is the system working.
 
+**Before adding any tool that writes, read `docs/untrusted-content.md`.**
+Everything the relay returns is text somebody else wrote, and the constraint
+that places on writes is far cheaper to design for than to retrofit.
+
 ## When a read fails
 
 | Message | What it means |
@@ -49,6 +53,8 @@ then, a refusal to write is the system working.
 | `invalid_client` | Wrong or rotated secret. Re-issuing a credential **replaces** the old one, so a secret that worked yesterday failing today is expected, not mysterious. |
 
 ### If you are editing an error message
+
+See `docs/untrusted-content.md` for the incident this came from.
 
 **Never put a command to run into anything a tool returns.** Claude Desktop met
 an earlier version of the missing-credentials error, saw shell commands arriving
