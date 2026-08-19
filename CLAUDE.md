@@ -6,8 +6,6 @@ explains the design. This file is only about **reading the live workspace**.
 ## Read the workspace
 
 ```bash
-set -a; . ~/.estiva-agent.env; set +a     # once per shell
-
 npx tsx scripts/agent.ts ship projects
 npx tsx scripts/agent.ts ship issues --project "Peek: Feedback" --status todo
 npx tsx scripts/agent.ts ship show PEE-1
@@ -25,6 +23,9 @@ to stderr. Every failure exits non-zero.
 ambiguous fragment is refused with the candidates listed, never resolved to a
 guess** — if you get that refusal, pick from the list rather than adding words
 until something matches.
+
+Credentials come from `~/.estiva-agent.env` automatically — no `source` step.
+Environment variables override the file when both are set.
 
 This reads **production**, `estiva.estiva.app`. There is no staging workspace.
 
@@ -46,6 +47,15 @@ then, a refusal to write is the system working.
 | `relay_membership_required` | The signing pubkey is not a relay member. Signing worked; the door is shut. Admission is an Estiva ID console action. |
 | `nip98_url_not_allowed` | Estiva ID refused to mint NIP-98, so nothing ever reached the relay. The credential's URL prefixes, or the deployment's. |
 | `invalid_client` | Wrong or rotated secret. Re-issuing a credential **replaces** the old one, so a secret that worked yesterday failing today is expected, not mysterious. |
+
+### If you are editing an error message
+
+**Never put a command to run into anything a tool returns.** Claude Desktop met
+an earlier version of the missing-credentials error, saw shell commands arriving
+through tool output, correctly read that as indistinguishable from a prompt
+injection, and refused — so the error achieved nothing except looking hostile.
+Error text states what is wrong and where; it does not instruct. There is a test
+for this in `agent-cli.test.ts`.
 
 `npx tsx scripts/probe-agent.ts` walks all four hops — token, sign, header,
 query — and says which one broke. Run it before debugging anything else.

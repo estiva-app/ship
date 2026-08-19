@@ -24,7 +24,7 @@
  * Signs a NIP-98 event, which travels no further than this process. Nothing is
  * published, and the credential could not publish if it tried.
  */
-import { clientCredentialsToken, credentialsFromEnv, serviceIdentitySigner } from '../lib/agent/credentials'
+import { clientCredentialsToken, loadCredentials, serviceIdentitySigner } from '../lib/agent/credentials'
 import { estivaIdSigner, SignerTokenExpired } from '../lib/nostr/signer'
 
 const RELAY_URL = process.env.RELAY_URL ?? 'https://estiva.estiva.app'
@@ -52,7 +52,7 @@ const httpAuth = () => ({
 })
 
 async function main() {
-  const credentials = credentialsFromEnv()
+  const credentials = loadCredentials()
   console.log(`identity  ${credentials.base}`)
   console.log(`client    ${credentials.clientId}\n`)
 

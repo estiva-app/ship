@@ -19,7 +19,7 @@
  * Minutes, not seconds — run it when changing anything about tokens, not on
  * every commit. Read-only throughout.
  */
-import { credentialsFromEnv, clientCredentialsToken, serviceIdentitySigner } from '../lib/agent/credentials'
+import { loadCredentials, clientCredentialsToken, serviceIdentitySigner } from '../lib/agent/credentials'
 import { Relay } from '../lib/nostr/relay'
 import { KIND } from '../src/kinds'
 
@@ -33,7 +33,7 @@ const sleep = (seconds: number) => new Promise((resolve) => setTimeout(resolve, 
 const stamp = () => new Date().toISOString().slice(11, 19)
 
 async function main() {
-  const credentials = credentialsFromEnv()
+  const credentials = loadCredentials()
 
   // Asked once up front so the run length comes from the service rather than a
   // number written here that could drift away from it silently.
