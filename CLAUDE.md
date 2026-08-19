@@ -3,6 +3,9 @@
 A minimal issue tracker — projects, issues, comments — built on Nostr. `README.md`
 explains the design. This file is only about **reading the live workspace**.
 
+Setting this up on a new machine, or for another person, is
+`docs/claude-desktop-setup.md`.
+
 ## Read the workspace
 
 ```bash

@@ -8,6 +8,12 @@ different people, sharing no code and no database, can work on the same data** â
 and that one app can render and act on another app's objects using only a
 published manifest.
 
+## Reading it from Claude
+
+Claude Desktop and Claude Code can read this workspace through a local MCP
+server that signs as an Estiva ID service identity â€” read-only, holding no key.
+Set-up is `docs/claude-desktop-setup.md`; `CLAUDE.md` covers the commands.
+
 ## Read first
 
 The spec and the reasoning behind it live in the Peek repo:
