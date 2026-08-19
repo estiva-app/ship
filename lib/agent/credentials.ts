@@ -29,6 +29,9 @@
  * So renewal is wired in by construction rather than offered as an option.
  * There is no way to build one of these without it.
  */
+import { existsSync, readFileSync, statSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
 import { estivaIdSigner, type Signer } from '../nostr/signer'
 
 export interface ServiceCredentials {
@@ -138,21 +141,114 @@ export async function serviceIdentitySigner(
 }
 
 /**
- * The credential this process was given, or a refusal that says what to do.
+ * Where the credentials file lives when nothing says otherwise.
  *
- * Environment rather than a config file: the secret should be as easy to keep
- * out of a repository as possible, and a path in a config file is a thing that
- * gets committed.
+ * A file rather than only environment variables, because the client that
+ * matters cannot set environment variables. Claude Desktop launches this server
+ * with `wsl.exe -e`, which runs a program directly — no login shell, no
+ * profile, nothing exported. A server that could only read `process.env` would
+ * work from every terminal and fail in the one place it is actually used.
+ *
+ * Kept out of `claude_desktop_config.json` deliberately (PEEK-158). That file is
+ * plaintext, gets copied between machines and pasted into bug reports; a path is
+ * safe there in a way a secret is not.
  */
-export function credentialsFromEnv(env: NodeJS.ProcessEnv = process.env): ResolvedCredentials {
-  const clientId = env.ESTIVA_ID_CLIENT_ID?.trim()
-  const clientSecret = env.ESTIVA_ID_CLIENT_SECRET?.trim()
+const DEFAULT_CREDENTIALS_FILE = '.estiva-agent.env'
+
+/** `KEY=value` lines, `#` comments, optional surrounding quotes. */
+function parseEnvFile(contents: string): Record<string, string> {
+  const values: Record<string, string> = {}
+  for (const line of contents.split('\n')) {
+    const trimmed = line.trim()
+    if (!trimmed || trimmed.startsWith('#')) continue
+    const at = trimmed.indexOf('=')
+    if (at <= 0) continue
+    const key = trimmed.slice(0, at).trim()
+    let value = trimmed.slice(at + 1).trim()
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1)
+    }
+    values[key] = value
+  }
+  return values
+}
+
+/**
+ * The credential this process was given, from the environment or from a file.
+ *
+ * The environment wins when both are present, so a terminal can override the
+ * file without editing it.
+ *
+ * ## The refusal describes state, it does not issue instructions
+ *
+ * An earlier version of this told the caller to run
+ * `set -a; . ~/.estiva-agent.env; set +a`. Claude Desktop read that, correctly
+ * identified shell commands arriving through tool output as indistinguishable
+ * from a prompt injection, and refused to act on it — which is exactly what a
+ * model should do with instructions that did not come from its user.
+ *
+ * So error text here states what was looked for and where, and says plainly
+ * that the fix is not available from inside a conversation. **Never put a
+ * command to run into anything that reaches a model.** The same rule applies to
+ * every message in `scripts/mcp-server.ts`.
+ */
+export function loadCredentials(env: NodeJS.ProcessEnv = process.env): ResolvedCredentials {
+  const fromEnv = {
+    clientId: env.ESTIVA_ID_CLIENT_ID?.trim(),
+    clientSecret: env.ESTIVA_ID_CLIENT_SECRET?.trim(),
+    base: env.ESTIVA_ID_BASE?.trim(),
+  }
+
+  const home = env.HOME ?? homedir()
+  const file = env.ESTIVA_AGENT_ENV_FILE?.trim() || join(home, DEFAULT_CREDENTIALS_FILE)
+
+  let fromFile: Record<string, string> = {}
+  let fileState: 'read' | 'absent' | 'unreadable' = 'absent'
+  if (existsSync(file)) {
+    try {
+      fromFile = parseEnvFile(readFileSync(file, 'utf8'))
+      fileState = 'read'
+
+      /*
+        Advisory only, and on stderr. A secret readable by every account on the
+        machine is worth saying out loud, but refusing to start over it would
+        strand somebody whose filesystem cannot represent the permission at all
+        — /mnt/c under WSL being exactly that case.
+      */
+      const mode = statSync(file).mode & 0o077
+      if (mode !== 0) {
+        console.error(`estiva: ${file} is readable by others (mode ${(statSync(file).mode & 0o777).toString(8)})`)
+      }
+    } catch {
+      fileState = 'unreadable'
+    }
+  }
+
+  const clientId = fromEnv.clientId || fromFile.ESTIVA_ID_CLIENT_ID
+  const clientSecret = fromEnv.clientSecret || fromFile.ESTIVA_ID_CLIENT_SECRET
 
   if (!clientId || !clientSecret) {
+    const where = {
+      read: `a credentials file exists at ${file} but does not define both values`,
+      absent: `no credentials file at ${file}`,
+      unreadable: `a credentials file at ${file} could not be read`,
+    }[fileState]
+
     throw new Error(
-      'Set ESTIVA_ID_CLIENT_ID and ESTIVA_ID_CLIENT_SECRET.\n' +
-        '  set -a; . ~/.estiva-agent.env; set +a',
+      'No Estiva credentials are available to this process. ' +
+        'ESTIVA_ID_CLIENT_ID and ESTIVA_ID_CLIENT_SECRET are unset in the environment, and ' +
+        `${where}. ` +
+        'This is local machine setup on the host running the server, and it cannot be ' +
+        'resolved from within a conversation.',
     )
   }
-  return { clientId, clientSecret, base: env.ESTIVA_ID_BASE?.trim() || DEFAULT_ID_BASE }
+
+  return {
+    clientId,
+    clientSecret,
+    base: fromEnv.base || fromFile.ESTIVA_ID_BASE || DEFAULT_ID_BASE,
+  }
 }
