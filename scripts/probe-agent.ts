@@ -28,7 +28,7 @@
  * server-side — which is what makes "read-only" a property of the credential
  * rather than a promise about this file.
  */
-import { clientCredentialsToken, credentialsFromEnv } from '../lib/agent/credentials'
+import { clientCredentialsToken, loadCredentials } from '../lib/agent/credentials'
 import { Relay } from '../lib/nostr/relay'
 import { estivaIdSigner } from '../lib/nostr/signer'
 import { KIND } from '../src/kinds'
@@ -44,7 +44,7 @@ const FILTERS: ReadonlyArray<{ label: string; kinds: number[] }> = [
 ]
 
 async function main() {
-  const credentials = credentialsFromEnv()
+  const credentials = loadCredentials()
 
   console.log(`identity  ${credentials.base}`)
   console.log(`relay     ${RELAY_URL}`)

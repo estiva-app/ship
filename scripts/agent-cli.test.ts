@@ -9,7 +9,11 @@
  *
  *   npx tsx scripts/agent-cli.test.ts
  */
+import { mkdtempSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { BadRequest, flagValue, parseArgs } from '../lib/agent/cli'
+import { loadCredentials } from '../lib/agent/credentials'
 import { findIssue } from '../lib/agent/apps/ship'
 import { findTopic, type Topic } from '../lib/agent/apps/peek'
 import type { Issue } from '../src/fold'
@@ -132,6 +136,61 @@ check('an exact name beats names containing it', findTopic(topics, 'test').folde
 check('a unique fragment still resolves', findTopic(topics, 'sequencing').folder === 'ddd')
 refuses('refuses an ambiguous topic fragment', () => findTopic(topics, 'tes'), 'matches 3 topics')
 refuses('refuses an unknown topic', () => findTopic(topics, 'nope'), 'No topic matches')
+
+console.log('\n— credentials —')
+
+/*
+  Claude Desktop launches the server with `wsl.exe -e`, which runs a program
+  directly: no login shell, no profile, nothing exported. A server that could
+  only read process.env would work in every terminal and fail in the one place
+  it is actually used, which is how this was found — Desktop reported missing
+  credentials while the CLI worked perfectly.
+*/
+const dir = mkdtempSync(join(tmpdir(), 'estiva-creds-'))
+const file = join(dir, 'agent.env')
+writeFileSync(
+  file,
+  ['# a comment', '', 'ESTIVA_ID_CLIENT_ID=from-file', 'ESTIVA_ID_CLIENT_SECRET="quoted-secret"'].join('\n'),
+)
+
+{
+  const loaded = loadCredentials({ ESTIVA_AGENT_ENV_FILE: file } as NodeJS.ProcessEnv)
+  check('reads credentials from a file when the environment is empty', loaded.clientId === 'from-file')
+  check('strips surrounding quotes', loaded.clientSecret === 'quoted-secret')
+  check('defaults the identity service', loaded.base.startsWith('https://'))
+}
+
+{
+  // A terminal must be able to override the file without editing it.
+  const loaded = loadCredentials({
+    ESTIVA_AGENT_ENV_FILE: file,
+    ESTIVA_ID_CLIENT_ID: 'from-env',
+    ESTIVA_ID_CLIENT_SECRET: 'env-secret',
+  } as NodeJS.ProcessEnv)
+  check('the environment wins over the file', loaded.clientId === 'from-env')
+}
+
+/*
+  The refusal is a security property, not a nicety.
+
+  An earlier version told the caller to run `set -a; . ~/.estiva-agent.env;
+  set +a`. Claude Desktop read that, recognised shell commands arriving through
+  tool output as indistinguishable from a prompt injection, and refused to act
+  — correctly. Anything a tool says reaches a model as untrusted text, so it
+  must describe state and never issue a command.
+*/
+try {
+  loadCredentials({ ESTIVA_AGENT_ENV_FILE: join(dir, 'nothing-here.env') } as NodeJS.ProcessEnv)
+  check('refuses when no credentials exist anywhere', false, 'it succeeded')
+} catch (error) {
+  const message = error instanceof Error ? error.message : String(error)
+  check('refuses when no credentials exist anywhere', true)
+  check('names the file it looked for', message.includes('nothing-here.env'))
+  check('says the fix is not available from a conversation', message.includes('cannot be'))
+
+  const commandLike = /set -a|source |npm |npx |chmod |export [A-Z_]+=/.test(message)
+  check('contains no command for a model to run', !commandLike, message.slice(0, 70))
+}
 
 console.log(failures === 0 ? '\nAll agent CLI checks passed.' : `\n${failures} failed.`)
 process.exit(failures === 0 ? 0 : 1)

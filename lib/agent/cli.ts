@@ -21,7 +21,7 @@
  */
 import type { Signer } from '../nostr/signer'
 import { Relay } from '../nostr/relay'
-import { credentialsFromEnv, serviceIdentitySigner } from './credentials'
+import { loadCredentials, serviceIdentitySigner } from './credentials'
 
 /** What every command is handed. Deliberately free of app concepts. */
 export interface AgentContext {
@@ -124,7 +124,7 @@ function usage(apps: AgentApp[]): string {
  */
 export async function connect(): Promise<AgentContext> {
   const relayUrl = (process.env.RELAY_URL ?? 'https://estiva.estiva.app').replace(/\/+$/, '')
-  const signer = await serviceIdentitySigner(credentialsFromEnv())
+  const signer = await serviceIdentitySigner(loadCredentials())
   return { relay: new Relay(relayUrl, signer), signer, relayUrl }
 }
 

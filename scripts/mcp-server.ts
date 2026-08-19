@@ -188,20 +188,23 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       The two remote failures that look identical from here and are not. Naming
       them is the difference between a person fixing access and a person
       debugging an MCP server that is working perfectly.
+
+      **Every string below states a fact and asks for nothing.** An earlier
+      version told the caller to run `set -a; . ~/.estiva-agent.env; set +a`.
+      Claude Desktop read that, recognised shell commands arriving through tool
+      output as indistinguishable from a prompt injection, and refused — which
+      is precisely what a model should do with instructions its user did not
+      give. A tool that needs the operator to act says what is wrong and says
+      the fix is not available here; it never supplies a command to run.
     */
     if (message.includes('relay_membership_required')) {
       return failure(
-        `${message}\n\nThe signing identity is not a member of the relay. This is admission, not signing, and it is fixed in the Estiva ID console rather than here.`,
+        `${message}\n\nThe signing identity is not a member of the relay, so signing succeeded and the read was refused. Resolving it is an administrative action in Estiva ID, not something available from this conversation.`,
       )
     }
     if (message.includes('nip98')) {
       return failure(
-        `${message}\n\nEstiva ID refused to mint NIP-98 auth, so nothing ever reached the relay. Check the credential's allowed URL prefixes.`,
-      )
-    }
-    if (message.includes('ESTIVA_ID_CLIENT')) {
-      return failure(
-        `${message}\n\nThe server started without credentials. Create ~/.estiva-agent.env and ask again — no restart needed.`,
+        `${message}\n\nEstiva ID declined to mint NIP-98 auth, so no request reached the relay. The cause is the credential's allowed URL prefixes or the deployment's, both of which are server-side configuration.`,
       )
     }
     return failure(message)
