@@ -8,6 +8,7 @@
     "serve": "node build.mjs && node scripts/serve.mjs",
     "typecheck": "tsc --noEmit",
     "probe": "tsx scripts/probe-kinds.ts",
+    "probe:agent": "tsx scripts/probe-agent.ts",
     "verify": "tsx scripts/verify.ts",
     "manifest": "tsx scripts/publish-manifest.ts",
     "test": "tsx scripts/nip19.test.ts && tsx scripts/app.test.ts && tsx scripts/signer.test.ts && tsx scripts/directory.test.ts && tsx scripts/auth-shell.test.ts",
