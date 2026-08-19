@@ -10,11 +10,11 @@
  *   set -a; . ~/.estiva-agent.env; set +a
  *   npx tsx scripts/agent.ts ship issues --status todo
  *
- * Registering a second app is the whole of adding one:
- *
- *   run([shipApp, peekApp], process.argv.slice(2))
+ * Registering an app is the whole of adding one — `peekApp` below cost exactly
+ * this line plus its own module, and touched no generic file.
  */
 import { run } from '../lib/agent/cli'
+import { peekApp } from '../lib/agent/apps/peek'
 import { shipApp } from '../lib/agent/apps/ship'
 
-void run([shipApp], process.argv.slice(2))
+void run([shipApp, peekApp], process.argv.slice(2))
