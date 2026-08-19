@@ -113,18 +113,48 @@ async function main() {
 
   const list = replies.get(2)
   const tools = (list?.result?.tools ?? []) as Array<{ name: string; description?: string }>
-  check('advertises exactly one tool', tools.length === 1, tools.map((t) => t.name).join(', '))
-  check('and it is estiva_ping', tools[0]?.name === 'estiva_ping')
+  const named = (name: string) => tools.find((tool) => tool.name === name)
+
+  check('advertises the read tools and the ping', tools.length === 3, tools.map((t) => t.name).join(', '))
+  check('ship_list_issues is offered', Boolean(named('ship_list_issues')))
+  check('ship_get_issue is offered', Boolean(named('ship_get_issue')))
+
   /*
-    The description is the only thing a model reads before deciding to call a
-    tool. An unnamed or undescribed tool is invisible in practice, so this is a
-    functional check rather than a stylistic one.
+    Descriptions are load-bearing here, not decoration.
+
+    Claude Code reads CLAUDE.md; Claude Desktop reads nothing. Three facts that
+    turn a correct-looking answer into a wrong one live only in these strings,
+    so their absence is a functional regression rather than a style lapse:
+
+      - the list can be incomplete, and `coverage` says by how much
+      - display refs collide, so `addr` is the identity
+      - writing is impossible by construction, so a refusal is not a fault
+
+    Asserted by substring because the exact wording will be edited and should
+    be; what must not happen is somebody trimming a description and silently
+    removing the only warning a Desktop user will ever see.
   */
-  check('the tool describes itself', (tools[0]?.description?.length ?? 0) > 30)
+  const listing = named('ship_list_issues')?.description ?? ''
+  check('the listing warns it may be incomplete', listing.includes('coverage'))
+  check('and says refs are not unique', listing.toLowerCase().includes('not unique'))
+  check('and says it cannot write', listing.toLowerCase().includes('read-only'))
+
+  const get = named('ship_get_issue')?.description ?? ''
+  check('the getter explains ambiguity is returned, not guessed', get.includes('candidates'))
 
   const ping = replies.get(3)
   const text = ((ping?.result?.content ?? []) as Array<{ text?: string }>)[0]?.text ?? ''
-  check('estiva_ping answers', text.startsWith('pong'), text.slice(0, 60))
+  /*
+    Parsed rather than string-matched: the ping returns JSON now, and a tool
+    whose output cannot be parsed is one a model has to guess at.
+  */
+  let pingBody: { ok?: boolean } = {}
+  try {
+    pingBody = JSON.parse(text) as { ok?: boolean }
+  } catch {
+    // leaves ok undefined, which fails the check below with the raw text shown
+  }
+  check('estiva_ping answers with parseable JSON', pingBody.ok === true, text.slice(0, 60))
 
   /*
     An unknown tool must come back as a tool *result* flagged as an error, not

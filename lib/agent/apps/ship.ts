@@ -15,7 +15,13 @@
 import { Store } from '../../../src/store'
 import type { Issue, Project } from '../../../src/fold'
 import { conversationsAbout } from '../../../src/fold'
-import { DEFAULT_ISSUE_STATUS, ISSUE_STATUSES, PROJECT_STATUSES, lookupStatus } from '../../../src/kinds'
+import {
+  DEFAULT_ISSUE_STATUS,
+  ISSUE_STATUSES,
+  KIND,
+  PROJECT_STATUSES,
+  lookupStatus,
+} from '../../../src/kinds'
 import type { Directory } from '../../../src/profiles'
 import { BadRequest, flagValue, type AgentApp, type AgentContext } from '../cli'
 
@@ -69,6 +75,49 @@ async function directoryFor(
 ): Promise<Directory> {
   const wanted = [...new Set(pubkeys.filter((key): key is string => Boolean(key)))]
   return wanted.length ? store(context).profiles(wanted) : new Map()
+}
+
+/**
+ * How much of the workspace this read could actually see.
+ *
+ * `loadAll` discovers from projects and widens into their Folders, so an issue
+ * whose project record no longer resolves is unreachable — 13 of 27 on prod
+ * when this was written (PEEK-154). The app has the same blind spot, so this is
+ * not a defect being papered over; it is a limit being **stated**.
+ *
+ * Stating it matters more for an agent than for a person. Somebody browsing
+ * sees projects and never forms the belief that they are looking at everything.
+ * An agent asked "what is still open?" answers from whatever came back, and an
+ * array carries no hint that a third of the data was never in scope. A number
+ * is enough to stop a confident wrong summary; silence is not.
+ *
+ * Counted by asking the relay for issue events directly, with no `h` scoping —
+ * the same unscoped query shape `resolveObject` already relies on. One extra
+ * round trip per listing, which is cheap next to answering for half a workspace.
+ */
+async function coverage(
+  context: AgentContext,
+  reachable: Issue[],
+): Promise<{ reachable: number; unreachable: number; total: number; note?: string }> {
+  const events = await context.relay.query([{ kinds: [KIND.ISSUE], limit: 2000 }])
+
+  const everything = new Set<string>()
+  for (const event of events) {
+    const d = event.tags.find((tag) => tag[0] === 'd')?.[1]
+    if (d) everything.add(`${KIND.ISSUE}:${event.pubkey}:${d}`)
+  }
+  for (const issue of reachable) everything.add(issue.addr)
+
+  const unreachable = everything.size - reachable.length
+  return {
+    reachable: reachable.length,
+    unreachable,
+    total: everything.size,
+    note:
+      unreachable > 0
+        ? `${unreachable} issue(s) exist that discovery cannot reach, because the project they belong to no longer resolves. They are invisible to ship.estiva.app too. Do not describe this list as complete.`
+        : undefined,
+  }
 }
 
 /**
@@ -168,10 +217,21 @@ export const shipApp: AgentApp = {
           context,
           issues.flatMap((issue) => [issue.assignee, issue.author]),
         )
-        return issues
-          .slice()
-          .sort((a, b) => b.createdAt - a.createdAt)
-          .map((issue) => issueSummary(issue, directory))
+
+        return {
+          issues: issues
+            .slice()
+            .sort((a, b) => b.createdAt - a.createdAt)
+            .map((issue) => issueSummary(issue, directory)),
+          /*
+            Reported against the whole workspace rather than the filtered slice,
+            deliberately. An unreachable issue has no project and no status this
+            read can see, so it cannot be attributed to a filter — and quietly
+            dropping the count when `--project` is passed would hide the gap in
+            exactly the narrow queries somebody trusts most.
+          */
+          coverage: await coverage(context, state.issues),
+        }
       },
     },
     {
