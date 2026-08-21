@@ -12,7 +12,7 @@ published manifest.
 
 Claude Desktop and Claude Code can read this workspace through a local MCP
 server that signs as an Estiva ID service identity — read-only, holding no key.
-Set-up is `docs/claude-desktop-setup.md`; `CLAUDE.md` covers the commands.
+Reading this workspace as an agent is [estiva-agent](https://github.com/estiva-app/estiva-agent).
 
 ## Read first
 

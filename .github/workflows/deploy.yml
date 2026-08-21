@@ -47,27 +47,6 @@ jobs:
       - name: Build
         run: npm run build
 
-      # The extension is already *built* by `npm test`, which drives the bundled
-      # artefact rather than the source. Packing it again here is for the other
-      # half: somebody has to be able to obtain the file.
-      #
-      # Onboarding is the whole point of the extension, and a build step only the
-      # author can run puts the author back in the loop for every new person —
-      # the exact dependency PEEK-166 exists to remove. An artifact on every run
-      # means "get estiva-agent.mcpb from whoever set you up" is a link rather
-      # than a favour, and that the file handed over matches a known commit.
-      - name: Pack the Desktop extension
-        run: npm run extension:pack
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: estiva-agent-mcpb
-          path: extension/estiva-agent.mcpb
-          # Long enough to onboard somebody from a merged commit without
-          # rebuilding, short enough that nobody installs a stale one by
-          # accident.
-          retention-days: 30
-
   publish:
     needs: check
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
