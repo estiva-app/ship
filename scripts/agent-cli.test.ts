@@ -14,10 +14,11 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { BadRequest, flagValue, parseArgs } from '../lib/agent/cli'
 import { loadCredentials } from '../lib/agent/credentials'
-import { findIssue, findProject, statusesFor } from '../lib/agent/apps/ship'
+import { findIssue, findProject, resolvePubkeys, statusesFor } from '../lib/agent/apps/ship'
 import type { Project } from '../src/fold'
 import { findTopic, type Topic } from '../lib/agent/apps/peek'
 import type { Issue } from '../src/fold'
+import type { Directory } from '../src/profiles'
 
 let failures = 0
 function check(label: string, condition: boolean, detail = '') {
@@ -193,6 +194,34 @@ check('open covers todo and in_progress', statusesFor('open').join(',') === 'tod
 check('a real status stays itself', statusesFor('done').join(',') === 'done')
 refuses('an unknown status is refused', () => statusesFor('wibble'), 'Unknown status')
 refuses('and the refusal mentions open', () => statusesFor('wibble'), 'open')
+
+console.log('\n— naming a change\'s value —')
+
+/*
+  A change's value can be a public key: `assignee` is one. Resolving only the
+  actor produced "Claude set assignee to b38fd268…" on a real issue — half a
+  sentence, where you can see who acted but not who it landed on.
+
+  Ship's own UI already did this (`apps/ship/views/issue.ts`); the agent module
+  did not, which is the drift PEEK-155 warns about in miniature.
+*/
+const people: Directory = new Map([
+  ['a'.repeat(64), { pubkey: 'a'.repeat(64), name: 'Claude', createdAt: 0 }],
+])
+
+check('names a pubkey it knows', resolvePubkeys(people, 'a'.repeat(64)) === 'Claude')
+check('is case-insensitive about the key', resolvePubkeys(people, 'A'.repeat(64)) === 'Claude')
+
+/*
+  Left as-is rather than prettified. An unnamed participant is unnamed, and an
+  invented label would be worse than the hex — it would imply somebody had a
+  profile when nobody does.
+*/
+check('leaves a pubkey nobody knows alone', resolvePubkeys(people, 'b'.repeat(64)) === 'b'.repeat(64))
+
+// Matched on shape, so a status value is never mistaken for a key.
+check('leaves an ordinary value alone', resolvePubkeys(people, 'in_progress') === 'in_progress')
+check('leaves an empty value alone', resolvePubkeys(people, '') === '')
 
 console.log('\n— credentials —')
 

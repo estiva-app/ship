@@ -36,6 +36,23 @@ function who(directory: Directory, pubkey: string | undefined): string | undefin
 }
 
 /**
+ * A change value that is a public key, rendered as a name.
+ *
+ * `assignee` changes carry a pubkey in `value`, so resolving only the actor
+ * leaves "Claude set assignee to b38fd268…" — half a sentence. Matched on shape
+ * rather than on field name so the next field carrying a key is covered without
+ * anybody remembering to add it.
+ *
+ * A key nobody has a profile for stays as it is: an unnamed participant is
+ * unnamed, and inventing something would be worse than the hex.
+ */
+export function resolvePubkeys(directory: Directory, value: string): string {
+  if (!/^[0-9a-f]{64}$/i.test(value.trim())) return value
+  const profile = directory.get(value.trim().toLowerCase())
+  return profile?.name ?? value
+}
+
+/**
  * Everything a status value should say when printed.
  *
  * `lookupStatus` returns the raw value for anything outside the vocabulary
@@ -311,6 +328,10 @@ export const shipApp: AgentApp = {
           issue.author,
           issue.assignee,
           ...history.map((change) => change.author),
+          // The values too, not just the actors — an assignee change names
+          // somebody in `value`, and asking for the actors alone is what left
+          // that half of the line unresolved.
+          ...history.map((change) => change.value),
           ...conversations.flatMap((thread) => [
             thread.root.author,
             ...thread.replies.map((reply) => reply.author),
@@ -330,7 +351,18 @@ export const shipApp: AgentApp = {
           */
           history: history.map((change) => ({
             field: change.field,
-            value: change.value,
+            /*
+              A change's *value* can be a pubkey too — `assignee` is one — and
+              resolving only the actor produced the half-fixed line
+              "Claude set assignee to b38fd268…", where the reader can see who
+              acted and not who it landed on.
+
+              Resolved by shape rather than by field name: any 64-character hex
+              value is a key somebody may have a name for, and matching on
+              `field === 'assignee'` would silently miss the next field that
+              carries one.
+            */
+            value: resolvePubkeys(directory, change.value),
             // `ts` when the change carried one, `created_at` otherwise — the
             // same precedence the fold uses, because second-resolution
             // timestamps tie for changes made in one burst.
