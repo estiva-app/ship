@@ -32,7 +32,13 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js'
-import { BadRequest, connect, type AgentContext, type ParsedArgs } from '../lib/agent/cli'
+import {
+  BadRequest,
+  connect,
+  connectionStatus,
+  type AgentContext,
+  type ParsedArgs,
+} from '../lib/agent/cli'
 import { shipApp } from '../lib/agent/apps/ship'
 
 const server = new Server({ name: 'estiva', version: '0.2.0' }, { capabilities: { tools: {} } })
@@ -204,7 +210,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     {
       name: 'estiva_ping',
       description:
-        'Check that the Estiva connection is alive without reading any workspace data. Use it to tell "the connection is down" apart from "there is nothing to report", which look identical in an empty answer.',
+        'Check the Estiva connection and report which hop is broken, without reading any workspace data. ' +
+        'Walks credentials, the identity-service token, and one relay read, and returns `{ ok, failed, hops, summary }`. ' +
+        'Use it when a read fails, and when a person asks why this is not working: "the connection is down" and "there is nothing to report" look identical in an empty answer, and the causes — an unconfigured credential, a replaced secret, an identity never admitted to the relay — have completely different fixes. ' +
+        'Several of those fixes are administrative actions in Estiva ID that nobody can carry out from inside this conversation; report the state and say who has to act.',
       inputSchema: { type: 'object', properties: {}, additionalProperties: false },
     },
   ],
@@ -224,13 +233,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
   try {
     switch (request.params.name) {
+      /*
+        Never routed through `context()`. Every other tool wants a working
+        connection and should fail if it cannot have one; this tool's entire
+        job is to describe a connection that may be broken, so a shared failed
+        promise would make it fail in exactly the case it exists for.
+      */
       case 'estiva_ping':
-        return text({
-          ok: true,
-          at: new Date().toISOString(),
-          pid: process.pid,
-          note: 'Server reachable. This says nothing about relay access — call a read tool for that.',
-        })
+        return text({ at: new Date().toISOString(), ...(await connectionStatus(shipApp)) })
 
       case 'ship_list_issues':
         return text(

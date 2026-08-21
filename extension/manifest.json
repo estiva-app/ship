@@ -1,0 +1,80 @@
+{
+  "manifest_version": "0.3",
+  "name": "estiva-agent",
+  "display_name": "Estiva Agent",
+  "version": "0.1.0",
+  "description": "Read and act on the Estiva workspace — Ship issues, over a Nostr relay.",
+  "long_description": "Gives Claude Desktop tools for the team's Estiva workspace: list and read Ship issues, and — where the credential allows it — comment, set a status, assign, and file an issue.\n\nNo signing key is stored on this machine. The extension holds a client credential, exchanges it for a short-lived token, and asks Estiva ID to sign each request. A lost laptop leaks a credential an admin can revoke in one action, not a key.\n\nThe identity itself is created by an Estiva ID admin, who also decides what it may sign and admits it to the relay. Entering a credential here does not grant access on its own.",
+  "author": {
+    "name": "Estiva",
+    "url": "https://github.com/estiva-app"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/estiva-app/ship"
+  },
+  "documentation": "https://github.com/estiva-app/ship/blob/main/docs/claude-desktop-setup.md",
+  "support": "https://github.com/estiva-app/ship/issues",
+  "server": {
+    "type": "node",
+    "entry_point": "server/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/server/index.js"],
+      "env": {
+        "ESTIVA_ID_CLIENT_ID": "${user_config.client_id}",
+        "ESTIVA_ID_CLIENT_SECRET": "${user_config.client_secret}",
+        "ESTIVA_ID_BASE": "${user_config.identity_service}",
+        "RELAY_URL": "${user_config.relay_url}"
+      }
+    }
+  },
+  "tools": [
+    { "name": "ship_list_issues", "description": "List issues, newest first, with a coverage note saying how much of the workspace the read could reach" },
+    { "name": "ship_get_issue", "description": "One issue in full: description, status, assignee, change history and conversation" },
+    { "name": "ship_comment", "description": "Add a comment to one issue" },
+    { "name": "ship_set_status", "description": "Set the status of one issue" },
+    { "name": "ship_assign", "description": "Assign one issue, by public key" },
+    { "name": "ship_create_issue", "description": "File one new issue in a project" },
+    { "name": "estiva_ping", "description": "Report whether credentials, signing and relay access are working, naming the hop that failed" }
+  ],
+  "keywords": ["estiva", "nostr", "issues", "ship"],
+  "license": "MIT",
+  "user_config": {
+    "client_id": {
+      "type": "string",
+      "title": "Client id",
+      "description": "The client id an Estiva ID admin issued for your service identity, e.g. claude-yourname.",
+      "required": true
+    },
+    "client_secret": {
+      "type": "string",
+      "title": "Client secret",
+      "description": "The secret issued alongside the client id. It is shown once, and it is a bearer credential — anyone holding it can read the workspace as that identity until it is revoked. Stored by Claude Desktop, not by this extension.",
+      "sensitive": true,
+      "required": true
+    },
+    "identity_service": {
+      "type": "string",
+      "title": "Estiva ID service",
+      "description": "The identity service that mints tokens and signs. Leave as it is unless an admin tells you otherwise.",
+      "default": "https://id.estiva.app",
+      "required": false
+    },
+    "relay_url": {
+      "type": "string",
+      "title": "Relay",
+      "description": "The relay holding the workspace. This is production; there is no staging workspace. Leave as it is unless an admin tells you otherwise.",
+      "default": "https://estiva.estiva.app",
+      "required": false
+    }
+  },
+  "compatibility": {
+    "claude_desktop": ">=0.10.0",
+    "platforms": ["darwin", "win32", "linux"],
+    "runtimes": {
+      "node": ">=18.0.0"
+    }
+  },
+  "privacy_policies": []
+}
