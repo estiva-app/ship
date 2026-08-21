@@ -12,7 +12,7 @@
  * from what the app shows a person. The whole value of this CLI is that it and
  * `ship.estiva.app` agree.
  */
-import { Store } from '../../../src/store'
+import { Store, nextRef, refPrefix } from '../../../src/store'
 import type { Issue, Project } from '../../../src/fold'
 import { conversationsAbout } from '../../../src/fold'
 import {
@@ -186,6 +186,46 @@ export function statusesFor(requested: string): readonly string[] {
   )
 }
 
+/**
+ * Every write goes through here, and the shape is the safety property.
+ *
+ * `docs/untrusted-content.md` argues that a write must trace back to something
+ * a person asked for and never to an instruction found in fetched content, and
+ * that **tool shape is the strongest place to enforce it** — because it removes
+ * the capability rather than governing its use.
+ *
+ * So: one object, one change, per call. There is no command here that takes a
+ * filter, a status, or a search term and acts on whatever matches. "Close every
+ * issue mentioning X" is not a thing this CLI can express, which means it is
+ * not a thing an agent can be talked into, whatever the credential permits.
+ *
+ * That matters more than it looks on this deployment. Every channel is open
+ * (PEEK-145), so Folder membership bounds nothing and `allowedKinds` is the
+ * only other control — and the credential is now permitted every kind Ship
+ * writes. Tool shape is the containment.
+ *
+ * Each write returns **what it actually did**, resolved and read back, so an
+ * answer built on it names the object rather than paraphrasing the request.
+ */
+async function resolveIssueFor(context: AgentContext, reference: string) {
+  const state = await store(context).loadAll()
+  const issue = findIssue(state.issues, reference)
+  return { state, issue }
+}
+
+/**
+ * `Relay.publish` reports `ok: false` for a rejection that arrived as HTTP 200 —
+ * the relay answers `200 {"accepted":false}` and the status code is not the
+ * authority. Every write funnels through here so no caller can forget, since
+ * the failure mode is an agent reporting an issue closed that the relay dropped.
+ */
+function published<T extends { ok: boolean; reason?: string; duplicate?: boolean }>(
+  result: T,
+  what: string,
+): void {
+  if (!result.ok) throw new BadRequest(`The relay refused ${what}: ${result.reason ?? 'no reason given'}`)
+}
+
 export const shipApp: AgentApp = {
   name: 'ship',
   summary: 'projects and issues in Estiva Ship',
@@ -305,6 +345,138 @@ export const shipApp: AgentApp = {
               body: message.body,
             })),
           })),
+        }
+      },
+    },
+    {
+      name: 'comment',
+      summary: 'add a comment to one issue',
+      usage: 'comment <ref> --body "..."',
+      async run(context, args) {
+        const reference = args.positional[0]
+        if (!reference) throw new BadRequest('comment needs an issue reference.')
+        const body = flagValue(args, 'body')
+        if (!body) throw new BadRequest('comment needs --body.')
+
+        const { issue } = await resolveIssueFor(context, reference)
+        /*
+          Posted into the issue's own Folder and tagged `about` its address, so
+          it lands where Peek shows the conversation rather than as a loose
+          message. `aboutRef` appends the naddr, which is what makes Peek render
+          the issue widget above it.
+        */
+        const result = await store(context).postMessage({
+          folder: issue.folder,
+          body,
+          about: issue.addr,
+        })
+        published(result, `a comment on ${issue.ref ?? issue.addr}`)
+
+        return { commented: { ref: issue.ref, addr: issue.addr, title: issue.title }, eventId: result.eventId }
+      },
+    },
+    {
+      name: 'set-status',
+      summary: 'set one issue\'s status',
+      usage: 'set-status <ref> <status>',
+      async run(context, args) {
+        const [reference, status] = args.positional
+        if (!reference || !status) throw new BadRequest('set-status needs a reference and a status.')
+
+        // Validated against the vocabulary before publishing: a value outside it
+        // is displayed rather than swallowed, so a typo becomes a visible bogus
+        // status on a real issue instead of an error.
+        const wanted = status.toLowerCase()
+        if (!ISSUE_STATUSES.some((entry) => entry.value === wanted)) {
+          throw new BadRequest(
+            `Unknown status "${status}". Try: ${ISSUE_STATUSES.map((s) => s.value).join(', ')}`,
+          )
+        }
+
+        const { issue } = await resolveIssueFor(context, reference)
+        const result = await store(context).setField({
+          folder: issue.folder,
+          target: issue.addr,
+          field: 'status',
+          value: wanted,
+        })
+        published(result, `a status change on ${issue.ref ?? issue.addr}`)
+
+        return {
+          changed: { ref: issue.ref, addr: issue.addr, title: issue.title },
+          field: 'status',
+          from: issue.status,
+          to: wanted,
+          eventId: result.eventId,
+        }
+      },
+    },
+    {
+      name: 'assign',
+      summary: 'assign one issue to somebody',
+      usage: 'assign <ref> <pubkey|me>',
+      async run(context, args) {
+        const [reference, who] = args.positional
+        if (!reference || !who) throw new BadRequest('assign needs a reference and a pubkey, or "me".')
+
+        // `me` is the signing identity — the agent itself. Anyone else has to be
+        // named by pubkey rather than by display name, because display names are
+        // self-set (docs/untrusted-content.md) and assigning by one would let a
+        // person choose who work lands on by renaming themselves.
+        const assignee = who === 'me' ? context.signer.pubkey : who
+        if (!/^[0-9a-f]{64}$/i.test(assignee)) {
+          throw new BadRequest('assign takes a 64-character hex pubkey, or "me". Names are not unique.')
+        }
+
+        const { issue } = await resolveIssueFor(context, reference)
+        const result = await store(context).setField({
+          folder: issue.folder,
+          target: issue.addr,
+          field: 'assignee',
+          value: assignee.toLowerCase(),
+        })
+        published(result, `an assignment on ${issue.ref ?? issue.addr}`)
+
+        return {
+          changed: { ref: issue.ref, addr: issue.addr, title: issue.title },
+          field: 'assignee',
+          from: issue.assignee,
+          to: assignee.toLowerCase(),
+          eventId: result.eventId,
+        }
+      },
+    },
+    {
+      name: 'create-issue',
+      summary: 'file one new issue in a project',
+      usage: 'create-issue --project <ref> --title "..." [--description "..."]',
+      async run(context, args) {
+        const projectRef = flagValue(args, 'project')
+        const title = flagValue(args, 'title')
+        if (!projectRef) throw new BadRequest('create-issue needs --project.')
+        if (!title) throw new BadRequest('create-issue needs --title.')
+
+        const state = await store(context).loadAll()
+        const project = findProject(state.projects, projectRef)
+
+        // The display key is derived from what is currently visible, so it can
+        // collide — the address is the identity and this is decoration. Derived
+        // here rather than left blank so the issue looks like its siblings.
+        const siblings = state.issues.filter((issue) => issue.projectAddr === project.addr)
+        const ref = nextRef(refPrefix(project.title), siblings.map((issue) => issue.ref))
+
+        const created = await store(context).createIssue({
+          folder: project.contentFolder,
+          title,
+          description: flagValue(args, 'description'),
+          projectAddr: project.addr,
+          ref,
+        })
+        published(created.result, `a new issue in ${project.title}`)
+
+        return {
+          created: { ref, addr: created.addr, title, project: project.title },
+          eventId: created.result.eventId,
         }
       },
     },
