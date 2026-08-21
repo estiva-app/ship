@@ -133,6 +133,26 @@ The split is load-bearing and PEEK-143 exists to keep it:
 Adding Peek is a sibling module plus one line in `scripts/agent.ts`. If a change
 makes a second app touch a generic file, the seam has leaked.
 
+`AgentApp.probe` is the one place an app hands the generic half a filter. It
+exists because the relay refuses a query with no `kinds` at all, so
+`connectionStatus` has no app-agnostic read to fall back on — not because the
+seam was inconvenient.
+
+### The Desktop extension
+
+`npm run extension:pack` bundles `scripts/mcp-server.ts` into
+`extension/estiva-agent.mcpb`. Three things about it are easy to break:
+
+- **`extension/manifest.json` lists the tools by hand**, and Desktop shows that
+  list before anything is installed. `extension.test.ts` diffs it against the
+  server's real `tools/list`; add a tool and update both.
+- **Configuration arrives as environment variables, and every declared field is
+  injected** — an optional one nobody filled in arrives as `""`, not absent. Use
+  `||`, never `??`, on anything read from `process.env` here.
+- **The bundle is ESM in a `.js` file** and needs its own `package.json` marker.
+  Inside this repository it starts without one, because Node walks up and finds
+  ours; installed anywhere else it does not. Only the explicit test covers it.
+
 Ship's module reads through `Store` and `foldFolder` rather than querying the
 relay directly. The fold holds the subtle rules — change ordering, re-linked
 Folders, a status set by someone who did not author the issue — and

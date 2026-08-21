@@ -246,6 +246,17 @@ function published<T extends { ok: boolean; reason?: string; duplicate?: boolean
 export const shipApp: AgentApp = {
   name: 'ship',
   summary: 'projects and issues in Estiva Ship',
+  /*
+    The cheapest read that proves relay access, for `connectionStatus`.
+
+    One project, because a workspace always has at least the ability to be asked
+    for one and the answer is tiny. An empty result is still a success: it
+    proves the identity was admitted and the query was served, which is the
+    thing being tested. "Admitted but empty" and "refused" are exactly the two
+    states a connection check exists to tell apart, so this must not treat a
+    count of zero as a failure.
+  */
+  probe: [{ kinds: [KIND.PROJECT], limit: 1 }],
   commands: [
     {
       name: 'projects',
