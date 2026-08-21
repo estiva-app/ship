@@ -47,6 +47,25 @@ function converse(messages: unknown[]): Promise<{ replies: Map<number, Rpc>; std
     const tsx = join(here, '..', 'node_modules', 'tsx', 'dist', 'cli.mjs')
     const child = spawn(process.execPath, [tsx, join(here, 'mcp-server.ts')], {
       stdio: ['pipe', 'pipe', 'pipe'],
+      /*
+        Scrubbed rather than inherited, and the header's "no credentials, no
+        network, no relay" is the reason.
+
+        `estiva_ping` used to answer from memory. It now walks the real hops, so
+        an inherited environment makes this suite behave differently depending
+        on whose machine it runs on: with `~/.estiva-agent.env` present it
+        exchanges a token and reads production, and without one it does not.
+        That is exactly how this arrived — green locally, red in CI, and the red
+        one was right.
+
+        `HOME` points somewhere with no credentials file, so the server takes
+        the unconfigured path and returns before any network call. Determinism
+        first, and offline as a consequence of it.
+      */
+      env: {
+        PATH: process.env.PATH,
+        HOME: join(here, '..', '.no-credentials-here'),
+      },
     })
 
     const replies = new Map<number, Rpc>()
@@ -183,13 +202,29 @@ async function main() {
     Parsed rather than string-matched: the ping returns JSON now, and a tool
     whose output cannot be parsed is one a model has to guess at.
   */
-  let pingBody: { ok?: boolean } = {}
+  let pingBody: { ok?: boolean; failed?: string; summary?: string } = {}
   try {
-    pingBody = JSON.parse(text) as { ok?: boolean }
+    pingBody = JSON.parse(text) as typeof pingBody
   } catch {
-    // leaves ok undefined, which fails the check below with the raw text shown
+    // leaves every field undefined, failing the checks below with the raw text
   }
-  check('estiva_ping answers with parseable JSON', pingBody.ok === true, text.slice(0, 60))
+  check('estiva_ping answers with parseable JSON', typeof pingBody.ok === 'boolean', text.slice(0, 60))
+
+  /*
+    Unconfigured is the assertion, not connected.
+
+    This spawns with no credentials — the state every new install is in before
+    an admin has finished — so a healthy answer here is `ok: false` naming the
+    credentials hop. Asserting `ok === true` would be asserting that whoever
+    runs the suite happens to have a working production credential, which is
+    both untrue in CI and not a property of this server.
+  */
+  check('an unconfigured server reports itself unconnected', pingBody.ok === false)
+  check('and names the hop that broke', pingBody.failed === 'credentials', pingBody.failed)
+  check(
+    'and its summary issues no command',
+    !/set -a|source |npm |npx |chmod |export [A-Z_]+=/.test(pingBody.summary ?? ''),
+  )
 
   /*
     An unknown tool must come back as a tool *result* flagged as an error, not

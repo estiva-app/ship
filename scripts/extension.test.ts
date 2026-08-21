@@ -107,7 +107,7 @@ check(
 {
   const previous = { relay: process.env.RELAY_URL, home: process.env.HOME }
   process.env.RELAY_URL = ''
-  process.env.HOME = join(root, 'extension/build/no-such-home')
+  process.env.HOME = join(root, '.no-credentials-here')
   delete process.env.ESTIVA_ID_CLIENT_ID
   delete process.env.ESTIVA_ID_CLIENT_SECRET
 
@@ -131,7 +131,7 @@ interface Rpc {
 const replies = await new Promise<Rpc[]>((resolve) => {
   const child = spawn('node', [bundle], {
     // No repository, no credentials file, no shell profile — the install state.
-    env: { PATH: process.env.PATH, HOME: join(root, 'extension/build/no-such-home') },
+    env: { PATH: process.env.PATH, HOME: join(root, '.no-credentials-here') },
     stdio: ['pipe', 'pipe', 'pipe'],
   })
   let out = ''
