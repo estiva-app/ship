@@ -1,0 +1,4171 @@
+{
+  "note": "Recorded from production. Both estiva-agent and estiva-ship fold these events and must produce `expected`. Do not regenerate to make a failing check pass — a failure means the two repos disagree, which is the thing this catches.",
+  "generatedAt": "2026-08-21T21:37:53.313Z",
+  "relay": "https://estiva.estiva.app",
+  "counts": {
+    "events": 103,
+    "recorded": 96,
+    "adversarial": 7,
+    "projects": 7,
+    "issues": 18,
+    "changes": 56,
+    "conversations": 7,
+    "byKind": {
+      "9": 22,
+      "1851": 56,
+      "30850": 7,
+      "30851": 18
+    }
+  },
+  "events": [
+    {
+      "content": "Status → in_progress",
+      "created_at": 1787142018,
+      "id": "014fc35342a892572cbd948111a7b661b3130739eee3706642522b664787601d",
+      "kind": 1851,
+      "pubkey": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+      "sig": "b600ad813fbc1af1d1bdfbe132add8ef9e3066ca6c21bf6dd2a769672a867dbd9cc8d45f459d14e80da644ceb49cc282e30a674e946966153b72baee7ccc3159",
+      "tags": [
+        [
+          "a",
+          "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:d92ac2b8-7ffb-4a15-9824-00044cce9cf5"
+        ],
+        [
+          "field",
+          "status"
+        ],
+        [
+          "value",
+          "in_progress"
+        ],
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "ts",
+          "1787142018561"
+        ]
+      ]
+    },
+    {
+      "content": "",
+      "created_at": 1787252534,
+      "id": "02ec29db462cd01fb545eb04e539abbf9e3d0382b52723119e46830cbf68634e",
+      "kind": 1851,
+      "pubkey": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+      "sig": "5ecd11894676112f121c3e4e977fa1fb965f914f5ed46cccabd495340987d37eabc6157d402e200616edb0d9f9a7b288e3a4c0feecb1d118a0eb5acc2d7674e6",
+      "tags": [
+        [
+          "a",
+          "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c"
+        ],
+        [
+          "field",
+          "status"
+        ],
+        [
+          "value",
+          "planned"
+        ],
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "ts",
+          "1787252534824"
+        ]
+      ]
+    },
+    {
+      "content": "It's good idea to turn it into React before adding extra functionality, I'll ask Claude tomorrow how much work that would be",
+      "created_at": 1787244500,
+      "id": "0334cd33ee176716cae51f6fa91530a0e51422e0e20ddc33764e9b47524565a7",
+      "kind": 9,
+      "pubkey": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+      "sig": "b7e1fd76c2ecf6afd5ffc1a47e74f544028ab33513b680a14355f384fdf069f313a461ddbb92ae7bfccb24aeb3b4a018147b0f5e73bc3dabf5e5b916a3289a40",
+      "tags": [
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "e",
+          "c62b085f9a703406b4d4b85e0edce83675c1b9bee8e32e7697764f28f30d01e5",
+          "",
+          "reply"
+        ]
+      ]
+    },
+    {
+      "content": "We need to Refactor whole Ship. It was done very basically. It's not even React app. And I think it starts to bite us, so before we start implementing more features, I will try to refactor it to React codebase.",
+      "created_at": 1787148754,
+      "id": "061db9081cc5e63bee68f4861a0e52475266bcc305701edd00633bc9e4251fda",
+      "kind": 9,
+      "pubkey": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+      "sig": "229503796722f586ea86280e6f7579c3984cd29cd472ab070906cfdee91f714166c3c41b68e127dd32ee63bdd2b8cdf23c344782586271ef1ba3f6251f56fd08",
+      "tags": [
+        [
+          "h",
+          "88de5526-366a-4016-83a3-417a1748baa8"
+        ],
+        [
+          "a",
+          "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:cf23dbca-64fb-4802-a804-e0119b0d8584"
+        ],
+        [
+          "ts",
+          "1787148754953"
+        ]
+      ]
+    },
+    {
+      "content": "",
+      "created_at": 1786359876,
+      "id": "072b6967fd0eaaee6416903d83e9cc00bee445cfe33fb4248043b3e61ebe36c1",
+      "kind": 1851,
+      "pubkey": "88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13",
+      "sig": "9b73640cb7a8b5d49607eeac93fbc179c9516df12a01953814293180184310a7ab197d0d9f28c131545801f3cfe350a1ccd5184a97582b7f6cf65d296d9bbe49",
+      "tags": [
+        [
+          "a",
+          "30851:88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13:79517829-1e67-45d3-bd78-3c16be3095f5"
+        ],
+        [
+          "field",
+          "status"
+        ],
+        [
+          "value",
+          "in_progress"
+        ],
+        [
+          "h",
+          "204e73cc-5ccd-43f9-a982-052e71622631"
+        ],
+        [
+          "ts",
+          "1786359876672"
+        ]
+      ]
+    },
+    {
+      "content": "Status → done",
+      "created_at": 1787137428,
+      "id": "07971bfca0f84e9eda1c51d03e5ef9e4c578479c9b769501f19f2da22d34ba19",
+      "kind": 1851,
+      "pubkey": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+      "sig": "dc1392d68cecc1d835953afc0c9b369ee92d56ac24df844c4c0c834c2f8ef9a540335b2b694a73b232d779908a932e1cc50c41249870a8706a96442c4ae70c32",
+      "tags": [
+        [
+          "a",
+          "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:5c20ef8d-6bc4-4ac9-adf8-aa8e0398dec5"
+        ],
+        [
+          "field",
+          "status"
+        ],
+        [
+          "value",
+          "done"
+        ],
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "ts",
+          "1787137428451"
+        ]
+      ]
+    },
+    {
+      "content": "Status → done",
+      "created_at": 1787208330,
+      "id": "084148b5aa4167a1a568d09259b99b854fa658d63f5c550577a2dc56f6e84ae2",
+      "kind": 1851,
+      "pubkey": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+      "sig": "873f1f6abdfc61b6531b118a25d6ef8e64dd796bf0292866dee0d5c35a8c3a0fe9f98510cf8c348107fe1279b6b7a398324f51caa0eb5eef3b0c90da8b5e5366",
+      "tags": [
+        [
+          "a",
+          "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2c5237d9-48ee-4d69-aa6c-cd1cb6b13c0d"
+        ],
+        [
+          "field",
+          "status"
+        ],
+        [
+          "value",
+          "done"
+        ],
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "ts",
+          "1787208330949"
+        ]
+      ]
+    },
+    {
+      "content": "Rename",
+      "created_at": 1787068631,
+      "id": "088bf18f1262129e005ed21fef9587bb5914379f523c386808d9a9c7af5139fa",
+      "kind": 1851,
+      "pubkey": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+      "sig": "ab0dd37be8e4eceb66da682d79e62287ec24ec5ec579a1044fadc9de303c82716d74812c6628a16d07b6dcb01cde17a181ca236dc7905138dd419a0316fc4c57",
+      "tags": [
+        [
+          "a",
+          "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c"
+        ],
+        [
+          "field",
+          "title"
+        ],
+        [
+          "value",
+          "Peek: Feedback & Bugs"
+        ],
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "ts",
+          "1787068631863"
+        ]
+      ]
+    },
+    {
+      "pubkey": "4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa",
+      "created_at": 1700000000,
+      "kind": 1851,
+      "tags": [
+        [
+          "h",
+          "fixture-folder"
+        ],
+        [
+          "a",
+          "30851:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:56119588-4b40-491f-a517-09b579d4798c"
+        ],
+        [
+          "field",
+          "status"
+        ],
+        [
+          "value",
+          "todo"
+        ],
+        [
+          "ts",
+          "9007199254740991"
+        ]
+      ],
+      "content": "hostile ts, must not win",
+      "id": "104e521a22b73ad9eb05d7346d40205667df0df8de4d7ca1279e18f430b3396a",
+      "sig": "696e56427799e3bff443f92f46dd6f6cc4f857b72d1bcaa6e6d42eb68e4b5dc160cf02c3ee110e8df60b47227024d39926e4c86609a87d1966fea84c5f28bcdf"
+    },
+    {
+      "content": "Description",
+      "created_at": 1787069020,
+      "id": "10c2941b61948f63f479dc332b511562204f4771ec7298f94e8badac25df687c",
+      "kind": 1851,
+      "pubkey": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+      "sig": "42c5ff019433e3b006d271b4ecfc198ead2a55dbc01ccde130bf51a0ac139c82269e1f5d308f95749523940c6e75ebe357c25172f36c8df5bddffbec54226077",
+      "tags": [
+        [
+          "a",
+          "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:3c582b93-052f-45d4-a8d0-1054f24687a4"
+        ],
+        [
+          "field",
+          "description"
+        ],
+        [
+          "value",
+          "I would expect a list of available people to show up, like in Ship. \nIt would be nice to be able to remove myself or have option \"Unassigned\""
+        ],
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "ts",
+          "1787069020492"
+        ]
+      ]
+    },
+    {
+      "content": "It's not urgent. Let's sleep on this.",
+      "created_at": 1787235697,
+      "id": "16917961132dea24f8d337801d28226ca4ff8e62ca662c070ed5eefedb1f2720",
+      "kind": 9,
+      "pubkey": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+      "sig": "ec543f359aeeaf4f06ec6c43055e58fe4d390fd202739e3696750835a00488001876848a09bf0dea6480dc42245841d502eef0b673bbb35a1b3ce0507196b79a",
+      "tags": [
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "e",
+          "c62b085f9a703406b4d4b85e0edce83675c1b9bee8e32e7697764f28f30d01e5",
+          "",
+          "reply"
+        ]
+      ]
+    },
+    {
+      "content": "Because then it feels like duplicate. You're trying to open item that is already open.",
+      "created_at": 1787217132,
+      "id": "16c7094f6ded549f465dfaa9bfa1119a90e395610c8439ee700169b8ec7704db",
+      "kind": 30851,
+      "pubkey": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+      "sig": "9eb50401f8712eb76b36dd5fc0bcb5a085fc24d7c64dc0ffdcd260c0415ac695ec09c1c0a6be202dae156ad0db76349b627f0a14a24566b5c9a4ee06a371bc46",
+      "tags": [
+        [
+          "d",
+          "e5bc8a9c-3800-4aa7-9e6a-08b156e0b889"
+        ],
+        [
+          "title",
+          "If item is already in Open Work, it shouldn't show in Screener"
+        ],
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "a",
+          "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c"
+        ],
+        [
+          "ref",
+          "PEE-6"
+        ]
+      ]
+    },
+    {
+      "content": "I would expect a list of available people to show up, like in Ship. \nIt would be nice to be able to remove myself or have option \"None\"",
+      "created_at": 1787069006,
+      "id": "172e935f5df1f75a1ce48d410fc59d4a0500957c0be396bf525ffea5b9ab308c",
+      "kind": 30851,
+      "pubkey": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+      "sig": "b3807793551f82718cb2dc2c4ca65a4299c99432aa99750d4c8d18be627d46a502bcdcabdb6c2b3dffd2711c7a6596960c10abfeeedd4cfa0015788c2dda0ab3",
+      "tags": [
+        [
+          "d",
+          "3c582b93-052f-45d4-a8d0-1054f24687a4"
+        ],
+        [
+          "title",
+          "It's not possible to select different assignee other than yourself"
+        ],
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "a",
+          "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c"
+        ],
+        [
+          "ref",
+          "PEE-1"
+        ]
+      ]
+    },
+    {
+      "content": "Rename",
+      "created_at": 1787068625,
+      "id": "1bae93b5461870219b139336cba4b9550f8c2f1d945c36f27bca310cd4480e77",
+      "kind": 1851,
+      "pubkey": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+      "sig": "f699ed625d431678b1be6d3377b2e696175a8f91f24daf609b39a7a16b382d3d3132d3c158c48fae5f69f51d8a88f286043c3f03bf62057dcf1b8a1ee4c7d824",
+      "tags": [
+        [
+          "a",
+          "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c"
+        ],
+        [
+          "field",
+          "title"
+        ],
+        [
+          "value",
+          "Peek: Feedback % Bugs"
+        ],
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "ts",
+          "1787068625383"
+        ]
+      ]
+    },
+    {
+      "content": "Created by the Claude service identity to verify the write path end to end. Safe to cancel or ignore.",
+      "created_at": 1787316300,
+      "id": "1c5d843781f8fdcbc77581089db9703ceb01ccac44cd812bc26e3c8f226894a0",
+      "kind": 30851,
+      "pubkey": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
+      "sig": "aae61c7b1509307f46ebe27a9d168ccc2df8908bcbf5c1f9324be50fe4aed61e4144fdbc56440a7d66ab1fa9033006f1891b05e7a3efd8298f45753bff2b646a",
+      "tags": [
+        [
+          "d",
+          "56119588-4b40-491f-a517-09b579d4798c"
+        ],
+        [
+          "title",
+          "Agent write path check (PEEK-147)"
+        ],
+        [
+          "h",
+          "806fb4e3-ebc9-4b6a-a18c-0ca59379aa1d"
+        ],
+        [
+          "a",
+          "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:2c5fbeff-4014-4bea-a69c-3bfc10354d6f"
+        ],
+        [
+          "ref",
+          "OTH-2"
+        ]
+      ]
+    },
+    {
+      "content": "",
+      "created_at": 1787067996,
+      "id": "1d52bffd37e445bf6c9dfd0bcd8b29e11e837e6610df5713e136dfefca013daf",
+      "kind": 1851,
+      "pubkey": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+      "sig": "7227a8ffede90d5fd677a605bef5aa79a35fa4b61df3537743f37b4871d9667b17f42bde8ed60a0491f5ca65eaff50d23986107300f4870d79c4cf211ba0176b",
+      "tags": [
+        [
+          "a",
+          "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c"
+        ],
+        [
+          "field",
+          "lead"
+        ],
+        [
+          "value",
+          "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697"
+        ],
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "ts",
+          "1787067996178"
+        ]
+      ]
+    },
+    {
+      "content": "Rename",
+      "created_at": 1787068468,
+      "id": "1e443e66ec61a0197f45adcb0af403b20eb11eef6dd2fdce5fbc5705ba9b1e21",
+      "kind": 1851,
+      "pubkey": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+      "sig": "df44afe1a39a221a1432e0df5c1a6ace7232db3c1c2a8cd8e5748b0ed49d3854540d007e02577ffd1db1467e88afc092b25b13d8a361db42cc23be7d50c140ed",
+      "tags": [
+        [
+          "a",
+          "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:20446118-7466-4281-a483-fa095d3ed935"
+        ],
+        [
+          "field",
+          "title"
+        ],
+        [
+          "value",
+          "Reference widget won't show up in some cases"
+        ],
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "ts",
+          "1787068468796"
+        ]
+      ]
+    },
+    {
+      "content": "",
+      "created_at": 1787068269,
+      "id": "22ae180e54ba9bfbb941029be1d738e8290070e22ddb121911888ae0dbe011fd",
+      "kind": 30850,
+      "pubkey": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+      "sig": "2849de5b49ede85012a657701ac4137a1696b7fd24ccac39bbfbbf9511c062910133bc7c6ae431ae8411e136c67a86dc7b8e335f1f180108e6a9aa998153ab67",
+      "tags": [
+        [
+          "d",
+          "360327a9-18c5-40e5-9747-9166dc284ddc"
+        ],
+        [
+          "title",
+          "Estiva ID: Feedback & Bugs"
+        ],
+        [
+          "h",
+          "fcfe9d61-2d05-4d25-b113-40b2d2e601ee"
+        ]
+      ]
+    },
+    {
+      "content": "",
+      "created_at": 1787210113,
+      "id": "2adb3b58dc9c3fcd3f0e81859fecda9287357ba1b18fe14f8c7f7ed21d8c72d0",
+      "kind": 1851,
+      "pubkey": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+      "sig": "e262a150cb71b5800a0d27a788ef45b1682682dee4e4714c67c19c905fc0caa79dc95b0827f9b1d6cb795f213d5d77336e1a0d807e17023873754c65f8a5dfaa",
+      "tags": [
+        [
+          "a",
+          "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:20446118-7466-4281-a483-fa095d3ed935"
+        ],
+        [
+          "field",
+          "status"
+        ],
+        [
+          "value",
+          "done"
+        ],
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "ts",
+          "1787210113155"
+        ]
+      ]
+    },
+    {
+      "content": "Settings entry point.",
+      "created_at": 1786359898,
+      "id": "2ccc0c83bf5526dc13b9ca02db72348748b71444850b7f080f957a23c13e3eb5",
+      "kind": 30851,
+      "pubkey": "88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13",
+      "sig": "eaad0c922d595caab9c72517a728f1f1942806ed2605f34b78f7767b2106e9b209ee74754562de63c749acd9dde8aae83ceb04d80c5c55875444191d03f77170",
+      "tags": [
+        [
+          "d",
+          "4aff182e-6851-407f-9249-23ee1604d377"
+        ],
+        [
+          "title",
+          "Billing entry"
+        ],
+        [
+          "h",
+          "0804b906-ba87-4c63-8d2f-53df1bb6d52e"
+        ],
+        [
+          "a",
+          "30850:88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13:360ddc81-afb0-4137-87bd-1cdd2f29529b"
+        ],
+        [
+          "ref",
+          "PAY-1"
+        ]
+      ]
+    },
+    {
+      "pubkey": "4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa",
+      "created_at": 1700000000,
+      "kind": 1851,
+      "tags": [
+        [
+          "h",
+          "fixture-folder"
+        ],
+        [
+          "a",
+          "30851:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:56119588-4b40-491f-a517-09b579d4798c"
+        ],
+        [
+          "field",
+          "status"
+        ],
+        [
+          "value",
+          "in_progress"
+        ],
+        [
+          "ts",
+          "1700000000500"
+        ]
+      ],
+      "content": "trusted ts, finer than a second",
+      "id": "2e6fb06523134c97c57b4f7535b8f7a4e0d55516f8c5663305c86113007003c4",
+      "sig": "3a6c38cd473b78c041b9e45e99a0efad427a889f2d28bca3fe7ee264a0200242dba38020d351e97452452e6b811e959f7dfc61a69fe5a1aa544dc078859159b3"
+    },
+    {
+      "content": "Stripe Checkout.",
+      "created_at": 1786359898,
+      "id": "2fb2fa3d320559f36a751109d55ef57e4caa84b3885911c6a6252e9d9fa1b01b",
+      "kind": 30850,
+      "pubkey": "88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13",
+      "sig": "ab46068d03bee2cd73687d0f1da1da7a1e83c6afe9c6610d90702d35940f827a08cb726f884a25615cf9ea4fcb0cf05c789812ac4be45cc849f1247fcd1fb2a7",
+      "tags": [
+        [
+          "d",
+          "360ddc81-afb0-4137-87bd-1cdd2f29529b"
+        ],
+        [
+          "title",
+          "Payment integration"
+        ],
+        [
+          "h",
+          "0804b906-ba87-4c63-8d2f-53df1bb6d52e"
+        ]
+      ]
+    },
+    {
+      "content": "Status → in_progress",
+      "created_at": 1787179353,
+      "id": "32a2cd294639c8bc8dc38b9e368bd6ba6019c53f849c51b953aac31131b85506",
+      "kind": 1851,
+      "pubkey": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+      "sig": "a33605e3af7de0c5bfeccd9c6f2031fd9b476810c9bb987628257e99be7d024bc9c2324a99aa15bfdaa2ac3fd732556d2d1c51cd7e4af93d006a141312ce2cbf",
+      "tags": [
+        [
+          "a",
+          "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2c5237d9-48ee-4d69-aa6c-cd1cb6b13c0d"
+        ],
+        [
+          "field",
+          "status"
+        ],
+        [
+          "value",
+          "in_progress"
+        ],
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "ts",
+          "1787179353428"
+        ]
+      ]
+    },
+    {
+      "content": "Stripe Checkout.",
+      "created_at": 1786359876,
+      "id": "32d32cac69a1df08d146626de8fe8c5c14633946f35a9461a0c4d725129aca67",
+      "kind": 30850,
+      "pubkey": "88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13",
+      "sig": "45f88a127bf45a485af6c34e3d25ab5d78beb4dbb4e38c86831d1b1a1fb85567b83dd2cde87a24494ebcf038d4ab817fce0b827b642c0f2f62c15c1c0aa27464",
+      "tags": [
+        [
+          "d",
+          "3cce07c5-c365-486c-ae67-17b29e0c773d"
+        ],
+        [
+          "title",
+          "Payment integration"
+        ],
+        [
+          "h",
+          "204e73cc-5ccd-43f9-a982-052e71622631"
+        ]
+      ]
+    },
+    {
+      "content": "archived",
+      "created_at": 1786698963,
+      "id": "33df71f76511137b3075e030365d18bb061ec0674fe5d385308127f1009bef25",
+      "kind": 1851,
+      "pubkey": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+      "sig": "9bdbeb18f77d2bfcc84eee20c80ee9a3c1f0c1f1b96b711843c6a18eda9827a10afa92bf3d67bcf4ea568020df8aec779ea98b637d04a800e05df2a607bc8da8",
+      "tags": [
+        [
+          "a",
+          "30850:88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13:3cce07c5-c365-486c-ae67-17b29e0c773d"
+        ],
+        [
+          "field",
+          "archived"
+        ],
+        [
+          "value",
+          "true"
+        ],
+        [
+          "h",
+          "204e73cc-5ccd-43f9-a982-052e71622631"
+        ],
+        [
+          "ts",
+          "1786698963121"
+        ]
+      ]
+    },
+    {
+      "content": "Draft messages\nBug if you start typing and message and you switch different topic, the text is kept there, which is weird.\nIf you start writing in thread and then go somewhere else and then go back to the thread to finish the message, the draft is gone",
+      "created_at": 1787302063,
+      "id": "35862ee2be56e39b023ea541cc5f63d84b59ba96b13b2a0d515ddedbf957637d",
+      "kind": 30851,
+      "pubkey": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+      "sig": "5eb363cade4b14bfcc3e6606616d518052f3f712ff3848b84bfdce4ec8af87c4c64531f986a53f30b402037394725662a53791f91cd2cc5e2f4c76fea2976949",
+      "tags": [
+        [
+          "d",
+          "f79e754f-5577-42fa-a7f8-44b0b952e272"
+        ],
+        [
+          "title",
+          "Draft messages"
+        ],
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "a",
+          "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c"
+        ],
+        [
+          "ref",
+          "PEE-7"
+        ]
+      ]
+    },
+    {
+      "content": "Status → in_progress",
+      "created_at": 1787252554,
+      "id": "36a2429fdf21166ccb82e7db7dd2b4dd2c520a7202eaba84348c7965e3fc36ad",
+      "kind": 1851,
+      "pubkey": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+      "sig": "a965e5ee7b6a872144c3c11e45551f958ef80f2f34e11feb316beb13bcf66a2fbf41763eb2d40df5f3886fe2482f2aac62a87ce8545602efe5030c70663a9cb5",
+      "tags": [
+        [
+          "a",
+          "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c"
+        ],
+        [
+          "field",
+          "status"
+        ],
+        [
+          "value",
+          "in_progress"
+        ],
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "ts",
+          "1787252554222"
+        ]
+      ]
+    },
+    {
+      "content": "This will need most likely changes on Buzz or at least reason about how it works in Buzz.\n\nnostr:naddr1qqjxvdeev5mn2drx956n2deh956ryenp94snwe3c956rgc3svgun2vn9xgmnyqgedp68gurn8ghj7etnw35hvcfwv4ehg6tkvyhxzursqgs08gu05erda02pvgf9uzhds7mdywflk8kewq4ksawuhsxx22wkf5grqsqqq7yryh2rl8",
+      "created_at": 1787327495,
+      "id": "388da2960b341571bdbacb7d9379cce2762f781ec19b5042ff162f29f00d9cc6",
+      "kind": 9,
+      "pubkey": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+      "sig": "50102704609b04d7a970feef2cdd50ff450a93a0d359e44551f3f1b5917ef9e5fc94ccce877d45eb795e4e60af789e5b4f5107771400f2aa79d29922c62a2341",
+      "tags": [
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "a",
+          "30851:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:f79e754f-5577-42fa-a7f8-44b0b952e272"
+        ],
+        [
+          "ts",
+          "1787327495827"
+        ]
+      ]
+    },
+    {
+      "content": "Description",
+      "created_at": 1787068281,
+      "id": "3cde513d39c249006842f37bcf4509112b0a6fc8bf4aa4f7e0579ed6aee049c9",
+      "kind": 1851,
+      "pubkey": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+      "sig": "32d39faebbad60a003803abe4c14a78d2a32084673d07c93ac45af234aed18a8657cbb5199a16c2c10e1b4a0676de68c9d017ae09021d9859a205fe9659217cc",
+      "tags": [
+        [
+          "a",
+          "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:360327a9-18c5-40e5-9747-9166dc284ddc"
+        ],
+        [
+          "field",
+          "description"
+        ],
+        [
+          "value",
+          "An issue appeared, might be worth taking a look. I signed in on Ship and left it open for some time. Then returned and found an error banner that I'm not signed, even though my avatar was still correct and there was no option to sign in in the menu, just sign out"
+        ],
+        [
+          "h",
+          "fcfe9d61-2d05-4d25-b113-40b2d2e601ee"
+        ],
+        [
+          "ts",
+          "1787068281400"
+        ]
+      ]
+    },
+    {
+      "content": "Description",
+      "created_at": 1787069802,
+      "id": "3d078efbb78bf2aed813c4b1712d359bd31d14744c718a659b5343107fded58d",
+      "kind": 1851,
+      "pubkey": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+      "sig": "3c1b5a847218ea24f573da60c9440168c5b05915f1f1c9574c24b463e47f8ddbb5007122c8a4bc8076481bf4a0955bdd687a97ae5aa1d823a81cdd5aeee9adc6",
+      "tags": [
+        [
+          "a",
+          "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:3c582b93-052f-45d4-a8d0-1054f24687a4"
+        ],
+        [
+          "field",
+          "description"
+        ],
+        [
+          "value",
+          "I would expect a list of available people to show up, like in Ship. \nIt would be nice to be able to remove myself or have option \"Unassigned\"\nTo be applied in files panel and reference widgets"
+        ],
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "ts",
+          "1787069802801"
+        ]
+      ]
+    },
+    {
+      "content": "Compare the Buzz Projects https://engineering.block.xyz/blog/projects-in-buzz with our Ship to see if we are doing in similar way or differ so we can enhance Ship.",
+      "created_at": 1787129664,
+      "id": "3d552d99e3c6df673656e658e5751943d1c1ebc2011ca9627ff837e4d19688bb",
+      "kind": 30851,
+      "pubkey": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+      "sig": "7d5eda54d9f26aad72016724f9ea85641a792e9e118d6648b7efa499f0d6b4d373e649beae5eeaae7e4cd3a694b88555dc142c1b482dbcff671209d4a053cc70",
+      "tags": [
+        [
+          "d",
+          "77041a63-d57f-4283-8daf-54b91138b9cd"
+        ],
+        [
+          "title",
+          "Analyze Buzz Projects comparing to Ship"
+        ],
+        [
+          "h",
+          "806fb4e3-ebc9-4b6a-a18c-0ca59379aa1d"
+        ],
+        [
+          "a",
+          "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:2c5fbeff-4014-4bea-a69c-3bfc10354d6f"
+        ],
+        [
+          "ref",
+          "OTH-1"
+        ]
+      ]
+    },
+    {
+      "content": "",
+      "created_at": 1787069189,
+      "id": "3d74149c02f7454c112faf6bbade4fb921efa223b84df4717b39a92586f526f6",
+      "kind": 30850,
+      "pubkey": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+      "sig": "ef8da4552a1d5c441c1cc9ed04188d1cf8ae5a782d8b47ce435e439a131149207b5f5a0f4b26f5a9ceca21ac8e6e372dbcac15b3ee1f8bda679dc6ffc292f414",
+      "tags": [
+        [
+          "d",
+          "cf23dbca-64fb-4802-a804-e0119b0d8584"
+        ],
+        [
+          "title",
+          "Ship: Feedback & Bugs"
+        ],
+        [
+          "h",
+          "88de5526-366a-4016-83a3-417a1748baa8"
+        ]
+      ]
+    },
+    {
+      "pubkey": "4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa",
+      "created_at": 1700000012,
+      "kind": 1851,
+      "tags": [
+        [
+          "h",
+          "fixture-folder"
+        ],
+        [
+          "a",
+          "30851:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:56119588-4b40-491f-a517-09b579d4798c"
+        ],
+        [
+          "field",
+          "status"
+        ],
+        [
+          "value",
+          "cancelled"
+        ]
+      ],
+      "content": "later by created_at, wins while the window is 1s",
+      "id": "44e938d6876d7be15a0ae0d153a1b3be524f0e02b8b47979221d1fe1f61698cb",
+      "sig": "36755501ca3ebc5cb1ae8f04f39b1a8ebaaf68356e65b45ce3ef1d1db3bce50f275b424cfab2746ff29ec938db9562075972146341262ecf6f925e9433667e2c"
+    },
+    {
+      "content": "",
+      "created_at": 1786359898,
+      "id": "4757a2906f77389686d0383138a29c452f7bac9fcddec13ac656122046fc372b",
+      "kind": 1851,
+      "pubkey": "88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13",
+      "sig": "a9abe985430517eb04dc36902f8cf71337f19d79ea27e8f46d38d7ea49718b60018e4c9f3c2df17a53eb96b43ff2951d9cbe518f8c0531d9772d79b322f85f97",
+      "tags": [
+        [
+          "a",
+          "30851:88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13:4aff182e-6851-407f-9249-23ee1604d377"
+        ],
+        [
+          "field",
+          "assignee"
+        ],
+        [
+          "value",
+          "88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13"
+        ],
+        [
+          "h",
+          "0804b906-ba87-4c63-8d2f-53df1bb6d52e"
+        ],
+        [
+          "ts",
+          "1786359898283"
+        ]
+      ]
+    },
+    {
+      "content": "",
+      "created_at": 1787068454,
+      "id": "49d2cd107ad121fbd9f20abb2c833e9058f069511901d5bfdbc5c271ec1ed9d1",
+      "kind": 30851,
+      "pubkey": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+      "sig": "d8327cfacd7e628c9e08dd08635fa32e0aa2213b8edcda2170303ca925f9a6f1737a52056582f57443de0d2de8a59d52e0f5c44494fa501a3a4d560478f29427",
+      "tags": [
+        [
+          "d",
+          "59c2a37c-bd29-4ff0-8583-9d4b91b2de7c"
+        ],
+        [
+          "title",
+          "Reference widget missing skeleton on load"
+        ],
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "a",
+          "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c"
+        ],
+        [
+          "ref",
+          "FEE-3"
+        ]
+      ]
+    },
+    {
+      "content": "But activity doesn't make sense because that kind of activity is for everyone, not just you..",
+      "created_at": 1787233874,
+      "id": "4ee37786d9c42cb7dbe2837b163245b84e5b74eb5123a464f10fba2e51e79813",
+      "kind": 9,
+      "pubkey": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+      "sig": "2ebe5ac214cfa752da2609e93922ab6943a2a0953d2a8550a33f0cbe7eb4d12fcb64e5deb56c1e8765bb5d29ef217bd784cb6d4f9379ac18d0409c82c08e5d4d",
+      "tags": [
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "e",
+          "c62b085f9a703406b4d4b85e0edce83675c1b9bee8e32e7697764f28f30d01e5",
+          "",
+          "reply"
+        ]
+      ]
+    },
+    {
+      "content": "Rename",
+      "created_at": 1787149596,
+      "id": "50f5ddae3aa50aa2c62ac2956ad9514fdcd5e9a8413b09132d6f4a82dd1fc748",
+      "kind": 1851,
+      "pubkey": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+      "sig": "108c7576e2d5749b7beedbacab64a234f12f91020d1182f6740b9f7276d5320146b003f588c8832eb2ba0ba9117bcac60b71c00cfc698c3697323ec2f69fe1e4",
+      "tags": [
+        [
+          "a",
+          "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:cbd92b45-39c0-4e38-9eed-fb79656de101"
+        ],
+        [
+          "field",
+          "title"
+        ],
+        [
+          "value",
+          "Assignee avatar and full name is missing in files panel & reference widget"
+        ],
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "ts",
+          "1787149596585"
+        ]
+      ]
+    },
+    {
+      "content": "",
+      "created_at": 1787067967,
+      "id": "5611ba939d28e1510fee6221ad639eef1630c7fd7f35fad7299b2f6f41062875",
+      "kind": 30850,
+      "pubkey": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+      "sig": "9fc7b1c1304baf935fbb818c969d3ed82b959c59f641301d096c8b7b1d7d8f115753e9369d0be2c8cf315e501796b61f7a3b6564dac1cc4145745f6a67539969",
+      "tags": [
+        [
+          "d",
+          "2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c"
+        ],
+        [
+          "title",
+          "Feedback on Peek"
+        ],
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ]
+      ]
+    },
+    {
+      "content": "Verifying the round trip: this comment, a status change, and an assignment were all written by the agent through the MCP/CLI path. If you are reading this in Ship, the write path works.",
+      "created_at": 1787316310,
+      "id": "579c89a2e12e72959660337fb3f84b2fae0418458c1592860ac09958fed9b3d0",
+      "kind": 9,
+      "pubkey": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
+      "sig": "c120356b089879f4347321ac0e9eeda00bd08d48a88f1698f3c97256d8614d8eb911c9228c6a9018edfef8c934db1675868e00836e43173596b7d33870569596",
+      "tags": [
+        [
+          "h",
+          "806fb4e3-ebc9-4b6a-a18c-0ca59379aa1d"
+        ],
+        [
+          "a",
+          "30851:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:56119588-4b40-491f-a517-09b579d4798c"
+        ],
+        [
+          "ts",
+          "1787316310359"
+        ]
+      ]
+    },
+    {
+      "content": "Few ideas\n- The animation could happen on the topic itself in the sidebar. Let's say you gave me emoji in conversation in Feedback on Peek. The Feedback on Peek topic in sidebar would get this animation.\n- Have dedicated section in Desk that would only be available if you have unread emoji reaction. It could be called \"Reactions\" and it would be just icon and if hove over, it would show a simple box where you would see the message with the reaction.",
+      "created_at": 1787236455,
+      "id": "5a64455fd68b9c15147caf6c97f0b0ad261c05db817b7cc5c43ff9912d1939df",
+      "kind": 9,
+      "pubkey": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+      "sig": "69420733a908fb813554501cf3ff1c816d913b2fd7381445c3a2a015ce522457032643adaddb2f3db0b56d4a468303e595a2445ef34cbd2b69227e1df3553e45",
+      "tags": [
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "e",
+          "c62b085f9a703406b4d4b85e0edce83675c1b9bee8e32e7697764f28f30d01e5",
+          "",
+          "reply"
+        ]
+      ]
+    },
+    {
+      "content": "[Interesting Claude-generated docs - Renamed 3]",
+      "created_at": 1787302193,
+      "id": "5bc2655c611dc44eab1647f78c8debaaceec1bead9ea78a35c200124410f1fc7",
+      "kind": 9,
+      "pubkey": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+      "sig": "1690d7221f8439fa7f919d57fe8f08d7c9fa7fc52e4335ffac92eae4c9e93c65998f0b30967a3e3ff53afdb63070f497159fd04f9a99d070bc9ff55f18a2c692",
+      "tags": [
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "e",
+          "d8841f142934ee0448800a150723ebe204d305ace9e322a52edf8ba48e0f6245",
+          "",
+          "reply"
+        ]
+      ]
+    },
+    {
+      "content": "",
+      "created_at": 1787068597,
+      "id": "5f45ff82c79a3305d6b37485a0d9d1e1c3f592f2bd7326b6f5207139e67f29b8",
+      "kind": 1851,
+      "pubkey": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+      "sig": "0b96f560cd79009608ffeae740938c9447b56d8c2b0d066068ba5ec18925be0e77622c6f17f3a6febfad31f4ccb621d50b6f5db96866b6b9faedac0597aef38e",
+      "tags": [
+        [
+          "a",
+          "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c"
+        ],
+        [
+          "field",
+          "lead"
+        ],
+        [
+          "value",
+          "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697"
+        ],
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "ts",
+          "1787068597853"
+        ]
+      ]
+    },
+    {
+      "content": "Yeah, it's so good and I think it's only the beginning. I definitely want to level-up conversation across all apps (well, now it's just ship and peek. E.g. add emoji reaction to ship or have draft messages shared across apps.",
+      "created_at": 1787242987,
+      "id": "64ae689f6b217743262670a33d6d1e3cf6db4065d7140cbeda54d65018f67533",
+      "kind": 9,
+      "pubkey": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+      "sig": "01a96cabc3cc76e8a70996d1f3fe37467386b3a9bfa55f888a11d2150b06492421650b7f8efaf81002264ff50395ac5495ebf7603da4bc89ea5e50ffc526f555",
+      "tags": [
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "e",
+          "c62b085f9a703406b4d4b85e0edce83675c1b9bee8e32e7697764f28f30d01e5",
+          "",
+          "reply"
+        ],
+        [
+          "ts",
+          "1787242987105"
+        ]
+      ]
+    },
+    {
+      "content": "Rename",
+      "created_at": 1787073749,
+      "id": "67d951c12dc720a349ae53876bf30ed5b8b1ce2bfd8f2e9990547e35b4e909ea",
+      "kind": 1851,
+      "pubkey": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+      "sig": "b804fdeb55fc84a96719a7c88bf890fbbc52328d028922837190608329beab38555612610269f0c36b5b31aa15277d9a63a648fb2d6940f5163f123c7948ca8e",
+      "tags": [
+        [
+          "a",
+          "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:ceb9ec2e-96bf-40df-85d8-37d68dc254a5"
+        ],
+        [
+          "field",
+          "title"
+        ],
+        [
+          "value",
+          "It's not possible to delete projects (from Projects page) and issues"
+        ],
+        [
+          "h",
+          "88de5526-366a-4016-83a3-417a1748baa8"
+        ],
+        [
+          "ts",
+          "1787073749211"
+        ]
+      ]
+    },
+    {
+      "content": "",
+      "created_at": 1787073710,
+      "id": "683095b6ea96fcd79e857a016aa7b2ac7386128eeedf011effc9561aa7be6b08",
+      "kind": 30851,
+      "pubkey": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+      "sig": "aade850253886bfecafc3e93d7982b00d021ac16a5a82216c89285fbc87349fc7669baca10f6d79cdaab111bc2cb52ad17dde7a1de05d1f96d6004ea37d04344",
+      "tags": [
+        [
+          "d",
+          "ceb9ec2e-96bf-40df-85d8-37d68dc254a5"
+        ],
+        [
+          "title",
+          "It's not possible to delete projects and issues"
+        ],
+        [
+          "h",
+          "88de5526-366a-4016-83a3-417a1748baa8"
+        ],
+        [
+          "a",
+          "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:cf23dbca-64fb-4802-a804-e0119b0d8584"
+        ],
+        [
+          "ref",
+          "SHI-3"
+        ]
+      ]
+    },
+    {
+      "content": "Status → cancelled",
+      "created_at": 1787119092,
+      "id": "6ba5eb697028425f1a9daa5e8e2d956ae33a6dd5ecaf1818038b49c9b23c9103",
+      "kind": 1851,
+      "pubkey": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+      "sig": "0896263dc7d0a72e4e950fecb49fc9fdb0be9825b012cfa32470ba71c358bfe4e01429909643ba9f97712f9f7b2f186de6d612f3b2793f60c13ed9ddbceeac2d",
+      "tags": [
+        [
+          "a",
+          "30851:88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13:79517829-1e67-45d3-bd78-3c16be3095f5"
+        ],
+        [
+          "field",
+          "status"
+        ],
+        [
+          "value",
+          "cancelled"
+        ],
+        [
+          "h",
+          "204e73cc-5ccd-43f9-a982-052e71622631"
+        ],
+        [
+          "ts",
+          "1787119092522"
+        ]
+      ]
+    },
+    {
+      "content": "Ship→Peek updates are not real-time and cannot explain themselves. Source ticket: PEEK-109.\n\n## The actual diagnosis\n\nThere is no polling. Peek reads the relay **once per topic mount** and never again — `useTopicView.tsx` keys its sync effect on `[topicId, topicFolderId, relayUrl, convex]`, none of which change while you sit in a topic. \"Replies take time to appear\" is really \"replies appear on remount\", which is why a reload fixes it.\n\nFour independent staleness sources, each matching a reported symptom:\n\n1. **Messages/replies** — one fetch per mount (`useTopicView.tsx:144-159`). Reactions and deletions are additionally capped to the newest 100 messages per topic (`convex/nostr/sync.ts:41`), so an older message never picks up a reaction at all.\n2. **Ship projects/issues in the sidebar** — `TopicProjectPanel.tsx:250-269` resolves once, keyed on a folder id that never changes. The file admits it: \"the panel reflects the moment it resolved and does not live-update\". A project created in Ship after the panel mounted never appears.\n3. **Everything outside topics never syncs at all** — the only relay-read call sites are `useTopicView` (channel) and `AuthGate` (profiles). DMs, inbox, Desk and Screener have no read path.\n4. **Auth failure is silent** — `useTopicView.tsx:150` calls `validToken()` and returns with no signal; relay failures below are `console.warn`. Silent refresh exists (PEEK-108) but it is a `setTimeout`, which browsers throttle in background tabs. The UI cannot distinguish \"nothing changed\" from \"I stopped being able to ask\".\n\n## What is already true (verified live, 2026-08-21)\n\n- `wss://estiva.estiva.app` accepts a WebSocket upgrade through Cloudflare from Peek's origin and immediately sends `[\"AUTH\",\"<challenge>\"]`. Verified with curl; **pass `--http1.1`** or the same request returns NIP-11 JSON, because `Connection`/`Upgrade` are not HTTP/2 headers.\n- NIP-11 reports `supported_nips` including 42, `auth_required: true`, `max_subscriptions: 1024`, `max_filters: 10`.\n- **One subscription covers messages, reactions AND deletions.** `buzz-core/src/filter.rs:68-90` has an explicit `#h` fallback to `StoredEvent.channel_id` for events carrying no `h` tag (kind:7, kind:5, whose channel is derived at ingest). So `{\"#h\":[channelUuid]}` delivers messages + reactions + deletions + assertions in one REQ. The current HTTP path needs four sequential round trips to do less.\n- **The projection is reusable unchanged.** PEEK-106 already split credential from projection: `importChannel` / `importReactions` / `importResolutions` take events, not tokens.\n- **Convex is already reactive.** Once a row lands, every open view updates. The only missing link is relay→Convex.\n\n## Two gates\n\n**Gate 1 — Estiva ID must sign kind:22242 (blocking).** `estiva-id/src/db/seed.ts:79` gives Peek `[9,7,5,9007,27235,1851,9101,9002]` — no 22242, so Peek cannot answer the AUTH challenge and every REQ returns `auth-required`. The socket looks healthy and delivers nothing. Deploying needs a **manual re-seed**: `update.sh` runs `migrate`, never `seed`. Unlike PEEK-128 this is only one gate — AUTH never goes through `ingest.rs`, `Kind::Authentication` is built into `buzz-auth/src/nip42.rs:52`, so no Buzz change and no relay deploy.\n\n**Gate 2 — one subscription per channel (silent trap).** `buzz-relay/src/handlers/req.rs:1013` returns `None` when filters name more than one distinct `#h`; `subscription.rs:84-113` then registers the subscription as *global*, and `fan_out_scoped:273-288` consults only the channel indexes for channel-scoped events. The invariant is stated at `subscription.rs:321-325`. A multi-channel subscription returns correct history at EOSE and then receives **zero** live events. One REQ per channel; 1024 per connection is no practical ceiling.\n\n## Why the socket stays in the browser\n\n`convex/nostr/sync.ts:18-20` proposes an external consumer holding the socket. An identity is obtainable — `estiva-id/src/domain/roles.ts` has role identities with a client-credentials grant. But Buzz gates reads **per channel**: `handlers/event.rs:181-196` filters live fan-out through `is_member_cached(community, channel, pubkey)` and fails closed on private channels. A service identity would need membership in every topic — a product decision (a bot in every conversation), not an implementation detail. `convex/crons.ts` already reached this conclusion. Convex keeps the projection; only the socket moves.\n\n## Shape of the fix\n\nOne shared WebSocket per tab. One subscription per open channel. Live events routed into the existing Convex import actions. Convex reactivity carries it to the UI. The HTTP path stays as the backfill on subscribe (it owns the `since` cursor and paging) and as the fallback when the socket is down — so the change is additive and a WS failure degrades to today's behaviour rather than to nothing.\n\nOrdering caveat to design for: `created_at` is in seconds and several events routinely land in the same one (SPEC §6.2). Imports are idempotent by event id and `nostrSyncedAt` only moves forward (`convex/nostr/data.ts:523`), so live and backfill can overlap safely.\n\n## Milestones\n\n- **M1 — Un-gated relief.** Refetch on focus/visibility plus a short interval, in both the topic sync and the project panel; TTL the profile cache. Turns \"until remount\" into \"within 30 seconds\" and probably clears most reported symptoms. Nothing blocks this.\n- **M2 — Open the 22242 gate.** Add it to Peek's allowed kinds, scoped by `relay` tag, deploy, **re-seed**, verify the row.\n- **M3 — The live socket.** WS client with NIP-42 AUTH and reconnect; refcounted per-channel subscription manager; live events into the Convex projection; `useTopicView` subscribing with HTTP as backfill and fallback.\n- **M4 — Honest state.** One derived connection state surfaced once, and relay read failures made visible instead of swallowed.\n- **M5 — Beyond topics.** Subscriptions for the inbox, Desk and DMs, which have no relay read path at all today.\n\n## Not yet verified\n\n- The **live** `allowed_kinds` row for peek. `seed.ts` has no 22242; the read to confirm production matches was blocked. Run `docker compose exec -T postgres psql -U estiva_id -d estiva_id -tAc \"select client_id, allowed_kinds from app_credentials\"` before planning on it.\n- No end-to-end 22242 signing test — needs a live user token.\n\nIssues are filed in implementation order. Each is written to be picked up cold by Claude Code.",
+      "created_at": 1787348120,
+      "id": "6c5b706baa802f30d5c57c5420a7e0acbef2604d21cb5e2ee0766ea4e2ffbaba",
+      "kind": 30850,
+      "pubkey": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+      "sig": "51af9a417fd144910e2b574342057e7f9e1dde367e0491b1352039ae4b3e060a79066101a74df1960b164d74fbe781cce418d0fd8f359b2283486ecabdcc1d0d",
+      "tags": [
+        [
+          "d",
+          "df13e841-891c-48db-a1a2-24f9c16b411e"
+        ],
+        [
+          "title",
+          "Peek: Real-time Ship→Peek updates"
+        ],
+        [
+          "h",
+          "996ab3d4-5565-4335-9e17-2284fda675a0"
+        ]
+      ]
+    },
+    {
+      "content": "Assign",
+      "created_at": 1787129683,
+      "id": "6d8ca1de4703b28d7fc865958ccc46950781895d8216eb60267f823a23a0cbdd",
+      "kind": 1851,
+      "pubkey": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+      "sig": "9520b8b054e705a265bcec7b74e86f6ade7b973b7fd5f1f1bc5cf8adc4194da23192d923ae543ab2952f15a735edf3987c8e86045394d79c0bbfde61cca6ab3b",
+      "tags": [
+        [
+          "a",
+          "30851:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:77041a63-d57f-4283-8daf-54b91138b9cd"
+        ],
+        [
+          "field",
+          "assignee"
+        ],
+        [
+          "value",
+          "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1"
+        ],
+        [
+          "h",
+          "806fb4e3-ebc9-4b6a-a18c-0ca59379aa1d"
+        ],
+        [
+          "ts",
+          "1787129683297"
+        ]
+      ]
+    },
+    {
+      "pubkey": "4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa",
+      "created_at": 1700000001,
+      "kind": 1851,
+      "tags": [
+        [
+          "h",
+          "fixture-folder"
+        ],
+        [
+          "a",
+          "30851:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:56119588-4b40-491f-a517-09b579d4798c"
+        ],
+        [
+          "field",
+          "assignee"
+        ],
+        [
+          "value",
+          "4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa"
+        ]
+      ],
+      "content": "tie a",
+      "id": "7110b6436098ad75cb10bc3ce67fbb821ef8c7883e245e831486633ebacea1be",
+      "sig": "ed963bb31476327e75b864fd4c189e23db737dc60dd18784b2b5ac3c8050a4c6b94f5ce74a36811e4198b153988753017b4d03e7a0004f892296bce078ba5bd0"
+    },
+    {
+      "content": "This is so cool, I read our conversations and sending this now from Ship. Was thinking about testing it only and forgot how it looks in real conversation and how useful that is",
+      "created_at": 1787238677,
+      "id": "7174ab409b66bd3ebb995a2c5ae3959e1e3bfdc727fdd11f12caaa60d5dff2a3",
+      "kind": 9,
+      "pubkey": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+      "sig": "12b68f111bffa394cfdcb305ab53f6cbea98c7f819d34d95e5f8c2cb8a16ddf50196bd88b95f3717ba614d7c7b2e964629435d04cf5dd95232fe103d42cb1332",
+      "tags": [
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "e",
+          "c62b085f9a703406b4d4b85e0edce83675c1b9bee8e32e7697764f28f30d01e5",
+          "",
+          "reply"
+        ],
+        [
+          "ts",
+          "1787238677620"
+        ]
+      ]
+    },
+    {
+      "content": "Status → in_progress",
+      "created_at": 1787137446,
+      "id": "718a62287ec049d2606588f12f870b90b2c8a43a874dfd1677e7571ead54f00d",
+      "kind": 1851,
+      "pubkey": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+      "sig": "f1e780cee13c121564c75f602d5b6863c7aab5748d90d5d2fcec6542a37029a1c99a2f8d0648751e56d394ae743bd0dab0576c5f28a47b94c263492fbcd8d8e5",
+      "tags": [
+        [
+          "a",
+          "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:20446118-7466-4281-a483-fa095d3ed935"
+        ],
+        [
+          "field",
+          "status"
+        ],
+        [
+          "value",
+          "in_progress"
+        ],
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "ts",
+          "1787137446473"
+        ]
+      ]
+    },
+    {
+      "content": "Status → done",
+      "created_at": 1787144358,
+      "id": "71dc90e010b1bbd1f7bc9ea9080689e7e950b9a8102a021d5b0355a14571d843",
+      "kind": 1851,
+      "pubkey": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+      "sig": "f3aae199b9fd2362ef371bdd92c4275dcab46224171219991c5e85fc5c68b1d7a98bf2c03611413d4499a00fa212344cac90298a9c7ca95e4d2261787869074f",
+      "tags": [
+        [
+          "a",
+          "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:d92ac2b8-7ffb-4a15-9824-00044cce9cf5"
+        ],
+        [
+          "field",
+          "status"
+        ],
+        [
+          "value",
+          "done"
+        ],
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "ts",
+          "1787144358400"
+        ]
+      ]
+    },
+    {
+      "content": "Testing message",
+      "created_at": 1787302086,
+      "id": "71e76081e141691f114b916e764e01ad51d36108ba687c1500c3c47966fb5279",
+      "kind": 9,
+      "pubkey": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+      "sig": "8da4d2ac870c6d0c35b39f4e89f636b49e3c3c60f44b617f83a38a775738c1bea1b54b857aaccd0326ff19ef3b82cd9283eddb8a9b29626e26ee39411cca25ca",
+      "tags": [
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "e",
+          "d8841f142934ee0448800a150723ebe204d305ace9e322a52edf8ba48e0f6245",
+          "",
+          "reply"
+        ]
+      ]
+    },
+    {
+      "content": "",
+      "created_at": 1787316312,
+      "id": "770916193bda67cf3fa241680452d01d808358738c8c2bf3f82ab3fa226ffcd6",
+      "kind": 1851,
+      "pubkey": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
+      "sig": "fdd5306c315979f710144fe0f2e805bcbdb6693d2ec7d69e04b32216a04fa50f6990a0c2c72f997ebf334d5405d92e9e34d9edf2ba6a6dc6d3c1f52161687ce2",
+      "tags": [
+        [
+          "a",
+          "30851:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:56119588-4b40-491f-a517-09b579d4798c"
+        ],
+        [
+          "field",
+          "assignee"
+        ],
+        [
+          "value",
+          "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46"
+        ],
+        [
+          "h",
+          "806fb4e3-ebc9-4b6a-a18c-0ca59379aa1d"
+        ],
+        [
+          "ts",
+          "1787316312156"
+        ]
+      ]
+    },
+    {
+      "content": "Assign",
+      "created_at": 1787327461,
+      "id": "794475e59c81156f422503cf2e630d47be6a495cd33b5164f1e814086106b9ac",
+      "kind": 1851,
+      "pubkey": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+      "sig": "83efb6ef968804f602446774f2d162378699e68c6148ca1ac3bc89197b71a947b6839c1ed977788f65a7604e5a861385dbe49ba48c13a4ea2a6a82116465de5c",
+      "tags": [
+        [
+          "a",
+          "30851:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:f79e754f-5577-42fa-a7f8-44b0b952e272"
+        ],
+        [
+          "field",
+          "assignee"
+        ],
+        [
+          "value",
+          "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1"
+        ],
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "ts",
+          "1787327461816"
+        ]
+      ]
+    },
+    {
+      "pubkey": "4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa",
+      "created_at": 1700000010,
+      "kind": 1851,
+      "tags": [
+        [
+          "h",
+          "fixture-folder"
+        ],
+        [
+          "a",
+          "30851:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:56119588-4b40-491f-a517-09b579d4798c"
+        ],
+        [
+          "field",
+          "status"
+        ],
+        [
+          "value",
+          "done"
+        ],
+        [
+          "ts",
+          "1700000013000"
+        ]
+      ],
+      "content": "drifted ts, refused at 1s of slack",
+      "id": "7b9b480d08859948980aa98e93800749322b7b40a2e6183834d9b48f9f2be922",
+      "sig": "49a2349a27f48a0b8782a86c3fc9e55cb3e70e67abf6ddc98107b064dcb2fec3e144389134ea6493712fe5fc0d27ac1d7c473082613ef4ace0f76144713b1acd"
+    },
+    {
+      "content": "",
+      "created_at": 1787316311,
+      "id": "7dafb5ae73446d75ab157c57e52d1b917feb6ae6b3dfe52d163d795e21b78411",
+      "kind": 1851,
+      "pubkey": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
+      "sig": "6fd6d8803562691b7ffedf9948c5a857d0f99330e4f418b1ff7f2c870830268f7887a17c07713f761fbcae3124919e676bb8b463e2a005049d072ce753b30200",
+      "tags": [
+        [
+          "a",
+          "30851:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:56119588-4b40-491f-a517-09b579d4798c"
+        ],
+        [
+          "field",
+          "status"
+        ],
+        [
+          "value",
+          "in_progress"
+        ],
+        [
+          "h",
+          "806fb4e3-ebc9-4b6a-a18c-0ca59379aa1d"
+        ],
+        [
+          "ts",
+          "1787316311248"
+        ]
+      ]
+    },
+    {
+      "content": "I like the effect Slack has on top of the activity menu item where the emoji animates a little and disappears. You don't know on which conversation it happened but you get a signal something happened. We don't have global activity so I'm thinking maybe to have it as an entry to topic-specific activity (and DM speficic activity)?",
+      "created_at": 1787233850,
+      "id": "816fdcec7f573147e79ef1ad915faad8062dadbe81b1c5874ce4dd61e5e79ac7",
+      "kind": 9,
+      "pubkey": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+      "sig": "153bd2888499f5b9d3054108ef653083f38e5c895c59993d199e239097d5e80bde1c7d77b5641b0d5754be52378d36348f58f5c2e239b8915d124f5c5000d8de",
+      "tags": [
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "e",
+          "c62b085f9a703406b4d4b85e0edce83675c1b9bee8e32e7697764f28f30d01e5",
+          "",
+          "reply"
+        ]
+      ]
+    },
+    {
+      "content": "",
+      "created_at": 1787068073,
+      "id": "8d75ffd5fa1fe1f8d5818a57b61832e8b3915a36edcadb20500fbaa44980cba1",
+      "kind": 30851,
+      "pubkey": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+      "sig": "5561a37410ae571e58b2eb6d781a59efaf2964cca7f1ae8ca5c4564e6bbc224199343e1eda7bf0333071b5010ec36f964bd008e7359d1f594e162fa048fb7e22",
+      "tags": [
+        [
+          "d",
+          "cbd92b45-39c0-4e38-9eed-fb79656de101"
+        ],
+        [
+          "title",
+          "Assignee avatar and full name is missing in files panel"
+        ],
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "a",
+          "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c"
+        ],
+        [
+          "ref",
+          "FEE-1"
+        ]
+      ]
+    },
+    {
+      "content": "Avatar + name + timestamp only",
+      "created_at": 1787069258,
+      "id": "8fe21dc5ce06ea99e5d22e85e2b56fa1611db1a5ae1f7ff8a76ba64c60b82b46",
+      "kind": 30851,
+      "pubkey": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+      "sig": "f9d9fbdd745e7627fdf595f4c1d0be162837e1874fa4407dc54be9ad9c7a055ce00a4a8f0924934d801e907edd7d7e9906207247670d54043c9ff6fdecaa5263",
+      "tags": [
+        [
+          "d",
+          "a98bbecd-4b8a-4332-b7d6-c88f1500b518"
+        ],
+        [
+          "title",
+          "Screenshots and reference widgets aren't rendered in conversation or replies"
+        ],
+        [
+          "h",
+          "88de5526-366a-4016-83a3-417a1748baa8"
+        ],
+        [
+          "a",
+          "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:cf23dbca-64fb-4802-a804-e0119b0d8584"
+        ],
+        [
+          "ref",
+          "SHI-1"
+        ]
+      ]
+    },
+    {
+      "content": "",
+      "created_at": 1787217363,
+      "id": "91429447f4da88ebd30eb9085094b992f7f3142f775f7a4e480a9643ed64dd4e",
+      "kind": 1851,
+      "pubkey": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+      "sig": "27f557bbffbeb7b0dc499a1b687722a6a8117058ffbe18ab2b27e0c0772ebb413af565db3e8826f2b62c91da90ef4b1b44c3ff457dc85bb4bfe98baea7c1edb3",
+      "tags": [
+        [
+          "a",
+          "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:20446118-7466-4281-a483-fa095d3ed935"
+        ],
+        [
+          "field",
+          "assignee"
+        ],
+        [
+          "value",
+          "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1"
+        ],
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "ts",
+          "1787217363532"
+        ]
+      ]
+    },
+    {
+      "content": "",
+      "created_at": 1786359898,
+      "id": "923703dba5da143e454f803cb9971d2d487c87aebb592e1fd68dbadf1de78372",
+      "kind": 1851,
+      "pubkey": "88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13",
+      "sig": "a652df920e81dbcb86ec589f3f98ee811100cd4c1d285fc37a30529b0ac06841ab63e24ceea61fe8884a01b20a6e5e2c4e521f8773d199477e3faf619326cfa7",
+      "tags": [
+        [
+          "a",
+          "30851:88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13:4aff182e-6851-407f-9249-23ee1604d377"
+        ],
+        [
+          "field",
+          "status"
+        ],
+        [
+          "value",
+          "in_progress"
+        ],
+        [
+          "h",
+          "0804b906-ba87-4c63-8d2f-53df1bb6d52e"
+        ],
+        [
+          "ts",
+          "1786359898228"
+        ]
+      ]
+    },
+    {
+      "content": "",
+      "created_at": 1787316712,
+      "id": "989dfc25ac1c461ddc2ac2655c1ac23f6d3ad0250914dff96ce78eab2195fc0f",
+      "kind": 1851,
+      "pubkey": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
+      "sig": "701a261109cbaaf9f4e3268362ab8526369ad19b77edcb6e4fbcf612faf34ed56debeaa385f17355382a6c23c5bd4fb9b6896b67478126b5ecd4de7b61a9fa85",
+      "tags": [
+        [
+          "a",
+          "30851:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:56119588-4b40-491f-a517-09b579d4798c"
+        ],
+        [
+          "field",
+          "status"
+        ],
+        [
+          "value",
+          "cancelled"
+        ],
+        [
+          "h",
+          "806fb4e3-ebc9-4b6a-a18c-0ca59379aa1d"
+        ],
+        [
+          "ts",
+          "1787316712573"
+        ]
+      ]
+    },
+    {
+      "content": "Status → done",
+      "created_at": 1787149599,
+      "id": "9cab754d013808dcabca5334d2f0c1b2c5815c91e305accef16ee8e8896d5954",
+      "kind": 1851,
+      "pubkey": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+      "sig": "1451990e196ec70c26d1ca47443ebc975f719d646101429bba3a3b66660d8161565c2e8c1046996ad18402876576601ffb2ee211622ce5222259f35f19778e0c",
+      "tags": [
+        [
+          "a",
+          "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:cbd92b45-39c0-4e38-9eed-fb79656de101"
+        ],
+        [
+          "field",
+          "status"
+        ],
+        [
+          "value",
+          "done"
+        ],
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "ts",
+          "1787149599556"
+        ]
+      ]
+    },
+    {
+      "content": "Settings entry point.",
+      "created_at": 1786359876,
+      "id": "9d0ed0321cd4cff1586ea5d6cda535e2a4292f41035f1715ef42114672f70cd4",
+      "kind": 30851,
+      "pubkey": "88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13",
+      "sig": "7ecbefae1a3918cc3f550615e79044e887efe494bb3086882c753791fa5fd5997cbb36167e6b36232989afda4c0c01f9169a7696e5ac2d831d8ccd8c51c8f4d4",
+      "tags": [
+        [
+          "d",
+          "79517829-1e67-45d3-bd78-3c16be3095f5"
+        ],
+        [
+          "title",
+          "Billing entry"
+        ],
+        [
+          "h",
+          "204e73cc-5ccd-43f9-a982-052e71622631"
+        ],
+        [
+          "a",
+          "30850:88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13:3cce07c5-c365-486c-ae67-17b29e0c773d"
+        ],
+        [
+          "ref",
+          "PAY-1"
+        ]
+      ]
+    },
+    {
+      "content": "An issue appeared, might be worth taking a look. I signed in on Ship and left it open for some time. Then returned and found an error banner that I'm not signed, even though my avatar was still correct and there was no option to sign in in the menu, just sign out",
+      "created_at": 1787068311,
+      "id": "9d34b502384c403cb43cf6d313b25fd5200f75572b541aee974ebdf58898b1cd",
+      "kind": 30851,
+      "pubkey": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+      "sig": "a825d9cf69b9020e7d782d8949e897b2f1f936f962c1fbdb751302cd3d54f73726475d86305e24dd19661b56a3bb200f56c1167467e26bb5a2283a81be985cec",
+      "tags": [
+        [
+          "d",
+          "a5eef7bf-06f8-4932-93f9-1c0552ab9578"
+        ],
+        [
+          "title",
+          "Weird log out on Ship"
+        ],
+        [
+          "h",
+          "fcfe9d61-2d05-4d25-b113-40b2d2e601ee"
+        ],
+        [
+          "a",
+          "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:360327a9-18c5-40e5-9747-9166dc284ddc"
+        ],
+        [
+          "ref",
+          "EST-1"
+        ]
+      ]
+    },
+    {
+      "content": "",
+      "created_at": 1787069672,
+      "id": "a04f4e0ef6982f2327d23b199a1dd37e83b9e272790971017dd856338d1c4064",
+      "kind": 30851,
+      "pubkey": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+      "sig": "5aff9e5fbc42910d820a22e5c8d3e20da524b0327deb57645b4e00cc5a960994fc26f5534cd33c4759c8bd40501c81452f89df30bddbf774fed3b2f2aa491a0b",
+      "tags": [
+        [
+          "d",
+          "d92ac2b8-7ffb-4a15-9824-00044cce9cf5"
+        ],
+        [
+          "title",
+          "Files panel and IconButtons aren't available when opening topics in Desk"
+        ],
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "a",
+          "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c"
+        ],
+        [
+          "ref",
+          "PEE-3"
+        ]
+      ]
+    },
+    {
+      "content": "Status → in_progress",
+      "created_at": 1787139814,
+      "id": "a19528cecf9c29e11396908f50d205c8e9e2bbbcea409b75f030a663531e41a6",
+      "kind": 1851,
+      "pubkey": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+      "sig": "63ecc630e43e902bbbca4879e5b38ac0dcc95c74934bae0814034022db0261da0e5930cef80b9d3554b00f7e76e24682bf0d4f789be7ba05182771ea34e46553",
+      "tags": [
+        [
+          "a",
+          "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:59c2a37c-bd29-4ff0-8583-9d4b91b2de7c"
+        ],
+        [
+          "field",
+          "status"
+        ],
+        [
+          "value",
+          "in_progress"
+        ],
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "ts",
+          "1787139814807"
+        ]
+      ]
+    },
+    {
+      "content": "",
+      "created_at": 1787069301,
+      "id": "a31560100c553a8d8f4ddac77c6af8a46308bbbcbe6d63c462ce42137a5b452f",
+      "kind": 30851,
+      "pubkey": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+      "sig": "cc1415e4a3582ff467d6e76738dc256abb4a5377685750227092429fd7b3101b4505fc6ecdff4594326d7090b3cb88a51a5d81ec4d9dad6dcd2c20803b0e4da4",
+      "tags": [
+        [
+          "d",
+          "085aa357-4f80-48ba-b704-1f52dcf295ee"
+        ],
+        [
+          "title",
+          "It's not possible to attach files in descriptions or conversations"
+        ],
+        [
+          "h",
+          "88de5526-366a-4016-83a3-417a1748baa8"
+        ],
+        [
+          "a",
+          "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:cf23dbca-64fb-4802-a804-e0119b0d8584"
+        ],
+        [
+          "ref",
+          "SHI-2"
+        ]
+      ]
+    },
+    {
+      "content": "Status → done",
+      "created_at": 1787209201,
+      "id": "a5115aa258d28be6d7af24bde6852f016b8babff2df531666ec88699e09aa56f",
+      "kind": 1851,
+      "pubkey": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+      "sig": "3a389573251880843364e98aefadea8734d3b5a6eda221b595f15777880f3ec074f30e0dc9797483e368c43fdfe770cb89c0f3aa29d4c59f8959c7ebe53eceb6",
+      "tags": [
+        [
+          "a",
+          "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:cbd92b45-39c0-4e38-9eed-fb79656de101"
+        ],
+        [
+          "field",
+          "status"
+        ],
+        [
+          "value",
+          "done"
+        ],
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "ts",
+          "1787209201334"
+        ]
+      ]
+    },
+    {
+      "content": "",
+      "created_at": 1786359876,
+      "id": "a88cac80f4a90515fe539d48a86dafdf45a45a2a5bd5e9e8abe02bbad7022ee8",
+      "kind": 1851,
+      "pubkey": "88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13",
+      "sig": "aeb6243d1b9b23e183a09dd45c413d0b4dc046950d73bb4116c8e0821771ebbd50b48e03c828f1660ebc76e20c302a9ef80faa37f125d408486dd82946247922",
+      "tags": [
+        [
+          "a",
+          "30851:88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13:79517829-1e67-45d3-bd78-3c16be3095f5"
+        ],
+        [
+          "field",
+          "assignee"
+        ],
+        [
+          "value",
+          "88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13"
+        ],
+        [
+          "h",
+          "204e73cc-5ccd-43f9-a982-052e71622631"
+        ],
+        [
+          "ts",
+          "1786359876729"
+        ]
+      ]
+    },
+    {
+      "content": "",
+      "created_at": 1787211122,
+      "id": "b9240e0653d04841b8017e9aa170e20a4a67ed5d4850fcdba510899512fc9606",
+      "kind": 30851,
+      "pubkey": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+      "sig": "c85e0179a4d8cbb52e3a0d52dcf015568e5913da573be4c11abaa863f1b6df41b1f9c3481c6d19937e2830594efcb6037edf2f654ef9b6155639cd3558eaf82d",
+      "tags": [
+        [
+          "d",
+          "547a0ac3-954d-40a4-a468-3fd5832f0e20"
+        ],
+        [
+          "title",
+          "Reply timestamps lose their date once the day has passed"
+        ],
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "a",
+          "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c"
+        ],
+        [
+          "ref",
+          "PEE-5"
+        ]
+      ]
+    },
+    {
+      "content": "",
+      "created_at": 1787129612,
+      "id": "bb63d65eeb3a39be6d482c220c26bdf321e06e5fa162713bc35749562cd5f835",
+      "kind": 30850,
+      "pubkey": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+      "sig": "2b902e352347cd1ffe4b2645c86014725e2f85ddd176204983cf77309c33f7ead8adcb7d29f021006452e51c16783b37b389d8f1a9e396e8beb92b341fcf0756",
+      "tags": [
+        [
+          "d",
+          "2c5fbeff-4014-4bea-a69c-3bfc10354d6f"
+        ],
+        [
+          "title",
+          "Other"
+        ],
+        [
+          "h",
+          "806fb4e3-ebc9-4b6a-a18c-0ca59379aa1d"
+        ]
+      ]
+    },
+    {
+      "content": "",
+      "created_at": 1787149573,
+      "id": "bb69e2086112e2a997c31bdaf8cf3b011b6ac7536aeab4f3e636ff81f1a8ae8b",
+      "kind": 1851,
+      "pubkey": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+      "sig": "2cc1a5f0305fa63259421fce33125bbdc96dcd43e9f71c06dfb7d23c88716a0aa1968b05965eedac38046690650c989b3dbbce2f82bdac6660bad9e01bcd540c",
+      "tags": [
+        [
+          "a",
+          "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:cbd92b45-39c0-4e38-9eed-fb79656de101"
+        ],
+        [
+          "field",
+          "assignee"
+        ],
+        [
+          "value",
+          "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697"
+        ],
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "ts",
+          "1787149573394"
+        ]
+      ]
+    },
+    {
+      "content": "Support code snippets in rich formatting",
+      "created_at": 1787299230,
+      "id": "bfc4a9baf40619a2b7d91f64f92496cfe94f19aef9392ff36b0df5ba374ad04e",
+      "kind": 9,
+      "pubkey": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+      "sig": "b5293095da622bca59e1b3b1ebfb8655b0b696b1e7ecbf78f61d692624fa679e447e6d7a5c2a85f4fe225ec97352bee035524fee6aa055462027baf5be58e6ce",
+      "tags": [
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ]
+      ]
+    },
+    {
+      "content": "Description",
+      "created_at": 1787068720,
+      "id": "c15572b687b8a97e9ce448104be59a82f670a3fdf39fcc7d6392d62609eb6eb6",
+      "kind": 1851,
+      "pubkey": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+      "sig": "6ffdd74a2f573af236fbfadacc93cc8b24af8da50767d05b29df9b9898960903442854cbdab43ed84c151181792da046e96d68e4fb27af34ede99b9c73a945a0",
+      "tags": [
+        [
+          "a",
+          "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:59c2a37c-bd29-4ff0-8583-9d4b91b2de7c"
+        ],
+        [
+          "field",
+          "description"
+        ],
+        [
+          "value",
+          "Result is empty space or jumping content"
+        ],
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "ts",
+          "1787068720929"
+        ]
+      ]
+    },
+    {
+      "pubkey": "4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa",
+      "created_at": 1700000001,
+      "kind": 1851,
+      "tags": [
+        [
+          "h",
+          "fixture-folder"
+        ],
+        [
+          "a",
+          "30851:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:56119588-4b40-491f-a517-09b579d4798c"
+        ],
+        [
+          "field",
+          "assignee"
+        ],
+        [
+          "value",
+          ""
+        ]
+      ],
+      "content": "tie c",
+      "id": "c53cb149cd07db6eaa524aacc87e4a24bb0a4cf1b0b2536bd2dbeadfb237c7a6",
+      "sig": "a109d653285efa423b84051816705c332c617629619cdb454c9a490086e521c56dabcc5b7d29be8f818655fa8f6690ae6befb02251364e5ec98f52b5a19d7f09"
+    },
+    {
+      "content": "Wondering how we can in meaningful non-distracting way surface is somebody react to your message with emoji. Right now, you learn about it just by accident. 😊",
+      "created_at": 1787231382,
+      "id": "c62b085f9a703406b4d4b85e0edce83675c1b9bee8e32e7697764f28f30d01e5",
+      "kind": 9,
+      "pubkey": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+      "sig": "a6d13a3aff1cccaf692da0d7262b6d45fc1c5cceb624170e7019f02f73ba633a8f1234bcf924b34edce4693bc795094c465fd2932a133b209912552883c29ddc",
+      "tags": [
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ]
+      ]
+    },
+    {
+      "content": "nostr:naddr1qqjxvdeev5mn2drx956n2deh956ryenp94snwe3c956rgc3svgun2vn9xgmnyqgedp68gurn8ghj7etnw35hvcfwv4ehg6tkvyhxzursqgs08gu05erda02pvgf9uzhds7mdywflk8kewq4ksawuhsxx22wkf5grqsqqq7yryh2rl8",
+      "created_at": 1787302076,
+      "id": "c76596b00c624e49fc618ab170a3018e995f2ae8d9861a06a342317eb92a9cd2",
+      "kind": 9,
+      "pubkey": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+      "sig": "25ba3d8e3f71bd239cc3ade45dafe7b3c51dec6de6cb3ee6baead6da713ec05f3fa5ace882594ab6e5eef84e4cc53d99502f39181d6ddd5412f4e9058117cde7",
+      "tags": [
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "e",
+          "d8841f142934ee0448800a150723ebe204d305ace9e322a52edf8ba48e0f6245",
+          "",
+          "reply"
+        ]
+      ]
+    },
+    {
+      "content": "Let's maybe chat 5 min tomorrow who will focus on what so we don't end up tackling the same stuff.",
+      "created_at": 1787252813,
+      "id": "c8033c82dbab5fa2a61c991bce2fcad86f2f92e8daf9700cfd3d96bed53b8e35",
+      "kind": 9,
+      "pubkey": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+      "sig": "1ec801571c79e0da28297dab901d1d8a06925b6fd8018fce10f2c6130380af2eb631fa28b5dd7ea8797c3e95011bdd5cde13ef6b27de999ec6e64fea6283153d",
+      "tags": [
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "e",
+          "c62b085f9a703406b4d4b85e0edce83675c1b9bee8e32e7697764f28f30d01e5",
+          "",
+          "reply"
+        ]
+      ]
+    },
+    {
+      "content": "Status → done",
+      "created_at": 1787212820,
+      "id": "d64127660f8e3ef5825acf608f4fd654bc4c6850f0ad4415b1423f738ff56f73",
+      "kind": 1851,
+      "pubkey": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+      "sig": "959ea2b4894c7e1cfd1e6af0ab4e927a48f02b5669171b50c319fbc762340922f8df4a5de76e453eaff0b7a4a6e5f1a3314a717df661105c52609d5d85014344",
+      "tags": [
+        [
+          "a",
+          "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:547a0ac3-954d-40a4-a468-3fd5832f0e20"
+        ],
+        [
+          "field",
+          "status"
+        ],
+        [
+          "value",
+          "done"
+        ],
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "ts",
+          "1787212820925"
+        ]
+      ]
+    },
+    {
+      "content": "## Draft messages\n- Bug if you start typing and message and you switch different topic, the text is kept there, which is weird.\n- If you start writing in thread and then go somewhere else and then go back to the thread to finish the message, the draft is gone",
+      "created_at": 1787236216,
+      "id": "d8841f142934ee0448800a150723ebe204d305ace9e322a52edf8ba48e0f6245",
+      "kind": 9,
+      "pubkey": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+      "sig": "6d4c379bbaab2be4a462463cc12bdd212b408d338e8467390069ec0e4333d1372b938982fe8f06d528ec0a849e81ebc56481260d9bc491c9c0a2d9188b331915",
+      "tags": [
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ]
+      ]
+    },
+    {
+      "content": "Assign",
+      "created_at": 1787217369,
+      "id": "d8ad9785fa1df467fb4da6d499fa5b4af4b30d6a377f2816b636a73f27e6538a",
+      "kind": 1851,
+      "pubkey": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+      "sig": "044219e7f0ebde1bcd75b2c005ce5b3ee788dc600d408152bf2e2bbca492eb6abf91ce9882772e95e20b8d2dae85616bac1fec11f557efb9b3550ff69e92c5c9",
+      "tags": [
+        [
+          "a",
+          "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:20446118-7466-4281-a483-fa095d3ed935"
+        ],
+        [
+          "field",
+          "assignee"
+        ],
+        [
+          "value",
+          "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697"
+        ],
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "ts",
+          "1787217369846"
+        ]
+      ]
+    },
+    {
+      "content": "",
+      "created_at": 1787068232,
+      "id": "d8e3d66551e06832dabb4c1000a4fdd2b61d0f586f74ba3017506263d25f11d2",
+      "kind": 9,
+      "pubkey": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+      "sig": "5b8eedf4a80174a406287b0dac67465e268c4e9a71deea279ba95ad2405195329df90c3066ca16c3304bb931bc25f2848136a815af3032768f9c90d126b2b5b4",
+      "tags": [
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "e",
+          "ed3799b6ebabffefa619d2f114198bd5478513cf18591040cb45d3f9ba8a3534",
+          "",
+          "reply"
+        ]
+      ]
+    },
+    {
+      "content": "",
+      "created_at": 1787209178,
+      "id": "da69390653fbf23ca194661bc5111154c8c0a89e6ab9df01bc7849bf089c9d45",
+      "kind": 1851,
+      "pubkey": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+      "sig": "6bcdba6dbd7596deb6a3ba5728933669a803d67e8d8eb9b85cf18073ed9b62bf6e4aa78ea966bfd151c6a7ea8d1f86ea516a934792107e0ffa3d9d53953ae7eb",
+      "tags": [
+        [
+          "a",
+          "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:cbd92b45-39c0-4e38-9eed-fb79656de101"
+        ],
+        [
+          "field",
+          "status"
+        ],
+        [
+          "value",
+          "in_progress"
+        ],
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "ts",
+          "1787209178878"
+        ]
+      ]
+    },
+    {
+      "content": "",
+      "created_at": 1787073444,
+      "id": "dacf898f768f3c71db3e97e282614e9cf972d509ae70c6889ec137cf2caf5654",
+      "kind": 30851,
+      "pubkey": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+      "sig": "2eb403cdcd71af398ea92c864dff80cfd1f7905b6cb23df46ac57e4ba695efb3a91d6b82418c00ce60c1c6c2c06b36ada01e2dadf0276da3f75b9f9978bb2060",
+      "tags": [
+        [
+          "d",
+          "5c20ef8d-6bc4-4ac9-adf8-aa8e0398dec5"
+        ],
+        [
+          "title",
+          "Topic/DM view should not start from the top - scroll down to last conversation"
+        ],
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "a",
+          "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c"
+        ],
+        [
+          "ref",
+          "PEE-4"
+        ]
+      ]
+    },
+    {
+      "content": "It would be useful for me to be able to go back to current topic and rename it as maybe the nature of the topic shift and it would be to capture it.",
+      "created_at": 1787069090,
+      "id": "dc7290e8a75d5fd414bc4e36f66bc79f62d9d424d7de8828d330398f7cd24de4",
+      "kind": 30851,
+      "pubkey": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+      "sig": "4ddfc4f84f3e0fa74dffe87bbb455ef93747bf35ff4e6f601af42993075bac58d195f0e13990e8dc5fd71dd3a0a3f9a3b0871b95b3cfa5a2556a85d0aa42c9cc",
+      "tags": [
+        [
+          "d",
+          "2c5237d9-48ee-4d69-aa6c-cd1cb6b13c0d"
+        ],
+        [
+          "title",
+          "Editing / renaming topics"
+        ],
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "a",
+          "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c"
+        ],
+        [
+          "ref",
+          "PEE-2"
+        ]
+      ]
+    },
+    {
+      "content": "Description",
+      "created_at": 1787068289,
+      "id": "e2966250157f0be088c820eea4434eb7e4d4f63a02563396123d42722425d73f",
+      "kind": 1851,
+      "pubkey": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+      "sig": "4eb19f441eb7810a133e95ef9bfd650c1e3423a359bc8fc23cb9a64264d921c465de4d5753299f1186081eeace9c58951a814a9330d29538479a349a17e24510",
+      "tags": [
+        [
+          "a",
+          "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:360327a9-18c5-40e5-9747-9166dc284ddc"
+        ],
+        [
+          "field",
+          "description"
+        ],
+        [
+          "value",
+          ""
+        ],
+        [
+          "h",
+          "fcfe9d61-2d05-4d25-b113-40b2d2e601ee"
+        ],
+        [
+          "ts",
+          "1787068289776"
+        ]
+      ]
+    },
+    {
+      "content": "",
+      "created_at": 1787217360,
+      "id": "e3a82808a4237c92ab021ebef5f54fdb363a681fce2b5716e2f5dc8048dd6b8e",
+      "kind": 1851,
+      "pubkey": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+      "sig": "9ce43aa0f24d7d31ee9a71d5fe14394e9876710fcaa2a10a1d8b90b3dc914a253ffa41ffec6031baecf8161e200f5d9e4fc336cb48e11bd4f7a5f0ae5135d85c",
+      "tags": [
+        [
+          "a",
+          "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:20446118-7466-4281-a483-fa095d3ed935"
+        ],
+        [
+          "field",
+          "assignee"
+        ],
+        [
+          "value",
+          "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1"
+        ],
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "ts",
+          "1787217360549"
+        ]
+      ]
+    },
+    {
+      "content": "archived",
+      "created_at": 1786698978,
+      "id": "e43033bc7e7f8b259780644cddcf57aad7c6ee0255bde9c3f76a20474d7bd3b7",
+      "kind": 1851,
+      "pubkey": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+      "sig": "22eb7581b310d96c35fb893af33605c207034bcd09b649fe87724d9fedee5719b805a791110b984dbbec2789bcaa70cd15f12635ce36a8466274dfc6b95db388",
+      "tags": [
+        [
+          "a",
+          "30850:88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13:360ddc81-afb0-4137-87bd-1cdd2f29529b"
+        ],
+        [
+          "field",
+          "archived"
+        ],
+        [
+          "value",
+          "true"
+        ],
+        [
+          "h",
+          "0804b906-ba87-4c63-8d2f-53df1bb6d52e"
+        ],
+        [
+          "ts",
+          "1786698978876"
+        ]
+      ]
+    },
+    {
+      "content": "Assign",
+      "created_at": 1787137447,
+      "id": "e43ca0b26e3f58c5d5c8e8ac2f3862ab17d8a97c26c9cc2e1281827e818e4fec",
+      "kind": 1851,
+      "pubkey": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+      "sig": "f3f43325eca8ac905ebf2f70751e9177337f1be3545e51aa5b1aab38f5d3b84ee92c3738c752edbf05b7d4e405d7b4a66597cb181d7a4826301b0b3b96eed297",
+      "tags": [
+        [
+          "a",
+          "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:20446118-7466-4281-a483-fa095d3ed935"
+        ],
+        [
+          "field",
+          "assignee"
+        ],
+        [
+          "value",
+          "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697"
+        ],
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "ts",
+          "1787137447969"
+        ]
+      ]
+    },
+    {
+      "content": "Rename",
+      "created_at": 1787069686,
+      "id": "e48d246467b1d704f7bd13c7b5513668a3f8f8f191dc5147dce553c90ba9721d",
+      "kind": 1851,
+      "pubkey": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+      "sig": "7d2b12ad8ea9eca71776d002169d82aed16186518f9e31b099debd81511fe9709f84d23daf382dbe3c1674c0a7ae70aa2fb12e68f162dffba1f27528f08f29d3",
+      "tags": [
+        [
+          "a",
+          "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:d92ac2b8-7ffb-4a15-9824-00044cce9cf5"
+        ],
+        [
+          "field",
+          "title"
+        ],
+        [
+          "value",
+          "Files panel and relevant IconButtons aren't available when opening topics in Desk"
+        ],
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "ts",
+          "1787069686612"
+        ]
+      ]
+    },
+    {
+      "content": "nostr:naddr1qqjxxcny8yexydp495enjces956x2vec95uk2ety94nxydeexc6nver9xycrzqgedp68gurn8ghj7etnw35hvcfwv4ehg6tkvyhxzursqgs23f7h88w6txg58mpw3zsu8vkknqyv62jsqqghn3ux75wsphpud9crqsqqq7yrrefggm",
+      "created_at": 1787068271,
+      "id": "e76c0c0057054ed10559f7f01a85757807a30757e47ff453f79f48796f893f75",
+      "kind": 9,
+      "pubkey": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+      "sig": "8853d37d63c4b2f61d27d884b808eb6a3fdd4c4fcc63372c21e406e4292075b4e2cc7e9603d4adbf8f269864d23c4afe000ab2545d5e7b59e68f04b59a889792",
+      "tags": [
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "e",
+          "ed3799b6ebabffefa619d2f114198bd5478513cf18591040cb45d3f9ba8a3534",
+          "",
+          "reply"
+        ]
+      ]
+    },
+    {
+      "pubkey": "4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa",
+      "created_at": 1700000001,
+      "kind": 1851,
+      "tags": [
+        [
+          "h",
+          "fixture-folder"
+        ],
+        [
+          "a",
+          "30851:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:56119588-4b40-491f-a517-09b579d4798c"
+        ],
+        [
+          "field",
+          "assignee"
+        ],
+        [
+          "value",
+          "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46"
+        ]
+      ],
+      "content": "tie b",
+      "id": "ebd36c2279963b74ddda8e1d6179120efef2d135b0dff9669d48ec1454902ebc",
+      "sig": "65be735aa49475f152b4e587636e9756383a1174b5d12dc5a8fac4f98cb109370654d4e142c6f61b6ce7fa40e363cbebefca20658d883cb38de861c741ff0e0f"
+    },
+    {
+      "content": "1. When editing already sent message\n2. When starting conversation from Ship",
+      "created_at": 1787068368,
+      "id": "ec786be128bc434da3f073240ecd8cbb7f4c34d91951b5126f4b97d830033b45",
+      "kind": 30851,
+      "pubkey": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+      "sig": "6fe1453f4add3a83a141d8aef7f8d18a0b7072033c1b2eed72ec41400644c6dea0973323e41a6dfb33f36b02cfcad184f9c7f98e71d379625ac0ee2efd6d6a28",
+      "tags": [
+        [
+          "d",
+          "20446118-7466-4281-a483-fa095d3ed935"
+        ],
+        [
+          "title",
+          "Reference widget won't show up"
+        ],
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "a",
+          "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c"
+        ],
+        [
+          "ref",
+          "FEE-2"
+        ]
+      ]
+    },
+    {
+      "content": "Assignee avatar and full name is missing in files panel\n\nnostr:naddr1qqjxxcny8yexydp495enjces956x2vec95uk2ety94nxydeexc6nver9xycrzqgedp68gurn8ghj7etnw35hvcfwv4ehg6tkvyhxzursqgs23f7h88w6txg58mpw3zsu8vkknqyv62jsqqghn3ux75wsphpud9crqsqqq7yrrefggm",
+      "created_at": 1787068153,
+      "id": "ed3799b6ebabffefa619d2f114198bd5478513cf18591040cb45d3f9ba8a3534",
+      "kind": 9,
+      "pubkey": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+      "sig": "abdbb0f40db82c31f24a01f4c953fdcc561e862c25a50a40f6ca9032e6494c6fa30cfd5e6a540a29d12d3071b12d63e5602100aaab60886b004a942158e6569f",
+      "tags": [
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "a",
+          "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:cbd92b45-39c0-4e38-9eed-fb79656de101"
+        ],
+        [
+          "ts",
+          "1787068153259"
+        ]
+      ]
+    },
+    {
+      "content": "",
+      "created_at": 1787137617,
+      "id": "ee0cbf85c588d3c80f437adfb01646c481ffe7800d5df8773ec0ef2a6289bfb8",
+      "kind": 1851,
+      "pubkey": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+      "sig": "563ea231c0d6f4435205e94750e8e2ef8bf30c199644ead4c4068cef0f92c70c5d981c79480fe40614aa91c7f03672800a7004254c3455d1141cad2d318935f1",
+      "tags": [
+        [
+          "a",
+          "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c"
+        ],
+        [
+          "field",
+          "status"
+        ],
+        [
+          "value",
+          "in_progress"
+        ],
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "ts",
+          "1787137617705"
+        ]
+      ]
+    },
+    {
+      "content": "@claude start working on it",
+      "created_at": 1787302614,
+      "id": "ee4029af359b3f8ec87b4c402cf190e4f87b5bf1a753aa208f50c18042fb2951",
+      "kind": 9,
+      "pubkey": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+      "sig": "835929daac5d067e9e0370b0370c1451afe6fd861b6d658800c2bd509cc30960506c4c66036b7d931259cf056af7b3bdc3c16c3368e9e28041d9a22ff95ea3b6",
+      "tags": [
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "e",
+          "d8841f142934ee0448800a150723ebe204d305ace9e322a52edf8ba48e0f6245",
+          "",
+          "reply"
+        ]
+      ]
+    },
+    {
+      "content": "Assign",
+      "created_at": 1787137431,
+      "id": "f013f9871614152bba432a18d8735102bc26d954ad6260d7ba1c5a3f6543335e",
+      "kind": 1851,
+      "pubkey": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+      "sig": "5cd00e6aceb2acf6c4f4e6404bab966995262ba5582a676b5870a19072ba9e7db2a29287bee74af0a9a7aac5cc71fa4e39651b9abcfb2c7c2d5e80730ea01154",
+      "tags": [
+        [
+          "a",
+          "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:5c20ef8d-6bc4-4ac9-adf8-aa8e0398dec5"
+        ],
+        [
+          "field",
+          "assignee"
+        ],
+        [
+          "value",
+          "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697"
+        ],
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "ts",
+          "1787137431724"
+        ]
+      ]
+    },
+    {
+      "content": "Status → done",
+      "created_at": 1787209250,
+      "id": "f1e38b8a006d5e1e4c3b35bd0d6cbb89be9abd2928775e8d73dea6648fba0d6c",
+      "kind": 1851,
+      "pubkey": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+      "sig": "ab3ede8b87432c87d0297556fe18a2fb3a3e660c102b52cadf10e07688935e5b8e4952c8d4dd01946381b3ee9eda26f2b88f1c98483dfc01831194b284f238ae",
+      "tags": [
+        [
+          "a",
+          "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:59c2a37c-bd29-4ff0-8583-9d4b91b2de7c"
+        ],
+        [
+          "field",
+          "status"
+        ],
+        [
+          "value",
+          "done"
+        ],
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "ts",
+          "1787209250461"
+        ]
+      ]
+    },
+    {
+      "content": "Description",
+      "created_at": 1787070178,
+      "id": "f5c8e2a2c73939ecaf04512b6d4817a188a826545d9139c681294c4ec243be86",
+      "kind": 1851,
+      "pubkey": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+      "sig": "0aa2bc94e2c18a6175e94a7f527cdaf1bab188c41ddd668b246814b0cc7650daedd4f9deb6e54f940dbd40b174af159d6643246c9f30bea2e52cacf9bd9c7708",
+      "tags": [
+        [
+          "a",
+          "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:20446118-7466-4281-a483-fa095d3ed935"
+        ],
+        [
+          "field",
+          "description"
+        ],
+        [
+          "value",
+          "1. When editing already sent message + pasting link\n2. When starting conversation from Ship"
+        ],
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "ts",
+          "1787070178504"
+        ]
+      ]
+    },
+    {
+      "content": "Status → cancelled",
+      "created_at": 1787119070,
+      "id": "fd0e98e82908d0eb78cf4a9f92259d26d8d4200e70111cb7929a5afe42b8762b",
+      "kind": 1851,
+      "pubkey": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+      "sig": "b01ae955837e4f626903c0dd59bbf4a8ec84516709554159aae53baa4dc9797209bf9bc155429fbefd0f4a306d9c38c2d46908e64d25fac3b6d2c24e804f0ae1",
+      "tags": [
+        [
+          "a",
+          "30851:88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13:4aff182e-6851-407f-9249-23ee1604d377"
+        ],
+        [
+          "field",
+          "status"
+        ],
+        [
+          "value",
+          "cancelled"
+        ],
+        [
+          "h",
+          "0804b906-ba87-4c63-8d2f-53df1bb6d52e"
+        ],
+        [
+          "ts",
+          "1787119070126"
+        ]
+      ]
+    },
+    {
+      "content": "Yeah, I was planning to do the same once I'm done with the Claude integration. I think it would be wise to have basic structure same for all those apps as it will be easier to maintain and keep updating.",
+      "created_at": 1787252706,
+      "id": "fea15d28a3e39234339fd4df9d2dfaa91dae97a255ed0eb33f1d43f752fb3e79",
+      "kind": 9,
+      "pubkey": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+      "sig": "8dbd2aed39976f25d3f83ef7cc4d11d94aa3a4c321bf969824abca02be550685dde3c46110ccf8f00a456158e68826b5252270200caf7fb53247cc6fce4a7f66",
+      "tags": [
+        [
+          "h",
+          "2303e8c1-c866-43b8-9b4c-e263f313a683"
+        ],
+        [
+          "e",
+          "c62b085f9a703406b4d4b85e0edce83675c1b9bee8e32e7697764f28f30d01e5",
+          "",
+          "reply"
+        ]
+      ]
+    }
+  ],
+  "expected": {
+    "projects": [
+      {
+        "addr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:df13e841-891c-48db-a1a2-24f9c16b411e",
+        "id": "df13e841-891c-48db-a1a2-24f9c16b411e",
+        "author": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+        "createdAt": 1787348120,
+        "title": "Peek: Real-time Ship→Peek updates",
+        "description": "Ship→Peek updates are not real-time and cannot explain themselves. Source ticket: PEEK-109.\n\n## The actual diagnosis\n\nThere is no polling. Peek reads the relay **once per topic mount** and never again — `useTopicView.tsx` keys its sync effect on `[topicId, topicFolderId, relayUrl, convex]`, none of which change while you sit in a topic. \"Replies take time to appear\" is really \"replies appear on remount\", which is why a reload fixes it.\n\nFour independent staleness sources, each matching a reported symptom:\n\n1. **Messages/replies** — one fetch per mount (`useTopicView.tsx:144-159`). Reactions and deletions are additionally capped to the newest 100 messages per topic (`convex/nostr/sync.ts:41`), so an older message never picks up a reaction at all.\n2. **Ship projects/issues in the sidebar** — `TopicProjectPanel.tsx:250-269` resolves once, keyed on a folder id that never changes. The file admits it: \"the panel reflects the moment it resolved and does not live-update\". A project created in Ship after the panel mounted never appears.\n3. **Everything outside topics never syncs at all** — the only relay-read call sites are `useTopicView` (channel) and `AuthGate` (profiles). DMs, inbox, Desk and Screener have no read path.\n4. **Auth failure is silent** — `useTopicView.tsx:150` calls `validToken()` and returns with no signal; relay failures below are `console.warn`. Silent refresh exists (PEEK-108) but it is a `setTimeout`, which browsers throttle in background tabs. The UI cannot distinguish \"nothing changed\" from \"I stopped being able to ask\".\n\n## What is already true (verified live, 2026-08-21)\n\n- `wss://estiva.estiva.app` accepts a WebSocket upgrade through Cloudflare from Peek's origin and immediately sends `[\"AUTH\",\"<challenge>\"]`. Verified with curl; **pass `--http1.1`** or the same request returns NIP-11 JSON, because `Connection`/`Upgrade` are not HTTP/2 headers.\n- NIP-11 reports `supported_nips` including 42, `auth_required: true`, `max_subscriptions: 1024`, `max_filters: 10`.\n- **One subscription covers messages, reactions AND deletions.** `buzz-core/src/filter.rs:68-90` has an explicit `#h` fallback to `StoredEvent.channel_id` for events carrying no `h` tag (kind:7, kind:5, whose channel is derived at ingest). So `{\"#h\":[channelUuid]}` delivers messages + reactions + deletions + assertions in one REQ. The current HTTP path needs four sequential round trips to do less.\n- **The projection is reusable unchanged.** PEEK-106 already split credential from projection: `importChannel` / `importReactions` / `importResolutions` take events, not tokens.\n- **Convex is already reactive.** Once a row lands, every open view updates. The only missing link is relay→Convex.\n\n## Two gates\n\n**Gate 1 — Estiva ID must sign kind:22242 (blocking).** `estiva-id/src/db/seed.ts:79` gives Peek `[9,7,5,9007,27235,1851,9101,9002]` — no 22242, so Peek cannot answer the AUTH challenge and every REQ returns `auth-required`. The socket looks healthy and delivers nothing. Deploying needs a **manual re-seed**: `update.sh` runs `migrate`, never `seed`. Unlike PEEK-128 this is only one gate — AUTH never goes through `ingest.rs`, `Kind::Authentication` is built into `buzz-auth/src/nip42.rs:52`, so no Buzz change and no relay deploy.\n\n**Gate 2 — one subscription per channel (silent trap).** `buzz-relay/src/handlers/req.rs:1013` returns `None` when filters name more than one distinct `#h`; `subscription.rs:84-113` then registers the subscription as *global*, and `fan_out_scoped:273-288` consults only the channel indexes for channel-scoped events. The invariant is stated at `subscription.rs:321-325`. A multi-channel subscription returns correct history at EOSE and then receives **zero** live events. One REQ per channel; 1024 per connection is no practical ceiling.\n\n## Why the socket stays in the browser\n\n`convex/nostr/sync.ts:18-20` proposes an external consumer holding the socket. An identity is obtainable — `estiva-id/src/domain/roles.ts` has role identities with a client-credentials grant. But Buzz gates reads **per channel**: `handlers/event.rs:181-196` filters live fan-out through `is_member_cached(community, channel, pubkey)` and fails closed on private channels. A service identity would need membership in every topic — a product decision (a bot in every conversation), not an implementation detail. `convex/crons.ts` already reached this conclusion. Convex keeps the projection; only the socket moves.\n\n## Shape of the fix\n\nOne shared WebSocket per tab. One subscription per open channel. Live events routed into the existing Convex import actions. Convex reactivity carries it to the UI. The HTTP path stays as the backfill on subscribe (it owns the `since` cursor and paging) and as the fallback when the socket is down — so the change is additive and a WS failure degrades to today's behaviour rather than to nothing.\n\nOrdering caveat to design for: `created_at` is in seconds and several events routinely land in the same one (SPEC §6.2). Imports are idempotent by event id and `nostrSyncedAt` only moves forward (`convex/nostr/data.ts:523`), so live and backfill can overlap safely.\n\n## Milestones\n\n- **M1 — Un-gated relief.** Refetch on focus/visibility plus a short interval, in both the topic sync and the project panel; TTL the profile cache. Turns \"until remount\" into \"within 30 seconds\" and probably clears most reported symptoms. Nothing blocks this.\n- **M2 — Open the 22242 gate.** Add it to Peek's allowed kinds, scoped by `relay` tag, deploy, **re-seed**, verify the row.\n- **M3 — The live socket.** WS client with NIP-42 AUTH and reconnect; refcounted per-channel subscription manager; live events into the Convex projection; `useTopicView` subscribing with HTTP as backfill and fallback.\n- **M4 — Honest state.** One derived connection state surfaced once, and relay read failures made visible instead of swallowed.\n- **M5 — Beyond topics.** Subscriptions for the inbox, Desk and DMs, which have no relay read path at all today.\n\n## Not yet verified\n\n- The **live** `allowed_kinds` row for peek. `seed.ts` has no 22242; the read to confirm production matches was blocked. Run `docker compose exec -T postgres psql -U estiva_id -d estiva_id -tAc \"select client_id, allowed_kinds from app_credentials\"` before planning on it.\n- No end-to-end 22242 signing test — needs a live user token.\n\nIssues are filed in implementation order. Each is written to be picked up cold by Claude Code.",
+        "contentFolder": "996ab3d4-5565-4335-9e17-2284fda675a0",
+        "originFolder": "996ab3d4-5565-4335-9e17-2284fda675a0",
+        "status": "planned",
+        "archived": false,
+        "fields": {}
+      },
+      {
+        "addr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:2c5fbeff-4014-4bea-a69c-3bfc10354d6f",
+        "id": "2c5fbeff-4014-4bea-a69c-3bfc10354d6f",
+        "author": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+        "createdAt": 1787129612,
+        "title": "Other",
+        "description": "",
+        "contentFolder": "806fb4e3-ebc9-4b6a-a18c-0ca59379aa1d",
+        "originFolder": "806fb4e3-ebc9-4b6a-a18c-0ca59379aa1d",
+        "status": "planned",
+        "archived": false,
+        "fields": {}
+      },
+      {
+        "addr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:cf23dbca-64fb-4802-a804-e0119b0d8584",
+        "id": "cf23dbca-64fb-4802-a804-e0119b0d8584",
+        "author": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "createdAt": 1787069189,
+        "title": "Ship: Feedback & Bugs",
+        "description": "",
+        "contentFolder": "88de5526-366a-4016-83a3-417a1748baa8",
+        "originFolder": "88de5526-366a-4016-83a3-417a1748baa8",
+        "status": "planned",
+        "archived": false,
+        "fields": {}
+      },
+      {
+        "addr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:360327a9-18c5-40e5-9747-9166dc284ddc",
+        "id": "360327a9-18c5-40e5-9747-9166dc284ddc",
+        "author": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+        "createdAt": 1787068269,
+        "title": "Estiva ID: Feedback & Bugs",
+        "description": "",
+        "contentFolder": "fcfe9d61-2d05-4d25-b113-40b2d2e601ee",
+        "originFolder": "fcfe9d61-2d05-4d25-b113-40b2d2e601ee",
+        "status": "planned",
+        "archived": false,
+        "fields": {
+          "description": {
+            "value": "",
+            "by": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+            "at": 1787068289
+          }
+        }
+      },
+      {
+        "addr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c",
+        "id": "2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c",
+        "author": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "createdAt": 1787067967,
+        "title": "Peek: Feedback & Bugs",
+        "description": "",
+        "contentFolder": "2303e8c1-c866-43b8-9b4c-e263f313a683",
+        "originFolder": "2303e8c1-c866-43b8-9b4c-e263f313a683",
+        "lead": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "status": "in_progress",
+        "archived": false,
+        "fields": {
+          "lead": {
+            "value": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+            "by": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+            "at": 1787068597
+          },
+          "title": {
+            "value": "Peek: Feedback & Bugs",
+            "by": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+            "at": 1787068631
+          },
+          "status": {
+            "value": "in_progress",
+            "by": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+            "at": 1787252554
+          }
+        }
+      },
+      {
+        "addr": "30850:88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13:360ddc81-afb0-4137-87bd-1cdd2f29529b",
+        "id": "360ddc81-afb0-4137-87bd-1cdd2f29529b",
+        "author": "88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13",
+        "createdAt": 1786359898,
+        "title": "Payment integration",
+        "description": "Stripe Checkout.",
+        "contentFolder": "0804b906-ba87-4c63-8d2f-53df1bb6d52e",
+        "originFolder": "0804b906-ba87-4c63-8d2f-53df1bb6d52e",
+        "status": "planned",
+        "archived": true,
+        "fields": {
+          "archived": {
+            "value": "true",
+            "by": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+            "at": 1786698978
+          }
+        }
+      },
+      {
+        "addr": "30850:88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13:3cce07c5-c365-486c-ae67-17b29e0c773d",
+        "id": "3cce07c5-c365-486c-ae67-17b29e0c773d",
+        "author": "88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13",
+        "createdAt": 1786359876,
+        "title": "Payment integration",
+        "description": "Stripe Checkout.",
+        "contentFolder": "204e73cc-5ccd-43f9-a982-052e71622631",
+        "originFolder": "204e73cc-5ccd-43f9-a982-052e71622631",
+        "status": "planned",
+        "archived": true,
+        "fields": {
+          "archived": {
+            "value": "true",
+            "by": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+            "at": 1786698963
+          }
+        }
+      }
+    ],
+    "issues": [
+      {
+        "addr": "30851:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:56119588-4b40-491f-a517-09b579d4798c",
+        "id": "56119588-4b40-491f-a517-09b579d4798c",
+        "author": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
+        "createdAt": 1787316300,
+        "title": "Agent write path check (PEEK-147)",
+        "description": "Created by the Claude service identity to verify the write path end to end. Safe to cancel or ignore.",
+        "folder": "806fb4e3-ebc9-4b6a-a18c-0ca59379aa1d",
+        "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:2c5fbeff-4014-4bea-a69c-3bfc10354d6f",
+        "ref": "OTH-2",
+        "status": "cancelled",
+        "assignee": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
+        "fields": {
+          "status": {
+            "value": "cancelled",
+            "by": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
+            "at": 1787316712
+          },
+          "assignee": {
+            "value": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
+            "by": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
+            "at": 1787316312
+          }
+        }
+      },
+      {
+        "addr": "30851:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:f79e754f-5577-42fa-a7f8-44b0b952e272",
+        "id": "f79e754f-5577-42fa-a7f8-44b0b952e272",
+        "author": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+        "createdAt": 1787302063,
+        "title": "Draft messages",
+        "description": "Draft messages\nBug if you start typing and message and you switch different topic, the text is kept there, which is weird.\nIf you start writing in thread and then go somewhere else and then go back to the thread to finish the message, the draft is gone",
+        "folder": "2303e8c1-c866-43b8-9b4c-e263f313a683",
+        "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c",
+        "ref": "PEE-7",
+        "status": "todo",
+        "assignee": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+        "fields": {
+          "assignee": {
+            "value": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+            "by": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+            "at": 1787327461
+          }
+        }
+      },
+      {
+        "addr": "30851:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:e5bc8a9c-3800-4aa7-9e6a-08b156e0b889",
+        "id": "e5bc8a9c-3800-4aa7-9e6a-08b156e0b889",
+        "author": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+        "createdAt": 1787217132,
+        "title": "If item is already in Open Work, it shouldn't show in Screener",
+        "description": "Because then it feels like duplicate. You're trying to open item that is already open.",
+        "folder": "2303e8c1-c866-43b8-9b4c-e263f313a683",
+        "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c",
+        "ref": "PEE-6",
+        "status": "todo",
+        "fields": {}
+      },
+      {
+        "addr": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:547a0ac3-954d-40a4-a468-3fd5832f0e20",
+        "id": "547a0ac3-954d-40a4-a468-3fd5832f0e20",
+        "author": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "createdAt": 1787211122,
+        "title": "Reply timestamps lose their date once the day has passed",
+        "description": "",
+        "folder": "2303e8c1-c866-43b8-9b4c-e263f313a683",
+        "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c",
+        "ref": "PEE-5",
+        "status": "done",
+        "fields": {
+          "status": {
+            "value": "done",
+            "by": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+            "at": 1787212820
+          }
+        }
+      },
+      {
+        "addr": "30851:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:77041a63-d57f-4283-8daf-54b91138b9cd",
+        "id": "77041a63-d57f-4283-8daf-54b91138b9cd",
+        "author": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+        "createdAt": 1787129664,
+        "title": "Analyze Buzz Projects comparing to Ship",
+        "description": "Compare the Buzz Projects https://engineering.block.xyz/blog/projects-in-buzz with our Ship to see if we are doing in similar way or differ so we can enhance Ship.",
+        "folder": "806fb4e3-ebc9-4b6a-a18c-0ca59379aa1d",
+        "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:2c5fbeff-4014-4bea-a69c-3bfc10354d6f",
+        "ref": "OTH-1",
+        "status": "todo",
+        "assignee": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+        "fields": {
+          "assignee": {
+            "value": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+            "by": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+            "at": 1787129683
+          }
+        }
+      },
+      {
+        "addr": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:ceb9ec2e-96bf-40df-85d8-37d68dc254a5",
+        "id": "ceb9ec2e-96bf-40df-85d8-37d68dc254a5",
+        "author": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "createdAt": 1787073710,
+        "title": "It's not possible to delete projects (from Projects page) and issues",
+        "description": "",
+        "folder": "88de5526-366a-4016-83a3-417a1748baa8",
+        "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:cf23dbca-64fb-4802-a804-e0119b0d8584",
+        "ref": "SHI-3",
+        "status": "todo",
+        "fields": {
+          "title": {
+            "value": "It's not possible to delete projects (from Projects page) and issues",
+            "by": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+            "at": 1787073749
+          }
+        }
+      },
+      {
+        "addr": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:5c20ef8d-6bc4-4ac9-adf8-aa8e0398dec5",
+        "id": "5c20ef8d-6bc4-4ac9-adf8-aa8e0398dec5",
+        "author": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "createdAt": 1787073444,
+        "title": "Topic/DM view should not start from the top - scroll down to last conversation",
+        "description": "",
+        "folder": "2303e8c1-c866-43b8-9b4c-e263f313a683",
+        "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c",
+        "ref": "PEE-4",
+        "status": "done",
+        "assignee": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "fields": {
+          "status": {
+            "value": "done",
+            "by": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+            "at": 1787137428
+          },
+          "assignee": {
+            "value": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+            "by": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+            "at": 1787137431
+          }
+        }
+      },
+      {
+        "addr": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:d92ac2b8-7ffb-4a15-9824-00044cce9cf5",
+        "id": "d92ac2b8-7ffb-4a15-9824-00044cce9cf5",
+        "author": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "createdAt": 1787069672,
+        "title": "Files panel and relevant IconButtons aren't available when opening topics in Desk",
+        "description": "",
+        "folder": "2303e8c1-c866-43b8-9b4c-e263f313a683",
+        "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c",
+        "ref": "PEE-3",
+        "status": "done",
+        "fields": {
+          "title": {
+            "value": "Files panel and relevant IconButtons aren't available when opening topics in Desk",
+            "by": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+            "at": 1787069686
+          },
+          "status": {
+            "value": "done",
+            "by": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+            "at": 1787144358
+          }
+        }
+      },
+      {
+        "addr": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:085aa357-4f80-48ba-b704-1f52dcf295ee",
+        "id": "085aa357-4f80-48ba-b704-1f52dcf295ee",
+        "author": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "createdAt": 1787069301,
+        "title": "It's not possible to attach files in descriptions or conversations",
+        "description": "",
+        "folder": "88de5526-366a-4016-83a3-417a1748baa8",
+        "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:cf23dbca-64fb-4802-a804-e0119b0d8584",
+        "ref": "SHI-2",
+        "status": "todo",
+        "fields": {}
+      },
+      {
+        "addr": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:a98bbecd-4b8a-4332-b7d6-c88f1500b518",
+        "id": "a98bbecd-4b8a-4332-b7d6-c88f1500b518",
+        "author": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "createdAt": 1787069258,
+        "title": "Screenshots and reference widgets aren't rendered in conversation or replies",
+        "description": "Avatar + name + timestamp only",
+        "folder": "88de5526-366a-4016-83a3-417a1748baa8",
+        "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:cf23dbca-64fb-4802-a804-e0119b0d8584",
+        "ref": "SHI-1",
+        "status": "todo",
+        "fields": {}
+      },
+      {
+        "addr": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2c5237d9-48ee-4d69-aa6c-cd1cb6b13c0d",
+        "id": "2c5237d9-48ee-4d69-aa6c-cd1cb6b13c0d",
+        "author": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "createdAt": 1787069090,
+        "title": "Editing / renaming topics",
+        "description": "It would be useful for me to be able to go back to current topic and rename it as maybe the nature of the topic shift and it would be to capture it.",
+        "folder": "2303e8c1-c866-43b8-9b4c-e263f313a683",
+        "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c",
+        "ref": "PEE-2",
+        "status": "done",
+        "fields": {
+          "status": {
+            "value": "done",
+            "by": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+            "at": 1787208330
+          }
+        }
+      },
+      {
+        "addr": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:3c582b93-052f-45d4-a8d0-1054f24687a4",
+        "id": "3c582b93-052f-45d4-a8d0-1054f24687a4",
+        "author": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "createdAt": 1787069006,
+        "title": "It's not possible to select different assignee other than yourself",
+        "description": "I would expect a list of available people to show up, like in Ship. \nIt would be nice to be able to remove myself or have option \"Unassigned\"\nTo be applied in files panel and reference widgets",
+        "folder": "2303e8c1-c866-43b8-9b4c-e263f313a683",
+        "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c",
+        "ref": "PEE-1",
+        "status": "todo",
+        "fields": {
+          "description": {
+            "value": "I would expect a list of available people to show up, like in Ship. \nIt would be nice to be able to remove myself or have option \"Unassigned\"\nTo be applied in files panel and reference widgets",
+            "by": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+            "at": 1787069802
+          }
+        }
+      },
+      {
+        "addr": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:59c2a37c-bd29-4ff0-8583-9d4b91b2de7c",
+        "id": "59c2a37c-bd29-4ff0-8583-9d4b91b2de7c",
+        "author": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "createdAt": 1787068454,
+        "title": "Reference widget missing skeleton on load",
+        "description": "Result is empty space or jumping content",
+        "folder": "2303e8c1-c866-43b8-9b4c-e263f313a683",
+        "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c",
+        "ref": "FEE-3",
+        "status": "done",
+        "fields": {
+          "description": {
+            "value": "Result is empty space or jumping content",
+            "by": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+            "at": 1787068720
+          },
+          "status": {
+            "value": "done",
+            "by": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+            "at": 1787209250
+          }
+        }
+      },
+      {
+        "addr": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:20446118-7466-4281-a483-fa095d3ed935",
+        "id": "20446118-7466-4281-a483-fa095d3ed935",
+        "author": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "createdAt": 1787068368,
+        "title": "Reference widget won't show up in some cases",
+        "description": "1. When editing already sent message + pasting link\n2. When starting conversation from Ship",
+        "folder": "2303e8c1-c866-43b8-9b4c-e263f313a683",
+        "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c",
+        "ref": "FEE-2",
+        "status": "done",
+        "assignee": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "fields": {
+          "title": {
+            "value": "Reference widget won't show up in some cases",
+            "by": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+            "at": 1787068468
+          },
+          "description": {
+            "value": "1. When editing already sent message + pasting link\n2. When starting conversation from Ship",
+            "by": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+            "at": 1787070178
+          },
+          "status": {
+            "value": "done",
+            "by": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+            "at": 1787210113
+          },
+          "assignee": {
+            "value": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+            "by": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+            "at": 1787217369
+          }
+        }
+      },
+      {
+        "addr": "30851:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:a5eef7bf-06f8-4932-93f9-1c0552ab9578",
+        "id": "a5eef7bf-06f8-4932-93f9-1c0552ab9578",
+        "author": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+        "createdAt": 1787068311,
+        "title": "Weird log out on Ship",
+        "description": "An issue appeared, might be worth taking a look. I signed in on Ship and left it open for some time. Then returned and found an error banner that I'm not signed, even though my avatar was still correct and there was no option to sign in in the menu, just sign out",
+        "folder": "fcfe9d61-2d05-4d25-b113-40b2d2e601ee",
+        "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:360327a9-18c5-40e5-9747-9166dc284ddc",
+        "ref": "EST-1",
+        "status": "todo",
+        "fields": {}
+      },
+      {
+        "addr": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:cbd92b45-39c0-4e38-9eed-fb79656de101",
+        "id": "cbd92b45-39c0-4e38-9eed-fb79656de101",
+        "author": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "createdAt": 1787068073,
+        "title": "Assignee avatar and full name is missing in files panel & reference widget",
+        "description": "",
+        "folder": "2303e8c1-c866-43b8-9b4c-e263f313a683",
+        "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c",
+        "ref": "FEE-1",
+        "status": "done",
+        "assignee": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "fields": {
+          "assignee": {
+            "value": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+            "by": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+            "at": 1787149573
+          },
+          "title": {
+            "value": "Assignee avatar and full name is missing in files panel & reference widget",
+            "by": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+            "at": 1787149596
+          },
+          "status": {
+            "value": "done",
+            "by": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+            "at": 1787209201
+          }
+        }
+      },
+      {
+        "addr": "30851:88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13:4aff182e-6851-407f-9249-23ee1604d377",
+        "id": "4aff182e-6851-407f-9249-23ee1604d377",
+        "author": "88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13",
+        "createdAt": 1786359898,
+        "title": "Billing entry",
+        "description": "Settings entry point.",
+        "folder": "0804b906-ba87-4c63-8d2f-53df1bb6d52e",
+        "projectAddr": "30850:88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13:360ddc81-afb0-4137-87bd-1cdd2f29529b",
+        "ref": "PAY-1",
+        "status": "cancelled",
+        "assignee": "88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13",
+        "fields": {
+          "status": {
+            "value": "cancelled",
+            "by": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+            "at": 1787119070
+          },
+          "assignee": {
+            "value": "88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13",
+            "by": "88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13",
+            "at": 1786359898
+          }
+        }
+      },
+      {
+        "addr": "30851:88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13:79517829-1e67-45d3-bd78-3c16be3095f5",
+        "id": "79517829-1e67-45d3-bd78-3c16be3095f5",
+        "author": "88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13",
+        "createdAt": 1786359876,
+        "title": "Billing entry",
+        "description": "Settings entry point.",
+        "folder": "204e73cc-5ccd-43f9-a982-052e71622631",
+        "projectAddr": "30850:88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13:3cce07c5-c365-486c-ae67-17b29e0c773d",
+        "ref": "PAY-1",
+        "status": "cancelled",
+        "assignee": "88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13",
+        "fields": {
+          "status": {
+            "value": "cancelled",
+            "by": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+            "at": 1787119092
+          },
+          "assignee": {
+            "value": "88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13",
+            "by": "88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13",
+            "at": 1786359876
+          }
+        }
+      }
+    ],
+    "activity": [
+      {
+        "id": "104e521a22b73ad9eb05d7346d40205667df0df8de4d7ca1279e18f430b3396a",
+        "author": "4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa",
+        "createdAt": 1700000000,
+        "ts": 9007199254740991,
+        "target": "30851:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:56119588-4b40-491f-a517-09b579d4798c",
+        "field": "status",
+        "value": "todo",
+        "note": "hostile ts, must not win"
+      },
+      {
+        "id": "2e6fb06523134c97c57b4f7535b8f7a4e0d55516f8c5663305c86113007003c4",
+        "author": "4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa",
+        "createdAt": 1700000000,
+        "ts": 1700000000500,
+        "target": "30851:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:56119588-4b40-491f-a517-09b579d4798c",
+        "field": "status",
+        "value": "in_progress",
+        "note": "trusted ts, finer than a second"
+      },
+      {
+        "id": "7110b6436098ad75cb10bc3ce67fbb821ef8c7883e245e831486633ebacea1be",
+        "author": "4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa",
+        "createdAt": 1700000001,
+        "target": "30851:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:56119588-4b40-491f-a517-09b579d4798c",
+        "field": "assignee",
+        "value": "4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa",
+        "note": "tie a"
+      },
+      {
+        "id": "c53cb149cd07db6eaa524aacc87e4a24bb0a4cf1b0b2536bd2dbeadfb237c7a6",
+        "author": "4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa",
+        "createdAt": 1700000001,
+        "target": "30851:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:56119588-4b40-491f-a517-09b579d4798c",
+        "field": "assignee",
+        "value": "",
+        "note": "tie c"
+      },
+      {
+        "id": "ebd36c2279963b74ddda8e1d6179120efef2d135b0dff9669d48ec1454902ebc",
+        "author": "4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa",
+        "createdAt": 1700000001,
+        "target": "30851:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:56119588-4b40-491f-a517-09b579d4798c",
+        "field": "assignee",
+        "value": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
+        "note": "tie b"
+      },
+      {
+        "id": "7b9b480d08859948980aa98e93800749322b7b40a2e6183834d9b48f9f2be922",
+        "author": "4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa",
+        "createdAt": 1700000010,
+        "ts": 1700000013000,
+        "target": "30851:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:56119588-4b40-491f-a517-09b579d4798c",
+        "field": "status",
+        "value": "done",
+        "note": "drifted ts, refused at 1s of slack"
+      },
+      {
+        "id": "44e938d6876d7be15a0ae0d153a1b3be524f0e02b8b47979221d1fe1f61698cb",
+        "author": "4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa",
+        "createdAt": 1700000012,
+        "target": "30851:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:56119588-4b40-491f-a517-09b579d4798c",
+        "field": "status",
+        "value": "cancelled",
+        "note": "later by created_at, wins while the window is 1s"
+      },
+      {
+        "id": "072b6967fd0eaaee6416903d83e9cc00bee445cfe33fb4248043b3e61ebe36c1",
+        "author": "88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13",
+        "createdAt": 1786359876,
+        "ts": 1786359876672,
+        "target": "30851:88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13:79517829-1e67-45d3-bd78-3c16be3095f5",
+        "field": "status",
+        "value": "in_progress",
+        "note": ""
+      },
+      {
+        "id": "a88cac80f4a90515fe539d48a86dafdf45a45a2a5bd5e9e8abe02bbad7022ee8",
+        "author": "88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13",
+        "createdAt": 1786359876,
+        "ts": 1786359876729,
+        "target": "30851:88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13:79517829-1e67-45d3-bd78-3c16be3095f5",
+        "field": "assignee",
+        "value": "88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13",
+        "note": ""
+      },
+      {
+        "id": "923703dba5da143e454f803cb9971d2d487c87aebb592e1fd68dbadf1de78372",
+        "author": "88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13",
+        "createdAt": 1786359898,
+        "ts": 1786359898228,
+        "target": "30851:88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13:4aff182e-6851-407f-9249-23ee1604d377",
+        "field": "status",
+        "value": "in_progress",
+        "note": ""
+      },
+      {
+        "id": "4757a2906f77389686d0383138a29c452f7bac9fcddec13ac656122046fc372b",
+        "author": "88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13",
+        "createdAt": 1786359898,
+        "ts": 1786359898283,
+        "target": "30851:88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13:4aff182e-6851-407f-9249-23ee1604d377",
+        "field": "assignee",
+        "value": "88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13",
+        "note": ""
+      },
+      {
+        "id": "33df71f76511137b3075e030365d18bb061ec0674fe5d385308127f1009bef25",
+        "author": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+        "createdAt": 1786698963,
+        "ts": 1786698963121,
+        "target": "30850:88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13:3cce07c5-c365-486c-ae67-17b29e0c773d",
+        "field": "archived",
+        "value": "true",
+        "note": "archived"
+      },
+      {
+        "id": "e43033bc7e7f8b259780644cddcf57aad7c6ee0255bde9c3f76a20474d7bd3b7",
+        "author": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+        "createdAt": 1786698978,
+        "ts": 1786698978876,
+        "target": "30850:88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13:360ddc81-afb0-4137-87bd-1cdd2f29529b",
+        "field": "archived",
+        "value": "true",
+        "note": "archived"
+      },
+      {
+        "id": "1d52bffd37e445bf6c9dfd0bcd8b29e11e837e6610df5713e136dfefca013daf",
+        "author": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "createdAt": 1787067996,
+        "ts": 1787067996178,
+        "target": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c",
+        "field": "lead",
+        "value": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "note": ""
+      },
+      {
+        "id": "3cde513d39c249006842f37bcf4509112b0a6fc8bf4aa4f7e0579ed6aee049c9",
+        "author": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+        "createdAt": 1787068281,
+        "ts": 1787068281400,
+        "target": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:360327a9-18c5-40e5-9747-9166dc284ddc",
+        "field": "description",
+        "value": "An issue appeared, might be worth taking a look. I signed in on Ship and left it open for some time. Then returned and found an error banner that I'm not signed, even though my avatar was still correct and there was no option to sign in in the menu, just sign out",
+        "note": "Description"
+      },
+      {
+        "id": "e2966250157f0be088c820eea4434eb7e4d4f63a02563396123d42722425d73f",
+        "author": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+        "createdAt": 1787068289,
+        "ts": 1787068289776,
+        "target": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:360327a9-18c5-40e5-9747-9166dc284ddc",
+        "field": "description",
+        "value": "",
+        "note": "Description"
+      },
+      {
+        "id": "1e443e66ec61a0197f45adcb0af403b20eb11eef6dd2fdce5fbc5705ba9b1e21",
+        "author": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "createdAt": 1787068468,
+        "ts": 1787068468796,
+        "target": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:20446118-7466-4281-a483-fa095d3ed935",
+        "field": "title",
+        "value": "Reference widget won't show up in some cases",
+        "note": "Rename"
+      },
+      {
+        "id": "5f45ff82c79a3305d6b37485a0d9d1e1c3f592f2bd7326b6f5207139e67f29b8",
+        "author": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "createdAt": 1787068597,
+        "ts": 1787068597853,
+        "target": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c",
+        "field": "lead",
+        "value": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "note": ""
+      },
+      {
+        "id": "1bae93b5461870219b139336cba4b9550f8c2f1d945c36f27bca310cd4480e77",
+        "author": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "createdAt": 1787068625,
+        "ts": 1787068625383,
+        "target": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c",
+        "field": "title",
+        "value": "Peek: Feedback % Bugs",
+        "note": "Rename"
+      },
+      {
+        "id": "088bf18f1262129e005ed21fef9587bb5914379f523c386808d9a9c7af5139fa",
+        "author": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "createdAt": 1787068631,
+        "ts": 1787068631863,
+        "target": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c",
+        "field": "title",
+        "value": "Peek: Feedback & Bugs",
+        "note": "Rename"
+      },
+      {
+        "id": "c15572b687b8a97e9ce448104be59a82f670a3fdf39fcc7d6392d62609eb6eb6",
+        "author": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "createdAt": 1787068720,
+        "ts": 1787068720929,
+        "target": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:59c2a37c-bd29-4ff0-8583-9d4b91b2de7c",
+        "field": "description",
+        "value": "Result is empty space or jumping content",
+        "note": "Description"
+      },
+      {
+        "id": "10c2941b61948f63f479dc332b511562204f4771ec7298f94e8badac25df687c",
+        "author": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "createdAt": 1787069020,
+        "ts": 1787069020492,
+        "target": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:3c582b93-052f-45d4-a8d0-1054f24687a4",
+        "field": "description",
+        "value": "I would expect a list of available people to show up, like in Ship. \nIt would be nice to be able to remove myself or have option \"Unassigned\"",
+        "note": "Description"
+      },
+      {
+        "id": "e48d246467b1d704f7bd13c7b5513668a3f8f8f191dc5147dce553c90ba9721d",
+        "author": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "createdAt": 1787069686,
+        "ts": 1787069686612,
+        "target": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:d92ac2b8-7ffb-4a15-9824-00044cce9cf5",
+        "field": "title",
+        "value": "Files panel and relevant IconButtons aren't available when opening topics in Desk",
+        "note": "Rename"
+      },
+      {
+        "id": "3d078efbb78bf2aed813c4b1712d359bd31d14744c718a659b5343107fded58d",
+        "author": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "createdAt": 1787069802,
+        "ts": 1787069802801,
+        "target": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:3c582b93-052f-45d4-a8d0-1054f24687a4",
+        "field": "description",
+        "value": "I would expect a list of available people to show up, like in Ship. \nIt would be nice to be able to remove myself or have option \"Unassigned\"\nTo be applied in files panel and reference widgets",
+        "note": "Description"
+      },
+      {
+        "id": "f5c8e2a2c73939ecaf04512b6d4817a188a826545d9139c681294c4ec243be86",
+        "author": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "createdAt": 1787070178,
+        "ts": 1787070178504,
+        "target": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:20446118-7466-4281-a483-fa095d3ed935",
+        "field": "description",
+        "value": "1. When editing already sent message + pasting link\n2. When starting conversation from Ship",
+        "note": "Description"
+      },
+      {
+        "id": "67d951c12dc720a349ae53876bf30ed5b8b1ce2bfd8f2e9990547e35b4e909ea",
+        "author": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "createdAt": 1787073749,
+        "ts": 1787073749211,
+        "target": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:ceb9ec2e-96bf-40df-85d8-37d68dc254a5",
+        "field": "title",
+        "value": "It's not possible to delete projects (from Projects page) and issues",
+        "note": "Rename"
+      },
+      {
+        "id": "fd0e98e82908d0eb78cf4a9f92259d26d8d4200e70111cb7929a5afe42b8762b",
+        "author": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+        "createdAt": 1787119070,
+        "ts": 1787119070126,
+        "target": "30851:88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13:4aff182e-6851-407f-9249-23ee1604d377",
+        "field": "status",
+        "value": "cancelled",
+        "note": "Status → cancelled"
+      },
+      {
+        "id": "6ba5eb697028425f1a9daa5e8e2d956ae33a6dd5ecaf1818038b49c9b23c9103",
+        "author": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+        "createdAt": 1787119092,
+        "ts": 1787119092522,
+        "target": "30851:88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13:79517829-1e67-45d3-bd78-3c16be3095f5",
+        "field": "status",
+        "value": "cancelled",
+        "note": "Status → cancelled"
+      },
+      {
+        "id": "6d8ca1de4703b28d7fc865958ccc46950781895d8216eb60267f823a23a0cbdd",
+        "author": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+        "createdAt": 1787129683,
+        "ts": 1787129683297,
+        "target": "30851:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:77041a63-d57f-4283-8daf-54b91138b9cd",
+        "field": "assignee",
+        "value": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+        "note": "Assign"
+      },
+      {
+        "id": "07971bfca0f84e9eda1c51d03e5ef9e4c578479c9b769501f19f2da22d34ba19",
+        "author": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "createdAt": 1787137428,
+        "ts": 1787137428451,
+        "target": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:5c20ef8d-6bc4-4ac9-adf8-aa8e0398dec5",
+        "field": "status",
+        "value": "done",
+        "note": "Status → done"
+      },
+      {
+        "id": "f013f9871614152bba432a18d8735102bc26d954ad6260d7ba1c5a3f6543335e",
+        "author": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "createdAt": 1787137431,
+        "ts": 1787137431724,
+        "target": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:5c20ef8d-6bc4-4ac9-adf8-aa8e0398dec5",
+        "field": "assignee",
+        "value": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "note": "Assign"
+      },
+      {
+        "id": "718a62287ec049d2606588f12f870b90b2c8a43a874dfd1677e7571ead54f00d",
+        "author": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "createdAt": 1787137446,
+        "ts": 1787137446473,
+        "target": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:20446118-7466-4281-a483-fa095d3ed935",
+        "field": "status",
+        "value": "in_progress",
+        "note": "Status → in_progress"
+      },
+      {
+        "id": "e43ca0b26e3f58c5d5c8e8ac2f3862ab17d8a97c26c9cc2e1281827e818e4fec",
+        "author": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "createdAt": 1787137447,
+        "ts": 1787137447969,
+        "target": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:20446118-7466-4281-a483-fa095d3ed935",
+        "field": "assignee",
+        "value": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "note": "Assign"
+      },
+      {
+        "id": "ee0cbf85c588d3c80f437adfb01646c481ffe7800d5df8773ec0ef2a6289bfb8",
+        "author": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "createdAt": 1787137617,
+        "ts": 1787137617705,
+        "target": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c",
+        "field": "status",
+        "value": "in_progress",
+        "note": ""
+      },
+      {
+        "id": "a19528cecf9c29e11396908f50d205c8e9e2bbbcea409b75f030a663531e41a6",
+        "author": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "createdAt": 1787139814,
+        "ts": 1787139814807,
+        "target": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:59c2a37c-bd29-4ff0-8583-9d4b91b2de7c",
+        "field": "status",
+        "value": "in_progress",
+        "note": "Status → in_progress"
+      },
+      {
+        "id": "014fc35342a892572cbd948111a7b661b3130739eee3706642522b664787601d",
+        "author": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "createdAt": 1787142018,
+        "ts": 1787142018561,
+        "target": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:d92ac2b8-7ffb-4a15-9824-00044cce9cf5",
+        "field": "status",
+        "value": "in_progress",
+        "note": "Status → in_progress"
+      },
+      {
+        "id": "71dc90e010b1bbd1f7bc9ea9080689e7e950b9a8102a021d5b0355a14571d843",
+        "author": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "createdAt": 1787144358,
+        "ts": 1787144358400,
+        "target": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:d92ac2b8-7ffb-4a15-9824-00044cce9cf5",
+        "field": "status",
+        "value": "done",
+        "note": "Status → done"
+      },
+      {
+        "id": "bb69e2086112e2a997c31bdaf8cf3b011b6ac7536aeab4f3e636ff81f1a8ae8b",
+        "author": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "createdAt": 1787149573,
+        "ts": 1787149573394,
+        "target": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:cbd92b45-39c0-4e38-9eed-fb79656de101",
+        "field": "assignee",
+        "value": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "note": ""
+      },
+      {
+        "id": "50f5ddae3aa50aa2c62ac2956ad9514fdcd5e9a8413b09132d6f4a82dd1fc748",
+        "author": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "createdAt": 1787149596,
+        "ts": 1787149596585,
+        "target": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:cbd92b45-39c0-4e38-9eed-fb79656de101",
+        "field": "title",
+        "value": "Assignee avatar and full name is missing in files panel & reference widget",
+        "note": "Rename"
+      },
+      {
+        "id": "9cab754d013808dcabca5334d2f0c1b2c5815c91e305accef16ee8e8896d5954",
+        "author": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "createdAt": 1787149599,
+        "ts": 1787149599556,
+        "target": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:cbd92b45-39c0-4e38-9eed-fb79656de101",
+        "field": "status",
+        "value": "done",
+        "note": "Status → done"
+      },
+      {
+        "id": "32a2cd294639c8bc8dc38b9e368bd6ba6019c53f849c51b953aac31131b85506",
+        "author": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "createdAt": 1787179353,
+        "ts": 1787179353428,
+        "target": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2c5237d9-48ee-4d69-aa6c-cd1cb6b13c0d",
+        "field": "status",
+        "value": "in_progress",
+        "note": "Status → in_progress"
+      },
+      {
+        "id": "084148b5aa4167a1a568d09259b99b854fa658d63f5c550577a2dc56f6e84ae2",
+        "author": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "createdAt": 1787208330,
+        "ts": 1787208330949,
+        "target": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2c5237d9-48ee-4d69-aa6c-cd1cb6b13c0d",
+        "field": "status",
+        "value": "done",
+        "note": "Status → done"
+      },
+      {
+        "id": "da69390653fbf23ca194661bc5111154c8c0a89e6ab9df01bc7849bf089c9d45",
+        "author": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "createdAt": 1787209178,
+        "ts": 1787209178878,
+        "target": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:cbd92b45-39c0-4e38-9eed-fb79656de101",
+        "field": "status",
+        "value": "in_progress",
+        "note": ""
+      },
+      {
+        "id": "a5115aa258d28be6d7af24bde6852f016b8babff2df531666ec88699e09aa56f",
+        "author": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "createdAt": 1787209201,
+        "ts": 1787209201334,
+        "target": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:cbd92b45-39c0-4e38-9eed-fb79656de101",
+        "field": "status",
+        "value": "done",
+        "note": "Status → done"
+      },
+      {
+        "id": "f1e38b8a006d5e1e4c3b35bd0d6cbb89be9abd2928775e8d73dea6648fba0d6c",
+        "author": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "createdAt": 1787209250,
+        "ts": 1787209250461,
+        "target": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:59c2a37c-bd29-4ff0-8583-9d4b91b2de7c",
+        "field": "status",
+        "value": "done",
+        "note": "Status → done"
+      },
+      {
+        "id": "2adb3b58dc9c3fcd3f0e81859fecda9287357ba1b18fe14f8c7f7ed21d8c72d0",
+        "author": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "createdAt": 1787210113,
+        "ts": 1787210113155,
+        "target": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:20446118-7466-4281-a483-fa095d3ed935",
+        "field": "status",
+        "value": "done",
+        "note": ""
+      },
+      {
+        "id": "d64127660f8e3ef5825acf608f4fd654bc4c6850f0ad4415b1423f738ff56f73",
+        "author": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "createdAt": 1787212820,
+        "ts": 1787212820925,
+        "target": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:547a0ac3-954d-40a4-a468-3fd5832f0e20",
+        "field": "status",
+        "value": "done",
+        "note": "Status → done"
+      },
+      {
+        "id": "e3a82808a4237c92ab021ebef5f54fdb363a681fce2b5716e2f5dc8048dd6b8e",
+        "author": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+        "createdAt": 1787217360,
+        "ts": 1787217360549,
+        "target": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:20446118-7466-4281-a483-fa095d3ed935",
+        "field": "assignee",
+        "value": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+        "note": ""
+      },
+      {
+        "id": "91429447f4da88ebd30eb9085094b992f7f3142f775f7a4e480a9643ed64dd4e",
+        "author": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+        "createdAt": 1787217363,
+        "ts": 1787217363532,
+        "target": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:20446118-7466-4281-a483-fa095d3ed935",
+        "field": "assignee",
+        "value": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+        "note": ""
+      },
+      {
+        "id": "d8ad9785fa1df467fb4da6d499fa5b4af4b30d6a377f2816b636a73f27e6538a",
+        "author": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+        "createdAt": 1787217369,
+        "ts": 1787217369846,
+        "target": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:20446118-7466-4281-a483-fa095d3ed935",
+        "field": "assignee",
+        "value": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "note": "Assign"
+      },
+      {
+        "id": "02ec29db462cd01fb545eb04e539abbf9e3d0382b52723119e46830cbf68634e",
+        "author": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "createdAt": 1787252534,
+        "ts": 1787252534824,
+        "target": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c",
+        "field": "status",
+        "value": "planned",
+        "note": ""
+      },
+      {
+        "id": "36a2429fdf21166ccb82e7db7dd2b4dd2c520a7202eaba84348c7965e3fc36ad",
+        "author": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "createdAt": 1787252554,
+        "ts": 1787252554222,
+        "target": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c",
+        "field": "status",
+        "value": "in_progress",
+        "note": "Status → in_progress"
+      },
+      {
+        "id": "7dafb5ae73446d75ab157c57e52d1b917feb6ae6b3dfe52d163d795e21b78411",
+        "author": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
+        "createdAt": 1787316311,
+        "ts": 1787316311248,
+        "target": "30851:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:56119588-4b40-491f-a517-09b579d4798c",
+        "field": "status",
+        "value": "in_progress",
+        "note": ""
+      },
+      {
+        "id": "770916193bda67cf3fa241680452d01d808358738c8c2bf3f82ab3fa226ffcd6",
+        "author": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
+        "createdAt": 1787316312,
+        "ts": 1787316312156,
+        "target": "30851:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:56119588-4b40-491f-a517-09b579d4798c",
+        "field": "assignee",
+        "value": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
+        "note": ""
+      },
+      {
+        "id": "989dfc25ac1c461ddc2ac2655c1ac23f6d3ad0250914dff96ce78eab2195fc0f",
+        "author": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
+        "createdAt": 1787316712,
+        "ts": 1787316712573,
+        "target": "30851:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:56119588-4b40-491f-a517-09b579d4798c",
+        "field": "status",
+        "value": "cancelled",
+        "note": ""
+      },
+      {
+        "id": "794475e59c81156f422503cf2e630d47be6a495cd33b5164f1e814086106b9ac",
+        "author": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+        "createdAt": 1787327461,
+        "ts": 1787327461816,
+        "target": "30851:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:f79e754f-5577-42fa-a7f8-44b0b952e272",
+        "field": "assignee",
+        "value": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+        "note": "Assign"
+      }
+    ],
+    "conversations": [
+      {
+        "id": "388da2960b341571bdbacb7d9379cce2762f781ec19b5042ff162f29f00d9cc6",
+        "root": {
+          "id": "388da2960b341571bdbacb7d9379cce2762f781ec19b5042ff162f29f00d9cc6",
+          "author": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+          "createdAt": 1787327495,
+          "ts": 1787327495827,
+          "body": "This will need most likely changes on Buzz or at least reason about how it works in Buzz.\n\nnostr:naddr1qqjxvdeev5mn2drx956n2deh956ryenp94snwe3c956rgc3svgun2vn9xgmnyqgedp68gurn8ghj7etnw35hvcfwv4ehg6tkvyhxzursqgs08gu05erda02pvgf9uzhds7mdywflk8kewq4ksawuhsxx22wkf5grqsqqq7yryh2rl8",
+          "folder": "2303e8c1-c866-43b8-9b4c-e263f313a683",
+          "about": [
+            "30851:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:f79e754f-5577-42fa-a7f8-44b0b952e272"
+          ]
+        },
+        "replies": [],
+        "about": [
+          "30851:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:f79e754f-5577-42fa-a7f8-44b0b952e272"
+        ],
+        "createdAt": 1787327495,
+        "lastAt": 1787327495
+      },
+      {
+        "id": "579c89a2e12e72959660337fb3f84b2fae0418458c1592860ac09958fed9b3d0",
+        "root": {
+          "id": "579c89a2e12e72959660337fb3f84b2fae0418458c1592860ac09958fed9b3d0",
+          "author": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
+          "createdAt": 1787316310,
+          "ts": 1787316310359,
+          "body": "Verifying the round trip: this comment, a status change, and an assignment were all written by the agent through the MCP/CLI path. If you are reading this in Ship, the write path works.",
+          "folder": "806fb4e3-ebc9-4b6a-a18c-0ca59379aa1d",
+          "about": [
+            "30851:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:56119588-4b40-491f-a517-09b579d4798c"
+          ]
+        },
+        "replies": [],
+        "about": [
+          "30851:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:56119588-4b40-491f-a517-09b579d4798c"
+        ],
+        "createdAt": 1787316310,
+        "lastAt": 1787316310
+      },
+      {
+        "id": "d8841f142934ee0448800a150723ebe204d305ace9e322a52edf8ba48e0f6245",
+        "root": {
+          "id": "d8841f142934ee0448800a150723ebe204d305ace9e322a52edf8ba48e0f6245",
+          "author": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+          "createdAt": 1787236216,
+          "body": "## Draft messages\n- Bug if you start typing and message and you switch different topic, the text is kept there, which is weird.\n- If you start writing in thread and then go somewhere else and then go back to the thread to finish the message, the draft is gone",
+          "folder": "2303e8c1-c866-43b8-9b4c-e263f313a683",
+          "about": []
+        },
+        "replies": [
+          {
+            "id": "c76596b00c624e49fc618ab170a3018e995f2ae8d9861a06a342317eb92a9cd2",
+            "author": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+            "createdAt": 1787302076,
+            "body": "nostr:naddr1qqjxvdeev5mn2drx956n2deh956ryenp94snwe3c956rgc3svgun2vn9xgmnyqgedp68gurn8ghj7etnw35hvcfwv4ehg6tkvyhxzursqgs08gu05erda02pvgf9uzhds7mdywflk8kewq4ksawuhsxx22wkf5grqsqqq7yryh2rl8",
+            "folder": "2303e8c1-c866-43b8-9b4c-e263f313a683",
+            "rootId": "d8841f142934ee0448800a150723ebe204d305ace9e322a52edf8ba48e0f6245",
+            "parentId": "d8841f142934ee0448800a150723ebe204d305ace9e322a52edf8ba48e0f6245",
+            "about": []
+          },
+          {
+            "id": "71e76081e141691f114b916e764e01ad51d36108ba687c1500c3c47966fb5279",
+            "author": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+            "createdAt": 1787302086,
+            "body": "Testing message",
+            "folder": "2303e8c1-c866-43b8-9b4c-e263f313a683",
+            "rootId": "d8841f142934ee0448800a150723ebe204d305ace9e322a52edf8ba48e0f6245",
+            "parentId": "d8841f142934ee0448800a150723ebe204d305ace9e322a52edf8ba48e0f6245",
+            "about": []
+          },
+          {
+            "id": "5bc2655c611dc44eab1647f78c8debaaceec1bead9ea78a35c200124410f1fc7",
+            "author": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+            "createdAt": 1787302193,
+            "body": "[Interesting Claude-generated docs - Renamed 3]",
+            "folder": "2303e8c1-c866-43b8-9b4c-e263f313a683",
+            "rootId": "d8841f142934ee0448800a150723ebe204d305ace9e322a52edf8ba48e0f6245",
+            "parentId": "d8841f142934ee0448800a150723ebe204d305ace9e322a52edf8ba48e0f6245",
+            "about": []
+          },
+          {
+            "id": "ee4029af359b3f8ec87b4c402cf190e4f87b5bf1a753aa208f50c18042fb2951",
+            "author": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+            "createdAt": 1787302614,
+            "body": "@claude start working on it",
+            "folder": "2303e8c1-c866-43b8-9b4c-e263f313a683",
+            "rootId": "d8841f142934ee0448800a150723ebe204d305ace9e322a52edf8ba48e0f6245",
+            "parentId": "d8841f142934ee0448800a150723ebe204d305ace9e322a52edf8ba48e0f6245",
+            "about": []
+          }
+        ],
+        "about": [],
+        "createdAt": 1787236216,
+        "lastAt": 1787302614
+      },
+      {
+        "id": "bfc4a9baf40619a2b7d91f64f92496cfe94f19aef9392ff36b0df5ba374ad04e",
+        "root": {
+          "id": "bfc4a9baf40619a2b7d91f64f92496cfe94f19aef9392ff36b0df5ba374ad04e",
+          "author": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+          "createdAt": 1787299230,
+          "body": "Support code snippets in rich formatting",
+          "folder": "2303e8c1-c866-43b8-9b4c-e263f313a683",
+          "about": []
+        },
+        "replies": [],
+        "about": [],
+        "createdAt": 1787299230,
+        "lastAt": 1787299230
+      },
+      {
+        "id": "c62b085f9a703406b4d4b85e0edce83675c1b9bee8e32e7697764f28f30d01e5",
+        "root": {
+          "id": "c62b085f9a703406b4d4b85e0edce83675c1b9bee8e32e7697764f28f30d01e5",
+          "author": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+          "createdAt": 1787231382,
+          "body": "Wondering how we can in meaningful non-distracting way surface is somebody react to your message with emoji. Right now, you learn about it just by accident. 😊",
+          "folder": "2303e8c1-c866-43b8-9b4c-e263f313a683",
+          "about": []
+        },
+        "replies": [
+          {
+            "id": "816fdcec7f573147e79ef1ad915faad8062dadbe81b1c5874ce4dd61e5e79ac7",
+            "author": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+            "createdAt": 1787233850,
+            "body": "I like the effect Slack has on top of the activity menu item where the emoji animates a little and disappears. You don't know on which conversation it happened but you get a signal something happened. We don't have global activity so I'm thinking maybe to have it as an entry to topic-specific activity (and DM speficic activity)?",
+            "folder": "2303e8c1-c866-43b8-9b4c-e263f313a683",
+            "rootId": "c62b085f9a703406b4d4b85e0edce83675c1b9bee8e32e7697764f28f30d01e5",
+            "parentId": "c62b085f9a703406b4d4b85e0edce83675c1b9bee8e32e7697764f28f30d01e5",
+            "about": []
+          },
+          {
+            "id": "4ee37786d9c42cb7dbe2837b163245b84e5b74eb5123a464f10fba2e51e79813",
+            "author": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+            "createdAt": 1787233874,
+            "body": "But activity doesn't make sense because that kind of activity is for everyone, not just you..",
+            "folder": "2303e8c1-c866-43b8-9b4c-e263f313a683",
+            "rootId": "c62b085f9a703406b4d4b85e0edce83675c1b9bee8e32e7697764f28f30d01e5",
+            "parentId": "c62b085f9a703406b4d4b85e0edce83675c1b9bee8e32e7697764f28f30d01e5",
+            "about": []
+          },
+          {
+            "id": "16917961132dea24f8d337801d28226ca4ff8e62ca662c070ed5eefedb1f2720",
+            "author": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+            "createdAt": 1787235697,
+            "body": "It's not urgent. Let's sleep on this.",
+            "folder": "2303e8c1-c866-43b8-9b4c-e263f313a683",
+            "rootId": "c62b085f9a703406b4d4b85e0edce83675c1b9bee8e32e7697764f28f30d01e5",
+            "parentId": "c62b085f9a703406b4d4b85e0edce83675c1b9bee8e32e7697764f28f30d01e5",
+            "about": []
+          },
+          {
+            "id": "5a64455fd68b9c15147caf6c97f0b0ad261c05db817b7cc5c43ff9912d1939df",
+            "author": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+            "createdAt": 1787236455,
+            "body": "Few ideas\n- The animation could happen on the topic itself in the sidebar. Let's say you gave me emoji in conversation in Feedback on Peek. The Feedback on Peek topic in sidebar would get this animation.\n- Have dedicated section in Desk that would only be available if you have unread emoji reaction. It could be called \"Reactions\" and it would be just icon and if hove over, it would show a simple box where you would see the message with the reaction.",
+            "folder": "2303e8c1-c866-43b8-9b4c-e263f313a683",
+            "rootId": "c62b085f9a703406b4d4b85e0edce83675c1b9bee8e32e7697764f28f30d01e5",
+            "parentId": "c62b085f9a703406b4d4b85e0edce83675c1b9bee8e32e7697764f28f30d01e5",
+            "about": []
+          },
+          {
+            "id": "7174ab409b66bd3ebb995a2c5ae3959e1e3bfdc727fdd11f12caaa60d5dff2a3",
+            "author": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+            "createdAt": 1787238677,
+            "ts": 1787238677620,
+            "body": "This is so cool, I read our conversations and sending this now from Ship. Was thinking about testing it only and forgot how it looks in real conversation and how useful that is",
+            "folder": "2303e8c1-c866-43b8-9b4c-e263f313a683",
+            "rootId": "c62b085f9a703406b4d4b85e0edce83675c1b9bee8e32e7697764f28f30d01e5",
+            "parentId": "c62b085f9a703406b4d4b85e0edce83675c1b9bee8e32e7697764f28f30d01e5",
+            "about": []
+          },
+          {
+            "id": "64ae689f6b217743262670a33d6d1e3cf6db4065d7140cbeda54d65018f67533",
+            "author": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+            "createdAt": 1787242987,
+            "ts": 1787242987105,
+            "body": "Yeah, it's so good and I think it's only the beginning. I definitely want to level-up conversation across all apps (well, now it's just ship and peek. E.g. add emoji reaction to ship or have draft messages shared across apps.",
+            "folder": "2303e8c1-c866-43b8-9b4c-e263f313a683",
+            "rootId": "c62b085f9a703406b4d4b85e0edce83675c1b9bee8e32e7697764f28f30d01e5",
+            "parentId": "c62b085f9a703406b4d4b85e0edce83675c1b9bee8e32e7697764f28f30d01e5",
+            "about": []
+          },
+          {
+            "id": "0334cd33ee176716cae51f6fa91530a0e51422e0e20ddc33764e9b47524565a7",
+            "author": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+            "createdAt": 1787244500,
+            "body": "It's good idea to turn it into React before adding extra functionality, I'll ask Claude tomorrow how much work that would be",
+            "folder": "2303e8c1-c866-43b8-9b4c-e263f313a683",
+            "rootId": "c62b085f9a703406b4d4b85e0edce83675c1b9bee8e32e7697764f28f30d01e5",
+            "parentId": "c62b085f9a703406b4d4b85e0edce83675c1b9bee8e32e7697764f28f30d01e5",
+            "about": []
+          },
+          {
+            "id": "fea15d28a3e39234339fd4df9d2dfaa91dae97a255ed0eb33f1d43f752fb3e79",
+            "author": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+            "createdAt": 1787252706,
+            "body": "Yeah, I was planning to do the same once I'm done with the Claude integration. I think it would be wise to have basic structure same for all those apps as it will be easier to maintain and keep updating.",
+            "folder": "2303e8c1-c866-43b8-9b4c-e263f313a683",
+            "rootId": "c62b085f9a703406b4d4b85e0edce83675c1b9bee8e32e7697764f28f30d01e5",
+            "parentId": "c62b085f9a703406b4d4b85e0edce83675c1b9bee8e32e7697764f28f30d01e5",
+            "about": []
+          },
+          {
+            "id": "c8033c82dbab5fa2a61c991bce2fcad86f2f92e8daf9700cfd3d96bed53b8e35",
+            "author": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+            "createdAt": 1787252813,
+            "body": "Let's maybe chat 5 min tomorrow who will focus on what so we don't end up tackling the same stuff.",
+            "folder": "2303e8c1-c866-43b8-9b4c-e263f313a683",
+            "rootId": "c62b085f9a703406b4d4b85e0edce83675c1b9bee8e32e7697764f28f30d01e5",
+            "parentId": "c62b085f9a703406b4d4b85e0edce83675c1b9bee8e32e7697764f28f30d01e5",
+            "about": []
+          }
+        ],
+        "about": [],
+        "createdAt": 1787231382,
+        "lastAt": 1787252813
+      },
+      {
+        "id": "061db9081cc5e63bee68f4861a0e52475266bcc305701edd00633bc9e4251fda",
+        "root": {
+          "id": "061db9081cc5e63bee68f4861a0e52475266bcc305701edd00633bc9e4251fda",
+          "author": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+          "createdAt": 1787148754,
+          "ts": 1787148754953,
+          "body": "We need to Refactor whole Ship. It was done very basically. It's not even React app. And I think it starts to bite us, so before we start implementing more features, I will try to refactor it to React codebase.",
+          "folder": "88de5526-366a-4016-83a3-417a1748baa8",
+          "about": [
+            "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:cf23dbca-64fb-4802-a804-e0119b0d8584"
+          ]
+        },
+        "replies": [],
+        "about": [
+          "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:cf23dbca-64fb-4802-a804-e0119b0d8584"
+        ],
+        "createdAt": 1787148754,
+        "lastAt": 1787148754
+      },
+      {
+        "id": "ed3799b6ebabffefa619d2f114198bd5478513cf18591040cb45d3f9ba8a3534",
+        "root": {
+          "id": "ed3799b6ebabffefa619d2f114198bd5478513cf18591040cb45d3f9ba8a3534",
+          "author": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+          "createdAt": 1787068153,
+          "ts": 1787068153259,
+          "body": "Assignee avatar and full name is missing in files panel\n\nnostr:naddr1qqjxxcny8yexydp495enjces956x2vec95uk2ety94nxydeexc6nver9xycrzqgedp68gurn8ghj7etnw35hvcfwv4ehg6tkvyhxzursqgs23f7h88w6txg58mpw3zsu8vkknqyv62jsqqghn3ux75wsphpud9crqsqqq7yrrefggm",
+          "folder": "2303e8c1-c866-43b8-9b4c-e263f313a683",
+          "about": [
+            "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:cbd92b45-39c0-4e38-9eed-fb79656de101"
+          ]
+        },
+        "replies": [
+          {
+            "id": "d8e3d66551e06832dabb4c1000a4fdd2b61d0f586f74ba3017506263d25f11d2",
+            "author": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+            "createdAt": 1787068232,
+            "body": "",
+            "folder": "2303e8c1-c866-43b8-9b4c-e263f313a683",
+            "rootId": "ed3799b6ebabffefa619d2f114198bd5478513cf18591040cb45d3f9ba8a3534",
+            "parentId": "ed3799b6ebabffefa619d2f114198bd5478513cf18591040cb45d3f9ba8a3534",
+            "about": []
+          },
+          {
+            "id": "e76c0c0057054ed10559f7f01a85757807a30757e47ff453f79f48796f893f75",
+            "author": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+            "createdAt": 1787068271,
+            "body": "nostr:naddr1qqjxxcny8yexydp495enjces956x2vec95uk2ety94nxydeexc6nver9xycrzqgedp68gurn8ghj7etnw35hvcfwv4ehg6tkvyhxzursqgs23f7h88w6txg58mpw3zsu8vkknqyv62jsqqghn3ux75wsphpud9crqsqqq7yrrefggm",
+            "folder": "2303e8c1-c866-43b8-9b4c-e263f313a683",
+            "rootId": "ed3799b6ebabffefa619d2f114198bd5478513cf18591040cb45d3f9ba8a3534",
+            "parentId": "ed3799b6ebabffefa619d2f114198bd5478513cf18591040cb45d3f9ba8a3534",
+            "about": []
+          }
+        ],
+        "about": [
+          "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:cbd92b45-39c0-4e38-9eed-fb79656de101"
+        ],
+        "createdAt": 1787068153,
+        "lastAt": 1787068271
+      }
+    ]
+  }
+}
