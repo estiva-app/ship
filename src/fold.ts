@@ -214,7 +214,13 @@ function foldChanges(changes: Change[]): Map<string, FoldedFields> {
   const byTarget = new Map<string, FoldedFields>()
   const winners = new Map<string, Change>()
   for (const change of changes) {
-    const key = `${change.target} ${change.field}`
+    // `\0` as the escape, not the byte. The separator has to be something
+    // neither an address nor a field name can contain, and NUL is the right
+    // choice — but writing it literally made this file binary to the tools that
+    // read source: `grep` skipped it and said nothing, and it sat 25 bytes from
+    // the 8000-byte window git scans for NUL, so one deletion above here would
+    // have turned every diff of this file into "Binary files differ".
+    const key = `${change.target}\0${change.field}`
     const held = winners.get(key)
     if (!held || wins(change, held)) winners.set(key, change)
   }
