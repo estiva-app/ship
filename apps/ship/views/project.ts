@@ -292,16 +292,34 @@ function folderPanel(ctx: Ctx, project: Project, contentFolder: string): HTMLEle
     const parsed = parseFolderLink(pasted)
     if (!parsed) return ctx.say('That does not look like a Folder link or a UUID.', 'error')
     if (parsed === contentFolder) return ctx.say('Already paired with that Folder.')
+    // Pairing writes twice: the change that decides it, and the same statement
+    // inside the Folder being paired so other apps can find the project there.
+    // The second can be refused on its own — a Folder that will not take a
+    // write is still a Folder we can point at — so its outcome is carried out
+    // here rather than folded into one boolean.
+    let announced = true
+    let announceReason: string | undefined
     const ok = await ctx.publish('Folder link', async () => {
       const result = await ctx.store.linkProjectFolder({
         recordFolder: project.originFolder,
         project: project.addr,
         folder: parsed,
       })
+      announced = result.announced
+      announceReason = result.announceReason
       return result.ok ? result : { ok: false, reason: explainRejection(result.reason, parsed) }
     })
     if (ok) {
-      ctx.say('Paired. New issues will land in that Folder.')
+      if (announced) {
+        ctx.say('Paired. New issues will land in that Folder.')
+      } else {
+        ctx.say(
+          `Paired, and new issues will land in that Folder — but the Folder itself refused the ` +
+            `note that says so${announceReason ? `: ${announceReason}` : '.'} ` +
+            `Apps reading that Folder may not find this project until an issue is filed in it.`,
+          'error',
+        )
+      }
       await ctx.reload()
     }
   }

@@ -246,20 +246,58 @@ export class Store {
    * Readers take the union of every Folder a project has pointed at
    * (`projectFolders`) rather than pretending the history did not happen.
    */
-  linkProjectFolder(args: {
+  async linkProjectFolder(args: {
     /** The Folder the project *record* lives in — its own `h`. */
     recordFolder: string
     project: string
     folder: string
-  }): Promise<PublishResult> {
+  }): Promise<PublishResult & { announced: boolean; announceReason?: string }> {
     assertFolderId(args.folder)
-    return this.setField({
+    const note = `linked to Folder ${args.folder.slice(0, 8)}…`
+
+    // The change that decides the pairing. It goes where the record lives,
+    // because that is the Folder every reader of this project already loads.
+    const linked = await this.setField({
       folder: args.recordFolder,
       target: args.project,
       field: 'folder',
       value: args.folder,
-      note: `linked to Folder ${args.folder.slice(0, 8)}…`,
+      note,
     })
+    if (!linked.ok) return { ...linked, announced: false }
+    if (args.folder === args.recordFolder) return { ...linked, announced: true }
+
+    // The same statement again, published *into* the Folder being paired.
+    //
+    // Without it that Folder contains no trace of the pairing at all: the
+    // project record keeps the `h` it was born with, and so does the change
+    // above, so an app reading the new Folder sees nothing naming the project.
+    // Peek shipped a reader that infers it from the issues instead
+    // (estiva-app/peek#54) — which works, and stops working for a Folder paired
+    // before any issue is filed in it. Inference was the only option because
+    // nothing here said it out loud; this is Ship saying it out loud.
+    //
+    // Deliberately the identical field and value, not a new vocabulary. It
+    // folds to the same state, so a reader that already understands `folder`
+    // needs no change, and one that loads both Folders sees the statement twice
+    // and folds it once — last-write-wins is idempotent for a repeated value.
+    const announced = await this.setField({
+      folder: args.folder,
+      target: args.project,
+      field: 'folder',
+      value: args.folder,
+      note,
+    })
+
+    // The pairing itself succeeded either way, so this is not a failure to
+    // report as one. It is a real caveat though — a Folder that refused the
+    // write is a Folder other apps may not find the project in — so it is
+    // returned rather than swallowed, and the caller says so.
+    return {
+      ...linked,
+      announced: announced.ok,
+      announceReason: announced.ok ? undefined : announced.reason,
+    }
   }
 
   async createIssue(args: {
