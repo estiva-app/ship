@@ -478,10 +478,10 @@ export class Store {
   /**
    * Everything this identity can see: every project, and everything in it.
    *
-   * **Discovery, not an index.** The first query asks the relay for `kind:30850`
-   * with no `#h` at all, and access control decides what comes back — a project
-   * in a Folder you are not a member of, and which is not open, simply is not
-   * there. That is the whole reason there is no workspace object: Buzz already
+   * **Discovery, not an index.** The first round trip asks the relay for
+   * `kind:30850` and `kind:30851` with no `#h` at all, and access control
+   * decides what comes back — an object in a Folder you are not a member of,
+   * and which is not open, simply is not there. That is the whole reason there is no workspace object: Buzz already
    * scopes this by community, resolved from the relay host before the request is
    * even authenticated (`ARCHITECTURE.md` §3 Step 0). The relay URL *is* the
    * workspace, so a workspace Folder would be a worse copy of something the
@@ -491,15 +491,37 @@ export class Store {
    * REW-11: a global project record comes back from exactly the same filter,
    * and `projectFolders` reads its `buzz-channel` where it used to read `h`.
    *
-   * Two round trips, and they cannot be collapsed: the second query's `#h` list
-   * *is* the answer to the first.
+   * **Issues are discovered directly as well as through their projects** — see
+   * SHI-7 and the note inside. Reaching them only through a parent loses every
+   * issue whose parent was deleted, which was 12 of 13 unreachable issues on
+   * production.
+   *
+   * At least two round trips, and they cannot be collapsed: the widening
+   * query's `#h` list *is* the answer to the discovery one.
    *
    * Folded as a single stream at the end rather than per Folder. Not an
    * optimisation — a re-linked project's record and its older issues sit in
    * different Folders, and folding those separately would drop changes.
    */
   async loadAll(limit = 2000): Promise<FolderState> {
-    let events = await this.relay.query([{ kinds: [KIND.PROJECT], limit }])
+    /*
+      Two discovery queries, not one, and the second is the whole of SHI-7.
+
+      Discovering only projects and widening into their Folders loses every
+      issue whose parent does not resolve. On production that was 13 of 93,
+      and none of them for the reason anybody assumed: twelve had a project
+      record that was *deleted*, one never carried an `a` tag, and all
+      thirteen sat in Folders this reader could already see. So it was never
+      an access problem — nothing had asked for them.
+
+      Asking for `kind:30851` directly is the same unscoped shape the coverage
+      report already used to *count* them. The count was honest and the read
+      was not; this closes that gap.
+    */
+    let events = await this.relay.query([
+      { kinds: [KIND.PROJECT], limit },
+      { kinds: [KIND.ISSUE], limit },
+    ])
     const fetched = new Set<string>()
 
     /**
@@ -525,6 +547,27 @@ export class Store {
         for (const folder of projectFolders(project, state.activity)) {
           if (!fetched.has(folder)) wanted.add(folder)
         }
+      }
+      /*
+        An issue's own Folder, which is NOT reachable from its project when the
+        project is gone — and skipping it is worse than not finding the issue
+        at all.
+
+        The issue root carries no status and no assignee by design; both are
+        `kind:1851` changes living in the issue's Folder. Fold an issue without
+        them and it renders with the *default* status, confidently.
+
+        Measured on the thirteen by folding both ways and diffing: 14 change
+        events target them, and they land on **2 distinct issues** — both of
+        which are `done` and assigned, and both of which would have come back
+        `todo` and unassigned. (The event count is not the issue count: six
+        status changes were one ticket moved through its lifecycle several
+        times.) Two wrong rows is a smaller number than thirteen missing ones
+        and a worse outcome, because a missing row is noticed and a wrong
+        status is believed.
+      */
+      for (const issue of state.issues) {
+        if (issue.folder && !fetched.has(issue.folder)) wanted.add(issue.folder)
       }
       if (!wanted.size) break
       for (const folder of wanted) fetched.add(folder)
