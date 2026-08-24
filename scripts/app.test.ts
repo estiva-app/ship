@@ -93,6 +93,102 @@ check('the issue took its change', folded.issues[0]?.status === 'done')
 check('the project took its change', folded.projects[0]?.status === 'completed')
 check('the project reports its Folder', folded.projects[0]?.contentFolder === CONTENT)
 
+// ── Two project wire shapes, read together ──────────────────────────────────
+
+/*
+  REW-11 moves the project record off its channel: `h` → `buzz-channel`,
+  `title` → `name`, and the description out of `.content` into a tag. Records
+  written before that keep the old shape **forever** — a replaceable event can
+  only be rewritten by its author, and rewriting stamps a fresh `created_at`
+  the relay will not let us backdate past ±15 minutes.
+
+  So the two shapes coexist permanently, and the failure they would cause is
+  silent: a reader that stops understanding `h` does not error, it renders a
+  project whose Folder is the empty string and whose issues have all vanished.
+  These pin both directions.
+*/
+
+console.log('\n# a project record in either wire shape\n')
+
+const globalProject: SignedEvent = sign(
+  {
+    pubkey: PK,
+    created_at: Math.floor(Date.now() / 1000),
+    kind: 30850,
+    tags: [
+      ['d', 'p2'],
+      ['name', 'Payment integration'],
+      ['description', 'Take card payments'],
+      ['buzz-channel', CONTENT],
+      ['lead', PK],
+    ],
+    content: '',
+  },
+  'g1',
+)
+
+const bothShapes = foldFolder([sign(project, 'e1'), globalProject])
+const legacy = bothShapes.projects.find((p) => p.id === 'p1')
+const global_ = bothShapes.projects.find((p) => p.id === 'p2')
+
+check('both shapes fold', bothShapes.projects.length === 2)
+check('the global record keeps its name', global_?.title === 'Payment integration')
+check('  …reads its description from the tag', global_?.description === 'Take card payments')
+check('  …resolves buzz-channel as its Folder', global_?.contentFolder === CONTENT)
+check('  …and as the Folder its changes address', global_?.originFolder === CONTENT)
+check('  …and still reports its lead', global_?.lead === PK)
+check('the h-shaped record is unaffected', legacy?.contentFolder === CONTENT)
+check('  …and still reads title, not name', legacy?.title === 'Payment integration')
+
+// The one that would be invisible: a record carrying `h` reads as channel-scoped
+// whatever else it says, because that is what the relay actually did with it.
+const transitional = sign(
+  {
+    pubkey: PK,
+    created_at: Math.floor(Date.now() / 1000),
+    kind: 30850,
+    tags: [['d', 'p3'], ['name', 'Both'], ['h', CONTENT], ['buzz-channel', TOPIC]],
+    content: '',
+  },
+  't1',
+)
+check(
+  'a record carrying both tags is read as channel-scoped',
+  foldFolder([transitional]).projects[0]?.originFolder === CONTENT,
+)
+
+// An empty description tag is a statement, not an absence — otherwise clearing
+// a description would silently resurrect whatever `.content` still held.
+const clearedDescription = sign(
+  {
+    pubkey: PK,
+    created_at: Math.floor(Date.now() / 1000),
+    kind: 30850,
+    tags: [['d', 'p4'], ['name', 'Cleared'], ['description', ''], ['buzz-channel', CONTENT]],
+    content: 'stale prose nobody removed',
+  },
+  'c1',
+)
+check(
+  'an empty description tag wins over leftover content',
+  foldFolder([clearedDescription]).projects[0]?.description === '',
+)
+
+// A change still overrides the record, whichever shape the record is in.
+const globalRename: SignedEvent = sign(
+  buildChange(PK, Date.now(), {
+    target: `30850:${PK}:p2`,
+    field: 'title',
+    value: 'Renamed by someone else',
+    folder: CONTENT,
+  }),
+  'g2',
+)
+check(
+  'a rename change still beats the record\'s own name tag',
+  foldFolder([globalProject, globalRename]).projects[0]?.title === 'Renamed by someone else',
+)
+
 // ── Re-linking a project to a Peek topic ────────────────────────────────────
 
 console.log('\n# re-linking a project to an existing Peek topic\n')

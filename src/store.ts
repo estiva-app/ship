@@ -442,6 +442,14 @@ export class Store {
    * stream to be correct, and a truncated stream would silently produce a stale
    * status rather than an error. Paging this properly means folding
    * incrementally, which the MVP does not need.
+   *
+   * **This and `loadFolders` filter by `#h`, so they do not see a global project
+   * record** — one carrying `buzz-channel` instead of `h`. Such a Folder reads
+   * as issues with no project. That is correct rather than broken: a global
+   * record is by definition in no Folder, and a second query to put it back
+   * would undo REW-11. `loadAll` is the method that sees everything, and it is
+   * what both the app and the agent use; these two are for scripts and for
+   * reading one container in isolation.
    */
   async loadFolder(folder: string, limit = 2000): Promise<FolderState> {
     return foldFolder(await this.rawFolders([folder], limit), referencedAddresses)
@@ -469,6 +477,10 @@ export class Store {
    * even authenticated (`ARCHITECTURE.md` §3 Step 0). The relay URL *is* the
    * workspace, so a workspace Folder would be a worse copy of something the
    * substrate already guarantees.
+   *
+   * That unscoped first query is also why this method needs no change for
+   * REW-11: a global project record comes back from exactly the same filter,
+   * and `projectFolders` reads its `buzz-channel` where it used to read `h`.
    *
    * Two round trips, and they cannot be collapsed: the second query's `#h` list
    * *is* the answer to the first.
@@ -555,7 +567,13 @@ export class Store {
     ])
     const event = events.find((e) => e.tags.find((t) => t[0] === 'd')?.[1] === d)
     if (!event) return null
-    const folder = event.tags.find((t) => t[0] === 'h')?.[1]
+    // `h` first, then `buzz-channel`: a REW-11 project record is global and has
+    // no `h` at all, so keying only on `h` would resolve the event and then
+    // throw it away — reported to the person as "you may not have access",
+    // which would be a lie about the one record type most likely to be public.
+    const folder =
+      event.tags.find((t) => t[0] === 'h')?.[1] ??
+      event.tags.find((t) => t[0] === 'buzz-channel')?.[1]
     return folder ? { event, folder } : null
   }
 

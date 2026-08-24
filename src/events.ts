@@ -59,6 +59,38 @@ export function assertFolderId(folder: string): void {
  * change its own `h`, so that override is the only way to express "this project
  * now lives in that topic" after the fact — and the reader takes the union, so
  * issues already filed do not disappear.
+ *
+ * ## Why this still writes `h` and `title` (REW-11)
+ *
+ * REW-11 replaces `["h", uuid]` with `["buzz-channel", uuid]` and `["title"]`
+ * with `["name"]` + a `["description"]` tag, so the record becomes global and
+ * discoverable without channel access. `src/fold.ts` **already reads that
+ * shape** — see `projectFolder`, `projectName`, `projectDescription`.
+ *
+ * The writer has not flipped because the relay refuses the result. Buzz lists
+ * `KIND_LL_PROJECT` in `requires_h_channel_scope`
+ * (`buzz-relay/src/handlers/ingest.rs:494`) alongside `KIND_LL_ISSUE` and
+ * `KIND_LL_CHANGE`, so a `kind:30850` with no `h` comes back
+ *
+ *   200 {"accepted": false, "message": "invalid: channel-scoped events must
+ *        include an h tag"}
+ *
+ * — measured against production, not inferred, and a 200 with `accepted:false`
+ * is exactly the rejection shape `lib/nostr/relay.ts` exists to catch. The
+ * comment on that list says the Folder is required because it is "both how
+ * objects are grouped and how access is enforced", which is true of an issue
+ * and is the thing REW-11 argues is wrong for a *project record*.
+ *
+ * So the flip needs `KIND_LL_PROJECT` removed from that one list and the relay
+ * deployed. Issues and changes stay on it — only the record goes global. When
+ * that lands, this builder emits
+ *
+ *   [["d", id], ["name", …], ["description", …], ["buzz-channel", folder]]
+ *
+ * with `lead` unchanged and `d` still an opaque uuid (RFC 0.3 §4.3: a human
+ * slug in an immutable address leaks a name you may later want private). No
+ * reader change is needed at that point, which is the whole reason the reader
+ * went first.
  */
 export function buildProject(
   pubkey: string,

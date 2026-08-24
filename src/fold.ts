@@ -114,16 +114,24 @@ export interface Project {
   /**
    * The Folder this project *is* — where its issues and conversation live.
    *
-   * Normally the project record's own `h`. A `kind:1851` on the `folder` field
-   * overrides it, which is the only way to re-point a project at an existing
-   * Peek topic after creation: an event cannot change its own `h`.
+   * Normally the Folder the record names: `buzz-channel` on a global record,
+   * `h` on a channel-scoped one. A `kind:1851` on the `folder` field overrides
+   * it, which is the only way to re-point a project at an existing Peek topic
+   * after creation: an event cannot change its own `h`.
    */
   contentFolder: string
   /**
-   * The Folder the project record itself was written into.
+   * The Folder the project record *names as its own* — before any re-link.
    *
    * Kept separately from `contentFolder` because a re-link overrides the latter,
-   * and this one is where the project's older issues still live.
+   * and this one is where the project's older issues still live. It is also the
+   * Folder a `kind:1851` about this project has to be addressed to, since
+   * changes stay channel-scoped whatever the record does.
+   *
+   * Under the old shape it is literally where the record was written (its `h`).
+   * Under the REW-11 shape the record is global and lives in no Folder at all,
+   * so it is the `buzz-channel` the record points at. Same value, same use; only
+   * the record's own location changed.
    */
   originFolder: string
   lead?: string
@@ -382,6 +390,54 @@ export interface FolderState {
 }
 
 /**
+ * The Folder a project record names, under either wire shape.
+ *
+ * **Both shapes are read, and both stay readable indefinitely.** REW-11 moves
+ * the project record off its channel: `["h", uuid]` becomes
+ * `["buzz-channel", uuid]`, so the record stops being filed under a Folder and
+ * starts merely *pointing* at one. That is upstream's NIP-MP vocabulary, and
+ * RFC 0.3 §4.2 argues it is forced — a record filed under a channel cannot be
+ * discovered by anyone the channel does not already admit.
+ *
+ * There is no migration and there will not be one. A replaceable event can only
+ * be rewritten by its own author, and rewriting it would stamp a fresh
+ * `created_at` over the original — the relay refuses anything more than roughly
+ * ±15 minutes from its own clock, so the real date cannot be preserved. Records
+ * written before the change keep `h` forever, and a reader that stops
+ * understanding `h` loses them.
+ *
+ * `h` is checked first because every record in existence today has one, and
+ * because a record carrying both is transitional rather than global — it is
+ * still filed under a channel, whatever else it says.
+ */
+function projectFolder(event: SignedEvent): string | undefined {
+  return tag(event, 'h') ?? tag(event, 'buzz-channel')
+}
+
+/**
+ * A project's display name: upstream's `name`, or Ship's original `title`.
+ *
+ * Independent of the `h`/`buzz-channel` swap and read the same way — the
+ * vocabulary changed in the same commit, so a record can carry either, and old
+ * records carry `title` forever for the same reason they carry `h`.
+ */
+function projectName(event: SignedEvent): string | undefined {
+  return tag(event, 'name') ?? tag(event, 'title')
+}
+
+/**
+ * A project's description: upstream's `description` tag, or Ship's `.content`.
+ *
+ * `.content` is the fallback rather than the other way round, so a record that
+ * carries the tag is taken at its word even when something also left content
+ * behind. An absent tag and an empty one are deliberately different: a record
+ * that says its description is empty is not a record that never said.
+ */
+function projectDescription(event: SignedEvent): string {
+  return tag(event, 'description') ?? event.content
+}
+
+/**
  * Fold a Folder's raw events into current state.
  *
  * Takes everything the relay returned for one `h` and sorts it out here rather
@@ -421,13 +477,16 @@ export function foldFolder(
       // A change may rename an object. The root still holds the author's title;
       // a change overrides it, because a rename by someone else has nowhere
       // else to live.
-      title: fields.title?.value ?? tag(event, 'title') ?? '(untitled project)',
-      description: fields.description?.value ?? event.content,
-      // The project's Folder is its own `h` — the Folder *is* the project. A
-      // change may re-point it at an existing Peek topic; that override wins,
-      // but the original still has to be read (see `projectFolders`).
-      contentFolder: fields.folder?.value ?? tag(event, 'h') ?? '',
-      originFolder: tag(event, 'h') ?? '',
+      // Two wire shapes, read in one pass, and it stays that way — see
+      // `projectFolder` and `projectName` below for why there is no migration.
+      title: fields.title?.value ?? projectName(event) ?? '(untitled project)',
+      description: fields.description?.value ?? projectDescription(event),
+      // The project's Folder is the one its record names — the Folder *is* the
+      // project. A change may re-point it at an existing Peek topic; that
+      // override wins, but the original still has to be read
+      // (see `projectFolders`).
+      contentFolder: fields.folder?.value ?? projectFolder(event) ?? '',
+      originFolder: projectFolder(event) ?? '',
       lead: fields.lead?.value ?? tag(event, 'lead'),
       status: fields.status?.value ?? DEFAULT_PROJECT_STATUS,
       // Any non-empty value means archived; unarchiving writes an empty string
