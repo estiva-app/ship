@@ -34,12 +34,12 @@ export function assertFolderId(folder: string): void {
 }
 
 /**
- * kind:30850 Project. Tag order: d, title, h, [lead].
+ * kind:30850 Project. Tag order: d, name, [description], buzz-channel, [lead].
  *
  * ## The Folder *is* the project
  *
- * A project's `h` is its own Folder — the same container its issues, their
- * change events and its conversation live in. That is the whole model, and it
+ * A project's `buzz-channel` is its own Folder — the same container its issues,
+ * their change events and its conversation live in. That is the whole model, and it
  * is what RFC_UPDATES.md §1.1 already described: "the Peek topic and the Linear
  * project are the same Folder, projected differently."
  *
@@ -60,37 +60,39 @@ export function assertFolderId(folder: string): void {
  * now lives in that topic" after the fact — and the reader takes the union, so
  * issues already filed do not disappear.
  *
- * ## Why this still writes `h` and `title` (REW-11)
+ * ## The record is global; its contents are not (REW-11)
  *
- * REW-11 replaces `["h", uuid]` with `["buzz-channel", uuid]` and `["title"]`
- * with `["name"]` + a `["description"]` tag, so the record becomes global and
- * discoverable without channel access. `src/fold.ts` **already reads that
- * shape** — see `projectFolder`, `projectName`, `projectDescription`.
+ * The record carries `buzz-channel` rather than `h`, so the relay stores it
+ * **globally** and anybody can discover the project without being admitted to
+ * its channel. Issues, changes and messages keep their `h` and stay
+ * channel-scoped — the conversation is still gated, only the description of the
+ * container is public. RFC 0.3 §4.2 argues this is forced rather than chosen: a
+ * record filed under a channel cannot be discovered by anyone the channel does
+ * not already admit, which defeats three of the four properties a container
+ * needs.
  *
- * The writer has not flipped because the relay refuses the result. Buzz lists
- * `KIND_LL_PROJECT` in `requires_h_channel_scope`
- * (`buzz-relay/src/handlers/ingest.rs:494`) alongside `KIND_LL_ISSUE` and
- * `KIND_LL_CHANGE`, so a `kind:30850` with no `h` comes back
+ * **This means a project's name is world-readable.** That is the intended
+ * trade for discoverability and it is not reversible by editing later, because
+ * the event is already published. A project whose *name* must stay private
+ * wants RFC 0.3's private-folder model, not this.
  *
- *   200 {"accepted": false, "message": "invalid: channel-scoped events must
- *        include an h tag"}
+ * The relay had to change first: `KIND_LL_PROJECT` was in
+ * `requires_h_channel_scope`, so a `kind:30850` with no `h` came back
+ * `200 {"accepted": false, "message": "invalid: channel-scoped events must
+ * include an h tag"}` — a 200 with `accepted:false`, which is exactly the
+ * rejection shape `lib/nostr/relay.ts` exists to catch. `KIND_LL_ISSUE` and
+ * `KIND_LL_CHANGE` are still on that list and must stay there.
  *
- * — measured against production, not inferred, and a 200 with `accepted:false`
- * is exactly the rejection shape `lib/nostr/relay.ts` exists to catch. The
- * comment on that list says the Folder is required because it is "both how
- * objects are grouped and how access is enforced", which is true of an issue
- * and is the thing REW-11 argues is wrong for a *project record*.
+ * `d` is still an opaque uuid, deliberately (RFC 0.3 §4.3: a human slug in an
+ * immutable address leaks a name you may later want private).
  *
- * So the flip needs `KIND_LL_PROJECT` removed from that one list and the relay
- * deployed. Issues and changes stay on it — only the record goes global. When
- * that lands, this builder emits
+ * ## Reading the old shape is permanent
  *
- *   [["d", id], ["name", …], ["description", …], ["buzz-channel", folder]]
- *
- * with `lead` unchanged and `d` still an opaque uuid (RFC 0.3 §4.3: a human
- * slug in an immutable address leaks a name you may later want private). No
- * reader change is needed at that point, which is the whole reason the reader
- * went first.
+ * Records written before this carry `h` and `title` and always will. They
+ * cannot be rewritten: a replaceable event is rewritable only by its author,
+ * and rewriting stamps a `created_at` the relay will not backdate past roughly
+ * ±15 minutes. `src/fold.ts` reads both shapes — `projectFolder`,
+ * `projectName`, `projectDescription` — and must keep doing so forever.
  */
 export function buildProject(
   pubkey: string,
@@ -110,16 +112,22 @@ export function buildProject(
   assertFolderId(args.folder)
   const tags: NostrTag[] = [
     ['d', args.projectId],
-    ['title', args.title],
-    ['h', args.folder],
+    ['name', args.title],
   ]
+  if (args.description) tags.push(['description', args.description])
+  tags.push(['buzz-channel', args.folder])
   if (args.lead) tags.push(['lead', args.lead.toLowerCase()])
   return {
     pubkey,
     created_at: toNostrSeconds(createdAtMs),
     kind: KIND.PROJECT,
     tags,
-    content: args.description ?? '',
+    // Empty, deliberately. The description moved into a tag so that a reader
+    // holding only tags — a discovery query, another app's index — has it
+    // without fetching content. `fold.ts` still reads `.content` when the tag
+    // is absent, which is the only reason every record written before this
+    // still shows its description.
+    content: '',
   }
 }
 

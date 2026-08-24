@@ -156,6 +156,15 @@ export class Store {
    *
    * When creating a new Folder the order matters: it has to exist before
    * anything can be written into it (FRICTION.md A4).
+   *
+   * That ordering survives REW-11 even though the reason narrowed. The project
+   * record is global now, so it no longer needs the channel to exist — but its
+   * issues, changes and conversation all still carry an `h`, so a project whose
+   * Folder was never created is a project nothing can be filed into. Bailing out
+   * when `ensureFolder` fails is therefore still right: publishing the record
+   * anyway would advertise a container that does not exist, and advertising it
+   * *globally* would put that claim in front of everyone rather than only the
+   * person who tried.
    */
   async createProject(args: {
     title: string
