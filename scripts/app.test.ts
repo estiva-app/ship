@@ -38,10 +38,14 @@ console.log('\n# which Folder each event lands in\n')
 const project = buildProject(PK, Date.now(), {
   projectId: 'p1',
   title: 'Payment integration',
+  description: 'Take card payments',
   folder: CONTENT,
 })
-check('a project record lives in the project\'s own Folder', tag(project, 'h') === CONTENT)
+check('a project record names its Folder without being filed in it', tag(project, 'buzz-channel') === CONTENT)
+check('  …so it carries no h at all, which is what makes it discoverable', tag(project, 'h') === undefined)
 check('  …and carries no separate index pointer', tag(project, 'folder') === undefined)
+check('  …upstream vocabulary: name, not title', tag(project, 'name') === 'Payment integration' && tag(project, 'title') === undefined)
+check('  …description is a tag, and content is empty', tag(project, 'description') === 'Take card payments' && project.content === '')
 
 const issue = buildIssue(PK, Date.now(), {
   issueId: 'i1',
@@ -68,11 +72,16 @@ const projectChange = buildChange(PK, Date.now(), {
 })
 check('a change to a project carries that same Folder', tag(projectChange, 'h') === CONTENT)
 
-// The whole point: one container. Access to the Peek topic is access to the
-// project, its issues and its history, with nothing left in a second place.
+// Still one container — but the record now *names* it instead of sitting in it.
+// Access to the Peek topic is access to the issues, the history and the
+// conversation; the record itself is public and points at the same uuid.
 check(
-  'every event about the project shares one h',
-  new Set([project, issue, statusChange, projectChange].map((e) => tag(e, 'h'))).size === 1,
+  'every event *inside* the project shares one h',
+  new Set([issue, statusChange, projectChange].map((e) => tag(e, 'h'))).size === 1,
+)
+check(
+  '  …and the record points at that same Folder from outside it',
+  tag(project, 'buzz-channel') === tag(issue, 'h'),
 )
 
 // ── Folding across containers ───────────────────────────────────────────────
