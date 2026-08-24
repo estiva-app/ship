@@ -53,15 +53,28 @@ are exactly the ones production cannot demonstrate.
 
 ## Two things that will mislead you
 
-**The app does not show every issue.** `loadAll` discovers from projects and
-widens into their Folders, so an issue whose project record no longer resolves
-is unreachable — 13 of 31 on production when this was written. This is a
-property of the discovery model, not a bug in a query. See PEEK-154.
+**The app used to miss issues, and no longer does — SHI-7, 2026-08-24.**
+`loadAll` discovered only from projects and widened into their Folders, so an
+issue whose project record no longer resolved was never asked for: 13 unreachable
+of 97 on production. It now also queries `kind:30851` directly **and widens into
+each discovered issue's own Folder**, which takes coverage to 0 of 97.
 
-PEEK-150 sharpened it: those issues are intact and readable. A reader that
-queries `kind:30851` directly finds all 31, and 12 of the 13 still carry a valid
-`a` tag pointing at a project that was deleted. The fault is navigating from a
-parent that can disappear, not the data.
+Both halves matter and the second is the one to protect. An issue root carries no
+status and no assignee — both are `kind:1851` changes living in the issue's
+Folder — so discovering an issue without widening into it folds a *default*
+status. Two of the thirteen are `done` and assigned and would read `todo`. A
+missing row is noticed; a wrong status is believed.
+
+The `coverage` block in `estiva-agent` stays and is still worth reading. It
+reported 13 because of this defect; at 0 it now measures the real case — an issue
+in a Folder the reader genuinely cannot read. Production has no private channel
+today (all 50 are open), so that has never happened here. It will.
+
+History, because the diagnosis was wrong for a while: PEEK-154 and PEEK-150 read
+this as an access-control problem, and REW-11 was justified partly on fixing it.
+It was not access. Twelve of the thirteen had a project record that was
+**deleted**, one never carried an `a` tag, and all thirteen sat in Folders the
+reader could already see — so REW-11 measured 13 before and 13 after.
 
 **Display refs are not unique.** `nextRef` derives them from what a client could
 see at the time, so the workspace contains two `PEE-1`, two `NEW-1` and two
