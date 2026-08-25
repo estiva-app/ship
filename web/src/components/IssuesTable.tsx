@@ -65,10 +65,10 @@ export function IssuesTable({ issues, statuses, hrefFor, className }: IssuesTabl
                 <StatusLabel value={issue.status} label={statusLabel(issue.status, statuses)} />
               </td>
               <td className={cn(TD, 'text-text-secondary')}>
-                {issue.assignee ? <Person name={issue.assignee.name} picture={issue.assignee.picture} size={20} /> : <span className="text-text-muted">—</span>}
+                {issue.assignee ? <Person name={issue.assignee.name} picture={issue.assignee.picture} size={16} /> : <span className="text-text-muted">—</span>}
               </td>
               <td className={cn(TD, 'text-text-secondary')}>
-                <Person name={issue.openedBy.name} picture={issue.openedBy.picture} size={20} />
+                <Person name={issue.openedBy.name} picture={issue.openedBy.picture} size={16} />
               </td>
               <td className={cn(TD, 'whitespace-nowrap tabular-nums text-text-muted')}>{ago(issue.at)}</td>
             </tr>

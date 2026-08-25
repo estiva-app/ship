@@ -2,13 +2,13 @@ import { useState } from 'react'
 import { IconChevronDown, IconChevronRight } from '@tabler/icons-react'
 import { cn } from '@/lib/cn'
 import { groupByStatus, type StatusEntry } from '@/lib/issues'
-import { Chip } from '@/components/ui/Chip'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { StatusLabel } from '@/components/ui/StatusLabel'
 import { IssueRow, type IssueRowData } from './IssueRow'
 
 /**
- * A status group: a header with the shaped icon, the label and a count, then
+ * A status group: a header with the shaped icon, the label and a bare mono
+ * count — the sidebar's treatment, not a chip (Katerina, 2026-08-27) — then
  * its rows. Collapsible; "Done" starts collapsed (ruling C15) so the work
  * still open is what a page shows first.
  */
@@ -34,7 +34,7 @@ export function IssueGroup({ status, label, issues, statuses, hrefFor, defaultCo
       >
         <Chevron size={14} stroke={1.5} className="shrink-0 text-text-muted" />
         <StatusLabel value={status} label={label} strong />
-        <Chip label={String(issues.length)} />
+        <span className="font-mono text-caption tabular-nums text-text-muted">{issues.length}</span>
       </button>
       {!collapsed && issues.map((issue) => <IssueRow key={issue.addr} issue={issue} statuses={statuses} href={hrefFor(issue)} />)}
     </section>

@@ -29,11 +29,12 @@ export function IssueView({ crumbs, title, description, onRename, onDescribe, th
   if (crumbs.ref) items.push({ label: crumbs.ref, mono: true })
 
   return (
-    <div className="flex h-full min-h-0">
-      {/* Only this column scrolls; the rail beside it stays where it is. */}
-      <div className="flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-5">
-        <Breadcrumb items={items} />
-        <div className="flex flex-col gap-6">
+    <div className="flex h-full min-h-0 flex-col gap-4 px-6 pt-5">
+      <Breadcrumb items={items} />
+      <div className="flex min-h-0 flex-1 gap-8">
+        {/* Only this column scrolls — without a visible scrollbar — and the rail
+            beside it starts level with the title and never moves. */}
+        <div className="flex min-w-0 flex-1 flex-col gap-6 overflow-y-auto pb-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <div className="flex flex-col gap-2">
             <EditableText label="Title" value={title} placeholder="Untitled issue" onCommit={onRename} className="-mx-2 text-h2" />
             <EditableText label="Description" value={description} placeholder="Add a description…" onCommit={onDescribe} multiline className="-mx-2 text-body-2" />
@@ -47,9 +48,9 @@ export function IssueView({ crumbs, title, description, onRename, onDescribe, th
             <ActivityFeed entries={activity} />
           </section>
         </div>
-      </div>
-      <div className="shrink-0 overflow-y-auto py-5 pr-6">
-        <IssueRail {...rail} />
+        <div className="shrink-0 overflow-y-auto pb-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <IssueRail {...rail} />
+        </div>
       </div>
     </div>
   )

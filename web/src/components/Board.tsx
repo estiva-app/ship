@@ -1,7 +1,6 @@
 import { cn } from '@/lib/cn'
 import type { StatusEntry } from '@/lib/issues'
 import { Avatar } from '@/components/ui/Avatar'
-import { Chip } from '@/components/ui/Chip'
 import { StatusLabel } from '@/components/ui/StatusLabel'
 import type { IssueRowData } from './IssueRow'
 
@@ -51,7 +50,7 @@ export function BoardColumn({
     <section className="flex min-h-40 min-w-0 flex-col gap-2 rounded-lg border border-border-default bg-bg-surface p-2">
       <header className="flex h-7 items-center gap-2 px-1">
         <StatusLabel value={status} label={label} strong />
-        <Chip label={String(issues.length)} />
+        <span className="font-mono text-caption tabular-nums text-text-muted">{issues.length}</span>
       </header>
       <div className="flex flex-col gap-1.5">
         {issues.map((issue) => (

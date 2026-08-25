@@ -15,8 +15,8 @@ import { Chip } from './Chip'
  * A tab's count is a Chip beside the label, not part of the label text
  * ("Active" + [5], never "Active (5)") — Katerina, 2026-08-26. On the active
  * tab the chip sits on the accent tint, where a neutral chip (bg-inset)
- * vanished; it takes a lighter fill there instead — bg-active, the
- * translucent white (Katerina, 2026-08-27: lighter, not dark).
+ * vanished; it takes white at 15% there instead (Katerina, 2026-08-27:
+ * "white with opacity" — bg-active's 8% read as grey).
  */
 export interface TabDef<T extends string> {
   id: T
@@ -53,7 +53,7 @@ export function Tabs<T extends string>({ tabs, active, onChange, size = 'default
         >
           {tab.icon}
           {tab.label}
-          {tab.count ? <Chip label={String(tab.count)} className={active === tab.id ? 'bg-bg-active' : undefined} /> : null}
+          {tab.count ? <Chip label={String(tab.count)} className={active === tab.id ? 'bg-white/15' : undefined} /> : null}
         </button>
       ))}
     </div>

@@ -35,7 +35,7 @@
      surface: the old palette had one value for hover AND elevated, and a
      menu item on the elevated surface hovered invisibly. */
   --bg-hover:    rgba(255, 255, 255, 0.05);
-  --bg-selected: rgba(108, 140, 255, 0.12);
+  --bg-selected: rgba(55, 87, 208, 0.16);
   --bg-active:   rgba(255, 255, 255, 0.08);
   --bg-disabled: #16181f;
 
@@ -53,16 +53,18 @@
   --border-subtle:  #232734;
   --border-default: #272b36;
   --border-strong:  #3a3f4d;
-  --border-focus:   #6c8cff;
+  --border-focus:   #3757d0;
 
   /* accent */
-  --accent-primary: #6c8cff;
-  --accent-hover:   #86a0ff;
-  --accent-muted:   #1d2540;
+  /* Darker than the old app's #6c8cff (Katerina, 2026-08-27: "too bright");
+     light text on it now reads at 4.9:1. */
+  --accent-primary: #3757d0;
+  --accent-hover:   #4a68dc;
+  --accent-muted:   #1a2342;
 
   /* semantic */
-  --info-default:    #6c8cff;
-  --info-muted:      #1d2540;
+  --info-default:    #5b7be8;
+  --info-muted:      #1a2342;
   --warning-default: #e0b04a;
   --warning-muted:   #3a2f14;
   --success-default: #46c08a;

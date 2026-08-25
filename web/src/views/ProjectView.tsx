@@ -1,3 +1,4 @@
+import { IconLayoutKanban, IconTable } from '@tabler/icons-react'
 import { Breadcrumb } from '@/components/ui/Breadcrumb'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Tabs } from '@/components/ui/Tabs'
@@ -45,19 +46,20 @@ export interface ProjectViewProps {
 
 export function ProjectView({ crumbs, header, view, onView, issues, issueStatuses, hrefFor, threads, onStartConversation, onReply, rail }: ProjectViewProps) {
   return (
-    <div className="flex h-full min-h-0">
-      {/* Only this column scrolls; the rail beside it stays where it is. */}
-      <div className="flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-5">
-        <Breadcrumb items={[{ label: 'Projects', href: crumbs.projectsHref }, { label: crumbs.title }]} />
-        <div className="flex flex-col gap-6">
+    <div className="flex h-full min-h-0 flex-col gap-4 px-6 pt-5">
+      <Breadcrumb items={[{ label: 'Projects', href: crumbs.projectsHref }, { label: crumbs.title }]} />
+      <div className="flex min-h-0 flex-1 gap-8">
+        {/* Only this column scrolls — without a visible scrollbar — and the rail
+            beside it starts level with the title and never moves. */}
+        <div className="flex min-w-0 flex-1 flex-col gap-6 overflow-y-auto pb-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <ProjectHeader {...header} />
           <section className="flex flex-col gap-3">
             <div className="flex items-center gap-3">
               <h2 className="flex-1 text-h4 text-text-primary">Issues</h2>
               <Tabs
                 tabs={[
-                  { id: 'table', label: 'Table' },
-                  { id: 'board', label: 'Board' },
+                  { id: 'table', label: 'Table', icon: <IconTable size={16} stroke={1.5} /> },
+                  { id: 'board', label: 'Board', icon: <IconLayoutKanban size={16} stroke={1.5} /> },
                 ]}
                 active={view}
                 onChange={onView}
@@ -76,9 +78,9 @@ export function ProjectView({ crumbs, header, view, onView, issues, issueStatuse
             <Conversations threads={threads} onStart={onStartConversation} onReply={onReply} />
           </section>
         </div>
-      </div>
-      <div className="shrink-0 overflow-y-auto py-5 pr-6">
-        <ProjectRail {...rail} archived={header.archived} />
+        <div className="shrink-0 overflow-y-auto pb-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <ProjectRail {...rail} archived={header.archived} />
+        </div>
       </div>
     </div>
   )
