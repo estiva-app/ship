@@ -2,7 +2,7 @@ import { cn } from '@/lib/cn'
 import type { StatusEntry } from '@/lib/issues'
 import { Avatar } from '@/components/ui/Avatar'
 import { Chip } from '@/components/ui/Chip'
-import { StatusIcon } from '@/components/ui/StatusIcon'
+import { StatusLabel } from '@/components/ui/StatusLabel'
 import type { IssueRowData } from './IssueRow'
 
 /**
@@ -47,8 +47,7 @@ export function BoardColumn({
   return (
     <section className="flex min-h-40 w-[220px] shrink-0 flex-col gap-2 rounded-lg border border-border-default bg-bg-surface p-2">
       <header className="flex h-7 items-center gap-2 px-1">
-        <StatusIcon value={status} size={14} />
-        <span className="text-body-2-strong text-text-primary">{label}</span>
+        <StatusLabel value={status} label={label} strong />
         <Chip label={String(issues.length)} />
       </header>
       <div className="flex flex-col gap-1.5">

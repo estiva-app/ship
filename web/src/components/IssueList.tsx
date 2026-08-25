@@ -4,7 +4,7 @@ import { cn } from '@/lib/cn'
 import { groupByStatus, type StatusEntry } from '@/lib/issues'
 import { Chip } from '@/components/ui/Chip'
 import { EmptyState } from '@/components/ui/EmptyState'
-import { StatusIcon } from '@/components/ui/StatusIcon'
+import { StatusLabel } from '@/components/ui/StatusLabel'
 import { IssueRow, type IssueRowData } from './IssueRow'
 
 /**
@@ -33,8 +33,7 @@ export function IssueGroup({ status, label, issues, statuses, hrefFor, defaultCo
         className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-left transition-colors hover:bg-bg-hover"
       >
         <Chevron size={14} stroke={1.5} className="shrink-0 text-text-muted" />
-        <StatusIcon value={status} />
-        <span className="text-body-2-strong text-text-primary">{label}</span>
+        <StatusLabel value={status} label={label} strong />
         <Chip label={String(issues.length)} />
       </button>
       {!collapsed && issues.map((issue) => <IssueRow key={issue.addr} issue={issue} statuses={statuses} href={hrefFor(issue)} />)}

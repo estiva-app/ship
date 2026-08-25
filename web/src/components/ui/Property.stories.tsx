@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite'
 import { Person } from './Person'
 import { Property } from './Property'
 import { Select } from './Select'
-import { StatusIcon } from './StatusIcon'
+import { StatusLabel } from './StatusLabel'
 
 /** Peek's Property. `row` is Peek's; `stacked` is Ship's rail label — see Projects/ProjectRail for the rail itself. */
 const meta = {
@@ -49,10 +49,7 @@ export const RowValues: Story = {
   render: () => (
     <>
       <Property label="Status">
-        <span className="flex items-center gap-1.5 text-body-2 text-text-primary">
-          <StatusIcon value="in_progress" />
-          In Progress
-        </span>
+        <StatusLabel value="in_progress" label="In Progress" />
       </Property>
       <Property label="Lead">
         <Person name="Ana Duarte" className="text-body-2 text-text-primary" />

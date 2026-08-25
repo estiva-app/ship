@@ -2,7 +2,7 @@ import { cn } from '@/lib/cn'
 import { ago } from '@/lib/time'
 import { statusLabel, type StatusEntry } from '@/lib/issues'
 import { Person } from '@/components/ui/Person'
-import { StatusIcon } from '@/components/ui/StatusIcon'
+import { StatusLabel } from '@/components/ui/StatusLabel'
 import type { IssueRowData } from './IssueRow'
 
 /**
@@ -28,7 +28,8 @@ export interface IssuesTableProps {
 // Sizes spelled as arbitrary values, not tokens: these strings go through cn(),
 // and tailwind-merge drops a custom text-size class that is followed by a
 // text-{colour} class (the pitfall Peek's config records). The header is the
-// menu token (9/115%/500); the ref and the date are the caption token (12).
+// menu token (9/115%/500); the ref is the caption token (12); everything else
+// in a cell, the date included, is the table's own 14 (Katerina, 2026-08-26).
 const TH = 'h-9 px-3 text-left text-[9px] font-medium uppercase leading-[115%] tracking-[0.08em] text-text-secondary'
 const TD = 'h-10 px-3 text-body-2'
 const SMALL = 'text-[12px] leading-[120%]'
@@ -59,10 +60,7 @@ export function IssuesTable({ issues, statuses, hrefFor, className }: IssuesTabl
                 </a>
               </td>
               <td className={TD}>
-                <span className="flex items-center gap-1.5 text-text-secondary">
-                  <StatusIcon value={issue.status} size={14} />
-                  {statusLabel(issue.status, statuses)}
-                </span>
+                <StatusLabel value={issue.status} label={statusLabel(issue.status, statuses)} />
               </td>
               <td className={cn(TD, 'text-text-secondary')}>
                 {issue.assignee ? <Person name={issue.assignee.name} picture={issue.assignee.picture} size={20} /> : <span className="text-text-muted">—</span>}
@@ -70,7 +68,7 @@ export function IssuesTable({ issues, statuses, hrefFor, className }: IssuesTabl
               <td className={cn(TD, 'text-text-secondary')}>
                 <Person name={issue.openedBy.name} picture={issue.openedBy.picture} size={20} />
               </td>
-              <td className={cn(TD, 'whitespace-nowrap tabular-nums', SMALL, 'text-text-muted')}>{ago(issue.at)}</td>
+              <td className={cn(TD, 'whitespace-nowrap tabular-nums text-text-muted')}>{ago(issue.at)}</td>
             </tr>
           ))}
         </tbody>

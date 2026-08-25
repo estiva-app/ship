@@ -2,7 +2,7 @@ import { cn } from '@/lib/cn'
 import { ago } from '@/lib/time'
 import { Avatar } from '@/components/ui/Avatar'
 import { Chip } from '@/components/ui/Chip'
-import { StatusIcon } from '@/components/ui/StatusIcon'
+import { StatusLabel } from '@/components/ui/StatusLabel'
 
 /**
  * One project on the projects list — her anatomy (ruling B7): title ·
@@ -67,10 +67,7 @@ export function ProjectCard({
           2026-08-26). */}
       <p className="mb-1 line-clamp-2 min-h-[2lh] text-body-2 text-text-secondary">{description}</p>
       <div className="flex items-center gap-2.5 text-caption text-text-muted">
-        <span className="flex items-center gap-1.5">
-          <StatusIcon value={status.value} size={14} />
-          {status.label}
-        </span>
+        <StatusLabel value={status.value} label={status.label} size="small" />
         {issueCount > 0 && (
           <>
             <Dot />

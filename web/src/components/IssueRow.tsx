@@ -2,7 +2,7 @@ import { cn } from '@/lib/cn'
 import { ago } from '@/lib/time'
 import { statusLabel, type StatusEntry } from '@/lib/issues'
 import { Avatar } from '@/components/ui/Avatar'
-import { StatusIcon } from '@/components/ui/StatusIcon'
+import { StatusLabel } from '@/components/ui/StatusLabel'
 
 /**
  * One issue, as production's row (Katerina, 2026-08-26): a bordered card of
@@ -50,10 +50,7 @@ export function IssueRow({ issue, statuses, href, className }: IssueRowProps) {
       <span className="truncate text-body-2-strong text-text-primary">{issue.title}</span>
       <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-caption text-text-muted">
         <span className={cn('font-mono', issue.ref ? 'text-text-muted' : 'text-text-disabled')}>{issue.ref ?? '—'}</span>
-        <span className="flex items-center gap-1.5 text-text-secondary">
-          <StatusIcon value={issue.status} size={14} />
-          {statusLabel(issue.status, statuses)}
-        </span>
+        <StatusLabel value={issue.status} label={statusLabel(issue.status, statuses)} size="small" />
         {issue.assignee && (
           <span className="flex min-w-0 items-center gap-1.5 text-text-secondary">
             <Avatar name={issue.assignee.name} src={issue.assignee.picture} size={16} />
