@@ -1,0 +1,55 @@
+import { Meta } from '@storybook/addon-docs/blocks'
+
+<Meta title="Docs/Introduction" />
+
+# Ship — Component Library
+
+This is the living component reference for **Estiva Ship**, the issue tracker
+(projects, issues, comments) — being rebuilt on React, Vite and Tailwind as the
+second consumer of the shared Estiva foundation. Every screen and component of
+the new app appears here first, then gets wired to live data, then gets
+reviewed.
+
+New here? Start with **Design Tokens** — the colours, type, radius and shadows
+every component is built from.
+
+## What is shared, and what is Ship's
+
+- **Token names** are shared with Peek and every other Estiva app, through the
+  `@estiva/ui` package. A component written against them renders anywhere.
+- **Token values** are Ship's own theme — Ship has its own palette.
+- **Generic components** (avatars, buttons, inputs, chips…) come from the
+  package and have their own Storybook there. This one holds what is Ship's:
+  issue rows, the board, the project page, the app shell.
+
+This Storybook loads only Ship's stories. Somebody building Ship needs Ship and
+the installed package, nothing else.
+
+## How the sidebar is organised
+
+- **Docs** — this page and the Design Tokens reference.
+- **Primitives · Feedback · Inputs** — the same section names as Peek, for
+  the same concepts, so one component never exists twice under two names.
+- **Issues · Projects** — Ship's product surfaces.
+- **Navigation** — the app frame: shell, sidebar, header.
+
+## Conventions
+
+- **Stories first.** A component exists in Storybook before it exists in a
+  screen. Review happens here.
+- **Tokens only.** Never raw hex. If a colour you need has no token, the token
+  is missing — say so rather than reaching for a value.
+- **Autodocs.** Each component gets a **Docs** tab generated from its JSDoc
+  and `argTypes`.
+- **No product knowledge in a primitive.** If it knows what an issue is, it
+  belongs under Issues, not Primitives.
+- **Never show a key, or part of one.** A person is a face and a name; where
+  there is no profile, a silhouette and an em dash.
+- **Only offer actions that can succeed.** A control someone may not use is
+  not rendered.
+
+## Where the data comes from
+
+Ship has no backend. The app reads the relay and folds events in the browser;
+the fold lives in `../src` and is **never edited from here** — components reach
+it through the data seam in `src/api/`. Stories use fixtures, never the relay.

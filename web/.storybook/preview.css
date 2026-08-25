@@ -1,0 +1,14 @@
+/*
+ * Docs-page example blocks sit on the app's own canvas (--bg-base, the same
+ * surface as the running app) instead of the docs theme's default block
+ * background, so a component is judged against what it will actually sit on.
+ */
+.docs-story {
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+}
+
+/* The inline story wrapper inside docs inherits the same canvas. */
+.docs-story > div {
+  background-color: transparent;
+}

@@ -7,19 +7,24 @@
   "scripts": {
     "dev": "vite --port 5191 --strictPort",
     "build": "tsc -b && vite build",
-    "preview": "vite preview --port 5191 --strictPort"
+    "preview": "vite preview --port 5191 --strictPort",
+    "storybook": "storybook dev -p 6007",
+    "build-storybook": "storybook build"
   },
   "dependencies": {
     "react": "^19.2.4",
     "react-dom": "^19.2.4"
   },
   "devDependencies": {
+    "@storybook/addon-docs": "^10.5.10",
+    "@storybook/react-vite": "^10.5.10",
     "@types/node": "^24.12.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
     "autoprefixer": "^10.4.27",
     "postcss": "^8.5.8",
+    "storybook": "^10.5.10",
     "tailwindcss": "^3.4.19",
     "typescript": "~5.9.3",
     "vite": "^8.0.1"
