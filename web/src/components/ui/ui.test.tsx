@@ -1,6 +1,6 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { ComposeBox } from './ComposeBox'
+import { Composer } from '../Composer'
 import { DialogShell } from './DialogShell'
 import { IconButton } from './IconButton'
 import { Select } from './Select'
@@ -61,33 +61,33 @@ describe('DialogShell', () => {
   })
 })
 
-describe('ComposeBox', () => {
-  it('sends trimmed text on Enter, never sends empty, and Shift+Enter is a new line', () => {
-    const onSend = vi.fn()
-    render(<ComposeBox onSend={onSend} placeholder="Reply…" />)
-    const area = screen.getByRole('textbox', { name: 'Reply…' })
-    const send = screen.getByRole('button', { name: 'Send' })
-    expect(send).toBeDisabled()
+describe('Composer', () => {
+  it('submits trimmed text on Enter, never submits empty, and clears only when the post succeeded', async () => {
+    const onSubmit = vi.fn().mockResolvedValue(true)
+    render(<Composer onSubmit={onSubmit} />)
+    const input = screen.getByRole('textbox', { name: 'Start a conversation…' })
+    const post = screen.getByRole('button', { name: 'Post' })
+    expect(post).toBeDisabled()
 
-    fireEvent.keyDown(area, { key: 'Enter' })
-    expect(onSend).not.toHaveBeenCalled()
+    fireEvent.submit(input.closest('form')!)
+    expect(onSubmit).not.toHaveBeenCalled()
 
-    fireEvent.change(area, { target: { value: '  hello  ' } })
-    expect(send).toBeEnabled()
-    fireEvent.keyDown(area, { key: 'Enter', shiftKey: true })
-    expect(onSend).not.toHaveBeenCalled()
-    fireEvent.keyDown(area, { key: 'Enter' })
-    expect(onSend).toHaveBeenCalledWith('hello')
-    expect(area).toHaveValue('')
-    expect(send).toBeDisabled()
+    fireEvent.change(input, { target: { value: '  hello  ' } })
+    expect(post).toBeEnabled()
+    fireEvent.submit(input.closest('form')!)
+    expect(onSubmit).toHaveBeenCalledWith('hello')
+    await waitFor(() => expect(input).toHaveValue(''))
   })
 
-  it('sends from the button too', () => {
-    const onSend = vi.fn()
-    render(<ComposeBox onSend={onSend} />)
-    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'a message' } })
-    fireEvent.mouseDown(screen.getByRole('button', { name: 'Send' }))
-    expect(onSend).toHaveBeenCalledWith('a message')
+  it('keeps the text when the post fails', async () => {
+    const onSubmit = vi.fn().mockResolvedValue(false)
+    render(<Composer kind="reply" onSubmit={onSubmit} />)
+    const input = screen.getByRole('textbox', { name: 'Reply…' })
+    fireEvent.change(input, { target: { value: 'still here' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Reply' }))
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Reply' })).toBeEnabled())
+    expect(input).toHaveValue('still here')
   })
 })
 

@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite'
 import { SearchInput } from './SearchInput'
 
 const meta = {
-  title: 'Primitives/SearchInput',
+  title: 'Inputs/SearchInput',
   component: SearchInput,
   args: { placeholder: 'Search Ship…', className: 'w-[290px]' },
 } satisfies Meta<typeof SearchInput>
