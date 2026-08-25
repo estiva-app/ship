@@ -261,6 +261,69 @@ export function buildChange(
  * about an issue, so Peek renders the issue widget above the message instead of
  * showing a bare comment with no indication of what it refers to.
  */
+/**
+ * kind:1111 NIP-22 comment. Tag order: A, K, P, a, k, p, h, ts.
+ *
+ * ## Uppercase is the root, lowercase is the parent
+ *
+ * That is the whole of NIP-22 and the only thing to get right. Uppercase
+ * `A`/`K`/`P` name the **thread root** — the object being discussed, its kind,
+ * its author. Lowercase name the **immediate parent**. For a top-level comment
+ * the two are the same object, which is why both are written and why a reply
+ * three deep still knows what the thread is about.
+ *
+ * `K` and `P` are derived from the address rather than passed in: an address is
+ * `<kind>:<pubkey>:<d>`, so it already carries both, and taking them from a
+ * second argument would let a caller state a kind that contradicts the `A` it
+ * just gave.
+ *
+ * ## `h` is not optional, and nothing will tell you
+ *
+ * `1111` is channel-scoped when it carries an `h` and **global when it does
+ * not**. The relay accepts both — measured, not assumed — so a comment
+ * published without one is stored world-readable however private the issue it
+ * hangs off. There is no error and no warning; the event simply becomes public.
+ * `assertFolderId` above is the only thing standing there, which is why this
+ * builder takes a Folder rather than an optional one.
+ *
+ * ## Why replies are still kind:9
+ *
+ * A `1111` MUST name its root, and a reply's root is the *object*, not the
+ * comment it answers — so building one needs the thread's anchor, which
+ * `replyTo` does not carry and the caller does not currently pass. Emitting a
+ * `1111` without an `A` would be worse than a `kind:9`: malformed rather than
+ * merely old. So a reply stays a `kind:9` until a caller can supply the anchor,
+ * which is a change in the app rather than here.
+ *
+ * Nothing breaks in the meantime. `fold.ts` reads both kinds into one thread,
+ * and Peek's topic sync reads both since peek#58.
+ */
+function buildNip22Comment(
+  pubkey: string,
+  createdAtMs: number,
+  args: { folder: string; body: string; about: string },
+): UnsignedEvent {
+  const [kind, author] = args.about.split(':')
+  return {
+    pubkey,
+    created_at: toNostrSeconds(createdAtMs),
+    kind: KIND.COMMENT,
+    tags: [
+      ['A', args.about],
+      ['K', kind],
+      ['P', author],
+      ['a', args.about],
+      ['k', kind],
+      ['p', author],
+      ['h', args.folder],
+      // Same `ts` as everything else Ship writes, for the same reason: see
+      // `buildConversationMessage` below.
+      ['ts', String(Math.floor(createdAtMs))],
+    ],
+    content: args.body,
+  }
+}
+
 export function buildConversationMessage(
   pubkey: string,
   createdAtMs: number,
@@ -274,6 +337,18 @@ export function buildConversationMessage(
   },
 ): UnsignedEvent {
   assertFolderId(args.folder)
+
+  // A comment that names what it is about becomes a NIP-22 `kind:1111`; every
+  // other message stays a `kind:9`. See `buildNip22Comment` for why the split
+  // is where it is.
+  if (args.about && !args.replyTo) {
+    return buildNip22Comment(pubkey, createdAtMs, {
+      folder: args.folder,
+      body: args.body,
+      about: args.about,
+    })
+  }
+
   const event = buildMessage(pubkey, createdAtMs, {
     channelUuid: args.folder,
     content: args.body,
