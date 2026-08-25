@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { IconCopy, IconExternalLink, IconLogout } from '@tabler/icons-react'
 import { cn } from '@/lib/cn'
 import { Button } from '@/components/ui/Button'
 import { Person } from '@/components/ui/Person'
@@ -20,7 +19,8 @@ import { PersonTrigger } from '@/components/ui/PersonTrigger'
  * never receives the key, so it cannot show one; the caller copies.
  *
  * Three kinds of text, three tokens: a section label is muted, the value is
- * primary, the sentence under it is secondary. The actions are Buttons.
+ * primary, the sentence under it is secondary. The actions are plain
+ * Buttons — text only, no icons (Katerina, 2026-08-25).
  *
  * Signed-in affordances ("Edit your profile in Estiva ID", "Sign out") are
  * modelled now and wired in REW-2.
@@ -108,7 +108,6 @@ export function IdentityMenu({ me, signedIn, relayUrl, idBase, onCopyKey, onSign
             {signedIn && idBase && (
               <Button
                 className="w-full justify-start"
-                leadingIcon={<IconExternalLink size={16} stroke={1.5} className="text-text-secondary" />}
                 onClick={act(() => window.open(idBase, '_blank', 'noopener,noreferrer'))}
               >
                 Edit your profile in Estiva ID
@@ -116,7 +115,6 @@ export function IdentityMenu({ me, signedIn, relayUrl, idBase, onCopyKey, onSign
             )}
             <Button
               className="w-full justify-start"
-              leadingIcon={<IconCopy size={16} stroke={1.5} className="text-text-secondary" />}
               onClick={act(onCopyKey)}
             >
               Copy public key
@@ -124,7 +122,6 @@ export function IdentityMenu({ me, signedIn, relayUrl, idBase, onCopyKey, onSign
             {idBase && onSignOut && (
               <Button
                 className="w-full justify-start"
-                leadingIcon={<IconLogout size={16} stroke={1.5} className="text-text-secondary" />}
                 onClick={act(onSignOut)}
               >
                 Sign out

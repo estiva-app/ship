@@ -27,9 +27,12 @@
   --bg-surface:  #16181f;
   --bg-elevated: #1c1f28;
   --bg-inset:    #121419;
-  --bg-hover:    #1c1f28;
+  /* Translucent, as Peek's Signal theme does it, so a hover reads on every
+     surface: the old palette had one value for hover AND elevated, and a
+     menu item on the elevated surface hovered invisibly. */
+  --bg-hover:    rgba(255, 255, 255, 0.05);
   --bg-selected: rgba(108, 140, 255, 0.12);
-  --bg-active:   #232734;
+  --bg-active:   rgba(255, 255, 255, 0.08);
   --bg-disabled: #16181f;
 
   /* text */
