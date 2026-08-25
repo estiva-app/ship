@@ -97,7 +97,7 @@ describe('Breadcrumb', () => {
 
 describe('MessageCard', () => {
   it('names the author as a person or an em dash, never a key, and keeps the body as text', () => {
-    const { container } = render(<MessageCard message={{ ...THREADS[0].replies[1], body: '<b>not markup</b>' }} />)
+    const { container } = render(<MessageCard message={{ ...THREADS[0].replies[1], author: {}, body: '<b>not markup</b>' }} />)
     expect(container.textContent).toContain('—')
     expect(container.querySelector('b')).toBeNull()
     expect(container.textContent).not.toMatch(/[0-9a-f]{8}/)

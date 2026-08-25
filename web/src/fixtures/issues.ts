@@ -1,6 +1,9 @@
 import type { IssueRowData } from '@/components/IssueRow'
 import type { IssuesTableRow } from '@/components/IssuesTable'
 import type { ThreadData } from '@/components/ConversationThread'
+import anaPortrait from './avatars/ana-duarte.png'
+import raviPortrait from './avatars/ravi-mehta.png'
+import maraPortrait from './avatars/mara-sato.png'
 
 /**
  * Invented data for stories and tests — nothing real. Ship's own fictional
@@ -9,8 +12,10 @@ import type { ThreadData } from '@/components/ConversationThread'
  */
 const NOW = Math.floor(Date.now() / 1000)
 
-export const ANA = { name: 'Ana Duarte' }
-export const RAVI = { name: 'Ravi Mehta' }
+/** Portraits: Peek's own fictional demo faces (peek/src/assets/avatars), so the two apps share invented people. */
+export const ANA = { name: 'Ana Duarte', picture: anaPortrait }
+export const RAVI = { name: 'Ravi Mehta', picture: raviPortrait }
+export const MARA = { name: 'Mara Sato', picture: maraPortrait }
 export const NOBODY = {}
 
 export const ISSUE_STATUSES = [
@@ -23,7 +28,7 @@ export const ISSUE_STATUSES = [
 export const ISSUES: IssuesTableRow[] = [
   { addr: '30851:a:1', ref: 'REL-1', title: 'Board columns lose order after an archived project returns', status: 'in_progress', assignee: ANA, openedBy: RAVI, at: NOW - 3600 * 2, conversations: 2 },
   { addr: '30851:a:2', ref: 'REL-2', title: 'Comments lose their draft when navigating away', status: 'in_progress', assignee: RAVI, openedBy: ANA, at: NOW - 86400 },
-  { addr: '30851:a:3', ref: 'REL-3', title: 'Pick the dark theme accent', status: 'todo', openedBy: ANA, at: NOW - 86400 * 2, conversations: 1 },
+  { addr: '30851:a:3', ref: 'REL-3', title: 'Pick the dark theme accent', status: 'todo', assignee: MARA, openedBy: ANA, at: NOW - 86400 * 2, conversations: 1 },
   { addr: '30851:a:4', ref: 'REL-4', title: 'Add a keyboard path for changing status from the list', status: 'todo', assignee: ANA, openedBy: RAVI, at: NOW - 86400 * 3 },
   { addr: '30851:a:5', title: 'Filed from another app, with no ref', status: 'todo', openedBy: NOBODY, at: NOW - 86400 * 4 },
   { addr: '30851:a:6', ref: 'REL-6', title: 'Empty states read as broken screens', status: 'done', assignee: RAVI, openedBy: ANA, at: NOW - 86400 * 9 },
@@ -42,7 +47,7 @@ export const THREADS: ThreadData[] = [
     root: { id: 'm1', author: ANA, at: NOW - 3600 * 3, body: 'The board keeps the columns in vocabulary order after a reload, but not after an archived project comes back. Anyone else seeing this?' },
     replies: [
       { id: 'm2', author: RAVI, at: NOW - 3600 * 2, body: 'Yes — it re-reads the folder union and the archived one lands last.' },
-      { id: 'm3', author: NOBODY, at: NOW - 3600, body: 'Same here, from Peek.' },
+      { id: 'm3', author: MARA, at: NOW - 3600, body: 'Same here, from Peek.' },
     ],
   },
   {

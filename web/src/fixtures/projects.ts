@@ -1,7 +1,7 @@
 import type { ProjectCardProps } from '@/components/ProjectCard'
 import type { ActivityEntry } from '@/components/ActivityFeed'
 import type { SidebarProject } from '@/components/Sidebar'
-import { ANA, RAVI } from './issues'
+import { ANA, MARA, RAVI } from './issues'
 
 /** Invented projects — nothing real. */
 const NOW = Math.floor(Date.now() / 1000)
@@ -88,8 +88,9 @@ export const SIDEBAR_PROJECTS: SidebarProject[] = [
 ]
 
 export const PEOPLE = [
-  { value: 'ana', name: 'Ana Duarte' },
-  { value: 'ravi', name: 'Ravi Mehta' },
+  { value: 'ana', name: ANA.name, picture: ANA.picture },
+  { value: 'ravi', name: RAVI.name, picture: RAVI.picture },
+  { value: 'mara', name: MARA.name, picture: MARA.picture },
 ]
 
 /** What the fold's change stream says about one issue, already in words. */

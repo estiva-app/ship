@@ -7,9 +7,9 @@ import { cn } from '@/lib/cn'
  * change of geometry is one edit.
  *
  * Same three variants and two sizes as Peek: 32px default / 24px small,
- * 6px radius, 500 weight; the primary reads inverse text on the accent, which
- * is what Peek's `signal:` theme does and is the only sensible reading on a
- * dark base. Sizes are spelled as arbitrary values for the reason Peek's
+ * 6px radius, 500 weight on every variant. The primary reads LIGHT text on the
+ * accent, as production's does (Katerina, 2026-08-27) — Peek's Signal uses
+ * the inverse; on a dark base the two are close and hers is the lighter. Sizes are spelled as arbitrary values for the reason Peek's
  * tailwind config records: tailwind-merge drops a custom `text-{size}` that
  * is followed by a `text-{colour}`.
  *
@@ -50,7 +50,7 @@ export function Button({
         // Extra right padding beside a leading icon, for optical balance.
         size === 'default' && (hasLeadingIcon ? 'pl-2 pr-3' : 'px-2'),
         size === 'small' && (hasLeadingIcon ? 'pl-1.5 pr-2' : 'px-1.5'),
-        !disabled && variant === 'primary' && 'cursor-pointer bg-accent-primary text-text-inverse hover:bg-accent-hover',
+        !disabled && variant === 'primary' && 'cursor-pointer bg-accent-primary text-text-primary hover:bg-accent-hover',
         !disabled && variant === 'outlined' && 'cursor-pointer border border-border-default text-text-primary hover:bg-bg-hover',
         !disabled && variant === 'muted' && 'cursor-pointer text-text-primary hover:bg-bg-hover',
         !disabled && variant === 'destructive' && 'cursor-pointer text-error-default hover:bg-error-muted',

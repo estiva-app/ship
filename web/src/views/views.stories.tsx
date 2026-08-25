@@ -5,7 +5,7 @@ import { AppShell } from '@/components/AppShell'
 import { IdentityMenu } from '@/components/IdentityMenu'
 import { Sidebar } from '@/components/Sidebar'
 import { ACTIVITY, ARCHIVED_CARDS, PEOPLE, PROJECT_CARDS, PROJECT_STATUSES, SIDEBAR_PROJECTS } from '@/fixtures/projects'
-import { ISSUES, ISSUE_STATUSES, THREADS, hrefFor } from '@/fixtures/issues'
+import { ANA, ISSUES, ISSUE_STATUSES, THREADS, hrefFor } from '@/fixtures/issues'
 import { IssueView } from './IssueView'
 import { IssuesView, type IssuesScope } from './IssuesView'
 import { ProjectView } from './ProjectView'
@@ -20,7 +20,7 @@ function Shell({ current, children }: { current: 'issues' | 'projects' | { proje
   return (
     <div className="h-screen">
       <AppShell
-        identity={<IdentityMenu me={{ name: 'Ana Duarte' }} signedIn idBase="https://id.estiva.app" relayUrl="http://localhost:3000" onCopyKey={fn()} onSignOut={fn()} />}
+        identity={<IdentityMenu me={ANA} signedIn idBase="https://id.estiva.app" relayUrl="http://localhost:3000" onCopyKey={fn()} onSignOut={fn()} />}
         sidebar={<Sidebar openIssues={18} issuesHref="#/issues" projectsHref="#/projects" projects={SIDEBAR_PROJECTS} current={current} />}
       >
         {children}
