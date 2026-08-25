@@ -25,7 +25,7 @@ export const WithWords: Story = {
   render: (args) => (
     <div className="flex flex-col gap-2">
       <ProgressBar {...args} />
-      <span className="text-body-2 tabular-nums text-text-secondary">
+      <span className="text-caption tabular-nums text-text-muted">
         {args.value} of {args.max} done
       </span>
     </div>

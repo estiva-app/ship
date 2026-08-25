@@ -1,0 +1,75 @@
+import { cn } from '@/lib/cn'
+import { ago } from '@/lib/time'
+import { statusLabel, type StatusEntry } from '@/lib/issues'
+import { Person } from '@/components/ui/Person'
+import { StatusIcon } from '@/components/ui/StatusIcon'
+import type { IssueRowData } from './IssueRow'
+
+/**
+ * The project page's table view, as production: ref · Title · Status ·
+ * Assignee · Opened by · Updated. Scrolls inside its own container rather
+ * than widening the page — a horizontally scrolling *page* would take the
+ * sidebar with it. Same cells as the row renders, aligned as a grid.
+ *
+ * A missing ref is an em dash (audit L2); people are faces and names, never
+ * keys; a status the vocabulary does not know is shown raw.
+ */
+export interface IssuesTableRow extends IssueRowData {
+  openedBy: { name?: string; picture?: string }
+}
+
+export interface IssuesTableProps {
+  issues: IssuesTableRow[]
+  statuses: StatusEntry[]
+  hrefFor: (issue: IssueRowData) => string
+  className?: string
+}
+
+const TH = 'h-9 px-3 text-left text-menu font-medium uppercase tracking-[0.08em] text-text-secondary'
+const TD = 'h-10 px-3 text-body-2'
+
+export function IssuesTable({ issues, statuses, hrefFor, className }: IssuesTableProps) {
+  return (
+    <div className={cn('overflow-x-auto rounded-lg border border-border-default', className)}>
+      <table className="w-full min-w-[640px] border-collapse">
+        <thead className="bg-bg-surface">
+          <tr className="border-b border-border-default">
+            <th className={cn(TH, 'w-20')}>
+              <span className="sr-only">Ref</span>
+            </th>
+            <th className={TH}>Title</th>
+            <th className={cn(TH, 'w-36')}>Status</th>
+            <th className={cn(TH, 'w-44')}>Assignee</th>
+            <th className={cn(TH, 'w-44')}>Opened by</th>
+            <th className={cn(TH, 'w-24')}>Updated</th>
+          </tr>
+        </thead>
+        <tbody>
+          {issues.map((issue) => (
+            <tr key={issue.addr} className="border-b border-border-subtle last:border-b-0 hover:bg-bg-hover">
+              <td className={cn(TD, 'font-mono text-caption', issue.ref ? 'text-text-muted' : 'text-text-disabled')}>{issue.ref ?? '—'}</td>
+              <td className={cn(TD, 'max-w-0')}>
+                <a href={hrefFor(issue)} className="block truncate text-text-primary hover:underline">
+                  {issue.title}
+                </a>
+              </td>
+              <td className={TD}>
+                <span className="flex items-center gap-1.5 text-text-secondary">
+                  <StatusIcon value={issue.status} size={14} />
+                  {statusLabel(issue.status, statuses)}
+                </span>
+              </td>
+              <td className={cn(TD, 'text-text-secondary')}>
+                {issue.assignee ? <Person name={issue.assignee.name} picture={issue.assignee.picture} size={20} /> : <span className="text-text-muted">—</span>}
+              </td>
+              <td className={cn(TD, 'text-text-secondary')}>
+                <Person name={issue.openedBy.name} picture={issue.openedBy.picture} size={20} />
+              </td>
+              <td className={cn(TD, 'whitespace-nowrap text-caption tabular-nums text-text-muted')}>{ago(issue.at)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
