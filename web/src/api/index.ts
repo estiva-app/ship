@@ -21,6 +21,7 @@ import { RELAY_URL } from '../config'
 export type { Change, Conversation, FolderState, Issue, Message, Project } from '../../../src/fold'
 export type { Directory, Profile } from '../../../src/profiles'
 export { initials } from '../../../src/profiles'
+export { ISSUE_STATUSES, PROJECT_STATUSES, lookupStatus, type VocabEntry } from '../../../src/kinds'
 export { useWorkspace } from './useWorkspace'
 
 /**

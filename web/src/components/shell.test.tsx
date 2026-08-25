@@ -98,9 +98,9 @@ describe('IdentityMenu', () => {
     expect(screen.getByText('http://localhost:3000')).toBeInTheDocument()
     expect(container.textContent).not.toMatch(/[0-9a-f]{8}/)
     // Anonymous, in a build with no Estiva ID: the one action is copying the key.
-    expect(screen.getAllByRole('button')).toHaveLength(2)
+    expect(screen.getAllByRole('menuitem')).toHaveLength(1)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Copy public key' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Copy public key' }))
     expect(onCopyKey).toHaveBeenCalledTimes(1)
     expect(screen.queryByRole('menu')).toBeNull()
     expect(container.textContent).not.toContain(KEY.slice(0, 8))
@@ -121,10 +121,10 @@ describe('IdentityMenu', () => {
     )
     fireEvent.click(screen.getByRole('button', { name: /Jan Mikula/ }))
     expect(screen.getByText('Signed in as')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Edit your profile in Estiva ID' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Edit your profile in Estiva ID' }))
     expect(open).toHaveBeenCalledWith('https://id.estiva.app', '_blank', 'noopener,noreferrer')
     fireEvent.click(screen.getByRole('button', { name: /Jan Mikula/ }))
-    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Sign out' }))
     expect(onSignOut).toHaveBeenCalledTimes(1)
   })
 
