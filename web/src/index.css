@@ -136,6 +136,32 @@
   --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.50), 0 4px 6px -4px rgba(0,0,0,0.40);
 }
 
+/* ─── Scrollbar — Peek's, verbatim (2026-08-27): thin, on tokens, no buttons ─── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+::-webkit-scrollbar-button {
+  display: none;
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 @layer base {
   html,
   body,
