@@ -12,7 +12,7 @@ import { WithTooltip } from '@/components/ui/Tooltip'
  * here the caller passes the number and the words for it, and a zero is not
  * drawn at all.
  *
- * Active is the same fill as a selected tab — the accent tint — with the text
+ * Active is the same fill as a selected tab — bg-active, neutral — with the text
  * left primary (rulings A3 and, 2026-08-27, "same as the selected tab").
  */
 export interface NavItemProps {
@@ -35,7 +35,7 @@ export function NavItem({ label, href, count, countLabel, active = false, icon, 
       aria-current={active ? 'page' : undefined}
       className={cn(
         'flex h-8 min-w-0 items-center gap-2 rounded-md px-2 text-body-2 transition-colors',
-        active ? 'bg-accent-muted text-text-primary' : 'text-text-secondary hover:bg-bg-hover hover:text-text-primary',
+        active ? 'bg-bg-active text-text-primary' : 'text-text-secondary hover:bg-bg-hover hover:text-text-primary',
         className,
       )}
     >

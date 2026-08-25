@@ -31,13 +31,11 @@ describe('IssueRow', () => {
 })
 
 describe('IssueList', () => {
-  it('starts with Done collapsed and opens it on click', () => {
+  it('shows every group with a title and a bare count — no accordion', () => {
     render(<IssueList issues={ROWS} statuses={ISSUE_STATUSES} hrefFor={hrefFor} />)
-    const done = screen.getByRole('button', { name: /^Done/ })
-    expect(done).toHaveAttribute('aria-expanded', 'false')
-    expect(screen.queryByText('Empty states read as broken screens')).toBeNull()
-    fireEvent.click(done)
     expect(screen.getByText('Empty states read as broken screens')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Done/ })).toBeNull()
+    expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(5)
   })
 
   it('says so when there is nothing', () => {

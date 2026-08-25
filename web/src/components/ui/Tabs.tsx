@@ -6,7 +6,8 @@ import { Chip } from './Chip'
  * Peek's TopicTabs, ported with the topic-specific ids taken out (ruling B8:
  * "use Peek's Tabs component so it is shared"). `@estiva/ui` candidate.
  *
- * Two sizes. `default` is Ship's — 14px (`text-body-2`), a little more room —
+ * A selected tab is a neutral fill (bg-active), not the accent tint
+ * (Katerina, 2026-08-27). Two sizes. `default` is Ship's — 14px (`text-body-2`), a little more room —
  * because Peek's 12px read too small on the projects list (Katerina,
  * 2026-08-26). `small` is Peek's own geometry, kept so the shared component
  * still renders Peek unchanged. Both on tokens: Peek's inline
@@ -48,7 +49,7 @@ export function Tabs<T extends string>({ tabs, active, onChange, size = 'default
           className={cn(
             'flex cursor-pointer items-center gap-1.5 transition-colors',
             size === 'default' ? 'rounded-md px-2 py-1 text-body-2' : 'rounded px-1.5 py-0.5 text-caption',
-            active === tab.id ? 'bg-accent-muted text-text-primary' : 'text-text-secondary hover:bg-bg-hover',
+            active === tab.id ? 'bg-bg-active text-text-primary' : 'text-text-secondary hover:bg-bg-hover',
           )}
         >
           {tab.icon}

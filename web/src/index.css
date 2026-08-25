@@ -35,7 +35,7 @@
      surface: the old palette had one value for hover AND elevated, and a
      menu item on the elevated surface hovered invisibly. */
   --bg-hover:    rgba(255, 255, 255, 0.05);
-  --bg-selected: rgba(55, 87, 208, 0.16);
+  --bg-selected: rgba(75, 88, 212, 0.16);
   --bg-active:   rgba(255, 255, 255, 0.08);
   --bg-disabled: #16181f;
 
@@ -53,14 +53,14 @@
   --border-subtle:  #232734;
   --border-default: #272b36;
   --border-strong:  #3a3f4d;
-  --border-focus:   #3757d0;
+  --border-focus:   #4b58d4;
 
   /* accent */
   /* Darker than the old app's #6c8cff (Katerina, 2026-08-27: "too bright");
      light text on it now reads at 4.9:1. */
-  --accent-primary: #3757d0;
-  --accent-hover:   #4a68dc;
-  --accent-muted:   #1a2342;
+  --accent-primary: #4b58d4;  /* a touch of purple, still blue (2026-08-27) */
+  --accent-hover:   #5c69dc;
+  --accent-muted:   #1c2144;
 
   /* semantic */
   --info-default:    #5b7be8;
@@ -109,12 +109,13 @@
   --border-subtle:  #1F1F22;
   --border-default: #2D2D31;
   --border-strong:  #52525B;
-  --border-focus:   #A78BFA;
+  --border-focus:   #6D4FD2;
 
 
   /* accent */
-  --accent-primary: #A78BFA;
-  --accent-hover:   #8B5CF6;
+  /* Darker than Peek's #A78BFA (Katerina, 2026-08-27); light text reads 5.5:1. */
+  --accent-primary: #6D4FD2;
+  --accent-hover:   #7D61DC;
   --accent-muted:   #2E2554;
 
 
