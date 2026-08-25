@@ -6,7 +6,7 @@ import { StatusIcon } from '@/components/ui/StatusIcon'
 
 /**
  * One project on the projects list — her anatomy (ruling B7): title ·
- * description clamped to two lines · a line reading *status · N issues ·
+ * description clamped to — and always as tall as — two lines · a line reading *status · N issues ·
  * x/y done* with a shaped status icon before the word · a last line
  * *by · face · name · 1d ago*. Archived ones carry an "Archived" chip (B8).
  * The two meta lines breathe a little more than the rest (`gap-2.5`;
@@ -62,7 +62,10 @@ export function ProjectCard({
         <span className="min-w-0 flex-1 truncate text-body-2-strong text-text-primary">{title}</span>
         {archived && <Chip label="Archived" />}
       </div>
-      {description && <p className="line-clamp-2 text-body-2 text-text-secondary">{description}</p>}
+      {/* Always two lines tall, even with one line or none, so the status line and
+          the by-line sit at the same height on every card in the grid (Katerina,
+          2026-08-26). */}
+      <p className="line-clamp-2 min-h-[2lh] text-body-2 text-text-secondary">{description}</p>
       <div className="flex items-center gap-2.5 text-caption text-text-muted">
         <span className="flex items-center gap-1.5">
           <StatusIcon value={status.value} size={14} />
