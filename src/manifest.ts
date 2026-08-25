@@ -47,8 +47,18 @@ import {
 
 /** Where a slot's value comes from. Exactly one of these is set. */
 export type SlotSource =
-  /** A tag on the root event, by name. */
-  | { tag: string; map?: string; as?: 'pubkey'; label?: string; truncate?: number }
+  /**
+   * A tag on the root event, or a list of them meaning **first that resolves**.
+   *
+   * A list exists because a tag can be renamed and the events already
+   * published cannot be, so an app's history spans both spellings
+   * permanently. Same reason as `emits.alsoRead`, one level down: the owning
+   * app is the only party that knows what it used to write.
+   *
+   * Not a `SlotSource[]`, which means "render all of these as meta". This is
+   * one slot with several places to look.
+   */
+  | { tag: string | string[]; map?: string; as?: 'pubkey'; label?: string; truncate?: number }
   /** A top-level event field — in practice only `content`. */
   | { field: 'content'; truncate?: number; label?: string }
   /**
@@ -137,7 +147,14 @@ export function manifestContent(): ManifestContent {
       [KIND.PROJECT]: {
         widget: 'card',
         slots: {
-          title: { tag: 'title' },
+          // `name` first, `title` behind it. REW-11 renamed this tag on the
+          // record, and a record published before that keeps `title` forever —
+          // it is replaceable only by its author, and rewriting it would stamp
+          // a `created_at` the relay will not backdate. Naming one spelling
+          // renders half the workspace blank, and which half depends only on
+          // which one you name. The issue below is untouched: REW-11 did not
+          // rename anything there.
+          title: { tag: ['name', 'title'] },
           subtitle: { field: 'content', truncate: 120 },
           status: { fold: 'status', map: 'statuses', default: DEFAULT_PROJECT_STATUS },
           // Seeded by the root's `lead` tag, overridden by a change — the same
