@@ -9,7 +9,9 @@ import type { IssueRowData } from './IssueRow'
  * The project page's table view, as production: ref · Title · Status ·
  * Assignee · Opened by · Updated. Scrolls inside its own container rather
  * than widening the page — a horizontally scrolling *page* would take the
- * sidebar with it. Same cells as the row renders, aligned as a grid.
+ * sidebar with it. Fixed layout with a real minimum width, so the title
+ * column keeps its room and a narrow container scrolls the table rather
+ * than crushing the titles. Same cells as the row renders, aligned as a grid.
  *
  * A missing ref is an em dash (audit L2); people are faces and names, never
  * keys; a status the vocabulary does not know is shown raw.
@@ -37,16 +39,16 @@ const SMALL = 'text-[12px] leading-[120%]'
 export function IssuesTable({ issues, statuses, hrefFor, className }: IssuesTableProps) {
   return (
     <div className={cn('overflow-x-auto rounded-lg border border-border-default', className)}>
-      <table className="w-full min-w-[640px] border-collapse">
+      <table className="w-full min-w-[840px] table-fixed border-collapse">
         <thead className="bg-bg-surface">
           <tr className="border-b border-border-default">
-            <th className={cn(TH, 'w-20')}>
+            <th className={cn(TH, 'w-16')}>
               <span className="sr-only">Ref</span>
             </th>
             <th className={TH}>Title</th>
-            <th className={cn(TH, 'w-36')}>Status</th>
-            <th className={cn(TH, 'w-44')}>Assignee</th>
-            <th className={cn(TH, 'w-44')}>Opened by</th>
+            <th className={cn(TH, 'w-32')}>Status</th>
+            <th className={cn(TH, 'w-40')}>Assignee</th>
+            <th className={cn(TH, 'w-40')}>Opened by</th>
             <th className={cn(TH, 'w-24')}>Updated</th>
           </tr>
         </thead>
@@ -54,7 +56,7 @@ export function IssuesTable({ issues, statuses, hrefFor, className }: IssuesTabl
           {issues.map((issue) => (
             <tr key={issue.addr} className="border-b border-border-subtle last:border-b-0 hover:bg-bg-hover">
               <td className={cn(TD, 'font-mono', SMALL, issue.ref ? 'text-text-muted' : 'text-text-disabled')}>{issue.ref ?? '—'}</td>
-              <td className={cn(TD, 'max-w-0')}>
+              <td className={TD}>
                 <a href={hrefFor(issue)} className="block truncate text-text-primary hover:underline">
                   {issue.title}
                 </a>

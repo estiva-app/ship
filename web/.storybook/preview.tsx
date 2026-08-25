@@ -71,7 +71,7 @@ const preview: Preview = {
       // Docs first; the rest follows Peek's taxonomy where the concepts match
       // (one component, not two that drift), Ship's own sections after.
       storySort: {
-        order: ['Docs', ['Introduction', 'Design Tokens'], 'Primitives', 'Feedback', 'Inputs', 'Overlays', 'Issues', 'Projects', 'Conversations', 'Navigation'],
+        order: ['Docs', ['Introduction', 'Design Tokens'], 'Primitives', 'Feedback', 'Inputs', 'Overlays', 'Issues', 'Projects', 'Conversations', 'Navigation', 'Views'],
       },
     },
   },

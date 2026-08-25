@@ -3,7 +3,8 @@ import type { Meta, StoryObj } from '@storybook/react-vite'
 import { Button } from './ui/Button'
 import { EmptyState } from './ui/EmptyState'
 import { Tabs } from './ui/Tabs'
-import { ProjectCard, type ProjectCardProps } from './ProjectCard'
+import { ARCHIVED_CARDS, PROJECT_CARDS } from '@/fixtures/projects'
+import { ProjectCard } from './ProjectCard'
 
 const NOW = Math.floor(Date.now() / 1000)
 
@@ -58,58 +59,6 @@ export const UnknownAuthor: Story = { decorators: oneCard, args: { author: {} } 
 /** A status the vocabulary does not know is shown raw. */
 export const UnknownStatus: Story = { decorators: oneCard, args: { status: { value: 'blocked', label: 'blocked' } } }
 
-const PROJECTS: ProjectCardProps[] = [
-  {
-    href: '#/p/des',
-    title: 'Design System',
-    description: 'Tokens, primitives and the Storybook that reviews them.',
-    status: { value: 'in_progress', label: 'In Progress' },
-    issueCount: 11,
-    doneCount: 2,
-    author: { name: 'Ana Duarte' },
-    createdAt: NOW - 86400,
-  },
-  {
-    href: '#/p/rel',
-    title: 'Relay Migration',
-    description: 'Moving every workspace read and write onto the relay, one surface at a time, with the old path kept until each is proven.',
-    status: { value: 'in_progress', label: 'In Progress' },
-    issueCount: 11,
-    doneCount: 5,
-    author: { name: 'Ravi Mehta' },
-    createdAt: NOW - 86400 * 2,
-  },
-  {
-    href: '#/p/pay',
-    title: 'Payment integration',
-    description: 'Take card payments.',
-    status: { value: 'planned', label: 'Planned' },
-    issueCount: 11,
-    doneCount: 1,
-    author: { name: 'Ravi Mehta' },
-    createdAt: NOW - 86400 * 2,
-  },
-  {
-    href: '#/p/onb',
-    title: 'Onboarding flow for new workspaces',
-    description: 'The first ten minutes, from an invite to a first issue.',
-    status: { value: 'planned', label: 'Planned' },
-    issueCount: 6,
-    doneCount: 0,
-    author: { name: 'Ana Duarte' },
-    createdAt: NOW - 3600 * 5,
-  },
-  {
-    href: '#/p/mob',
-    title: 'Mobile app',
-    status: { value: 'planned', label: 'Planned' },
-    issueCount: 0,
-    doneCount: 0,
-    author: {},
-    createdAt: NOW - 120,
-  },
-]
-
 /**
  * The projects list as it will compose (step c): heading + "Add project" as
  * today, the Active/Archived tabs (only when something is archived), the
@@ -135,23 +84,15 @@ export const InTheList: Story = {
         />
         {which === 'active' ? (
           <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-2.5">
-            {PROJECTS.map((project) => (
+            {PROJECT_CARDS.map((project) => (
               <ProjectCard key={project.href} {...project} />
             ))}
           </div>
         ) : (
           <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-2.5">
-            <ProjectCard
-              href="#/p/old"
-              title="Website refresh"
-              description="The marketing site on the new tokens."
-              status={{ value: 'completed', label: 'Completed' }}
-              issueCount={6}
-              doneCount={6}
-              author={{ name: 'Ravi Mehta' }}
-              createdAt={NOW - 86400 * 40}
-              archived
-            />
+            {ARCHIVED_CARDS.map((project) => (
+              <ProjectCard key={project.href} {...project} />
+            ))}
           </div>
         )}
       </div>
