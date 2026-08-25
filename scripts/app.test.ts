@@ -198,6 +198,79 @@ check(
   foldFolder([globalProject, globalRename]).projects[0]?.title === 'Renamed by someone else',
 )
 
+// ── NIP-22 comments read alongside kind:9 ───────────────────────────────────
+
+/*
+  REW-10's reader half. A `kind:9` comment is not replaceable at all — unlike a
+  project record it cannot be rewritten even by its author — so the two shapes
+  coexist permanently and both must land in the same thread.
+
+  The case of the tags is the whole of NIP-22 and the easiest thing to get
+  wrong: uppercase names the thread root, lowercase the immediate parent.
+*/
+
+console.log('\n# NIP-22 kind:1111 comments\n')
+
+const ISSUE_ADDR = `30851:${PK}:i1`
+
+const nip22Root: SignedEvent = sign(
+  {
+    pubkey: PK,
+    created_at: Math.floor(Date.now() / 1000),
+    kind: 1111,
+    tags: [
+      ['A', ISSUE_ADDR], ['K', '30851'], ['P', PK],
+      ['a', ISSUE_ADDR], ['k', '30851'],
+      ['h', CONTENT],
+    ],
+    content: 'A standard comment',
+  },
+  'c1',
+)
+const nip22Reply: SignedEvent = sign(
+  {
+    pubkey: PK,
+    created_at: Math.floor(Date.now() / 1000) + 1,
+    kind: 1111,
+    tags: [
+      ['A', ISSUE_ADDR], ['K', '30851'], ['P', PK],
+      ['e', 'c1'], ['k', '1111'],
+      ['h', CONTENT],
+    ],
+    content: 'A reply to it',
+  },
+  'c2',
+)
+// The shape Ship writes today, which must keep working forever.
+const legacyComment: SignedEvent = sign(
+  {
+    pubkey: PK,
+    created_at: Math.floor(Date.now() / 1000),
+    kind: 9,
+    tags: [['h', CONTENT], ['a', ISSUE_ADDR]],
+    content: 'An old kind:9 comment',
+  },
+  'm1',
+)
+
+const convo = foldFolder([sign(issue, 'e2'), legacyComment, nip22Root, nip22Reply])
+check('a 1111 comment is read at all', convo.conversations.length > 0)
+check('  …it lands under the issue it names', convo.conversations.some((c) => c.about.includes(ISSUE_ADDR)))
+check('  …and so does the old kind:9, in the same workspace',
+  convo.conversations.filter((c) => c.about.includes(ISSUE_ADDR)).length === 2)
+
+const thread = convo.conversations.find((c) => c.root.id === 'c1')
+check('a top-level 1111 is its own conversation root', !!thread)
+check('  …and its reply is grouped under it, not beside it', thread?.replies.length === 1 && thread?.replies[0]?.id === 'c2')
+check('  …the reply keeps the thread anchor from the uppercase A', thread?.replies[0]?.about.includes(ISSUE_ADDR) === true)
+check('the comment stays in its Folder', thread?.root.folder === CONTENT)
+
+// Case is the trap: reading lowercase `a` as the root would put a reply in its
+// own thread, and reading uppercase `E` as the parent would lose the ordering.
+const miscased = foldFolder([nip22Reply])
+check('a reply whose root is an address still parses', miscased.conversations.length === 1)
+check('  …with the parent it names, not the root', miscased.conversations[0]?.root.parentId === 'c1')
+
 // ── Re-linking a project to a Peek topic ────────────────────────────────────
 
 console.log('\n# re-linking a project to an existing Peek topic\n')
