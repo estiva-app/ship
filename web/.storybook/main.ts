@@ -13,6 +13,19 @@ const config: StorybookConfig = {
   framework: '@storybook/react-vite',
   stories: ['../src/stories/**/*.mdx', '../src/**/*.stories.@(ts|tsx)'],
   addons: ['@storybook/addon-docs'],
+  viteFinal: (viteConfig) => {
+    // Stories must be deterministic and must never touch production: the
+    // build-time values are pinned to the local relay and to "no sign-in",
+    // whatever the shell environment says. Same three names as the app build
+    // (vite.config.ts), so a component reading src/config.ts works here too.
+    viteConfig.define = {
+      ...viteConfig.define,
+      __RELAY_URL__: JSON.stringify('http://localhost:3000'),
+      __ID_BASE__: JSON.stringify(''),
+      __CLIENT_ID__: JSON.stringify('estiva-ship'),
+    }
+    return viteConfig
+  },
 }
 
 export default config
