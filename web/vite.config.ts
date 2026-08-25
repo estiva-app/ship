@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import { fileURLToPath } from 'node:url'
 
@@ -24,6 +24,9 @@ export const BUILD_DEFINES = {
   __CLIENT_ID__: JSON.stringify(process.env.CLIENT_ID ?? 'estiva-ship'),
 }
 
+const here = fileURLToPath(new URL('.', import.meta.url))
+const repoRoot = fileURLToPath(new URL('..', import.meta.url))
+
 // The dev server takes :5191 so the old app can keep :5190 beside it — the two
 // run side by side until the cutover (REW-8).
 //
@@ -38,5 +41,18 @@ export default defineConfig({
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
+  },
+  server: {
+    fs: {
+      // The data seam (src/api) imports Ship's data layer from ../src and
+      // ../lib, one level above this app. Vite refuses to serve files outside
+      // its root unless told the repo is the boundary.
+      allow: [here, repoRoot],
+    },
+  },
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: './src/test-setup.ts',
   },
 })

@@ -20,7 +20,8 @@
     "strict": true,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
-    "erasableSyntaxOnly": true,
+    /* Off, unlike Peek: the data layer this app imports read-only (../src, ../lib/nostr) uses constructor parameter properties, which this flag forbids, and those files are vendored into estiva-agent and never edited from here. New code in web/ still avoids non-erasable syntax by convention. */
+    "erasableSyntaxOnly": false,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true,
     "paths": {
