@@ -48,10 +48,12 @@ export function ProjectView({ crumbs, header, view, onView, issues, issueStatuse
   return (
     <div className="flex h-full min-h-0 flex-col gap-4 px-6 pt-5">
       <Breadcrumb items={[{ label: 'Projects', href: crumbs.projectsHref }, { label: crumbs.title }]} />
-      <div className="flex min-h-0 flex-1 gap-8">
+      <div className="flex min-h-0 flex-1 gap-2">
         {/* Only this column scrolls — with Peek's thin scrollbar — and the rail
-            beside it starts level with the title and never moves. */}
-        <div className="flex min-w-0 flex-1 flex-col gap-6 overflow-y-auto pb-5">
+            beside it starts level with the title and never moves. The column keeps
+            24px inside its right edge, so the content sits as far from the
+            scrollbar as from the page edge (pr-6 + gap-2 = the old gap-8). */}
+        <div className="flex min-w-0 flex-1 flex-col gap-6 overflow-y-auto pb-5 pr-6">
           <ProjectHeader {...header} />
           <section className="flex flex-col gap-3">
             <div className="flex items-center gap-3">
