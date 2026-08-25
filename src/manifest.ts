@@ -214,19 +214,35 @@ export function manifestContent(): ManifestContent {
         id: 'comment',
         label: 'Comment',
         /**
-         * Emits `kind:9` — Peek's own topic message — not a Ship kind.
+         * Emits NIP-22 `kind:1111`, and **also declares the `kind:9` it used
+         * to**. Both halves matter and they are not the same statement.
          *
-         * A project is a Folder and a Peek topic is that Folder, so a comment
-         * on one of these objects is a conversation in the container. Declaring
-         * kind:9 means a consumer's comment starts a real conversation that
-         * both apps show, rather than a NIP-22 note only this app renders.
+         * `kind` is what a consumer publishes. Ship moved to `1111` because
+         * scoping a threaded comment to an *addressable* event is exactly what
+         * lets two apps comment on the same object without either owning the
+         * comment kind — and because it is the standard version of what Ship
+         * was already doing with a bare `a` tag.
          *
-         * `scope: 'address'` still makes the consumer put an `a` tag on it,
-         * which is what attaches the thread to *this* object rather than to the
-         * project at large.
+         * `alsoRead` is what a consumer must still *fetch*. A `kind:9` message
+         * is not replaceable at all, so every comment written before this stays
+         * a `kind:9` permanently — there is no migration and there never will
+         * be. Omitting `alsoRead` would not lose the new comments, it would
+         * lose all the old ones, and it would do it silently: a thread that
+         * begins in the middle. See `protocol/SPEC.md` §7.3.
+         *
+         * This manifest does not describe Ship so much as instruct Peek. Peek
+         * publishes under `kind` and reads the union of both (`commentKindsOf`),
+         * so this event and Ship's writer have to change together — flipping
+         * one without the other makes Peek publish a kind Ship is not writing,
+         * or query a kind that has no history.
+         *
+         * The conversation stays shared either way, which was the original
+         * point of declaring `kind:9`: a project is a Folder, a Peek topic is
+         * that Folder, and a comment lands in the container both apps read. A
+         * `1111` carrying `h` is in that same container.
          */
         appliesTo: [String(KIND.PROJECT), String(KIND.ISSUE)],
-        emits: { kind: KIND.MESSAGE, scope: 'address' },
+        emits: { kind: KIND.COMMENT, scope: 'address', alsoRead: [KIND.MESSAGE] },
         input: { type: 'string' },
       },
       {

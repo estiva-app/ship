@@ -11,7 +11,8 @@
  *
  *   npx tsx scripts/app.test.ts
  */
-import { buildChange, buildIssue, buildProject } from '../src/events'
+import { buildChange, buildConversationMessage, buildIssue, buildProject } from '../src/events'
+import { buildManifest } from '../src/manifest'
 import { foldFolder, projectFolders, type Change, type Project } from '../src/fold'
 import { directoryFrom, initials, parseProfile } from '../src/profiles'
 import { href, parse } from '../apps/ship/router'
@@ -270,6 +271,57 @@ check('the comment stays in its Folder', thread?.root.folder === CONTENT)
 const miscased = foldFolder([nip22Reply])
 check('a reply whose root is an address still parses', miscased.conversations.length === 1)
 check('  …with the parent it names, not the root', miscased.conversations[0]?.root.parentId === 'c1')
+
+// ── Writing a NIP-22 comment ────────────────────────────────────────────────
+
+/*
+  The writer half. Two things here are load-bearing and neither would fail a
+  build: an `h` that is missing makes the comment world-readable, and a reply
+  without a root would be a malformed 1111 rather than an old kind:9.
+*/
+
+console.log('\n# writing comments\n')
+
+const ISSUE_ADDR2 = `30851:${PK}:i1`
+const comment = buildConversationMessage(PK, Date.now(), {
+  folder: CONTENT,
+  body: 'A comment',
+  about: ISSUE_ADDR2,
+})
+
+check('a comment about an object is a NIP-22 kind:1111', comment.kind === 1111)
+check('  …with the object as its uppercase thread root', tag(comment, 'A') === ISSUE_ADDR2)
+check('  …and the same object as the parent, being top-level', tag(comment, 'a') === ISSUE_ADDR2)
+check('  …K and P derived from the address, not restated', tag(comment, 'K') === '30851' && tag(comment, 'P') === PK)
+check('  …lowercase k and p mirror them', tag(comment, 'k') === '30851' && tag(comment, 'p') === PK)
+
+// The one that is invisible if it breaks: no `h` means the relay stores it
+// globally and world-readable, whatever the privacy of the issue.
+check('a comment ALWAYS carries h, or it is published world-readable', tag(comment, 'h') === CONTENT)
+check('  …and keeps ts, so a thread reads back in order', !!tag(comment, 'ts'))
+
+// A message with nothing to anchor to has no NIP-22 root and must not pretend.
+const plain = buildConversationMessage(PK, Date.now(), { folder: CONTENT, body: 'Just talking' })
+check('a message about nothing stays a kind:9', plain.kind === 9)
+check('  …and carries no A tag to be malformed by', tag(plain, 'A') === undefined)
+
+// A reply has no anchor available, so it stays kind:9 rather than becoming a
+// 1111 with no root. Both shapes fold into one thread either way.
+const reply = buildConversationMessage(PK, Date.now(), {
+  folder: CONTENT,
+  body: 'Replying',
+  replyTo: { rootId: 'r1', parentId: 'r1' },
+})
+check('a reply stays a kind:9 until a caller can supply the anchor', reply.kind === 9)
+check('  …and threads by e, as it always did', tag(reply, 'e') === 'r1')
+
+// The manifest is not a description of Ship, it is an instruction to Peek.
+const shipManifest = buildManifest(PK, Date.now())
+const commentAction = (JSON.parse(shipManifest.content) as {
+  actions: { id: string; emits: { kind: number; alsoRead?: number[] } }[]
+}).actions.find((a) => a.id === 'comment')!
+check('the manifest tells consumers to publish 1111', commentAction.emits.kind === 1111)
+check('  …and to keep reading the kind:9 it used to emit', commentAction.emits.alsoRead?.includes(9) === true)
 
 // ── Re-linking a project to a Peek topic ────────────────────────────────────
 
