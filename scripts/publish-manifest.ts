@@ -86,7 +86,19 @@ function resolveSlot(
   event: { tags: string[][]; content: string },
   folded: Record<string, { value: string }>,
 ): string | undefined {
-  if ('tag' in slot) return event.tags.find((t) => t[0] === slot.tag)?.[1]
+  if ('tag' in slot) {
+    // `tag` may name several spellings, meaning first that resolves — a slot
+    // whose tag was renamed has to reach records written under both. An empty
+    // value is skipped rather than accepted: it is the absence of an answer,
+    // and stopping there would report a blank slot with a good fallback behind
+    // it. Consumers do the same; this mirrors them so the check and the
+    // rendering cannot disagree.
+    for (const name of Array.isArray(slot.tag) ? slot.tag : [slot.tag]) {
+      const value = event.tags.find((t) => t[0] === name)?.[1]
+      if (value !== undefined && value !== '') return value
+    }
+    return undefined
+  }
   if ('field' in slot) return event.content
   return folded[slot.fold]?.value ?? slot.default
 }
