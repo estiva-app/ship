@@ -21,7 +21,7 @@ import { secretKeySigner } from '../lib/nostr/signer'
 import { publicKeyFromSecret, signEvent } from '../lib/nostr/sign'
 import { buildManifest, DEFAULT_APP_URL, MANIFEST_D_TAG, type ManifestContent, type SlotSource } from '../src/manifest'
 import { Store } from '../src/store'
-import { foldFolder } from '../src/fold'
+import { buildDeletion as buildEventDeletion } from '../lib/nostr/events'
 import { KIND } from '../src/kinds'
 
 const RELAY_URL = process.env.RELAY_URL ?? 'http://localhost:3000'
@@ -140,14 +140,38 @@ async function main() {
   await store.setField({ folder, target: issue.addr, field: 'status', value: 'in_progress' })
   await store.setField({ folder, target: issue.addr, field: 'assignee', value: identity.pubkey })
 
+  /*
+    `loadAll`, not `rawFolders([folder])`.
+
+    REW-11 made the project record global: it carries `buzz-channel` and no
+    `h`, so an `#h` read cannot see it and this check reported "kind:30850 has
+    no real object to project" on every run — the script wrong, not the
+    manifest. `loadAll` is the method that sees both shapes, which is why the
+    app and the agent both use it and why `rawFolders` documents itself as the
+    read-one-container path.
+
+    `raw` is still the `#h` read, because the per-slot checks need the raw root
+    *events* and the issue's are channel-scoped. The project's root event is
+    fetched separately, by address, for the same reason it is not in `raw`.
+  */
   const raw = await store.rawFolders([folder])
-  const state = foldFolder(raw)
+  const [projectRoot] = await relay.query([
+    { kinds: [KIND.PROJECT], authors: [identity.pubkey], '#d': [project.id], limit: 1 },
+  ])
+  const rootEvents = projectRoot ? [...raw, projectRoot] : raw
+  const state = await store.loadAll()
   console.log('')
 
   for (const [kindStr, projection] of Object.entries(manifest.projections)) {
     const kind = Number(kindStr)
-    const object = kind === KIND.PROJECT ? state.projects[0] : state.issues[0]
-    const rootEvent = raw.find((e) => e.kind === kind)
+    // By id, not by index: `loadAll` returns the whole workspace, so
+    // `projects[0]` is whichever project sorts first and not necessarily the
+    // one this run just created.
+    const object =
+      kind === KIND.PROJECT
+        ? state.projects.find((x) => x.addr === project.addr)
+        : state.issues.find((x) => x.addr === issue.addr)
+    const rootEvent = rootEvents.find((e) => e.kind === kind)
     if (!rootEvent || !object) {
       check(`kind:${kind} has a real object to project`, false)
       continue
@@ -180,7 +204,11 @@ async function main() {
   )
   check(
     'and it resolves to the folded value',
-    resolveSlot(statusSlot, raw.find((e) => e.kind === KIND.ISSUE)!, state.issues[0].fields) === 'in_progress',
+    resolveSlot(
+      statusSlot,
+      raw.find((e) => e.kind === KIND.ISSUE)!,
+      state.issues.find((x) => x.addr === issue.addr)!.fields,
+    ) === 'in_progress',
   )
 
   // Every `map` must name a vocabulary that exists, or a consumer cannot render
@@ -198,6 +226,39 @@ async function main() {
     'every referenced vocabulary is declared',
     [...referenced].every((name) => vocabNames.has(name)),
     `${[...referenced].join(', ')} ⊆ ${[...vocabNames].join(', ')}`,
+  )
+
+  /*
+    Take the fixtures back out.
+
+    The checks above need *real* published events, which is the point — a
+    projection that resolves against a hand-built object proves nothing about
+    the relay. But the objects were only ever scaffolding, and until now the
+    script left them behind: four "Payment integration" projects and twelve
+    child events had accumulated on production by 2026-08-25, from runs going
+    back months, two of them created the same afternoon this cleanup was
+    written. They show up in every project list in both apps.
+
+    Deletable because the manifest key signs them and NIP-09 is author-scoped —
+    the same property that makes the agent's own writes permanent works in our
+    favour here. Addressable objects go by `a`, the change events by `e`.
+
+    Reported rather than checked: a failed cleanup is litter, not a wrong
+    manifest, and failing the run for it would bury the result that matters.
+  */
+  const removed: boolean[] = []
+  for (const addr of [issue.addr, project.addr]) {
+    const r = await store.deleteProject({ recordFolder: folder, project: addr, reason: 'manifest verification fixture' })
+    removed.push(r.ok)
+  }
+  for (const e of raw.filter((x) => x.kind === KIND.CHANGE && x.pubkey === identity.pubkey)) {
+    const r = await relay.publish(signEvent(buildEventDeletion(identity.pubkey, Date.now(), { targetEventId: e.id }), identity.secretKeyHex))
+    removed.push(r.ok)
+  }
+  console.log(
+    removed.every(Boolean)
+      ? `\n   removed ${removed.length} verification fixture(s)`
+      : `\n   ⚠ ${removed.filter((x) => !x).length} of ${removed.length} fixture(s) could not be removed — check the workspace for stray "Payment integration" projects`,
   )
 
   console.log(
