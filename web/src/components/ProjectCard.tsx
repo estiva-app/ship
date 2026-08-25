@@ -65,7 +65,7 @@ export function ProjectCard({
       {/* Always two lines tall, even with one line or none, so the status line and
           the by-line sit at the same height on every card in the grid (Katerina,
           2026-08-26). */}
-      <p className="line-clamp-2 min-h-[2lh] text-body-2 text-text-secondary">{description}</p>
+      <p className="mb-1 line-clamp-2 min-h-[2lh] text-body-2 text-text-secondary">{description}</p>
       <div className="flex items-center gap-2.5 text-caption text-text-muted">
         <span className="flex items-center gap-1.5">
           <StatusIcon value={status.value} size={14} />
