@@ -323,6 +323,38 @@ const commentAction = (JSON.parse(shipManifest.content) as {
 check('the manifest tells consumers to publish 1111', commentAction.emits.kind === 1111)
 check('  …and to keep reading the kind:9 it used to emit', commentAction.emits.alsoRead?.includes(9) === true)
 
+// ── The manifest still projects a renamed tag ───────────────────────────────
+
+/*
+  REW-11 renamed the project record's title tag from `title` to `name`. Records
+  published before that keep `title` permanently, so the projection has to name
+  both — and the order matters, because the first that resolves wins.
+
+  This is what actually broke: the record shape, the fold and the relay were all
+  verified, and the *other app's rendering* was not. Four production records
+  rendered untitled in Peek before anyone noticed.
+*/
+
+console.log('\n# the manifest projects both title spellings\n')
+
+const manifestJson = JSON.parse(buildManifest(PK, Date.now()).content) as {
+  projections: Record<string, { slots: Record<string, { tag?: string | string[] }> }>
+}
+const projectTitle = manifestJson.projections['30850'].slots.title
+const issueTitle = manifestJson.projections['30851'].slots.title
+
+check('the project title slot names the new spelling first', Array.isArray(projectTitle.tag) && projectTitle.tag[0] === 'name')
+check('  …and keeps the old one behind it, for records that predate REW-11', Array.isArray(projectTitle.tag) && projectTitle.tag.includes('title'))
+check('the issue title slot is untouched — REW-11 renamed nothing there', issueTitle.tag === 'title')
+
+// What the builder actually writes has to match what the projection looks for,
+// or the manifest is describing an app that does not exist.
+const projForManifest = buildProject(PK, Date.now(), { projectId: 'p9', title: 'Named', folder: CONTENT })
+check(
+  'and the record really does carry the tag the projection names first',
+  tag(projForManifest, 'name') === 'Named',
+)
+
 // ── Re-linking a project to a Peek topic ────────────────────────────────────
 
 console.log('\n# re-linking a project to an existing Peek topic\n')
