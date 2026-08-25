@@ -294,6 +294,7 @@ export interface Conversation {
  * written by a client that omits markers still has to thread.
  */
 export function parseMessage(event: SignedEvent, resolveRefs: (body: string) => string[]): Message | null {
+  if (event.kind === KIND.COMMENT) return parseNip22Comment(event, resolveRefs)
   if (event.kind !== KIND.MESSAGE) return null
   const es = event.tags.filter((t) => t[0] === 'e')
   const marked = (name: string) => es.find((t) => t[3] === name)?.[1]
@@ -313,6 +314,67 @@ export function parseMessage(event: SignedEvent, resolveRefs: (body: string) => 
     // Both routes to "what is this about": an explicit `a` tag, and a
     // `nostr:naddr…` typed into the body by a person in Peek.
     about: [...new Set([...tags(event, 'a'), ...resolveRefs(event.content)])],
+  }
+}
+
+/**
+ * A NIP-22 `kind:1111` comment, read into the same `Message` shape as a `kind:9`.
+ *
+ * REW-10 moves Ship's comments to `1111`, and this is the reader half — landed
+ * before anything writes one, for the reason REW-11 established: the two shapes
+ * coexist permanently. A `kind:9` comment is **not replaceable at all**, so
+ * unlike a project record it cannot be rewritten even by its own author. Every
+ * comment written to date stays `kind:9` forever, and a reader that only learns
+ * `1111` loses the entire existing conversation history.
+ *
+ * ## Case matters, and it is the whole of NIP-22
+ *
+ * Uppercase `A`/`E`/`K`/`P` name the **thread root** — the object being
+ * discussed. Lowercase name the **immediate parent** — the comment being
+ * replied to. For a top-level comment the two are the same, which is why the
+ * spec has both: without the uppercase pair, a reply three deep would have
+ * nothing left saying what the thread is about.
+ *
+ * Mapped onto Ship's model:
+ *
+ * - **`about`** takes the uppercase `A` (and any lowercase `a`, which for a
+ *   top-level comment repeats it). That is what puts the comment under its
+ *   issue in `conversationsAbout`, and it is the same field a `kind:9` fills
+ *   from its own `a` tag — so both shapes land in the same thread.
+ * - **`rootId`** is the uppercase `E` when the thread roots at an *event*. When
+ *   it roots at an *address* — which is Ship's case, since an issue is
+ *   addressable — there is no root event id, so a top-level comment becomes its
+ *   own conversation root exactly as a `kind:9` with no `e` tag does.
+ * - **`parentId`** is the lowercase `e`: the comment being replied to.
+ *
+ * `h` is read the same way and matters as much: `1111` is channel-scoped when
+ * it carries one and **global when it does not**, so a comment published
+ * without an `h` is world-readable regardless of how private its issue is.
+ * Nothing here can fix that — it has to be got right at write time.
+ */
+function parseNip22Comment(
+  event: SignedEvent,
+  resolveRefs: (body: string) => string[],
+): Message | null {
+  const rootEvent = tag(event, 'E')
+  const parentEvent = tag(event, 'e')
+  const rawTs = Number.parseInt(tag(event, 'ts') ?? '', 10)
+  return {
+    id: event.id,
+    author: event.pubkey,
+    createdAt: event.created_at,
+    ts: Number.isFinite(rawTs) ? rawTs : undefined,
+    body: event.content,
+    folder: tag(event, 'h') ?? '',
+    rootId: rootEvent ?? parentEvent,
+    parentId: parentEvent ?? rootEvent,
+    about: [
+      ...new Set([
+        ...tags(event, 'A'),
+        ...tags(event, 'a'),
+        ...resolveRefs(event.content),
+      ]),
+    ],
   }
 }
 

@@ -37,6 +37,20 @@ export const KIND = {
    */
   MESSAGE: 9,
   /**
+   * NIP-22 comment — a threaded comment scoped to any event or **address**.
+   *
+   * Read but not yet written (REW-10). Ship publishes comments as `kind:9` so
+   * that a comment and the Peek topic conversation are one event rather than
+   * two records nobody reconciles; `1111` keeps that property while dropping
+   * the one non-standard part, since scoping to an addressable event is
+   * precisely what lets two apps comment on the same object without either
+   * owning the comment kind.
+   *
+   * Uppercase `A`/`E`/`K`/`P` name the thread root, lowercase the immediate
+   * parent. See `parseNip22Comment` in `fold.ts` — the case is the whole spec.
+   */
+  COMMENT: 1111,
+  /**
    * NIP-09 deletion request.
    *
    * A request rather than a delete, and honoured only for the pubkey that

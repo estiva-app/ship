@@ -39,7 +39,7 @@ import { MANIFEST_ADDRESS } from './manifest-address'
  * Folder — the topic's conversations *are* the project's, read in one round
  * trip alongside everything else.
  */
-const FOLDER_KINDS = [KIND.PROJECT, KIND.ISSUE, KIND.CHANGE, KIND.MESSAGE]
+const FOLDER_KINDS = [KIND.PROJECT, KIND.ISSUE, KIND.CHANGE, KIND.MESSAGE, KIND.COMMENT]
 
 /**
  * Turn `nostr:naddr…` in a message body into addresses.
