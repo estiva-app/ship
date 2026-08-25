@@ -6,8 +6,11 @@ import { Composer } from './Composer'
 
 /**
  * Conversations as production shows them: a composer to start one, then
- * each thread — its root, its replies one level in behind a left rule, and
- * a reply composer. Flat within a thread, as Peek shows them; never deeper.
+ * each thread as its own CARD — a hairline border, the surface background,
+ * 10×12 padding (Katerina, 2026-08-27: "production has a different
+ * background") — holding its root, its replies one level in behind a left
+ * rule, and a reply line. Flat within a thread, as Peek shows them; never
+ * deeper. Cards sit 10px apart.
  *
  * A message is a face and a name, the time, the body. The body is untrusted
  * text from other people and other apps: rendered as text, never as markup,
@@ -44,7 +47,7 @@ export function MessageCard({ message, reply = false }: { message: MessageData; 
 
 export function ConversationThread({ thread, onReply }: { thread: ThreadData; onReply: (threadId: string, text: string) => Promise<boolean | void> | boolean | void }) {
   return (
-    <div className="flex flex-col gap-1 border-b border-border-subtle py-2 last:border-b-0">
+    <div className="flex flex-col gap-1 rounded-lg border border-border-default bg-bg-surface px-3 py-2.5">
       <MessageCard message={thread.root} />
       {thread.replies.map((reply) => (
         <MessageCard key={reply.id} message={reply} reply />
@@ -63,8 +66,8 @@ export interface ConversationsProps {
 
 export function Conversations({ threads, onStart, onReply, className }: ConversationsProps) {
   return (
-    <div className={cn('flex flex-col gap-2', className)}>
-      <Composer onSubmit={onStart} />
+    <div className={cn('flex flex-col gap-2.5', className)}>
+      <Composer onSubmit={onStart} className="mb-1" />
       {threads.length ? (
         threads.map((thread) => <ConversationThread key={thread.id} thread={thread} onReply={onReply} />)
       ) : (
