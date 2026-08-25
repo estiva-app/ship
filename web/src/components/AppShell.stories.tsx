@@ -21,7 +21,6 @@ const meta = {
   parameters: { layout: 'fullscreen' },
   args: {
     identity: <IdentityMenu me={{}} signedIn={false} relayUrl="http://localhost:3000" onCopyKey={fn()} />,
-    search: <SearchInput placeholder="Search Ship…" shortcut="⌘ K" className="w-[290px]" />,
     sidebar: (
       <Sidebar
         openIssues={18}
@@ -50,8 +49,13 @@ const meta = {
 export default meta
 type Story = StoryObj<typeof meta>
 
-/** The four regions: header, (no banner), sidebar, main. Anonymous. */
+/** The four regions: header, (no banner), sidebar, main. Anonymous. No search field by default (Katerina, 2026-08-27) until search exists. */
 export const Anonymous: Story = {}
+
+/** The search slot filled — the field exists; the feature comes later. */
+export const WithSearch: Story = {
+  args: { search: <SearchInput placeholder="Search Ship…" shortcut="⌘ K" className="w-[290px]" /> },
+}
 
 /** The banner strip under the header, as after "Copy public key". */
 export const WithBanner: Story = {

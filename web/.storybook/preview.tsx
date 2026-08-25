@@ -9,16 +9,16 @@ import './preview.css'
 /**
  * The themes this Storybook can render.
  *
- * One today: `ship`, the app's own palette (src/index.css). A candidate for
- * the palette design pass is another `[data-theme="<name>"]` block in
- * index.css plus one more entry in the toolbar list below, so candidates get
- * reviewed side by side rather than by editing the live one.
+ * Two: `ship`, the app's own provisional palette, and `dark`, Peek's dark
+ * theme copied verbatim (2026-08-27) so the two can be compared from the
+ * toolbar. A further candidate is another `[data-theme="<name>"]` block in
+ * index.css plus one more entry here.
  *
  * Driven by the `data-theme` attribute on <html> — the same switch the app
  * uses (index.html) — so a story and the running app can never disagree
  * about how a theme is selected.
  */
-const THEMES = ['ship'] as const
+const THEMES = ['ship', 'dark'] as const
 const DEFAULT_THEME: (typeof THEMES)[number] = 'ship'
 
 const applyTheme = (theme?: string) => {

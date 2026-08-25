@@ -4,7 +4,6 @@ import { fn } from 'storybook/test'
 import { AppShell } from '@/components/AppShell'
 import { IdentityMenu } from '@/components/IdentityMenu'
 import { Sidebar } from '@/components/Sidebar'
-import { SearchInput } from '@/components/ui/SearchInput'
 import { ACTIVITY, ARCHIVED_CARDS, PEOPLE, PROJECT_CARDS, PROJECT_STATUSES, SIDEBAR_PROJECTS } from '@/fixtures/projects'
 import { ISSUES, ISSUE_STATUSES, THREADS, hrefFor } from '@/fixtures/issues'
 import { IssueView } from './IssueView'
@@ -22,7 +21,6 @@ function Shell({ current, children }: { current: 'issues' | 'projects' | { proje
     <div className="h-screen">
       <AppShell
         identity={<IdentityMenu me={{ name: 'Ana Duarte' }} signedIn idBase="https://id.estiva.app" relayUrl="http://localhost:3000" onCopyKey={fn()} onSignOut={fn()} />}
-        search={<SearchInput placeholder="Search Ship…" shortcut="⌘ K" className="w-[290px]" />}
         sidebar={<Sidebar openIssues={18} issuesHref="#/issues" projectsHref="#/projects" projects={SIDEBAR_PROJECTS} current={current} />}
       >
         {children}
