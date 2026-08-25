@@ -11,7 +11,7 @@ const base = {
   status: { value: 'in_progress', label: 'In Progress' },
   issueCount: 4,
   doneCount: 1,
-  author: { name: 'Jan Mikula' },
+  author: { name: 'Ana Duarte' },
   createdAt: Math.floor(Date.now() / 1000) - 86400,
 }
 
@@ -21,7 +21,7 @@ describe('ProjectCard', () => {
     expect(screen.getByRole('link')).toHaveAttribute('href', '#/p/x')
     expect(container.textContent).toContain('In Progress·4 issues·1/4 done')
     // The face's initials sit in textContent between "by" and the name.
-    expect(container.textContent).toContain('Jan Mikula·1d ago')
+    expect(container.textContent).toContain('Ana Duarte·1d ago')
     expect(container.textContent).not.toContain('Archived')
   })
 
@@ -68,15 +68,15 @@ describe('Tabs', () => {
     render(
       <Tabs
         tabs={[
-          { id: 'active', label: 'Active (5)' },
-          { id: 'archived', label: 'Archived (2)' },
+          { id: 'active', label: 'Active', count: 5 },
+          { id: 'archived', label: 'Archived', count: 2 },
         ]}
         active="active"
         onChange={onChange}
       />,
     )
-    expect(screen.getByRole('tab', { name: 'Active (5)' })).toHaveAttribute('aria-selected', 'true')
-    fireEvent.click(screen.getByRole('tab', { name: 'Archived (2)' }))
+    expect(screen.getByRole('tab', { name: /^Active/ })).toHaveAttribute('aria-selected', 'true')
+    fireEvent.click(screen.getByRole('tab', { name: /^Archived/ }))
     expect(onChange).toHaveBeenCalledWith('archived')
   })
 })

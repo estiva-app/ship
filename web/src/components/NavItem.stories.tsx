@@ -27,5 +27,5 @@ export const NoCount: Story = { args: { count: 0 } }
 
 /** A project title that does not fit truncates; the count keeps its place. */
 export const LongLabel: Story = {
-  args: { label: 'Cross-app read state across every surface the person touches', count: 4 },
+  args: { label: 'Onboarding flow for new workspaces across every surface', count: 4 },
 }

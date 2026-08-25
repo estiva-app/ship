@@ -7,18 +7,19 @@ import { ProjectCard, type ProjectCardProps } from './ProjectCard'
 
 const NOW = Math.floor(Date.now() / 1000)
 
+/** Invented projects and people — nothing here is real data. */
 const meta = {
   title: 'Projects/ProjectCard',
   component: ProjectCard,
   args: {
-    href: '#/p/rew',
-    title: 'Rewrite Ship with shared foundation',
+    href: '#/p/des',
+    title: 'Design System',
     description:
-      'Ship on React/Vite/Tailwind, and the second consumer that makes the packages extractable. Same stack, same view-by-view port, same src/lib/nostr boundary.',
+      'Tokens, primitives and the Storybook that reviews them. One vocabulary for every surface, so a new screen starts from the same parts as the last one.',
     status: { value: 'in_progress', label: 'In Progress' },
     issueCount: 11,
     doneCount: 2,
-    author: { name: 'Jan Mikula' },
+    author: { name: 'Ana Duarte' },
     createdAt: NOW - 86400,
   },
 } satisfies Meta<typeof ProjectCard>
@@ -42,7 +43,7 @@ export const Default: Story = { decorators: oneCard }
 /** No issues: the counters are absent, not "0 issues · 0/0 done". */
 export const Empty: Story = {
   decorators: oneCard,
-  args: { title: 'Catch up the Buzz fork', description: undefined, status: { value: 'planned', label: 'Planned' }, issueCount: 0, doneCount: 0 },
+  args: { title: 'Mobile app', description: undefined, status: { value: 'planned', label: 'Planned' }, issueCount: 0, doneCount: 0 },
 }
 
 /** Archived, with its chip. */
@@ -59,48 +60,48 @@ export const UnknownStatus: Story = { decorators: oneCard, args: { status: { val
 
 const PROJECTS: ProjectCardProps[] = [
   {
-    href: '#/p/rew',
-    title: 'Rewrite Ship with shared foundation',
-    description: 'Ship on React/Vite/Tailwind, and the second consumer that makes the packages extractable.',
+    href: '#/p/des',
+    title: 'Design System',
+    description: 'Tokens, primitives and the Storybook that reviews them.',
     status: { value: 'in_progress', label: 'In Progress' },
     issueCount: 11,
     doneCount: 2,
-    author: { name: 'Jan Mikula' },
+    author: { name: 'Ana Duarte' },
     createdAt: NOW - 86400,
   },
   {
-    href: '#/p/pee',
-    title: 'Peek: Real-time Ship→Peek updates',
-    description: 'Peek reads the relay once per mount and never again. Make it live, and make stale state explain itself.',
+    href: '#/p/rel',
+    title: 'Relay Migration',
+    description: 'Moving every workspace read and write onto the relay, one surface at a time, with the old path kept until each is proven.',
     status: { value: 'in_progress', label: 'In Progress' },
     issueCount: 11,
     doneCount: 5,
-    author: { name: 'Jan Mikula' },
+    author: { name: 'Ravi Mehta' },
     createdAt: NOW - 86400 * 2,
   },
   {
-    href: '#/p/cro',
-    title: 'Cross-app read state',
-    description: 'Read/unread becomes a property of the person, not the app.',
+    href: '#/p/pay',
+    title: 'Payment integration',
+    description: 'Take card payments.',
     status: { value: 'planned', label: 'Planned' },
     issueCount: 11,
     doneCount: 1,
-    author: { name: 'Jan Mikula' },
+    author: { name: 'Ravi Mehta' },
     createdAt: NOW - 86400 * 2,
   },
   {
-    href: '#/p/sha',
-    title: 'Shared foundation packages',
-    description: 'Four packages plus a scaffold, so app four is cheap.',
+    href: '#/p/onb',
+    title: 'Onboarding flow for new workspaces',
+    description: 'The first ten minutes, from an invite to a first issue.',
     status: { value: 'planned', label: 'Planned' },
     issueCount: 6,
     doneCount: 0,
-    author: { name: 'Katerina Kelepouri' },
+    author: { name: 'Ana Duarte' },
     createdAt: NOW - 3600 * 5,
   },
   {
-    href: '#/p/cat',
-    title: 'Catch up the Buzz fork',
+    href: '#/p/mob',
+    title: 'Mobile app',
     status: { value: 'planned', label: 'Planned' },
     issueCount: 0,
     doneCount: 0,
@@ -126,8 +127,8 @@ export const InTheList: Story = {
         </div>
         <Tabs
           tabs={[
-            { id: 'active', label: 'Active (5)' },
-            { id: 'archived', label: 'Archived (1)' },
+            { id: 'active', label: 'Active', count: 5 },
+            { id: 'archived', label: 'Archived', count: 1 },
           ]}
           active={which}
           onChange={setWhich}
@@ -142,12 +143,12 @@ export const InTheList: Story = {
           <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-2.5">
             <ProjectCard
               href="#/p/old"
-              title="Relay migration"
-              description="Moving Ship's records from Convex onto the relay."
+              title="Website refresh"
+              description="The marketing site on the new tokens."
               status={{ value: 'completed', label: 'Completed' }}
               issueCount={6}
               doneCount={6}
-              author={{ name: 'Jan Mikula' }}
+              author={{ name: 'Ravi Mehta' }}
               createdAt={NOW - 86400 * 40}
               archived
             />

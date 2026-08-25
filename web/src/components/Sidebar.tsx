@@ -8,10 +8,10 @@ import { NavItem } from './NavItem'
  * active projects under a "Projects" heading. No inbox, no "my issues", no
  * teams; a personal filter belongs to the list it filters.
  *
- * Every number here is open issues (ruling A2). The Projects entry therefore
- * carries no count: the only honest number for it would be the count of
- * active projects, which is a different quantity wearing the same clothes —
- * exactly the silent mix the audit found in today's app.
+ * Two kinds of number, each saying what it counts in its tooltip (ruling
+ * A2): the Issues entry and every project row count OPEN issues ("18 open");
+ * the Projects entry counts ACTIVE projects ("5 active"), as today — restored
+ * on Katerina's ruling (2026-08-26) after a first cut dropped it.
  *
  * Archived projects are out of the navigation entirely, as today; they stay
  * one click inside Projects, which is where you go when looking for something
@@ -55,12 +55,15 @@ export function Sidebar({ openIssues, issuesHref, projectsHref, projects, curren
         href={issuesHref}
         icon={<IconListDetails size={16} stroke={1.5} />}
         count={openIssues}
+        countLabel={`${openIssues} open`}
         active={current === 'issues'}
       />
       <NavItem
         label="Projects"
         href={projectsHref}
         icon={<IconBox size={16} stroke={1.5} />}
+        count={projects.length}
+        countLabel={`${projects.length} active`}
         active={current === 'projects'}
       />
       {projects.length > 0 && (
@@ -74,6 +77,7 @@ export function Sidebar({ openIssues, issuesHref, projectsHref, projects, curren
               label={project.title}
               href={project.href}
               count={project.openCount}
+              countLabel={`${project.openCount} open`}
               active={isProject && current.projectAddr === project.addr}
             />
           ))}

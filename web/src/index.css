@@ -26,7 +26,11 @@
   --bg-base:     #0e0f13;
   --bg-surface:  #16181f;
   --bg-elevated: #1c1f28;
-  --bg-inset:    #121419;
+  /* Lighter than the surfaces it sits on, as Peek's dark theme has it (its
+     inset is the lightest background): a neutral Chip and a search field are
+     bg-inset, and at the old #121419 — darker than the surface — both were
+     invisible (Katerina, 2026-08-26). */
+  --bg-inset:    #1f2330;
   /* Translucent, as Peek's Signal theme does it, so a hover reads on every
      surface: the old palette had one value for hover AND elevated, and a
      menu item on the elevated surface hovered invisibly. */
@@ -43,7 +47,10 @@
   --text-inverse:   #0e0f13;
 
   /* border */
-  --border-subtle:  #1c1f28;
+  /* One step above bg-elevated, so a Divider inside a menu (elevated) is a
+     line and not the same colour as its ground — it was invisible at the old
+     #1c1f28 = bg-elevated (Katerina, 2026-08-26: "I see no divider"). */
+  --border-subtle:  #232734;
   --border-default: #272b36;
   --border-strong:  #3a3f4d;
   --border-focus:   #6c8cff;

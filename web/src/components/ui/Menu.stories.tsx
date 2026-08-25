@@ -1,9 +1,15 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { IconCircleCheck, IconCircleDashed } from '@tabler/icons-react'
 import { fn } from 'storybook/test'
 import { Divider } from './Divider'
 import { Menu, MenuItem, MenuSection } from './Menu'
 
+/**
+ * The menu SHELL, and only the shell: container, rows, a section heading, a
+ * divider, the two exits. What a menu says is each caller's business — the
+ * identity menu is the real one in this app (Navigation/IdentityMenu). Item
+ * icons and destructive rows are props the shell supports for Peek's sake and
+ * are not shown here (Katerina, 2026-08-26: "we need only the menu shell").
+ */
 const meta = {
   title: 'Primitives/Menu',
   component: Menu,
@@ -23,32 +29,31 @@ const meta = {
 export default meta
 type Story = StoryObj<typeof meta>
 
-/** Peek's TopicMoreMenu shape: three plain items, the last destructive. */
+/** Three plain rows under a trigger. */
 export const Plain: Story = {
   args: {
     children: (
       <>
-        <MenuItem label="Topic details" onClick={fn()} />
-        <MenuItem label="Add to Open work" onClick={fn()} />
-        <MenuItem label="Delete topic" destructive onClick={fn()} />
+        <MenuItem label="First action" onClick={fn()} />
+        <MenuItem label="Second action" onClick={fn()} />
+        <MenuItem label="Third action" onClick={fn()} />
       </>
     ),
   },
 }
 
-/** Peek's ConversationMoreMenu shape: a heading, icons, a shortcut, a divider. */
+/** A section heading, a divider, then rows — the identity menu's bones. */
 export const WithSections: Story = {
   args: {
     className: 'w-[244px]',
     children: (
       <>
-        <MenuSection label="Utilities">
-          <MenuItem icon={<IconCircleDashed size={16} stroke={1.5} className="text-text-secondary" />} label="Start topic" onClick={fn()} />
-          <MenuItem icon={<IconCircleCheck size={16} stroke={1.5} className="text-text-secondary" />} label="Resolve" shortcut="→" onClick={fn()} />
+        <MenuSection label="Section">
+          <MenuItem label="First action" onClick={fn()} />
+          <MenuItem label="Second action" onClick={fn()} />
         </MenuSection>
         <Divider className="mx-0 my-2" />
-        <MenuItem label="View details" onClick={fn()} />
-        <MenuItem label="Delete" destructive onClick={fn()} />
+        <MenuItem label="Third action" onClick={fn()} />
       </>
     ),
   },

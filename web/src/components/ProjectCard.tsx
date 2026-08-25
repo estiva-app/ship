@@ -9,12 +9,16 @@ import { StatusIcon } from '@/components/ui/StatusIcon'
  * description clamped to two lines · a line reading *status · N issues ·
  * x/y done* with a shaped status icon before the word · a last line
  * *by · face · name · 1d ago*. Archived ones carry an "Archived" chip (B8).
+ * The two meta lines breathe a little more than the rest (`gap-2.5`;
+ * Katerina, 2026-08-26).
  *
  * Counts are honest: an empty project shows no issue counter at all rather
  * than "0 issues · 0/0 done" (Peek's counts rule), so its line is just the
- * status. The author is a face and a name — never a key — resolved by the
- * caller from `kind:0`; nobody has published one for most keys, and then
- * the face is a silhouette and the name an em dash.
+ * status. The status word is the vocabulary's label, exactly as production
+ * prints it (`lookupStatus`) — never a renamed one. The author is a face and
+ * a name — never a key — resolved by the caller from `kind:0`; nobody has
+ * published one for most keys, and then the face is a silhouette and the
+ * name an em dash. The time is the old app's `ago()`, as in production.
  *
  * Geometry follows today's card: a surface panel with a hairline border that
  * brightens on hover. The whole card is the link.
@@ -59,9 +63,11 @@ export function ProjectCard({
         {archived && <Chip label="Archived" />}
       </div>
       {description && <p className="line-clamp-2 text-body-2 text-text-secondary">{description}</p>}
-      <div className="flex items-center gap-1.5 text-caption text-text-muted">
-        <StatusIcon value={status.value} size={14} />
-        <span>{status.label}</span>
+      <div className="flex items-center gap-2.5 text-caption text-text-muted">
+        <span className="flex items-center gap-1.5">
+          <StatusIcon value={status.value} size={14} />
+          {status.label}
+        </span>
         {issueCount > 0 && (
           <>
             <Dot />
@@ -75,11 +81,13 @@ export function ProjectCard({
           </>
         )}
       </div>
-      <div className="flex items-center gap-1.5 text-caption text-text-muted">
-        <span>by</span>
-        <Avatar name={author.name} src={author.picture} size={16} />
-        <span className={cn('truncate', author.name ? 'text-text-secondary' : 'text-text-muted')}>
-          {author.name ?? '—'}
+      <div className="flex items-center gap-2.5 text-caption text-text-muted">
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span>by</span>
+          <Avatar name={author.name} src={author.picture} size={16} />
+          <span className={cn('truncate', author.name ? 'text-text-secondary' : 'text-text-muted')}>
+            {author.name ?? '—'}
+          </span>
         </span>
         <Dot />
         <span className="shrink-0">{ago(createdAt)}</span>

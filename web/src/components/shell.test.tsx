@@ -10,8 +10,8 @@ const KEY = 'a8a7d739'.repeat(8)
 
 describe('Avatar', () => {
   it('takes initials from a name, never from a key', () => {
-    expect(initialsFromName('Jan Mikula')).toBe('JM')
-    expect(initialsFromName('Katerina')).toBe('KA')
+    expect(initialsFromName('Ana Duarte')).toBe('AD')
+    expect(initialsFromName('Ravi')).toBe('RA')
     expect(initialsFromName(undefined)).toBe('')
     expect(initialsFromName('   ')).toBe('')
   })
@@ -53,7 +53,7 @@ describe('Sidebar', () => {
       <Sidebar openIssues={5} issuesHref="#/" projectsHref="#/projects" projects={projects} current="issues" />,
     )
     const labels = screen.getAllByRole('link').map((a) => a.textContent)
-    expect(labels).toEqual(['Issues5', 'Projects', 'One2', 'Two'])
+    expect(labels).toEqual(['Issues5', 'Projects2', 'One2', 'Two'])
   })
 
   it('marks a project route on its own row, keyed by addr', () => {
@@ -67,7 +67,7 @@ describe('Sidebar', () => {
       />,
     )
     expect(screen.getByRole('link', { name: 'Two' })).toHaveAttribute('aria-current', 'page')
-    expect(screen.getByRole('link', { name: 'Projects' })).not.toHaveAttribute('aria-current')
+    expect(screen.getByRole('link', { name: /^Projects/ })).not.toHaveAttribute('aria-current')
   })
 
   it('draws no Projects heading when there are none', () => {
@@ -111,7 +111,7 @@ describe('IdentityMenu', () => {
     const open = vi.spyOn(window, 'open').mockImplementation(() => null)
     render(
       <IdentityMenu
-        me={{ name: 'Jan Mikula' }}
+        me={{ name: 'Ana Duarte' }}
         signedIn
         idBase="https://id.estiva.app"
         relayUrl="http://localhost:3000"
@@ -119,11 +119,11 @@ describe('IdentityMenu', () => {
         onSignOut={onSignOut}
       />,
     )
-    fireEvent.click(screen.getByRole('button', { name: /Jan Mikula/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Ana Duarte/ }))
     expect(screen.getByText('Signed in as')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('menuitem', { name: 'Edit your profile in Estiva ID' }))
     expect(open).toHaveBeenCalledWith('https://id.estiva.app', '_blank', 'noopener,noreferrer')
-    fireEvent.click(screen.getByRole('button', { name: /Jan Mikula/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Ana Duarte/ }))
     fireEvent.click(screen.getByRole('menuitem', { name: 'Sign out' }))
     expect(onSignOut).toHaveBeenCalledTimes(1)
   })

@@ -4,13 +4,15 @@ import { AppShell } from './AppShell'
 import { Banner } from './Banner'
 import { IdentityMenu } from './IdentityMenu'
 import { Sidebar, type SidebarProject } from './Sidebar'
+import { SearchInput } from './ui/SearchInput'
 
+/** Invented projects, nothing real. */
 const PROJECTS: SidebarProject[] = [
-  { addr: '30850:a:rew', title: 'Rewrite Ship with shared foundation', href: '#/p/rew', openCount: 9 },
-  { addr: '30850:a:pee', title: 'Peek: Real-time Ship→Peek updates', href: '#/p/pee', openCount: 6 },
-  { addr: '30850:a:cro', title: 'Cross-app read state', href: '#/p/cro', openCount: 3 },
-  { addr: '30850:a:sha', title: 'Shared foundation packages', href: '#/p/sha', openCount: 0 },
-  { addr: '30850:a:cat', title: 'Catch up the Buzz fork', href: '#/p/cat', openCount: 0 },
+  { addr: '30850:a:des', title: 'Design System', href: '#/p/des', openCount: 9 },
+  { addr: '30850:a:rel', title: 'Relay Migration', href: '#/p/rel', openCount: 6 },
+  { addr: '30850:a:pay', title: 'Payment integration', href: '#/p/pay', openCount: 3 },
+  { addr: '30850:a:onb', title: 'Onboarding flow for new workspaces', href: '#/p/onb', openCount: 0 },
+  { addr: '30850:a:mob', title: 'Mobile app', href: '#/p/mob', openCount: 0 },
 ]
 
 const meta = {
@@ -19,6 +21,7 @@ const meta = {
   parameters: { layout: 'fullscreen' },
   args: {
     identity: <IdentityMenu me={{}} signedIn={false} relayUrl="http://localhost:3000" onCopyKey={fn()} />,
+    search: <SearchInput placeholder="Search Ship…" shortcut="⌘ K" className="w-[290px]" />,
     sidebar: (
       <Sidebar
         openIssues={18}
@@ -60,7 +63,7 @@ export const SignedInOnAProject: Story = {
   args: {
     identity: (
       <IdentityMenu
-        me={{ name: 'Katerina Kelepouri' }}
+        me={{ name: 'Ana Duarte' }}
         signedIn
         idBase="https://id.estiva.app"
         relayUrl="http://localhost:3000"
@@ -74,7 +77,7 @@ export const SignedInOnAProject: Story = {
         issuesHref="#/"
         projectsHref="#/projects"
         projects={PROJECTS}
-        current={{ projectAddr: '30850:a:pee' }}
+        current={{ projectAddr: '30850:a:rel' }}
       />
     ),
   },

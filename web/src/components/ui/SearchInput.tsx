@@ -2,8 +2,12 @@ import type { InputHTMLAttributes } from 'react'
 import { cn } from '@/lib/cn'
 
 /**
- * Peek's SearchInput, ported (2026-08-25) minus its `signal:` variants.
- * `@estiva/ui` candidate — the one thing Ship adds is its own placeholder.
+ * Peek's SearchInput, ported (2026-08-25), rendered the way Peek's Signal
+ * theme renders it but on Ship's tokens (Katerina, 2026-08-26): the field is
+ * an inset panel with a hairline border that strengthens on focus, and the
+ * keyboard hint is Signal's `kbd` chip — mono, 10px, a faint fill (the
+ * `bg-hover` translucency), a thicker bottom edge. `@estiva/ui` candidate —
+ * the one thing Ship adds is its own placeholder.
  *
  * In Peek's TopBar this is a launcher affordance rather than a live field:
  * clicking it opens the command launcher. Ship will decide what its search
@@ -31,9 +35,9 @@ export function SearchInput({ shortcut, className, placeholder = 'Search…', ..
         {...props}
       />
       {shortcut && (
-        <div className="flex shrink-0 items-center justify-center rounded-sm border border-border-strong bg-bg-inset px-1 py-px">
-          <span className="whitespace-nowrap text-caption text-text-secondary">{shortcut}</span>
-        </div>
+        <kbd className="shrink-0 whitespace-nowrap rounded-sm border border-b-2 border-border-default bg-bg-hover px-1 py-0.5 font-mono text-[10px] leading-[1.2] text-text-secondary">
+          {shortcut}
+        </kbd>
       )}
     </div>
   )

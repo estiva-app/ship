@@ -5,11 +5,12 @@ import { WithTooltip } from '@/components/ui/Tooltip'
 /**
  * One row of the sidebar: a label, an optional count, an active state.
  *
- * The count is a number of OPEN issues and nothing else (ruling A2) — the
- * tooltip says so ("18 open"), and a zero is not drawn at all. Today's app
- * counts open issues on one row and every issue on the next, and says
- * nothing about which; this component cannot express that difference, so
- * the caller has to pass the right number.
+ * A count is a number of ONE thing, and its tooltip says which (ruling A2):
+ * the issue rows count open issues ("18 open"); the Projects entry counts
+ * active projects ("5 active" — Katerina, 2026-08-26, restoring today's
+ * count). Today's app shows both numbers and says nothing about either;
+ * here the caller passes the number and the words for it, and a zero is not
+ * drawn at all.
  *
  * Active is a quiet selected background with the text left primary (ruling
  * A3), not the accent-coloured bold of the old app.
@@ -17,15 +18,17 @@ import { WithTooltip } from '@/components/ui/Tooltip'
 export interface NavItemProps {
   label: string
   href: string
-  /** Open issues. `0` or absent renders no counter (Peek's counts rule). */
+  /** `0` or absent renders no counter (Peek's counts rule). */
   count?: number
+  /** What the count counts, for the tooltip — "18 open", "5 active". */
+  countLabel?: string
   active?: boolean
-  /** 16px, stroke 1.5. The two fixed entries have none today; kept optional. */
+  /** 16px, stroke 1.5. */
   icon?: ReactNode
   className?: string
 }
 
-export function NavItem({ label, href, count, active = false, icon, className }: NavItemProps) {
+export function NavItem({ label, href, count, countLabel, active = false, icon, className }: NavItemProps) {
   return (
     <a
       href={href}
@@ -39,7 +42,7 @@ export function NavItem({ label, href, count, active = false, icon, className }:
       {icon && <span className="shrink-0">{icon}</span>}
       <span className="flex-1 truncate">{label}</span>
       {count ? (
-        <WithTooltip label={`${count} open`}>
+        <WithTooltip label={countLabel ?? `${count} open`}>
           <span className="shrink-0 text-caption tabular-nums text-text-muted">{count}</span>
         </WithTooltip>
       ) : null}

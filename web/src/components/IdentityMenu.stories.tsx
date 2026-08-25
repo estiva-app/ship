@@ -14,7 +14,7 @@ const meta = {
   },
   decorators: [
     (Story) => (
-      <div className="flex h-12 w-[520px] items-center justify-end border-b border-border-default bg-bg-surface pr-2">
+      <div className="flex h-[52px] w-[520px] items-center justify-end border-b border-border-default bg-bg-surface pr-[26px]">
         <Story />
       </div>
     ),
@@ -30,7 +30,7 @@ export const Anonymous: Story = {}
 /** Signed in through Estiva ID, in a build that offers sign-in. */
 export const SignedIn: Story = {
   args: {
-    me: { name: 'Katerina Kelepouri', email: 'katerina@example.com' },
+    me: { name: 'Ana Duarte', email: 'ana@example.com' },
     signedIn: true,
     idBase: 'https://id.estiva.app',
   },
@@ -40,7 +40,7 @@ export const SignedIn: Story = {
 export const WithPicture: Story = {
   args: {
     me: {
-      name: 'Jan Mikula',
+      name: 'Ravi Mehta',
       picture:
         'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><rect width="10" height="10" fill="%236c8cff"/></svg>',
     },

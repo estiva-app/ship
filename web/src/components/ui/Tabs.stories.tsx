@@ -12,7 +12,7 @@ type Story = StoryObj<typeof meta>
 
 type Which = 'active' | 'archived'
 
-/** The projects list's pair, as today: labels carry their counts. */
+/** The projects list's pair: the count is a chip beside the label (Katerina, 2026-08-26). */
 export const ActiveArchived: Story = {
   args: { tabs: [], active: 'active', onChange: () => {} },
   render: () => {
@@ -20,8 +20,8 @@ export const ActiveArchived: Story = {
     return (
       <Tabs<Which>
         tabs={[
-          { id: 'active', label: 'Active (5)' },
-          { id: 'archived', label: 'Archived (2)' },
+          { id: 'active', label: 'Active', count: 5 },
+          { id: 'archived', label: 'Archived', count: 2 },
         ]}
         active={active}
         onChange={setActive}

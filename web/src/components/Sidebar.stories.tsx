@@ -1,13 +1,13 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { Sidebar, type SidebarProject } from './Sidebar'
 
-/** Shaped like the local workspace: five active projects, twenty-eight issues. */
+/** Shaped like the local sandbox — invented projects, nothing real. */
 const PROJECTS: SidebarProject[] = [
-  { addr: '30850:a:rew', title: 'Rewrite Ship with shared foundation', href: '#/p/rew', openCount: 9 },
-  { addr: '30850:a:pee', title: 'Peek: Real-time Ship→Peek updates', href: '#/p/pee', openCount: 6 },
-  { addr: '30850:a:cro', title: 'Cross-app read state', href: '#/p/cro', openCount: 3 },
-  { addr: '30850:a:sha', title: 'Shared foundation packages', href: '#/p/sha', openCount: 0 },
-  { addr: '30850:a:cat', title: 'Catch up the Buzz fork', href: '#/p/cat', openCount: 0 },
+  { addr: '30850:a:des', title: 'Design System', href: '#/p/des', openCount: 9 },
+  { addr: '30850:a:rel', title: 'Relay Migration', href: '#/p/rel', openCount: 6 },
+  { addr: '30850:a:pay', title: 'Payment integration', href: '#/p/pay', openCount: 3 },
+  { addr: '30850:a:onb', title: 'Onboarding flow for new workspaces', href: '#/p/onb', openCount: 0 },
+  { addr: '30850:a:mob', title: 'Mobile app', href: '#/p/mob', openCount: 0 },
 ]
 
 const meta = {
@@ -33,13 +33,13 @@ const meta = {
 export default meta
 type Story = StoryObj<typeof meta>
 
-/** On the Issues list. Every number is open issues; projects with none show none. */
+/** On the Issues list. Issues counts open issues; Projects counts active projects; a project row with no open issues shows no number. */
 export const Issues: Story = {}
 
 export const Projects: Story = { args: { current: 'projects' } }
 
 /** A project route marks its own row, not the Projects entry. */
-export const OnAProject: Story = { args: { current: { projectAddr: '30850:a:pee' } } }
+export const OnAProject: Story = { args: { current: { projectAddr: '30850:a:rel' } } }
 
-/** A workspace with no active projects: the heading is not drawn either. */
+/** A workspace with no active projects: no count on Projects, and no heading either. */
 export const Empty: Story = { args: { openIssues: 0, projects: [] } }
