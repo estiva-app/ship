@@ -1,19 +1,19 @@
 import { cn } from '@/lib/cn'
 import { ago } from '@/lib/time'
+import { statusLabel, type StatusEntry } from '@/lib/issues'
 import { Avatar } from '@/components/ui/Avatar'
 import { StatusIcon } from '@/components/ui/StatusIcon'
-import { WithTooltip } from '@/components/ui/Tooltip'
 
 /**
- * One issue, one 36px line (ruling C15): status icon · ref · title · spacer ·
- * assignee's face · relative time. The title is the only emphasised thing;
- * everything else steps down. The whole row is the link.
+ * One issue, as production's row (Katerina, 2026-08-26): a bordered card of
+ * two lines. The title on the first; on the second, small and quiet — the
+ * ref in mono, the status with its shaped icon right after it, the assignee
+ * as a face and a name, who opened it and when, and how many conversations
+ * it has. The whole card is the link.
  *
  * The ref is decoration — refs collide across projects — so it is shown and
  * never used to identify anything; an issue without one shows an em dash
- * (audit L2), not a blank. The assignee is a face, never a key; unassigned
- * draws nothing rather than a placeholder that looks like a person.
- *
+ * (audit L2), not a blank. People are faces and names, never keys.
  * Ship-only: it knows what an issue is.
  */
 export interface IssueRowData {
@@ -23,36 +23,56 @@ export interface IssueRowData {
   title: string
   status: string
   assignee?: { name?: string; picture?: string }
-  /** Seconds — when it was last touched, as production's table reads it. */
+  openedBy?: { name?: string; picture?: string }
+  /** Seconds — when it was opened. */
   at: number
+  /** Threads about this issue. */
+  conversations?: number
 }
 
 export interface IssueRowProps {
   issue: IssueRowData
+  statuses: StatusEntry[]
   href: string
   className?: string
 }
 
-export function IssueRow({ issue, href, className }: IssueRowProps) {
+export function IssueRow({ issue, statuses, href, className }: IssueRowProps) {
+  const threads = issue.conversations ?? 0
   return (
     <a
       href={href}
       className={cn(
-        'flex h-9 min-w-0 items-center gap-3 rounded-md px-2 text-body-2 transition-colors hover:bg-bg-hover',
+        'flex flex-col gap-1.5 rounded-lg border border-border-default bg-bg-surface px-3 py-2.5 transition-colors hover:border-border-strong',
         className,
       )}
     >
-      <StatusIcon value={issue.status} />
-      <span className={cn('w-14 shrink-0 font-mono text-caption', issue.ref ? 'text-text-muted' : 'text-text-disabled')}>
-        {issue.ref ?? '—'}
+      <span className="truncate text-body-2-strong text-text-primary">{issue.title}</span>
+      <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-caption text-text-muted">
+        <span className={cn('font-mono', issue.ref ? 'text-text-muted' : 'text-text-disabled')}>{issue.ref ?? '—'}</span>
+        <span className="flex items-center gap-1.5 text-text-secondary">
+          <StatusIcon value={issue.status} size={14} />
+          {statusLabel(issue.status, statuses)}
+        </span>
+        {issue.assignee && (
+          <span className="flex min-w-0 items-center gap-1.5 text-text-secondary">
+            <Avatar name={issue.assignee.name} src={issue.assignee.picture} size={16} />
+            <span className="truncate">{issue.assignee.name ?? '—'}</span>
+          </span>
+        )}
+        <span className="flex min-w-0 items-center gap-1.5">
+          opened by
+          {issue.openedBy && <Avatar name={issue.openedBy.name} src={issue.openedBy.picture} size={16} />}
+          <span className="truncate">{issue.openedBy?.name ?? '—'}</span>
+          <span aria-hidden="true">·</span>
+          <span className="shrink-0">{ago(issue.at)}</span>
+        </span>
+        {threads > 0 && (
+          <span className="shrink-0">
+            {threads} {threads === 1 ? 'conversation' : 'conversations'}
+          </span>
+        )}
       </span>
-      <span className="min-w-0 flex-1 truncate text-text-primary">{issue.title}</span>
-      {issue.assignee && (
-        <WithTooltip label={issue.assignee.name ?? '—'}>
-          <Avatar name={issue.assignee.name} src={issue.assignee.picture} size={20} />
-        </WithTooltip>
-      )}
-      <span className="w-14 shrink-0 text-right text-caption tabular-nums text-text-muted">{ago(issue.at)}</span>
     </a>
   )
 }

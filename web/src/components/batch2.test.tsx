@@ -23,7 +23,7 @@ describe('groupByStatus — production’s rule', () => {
 
 describe('IssueRow', () => {
   it('shows an em dash for a missing ref, links the whole row, and never a key', () => {
-    const { container } = render(<IssueRow issue={ROWS[4]} href="#/issue/x" />)
+    const { container } = render(<IssueRow issue={ROWS[4]} statuses={ISSUE_STATUSES} href="#/issue/x" />)
     expect(screen.getByRole('link')).toHaveAttribute('href', '#/issue/x')
     expect(container.textContent).toContain('—')
     expect(container.textContent).not.toMatch(/[0-9a-f]{8}/)

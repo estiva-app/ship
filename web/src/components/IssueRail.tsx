@@ -22,7 +22,7 @@ export interface IssueRailProps {
   assignee: string
   people: RailPerson[]
   onAssigneeChange: (value: string) => void
-  /** `''` for "Inbox (no project)". */
+  /** `''` for no project. */
   project: string
   projects: SelectOption[]
   onProjectChange: (value: string) => void

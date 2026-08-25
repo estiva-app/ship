@@ -16,15 +16,16 @@ export interface IssueGroupProps {
   status: string
   label: string
   issues: IssueRowData[]
+  statuses: StatusEntry[]
   hrefFor: (issue: IssueRowData) => string
   defaultCollapsed?: boolean
 }
 
-export function IssueGroup({ status, label, issues, hrefFor, defaultCollapsed = false }: IssueGroupProps) {
+export function IssueGroup({ status, label, issues, statuses, hrefFor, defaultCollapsed = false }: IssueGroupProps) {
   const [collapsed, setCollapsed] = useState(defaultCollapsed)
   const Chevron = collapsed ? IconChevronRight : IconChevronDown
   return (
-    <section className="flex flex-col gap-px">
+    <section className="flex flex-col gap-2">
       <button
         type="button"
         onClick={() => setCollapsed((value) => !value)}
@@ -36,7 +37,7 @@ export function IssueGroup({ status, label, issues, hrefFor, defaultCollapsed = 
         <span className="text-body-2-strong text-text-primary">{label}</span>
         <Chip label={String(issues.length)} />
       </button>
-      {!collapsed && issues.map((issue) => <IssueRow key={issue.addr} issue={issue} href={hrefFor(issue)} />)}
+      {!collapsed && issues.map((issue) => <IssueRow key={issue.addr} issue={issue} statuses={statuses} href={hrefFor(issue)} />)}
     </section>
   )
 }
@@ -65,6 +66,7 @@ export function IssueList({ issues, statuses, hrefFor, collapsed = ['done'], emp
           status={group.status}
           label={group.label}
           issues={group.items}
+          statuses={statuses}
           hrefFor={hrefFor}
           defaultCollapsed={collapsed.includes(group.status)}
         />

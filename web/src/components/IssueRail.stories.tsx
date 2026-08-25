@@ -15,7 +15,7 @@ const PEOPLE = [
   { value: 'ravi', name: 'Ravi Mehta' },
 ]
 const PROJECTS = [
-  { value: '', label: 'Inbox (no project)' },
+  { value: '', label: 'No project' },
   { value: 'des', label: 'Design System' },
   { value: 'rel', label: 'Relay Migration' },
 ]

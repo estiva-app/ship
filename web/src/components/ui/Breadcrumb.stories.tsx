@@ -19,9 +19,9 @@ type Story = StoryObj<typeof meta>
 
 export const OnAnIssue: Story = {}
 
-/** An issue with no project: "Inbox", muted, and no ref. */
-export const InTheInbox: Story = {
-  args: { items: [{ label: 'Issues', href: '#/issues' }, { label: 'Inbox', muted: true }] },
+/** An issue with no project: straight from Issues to the ref. */
+export const NoProject: Story = {
+  args: { items: [{ label: 'Issues', href: '#/issues' }, { label: 'REL-6', mono: true }] },
 }
 
 /** A project page: Projects / project. */

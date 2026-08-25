@@ -1,12 +1,12 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { ANA, ROWS, hrefFor } from '@/fixtures/issues'
+import { ANA, ISSUE_STATUSES, ROWS, hrefFor } from '@/fixtures/issues'
 import { IssueRow } from './IssueRow'
 
-/** One 36px line: status · ref · title · assignee · time. The title is the only emphasised thing. */
+/** Production's two-line row: the title, then ref · status · assignee · opened by · time · conversations, small and quiet. */
 const meta = {
   title: 'Issues/IssueRow',
   component: IssueRow,
-  args: { issue: ROWS[0], href: hrefFor(ROWS[0]) },
+  args: { issue: ROWS[0], statuses: ISSUE_STATUSES, href: hrefFor(ROWS[0]) },
   decorators: [
     (Story) => (
       <div className="w-[640px]">

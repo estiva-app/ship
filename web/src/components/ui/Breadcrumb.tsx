@@ -14,7 +14,7 @@ export interface Crumb {
   href?: string
   /** Set the item in the mono face — a ref, an id. */
   mono?: boolean
-  /** Quieter — production's "Inbox" when an issue has no project. */
+  /** Quieter — a label that is not a place. */
   muted?: boolean
 }
 

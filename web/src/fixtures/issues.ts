@@ -21,9 +21,9 @@ export const ISSUE_STATUSES = [
 ]
 
 export const ISSUES: IssuesTableRow[] = [
-  { addr: '30851:a:1', ref: 'REL-1', title: 'Board columns lose order after an archived project returns', status: 'in_progress', assignee: ANA, openedBy: RAVI, at: NOW - 3600 * 2 },
+  { addr: '30851:a:1', ref: 'REL-1', title: 'Board columns lose order after an archived project returns', status: 'in_progress', assignee: ANA, openedBy: RAVI, at: NOW - 3600 * 2, conversations: 2 },
   { addr: '30851:a:2', ref: 'REL-2', title: 'Comments lose their draft when navigating away', status: 'in_progress', assignee: RAVI, openedBy: ANA, at: NOW - 86400 },
-  { addr: '30851:a:3', ref: 'REL-3', title: 'Pick the dark theme accent', status: 'todo', openedBy: ANA, at: NOW - 86400 * 2 },
+  { addr: '30851:a:3', ref: 'REL-3', title: 'Pick the dark theme accent', status: 'todo', openedBy: ANA, at: NOW - 86400 * 2, conversations: 1 },
   { addr: '30851:a:4', ref: 'REL-4', title: 'Add a keyboard path for changing status from the list', status: 'todo', assignee: ANA, openedBy: RAVI, at: NOW - 86400 * 3 },
   { addr: '30851:a:5', title: 'Filed from another app, with no ref', status: 'todo', openedBy: NOBODY, at: NOW - 86400 * 4 },
   { addr: '30851:a:6', ref: 'REL-6', title: 'Empty states read as broken screens', status: 'done', assignee: RAVI, openedBy: ANA, at: NOW - 86400 * 9 },
