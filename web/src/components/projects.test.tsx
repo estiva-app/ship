@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { ago } from '@/lib/time'
-import { StatusIcon } from './ui/StatusIcon'
+import { StatusLabel } from './ui/StatusLabel'
 import { Tabs } from './ui/Tabs'
 import { ProjectCard } from './ProjectCard'
 
@@ -48,17 +48,20 @@ describe('ProjectCard', () => {
   })
 })
 
-describe('StatusIcon', () => {
-  it('draws a plain circle for a status the vocabulary does not know', () => {
-    const { container } = render(<StatusIcon value="blocked" />)
+describe('StatusLabel', () => {
+  it('draws a plain circle and the raw word for a status the vocabulary does not know', () => {
+    const { container } = render(<StatusLabel value="blocked" label="blocked" />)
     expect(container.querySelector('svg.tabler-icon-circle')).not.toBeNull()
+    expect(container.textContent).toBe('blocked')
   })
 
-  it('shares shapes between issues and projects', () => {
-    const done = render(<StatusIcon value="done" />).container.querySelector('svg')!.className.baseVal
-    const completed = render(<StatusIcon value="completed" />).container.querySelector('svg')!.className.baseVal
-    expect(done).toBe(completed)
-    expect(done).toContain('tabler-icon-circle-check')
+  it('shares shapes between issues and projects, and one colour across sizes', () => {
+    const done = render(<StatusLabel value="done" label="Done" />).container
+    const completed = render(<StatusLabel value="completed" label="Completed" size="small" />).container
+    expect(done.querySelector('svg')!.className.baseVal).toContain('tabler-icon-circle-check')
+    expect(completed.querySelector('svg')!.className.baseVal).toContain('tabler-icon-circle-check')
+    expect(done.firstElementChild).toHaveClass('text-text-secondary')
+    expect(completed.firstElementChild).toHaveClass('text-text-secondary')
   })
 })
 
