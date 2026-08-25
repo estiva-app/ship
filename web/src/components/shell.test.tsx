@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Avatar, initialsFromName } from './ui/Avatar'
 import { IdentityMenu } from './IdentityMenu'
 import { NavItem } from './NavItem'
@@ -73,25 +73,34 @@ describe('Sidebar', () => {
   it('draws no Projects heading when there are none', () => {
     render(<Sidebar openIssues={0} issuesHref="#/" projectsHref="#/projects" projects={[]} current="projects" />)
     expect(screen.getAllByRole('link')).toHaveLength(2)
-    expect(screen.queryByText('Projects', { selector: 'div' })).toBeNull()
+    // Only the nav entry says "Projects"; the section heading is not drawn.
+    expect(screen.getAllByText('Projects')).toHaveLength(1)
   })
 })
 
 describe('IdentityMenu', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
   it('shows Anonymous with a silhouette, and the old menu text, with no key anywhere', () => {
     const onCopyKey = vi.fn()
     const { container } = render(
       <IdentityMenu me={{}} signedIn={false} relayUrl="http://localhost:3000" onCopyKey={onCopyKey} />,
     )
-    expect(screen.getByRole('button', { name: /Anonymous/ })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: /Anonymous/ }))
+    const trigger = screen.getByRole('button', { name: /Anonymous/ })
+    expect(trigger).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(trigger)
+    expect(trigger).toHaveAttribute('aria-expanded', 'true')
     expect(screen.getByText('Acting as')).toBeInTheDocument()
     expect(screen.getByText('A key held by this browser only. Nobody else knows who you are.')).toBeInTheDocument()
     expect(screen.getByText('Everyone on this relay shares this workspace, in every app.')).toBeInTheDocument()
     expect(screen.getByText('http://localhost:3000')).toBeInTheDocument()
     expect(container.textContent).not.toMatch(/[0-9a-f]{8}/)
+    // Anonymous, in a build with no Estiva ID: the one action is copying the key.
+    expect(screen.getAllByRole('button')).toHaveLength(2)
 
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Copy public key' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Copy public key' }))
     expect(onCopyKey).toHaveBeenCalledTimes(1)
     expect(screen.queryByRole('menu')).toBeNull()
     expect(container.textContent).not.toContain(KEY.slice(0, 8))
@@ -99,6 +108,7 @@ describe('IdentityMenu', () => {
 
   it('offers the Estiva ID link and Sign out only when signed in to a build that has ID', () => {
     const onSignOut = vi.fn()
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null)
     render(
       <IdentityMenu
         me={{ name: 'Jan Mikula' }}
@@ -111,11 +121,10 @@ describe('IdentityMenu', () => {
     )
     fireEvent.click(screen.getByRole('button', { name: /Jan Mikula/ }))
     expect(screen.getByText('Signed in as')).toBeInTheDocument()
-    expect(screen.getByRole('menuitem', { name: 'Edit your profile in Estiva ID' })).toHaveAttribute(
-      'href',
-      'https://id.estiva.app',
-    )
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Sign out' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Edit your profile in Estiva ID' }))
+    expect(open).toHaveBeenCalledWith('https://id.estiva.app', '_blank', 'noopener,noreferrer')
+    fireEvent.click(screen.getByRole('button', { name: /Jan Mikula/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
     expect(onSignOut).toHaveBeenCalledTimes(1)
   })
 

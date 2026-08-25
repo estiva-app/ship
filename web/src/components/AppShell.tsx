@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { HeaderBar } from './HeaderBar'
+import { TopBar } from './TopBar'
 
 /**
  * The four regions that survived the old `index.html` once its 13,939 bytes
@@ -11,18 +11,20 @@ import { HeaderBar } from './HeaderBar'
  * no data and no routes.
  */
 export interface AppShellProps {
-  /** The header's right-hand side — an `IdentityMenu`. */
+  /** The top bar's right-hand side — an `IdentityMenu`. */
   identity: ReactNode
+  /** The top bar's centre — a search field, later. */
+  search?: ReactNode
   /** A `Banner`, or nothing. */
   banner?: ReactNode
   sidebar: ReactNode
   children: ReactNode
 }
 
-export function AppShell({ identity, banner, sidebar, children }: AppShellProps) {
+export function AppShell({ identity, search, banner, sidebar, children }: AppShellProps) {
   return (
     <div className="flex h-full min-h-0 flex-col bg-bg-base text-text-primary">
-      <HeaderBar identity={identity} />
+      <TopBar search={search} right={identity} />
       {banner}
       <div className="flex min-h-0 flex-1">
         {sidebar}

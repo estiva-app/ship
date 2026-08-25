@@ -1,4 +1,6 @@
+import { IconBox, IconListDetails } from '@tabler/icons-react'
 import { cn } from '@/lib/cn'
+import { SectionLabel } from '@/components/ui/SectionLabel'
 import { NavItem } from './NavItem'
 
 /**
@@ -48,12 +50,23 @@ export function Sidebar({ openIssues, issuesHref, projectsHref, projects, curren
         className,
       )}
     >
-      <NavItem label="Issues" href={issuesHref} count={openIssues} active={current === 'issues'} />
-      <NavItem label="Projects" href={projectsHref} active={current === 'projects'} />
+      <NavItem
+        label="Issues"
+        href={issuesHref}
+        icon={<IconListDetails size={16} stroke={1.5} />}
+        count={openIssues}
+        active={current === 'issues'}
+      />
+      <NavItem
+        label="Projects"
+        href={projectsHref}
+        icon={<IconBox size={16} stroke={1.5} />}
+        active={current === 'projects'}
+      />
       {projects.length > 0 && (
         <>
-          <div className="px-2 pb-1.5 pt-4 text-[11px] font-medium uppercase tracking-[0.08em] text-text-muted">
-            Projects
+          <div className="mt-2 flex h-8 items-center px-2">
+            <SectionLabel>Projects</SectionLabel>
           </div>
           {projects.map((project) => (
             <NavItem

@@ -2,7 +2,7 @@ import { IconUserFilled } from '@tabler/icons-react'
 import { cn } from '@/lib/cn'
 
 /**
- * A person's face.
+ * A person's face. `@estiva/ui` candidate (SHA-5) — no product knowledge here.
  *
  * **This component cannot render a key, and that is its whole point.** It takes
  * a name and a picture — both from `kind:0`, both absent for most people — and
@@ -17,6 +17,12 @@ import { cn } from '@/lib/cn'
  *
  * Initials are light text on the accent tint (her ruling, 2026-08-24) rather
  * than the old app's per-key hue — a colour derived from a key is a key, dimly.
+ *
+ * They are drawn as SVG text so the *capitals* sit on the centre line: HTML
+ * text centres its line box, and Geist's caps stand on a baseline a fifth of
+ * an em above the box bottom, which read as "too high" at every size
+ * (Katerina, 2026-08-25). Cap height is 0.70 em, so the baseline goes 0.35 em
+ * below centre.
  */
 export interface AvatarProps {
   /** From `kind:0`. Absent means anonymous — a silhouette, never a key. */
@@ -40,6 +46,8 @@ export function initialsFromName(name: string | undefined): string {
   return ''
 }
 
+const CAP_HEIGHT_EM = 0.7
+
 export function Avatar({ name, src, size = 22, className }: AvatarProps) {
   const initials = initialsFromName(name)
   return (
@@ -54,12 +62,18 @@ export function Avatar({ name, src, size = 22, className }: AvatarProps) {
       aria-hidden="true"
     >
       {initials ? (
-        <span
-          className="font-medium leading-none"
-          style={{ fontSize: Math.round(size * 0.42) }}
-        >
-          {initials}
-        </span>
+        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="font-sans font-medium">
+          <text
+            x="50%"
+            y="50%"
+            dy={`${CAP_HEIGHT_EM / 2}em`}
+            textAnchor="middle"
+            fontSize={Math.round(size * 0.42)}
+            fill="currentColor"
+          >
+            {initials}
+          </text>
+        </svg>
       ) : (
         <IconUserFilled size={Math.round(size * 0.58)} className="text-text-muted" />
       )}

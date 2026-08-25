@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { IconChevronDown } from '@tabler/icons-react'
+import { IconCopy, IconExternalLink, IconLogout } from '@tabler/icons-react'
 import { cn } from '@/lib/cn'
-import { Avatar } from '@/components/ui/Avatar'
+import { Button } from '@/components/ui/Button'
+import { Person } from '@/components/ui/Person'
+import { PersonTrigger } from '@/components/ui/PersonTrigger'
 
 /**
- * Who you are, and where you are — the header's identity trigger and the
+ * Who you are, and where you are — the top bar's identity trigger and the
  * menu it opens.
  *
  * The trigger is a face and a name, never a key (ruling A4). Anonymous is a
@@ -16,6 +18,9 @@ import { Avatar } from '@/components/ui/Avatar'
  * workspace (and the smoke test asserts that this menu names it). The one
  * place a key appears is as the *result* of "Copy public key" — this component
  * never receives the key, so it cannot show one; the caller copies.
+ *
+ * Three kinds of text, three tokens: a section label is muted, the value is
+ * primary, the sentence under it is secondary. The actions are Buttons.
  *
  * Signed-in affordances ("Edit your profile in Estiva ID", "Sign out") are
  * modelled now and wired in REW-2.
@@ -43,7 +48,6 @@ export interface IdentityMenuProps {
 export function IdentityMenu({ me, signedIn, relayUrl, idBase, onCopyKey, onSignOut, className }: IdentityMenuProps) {
   const [open, setOpen] = useState(false)
   const root = useRef<HTMLDivElement>(null)
-  const displayName = me.name ?? 'Anonymous'
 
   useEffect(() => {
     if (!open) return
@@ -61,108 +65,91 @@ export function IdentityMenu({ me, signedIn, relayUrl, idBase, onCopyKey, onSign
     }
   }, [open])
 
-  const close = () => setOpen(false)
+  const act = (action: () => void) => () => {
+    setOpen(false)
+    action()
+  }
 
   return (
     <div ref={root} className={cn('relative', className)}>
-      <button
-        type="button"
-        aria-haspopup="menu"
-        aria-expanded={open}
+      <PersonTrigger
+        name={me.name}
+        picture={me.picture}
+        fallback="Anonymous"
+        open={open}
         onClick={() => setOpen((value) => !value)}
-        className={cn(
-          'flex h-8 cursor-pointer items-center gap-2 rounded-md pl-1.5 pr-2 transition-colors hover:bg-bg-hover',
-          open && 'bg-bg-hover',
-        )}
-      >
-        <Avatar name={me.name} src={me.picture} size={22} />
-        <span className={cn('text-body-2', me.name ? 'text-text-primary' : 'text-text-muted')}>{displayName}</span>
-        <IconChevronDown size={14} stroke={1.5} className="text-text-muted" />
-      </button>
+      />
 
       {open && (
         <div
           role="menu"
-          className="absolute right-0 top-full z-50 mt-1 w-[300px] rounded-lg border border-border-default bg-bg-elevated py-1.5 shadow-lg"
+          className="absolute right-0 top-full z-50 mt-1 w-72 rounded-lg border border-border-default bg-bg-elevated p-1 shadow-lg"
         >
-          <MenuLabel>{signedIn ? 'Signed in as' : 'Acting as'}</MenuLabel>
-          <MenuValue>
-            <span className="flex items-center gap-2">
-              <Avatar name={me.name} src={me.picture} size={20} />
-              <span className={cn('text-body-2-strong', me.name ? 'text-text-primary' : 'text-text-muted')}>
-                {displayName}
-              </span>
-            </span>
-          </MenuValue>
-          <MenuNote>
-            {signedIn
-              ? 'Your Estiva ID. The same person you are in Estiva Peek.'
-              : 'A key held by this browser only. Nobody else knows who you are.'}
-          </MenuNote>
-          {me.email && <MenuNote>{me.email} · known to Estiva, never published to the relay</MenuNote>}
+          <Section label={signedIn ? 'Signed in as' : 'Acting as'}>
+            <Person name={me.name} picture={me.picture} fallback="Anonymous" size={28} className="text-body-2-strong" />
+            <Note>
+              {signedIn
+                ? 'Your Estiva ID. The same person you are in Estiva Peek.'
+                : 'A key held by this browser only. Nobody else knows who you are.'}
+            </Note>
+            {me.email && <Note>{me.email} · known to Estiva, never published to the relay</Note>}
+          </Section>
 
-          <MenuLabel>Workspace</MenuLabel>
-          <MenuValue>
-            <span className="break-all font-mono text-caption text-text-secondary">{relayUrl}</span>
-          </MenuValue>
-          <MenuNote>Everyone on this relay shares this workspace, in every app.</MenuNote>
+          <Divider />
 
-          <div className="mx-2 my-1.5 border-t border-border-subtle" />
+          <Section label="Workspace">
+            <span className="break-all font-mono text-caption text-text-primary">{relayUrl}</span>
+            <Note>Everyone on this relay shares this workspace, in every app.</Note>
+          </Section>
 
-          {signedIn && idBase && (
-            <MenuAction href={idBase} onClick={close}>
-              Edit your profile in Estiva ID
-            </MenuAction>
-          )}
-          <MenuAction
-            onClick={() => {
-              close()
-              onCopyKey()
-            }}
-          >
-            Copy public key
-          </MenuAction>
-          {idBase && onSignOut && (
-            <MenuAction
-              onClick={() => {
-                close()
-                onSignOut()
-              }}
+          <Divider />
+
+          <div className="flex flex-col gap-px pt-1">
+            {signedIn && idBase && (
+              <Button
+                className="w-full justify-start"
+                leadingIcon={<IconExternalLink size={16} stroke={1.5} className="text-text-secondary" />}
+                onClick={act(() => window.open(idBase, '_blank', 'noopener,noreferrer'))}
+              >
+                Edit your profile in Estiva ID
+              </Button>
+            )}
+            <Button
+              className="w-full justify-start"
+              leadingIcon={<IconCopy size={16} stroke={1.5} className="text-text-secondary" />}
+              onClick={act(onCopyKey)}
             >
-              Sign out
-            </MenuAction>
-          )}
+              Copy public key
+            </Button>
+            {idBase && onSignOut && (
+              <Button
+                className="w-full justify-start"
+                leadingIcon={<IconLogout size={16} stroke={1.5} className="text-text-secondary" />}
+                onClick={act(onSignOut)}
+              >
+                Sign out
+              </Button>
+            )}
+          </div>
         </div>
       )}
     </div>
   )
 }
 
-function MenuLabel({ children }: { children: ReactNode }) {
-  return <div className="px-3 pb-0.5 pt-2 text-caption text-text-muted">{children}</div>
-}
-
-function MenuValue({ children }: { children: ReactNode }) {
-  return <div className="px-3 py-0.5">{children}</div>
-}
-
-function MenuNote({ children }: { children: ReactNode }) {
-  return <div className="px-3 py-0.5 text-caption text-text-muted">{children}</div>
-}
-
-function MenuAction({ href, onClick, children }: { href?: string; onClick: () => void; children: ReactNode }) {
-  const classes =
-    'flex h-8 w-full cursor-pointer items-center px-3 text-left text-body-2 text-text-primary hover:bg-bg-hover'
-  if (href) {
-    return (
-      <a role="menuitem" href={href} target="_blank" rel="noreferrer" onClick={onClick} className={classes}>
-        {children}
-      </a>
-    )
-  }
+function Section({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <button role="menuitem" type="button" onClick={onClick} className={classes}>
+    <div className="flex flex-col gap-1.5 px-2 pb-3 pt-2">
+      <span className="text-caption text-text-muted">{label}</span>
       {children}
-    </button>
+    </div>
   )
+}
+
+function Note({ children }: { children: ReactNode }) {
+  return <span className="text-caption text-text-secondary">{children}</span>
+}
+
+function Divider() {
+  return <div className="mx-1 border-t border-border-subtle" />
 }
