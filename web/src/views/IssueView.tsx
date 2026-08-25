@@ -1,4 +1,5 @@
 import { Breadcrumb, type Crumb } from '@/components/ui/Breadcrumb'
+import { Divider } from '@/components/ui/Divider'
 import { EditableText } from '@/components/ui/EditableText'
 import { ActivityFeed, type ActivityEntry } from '@/components/ActivityFeed'
 import { Conversations, type ThreadData } from '@/components/ConversationThread'
@@ -29,31 +30,31 @@ export function IssueView({ crumbs, title, description, onRename, onDescribe, th
   if (crumbs.ref) items.push({ label: crumbs.ref, mono: true })
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-4 px-6 pt-5">
-      <Breadcrumb items={items} />
-      <div className="flex min-h-0 flex-1 gap-6">
-        {/* Only this column scrolls — with Peek's thin scrollbar — and the rail
-            beside it starts level with the title and never moves. The column keeps
-            24px inside its right edge, so the content sits as far from the
-            scrollbar as from the page edge, and the rail keeps 24px on its left
-            (gap-6) as on its right, the page edge. */}
-        <div className="flex min-w-0 flex-1 flex-col gap-6 overflow-y-auto pb-5 pr-6">
-          <div className="flex flex-col gap-2">
-            <EditableText label="Title" value={title} placeholder="Untitled issue" onCommit={onRename} className="-mx-2 text-h2" />
-            <EditableText label="Description" value={description} placeholder="Add a description…" onCommit={onDescribe} multiline className="-mx-2 text-body-2" />
-          </div>
-          <section className="flex flex-col gap-3">
-            <h2 className="text-h4 text-text-primary">Conversations</h2>
-            <Conversations threads={threads} onStart={onStartConversation} onReply={onReply} />
-          </section>
-          <section className="flex flex-col gap-3">
-            <h2 className="text-h4 text-text-primary">Activity</h2>
-            <ActivityFeed entries={activity} />
-          </section>
+    <div className="grid h-full min-h-0 grid-cols-[minmax(0,1fr)_1px_auto] grid-rows-[auto_minmax(0,1fr)] gap-y-4">
+      <div className="col-start-1 row-start-1 pl-6 pt-5">
+        <Breadcrumb items={items} />
+      </div>
+      {/* Only the content column scrolls — with Peek's thin scrollbar right
+          beside the hairline, which runs from the top bar to the bottom. The
+          content keeps 24px inside the column (pl/pr-6), the rail 24px either
+          side, and the rail starts level with the title and never moves. */}
+      <div className="col-start-1 row-start-2 flex min-h-0 min-w-0 flex-col gap-6 overflow-y-auto px-6 pb-5">
+        <div className="flex flex-col gap-2">
+          <EditableText label="Title" value={title} placeholder="Untitled issue" onCommit={onRename} className="-mx-2 text-h2" />
+          <EditableText label="Description" value={description} placeholder="Add a description…" onCommit={onDescribe} multiline className="-mx-2 text-body-2" />
         </div>
-        <div className="shrink-0 overflow-y-auto pb-5">
-          <IssueRail {...rail} />
-        </div>
+        <section className="flex flex-col gap-3">
+          <h2 className="text-h4 text-text-primary">Conversations</h2>
+          <Conversations threads={threads} onStart={onStartConversation} onReply={onReply} />
+        </section>
+        <section className="flex flex-col gap-3">
+          <h2 className="text-h4 text-text-primary">Activity</h2>
+          <ActivityFeed entries={activity} />
+        </section>
+      </div>
+      <Divider orientation="vertical" className="col-start-2 row-span-2 row-start-1" />
+      <div className="col-start-3 row-start-2 min-h-0 overflow-y-auto px-6 pb-5">
+        <IssueRail {...rail} />
       </div>
     </div>
   )
