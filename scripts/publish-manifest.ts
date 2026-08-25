@@ -52,6 +52,35 @@ function check(label: string, condition: boolean, detail = '') {
 }
 
 /** Resolve a slot against a real event the way a consumer would. */
+/**
+ * Refuse to publish a production manifest that points at a laptop.
+ *
+ * `APP_URL` and `RELAY_URL` both default to localhost, and only one of them is
+ * obvious when it is wrong. A run against the production relay with the default
+ * app URL publishes a manifest whose every "open in Ship" link is
+ * `http://localhost:5190/…` — which is what happened on 2026-08-25: two
+ * republishes, every check green, and the links in Peek's widget pointed at a
+ * machine nobody else has. The failing check is not the mechanism; there is no
+ * failing check, because from the script's point of view a localhost app URL is
+ * a perfectly valid string.
+ *
+ * So the pairing is asserted before anything is signed. A local relay with a
+ * local app is fine; a remote relay with a local app is a mistake every time.
+ */
+function assertUrlsAgree(relayUrl: string, appUrl: string): void {
+  const local = (u: string) => /^https?:\/\/(localhost|127\.0\.0\.1)/.test(u)
+  if (!local(relayUrl) && local(appUrl)) {
+    console.error(
+      `\n✋ Refusing to publish.\n` +
+        `   relay is ${relayUrl} but the app URL is ${appUrl}.\n` +
+        `   Every "open in Ship" link in the manifest would point at localhost.\n` +
+        `   Publishing to production:\n` +
+        `     APP_URL=https://ship.estiva.app/ RELAY_URL=https://estiva.estiva.app npm run manifest\n`,
+    )
+    process.exit(1)
+  }
+}
+
 function resolveSlot(
   slot: SlotSource,
   event: { tags: string[][]; content: string },
@@ -71,6 +100,7 @@ async function main() {
 
   // Overridable so a deployment somewhere other than the dev port publishes a
   // `web` tag that actually resolves for whoever follows it.
+  assertUrlsAgree(RELAY_URL, process.env.APP_URL ?? DEFAULT_APP_URL)
   const event = buildManifest(identity.pubkey, Date.now(), process.env.APP_URL)
   const published = await relay.publish(signEvent(event, identity.secretKeyHex))
   check('the relay accepts kind:31990', published.ok, published.reason ?? '')
