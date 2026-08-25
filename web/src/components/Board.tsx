@@ -8,8 +8,11 @@ import type { IssueRowData } from './IssueRow'
 /**
  * The kanban board, as production: one column per status in the vocabulary,
  * each with its shaped icon, label and count, and cards of ref · title ·
- * assignee's face (ruling C15). Scrolls horizontally inside itself, never
- * the page.
+ * assignee's face (ruling C15). The columns share the width — production's
+ * `minmax(…, 1fr)` grid, with a 170px minimum so four fit beside the rail at
+ * 1280 — so the board fills the page (Katerina, 2026-08-27) and only
+ * scrolls, inside itself and never the page, once a column would drop below
+ * its minimum.
  *
  * Read-only here. Production's drag-and-drop publishes a `kind:1851` exactly
  * as the status dropdown does; that write, and the drag states around it,
@@ -45,7 +48,7 @@ export function BoardColumn({
   hrefFor: (issue: IssueRowData) => string
 }) {
   return (
-    <section className="flex min-h-40 w-[220px] shrink-0 flex-col gap-2 rounded-lg border border-border-default bg-bg-surface p-2">
+    <section className="flex min-h-40 min-w-0 flex-col gap-2 rounded-lg border border-border-default bg-bg-surface p-2">
       <header className="flex h-7 items-center gap-2 px-1">
         <StatusLabel value={status} label={label} strong />
         <Chip label={String(issues.length)} />
@@ -69,7 +72,7 @@ export interface BoardProps {
 
 export function Board({ issues, statuses, hrefFor, className }: BoardProps) {
   return (
-    <div className={cn('flex gap-2 overflow-x-auto pb-1.5', className)}>
+    <div className={cn('grid grid-flow-col auto-cols-[minmax(170px,1fr)] gap-2 overflow-x-auto pb-1.5', className)}>
       {statuses.map((entry) => (
         <BoardColumn
           key={entry.value}
