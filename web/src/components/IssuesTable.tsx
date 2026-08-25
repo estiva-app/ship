@@ -25,8 +25,13 @@ export interface IssuesTableProps {
   className?: string
 }
 
-const TH = 'h-9 px-3 text-left text-menu font-medium uppercase tracking-[0.08em] text-text-secondary'
+// Sizes spelled as arbitrary values, not tokens: these strings go through cn(),
+// and tailwind-merge drops a custom text-size class that is followed by a
+// text-{colour} class (the pitfall Peek's config records). The header is the
+// menu token (9/115%/500); the ref and the date are the caption token (12).
+const TH = 'h-9 px-3 text-left text-[9px] font-medium uppercase leading-[115%] tracking-[0.08em] text-text-secondary'
 const TD = 'h-10 px-3 text-body-2'
+const SMALL = 'text-[12px] leading-[120%]'
 
 export function IssuesTable({ issues, statuses, hrefFor, className }: IssuesTableProps) {
   return (
@@ -47,7 +52,7 @@ export function IssuesTable({ issues, statuses, hrefFor, className }: IssuesTabl
         <tbody>
           {issues.map((issue) => (
             <tr key={issue.addr} className="border-b border-border-subtle last:border-b-0 hover:bg-bg-hover">
-              <td className={cn(TD, 'font-mono text-caption', issue.ref ? 'text-text-muted' : 'text-text-disabled')}>{issue.ref ?? '—'}</td>
+              <td className={cn(TD, 'font-mono', SMALL, issue.ref ? 'text-text-muted' : 'text-text-disabled')}>{issue.ref ?? '—'}</td>
               <td className={cn(TD, 'max-w-0')}>
                 <a href={hrefFor(issue)} className="block truncate text-text-primary hover:underline">
                   {issue.title}
@@ -65,7 +70,7 @@ export function IssuesTable({ issues, statuses, hrefFor, className }: IssuesTabl
               <td className={cn(TD, 'text-text-secondary')}>
                 <Person name={issue.openedBy.name} picture={issue.openedBy.picture} size={20} />
               </td>
-              <td className={cn(TD, 'whitespace-nowrap text-caption tabular-nums text-text-muted')}>{ago(issue.at)}</td>
+              <td className={cn(TD, 'whitespace-nowrap tabular-nums', SMALL, 'text-text-muted')}>{ago(issue.at)}</td>
             </tr>
           ))}
         </tbody>

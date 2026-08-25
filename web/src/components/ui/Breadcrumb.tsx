@@ -28,7 +28,9 @@ export function Breadcrumb({ items, className }: BreadcrumbProps) {
     <nav aria-label="Breadcrumb" className={cn('flex min-w-0 items-center gap-1.5 text-body-2', className)}>
       {items.map((item, index) => {
         const last = index === items.length - 1
-        const text = cn('truncate', item.mono && 'font-mono text-caption', item.muted || (last && item.mono) ? 'text-text-muted' : last ? 'text-text-primary' : 'text-text-secondary')
+        // The mono size is an arbitrary value (the caption token) because this string
+        // goes through cn() and a token size before a colour class is dropped.
+        const text = cn('truncate', item.mono && 'font-mono text-[12px] leading-[120%]', item.muted || (last && item.mono) ? 'text-text-muted' : last ? 'text-text-primary' : 'text-text-secondary')
         return (
           <Fragment key={`${item.label}-${index}`}>
             {index > 0 && (
