@@ -15,6 +15,9 @@ export const Primary: Story = { args: { variant: 'primary' } }
 export const Outlined: Story = { args: { variant: 'outlined' } }
 export const Muted: Story = {}
 
+/** Ship's addition to the shared Button: the muted button in the error colour, for Delete and its kind. */
+export const Destructive: Story = { args: { variant: 'destructive', children: 'Delete project' } }
+
 /** The leading icon takes 16px on the default size, 14px on small. */
 export const WithLeadingIcon: Story = {
   args: { variant: 'outlined', leadingIcon: <IconPlus size={16} stroke={1.5} /> },

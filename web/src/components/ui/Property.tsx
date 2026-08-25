@@ -13,10 +13,11 @@ import { SectionLabel } from './SectionLabel'
  *   property label is content, not a placeholder. Peek's `text-xs` is the
  *   `caption` token here.
  * - `stacked` — Ship's rail, as production has it: the label above a
- *   full-width control, the label a `SectionLabel` (Katerina, 2026-08-26:
- *   "I really like how it's done in production now … we have the section
- *   label for that"). Right for a 250px rail where the control wants the
- *   whole width.
+ *   full-width control, the label a `SectionLabel` set uppercase and
+ *   letter-spaced as production's rail labels are and as Peek's Signal theme
+ *   renders every SectionLabel (Katerina, 2026-08-26: "we have the section
+ *   label for that … I like that it's uppercase"). Right for a 250px rail
+ *   where the control wants the whole width.
  */
 export interface PropertyProps {
   label: string
@@ -29,7 +30,7 @@ export function Property({ label, layout = 'row', children, className }: Propert
   if (layout === 'stacked') {
     return (
       <div className={cn('flex flex-col gap-1.5', className)}>
-        <SectionLabel>{label}</SectionLabel>
+        <SectionLabel className="uppercase tracking-[0.08em] text-text-secondary">{label}</SectionLabel>
         {children}
       </div>
     )

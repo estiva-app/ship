@@ -12,8 +12,13 @@ import { cn } from '@/lib/cn'
  * dark base. Sizes are spelled as arbitrary values for the reason Peek's
  * tailwind config records: tailwind-merge drops a custom `text-{size}` that
  * is followed by a `text-{colour}`.
+ *
+ * Plus one variant Peek does not have yet and the shared package should:
+ * `destructive` — the muted button in the error colour, for "Delete project"
+ * and its kind (Katerina, 2026-08-26). A destructive action is a button like
+ * any other, not a dotted link.
  */
-export type ButtonVariant = 'primary' | 'outlined' | 'muted'
+export type ButtonVariant = 'primary' | 'outlined' | 'muted' | 'destructive'
 export type ButtonSize = 'default' | 'small'
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -48,6 +53,7 @@ export function Button({
         !disabled && variant === 'primary' && 'cursor-pointer bg-accent-primary text-text-inverse hover:bg-accent-hover',
         !disabled && variant === 'outlined' && 'cursor-pointer border border-border-default text-text-primary hover:bg-bg-hover',
         !disabled && variant === 'muted' && 'cursor-pointer text-text-primary hover:bg-bg-hover',
+        !disabled && variant === 'destructive' && 'cursor-pointer text-error-default hover:bg-error-muted',
         disabled && 'pointer-events-none bg-bg-disabled text-text-disabled',
         disabled && variant === 'outlined' && 'border border-border-default',
         className,
