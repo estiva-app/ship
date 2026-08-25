@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react'
 import { cn } from '@/lib/cn'
-import { SectionLabel } from './SectionLabel'
 
 /**
  * Peek's Property, ported (2026-08-26). `@estiva/ui` candidate.
@@ -13,11 +12,11 @@ import { SectionLabel } from './SectionLabel'
  *   property label is content, not a placeholder. Peek's `text-xs` is the
  *   `caption` token here.
  * - `stacked` — Ship's rail, as production has it: the label above a
- *   full-width control, the label a `SectionLabel` set uppercase and
- *   letter-spaced as production's rail labels are and as Peek's Signal theme
- *   renders every SectionLabel (Katerina, 2026-08-26: "we have the section
- *   label for that … I like that it's uppercase"). Right for a 250px rail
- *   where the control wants the whole width.
+ *   full-width control. The label is the `menu` token (9px / 115% / 500),
+ *   uppercase and letter-spaced, in `text-secondary` (Katerina, 2026-08-26:
+ *   "smaller and uppercase … we have a token for it, 9px"). Its className is
+ *   a literal string, not merged, so `text-menu` is not dropped beside the
+ *   colour class (the tailwind-merge pitfall).
  */
 export interface PropertyProps {
   label: string
@@ -30,7 +29,7 @@ export function Property({ label, layout = 'row', children, className }: Propert
   if (layout === 'stacked') {
     return (
       <div className={cn('flex flex-col gap-1.5', className)}>
-        <SectionLabel className="uppercase tracking-[0.08em] text-text-secondary">{label}</SectionLabel>
+        <span className="text-menu uppercase tracking-[0.08em] text-text-secondary">{label}</span>
         {children}
       </div>
     )

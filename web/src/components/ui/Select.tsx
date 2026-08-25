@@ -1,5 +1,5 @@
 import { IconCheck, IconChevronDown } from '@tabler/icons-react'
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { cn } from '@/lib/cn'
 
@@ -24,6 +24,13 @@ import { cn } from '@/lib/cn'
 export interface SelectOption {
   value: string
   label: string
+  /**
+   * Something before the label — a face for a person, a shape for a status.
+   * Shown in the trigger when chosen and in the list (Ship's addition,
+   * Katerina 2026-08-26: the assignee select shows the avatar). The select
+   * does not know what it is; the caller passes a 16px node.
+   */
+  leading?: ReactNode
 }
 
 export interface SelectProps {
@@ -171,7 +178,10 @@ export function Select({
           className,
         )}
       >
-        <span className={cn('truncate', !selected && 'text-text-muted')}>{selected?.label ?? placeholder}</span>
+        <span className={cn('flex min-w-0 items-center gap-2', !selected && 'text-text-muted')}>
+          {selected?.leading && <span className="shrink-0">{selected.leading}</span>}
+          <span className="truncate">{selected?.label ?? placeholder}</span>
+        </span>
         <IconChevronDown size={size === 'small' ? 14 : 16} stroke={1.5} className="shrink-0 text-text-secondary" />
       </button>
 
@@ -207,7 +217,10 @@ export function Select({
                   option.value === value && 'font-medium',
                 )}
               >
-                <span className="truncate">{option.label}</span>
+                <span className="flex min-w-0 items-center gap-2">
+                  {option.leading && <span className="shrink-0">{option.leading}</span>}
+                  <span className="truncate">{option.label}</span>
+                </span>
                 {option.value === value && <IconCheck size={16} stroke={1.5} className="shrink-0 text-text-secondary" />}
               </div>
             ))}
