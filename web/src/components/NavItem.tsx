@@ -39,7 +39,7 @@ export function NavItem({ label, href, count, countLabel, active = false, icon, 
         className,
       )}
     >
-      {icon && <span className="shrink-0">{icon}</span>}
+      {icon && <span className="flex shrink-0 items-center">{icon}</span>}
       <span className="flex-1 truncate">{label}</span>
       {count ? (
         <WithTooltip label={countLabel ?? `${count} open`}>

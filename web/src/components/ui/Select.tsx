@@ -179,7 +179,7 @@ export function Select({
         )}
       >
         <span className={cn('flex min-w-0 items-center gap-2', !selected && 'text-text-muted')}>
-          {selected?.leading && <span className="shrink-0">{selected.leading}</span>}
+          {selected?.leading && <span className="flex shrink-0 items-center">{selected.leading}</span>}
           <span className="truncate">{selected?.label ?? placeholder}</span>
         </span>
         <IconChevronDown size={size === 'small' ? 14 : 16} stroke={1.5} className="shrink-0 text-text-secondary" />
@@ -218,7 +218,7 @@ export function Select({
                 )}
               >
                 <span className="flex min-w-0 items-center gap-2">
-                  {option.leading && <span className="shrink-0">{option.leading}</span>}
+                  {option.leading && <span className="flex shrink-0 items-center">{option.leading}</span>}
                   <span className="truncate">{option.label}</span>
                 </span>
                 {option.value === value && <IconCheck size={16} stroke={1.5} className="shrink-0 text-text-secondary" />}

@@ -30,9 +30,9 @@ export function Chip({ type = 'neutral', label, leadingIcon, trailingIcon, class
         className,
       )}
     >
-      {leadingIcon && <span className="size-3 shrink-0">{leadingIcon}</span>}
+      {leadingIcon && <span className="flex size-3 shrink-0 items-center justify-center">{leadingIcon}</span>}
       {label && <span className="whitespace-nowrap text-chip">{label}</span>}
-      {trailingIcon && <span className="size-3 shrink-0">{trailingIcon}</span>}
+      {trailingIcon && <span className="flex size-3 shrink-0 items-center justify-center">{trailingIcon}</span>}
     </div>
   )
 }

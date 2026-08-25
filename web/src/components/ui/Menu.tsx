@@ -90,7 +90,7 @@ export function MenuItem({ label, onClick, icon, shortcut, destructive, selected
         selected && 'bg-bg-hover',
       )}
     >
-      {icon && <span className="shrink-0">{icon}</span>}
+      {icon && <span className="flex shrink-0 items-center">{icon}</span>}
       <span className={cn('flex-1 truncate text-sm', destructive ? 'text-error-default' : 'text-text-primary')}>
         {label}
       </span>
