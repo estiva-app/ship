@@ -16,13 +16,18 @@ import { localSigner, type Signer } from '../../../lib/nostr/signer'
 import { Store } from '../../../src/store'
 import type { FolderState } from '../../../src/fold'
 import type { Directory } from '../../../src/profiles'
+import { addrToNaddr, naddrToAddr } from '../../../lib/nostr/nip19'
+import { folderLink } from '../../../src/events'
 import { RELAY_URL } from '../config'
 
 export type { Change, Conversation, FolderState, Issue, Message, Project } from '../../../src/fold'
 export type { Directory, Profile } from '../../../src/profiles'
 export { initials } from '../../../src/profiles'
 export { ISSUE_STATUSES, PROJECT_STATUSES, lookupStatus, type VocabEntry } from '../../../src/kinds'
+export { conversationsAbout } from '../../../src/fold'
 export { useWorkspace } from './useWorkspace'
+export { useDirectory, type DirectoryView, type Person } from './useDirectory'
+export { peopleIn, short } from './people'
 
 /**
  * Who signs, decided once.
@@ -45,4 +50,31 @@ export function loadAll(): Promise<FolderState> {
 /** kind:0 profiles for a set of pubkeys — names and faces, never keys. */
 export function profiles(pubkeys: string[]): Promise<Directory> {
   return store.profiles(pubkeys)
+}
+
+/** The viewer's own key — what "assigned to me" and "you" mean. */
+export const me: string = signer.pubkey
+
+/**
+ * A `nostr:naddr…` reference for an object, carrying this relay as its hint —
+ * what "Copy reference for Peek" puts on the clipboard.
+ */
+export function referenceFor(addr: string): string {
+  return `nostr:${addrToNaddr(addr, [RELAY_URL])}`
+}
+
+/** A `folder:<uuid>` link, the handle pasted into Peek to pair a topic. */
+export { folderLink }
+
+/**
+ * Land an inbound `#/o/<naddr>` on the right surface. Resolves the pointer
+ * against the relay — the only way to learn which Folder it is in, and the
+ * honest access check — and returns the address and kind, or `null` when the
+ * object is unreadable from here. A malformed pointer throws.
+ */
+export async function resolveInbound(naddr: string): Promise<{ addr: string; kind: 'project' | 'issue' } | null> {
+  const addr = naddrToAddr(naddr)
+  const found = await store.resolveObject(addr)
+  if (!found) return null
+  return { addr, kind: addr.startsWith('30850:') ? 'project' : 'issue' }
 }
