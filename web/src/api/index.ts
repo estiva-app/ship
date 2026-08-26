@@ -11,9 +11,6 @@
  * Components import from '@/api'. A component importing '../../src/...' is a
  * boundary violation, whatever it does.
  */
-import { Relay } from '../../../lib/nostr/relay'
-import { localSigner, type Signer } from '../../../lib/nostr/signer'
-import { Store } from '../../../src/store'
 import type { FolderState } from '../../../src/fold'
 import type { Directory } from '../../../src/profiles'
 import { addrToNaddr, naddrToAddr } from '../../../lib/nostr/nip19'
@@ -28,19 +25,23 @@ export { conversationsAbout } from '../../../src/fold'
 export { useWorkspace } from './useWorkspace'
 export { useDirectory, type DirectoryView, type Person } from './useDirectory'
 export { peopleIn, short } from './people'
+export {
+  archiveProject,
+  createIssue,
+  createProject,
+  deleteProject,
+  explainRejection,
+  pairProjectFolder,
+  reply,
+  setIssueField,
+  setProjectField,
+  startConversation,
+  type CreateResult,
+  type WriteResult,
+} from './writes'
+export { clockProblem } from './clock'
+import { signer, store } from './store'
 
-/**
- * Who signs, decided once.
- *
- * Anonymous: a throwaway per-browser key, exactly as the old app does when
- * nobody is signed in — the relay wants a signature on every request even to
- * read, and an anonymous reader is a real mode, not a degraded one. Sign-in
- * through Estiva ID replaces this signer in REW-2; `Store` cannot tell the
- * difference, which is the point of the signer seam.
- */
-const signer: Signer = localSigner('ship.secretkey')
-
-const store = new Store(new Relay(RELAY_URL, signer), signer)
 
 /** Everything the reader can see: projects, issues, their changes and threads. */
 export function loadAll(): Promise<FolderState> {
