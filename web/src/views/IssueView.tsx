@@ -22,9 +22,11 @@ export interface IssueViewProps {
   onReply: (threadId: string, text: string) => Promise<boolean | void> | boolean | void
   activity: ActivityEntry[]
   rail: Omit<IssueRailProps, 'className'>
+  /** Why writes are unavailable — every write control on the page is disabled with it. */
+  readOnlyReason?: string
 }
 
-export function IssueView({ crumbs, title, description, onRename, onDescribe, threads, onStartConversation, onReply, activity, rail }: IssueViewProps) {
+export function IssueView({ crumbs, title, description, onRename, onDescribe, threads, onStartConversation, onReply, activity, rail, readOnlyReason }: IssueViewProps) {
   const items: Crumb[] = [{ label: 'Issues', href: crumbs.issuesHref }]
   if (crumbs.project) items.push({ label: crumbs.project.title, href: crumbs.project.href })
   if (crumbs.ref) items.push({ label: crumbs.ref, mono: true })
@@ -40,12 +42,12 @@ export function IssueView({ crumbs, title, description, onRename, onDescribe, th
           side, and the rail starts level with the title and never moves. */}
       <div className="col-start-1 row-start-2 flex min-h-0 min-w-0 flex-col gap-6 overflow-y-auto px-6 pb-5">
         <div className="flex flex-col gap-2">
-          <EditableText label="Title" value={title} placeholder="Untitled issue" onCommit={onRename} className="-mx-2 text-h2" />
-          <EditableText label="Description" value={description} placeholder="Add a description…" onCommit={onDescribe} multiline className="-mx-2 text-body-2" />
+          <EditableText label="Title" value={title} placeholder="Untitled issue" onCommit={onRename} readOnly={!!readOnlyReason} className="-mx-2 text-h2" />
+          <EditableText label="Description" value={description} placeholder="Add a description…" onCommit={onDescribe} multiline readOnly={!!readOnlyReason} className="-mx-2 text-body-2" />
         </div>
         <section className="flex flex-col gap-3">
           <h2 className="text-h4 text-text-primary">Conversations</h2>
-          <Conversations threads={threads} onStart={onStartConversation} onReply={onReply} />
+          <Conversations threads={threads} onStart={onStartConversation} onReply={onReply} disabledReason={readOnlyReason} />
         </section>
         <section className="flex flex-col gap-3">
           <h2 className="text-h4 text-text-primary">Activity</h2>
@@ -54,7 +56,7 @@ export function IssueView({ crumbs, title, description, onRename, onDescribe, th
       </div>
       <Divider orientation="vertical" className="col-start-2 row-span-2 row-start-1" />
       <div className="col-start-3 row-start-2 min-h-0 overflow-y-auto px-6 pb-5">
-        <IssueRail {...rail} />
+        <IssueRail {...rail} readOnlyReason={readOnlyReason} />
       </div>
     </div>
   )

@@ -27,16 +27,17 @@ const issue = (addr: string, projectAddr: string | undefined, status: string) =>
 })
 
 const STATE: FolderState = {
-  projects: [project('30850:x:live', 'Live'), project('30850:x:old', 'Old', true)],
+  projects: [project('30850:x:live', 'Live'), project('30850:x:old', 'Old', true), { ...project('30850:x:mine', 'Mine'), author: ME, lead: OTHER }],
   issues: [
     issue('30851:x:1', '30850:x:live', 'todo'),
     issue('30851:x:2', '30850:x:live', 'done'),
     issue('30851:x:3', '30850:x:old', 'todo'),
     { ...issue('30851:x:4', undefined, 'in_progress'), assignee: ME, ref: 'X-4' },
   ],
-  activity: [],
+  activity: [{ id: 'ch1', author: OTHER, createdAt: 99, target: '30851:x:1', field: 'status', value: 'todo', note: '' }],
   conversations: [
     { id: 'c1', root: { id: 'c1', author: OTHER, createdAt: 5, body: 'hi', folder: 'f', about: ['30851:x:4'] }, replies: [], about: ['30851:x:4'], createdAt: 5, lastAt: 5 },
+    { id: 'c2', root: { id: 'c2', author: ME, createdAt: 6, body: 'about the project', folder: 'f', about: [] }, replies: [{ id: 'c3', author: OTHER, createdAt: 7, body: 'reply', folder: 'f', about: [] }], about: [], createdAt: 6, lastAt: 7 },
   ],
 }
 
@@ -57,7 +58,7 @@ describe('sidebarProps — the old app\'s counting rules', () => {
     const props = sidebarProps(STATE, { name: 'issues' })
     // 1 (todo, live) + 4 (in_progress, no project); 2 is done, 3 is in an archived project.
     expect(props.openIssues).toBe(2)
-    expect(props.projects.map((p) => [p.title, p.openCount])).toEqual([['Live', 1]])
+    expect(props.projects.map((p) => [p.title, p.openCount])).toEqual([['Live', 1], ['Mine', 0]])
     expect(props.current).toBe('issues')
   })
 
@@ -133,5 +134,38 @@ describe('Issues page — rows from the fold', () => {
     fireEvent.click(main.getByRole('tab', { name: /Assigned to me/ }))
     expect(main.getAllByRole('link')).toHaveLength(1)
     expect(main.getByRole('link', { name: /X-4/ })).toHaveAttribute('href', '#/issue/30851%3Ax%3A4')
+  })
+})
+
+describe('Project page — one project from the fold', () => {
+  it('draws the table with Updated from the last change, the Folder threads, the rail — and no Delete for a non-author', () => {
+    location.hash = '#/project/30850%3Ax%3Alive'
+    render(<App />)
+    const main = within(screen.getByRole('main'))
+    expect(main.getByLabelText('Title')).toHaveTextContent('Live')
+    expect(main.getByRole('table')).toBeInTheDocument()
+    expect(main.getAllByRole('row')).toHaveLength(3) // header + 2 issues
+    expect(main.getByText('about the project')).toBeInTheDocument()
+    expect(main.getByText('reply')).toBeInTheDocument()
+    expect(main.getByRole('button', { name: 'Status' })).toBeDisabled()
+    expect(main.getByRole('button', { name: 'Copy Folder link' })).toBeEnabled()
+    expect(main.getByRole('button', { name: /Archive project/ })).toBeDisabled()
+    expect(main.queryByRole('button', { name: 'Delete project' })).not.toBeInTheDocument()
+    expect(main.getByText('1 of 2 done')).toBeInTheDocument()
+    expect(main.queryByRole('button', { name: /Edit title/ })).not.toBeInTheDocument()
+  })
+
+  it('offers Delete (disabled, with its reason) to the author, and the board when the route says so', () => {
+    location.hash = '#/project/30850%3Ax%3Amine?view=board'
+    render(<App />)
+    const main = within(screen.getByRole('main'))
+    expect(main.getByRole('button', { name: 'Delete project' })).toBeDisabled()
+    expect(main.queryByRole('table')).not.toBeInTheDocument()
+  })
+
+  it('says so when the project is not in this workspace', () => {
+    location.hash = '#/project/30850%3Ax%3Anope'
+    render(<App />)
+    expect(screen.getByText(/not in this workspace/)).toBeInTheDocument()
   })
 })

@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { cn } from '@/lib/cn'
 import { Button } from '@/components/ui/Button'
+import { WithTooltip } from '@/components/ui/Tooltip'
 import { TextInput } from '@/components/ui/TextInput'
 
 /**
@@ -21,6 +22,8 @@ export interface ComposerProps {
   /** Called with the trimmed text; resolve to clear the field, reject or resolve `false` to keep it. */
   onSubmit: (text: string) => Promise<boolean | void> | boolean | void
   autoFocus?: boolean
+  /** Why nothing can be posted right now; disables the field and the button, shown as a tooltip. */
+  disabledReason?: string
   className?: string
 }
 
@@ -29,11 +32,11 @@ const KINDS = {
   reply: { placeholder: 'Reply…', label: 'Reply', variant: 'outlined' as const },
 }
 
-export function Composer({ kind = 'conversation', onSubmit, autoFocus = false, className }: ComposerProps) {
+export function Composer({ kind = 'conversation', onSubmit, autoFocus = false, disabledReason, className }: ComposerProps) {
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
   const { placeholder, label, variant } = KINDS[kind]
-  const canSubmit = text.trim().length > 0 && !busy
+  const canSubmit = text.trim().length > 0 && !busy && !disabledReason
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
@@ -47,7 +50,7 @@ export function Composer({ kind = 'conversation', onSubmit, autoFocus = false, c
     }
   }
 
-  return (
+  const form = (
     <form onSubmit={submit} className={cn('flex items-center gap-2', className)}>
       <TextInput
         value={text}
@@ -55,7 +58,7 @@ export function Composer({ kind = 'conversation', onSubmit, autoFocus = false, c
         placeholder={placeholder}
         aria-label={placeholder}
         autoFocus={autoFocus}
-        disabled={busy}
+        disabled={busy || !!disabledReason}
         className="min-w-0 flex-1"
       />
       <Button type="submit" variant={variant} disabled={!canSubmit}>
@@ -63,4 +66,5 @@ export function Composer({ kind = 'conversation', onSubmit, autoFocus = false, c
       </Button>
     </form>
   )
+  return disabledReason ? <WithTooltip label={disabledReason}>{form}</WithTooltip> : form
 }

@@ -1,3 +1,4 @@
+import type { ReactElement } from 'react'
 import { cn } from '@/lib/cn'
 import { Avatar } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
@@ -5,6 +6,7 @@ import { Divider } from '@/components/ui/Divider'
 import { ProgressBar } from '@/components/ui/ProgressBar'
 import { Property } from '@/components/ui/Property'
 import { Select, type SelectOption } from '@/components/ui/Select'
+import { WithTooltip } from '@/components/ui/Tooltip'
 
 /**
  * The project page's right rail, exactly as production lays it out, from
@@ -39,6 +41,10 @@ export interface ProjectRailProps {
   archived: boolean
   onArchive: () => void
   onDelete: () => void
+  /** Delete is author-only (NIP-09); absent, not disabled, for anyone else. */
+  canDelete?: boolean
+  /** Why writes are unavailable: disables the selects and the write buttons, as a tooltip. Copy stays. */
+  readOnlyReason?: string
   className?: string
 }
 
@@ -69,15 +75,19 @@ export function ProjectRail({
   archived,
   onArchive,
   onDelete,
+  canDelete = true,
+  readOnlyReason,
   className,
 }: ProjectRailProps) {
+  const locked = !!readOnlyReason
+  const held = (button: ReactElement) => (readOnlyReason ? <WithTooltip label={readOnlyReason}>{button}</WithTooltip> : button)
   return (
     <aside className={cn('flex w-[250px] shrink-0 flex-col gap-4', className)}>
       <Property layout="stacked" label="Status">
-        <Select value={status} onChange={onStatusChange} options={statuses} ariaLabel="Status" />
+        <Select value={status} onChange={onStatusChange} options={statuses} ariaLabel="Status" disabled={locked} />
       </Property>
       <Property layout="stacked" label="Assignee">
-        <Select value={lead} onChange={onLeadChange} options={peopleOptions(people)} ariaLabel="Assignee" />
+        <Select value={lead} onChange={onLeadChange} options={peopleOptions(people)} ariaLabel="Assignee" disabled={locked} />
       </Property>
       <Property layout="stacked" label="Progress">
         <div className="flex flex-col gap-2">
@@ -93,19 +103,26 @@ export function ProjectRail({
           <Button size="small" variant="outlined" onClick={onCopyFolderLink}>
             Copy Folder link
           </Button>
-          <Button size="small" variant="outlined" onClick={onPairFolder}>
-            Pair with another Folder…
-          </Button>
+          {held(
+            <Button size="small" variant="outlined" onClick={onPairFolder} disabled={locked}>
+              Pair with another Folder…
+            </Button>,
+          )}
         </div>
       </Property>
       <Divider className="mx-0" />
       <div className="flex flex-col items-start gap-1">
-        <Button size="small" variant="muted" onClick={onArchive}>
-          {archived ? 'Unarchive project' : 'Archive project'}
-        </Button>
-        <Button size="small" variant="destructive" onClick={onDelete}>
-          Delete project
-        </Button>
+        {held(
+          <Button size="small" variant="muted" onClick={onArchive} disabled={locked}>
+            {archived ? 'Unarchive project' : 'Archive project'}
+          </Button>,
+        )}
+        {canDelete &&
+          held(
+            <Button size="small" variant="destructive" onClick={onDelete} disabled={locked}>
+              Delete project
+            </Button>,
+          )}
       </div>
     </aside>
   )

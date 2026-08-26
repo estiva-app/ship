@@ -45,14 +45,14 @@ export function MessageCard({ message, reply = false }: { message: MessageData; 
   )
 }
 
-export function ConversationThread({ thread, onReply }: { thread: ThreadData; onReply: (threadId: string, text: string) => Promise<boolean | void> | boolean | void }) {
+export function ConversationThread({ thread, onReply, disabledReason }: { thread: ThreadData; onReply: (threadId: string, text: string) => Promise<boolean | void> | boolean | void; disabledReason?: string }) {
   return (
     <div className="flex flex-col gap-1 rounded-lg border border-border-default bg-bg-surface px-3 py-2.5">
       <MessageCard message={thread.root} />
       {thread.replies.map((reply) => (
         <MessageCard key={reply.id} message={reply} reply />
       ))}
-      <Composer kind="reply" onSubmit={(text) => onReply(thread.id, text)} className="ml-3.5 mt-1" />
+      <Composer kind="reply" onSubmit={(text) => onReply(thread.id, text)} disabledReason={disabledReason} className="ml-3.5 mt-1" />
     </div>
   )
 }
@@ -61,15 +61,17 @@ export interface ConversationsProps {
   threads: ThreadData[]
   onStart: (text: string) => Promise<boolean | void> | boolean | void
   onReply: (threadId: string, text: string) => Promise<boolean | void> | boolean | void
+  /** Why nothing can be posted right now — every composer here is disabled with it. */
+  disabledReason?: string
   className?: string
 }
 
-export function Conversations({ threads, onStart, onReply, className }: ConversationsProps) {
+export function Conversations({ threads, onStart, onReply, disabledReason, className }: ConversationsProps) {
   return (
     <div className={cn('flex flex-col gap-2.5', className)}>
-      <Composer onSubmit={onStart} className="mb-1" />
+      <Composer onSubmit={onStart} disabledReason={disabledReason} className="mb-1" />
       {threads.length ? (
-        threads.map((thread) => <ConversationThread key={thread.id} thread={thread} onReply={onReply} />)
+        threads.map((thread) => <ConversationThread key={thread.id} thread={thread} onReply={onReply} disabledReason={disabledReason} />)
       ) : (
         <EmptyState className="py-8" message="No conversations yet." />
       )}

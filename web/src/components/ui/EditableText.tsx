@@ -21,9 +21,11 @@ export interface EditableTextProps {
   className?: string
   /** The accessible name of the field — "Title", "Description". */
   label: string
+  /** Show the value only — no edit affordance. For a reader who cannot write. */
+  readOnly?: boolean
 }
 
-export function EditableText({ value, placeholder, onCommit, multiline = false, className, label }: EditableTextProps) {
+export function EditableText({ value, placeholder, onCommit, multiline = false, className, label, readOnly = false }: EditableTextProps) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(value)
   const [busy, setBusy] = useState(false)
@@ -79,6 +81,17 @@ export function EditableText({ value, placeholder, onCommit, multiline = false, 
     multiline && 'resize-none',
     className,
   )
+
+  if (readOnly) {
+    return (
+      <div
+        aria-label={label}
+        className={cn('w-full px-2 py-1', multiline && 'whitespace-pre-wrap', value ? 'text-text-primary' : 'text-text-muted', className)}
+      >
+        {value || placeholder}
+      </div>
+    )
+  }
 
   if (editing) {
     return multiline ? (

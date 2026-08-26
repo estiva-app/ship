@@ -14,14 +14,16 @@ export interface ProjectHeaderProps {
   archived?: boolean
   onRename: (title: string) => Promise<boolean> | boolean
   onDescribe: (description: string) => Promise<boolean> | boolean
+  /** Title and description as text only, for a reader who cannot write. */
+  readOnly?: boolean
   className?: string
 }
 
-export function ProjectHeader({ title, description, archived = false, onRename, onDescribe, className }: ProjectHeaderProps) {
+export function ProjectHeader({ title, description, archived = false, onRename, onDescribe, className, readOnly = false }: ProjectHeaderProps) {
   return (
     <div className={cn('flex flex-col gap-2', className)}>
       <div className="flex items-start gap-2">
-        <EditableText
+        <EditableText readOnly={readOnly}
           label="Title"
           value={title}
           placeholder="Untitled project"
@@ -30,7 +32,7 @@ export function ProjectHeader({ title, description, archived = false, onRename, 
         />
         {archived && <Chip label="Archived" className="mt-2 shrink-0" />}
       </div>
-      <EditableText
+      <EditableText readOnly={readOnly}
         label="Description"
         value={description}
         placeholder="Add a description…"

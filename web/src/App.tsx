@@ -6,6 +6,7 @@ import { IdentityMenu } from '@/components/IdentityMenu'
 import { Sidebar, type SidebarProject } from '@/components/Sidebar'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { IssuesPage } from '@/pages/IssuesPage'
+import { ProjectPage, type Say } from '@/pages/ProjectPage'
 import { ProjectsPage } from '@/pages/ProjectsPage'
 import { ID_CONFIG, RELAY_URL } from './config'
 import { href, replace, useRoute, type Route } from './router'
@@ -57,19 +58,21 @@ export default function App() {
       }
       sidebar={<Sidebar {...sidebarProps(state, route)} />}
     >
-      <Page route={route} state={state} directory={directory} />
+      <Page route={route} state={state} directory={directory} say={say} />
     </AppShell>
   )
 }
 
-/** Which page the route names. Placeholders remain until steps 4–6 land. */
-function Page({ route, state, directory }: { route: Route; state: FolderState | null; directory: DirectoryView }) {
+/** Which page the route names. The issue page is a placeholder until step 6 lands. */
+function Page({ route, state, directory, say }: { route: Route; state: FolderState | null; directory: DirectoryView; say: Say }) {
   if (!state) return null
   switch (route.name) {
     case 'projects':
       return <ProjectsPage state={state} directory={directory} archived={route.archived} />
     case 'issues':
       return <IssuesPage state={state} directory={directory} />
+    case 'project':
+      return <ProjectPage state={state} directory={directory} addr={route.addr} view={route.view} say={say} />
     default:
       return <EmptyState className="py-12" message={`${route.name} — wiring in progress`} />
   }
@@ -110,7 +113,7 @@ export function sidebarProps(state: FolderState | null, route: Route) {
 function useBanner() {
   const [banner, setBanner] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
-  const say = useCallback((text: string, tone: 'ok' | 'error' = 'ok') => {
+  const say = useCallback<Say>((text, tone = 'ok') => {
     clearTimeout(timer.current)
     setBanner({ tone, text })
     if (tone === 'ok') timer.current = setTimeout(() => setBanner(null), 4000)

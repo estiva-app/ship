@@ -42,10 +42,13 @@ export interface ProjectViewProps {
     onPairFolder: () => void
     onArchive: () => void
     onDelete: () => void
+    canDelete?: boolean
   }
+  /** Why writes are unavailable — every write control on the page is disabled with it. */
+  readOnlyReason?: string
 }
 
-export function ProjectView({ crumbs, header, view, onView, issues, issueStatuses, hrefFor, threads, onStartConversation, onReply, rail }: ProjectViewProps) {
+export function ProjectView({ crumbs, header, view, onView, issues, issueStatuses, hrefFor, threads, onStartConversation, onReply, rail, readOnlyReason }: ProjectViewProps) {
   return (
     <div className="grid h-full min-h-0 grid-cols-[minmax(0,1fr)_1px_auto] grid-rows-[auto_minmax(0,1fr)] gap-y-4">
       <div className="col-start-1 row-start-1 pl-6 pt-5">
@@ -56,7 +59,7 @@ export function ProjectView({ crumbs, header, view, onView, issues, issueStatuse
           content keeps 24px inside the column (pl/pr-6), the rail 24px either
           side, and the rail starts level with the title and never moves. */}
       <div className="col-start-1 row-start-2 flex min-h-0 min-w-0 flex-col gap-6 overflow-y-auto px-6 pb-5">
-        <ProjectHeader {...header} />
+        <ProjectHeader {...header} readOnly={!!readOnlyReason} />
         <section className="flex flex-col gap-3">
           <div className="flex items-center gap-3">
             <h2 className="flex-1 text-h4 text-text-primary">Issues</h2>
@@ -79,12 +82,12 @@ export function ProjectView({ crumbs, header, view, onView, issues, issueStatuse
         </section>
         <section className="flex flex-col gap-3">
           <h2 className="text-h4 text-text-primary">Conversations</h2>
-          <Conversations threads={threads} onStart={onStartConversation} onReply={onReply} />
+          <Conversations threads={threads} onStart={onStartConversation} onReply={onReply} disabledReason={readOnlyReason} />
         </section>
       </div>
       <Divider orientation="vertical" className="col-start-2 row-span-2 row-start-1" />
       <div className="col-start-3 row-start-2 min-h-0 overflow-y-auto px-6 pb-5">
-        <ProjectRail {...rail} archived={header.archived} />
+        <ProjectRail {...rail} archived={header.archived} readOnlyReason={readOnlyReason} />
       </div>
     </div>
   )

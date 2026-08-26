@@ -30,6 +30,8 @@ export interface IssueRailProps {
   /** Seconds, as the relay keeps them. */
   openedAt: number
   onCopyReference: () => void
+  /** Why writes are unavailable: disables the three selects. Copy stays. */
+  readOnlyReason?: string
   className?: string
 }
 
@@ -46,18 +48,20 @@ export function IssueRail({
   openedBy,
   openedAt,
   onCopyReference,
+  readOnlyReason,
   className,
 }: IssueRailProps) {
+  const locked = !!readOnlyReason
   return (
     <aside className={cn('flex w-[250px] shrink-0 flex-col gap-4', className)}>
       <Property layout="stacked" label="Status">
-        <Select value={status} onChange={onStatusChange} options={statuses} ariaLabel="Status" />
+        <Select value={status} onChange={onStatusChange} options={statuses} ariaLabel="Status" disabled={locked} />
       </Property>
       <Property layout="stacked" label="Assignee">
-        <Select value={assignee} onChange={onAssigneeChange} options={peopleOptions(people)} ariaLabel="Assignee" />
+        <Select value={assignee} onChange={onAssigneeChange} options={peopleOptions(people)} ariaLabel="Assignee" disabled={locked} />
       </Property>
       <Property layout="stacked" label="Project">
-        <Select value={project} onChange={onProjectChange} options={projects} ariaLabel="Project" />
+        <Select value={project} onChange={onProjectChange} options={projects} ariaLabel="Project" disabled={locked} />
       </Property>
       <Divider className="mx-0" />
       <span className="flex items-center gap-1.5 text-caption text-text-muted">
