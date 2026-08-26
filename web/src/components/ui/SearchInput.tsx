@@ -6,7 +6,7 @@ import { cn } from '@/lib/cn'
  * theme renders it but on Ship's tokens (Katerina, 2026-08-26): the field is
  * an inset panel with a hairline border that strengthens on focus, and the
  * keyboard hint is Signal's `kbd` chip — mono, 10px, a faint fill (the
- * `bg-hover` translucency), a thicker bottom edge. `@estiva/ui` candidate —
+ * `bg-hover` translucency), a thicker bottom edge. `@estiva-app/ui` candidate —
  * the one thing Ship adds is its own placeholder.
  *
  * In Peek's TopBar this is a launcher affordance rather than a live field:

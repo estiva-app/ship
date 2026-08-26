@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { SectionLabel } from './SectionLabel'
 
-/** Peek's SectionLabel: 12/12/500, primary text. Every section heading in the app. `@estiva/ui` candidate. */
+/** Peek's SectionLabel: 12/12/500, primary text. Every section heading in the app. `@estiva-app/ui` candidate. */
 const meta = {
   title: 'Primitives/SectionLabel',
   component: SectionLabel,

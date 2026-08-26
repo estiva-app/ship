@@ -3,4 +3,4 @@
  * variant and `type="button"` default went into the package. This file keeps
  * the import path every component uses.
  */
-export { Button, type ButtonProps, type ButtonSize, type ButtonVariant } from '@estiva/ui'
+export { Button, type ButtonProps, type ButtonSize, type ButtonVariant } from '@estiva-app/ui'

@@ -47,6 +47,54 @@ jobs:
       - name: Build
         run: npm run build
 
+  # The rewrite lives in web/ with its own package.json, and the job above sees
+  # none of it: the root `tsc --noEmit` reads tsconfig.json, whose `include` is
+  # ["lib", "src", "apps", "scripts"], and the root `npm test` runs the old
+  # app's tsx scripts. Without this job the whole React front end is unchecked
+  # while the workflow reports success — a green tick about the old app,
+  # standing next to a rewrite nothing has compiled.
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      # The root install first: web/ compiles ../lib/nostr, whose imports of
+      # @noble/hashes and @noble/curves resolve out of the *root* node_modules.
+      # Installing only web/ fails with seven TS2307s that look like the shared
+      # library is broken.
+      - name: Install the repository's dependencies
+        working-directory: .
+        run: npm ci
+
+      - run: npm ci
+
+      # `tsc -b && vite build` — the same command that builds it for real.
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm test
+
+      # @estiva-app/ui's classes only reach the stylesheet if `content` covers
+      # the package, and Tailwind does not merge `content` from a preset. When
+      # it is wrong the build still succeeds and components render at the wrong
+      # size, so this is the only place it can be caught.
+      - name: The shared package's classes survive Tailwind's purge
+        run: |
+          if ! grep -qr "max-h-72" dist/assets/*.css; then
+            echo "::error::a class used only by @estiva-app/ui is missing from the built CSS — check estivaContent is spread into tailwind.config.js"
+            exit 1
+          fi
+
   publish:
     needs: check
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'

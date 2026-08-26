@@ -4,4 +4,4 @@
  * no name). This file only keeps the import path every component already
  * uses; nothing of Ship's is added.
  */
-export { Avatar, type AvatarProps } from '@estiva/ui'
+export { Avatar, type AvatarProps } from '@estiva-app/ui'

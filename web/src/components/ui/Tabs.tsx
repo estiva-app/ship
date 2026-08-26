@@ -4,7 +4,7 @@ import { Chip } from './Chip'
 
 /**
  * Peek's TopicTabs, ported with the topic-specific ids taken out (ruling B8:
- * "use Peek's Tabs component so it is shared"). `@estiva/ui` candidate.
+ * "use Peek's Tabs component so it is shared"). `@estiva-app/ui` candidate.
  *
  * A selected tab is a neutral fill (bg-active), not the accent tint
  * (Katerina, 2026-08-27). Two sizes. `default` is Ship's — 14px (`text-body-2`), a little more room —

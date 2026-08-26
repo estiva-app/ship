@@ -14,7 +14,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@estiva/ui": "file:../../estiva-ui",
+    "@estiva-app/ui": "^0.1.0",
     "@tabler/icons-react": "^3.41.1",
     "clsx": "^2.1.1",
     "react": "^19.2.4",

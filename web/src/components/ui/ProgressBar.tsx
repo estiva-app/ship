@@ -2,7 +2,7 @@ import { cn } from '@/lib/cn'
 
 /**
  * A progress bar: a thin inset track with a success-coloured fill, as
- * production's rail draws a project's progress. `@estiva/ui` candidate —
+ * production's rail draws a project's progress. `@estiva-app/ui` candidate —
  * nothing here knows what is being counted; Peek has no bar yet and would
  * use this one.
  *

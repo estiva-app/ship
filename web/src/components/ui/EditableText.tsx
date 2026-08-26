@@ -3,7 +3,7 @@ import { cn } from '@/lib/cn'
 
 /**
  * Text you click to edit — production's `editableText`, as a component.
- * `@estiva/ui` candidate: nothing here knows what is being edited.
+ * `@estiva-app/ui` candidate: nothing here knows what is being edited.
  *
  * Reads as text until clicked; then it is a field. Enter commits (Shift+Enter
  * is a new line when multiline), Escape cancels, blur commits. A commit that

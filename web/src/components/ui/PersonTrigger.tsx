@@ -5,7 +5,7 @@ import { Person, type PersonProps } from './Person'
 
 /**
  * A `Person` that opens something: face · name · chevron, as one control.
- * `@estiva/ui` candidate (Katerina, 2026-08-25) — Peek has no equivalent yet;
+ * `@estiva-app/ui` candidate (Katerina, 2026-08-25) — Peek has no equivalent yet;
  * its TopBar uses a bare avatar as the trigger.
  *
  * The chevron is 14px, the small-control size; the row is a 32px button like

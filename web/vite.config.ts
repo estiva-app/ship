@@ -26,11 +26,11 @@ export const BUILD_DEFINES = {
 
 const here = fileURLToPath(new URL('.', import.meta.url))
 const repoRoot = fileURLToPath(new URL('..', import.meta.url))
-// @estiva/ui is a local link (file:../../estiva-ui) consumed as SOURCE: Vite
-// resolves the link to its real path, outside this repo, so it is allowed
-// below — and `react` is deduped so the package's own copy is never a
-// second React (the "invalid hook call" crash).
-const estivaUiRoot = fileURLToPath(new URL('../../estiva-ui', import.meta.url))
+// `react` is deduped because @estiva-app/ui declares it a peer: two copies in
+// one tree is the "invalid hook call" crash, which appears at runtime and not
+// at build time. The package itself needs no `fs.allow` entry — it installs
+// from npm into node_modules, where it used to be a `file:` link to a sibling
+// directory that existed on one machine.
 
 // The dev server takes :5191 so the old app can keep :5190 beside it — the two
 // run side by side until the cutover (REW-8).
@@ -54,7 +54,7 @@ export default defineConfig({
       // ../lib, one level above this app. Vite refuses to serve files outside
       // its root unless told the repo is the boundary — and the package is
       // one level further out.
-      allow: [here, repoRoot, estivaUiRoot],
+      allow: [here, repoRoot],
     },
   },
   test: {

@@ -4,7 +4,7 @@ import { DialogShell } from '@/components/ui/DialogShell'
 
 /**
  * A question with two answers, before something a person would want back.
- * `@estiva/ui` candidate — nothing here knows what is being confirmed.
+ * `@estiva-app/ui` candidate — nothing here knows what is being confirmed.
  *
  * The confirm button is `destructive` when the action is (a deletion, an
  * archive); `primary` otherwise. While the action runs the buttons wait;

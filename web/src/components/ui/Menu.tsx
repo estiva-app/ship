@@ -4,7 +4,7 @@ import { cn } from '@/lib/cn'
 import { SectionLabel } from './SectionLabel'
 
 /**
- * THE menu shell — Peek's, extracted (2026-08-25). `@estiva/ui` candidate,
+ * THE menu shell — Peek's, extracted (2026-08-25). `@estiva-app/ui` candidate,
  * for every menu in every app.
  *
  * Peek has no single Menu file; TopicMoreMenu, ConversationMoreMenu and the

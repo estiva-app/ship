@@ -2,7 +2,7 @@ import { Fragment } from 'react'
 import { cn } from '@/lib/cn'
 
 /**
- * A trail: "Issues / Relay Migration / REL-6". `@estiva/ui` candidate —
+ * A trail: "Issues / Relay Migration / REL-6". `@estiva-app/ui` candidate —
  * Peek has no breadcrumb yet; nothing here knows what a project is.
  *
  * An item with an `href` is a link, even when it is last — an issue with no

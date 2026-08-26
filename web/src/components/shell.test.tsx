@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { initialsFor } from '@estiva/ui'
+import { initialsFor } from '@estiva-app/ui'
 import { Avatar } from './ui/Avatar'
 import { IdentityMenu } from './IdentityMenu'
 import { NavItem } from './NavItem'

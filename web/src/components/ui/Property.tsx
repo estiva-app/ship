@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { cn } from '@/lib/cn'
 
 /**
- * Peek's Property, ported (2026-08-26). `@estiva/ui` candidate.
+ * Peek's Property, ported (2026-08-26). `@estiva-app/ui` candidate.
  *
  * A labelled property row — "Status", "Lead", and whatever else a page
  * declares. Two layouts, one component (one component, not two that drift):

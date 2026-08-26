@@ -1,14 +1,14 @@
 /* Geist ships 400/500/600 only, loaded the same way Peek loads it. */
 @import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap');
 
-@import '@estiva/ui/tokens.css';
+@import '@estiva-app/ui/tokens.css';
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 /*
-  The theme VALUES live in @estiva/ui's tokens.css, imported above: `ship`
+  The theme VALUES live in @estiva-app/ui's tokens.css, imported above: `ship`
   (Ship's palette, Katerina's ruling 2026-08-28), selected by
   data-theme="ship" on <html> (index.html), and `dark` (Peek's), kept in the
   Storybook toolbar in case that changes. Nothing colour-related is defined

@@ -2,7 +2,7 @@ import { cn } from '@/lib/cn'
 import { Avatar } from './Avatar'
 
 /**
- * A face beside a name. `@estiva/ui` candidate — Peek's `Person` minus the
+ * A face beside a name. `@estiva-app/ui` candidate — Peek's `Person` minus the
  * projection type it takes its profile from: this one is handed the two
  * strings and nothing else, so it cannot be handed a key. Same `gap-1.5` as
  * Peek's (Katerina, 2026-08-26 — "match Peek").
