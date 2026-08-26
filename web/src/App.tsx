@@ -5,6 +5,7 @@ import { Banner } from '@/components/Banner'
 import { IdentityMenu } from '@/components/IdentityMenu'
 import { Sidebar, type SidebarProject } from '@/components/Sidebar'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { IssuesPage } from '@/pages/IssuesPage'
 import { ProjectsPage } from '@/pages/ProjectsPage'
 import { ID_CONFIG, RELAY_URL } from './config'
 import { href, replace, useRoute, type Route } from './router'
@@ -67,6 +68,8 @@ function Page({ route, state, directory }: { route: Route; state: FolderState | 
   switch (route.name) {
     case 'projects':
       return <ProjectsPage state={state} directory={directory} archived={route.archived} />
+    case 'issues':
+      return <IssuesPage state={state} directory={directory} />
     default:
       return <EmptyState className="py-12" message={`${route.name} — wiring in progress`} />
   }

@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/Button'
 import { Tabs } from '@/components/ui/Tabs'
+import { WithTooltip } from '@/components/ui/Tooltip'
 import type { StatusEntry } from '@/lib/issues'
 import { IssueList } from '@/components/IssueList'
 import type { IssueRowData } from '@/components/IssueRow'
@@ -20,12 +21,14 @@ export interface IssuesViewProps {
   scope: IssuesScope
   onScope: (scope: IssuesScope) => void
   hrefFor: (issue: IssueRowData) => string
-  onAddIssue: () => void
+  onAddIssue?: () => void
+  /** Why "Add issue" cannot be used right now; disables the button. */
+  addDisabledReason?: string
 }
 
 const isOpen = (issue: IssueRowData) => issue.status !== 'done' && issue.status !== 'cancelled'
 
-export function IssuesView({ issues, statuses, mine, scope, onScope, hrefFor, onAddIssue }: IssuesViewProps) {
+export function IssuesView({ issues, statuses, mine, scope, onScope, hrefFor, onAddIssue, addDisabledReason }: IssuesViewProps) {
   const open = issues.filter(isOpen)
   const assigned = issues.filter((issue) => mine.has(issue.addr))
   const shown = scope === 'open' ? open : scope === 'mine' ? assigned : issues
@@ -33,9 +36,17 @@ export function IssuesView({ issues, statuses, mine, scope, onScope, hrefFor, on
     <div className="flex flex-col gap-4 px-6 py-5">
       <div className="flex items-center gap-3">
         <h1 className="flex-1 text-h3 text-text-primary">Issues</h1>
-        <Button variant="primary" onClick={onAddIssue}>
-          Add issue
-        </Button>
+        {addDisabledReason ? (
+          <WithTooltip label={addDisabledReason}>
+            <Button variant="primary" disabled>
+              Add issue
+            </Button>
+          </WithTooltip>
+        ) : (
+          <Button variant="primary" onClick={onAddIssue}>
+            Add issue
+          </Button>
+        )}
       </div>
       <Tabs<IssuesScope>
         tabs={[

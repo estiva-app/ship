@@ -16,6 +16,7 @@ vi.mock('@/api', async (importOriginal) => {
 })
 
 import { resolveInbound, useDirectory, useWorkspace } from '@/api'
+import { fireEvent } from '@testing-library/react'
 import App, { sidebarProps } from './App'
 
 const project = (addr: string, title: string, archived = false) => ({
@@ -31,10 +32,12 @@ const STATE: FolderState = {
     issue('30851:x:1', '30850:x:live', 'todo'),
     issue('30851:x:2', '30850:x:live', 'done'),
     issue('30851:x:3', '30850:x:old', 'todo'),
-    issue('30851:x:4', undefined, 'in_progress'),
+    { ...issue('30851:x:4', undefined, 'in_progress'), assignee: ME, ref: 'X-4' },
   ],
   activity: [],
-  conversations: [],
+  conversations: [
+    { id: 'c1', root: { id: 'c1', author: OTHER, createdAt: 5, body: 'hi', folder: 'f', about: ['30851:x:4'] }, replies: [], about: ['30851:x:4'], createdAt: 5, lastAt: 5 },
+  ],
 }
 
 beforeEach(() => {
@@ -112,5 +115,23 @@ describe('Projects page — cards from the fold', () => {
     const main = within(screen.getByRole('main'))
     expect(main.getByRole('link', { name: /Old/ })).toBeInTheDocument()
     expect(main.queryByRole('link', { name: /Live/ })).not.toBeInTheDocument()
+  })
+})
+
+describe('Issues page — rows from the fold', () => {
+  it('groups every issue by status with its counts, and filters to mine', () => {
+    location.hash = '#/issues'
+    render(<App />)
+    const main = within(screen.getByRole('main'))
+    expect(main.getByRole('tab', { name: /^All/ })).toHaveTextContent('4')
+    expect(main.getByRole('tab', { name: /^Open/ })).toHaveTextContent('3')
+    expect(main.getByRole('tab', { name: /Assigned to me/ })).toHaveTextContent('1')
+    expect(main.getAllByRole('link')).toHaveLength(4)
+    expect(main.getByRole('link', { name: /X-4/ })).toHaveTextContent('1 conversation')
+    expect(main.getByRole('button', { name: 'Add issue' })).toBeDisabled()
+
+    fireEvent.click(main.getByRole('tab', { name: /Assigned to me/ }))
+    expect(main.getAllByRole('link')).toHaveLength(1)
+    expect(main.getByRole('link', { name: /X-4/ })).toHaveAttribute('href', '#/issue/30851%3Ax%3A4')
   })
 })
