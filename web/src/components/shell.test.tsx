@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { Avatar, initialsFromName } from './ui/Avatar'
+import { initialsFor } from '@estiva/ui'
+import { Avatar } from './ui/Avatar'
 import { IdentityMenu } from './IdentityMenu'
 import { NavItem } from './NavItem'
 import { Sidebar } from './Sidebar'
@@ -8,12 +9,17 @@ import { Sidebar } from './Sidebar'
 /** A 64-hex key. Nothing below may ever print this, or any part of it. */
 const KEY = 'a8a7d739'.repeat(8)
 
-describe('Avatar', () => {
-  it('takes initials from a name, never from a key', () => {
-    expect(initialsFromName('Ana Duarte')).toBe('AD')
-    expect(initialsFromName('Ravi')).toBe('RA')
-    expect(initialsFromName(undefined)).toBe('')
-    expect(initialsFromName('   ')).toBe('')
+describe("Avatar (the shared one, on Peek's rules)", () => {
+  it('takes initials from a name — the first letter of the first two words', () => {
+    expect(initialsFor('Ana Duarte')).toBe('AD')
+    expect(initialsFor('Ravi')).toBe('R')
+    expect(initialsFor('Mara Sato Ito')).toBe('MS')
+  })
+
+  it('draws the initials when named, and never a key', () => {
+    const { container } = render(<Avatar name="Ana Duarte" />)
+    expect(container.textContent).toBe('AD')
+    expect(container.textContent).not.toContain(KEY.slice(0, 4))
   })
 
   it('draws a silhouette when there is no name', () => {

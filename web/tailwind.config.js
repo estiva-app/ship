@@ -12,5 +12,6 @@ import estiva from '@estiva/ui/tailwind-preset'
  */
 export default {
   presets: [estiva],
-  content: ['./index.html', './src/**/*.{ts,tsx}', './.storybook/**/*.{ts,tsx}'],
+  // The package's components are source; their classes must be scanned too.
+  content: ['./index.html', './src/**/*.{ts,tsx}', './.storybook/**/*.{ts,tsx}', '../../estiva-ui/src/**/*.{ts,tsx}'],
 }

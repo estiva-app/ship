@@ -1,4 +1,15 @@
+import { fileURLToPath } from 'node:url'
 import type { StorybookConfig } from '@storybook/react-vite'
+
+/**
+ * Files Vite may serve. Setting `allow` replaces Vite's default (this app's
+ * root), so the app's own directories are named again beside the two that
+ * are outside it: the repo (the data layer in ../src and ../lib) and
+ * @estiva/ui, consumed as source through its file: link.
+ */
+const webRoot = fileURLToPath(new URL('..', import.meta.url))
+const repoRoot = fileURLToPath(new URL('../..', import.meta.url))
+const estivaUiRoot = fileURLToPath(new URL('../../../estiva-ui', import.meta.url))
 
 /**
  * Ship's own Storybook, self-contained.
@@ -24,6 +35,8 @@ const config: StorybookConfig = {
       __ID_BASE__: JSON.stringify(''),
       __CLIENT_ID__: JSON.stringify('estiva-ship'),
     }
+    viteConfig.resolve = { ...viteConfig.resolve, dedupe: [...(viteConfig.resolve?.dedupe ?? []), 'react', 'react-dom'] }
+    viteConfig.server = { ...viteConfig.server, fs: { ...viteConfig.server?.fs, allow: [...(viteConfig.server?.fs?.allow ?? []), webRoot, repoRoot, estivaUiRoot] } }
     return viteConfig
   },
 }
