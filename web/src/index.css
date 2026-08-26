@@ -1,0 +1,53 @@
+/* Geist ships 400/500/600 only, loaded the same way Peek loads it. */
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap');
+
+@import '@estiva-app/ui/tokens.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+  The theme VALUES live in @estiva-app/ui's tokens.css, imported above: `ship`
+  (Ship's palette, Katerina's ruling 2026-08-28), selected by
+  data-theme="ship" on <html> (index.html), and `dark` (Peek's), kept in the
+  Storybook toolbar in case that changes. Nothing colour-related is defined
+  in this file any more; a change of value is a change to the package.
+*/
+
+/* ─── Scrollbar — Peek's, verbatim (2026-08-27): thin, on tokens, no buttons ─── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+::-webkit-scrollbar-button {
+  display: none;
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    @apply bg-bg-base text-text-primary font-sans text-body-2 antialiased;
+  }
+}
