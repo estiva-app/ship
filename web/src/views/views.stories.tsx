@@ -73,6 +73,7 @@ export const Project: Story = {
     return (
       <Shell current={{ projectAddr: '30850:a:rel' }}>
         <ProjectView
+          onAddIssue={fn()}
           crumbs={{ projectsHref: '#/projects', title }}
           header={{ title, description, archived: false, onRename: (v) => (setTitle(v), true), onDescribe: (v) => (setDescription(v), true) }}
           view={view}

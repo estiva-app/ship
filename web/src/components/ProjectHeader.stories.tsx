@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { fn } from 'storybook/test'
+import { Button } from '@/components/ui/Button'
 import { ProjectHeader, type ProjectHeaderProps } from './ProjectHeader'
 
 /** The top of the project page: click the title or the description to edit; Enter commits, Escape cancels. */
@@ -58,4 +59,9 @@ export const Interactive: Story = {
 /** A save that fails keeps the field open with the text in it. */
 export const SaveFails: Story = {
   args: { onRename: fn<ProjectHeaderProps['onRename']>(() => new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 800))) },
+}
+
+/** With production's "Add issue" beside the title. */
+export const WithAddIssue: Story = {
+  args: { action: <Button variant="primary">Add issue</Button> },
 }

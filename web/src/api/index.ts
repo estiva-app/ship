@@ -17,7 +17,7 @@ import { Store } from '../../../src/store'
 import type { FolderState } from '../../../src/fold'
 import type { Directory } from '../../../src/profiles'
 import { addrToNaddr, naddrToAddr } from '../../../lib/nostr/nip19'
-import { folderLink } from '../../../src/events'
+import { folderLink, parseFolderLink } from '../../../src/events'
 import { RELAY_URL } from '../config'
 
 export type { Change, Conversation, FolderState, Issue, Message, Project } from '../../../src/fold'
@@ -63,8 +63,8 @@ export function referenceFor(addr: string): string {
   return `nostr:${addrToNaddr(addr, [RELAY_URL])}`
 }
 
-/** A `folder:<uuid>` link, the handle pasted into Peek to pair a topic. */
-export { folderLink }
+/** A `folder:<uuid>` link, the handle pasted into Peek to pair a topic — and the parser for one somebody pasted here. */
+export { folderLink, parseFolderLink }
 
 /**
  * Land an inbound `#/o/<naddr>` on the right surface. Resolves the pointer
