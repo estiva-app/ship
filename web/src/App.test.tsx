@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { FolderState } from '@/api'
 
@@ -92,5 +92,25 @@ describe('App — the shell around the route', () => {
     render(<App />)
     await waitFor(() => expect(location.hash).toBe('#/issues'))
     expect(screen.getByText(/Could not resolve that reference/)).toBeInTheDocument()
+  })
+})
+
+describe('Projects page — cards from the fold', () => {
+  it('draws the active projects with their counts, and the archived one behind the tab', () => {
+    location.hash = '#/projects'
+    render(<App />)
+    const main = within(screen.getByRole('main'))
+    expect(main.getByRole('heading', { name: 'Projects' })).toBeInTheDocument()
+    expect(main.getByRole('link', { name: /Live/ })).toHaveTextContent('2 issues')
+    expect(main.queryByRole('link', { name: /Old/ })).not.toBeInTheDocument()
+    expect(main.getByRole('button', { name: 'Add project' })).toBeDisabled()
+  })
+
+  it('shows the archived list when the route asks for it', () => {
+    location.hash = '#/projects?archived'
+    render(<App />)
+    const main = within(screen.getByRole('main'))
+    expect(main.getByRole('link', { name: /Old/ })).toBeInTheDocument()
+    expect(main.queryByRole('link', { name: /Live/ })).not.toBeInTheDocument()
   })
 })

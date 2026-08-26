@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { me, peopleIn, resolveInbound, useDirectory, useWorkspace, type FolderState } from '@/api'
+import { me, peopleIn, resolveInbound, useDirectory, useWorkspace, type DirectoryView, type FolderState } from '@/api'
 import { AppShell } from '@/components/AppShell'
 import { Banner } from '@/components/Banner'
 import { IdentityMenu } from '@/components/IdentityMenu'
 import { Sidebar, type SidebarProject } from '@/components/Sidebar'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { ProjectsPage } from '@/pages/ProjectsPage'
 import { ID_CONFIG, RELAY_URL } from './config'
 import { href, replace, useRoute, type Route } from './router'
 
@@ -55,15 +56,20 @@ export default function App() {
       }
       sidebar={<Sidebar {...sidebarProps(state, route)} />}
     >
-      <Page route={route} state={state} />
+      <Page route={route} state={state} directory={directory} />
     </AppShell>
   )
 }
 
-/** Placeholder until each page is wired (steps 3–6). */
-function Page({ route, state }: { route: Route; state: FolderState | null }) {
+/** Which page the route names. Placeholders remain until steps 4–6 land. */
+function Page({ route, state, directory }: { route: Route; state: FolderState | null; directory: DirectoryView }) {
   if (!state) return null
-  return <EmptyState className="py-12" message={`${route.name} — wiring in progress`} />
+  switch (route.name) {
+    case 'projects':
+      return <ProjectsPage state={state} directory={directory} archived={route.archived} />
+    default:
+      return <EmptyState className="py-12" message={`${route.name} — wiring in progress`} />
+  }
 }
 
 /**
