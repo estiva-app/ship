@@ -1,20 +1,22 @@
-import { useMemo } from 'react'
-import { PROJECT_STATUSES, lookupStatus, type DirectoryView, type FolderState } from '@/api'
+import { useMemo, useState } from 'react'
+import { PROJECT_STATUSES, createProject, lookupStatus, type DirectoryView, type FolderState } from '@/api'
+import { NewProjectDialog } from '@/components/NewProjectDialog'
 import type { ProjectCardProps } from '@/components/ProjectCard'
 import { ProjectsView } from '@/views/ProjectsView'
 import { go, href } from '../router'
-
-/** Until writes (REW-5), the one reason every write control gives. */
-export const WRITES_LATER = 'Available after sign-in'
+import { type Say } from './act'
 
 /**
  * The projects list from the fold, as the old app draws it
  * (`projectsView`): active or archived by the route, each card with its
  * issue and done counts, its author's face and its age. Nothing here
  * recomputes what the fold decided — `archived` and `status` are read off
- * the folded project.
+ * the folded project. "Add project" opens the form in a dialog; a created
+ * project is on screen only once the relay has been read again.
  */
-export function ProjectsPage({ state, directory, archived }: { state: FolderState; directory: DirectoryView; archived: boolean }) {
+export function ProjectsPage({ state, directory, archived, say, refresh }: { state: FolderState; directory: DirectoryView; archived: boolean; say: Say; refresh: () => Promise<void> }) {
+  const [adding, setAdding] = useState(false)
+
   const cards = useMemo(() => {
     const toCard = (project: FolderState['projects'][number]): ProjectCardProps => {
       const issues = state.issues.filter((issue) => issue.projectAddr === project.addr)
@@ -38,12 +40,29 @@ export function ProjectsPage({ state, directory, archived }: { state: FolderStat
   }, [state, directory])
 
   return (
-    <ProjectsView
-      active={cards.active}
-      archived={cards.archived}
-      showArchived={archived}
-      onShowArchived={(wantArchived) => go({ name: 'projects', archived: wantArchived })}
-      addDisabledReason={WRITES_LATER}
-    />
+    <>
+      <ProjectsView
+        active={cards.active}
+        archived={cards.archived}
+        showArchived={archived}
+        onShowArchived={(wantArchived) => go({ name: 'projects', archived: wantArchived })}
+        onAddProject={() => setAdding(true)}
+      />
+      {adding && (
+        <NewProjectDialog
+          onClose={() => setAdding(false)}
+          onCreate={async (draft) => {
+            const result = await createProject(draft)
+            if (!result.ok) {
+              say(`Project rejected — ${result.reason}`, 'error')
+              return false
+            }
+            await refresh()
+            say(draft.folder ? 'Project created in the Folder you pasted — it and that topic are now one container.' : 'Project created, with its own Folder.')
+            return true
+          }}
+        />
+      )}
+    </>
   )
 }

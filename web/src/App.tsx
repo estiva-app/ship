@@ -7,7 +7,8 @@ import { Sidebar, type SidebarProject } from '@/components/Sidebar'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { IssuePage } from '@/pages/IssuePage'
 import { IssuesPage } from '@/pages/IssuesPage'
-import { ProjectPage, type Say } from '@/pages/ProjectPage'
+import { ProjectPage } from '@/pages/ProjectPage'
+import type { Say } from '@/pages/act'
 import { ProjectsPage } from '@/pages/ProjectsPage'
 import { ID_CONFIG, RELAY_URL } from './config'
 import { href, replace, useRoute, type Route } from './router'
@@ -19,7 +20,7 @@ import { href, replace, useRoute, type Route } from './router'
  * the fold's data.
  */
 export default function App() {
-  const { state, error } = useWorkspace()
+  const { state, error, refresh } = useWorkspace()
   const route = useRoute()
   const { banner, say } = useBanner()
 
@@ -59,23 +60,23 @@ export default function App() {
       }
       sidebar={<Sidebar {...sidebarProps(state, route)} />}
     >
-      <Page route={route} state={state} directory={directory} say={say} />
+      <Page route={route} state={state} directory={directory} say={say} refresh={refresh} />
     </AppShell>
   )
 }
 
 /** Which page the route names; an inbound reference shows nothing until it resolves. */
-function Page({ route, state, directory, say }: { route: Route; state: FolderState | null; directory: DirectoryView; say: Say }) {
+function Page({ route, state, directory, say, refresh }: { route: Route; state: FolderState | null; directory: DirectoryView; say: Say; refresh: () => Promise<void> }) {
   if (!state) return null
   switch (route.name) {
     case 'projects':
-      return <ProjectsPage state={state} directory={directory} archived={route.archived} />
+      return <ProjectsPage state={state} directory={directory} archived={route.archived} say={say} refresh={refresh} />
     case 'issues':
-      return <IssuesPage state={state} directory={directory} />
+      return <IssuesPage state={state} directory={directory} say={say} refresh={refresh} />
     case 'project':
-      return <ProjectPage state={state} directory={directory} addr={route.addr} view={route.view} say={say} />
+      return <ProjectPage state={state} directory={directory} addr={route.addr} view={route.view} say={say} refresh={refresh} />
     case 'issue':
-      return <IssuePage state={state} directory={directory} addr={route.addr} say={say} />
+      return <IssuePage state={state} directory={directory} addr={route.addr} say={say} refresh={refresh} />
     default:
       return <EmptyState className="py-12" message="Resolving reference…" />
   }

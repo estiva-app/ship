@@ -1,14 +1,11 @@
 import { useMemo } from 'react'
-import { ISSUE_STATUSES, conversationsAbout, referenceFor, type DirectoryView, type FolderState } from '@/api'
+import { ISSUE_STATUSES, conversationsAbout, referenceFor, reply, setIssueField, startConversation, type DirectoryView, type FolderState } from '@/api'
 import type { ActivityEntry } from '@/components/ActivityFeed'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { IssueView } from '@/views/IssueView'
 import { href } from '../router'
-import { copyText, railPeople, threadFor, type Say } from './ProjectPage'
-import { WRITES_LATER } from './ProjectsPage'
-
-/** The write controls exist but cannot succeed yet (REW-5); they say so rather than fail. */
-const inert = () => false
+import { act, type Say } from './act'
+import { copyText, railPeople, threadFor } from './ProjectPage'
 
 /**
  * This issue's slice of the change stream, in words, newest first — the old
@@ -33,16 +30,16 @@ export function activityFor(issueAddr: string, state: FolderState, directory: Di
  * project, or none), title and description, every conversation that
  * mentions it — including ones started in Peek before it came up — its
  * history, and the rail with who opened it and a working "Copy reference
- * for Peek". History and conversation stay two sections (REW-4).
+ * for Peek". History and conversation stay two sections (REW-4). Every
+ * field edit is one change event to the issue's own Folder, followed by a
+ * re-read; a refused one leaves the field as the relay has it.
  */
-export function IssuePage({ state, directory, addr, say }: { state: FolderState; directory: DirectoryView; addr: string; say: Say }) {
+export function IssuePage({ state, directory, addr, say, refresh }: { state: FolderState; directory: DirectoryView; addr: string; say: Say; refresh: () => Promise<void> }) {
   const issue = state.issues.find((candidate) => candidate.addr === addr)
   const project = issue?.projectAddr ? state.projects.find((candidate) => candidate.addr === issue.projectAddr) : undefined
 
-  const threads = useMemo(
-    () => (issue ? conversationsAbout(state.conversations, issue.addr).map((c) => threadFor(c, directory)) : []),
-    [issue, state, directory],
-  )
+  const conversations = useMemo(() => (issue ? conversationsAbout(state.conversations, issue.addr) : []), [issue, state])
+  const threads = useMemo(() => conversations.map((c) => threadFor(c, directory)), [conversations, directory])
   const activity = useMemo(() => (issue ? activityFor(issue.addr, state, directory) : []), [issue, state, directory])
   const people = useMemo(() => railPeople(state, directory), [state, directory])
   const projects = useMemo(
@@ -59,6 +56,9 @@ export function IssuePage({ state, directory, addr, say }: { state: FolderState;
     )
   }
 
+  const set = (field: 'title' | 'description' | 'status' | 'assignee' | 'project', value: string, note: string) =>
+    act(note, () => setIssueField(issue, field, value, note), say, refresh)
+
   return (
     <IssueView
       crumbs={{
@@ -68,27 +68,35 @@ export function IssuePage({ state, directory, addr, say }: { state: FolderState;
       }}
       title={issue.title}
       description={issue.description}
-      onRename={inert}
-      onDescribe={inert}
+      onRename={(value) => set('title', value, 'Rename')}
+      onDescribe={(value) => set('description', value, 'Description')}
       threads={threads}
-      onStartConversation={inert}
-      onReply={inert}
+      // Threads about an issue carry a reference in the body so Peek renders
+      // the issue's widget above them (withReference: true), as the old app has it.
+      onStartConversation={(body) => act('Message', () => startConversation({ folder: issue.folder, about: issue.addr, withReference: true, body }), say, refresh)}
+      onReply={(threadId, body) => {
+        const conversation = conversations.find((c) => c.id === threadId)
+        if (!conversation) return false
+        return act('Reply', () => reply(conversation, issue.folder, body), say, refresh)
+      }}
       activity={activity}
       rail={{
         status: issue.status,
         statuses: ISSUE_STATUSES.map(({ value, label }) => ({ value, label })),
-        onStatusChange: () => {},
+        onStatusChange: (value) => void set('status', value, `Status → ${value}`),
         assignee: issue.assignee ?? '',
         people,
-        onAssigneeChange: () => {},
+        onAssigneeChange: (value) => void set('assignee', value, value ? 'Assign' : 'Unassign'),
         project: issue.projectAddr ?? '',
         projects,
-        onProjectChange: () => {},
+        onProjectChange: (value) => {
+          const target = state.projects.find((p) => p.addr === value)
+          void set('project', value, `Move to ${target?.title ?? 'No project'}`)
+        },
         openedBy: directory.personOf(issue.author),
         openedAt: issue.createdAt,
         onCopyReference: () => void copyText(referenceFor(issue.addr), 'Reference copied — paste it into a Peek message.', 'Copy this reference:', say),
       }}
-      readOnlyReason={WRITES_LATER}
     />
   )
 }

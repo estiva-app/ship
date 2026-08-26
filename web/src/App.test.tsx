@@ -12,10 +12,19 @@ vi.mock('@/api', async (importOriginal) => {
     useWorkspace: vi.fn(),
     useDirectory: vi.fn(),
     resolveInbound: vi.fn(),
+    createProject: vi.fn(),
+    createIssue: vi.fn(),
+    setIssueField: vi.fn(),
+    setProjectField: vi.fn(),
+    archiveProject: vi.fn(),
+    deleteProject: vi.fn(),
+    pairProjectFolder: vi.fn(),
+    startConversation: vi.fn(),
+    reply: vi.fn(),
   }
 })
 
-import { resolveInbound, useDirectory, useWorkspace } from '@/api'
+import { createIssue, createProject, deleteProject, resolveInbound, setIssueField, startConversation, useDirectory, useWorkspace } from '@/api'
 import { fireEvent } from '@testing-library/react'
 import App, { sidebarProps } from './App'
 
@@ -45,9 +54,13 @@ const STATE: FolderState = {
   ],
 }
 
+const refresh = vi.fn().mockResolvedValue(undefined)
+
 beforeEach(() => {
   location.hash = ''
-  vi.mocked(useWorkspace).mockReturnValue({ state: STATE, error: null, refresh: async () => {} })
+  refresh.mockClear()
+  for (const write of [createProject, createIssue, setIssueField, deleteProject, startConversation]) vi.mocked(write).mockReset()
+  vi.mocked(useWorkspace).mockReturnValue({ state: STATE, error: null, refresh })
   vi.mocked(useDirectory).mockReturnValue({
     directory: new Map(),
     nameOf: (k: string) => (k === ME ? 'Me Myself' : 'Someone'),
@@ -111,7 +124,34 @@ describe('Projects page — cards from the fold', () => {
     expect(main.getByRole('heading', { name: 'Projects' })).toBeInTheDocument()
     expect(main.getByRole('link', { name: /Live/ })).toHaveTextContent('2 issues')
     expect(main.queryByRole('link', { name: /Old/ })).not.toBeInTheDocument()
-    expect(main.getByRole('button', { name: 'Add project' })).toBeDisabled()
+    expect(main.getByRole('button', { name: 'Add project' })).toBeEnabled()
+  })
+
+  it('creates a project through the dialog, then re-reads the relay and says so', async () => {
+    vi.mocked(createProject).mockResolvedValue({ ok: true, addr: '30850:x:new' })
+    location.hash = '#/projects'
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'Add project' }))
+    const dialog = within(screen.getByRole('dialog', { name: 'New project' }))
+    fireEvent.change(dialog.getByPlaceholderText('New project title'), { target: { value: 'Mobile app' } })
+    fireEvent.click(dialog.getByRole('button', { name: 'Create project' }))
+    await waitFor(() => expect(createProject).toHaveBeenCalledWith({ title: 'Mobile app', description: '', folder: undefined }))
+    await waitFor(() => expect(refresh).toHaveBeenCalled())
+    expect(await screen.findByText('Project created, with its own Folder.')).toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  })
+
+  it('keeps the dialog open and says why when the relay refuses', async () => {
+    vi.mocked(createProject).mockResolvedValue({ ok: false, reason: 'not a channel member' })
+    location.hash = '#/projects'
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'Add project' }))
+    const dialog = within(screen.getByRole('dialog', { name: 'New project' }))
+    fireEvent.change(dialog.getByPlaceholderText('New project title'), { target: { value: 'X' } })
+    fireEvent.click(dialog.getByRole('button', { name: 'Create project' }))
+    expect(await screen.findByText(/Project rejected — not a channel member/)).toBeInTheDocument()
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(refresh).not.toHaveBeenCalled()
   })
 
   it('shows the archived list when the route asks for it', () => {
@@ -133,7 +173,7 @@ describe('Issues page — rows from the fold', () => {
     expect(main.getByRole('tab', { name: /Assigned to me/ })).toHaveTextContent('1')
     expect(main.getAllByRole('link')).toHaveLength(4)
     expect(main.getByRole('link', { name: /X-4/ })).toHaveTextContent('1 conversation')
-    expect(main.getByRole('button', { name: 'Add issue' })).toBeDisabled()
+    expect(main.getByRole('button', { name: 'Add issue' })).toBeEnabled()
 
     fireEvent.click(main.getByRole('tab', { name: /Assigned to me/ }))
     expect(main.getAllByRole('link')).toHaveLength(1)
@@ -146,25 +186,43 @@ describe('Project page — one project from the fold', () => {
     location.hash = '#/project/30850%3Ax%3Alive'
     render(<App />)
     const main = within(screen.getByRole('main'))
-    expect(main.getByLabelText('Title')).toHaveTextContent('Live')
+    expect(main.getByRole('button', { name: 'Edit title' })).toHaveTextContent('Live')
     expect(main.getByRole('table')).toBeInTheDocument()
     expect(main.getAllByRole('row')).toHaveLength(3) // header + 2 issues
     expect(main.getByText('about the project')).toBeInTheDocument()
     expect(main.getByText('reply')).toBeInTheDocument()
-    expect(main.getByRole('button', { name: 'Status' })).toBeDisabled()
+    expect(main.getByRole('button', { name: 'Status' })).toBeEnabled()
     expect(main.getByRole('button', { name: 'Copy Folder link' })).toBeEnabled()
-    expect(main.getByRole('button', { name: /Archive project/ })).toBeDisabled()
+    expect(main.getByRole('button', { name: /Archive project/ })).toBeEnabled()
     expect(main.queryByRole('button', { name: 'Delete project' })).not.toBeInTheDocument()
     expect(main.getByText('1 of 2 done')).toBeInTheDocument()
-    expect(main.queryByRole('button', { name: /Edit title/ })).not.toBeInTheDocument()
+    expect(main.getByRole('button', { name: 'Add issue' })).toBeEnabled()
   })
 
-  it('offers Delete (disabled, with its reason) to the author, and the board when the route says so', () => {
+  it('offers Delete to the author, asks first, and requests the deletion', async () => {
+    vi.mocked(deleteProject).mockResolvedValue({ ok: true })
     location.hash = '#/project/30850%3Ax%3Amine?view=board'
     render(<App />)
     const main = within(screen.getByRole('main'))
-    expect(main.getByRole('button', { name: 'Delete project' })).toBeDisabled()
     expect(main.queryByRole('table')).not.toBeInTheDocument()
+    fireEvent.click(main.getByRole('button', { name: 'Delete project' }))
+    const dialog = within(screen.getByRole('dialog', { name: /Delete .Mine./ }))
+    expect(deleteProject).not.toHaveBeenCalled()
+    fireEvent.click(dialog.getByRole('button', { name: 'Delete project' }))
+    await waitFor(() => expect(deleteProject).toHaveBeenCalledWith(expect.objectContaining({ addr: '30850:x:mine' })))
+    expect(await screen.findByText('Deletion requested.')).toBeInTheDocument()
+    await waitFor(() => expect(location.hash).toBe('#/projects'))
+  })
+
+  it('posts a project conversation into its content Folder and re-reads', async () => {
+    vi.mocked(startConversation).mockResolvedValue({ ok: true })
+    location.hash = '#/project/30850%3Ax%3Alive'
+    render(<App />)
+    const main = within(screen.getByRole('main'))
+    fireEvent.change(main.getByPlaceholderText('Start a conversation…'), { target: { value: 'hello' } })
+    fireEvent.click(main.getByRole('button', { name: 'Post' }))
+    await waitFor(() => expect(startConversation).toHaveBeenCalledWith({ folder: 'f', about: '30850:x:live', withReference: false, body: 'hello' }))
+    await waitFor(() => expect(refresh).toHaveBeenCalled())
   })
 
   it('says so when the project is not in this workspace', () => {
@@ -179,15 +237,43 @@ describe('Issue page — one issue from the fold', () => {
     location.hash = '#/issue/30851%3Ax%3A4'
     render(<App />)
     const main = within(screen.getByRole('main'))
-    expect(main.getByLabelText('Title')).toHaveTextContent('30851:x:4')
+    expect(main.getByRole('button', { name: 'Edit title' })).toHaveTextContent('30851:x:4')
     expect(main.getByText('X-4')).toBeInTheDocument()
     expect(main.queryByRole('link', { name: 'Live' })).not.toBeInTheDocument()
     expect(main.getByText('hi')).toBeInTheDocument()
     const feed = main.getAllByText(/set (status|assignee) to/)
     expect(feed.map((node) => node.textContent)).toEqual(['Me Myself set status to in_progress', 'Someone set assignee to Me Myself'])
-    expect(main.getByRole('button', { name: 'Assignee' })).toBeDisabled()
+    expect(main.getByRole('button', { name: 'Assignee' })).toBeEnabled()
     expect(main.getByRole('button', { name: 'Copy reference for Peek' })).toBeEnabled()
     expect(main.getByText(/Opened by/)).toBeInTheDocument()
+  })
+
+  it('a status change is one change event to the issue, then a re-read; a refusal is said and changes nothing', async () => {
+    vi.mocked(setIssueField).mockResolvedValue({ ok: true })
+    location.hash = '#/issue/30851%3Ax%3A4'
+    render(<App />)
+    const main = within(screen.getByRole('main'))
+    fireEvent.click(main.getByRole('button', { name: 'Status' }))
+    fireEvent.mouseDown(screen.getByRole('option', { name: 'Done' }))
+    await waitFor(() => expect(setIssueField).toHaveBeenCalledWith(expect.objectContaining({ addr: '30851:x:4' }), 'status', 'done', 'Status → done'))
+    await waitFor(() => expect(refresh).toHaveBeenCalledTimes(1))
+
+    vi.mocked(setIssueField).mockResolvedValue({ ok: false, reason: 'relay said no' })
+    fireEvent.click(main.getByRole('button', { name: 'Status' }))
+    fireEvent.mouseDown(screen.getByRole('option', { name: 'Cancelled' }))
+    expect(await screen.findByText(/Status → cancelled rejected — relay said no/)).toBeInTheDocument()
+    expect(refresh).toHaveBeenCalledTimes(1)
+    expect(main.getByRole('button', { name: 'Status' })).toHaveTextContent('In Progress')
+  })
+
+  it('starts a thread about the issue with the reference Peek needs', async () => {
+    vi.mocked(startConversation).mockResolvedValue({ ok: true })
+    location.hash = '#/issue/30851%3Ax%3A4'
+    render(<App />)
+    const main = within(screen.getByRole('main'))
+    fireEvent.change(main.getByPlaceholderText('Start a conversation…'), { target: { value: 'seen this?' } })
+    fireEvent.click(main.getByRole('button', { name: 'Post' }))
+    await waitFor(() => expect(startConversation).toHaveBeenCalledWith({ folder: 'f', about: '30851:x:4', withReference: true, body: 'seen this?' }))
   })
 
   it('links the project in the trail when the issue has one', () => {
