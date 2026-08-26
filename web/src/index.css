@@ -8,16 +8,16 @@
 /*
   Ship's theme: the VALUES behind the token names in tailwind.config.js.
 
-  PROVISIONAL. These are today's Ship palette (apps/ship/index.html), mapped
-  onto Peek's token names so the shell has something to render, with one
-  correction: the old `--muted` (#5b6070, 3.06:1 on the base) is not used for
-  readable text — it survives only as `text-disabled`. Ship's real palette is
-  a design pass of its own and replaces every value in this block; nothing
-  outside it changes when that happens.
+  SHIP'S PALETTE — Katerina's ruling, 2026-08-28: this is the theme the app
+  ships with. It began as today's Ship colours (apps/ship/index.html) mapped
+  onto Peek's token names, with one correction: the old `--muted` (#5b6070,
+  3.06:1 on the base) is not used for readable text — it survives only as
+  `text-disabled`; the accent was then darkened and warmed towards purple
+  (2026-08-27). Under SHA-5 this block moves into @estiva/ui as the `ship`
+  theme, value for value.
 
-  One theme today, selected by `data-theme="ship"` on <html>, so a second
-  theme (light, or a Storybook side-by-side candidate) is another block with
-  another name rather than an edit to this one.
+  Selected by `data-theme="ship"` on <html>. Another theme is another block
+  with another name, never an edit to this one.
 */
 :root[data-theme='ship'] {
   color-scheme: dark;
@@ -81,10 +81,10 @@
 /*
   Peek's `dark` theme, its values copied verbatim from peek/src/index.css
   (2026-08-27, Katerina: "assign all of its values to Ship and see how it
-  looks"). Peek-only tokens (bg-private, border-private, logo) left out. Both
-  themes stay; pick from the Storybook toolbar. Worth judging with the two
-  lessons from the provisional palette in mind: hover must read on every
-  surface, and border-subtle must be a line on bg-elevated.
+  looks"). Peek-only tokens (bg-private, border-private, logo) left out.
+  Not the app's theme — she chose `ship` (2026-08-28) — but it stays, in
+  Storybook, in case that changes. Two lessons it taught: hover must read
+  on every surface, and border-subtle must be a line on bg-elevated.
 */
 :root[data-theme='dark'] {
   color-scheme: dark;

@@ -9,10 +9,10 @@ import './preview.css'
 /**
  * The themes this Storybook can render.
  *
- * Two: `ship`, the app's own provisional palette, and `dark`, Peek's dark
- * theme copied verbatim (2026-08-27) so the two can be compared from the
- * toolbar. A further candidate is another `[data-theme="<name>"]` block in
- * index.css plus one more entry here.
+ * Two: `ship`, the app's palette (Katerina's ruling, 2026-08-28), and
+ * `dark`, Peek's dark theme copied verbatim (2026-08-27), kept so the two
+ * can still be compared from the toolbar. A further candidate is another
+ * `[data-theme="<name>"]` block in index.css plus one more entry here.
  *
  * Driven by the `data-theme` attribute on <html> — the same switch the app
  * uses (index.html) — so a story and the running app can never disagree
