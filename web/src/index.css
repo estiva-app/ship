@@ -1,140 +1,19 @@
 /* Geist ships 400/500/600 only, loaded the same way Peek loads it. */
 @import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap');
 
+@import '@estiva/ui/tokens.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 /*
-  Ship's theme: the VALUES behind the token names in tailwind.config.js.
-
-  SHIP'S PALETTE — Katerina's ruling, 2026-08-28: this is the theme the app
-  ships with. It began as today's Ship colours (apps/ship/index.html) mapped
-  onto Peek's token names, with one correction: the old `--muted` (#5b6070,
-  3.06:1 on the base) is not used for readable text — it survives only as
-  `text-disabled`; the accent was then darkened and warmed towards purple
-  (2026-08-27). Under SHA-5 this block moves into @estiva/ui as the `ship`
-  theme, value for value.
-
-  Selected by `data-theme="ship"` on <html>. Another theme is another block
-  with another name, never an edit to this one.
+  The theme VALUES live in @estiva/ui's tokens.css, imported above: `ship`
+  (Ship's palette, Katerina's ruling 2026-08-28), selected by
+  data-theme="ship" on <html> (index.html), and `dark` (Peek's), kept in the
+  Storybook toolbar in case that changes. Nothing colour-related is defined
+  in this file any more; a change of value is a change to the package.
 */
-:root[data-theme='ship'] {
-  color-scheme: dark;
-
-  /* bg */
-  --bg-base:     #0e0f13;
-  --bg-surface:  #16181f;
-  --bg-elevated: #1c1f28;
-  /* Lighter than the surfaces it sits on, as Peek's dark theme has it (its
-     inset is the lightest background): a neutral Chip and a search field are
-     bg-inset, and at the old #121419 — darker than the surface — both were
-     invisible (Katerina, 2026-08-26). */
-  --bg-inset:    #1f2330;
-  /* Translucent, as Peek's Signal theme does it, so a hover reads on every
-     surface: the old palette had one value for hover AND elevated, and a
-     menu item on the elevated surface hovered invisibly. */
-  --bg-hover:    rgba(255, 255, 255, 0.05);
-  --bg-selected: rgba(75, 88, 212, 0.16);
-  --bg-active:   rgba(255, 255, 255, 0.08);
-  --bg-disabled: #16181f;
-
-  /* text */
-  --text-primary:   #e6e8ee;
-  --text-secondary: #b3b9c7;
-  --text-muted:     #8b91a1;
-  --text-disabled:  #5b6070;
-  --text-inverse:   #0e0f13;
-
-  /* border */
-  /* One step above bg-elevated, so a Divider inside a menu (elevated) is a
-     line and not the same colour as its ground — it was invisible at the old
-     #1c1f28 = bg-elevated (Katerina, 2026-08-26: "I see no divider"). */
-  --border-subtle:  #232734;
-  --border-default: #272b36;
-  --border-strong:  #3a3f4d;
-  --border-focus:   #4b58d4;
-
-  /* accent */
-  /* Darker than the old app's #6c8cff (Katerina, 2026-08-27: "too bright");
-     light text on it now reads at 4.9:1. */
-  --accent-primary: #4b58d4;  /* a touch of purple, still blue (2026-08-27) */
-  --accent-hover:   #5c69dc;
-  --accent-muted:   #1c2144;
-
-  /* semantic */
-  --info-default:    #5b7be8;
-  --info-muted:      #1a2342;
-  --warning-default: #e0b04a;
-  --warning-muted:   #3a2f14;
-  --success-default: #46c08a;
-  --success-muted:   #123326;
-  --error-default:   #e5697a;
-  --error-muted:     #3a1c22;
-
-  /* elevation */
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -4px rgba(0, 0, 0, 0.4);
-}
-
-/*
-  Peek's `dark` theme, its values copied verbatim from peek/src/index.css
-  (2026-08-27, Katerina: "assign all of its values to Ship and see how it
-  looks"). Peek-only tokens (bg-private, border-private, logo) left out.
-  Not the app's theme — she chose `ship` (2026-08-28) — but it stays, in
-  Storybook, in case that changes. Two lessons it taught: hover must read
-  on every surface, and border-subtle must be a line on bg-elevated.
-*/
-:root[data-theme='dark'] {
-  color-scheme: dark;
-  /* bg */
-  --bg-base:     #09090B;
-  --bg-surface:  #141416;
-  --bg-elevated: #1C1C1F;
-  --bg-inset:    #27272A;
-  --bg-hover:    #232326;
-  --bg-selected: #1F1F22;
-  --bg-active:   #2D2D31;
-  --bg-disabled: #1C1C1F;
-
-  /* text */
-  --text-primary:   #FAFAFA;
-  --text-secondary: #AEAEB6; /* nudged up from #A1A1AA (2026-07-23) — brighter bodies, still clearly below primary */
-  --text-muted:     #71717A;
-  --text-disabled:  #52525B;
-  --text-inverse:   #18181B;
-
-  /* border */
-  --border-subtle:  #1F1F22;
-  --border-default: #2D2D31;
-  --border-strong:  #52525B;
-  --border-focus:   #6D4FD2;
-
-
-  /* accent */
-  /* Darker than Peek's #A78BFA (Katerina, 2026-08-27); light text reads 5.5:1. */
-  --accent-primary: #6D4FD2;
-  --accent-hover:   #7D61DC;
-  --accent-muted:   #2E2554;
-
-
-
-  /* semantic */
-  --info-default:    #60A5FA;
-  --info-muted:      #172554;
-  --warning-default: #FBBF24;
-  --warning-muted:   #4A3728;
-  --success-default: #34D399;
-  --success-muted:   #0E392B;
-  --error-default:   #F87171;
-  --error-muted:     #4A2828;
-
-  /* shadows */
-  --shadow-sm: 0 1px 2px 0 rgba(0,0,0,0.30);
-  --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.40), 0 2px 4px -2px rgba(0,0,0,0.30);
-  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.50), 0 4px 6px -4px rgba(0,0,0,0.40);
-}
 
 /* ─── Scrollbar — Peek's, verbatim (2026-08-27): thin, on tokens, no buttons ─── */
 * {
