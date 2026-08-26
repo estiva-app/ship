@@ -54,7 +54,7 @@ export function Tabs<T extends string>({ tabs, active, onChange, size = 'default
         >
           {tab.icon}
           {tab.label}
-          {tab.count ? <Chip label={String(tab.count)} className={active === tab.id ? 'bg-white/15' : undefined} /> : null}
+          {tab.count !== undefined ? <Chip label={String(tab.count)} className={active === tab.id ? 'bg-white/15' : undefined} /> : null}
         </button>
       ))}
     </div>

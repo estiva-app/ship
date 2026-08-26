@@ -21,6 +21,8 @@ export interface IssueRowData {
   addr: string
   ref?: string
   title: string
+  /** Shown under the title, clamped to two lines, as production does. */
+  description?: string
   status: string
   assignee?: { name?: string; picture?: string }
   openedBy?: { name?: string; picture?: string }
@@ -48,6 +50,7 @@ export function IssueRow({ issue, statuses, href, className }: IssueRowProps) {
       )}
     >
       <span className="truncate text-body-2-strong text-text-primary">{issue.title}</span>
+      {issue.description && <span className="line-clamp-2 text-body-2 text-text-secondary">{issue.description}</span>}
       <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-caption text-text-muted">
         <span className={cn('font-mono', issue.ref ? 'text-text-muted' : 'text-text-disabled')}>{issue.ref ?? '—'}</span>
         <StatusLabel value={issue.status} label={statusLabel(issue.status, statuses)} size="small" />

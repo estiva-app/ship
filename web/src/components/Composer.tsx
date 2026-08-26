@@ -50,7 +50,12 @@ export function Composer({ kind = 'conversation', onSubmit, autoFocus = false, d
     }
   }
 
-  const form = (
+  const button = (
+    <Button type="submit" variant={variant} disabled={!canSubmit}>
+      {label}
+    </Button>
+  )
+  return (
     <form onSubmit={submit} className={cn('flex items-center gap-2', className)}>
       <TextInput
         value={text}
@@ -61,10 +66,7 @@ export function Composer({ kind = 'conversation', onSubmit, autoFocus = false, d
         disabled={busy || !!disabledReason}
         className="min-w-0 flex-1"
       />
-      <Button type="submit" variant={variant} disabled={!canSubmit}>
-        {label}
-      </Button>
+      {disabledReason ? <WithTooltip label={disabledReason}>{button}</WithTooltip> : button}
     </form>
   )
-  return disabledReason ? <WithTooltip label={disabledReason}>{form}</WithTooltip> : form
 }
