@@ -11,13 +11,21 @@ import { WRITES_LATER } from './ProjectsPage'
 
 export type Say = (text: string, tone?: 'ok' | 'error') => void
 
+/**
+ * The old app's `stripReferences`: a `nostr:naddr…` in a body is the object
+ * the message is about, already shown as the page — not text to read.
+ */
+export function stripReferences(body: string): string {
+  return body.replace(/nostr:naddr1[0-9acdefghjklmnpqrstuvwxyz]+/gi, '').trim()
+}
+
 /** A conversation from the fold as the thread card draws it: names and faces for keys, the fold's order kept. */
 export function threadFor(conversation: FolderState['conversations'][number], directory: DirectoryView): ThreadData {
   const message = (m: FolderState['conversations'][number]['root']) => ({
     id: m.id,
     author: directory.personOf(m.author),
     at: m.createdAt,
-    body: m.body,
+    body: stripReferences(m.body),
   })
   return { id: conversation.id, root: message(conversation.root), replies: conversation.replies.map(message) }
 }

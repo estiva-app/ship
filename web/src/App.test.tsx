@@ -34,9 +34,13 @@ const STATE: FolderState = {
     issue('30851:x:3', '30850:x:old', 'todo'),
     { ...issue('30851:x:4', undefined, 'in_progress'), assignee: ME, ref: 'X-4' },
   ],
-  activity: [{ id: 'ch1', author: OTHER, createdAt: 99, target: '30851:x:1', field: 'status', value: 'todo', note: '' }],
+  activity: [
+    { id: 'ch1', author: OTHER, createdAt: 99, target: '30851:x:1', field: 'status', value: 'todo', note: '' },
+    { id: 'ch2', author: OTHER, createdAt: 100, target: '30851:x:4', field: 'assignee', value: ME, note: '' },
+    { id: 'ch3', author: ME, createdAt: 101, target: '30851:x:4', field: 'status', value: 'in_progress', note: '' },
+  ],
   conversations: [
-    { id: 'c1', root: { id: 'c1', author: OTHER, createdAt: 5, body: 'hi', folder: 'f', about: ['30851:x:4'] }, replies: [], about: ['30851:x:4'], createdAt: 5, lastAt: 5 },
+    { id: 'c1', root: { id: 'c1', author: OTHER, createdAt: 5, body: 'hi nostr:naddr1qqxyz', folder: 'f', about: ['30851:x:4'] }, replies: [], about: ['30851:x:4'], createdAt: 5, lastAt: 5 },
     { id: 'c2', root: { id: 'c2', author: ME, createdAt: 6, body: 'about the project', folder: 'f', about: [] }, replies: [{ id: 'c3', author: OTHER, createdAt: 7, body: 'reply', folder: 'f', about: [] }], about: [], createdAt: 6, lastAt: 7 },
   ],
 }
@@ -47,7 +51,7 @@ beforeEach(() => {
   vi.mocked(useDirectory).mockReturnValue({
     directory: new Map(),
     nameOf: (k: string) => (k === ME ? 'Me Myself' : 'Someone'),
-    personOf: () => ({}),
+    personOf: (k: string) => ({ name: k === ME ? 'Me Myself' : 'Someone' }),
     profileOf: () => undefined,
   })
   vi.mocked(resolveInbound).mockReset()
@@ -70,7 +74,7 @@ describe('sidebarProps — the old app\'s counting rules', () => {
 describe('App — the shell around the route', () => {
   it('shows the viewer by name, the counts from the relay, and canonicalises an empty hash', async () => {
     render(<App />)
-    expect(screen.getByText('Me Myself')).toBeInTheDocument()
+    expect(within(screen.getByRole('banner')).getByText('Me Myself')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /^Issues/ })).toHaveTextContent('2')
     await waitFor(() => expect(location.hash).toBe('#/issues'))
   })
@@ -79,7 +83,7 @@ describe('App — the shell around the route', () => {
     vi.mocked(useWorkspace).mockReturnValue({ state: STATE, error: 'relay refused', refresh: async () => {} })
     render(<App />)
     expect(screen.getByText(/Could not read from the relay — relay refused/)).toBeInTheDocument()
-    expect(screen.getByText('Me Myself')).toBeInTheDocument()
+    expect(within(screen.getByRole('banner')).getByText('Me Myself')).toBeInTheDocument()
   })
 
   it('lands an inbound reference on the object it names', async () => {
@@ -165,6 +169,36 @@ describe('Project page — one project from the fold', () => {
 
   it('says so when the project is not in this workspace', () => {
     location.hash = '#/project/30850%3Ax%3Anope'
+    render(<App />)
+    expect(screen.getByText(/not in this workspace/)).toBeInTheDocument()
+  })
+})
+
+describe('Issue page — one issue from the fold', () => {
+  it('draws the trail, the conversation about it, the history in words newest first, and the rail', () => {
+    location.hash = '#/issue/30851%3Ax%3A4'
+    render(<App />)
+    const main = within(screen.getByRole('main'))
+    expect(main.getByLabelText('Title')).toHaveTextContent('30851:x:4')
+    expect(main.getByText('X-4')).toBeInTheDocument()
+    expect(main.queryByRole('link', { name: 'Live' })).not.toBeInTheDocument()
+    expect(main.getByText('hi')).toBeInTheDocument()
+    const feed = main.getAllByText(/set (status|assignee) to/)
+    expect(feed.map((node) => node.textContent)).toEqual(['Me Myself set status to in_progress', 'Someone set assignee to Me Myself'])
+    expect(main.getByRole('button', { name: 'Assignee' })).toBeDisabled()
+    expect(main.getByRole('button', { name: 'Copy reference for Peek' })).toBeEnabled()
+    expect(main.getByText(/Opened by/)).toBeInTheDocument()
+  })
+
+  it('links the project in the trail when the issue has one', () => {
+    location.hash = '#/issue/30851%3Ax%3A1'
+    render(<App />)
+    const main = within(screen.getByRole('main'))
+    expect(main.getByRole('link', { name: 'Live' })).toHaveAttribute('href', '#/project/30850%3Ax%3Alive')
+  })
+
+  it('says so when the issue is not in this workspace', () => {
+    location.hash = '#/issue/30851%3Ax%3Anope'
     render(<App />)
     expect(screen.getByText(/not in this workspace/)).toBeInTheDocument()
   })

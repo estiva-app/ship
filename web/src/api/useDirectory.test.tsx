@@ -52,7 +52,7 @@ describe('useDirectory — names and faces on the old app\'s two-speed rule', ()
     const { result } = renderHook(() => useDirectory([A], 'issues'))
     await waitFor(() => expect(profiles).toHaveBeenCalled())
     expect(result.current.nameOf(A)).toBe('aaaaaaaa…')
-    expect(result.current.personOf(A)).toEqual({})
+    expect(result.current.personOf(A)).toEqual({ name: 'aaaaaaaa…', picture: undefined })
   })
 
   it('asks nothing when there is nobody to ask about', () => {

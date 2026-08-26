@@ -14,7 +14,7 @@ export interface DirectoryView {
   directory: Directory
   /** Display name, or the shortened key while there is none. */
   nameOf: (pubkey: string) => string
-  /** `{ name, picture }` for the UI; empty for a key with no profile. */
+  /** `{ name, picture }` for the UI — the shortened key as the name while there is no profile, as the old app shows one. */
   personOf: (pubkey: string) => Person
   profileOf: (pubkey: string) => Profile | undefined
 }
@@ -74,7 +74,7 @@ export function useDirectory(pubkeys: string[], navKey: string): DirectoryView {
   const personOf = useCallback(
     (pubkey: string): Person => {
       const profile = directory.get(pubkey)
-      return profile ? { name: profile.name, picture: profile.picture } : {}
+      return { name: profile?.name ?? short(pubkey), picture: profile?.picture }
     },
     [directory],
   )

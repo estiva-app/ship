@@ -5,8 +5,10 @@ import { cn } from '@/lib/cn'
  * A trail: "Issues / Relay Migration / REL-6". `@estiva/ui` candidate —
  * Peek has no breadcrumb yet; nothing here knows what a project is.
  *
- * Every item but the last is a link. The last is where you are, and may be
- * `mono` (an issue's ref, as production sets it) or plain. A separator is the
+ * An item with an `href` is a link, even when it is last — an issue with no
+ * ref ends its trail on its project, which is still somewhere to go. The
+ * last item is where you are when it has none, and may be `mono` (an
+ * issue's ref, as production sets it) or plain. A separator is the
  * slash production uses, muted, never read aloud.
  */
 export interface Crumb {
@@ -38,7 +40,7 @@ export function Breadcrumb({ items, className }: BreadcrumbProps) {
                 /
               </span>
             )}
-            {item.href && !last ? (
+            {item.href ? (
               <a href={item.href} className={cn(text, 'hover:text-text-primary')}>
                 {item.label}
               </a>

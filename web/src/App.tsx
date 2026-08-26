@@ -5,6 +5,7 @@ import { Banner } from '@/components/Banner'
 import { IdentityMenu } from '@/components/IdentityMenu'
 import { Sidebar, type SidebarProject } from '@/components/Sidebar'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { IssuePage } from '@/pages/IssuePage'
 import { IssuesPage } from '@/pages/IssuesPage'
 import { ProjectPage, type Say } from '@/pages/ProjectPage'
 import { ProjectsPage } from '@/pages/ProjectsPage'
@@ -63,7 +64,7 @@ export default function App() {
   )
 }
 
-/** Which page the route names. The issue page is a placeholder until step 6 lands. */
+/** Which page the route names; an inbound reference shows nothing until it resolves. */
 function Page({ route, state, directory, say }: { route: Route; state: FolderState | null; directory: DirectoryView; say: Say }) {
   if (!state) return null
   switch (route.name) {
@@ -73,8 +74,10 @@ function Page({ route, state, directory, say }: { route: Route; state: FolderSta
       return <IssuesPage state={state} directory={directory} />
     case 'project':
       return <ProjectPage state={state} directory={directory} addr={route.addr} view={route.view} say={say} />
+    case 'issue':
+      return <IssuePage state={state} directory={directory} addr={route.addr} say={say} />
     default:
-      return <EmptyState className="py-12" message={`${route.name} — wiring in progress`} />
+      return <EmptyState className="py-12" message="Resolving reference…" />
   }
 }
 
