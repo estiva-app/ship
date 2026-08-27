@@ -1,4 +1,4 @@
-import { Relay } from '../../../lib/nostr/relay'
+import { Relay } from '@estiva-app/protocol'
 import { localSigner, type Signer } from '../../../lib/nostr/signer'
 import { Store } from '../../../src/store'
 import { RELAY_URL } from '../config'

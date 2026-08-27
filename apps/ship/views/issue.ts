@@ -8,7 +8,7 @@
  * on it, and the two paths publish byte-identical events.
  */
 import { ISSUE_STATUSES, PROJECT_STATUSES } from '../../../src/kinds'
-import { addrToNaddr } from '../../../lib/nostr/nip19'
+import { addrToNaddr } from '@estiva-app/protocol'
 import { conversationsAbout, type Issue } from '../../../src/fold'
 import type { Ctx } from '../context'
 import { href } from '../router'

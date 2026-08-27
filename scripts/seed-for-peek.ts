@@ -16,12 +16,12 @@
  *
  *   npm run seed:peek -- <pubkey> [<pubkey> …]
  */
-import { Relay } from '../lib/nostr/relay'
+import { Relay } from '@estiva-app/protocol'
 import { secretKeySigner } from '../lib/nostr/signer'
-import { publicKeyFromSecret, signEvent } from '../lib/nostr/sign'
-import { buildAddMember, buildProfile } from '../lib/nostr/events'
+import { publicKeyFromSecret, signEvent } from '@estiva-app/protocol'
+import { buildAddMember, buildProfile } from '@estiva-app/protocol'
 import { Store } from '../src/store'
-import { addrToNaddr } from '../lib/nostr/nip19'
+import { addrToNaddr } from '@estiva-app/protocol'
 
 const RELAY_URL = 'http://localhost:3000'
 const PEEK_READERS = process.argv.slice(2)

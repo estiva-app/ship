@@ -17,8 +17,8 @@
  */
 import { schnorr } from '@noble/curves/secp256k1'
 import { hexToBytes } from '@noble/hashes/utils'
-import { computeEventId, type UnsignedEvent } from '../lib/nostr/events'
-import { authorizationHeader } from '../lib/nostr/nip98'
+import { computeEventId, type UnsignedEvent } from '@estiva-app/protocol'
+import { authorizationHeader } from '@estiva-app/protocol'
 import { estivaIdSigner, secretKeySigner, SignerTokenExpired } from '../lib/nostr/signer'
 
 let failures = 0

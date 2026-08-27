@@ -12,9 +12,9 @@
  * repeatedly against a dev relay.
  */
 import { randomUUID } from 'node:crypto'
-import { buildCreateChannel, type NostrTag, type UnsignedEvent } from '../lib/nostr/events'
-import { signEvent, publicKeyFromSecret } from '../lib/nostr/sign'
-import { Relay } from '../lib/nostr/relay'
+import { buildCreateChannel, type NostrTag, type UnsignedEvent } from '@estiva-app/protocol'
+import { signEvent, publicKeyFromSecret } from '@estiva-app/protocol'
+import { Relay } from '@estiva-app/protocol'
 import { secretKeySigner } from '../lib/nostr/signer'
 
 const RELAY_URL = process.env.RELAY_URL ?? 'http://localhost:3000'

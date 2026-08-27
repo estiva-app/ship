@@ -2,11 +2,19 @@
  * Two repos, one fold. This file is identical in `estiva-agent` and `estiva-ship`.
  *
  * The agent's tooling was extracted out of Ship (PEEK-155), and the honest cost
- * of that is a duplicated protocol layer — `lib/nostr/` and `src/` exist in both
- * repositories. Ship's own README argues duplication is right for this ecosystem:
- * apps are meant to be independent implementations, not siblings sharing a
- * package. The risk it accepts is drift, and Ship's CLAUDE.md names the specific
- * form that matters:
+ * of that was a duplicated protocol layer — `lib/nostr/` and `src/` existed in
+ * both repositories, byte for byte, and `diff -r` was what kept them honest.
+ *
+ * **Half of that is now gone.** SHA-3 moved the wire format into
+ * `@estiva-app/protocol`, so both repos import one implementation of the bytes
+ * rather than holding two copies of it. What is still duplicated is `src/` — the
+ * kinds, the fold, the store, the vocabularies — and that is deliberate: how an
+ * app folds events into current truth is where apps are *supposed* to differ, and
+ * the package's own rule is that it contains no interpretation.
+ *
+ * So this file matters more than it did, not less. The duplication it guards is
+ * now the duplication nobody intends to remove. Ship's CLAUDE.md names the
+ * specific form of drift that matters:
  *
  *   > reimplementing any of it would make the CLI disagree with the app, which
  *   > is the one thing it must not do
@@ -40,7 +48,7 @@ import { createHash } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { foldFolder } from '../src/fold'
-import type { SignedEvent } from '../lib/nostr/events'
+import type { SignedEvent } from '@estiva-app/protocol'
 
 const here = dirname(fileURLToPath(import.meta.url))
 

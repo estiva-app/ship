@@ -1,70 +1,30 @@
 /**
- * Who signs, decided once and injected everywhere (PEEK-44).
+ * The signer implementations this app has, over `@estiva-app/protocol`'s seam.
  *
- * ## Why this exists at all
+ * The {@link Signer} interface, and the raw-secret-key implementation of it,
+ * moved into the package in SHA-3 — they are part of how an event gets its
+ * signature, which is the one thing the suite may not disagree with itself
+ * about. The interface's own reasoning (why `pubkey` is synchronous and `sign`
+ * is not, and why a signer cannot sign as somebody else) travelled with it and
+ * lives in `@estiva-app/protocol`'s `sign.ts`.
  *
- * The README claims two apps built by different people, sharing no code and no
- * database, can work on the same data. Wiring Ship directly to our own login
- * service would quietly undercut that — the app would only work for people with
- * an Estiva account.
+ * What stays here is everything that knows about **Estiva ID**: the token, the
+ * renewal, the `/sign` round trip, and the browser-extension path. That is
+ * identity rather than protocol, and it is `@estiva-app/identity`'s remit —
+ * SHA-4, which lands inside REW-2. Until then this file is the app's copy, and
+ * it is still byte-identical to Ship's, which `diff -r lib/nostr` continues to
+ * hold.
  *
- * Depending on a *signer* does not. Separating the signer from the client is
- * ordinary Nostr architecture (NIP-07, NIP-46), so the app stays honest for
- * anyone who wants to point their own signer at it, and "sign in with Estiva ID"
- * becomes one implementation among several rather than an assumption baked into
- * the data layer.
- *
- * ## The two decisions in the interface
- *
- * **`pubkey` is synchronous.** Every event builder needs it before there is
- * anything to sign — `buildIssue(pubkey, …)` — so making it a promise would put
- * an `await` in front of every construction site for no benefit. You know who
- * you are before you sign; implementations that must ask (NIP-07) resolve it
- * once, at construction.
- *
- * **`sign` is asynchronous**, because two of the three implementations are: a
- * remote call to `/sign` and a round trip to a browser extension. The local key
- * is the odd one out, and it is cheaper for it to return a resolved promise than
- * for the interface to pretend signing is always instant.
- *
- * ## What a signer deliberately cannot do
- *
- * Sign as somebody else. Every implementation attributes the event to its own
- * `pubkey` and ignores whatever the caller put there, which is the same
- * guarantee `/sign` makes server-side. Code that genuinely needs to produce a
- * mismatched event — `scripts/verify.ts` forging one to prove the relay rejects
- * it — uses `signEvent` directly and holds a raw key to do it.
+ * The re-exports below are not a shim. `Signer` is the interface these functions
+ * implement, and a module that implements an interface may reasonably hand it on
+ * to its callers — that is what keeps every existing `from './signer'` import in
+ * this repo pointing at one definition of the bytes rather than two.
  */
-import type { SignedEvent, UnsignedEvent } from './events'
-import { publicKeyFromSecret, signEvent } from './sign'
+import type { SignedEvent, UnsignedEvent } from '@estiva-app/protocol'
+import { secretKeySigner, type Signer, type SignerKind } from '@estiva-app/protocol'
 
-/** How the current signer authenticates, for anything that needs to say so. */
-export type SignerKind = 'local' | 'estiva-id' | 'nip07'
-
-export interface Signer {
-  /** The pubkey every event from this signer is attributed to. */
-  readonly pubkey: string
-  readonly kind: SignerKind
-  /** Attributes the event to {@link pubkey}, whatever the caller supplied. */
-  sign(unsigned: UnsignedEvent): Promise<SignedEvent>
-}
-
-/**
- * A signer holding a raw secret key.
- *
- * The honest name for what the app has always done. Used directly by scripts,
- * which have no `localStorage`, and underneath {@link localSigner}.
- */
-export function secretKeySigner(secretKeyHex: string, kind: SignerKind = 'local'): Signer {
-  const pubkey = publicKeyFromSecret(secretKeyHex)
-  return {
-    pubkey,
-    kind,
-    async sign(unsigned) {
-      return signEvent({ ...unsigned, pubkey }, secretKeyHex)
-    },
-  }
-}
+export type { Signer, SignerKind }
+export { secretKeySigner }
 
 /**
  * A per-browser identity, generated on first use and kept in `localStorage`.

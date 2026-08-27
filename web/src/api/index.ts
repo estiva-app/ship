@@ -13,7 +13,7 @@
  */
 import type { FolderState } from '../../../src/fold'
 import type { Directory } from '../../../src/profiles'
-import { addrToNaddr, naddrToAddr } from '../../../lib/nostr/nip19'
+import { addrToNaddr, naddrToAddr } from '@estiva-app/protocol'
 import { folderLink, parseFolderLink } from '../../../src/events'
 import { RELAY_URL } from '../config'
 

@@ -36,7 +36,7 @@
  * as a fold alone loses the value the project was created with. Surfaced by
  * PEEK-24, where Peek offers the reassignment and then has to show the result.
  */
-import { toNostrSeconds, type NostrTag, type UnsignedEvent } from '../lib/nostr/events'
+import { toNostrSeconds, type NostrTag, type UnsignedEvent } from '@estiva-app/protocol'
 import {
   DEFAULT_ISSUE_STATUS,
   DEFAULT_PROJECT_STATUS,

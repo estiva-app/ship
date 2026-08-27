@@ -18,7 +18,7 @@ import { directoryFrom, initials, parseProfile } from '../src/profiles'
 import { href, parse } from '../apps/ship/router'
 import { byStatus } from '../apps/ship/views/issue-list'
 import type { Issue } from '../src/fold'
-import type { SignedEvent } from '../lib/nostr/events'
+import type { SignedEvent } from '@estiva-app/protocol'
 
 let failures = 0
 function check(label: string, condition: boolean, detail = '') {

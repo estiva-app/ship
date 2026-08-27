@@ -17,7 +17,7 @@ import { createServer } from 'node:http'
 import { readFileSync, mkdirSync } from 'node:fs'
 import { extname, join } from 'node:path'
 import { chromium, type ConsoleMessage, type Page } from 'playwright-core'
-import { addrToNaddr } from '../lib/nostr/nip19'
+import { addrToNaddr } from '@estiva-app/protocol'
 
 const ROOT = new URL('..', import.meta.url).pathname
 const DIST = join(ROOT, 'dist')

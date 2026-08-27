@@ -17,10 +17,10 @@
  *
  * The pubkey must already be a relay member — the relay runs closed.
  */
-import { publicKeyFromSecret, signEvent } from '../lib/nostr/sign'
-import { Relay } from '../lib/nostr/relay'
+import { publicKeyFromSecret, signEvent } from '@estiva-app/protocol'
+import { Relay } from '@estiva-app/protocol'
 import { secretKeySigner } from '../lib/nostr/signer'
-import type { UnsignedEvent } from '../lib/nostr/events'
+import type { UnsignedEvent } from '@estiva-app/protocol'
 
 const RELAY_URL = process.env.RELAY_URL ?? 'http://localhost:3000'
 const SECRET = process.env.PROBE_SECRET_KEY

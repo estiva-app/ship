@@ -2,7 +2,7 @@
   "name": "estiva-ship",
   "private": true,
   "type": "module",
-  "description": "A minimal issue tracker on Nostr \u2014 projects, issues, comments",
+  "description": "A minimal issue tracker on Nostr — projects, issues, comments",
   "scripts": {
     "build": "node build.mjs",
     "serve": "node build.mjs && node scripts/serve.mjs",
@@ -19,6 +19,7 @@
     "seed:peek": "tsx scripts/seed-for-peek.ts"
   },
   "dependencies": {
+    "@estiva-app/protocol": "^0.1.0",
     "@noble/curves": "1.9.2",
     "@noble/hashes": "1.8.0"
   },

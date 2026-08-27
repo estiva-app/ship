@@ -16,7 +16,7 @@ import {
   decodeNaddr,
   findNaddrs,
   naddrToAddr,
-} from '../lib/nostr/nip19'
+} from '@estiva-app/protocol'
 
 let failures = 0
 function check(label: string, condition: boolean, detail = '') {
