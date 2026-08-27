@@ -15,7 +15,7 @@
  * here is deterministic, which is what makes "two apps agree on the state"
  * checkable rather than hopeful.
  */
-import type { SignedEvent } from '../lib/nostr/events'
+import type { SignedEvent } from '@estiva-app/protocol'
 import { DEFAULT_ISSUE_STATUS, DEFAULT_PROJECT_STATUS, KIND } from './kinds'
 
 /** First value of a tag, or undefined. Tags are `[name, value, …]`. */

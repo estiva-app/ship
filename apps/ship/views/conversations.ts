@@ -12,7 +12,7 @@
  */
 import type { Conversation, Message } from '../../../src/fold'
 import type { Ctx } from '../context'
-import { addrToNaddr } from '../../../lib/nostr/nip19'
+import { addrToNaddr } from '@estiva-app/protocol'
 import { ago, avatar, empty, h } from '../ui'
 
 export function conversations(

@@ -1,5 +1,5 @@
-import type { PublishResult } from '../../../lib/nostr/relay'
-import { addrToNaddr } from '../../../lib/nostr/nip19'
+import type { PublishResult } from '@estiva-app/protocol'
+import { addrToNaddr } from '@estiva-app/protocol'
 import type { Conversation, Issue, Project } from '../../../src/fold'
 import { nextRef, refPrefix } from '../../../src/store'
 import { RELAY_URL } from '../config'

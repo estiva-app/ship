@@ -16,12 +16,12 @@
  * addressable event rather than creating a second competing manifest.
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
-import { Relay } from '../lib/nostr/relay'
+import { Relay } from '@estiva-app/protocol'
 import { secretKeySigner } from '../lib/nostr/signer'
-import { publicKeyFromSecret, signEvent } from '../lib/nostr/sign'
+import { publicKeyFromSecret, signEvent } from '@estiva-app/protocol'
 import { buildManifest, DEFAULT_APP_URL, MANIFEST_D_TAG, type ManifestContent, type SlotSource } from '../src/manifest'
 import { Store } from '../src/store'
-import { buildDeletion as buildEventDeletion } from '../lib/nostr/events'
+import { buildDeletion as buildEventDeletion } from '@estiva-app/protocol'
 import { KIND } from '../src/kinds'
 
 const RELAY_URL = process.env.RELAY_URL ?? 'http://localhost:3000'

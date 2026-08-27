@@ -24,9 +24,9 @@
  *   npx tsx scripts/verify.ts
  */
 import { randomUUID } from 'node:crypto'
-import { Relay } from '../lib/nostr/relay'
+import { Relay } from '@estiva-app/protocol'
 import { secretKeySigner } from '../lib/nostr/signer'
-import { addrToNaddr } from '../lib/nostr/nip19'
+import { addrToNaddr } from '@estiva-app/protocol'
 import { Store } from '../src/store'
 import { conversationsAbout, foldFolder, projectFolders } from '../src/fold'
 import { KIND } from '../src/kinds'
@@ -75,8 +75,8 @@ async function main() {
    * once per person.
    */
   const addRavi = async (folder: string) => {
-    const { buildAddMember } = await import('../lib/nostr/events')
-    const { signEvent } = await import('../lib/nostr/sign')
+    const { buildAddMember } = await import('@estiva-app/protocol')
+    const { signEvent } = await import('@estiva-app/protocol')
     return new Relay(RELAY_URL, ana.signer).publish(
       signEvent(
         buildAddMember(ana.identity.pubkey, Date.now(), {
@@ -203,7 +203,7 @@ async function main() {
   )
 
   const { buildChange } = await import('../src/events')
-  const { signEvent } = await import('../lib/nostr/sign')
+  const { signEvent } = await import('@estiva-app/protocol')
 
   // ── 5. A `ts` nobody should believe ────────────────────────────────────────
   // Under the honour system, nothing validates another app's writes

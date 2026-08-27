@@ -16,7 +16,7 @@ import {
   type NostrTag,
   type ThreadRef,
   type UnsignedEvent,
-} from '../lib/nostr/events'
+} from '@estiva-app/protocol'
 import { KIND } from './kinds'
 
 /**

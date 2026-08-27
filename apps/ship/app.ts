@@ -20,7 +20,7 @@
  * about Folders again, except when publishing, where the `h` has to match the
  * object being written to.
  */
-import { Relay } from '../../lib/nostr/relay'
+import { Relay } from '@estiva-app/protocol'
 import { estivaIdSigner, localSigner, type Signer } from '../../lib/nostr/signer'
 import {
   beginSignIn,
@@ -39,7 +39,7 @@ import {
 } from '../../lib/auth/shell/contract'
 import { clearAuthShell, renderAuthShell } from '../../lib/auth/shell/shell'
 import { lookupMembers, type MemberDirectory } from '../../lib/estiva-id/directory'
-import { naddrToAddr } from '../../lib/nostr/nip19'
+import { naddrToAddr } from '@estiva-app/protocol'
 import { Store } from '../../src/store'
 import type { FolderState, Issue, Project } from '../../src/fold'
 import type { Directory } from '../../src/profiles'

@@ -11,7 +11,7 @@
  *
  * Pure parsing plus a small in-memory directory. The fetch lives in `store.ts`.
  */
-import type { SignedEvent } from '../lib/nostr/events'
+import type { SignedEvent } from '@estiva-app/protocol'
 import { KIND } from './kinds'
 
 /** A person, as the relay describes them. Every field is optional — a profile is free text. */

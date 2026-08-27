@@ -7,14 +7,14 @@
  * of the state, "two apps agree on the data" would be measuring Ship's
  * cache rather than the shared record.
  */
-import type { PublishResult, Relay } from '../lib/nostr/relay'
+import type { PublishResult, Relay } from '@estiva-app/protocol'
 import type { Signer } from '../lib/nostr/signer'
 import {
   buildCreateChannel,
   type SignedEvent,
   type ThreadRef,
   type UnsignedEvent,
-} from '../lib/nostr/events'
+} from '@estiva-app/protocol'
 import {
   assertFolderId,
   buildChange,
@@ -25,7 +25,7 @@ import {
   issueAddr,
   projectAddr,
 } from './events'
-import { findNaddrs, naddrToAddr } from '../lib/nostr/nip19'
+import { findNaddrs, naddrToAddr } from '@estiva-app/protocol'
 import { foldFolder, projectFolders, type FolderState } from './fold'
 import { directoryFrom, type Directory } from './profiles'
 import { KIND } from './kinds'
