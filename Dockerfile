@@ -17,7 +17,7 @@ FROM node:24-bookworm-slim AS build
 WORKDIR /app
 
 # Baked in at build time, because the relay URL *is* the workspace — see the
-# header comment in build.mjs. A bundle pointed at the wrong relay is a
+# header comment in web/vite.config.ts. A bundle pointed at the wrong relay is a
 # different application, not a misconfigured one.
 ARG RELAY_URL=http://localhost:3000
 ARG ID_BASE=
@@ -25,15 +25,43 @@ ARG ID_BASE=
 # refuses every request as an unknown app.
 ARG CLIENT_ID=estiva-ship
 
+# The root install comes first and is not optional for the app below: web/
+# compiles ../lib/nostr, whose imports of @noble/hashes and @noble/curves
+# resolve out of the *root* node_modules. Installing only web/ fails with seven
+# TS2307s that read as if the shared library were broken.
 COPY package.json package-lock.json ./
 RUN npm ci
 
-COPY tsconfig.json build.mjs ./
-COPY apps ./apps
+COPY tsconfig.json ./
 COPY lib ./lib
 COPY src ./src
 
-RUN RELAY_URL="$RELAY_URL" ID_BASE="$ID_BASE" CLIENT_ID="$CLIENT_ID" npm run build
+# `apps/` is here for one file, and not for the app it is named after.
+#
+# web/src/router.ts re-exports ../../apps/ship/router rather than copying it:
+# the hash router is pure, already tested, and every route it defines — including
+# the inbound `#/o/<naddr>` that Peek's "open in Ship" links carry — has to
+# survive the rewrite byte for byte. That was the right call while the image
+# built the old app and `apps/` was present regardless.
+#
+# It is a real constraint on REW-9: deleting apps/ without first moving
+# router.ts into web/ breaks this build with two TS2307s that name a path nobody
+# would expect the React app to reference. Nothing else here compiles apps/, and
+# build.mjs is deliberately absent — the fallback for a bad cutover is the
+# previous image's sha tag, not a second bundle inside this one.
+COPY apps ./apps
+
+# The React app (REW-8).
+COPY web/package.json web/package-lock.json ./web/
+RUN npm ci --prefix web
+
+COPY web ./web
+
+# The same three names, the same meaning, and the same defaults the old build
+# had — see the header of web/vite.config.ts. `npm run build` is
+# `tsc -b && vite build`, and it writes ../dist/ship, which is what the runtime
+# stage copies.
+RUN cd web && RELAY_URL="$RELAY_URL" ID_BASE="$ID_BASE" CLIENT_ID="$CLIENT_ID" npm run build
 
 
 FROM nginx:1.27-alpine AS runtime

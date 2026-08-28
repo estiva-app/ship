@@ -32,16 +32,28 @@ const repoRoot = fileURLToPath(new URL('..', import.meta.url))
 // from npm into node_modules, where it used to be a `file:` link to a sibling
 // directory that existed on one machine.
 
-// The dev server takes :5191 so the old app can keep :5190 beside it — the two
-// run side by side until the cutover (REW-8).
+// The dev server takes :5191 so the old app can keep :5190 beside it. Both apps
+// still exist in the tree — REW-9 removes the old one — but only this one is
+// built into the image and served.
 //
-// Output lands in web/dist/ while both apps coexist; production expects the
-// bundle at <repo>/dist/ship, which the old app writes today. Re-pointing
-// `outDir` there is a one-line change that belongs to the cutover, not to
-// the scaffold.
+// `outDir` is <repo>/dist/ship because that is where the image looks:
+// `COPY --from=build /app/dist/ship /usr/share/nginx/html`. It used to be the
+// old app's esbuild output; the cutover (REW-8) moved the name to this build
+// rather than changing the Dockerfile's destination, so nginx, deploy/ and
+// update.sh are all untouched by the switch.
+//
+// `emptyOutDir` is required and not merely tidy: Vite refuses to clear a
+// directory outside its root without it, and the directory already holds the
+// old app's `bundle.js` in any tree that has run the root build. Left behind,
+// that file is served by nothing and read by no one, but it makes `dist/ship`
+// look like it holds two apps.
 export default defineConfig({
   plugins: [react()],
   define: BUILD_DEFINES,
+  build: {
+    outDir: '../dist/ship',
+    emptyOutDir: true,
+  },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

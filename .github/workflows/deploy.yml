@@ -88,15 +88,27 @@ jobs:
       # the package, and Tailwind does not merge `content` from a preset. When
       # it is wrong the build still succeeds and components render at the wrong
       # size, so this is the only place it can be caught.
+      #
+      # `../dist/ship` since the cutover (REW-8): the build writes where the
+      # image looks, which is one level above web/. A path left pointing at
+      # web/dist would fail loudly rather than pass vacuously — `grep -qr` on a
+      # missing path exits non-zero — but it would fail for the wrong reason and
+      # read as a Tailwind problem.
       - name: The shared package's classes survive Tailwind's purge
         run: |
-          if ! grep -qr "max-h-72" dist/assets/*.css; then
+          if ! grep -qr "max-h-72" ../dist/ship/assets/*.css; then
             echo "::error::a class used only by @estiva-app/ui is missing from the built CSS — check estivaContent is spread into tailwind.config.js"
             exit 1
           fi
 
   publish:
-    needs: check
+    # Both, since the cutover (REW-8). `web` used to be advisory — it could fail
+    # while the image published, because the image was built from apps/ and the
+    # React app was served nowhere. Now web/ *is* the image, and this repository
+    # deploys itself: the box pulls `:main` from a systemd timer with nobody
+    # watching, so a publish is a deploy, and an ungated `web` job is a broken
+    # React build reaching production within two minutes.
+    needs: [check, web]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
 
