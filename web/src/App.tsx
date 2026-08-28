@@ -11,6 +11,7 @@ import { ProjectPage } from '@/pages/ProjectPage'
 import type { Say } from '@/pages/act'
 import { ProjectsPage } from '@/pages/ProjectsPage'
 import { ID_CONFIG, RELAY_URL } from './config'
+import { beginSignIn, beginSignOut, signInAvailable, signedIn } from './auth/estivaId'
 import { href, replace, useRoute, type Route } from './router'
 
 /**
@@ -45,10 +46,18 @@ export default function App() {
       identity={
         <IdentityMenu
           me={{ name: directory.nameOf(me), picture: directory.personOf(me).picture }}
-          signedIn={false}
+          signedIn={signedIn()}
           relayUrl={RELAY_URL}
           idBase={ID_CONFIG?.base}
           onCopyKey={copyKey}
+          {...(signInAvailable
+            ? {
+                // Signed in: end the session at Estiva ID, because clearing the
+                // local token is not signing out (PEEK-122). Signed out: a loud
+                // attempt, since the person just asked.
+                onSignOut: signedIn() ? beginSignOut : () => void beginSignIn(),
+              }
+            : {})}
         />
       }
       banner={
