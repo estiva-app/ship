@@ -12,6 +12,37 @@
  * membership or signatures — none of which the UI's correctness depends on.
  *
  *   npx tsx scripts/smoke.ts [--headed]
+ *
+ * ## It drives web/, not the vanilla app (REW-7)
+ *
+ * Until the cutover this built `apps/ship` with build.mjs and drove that DOM.
+ * Production now serves the React app, so a smoke test of the old one measured
+ * something nobody could reach — and REW-9 deletes `apps/` and `build.mjs`
+ * outright, which would have taken this file with it.
+ *
+ * Rewritten against `web/`, which shares none of the old selectors: the vanilla
+ * app had hand-written classes (`.card`, `.kanban-card`, `.detail-side select`)
+ * and the React app is Tailwind utilities plus `@estiva-app/ui` components.
+ * So the selectors here are **roles and accessible names** wherever one exists,
+ * which makes the test double as a check that the app is reachable by
+ * assistive tech — a class-name selector asserts nothing about that. The only
+ * exceptions are the four `data-surface` attributes (and `data-view`), which
+ * exist because "which surface is on screen" is not expressible as a role.
+ *
+ * ## Two assertions that had to change with the wire format
+ *
+ * Both were failing before this rewrite, and neither was a regression:
+ *
+ *  - **The project record is global now (REW-11).** It used to be filed under
+ *    its Folder with `h`; it now merely *points* at one with `buzz-channel`.
+ *    The check is therefore `project.buzz-channel === folder.h`, which tests
+ *    what REW-11 actually did rather than asserting the tag it removed.
+ *  - **A root comment is a `kind:1111` (REW-10).** A *reply* is still a
+ *    `kind:9`, deliberately — see `buildNip22Comment`: a `1111` must name its
+ *    root, a reply's root is the object rather than the comment it answers, and
+ *    the caller cannot supply that anchor yet, so a malformed `1111` would be
+ *    worse than a merely old `kind:9`. Both kinds are asserted here so the
+ *    split stays visible instead of being something the fold quietly absorbs.
  */
 import { createServer } from 'node:http'
 import { readFileSync, mkdirSync } from 'node:fs'
@@ -20,7 +51,14 @@ import { chromium, type ConsoleMessage, type Page } from 'playwright-core'
 import { addrToNaddr } from '@estiva-app/protocol'
 
 const ROOT = new URL('..', import.meta.url).pathname
-const DIST = join(ROOT, 'dist')
+/**
+ * Vite writes here, and the image serves exactly this directory at `/`.
+ *
+ * Served at the root rather than under `/ship/` because the built `index.html`
+ * references `/assets/…` absolutely — mounting it on a sub-path yields a blank
+ * page whose only symptom is two 404s in the console.
+ */
+const DIST = join(ROOT, 'dist', 'ship')
 const SHOTS = join(ROOT, '.smoke')
 const PORT = 5191
 const HEADED = process.argv.includes('--headed')
@@ -29,6 +67,8 @@ const TYPES: Record<string, string> = {
   '.html': 'text/html',
   '.js': 'text/javascript',
   '.css': 'text/css',
+  '.svg': 'image/svg+xml',
+  '.woff2': 'font/woff2',
 }
 
 let failures = 0
@@ -118,11 +158,40 @@ async function main() {
   })
   page.on('pageerror', (error) => errors.push(String(error)))
 
-  // Everything the app sends to the relay is answered here instead.
+  // Everything the app sends to the relay is answered here instead. The build
+  // under test defaults `RELAY_URL` to exactly this origin — see the header of
+  // web/vite.config.ts, which says so for this reason.
+  /** Requests this stub does not model, reported rather than guessed at. */
+  const unmodelled: string[] = []
+  /** How many times the app asked the relay for its clock. */
+  let clockProbes = 0
+
   await page.route('http://localhost:3000/**', async (route) => {
     const request = route.request()
-    const body = request.postDataJSON()
-    if (request.url().endsWith('/events')) {
+    const body = request.postDataJSON() as unknown
+
+    /*
+      The clock probe (`api/clock.ts`). A bare GET whose only useful part is the
+      `date` response header: the relay refuses an event whose `created_at` is
+      more than ~15 minutes from its own clock, so the app measures the skew
+      before signing and says so in words rather than letting the write come
+      back as a generic rejection.
+
+      Answered with this process's own clock, which makes the skew ~0 and lets
+      writes proceed. Something the vanilla app never did, and the reason this
+      handler now has to tolerate a request with no JSON body at all.
+    */
+    if (request.method() === 'GET' && new URL(request.url()).pathname === '/') {
+      clockProbes++
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers: { date: new Date().toUTCString() },
+        body: '{}',
+      })
+    }
+
+    if (request.url().endsWith('/events') && body) {
       ingest(body as Event)
       return route.fulfill({
         status: 200,
@@ -130,16 +199,41 @@ async function main() {
         body: JSON.stringify({ accepted: true, event_id: (body as Event).id, message: '' }),
       })
     }
-    const filters = body as Record<string, unknown>[]
-    const hits = stored.filter((event) => filters.some((filter) => matches(event, filter)))
-    return route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify(hits),
-    })
+    if (Array.isArray(body)) {
+      const filters = body as Record<string, unknown>[]
+      const hits = stored.filter((event) => filters.some((filter) => matches(event, filter)))
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(hits),
+      })
+    }
+    // Anything else — a bodyless GET, a preflight, an endpoint added since this
+    // stub was written. Answered emptily so one unmodelled call cannot fail the
+    // run by throwing inside the route handler, and recorded so it is visible
+    // instead of silently absorbed.
+    unmodelled.push(`${request.method()} ${new URL(request.url()).pathname}`)
+    return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
   })
 
-  await page.goto(`http://localhost:${PORT}/ship/`)
+  /** The section a heading names — how the conversation and activity blocks are found. */
+  const sectionFor = (name: string) =>
+    page.locator('section').filter({ has: page.getByRole('heading', { name, exact: true }) })
+
+  /** `Select` is not a native `<select>`: a labelled trigger, then a listbox. */
+  const pick = async (label: string, option: string | number) => {
+    await page.getByRole('button', { name: label, exact: true }).click()
+    await page.getByRole('listbox').waitFor()
+    await (typeof option === 'string'
+      ? page.getByRole('option', { name: option })
+      : page.getByRole('option').nth(option)
+    ).click()
+    await page.getByRole('listbox').waitFor({ state: 'detached' })
+  }
+
+  const sidebar = () => page.getByRole('navigation', { name: 'Workspace' })
+
+  await page.goto(`http://localhost:${PORT}/`)
 
   // ── Lands straight on the issue list; there is no workspace to choose ─────
   await page.waitForSelector('[data-surface="issues"]')
@@ -147,55 +241,61 @@ async function main() {
   await shot(page, '01-issues-empty')
 
   // ── Projects ──────────────────────────────────────────────────────────────
-  await page.getByRole('link', { name: /^Projects/ }).click()
+  await sidebar().getByRole('link', { name: /^Projects/ }).click()
   await page.waitForSelector('[data-surface="projects"]')
   await page.getByRole('button', { name: 'Add project' }).click()
-  // Scoped to the dialog. A bare `input[name="title"]` also matches forms on
-  // the surface behind it, and a click returns before the async re-render, so
-  // an unscoped selector can fill a control that is about to be replaced.
-  await page.waitForSelector('dialog.modal form.new-project')
-  check('the project form opens in a modal', await page.locator('dialog.modal').isVisible())
-  await page.locator('dialog.modal input[name="title"]').fill('Payment integration')
-  await page
-    .locator('dialog.modal textarea[name="description"]')
+  // Scoped to the dialog throughout: a bare placeholder also matches controls on
+  // the surface behind it, and a click returns before the async re-render, so an
+  // unscoped selector can fill something that is about to be replaced.
+  const projectDialog = page.getByRole('dialog')
+  await projectDialog.waitFor()
+  check('the project form opens in a modal', await projectDialog.isVisible())
+  await projectDialog.getByPlaceholder('New project title').fill('Payment integration')
+  await projectDialog
+    .getByPlaceholder('Description (optional)')
     .fill('Stripe Checkout for workspace billing.')
   await page.getByRole('button', { name: 'Create project' }).click()
-  await page.waitForSelector('.card h3')
-  check('the modal closes once the project is created', (await page.locator('dialog.modal').count()) === 0)
+  await page.getByRole('link', { name: /Payment integration/ }).first().waitFor()
+  check('the modal closes once the project is created', (await page.getByRole('dialog').count()) === 0)
 
   const project = stored.find((e) => e.kind === 30850)
-  check('a kind:9007 was published for the project Folder', stored.some((e) => e.kind === 9007))
+  const folder = stored.find((e) => e.kind === 9007)
+  check('a kind:9007 was published for the project Folder', !!folder)
   check(
     'exactly one Folder was created, for the project',
     stored.filter((e) => e.kind === 9007).length === 1,
   )
   check(
-    'the project record lives in that Folder',
-    // kind:9007 names the channel it creates with `h`, not `d`.
-    !!project && tagValue(project!, 'h') === tagValue(stored.find((e) => e.kind === 9007)!, 'h'),
-    `h=${tagValue(project!, 'h')?.slice(0, 8)}`,
+    'the project record points at that Folder, and is not filed under it',
+    // REW-11 made the record global: `buzz-channel` names the Folder, and there
+    // is deliberately no `h`. Asserting the absence too, because a record that
+    // carried both would fold correctly and still be the old shape.
+    !!project && !!folder && tagValue(project, 'buzz-channel') === tagValue(folder, 'h'),
+    `buzz-channel=${tagValue(project!, 'buzz-channel')?.slice(0, 8)}`,
   )
+  check('  …with no `h` of its own', !!project && tagValue(project, 'h') === undefined)
   await shot(page, '02-projects')
 
   // ── Project detail, and an issue inside it ────────────────────────────────
-  await page.locator('.card').first().click()
+  await page.getByRole('link', { name: /Payment integration/ }).first().click()
   await page.waitForSelector('[data-surface="project"][data-view="table"]')
   check('the project opens on one page, issues in table view', page.url().includes('/project/'))
   check(
     '  …with the description and conversations on the same page',
-    (await page.locator('[data-surface="project"] .conversations').count()) === 1,
+    (await sectionFor('Conversations').count()) === 1,
   )
 
   await page.getByRole('button', { name: 'Add issue' }).click()
-  await page.waitForSelector('dialog.modal form.new-issue')
-  await page.locator('dialog.modal input[name="title"]').fill('Billing entry + add payment method')
+  const issueDialog = page.getByRole('dialog')
+  await issueDialog.waitFor()
+  await issueDialog.getByPlaceholder(/^New issue in /).fill('Billing entry + add payment method')
   await page.getByRole('button', { name: 'Create issue' }).click()
   await page.waitForSelector('table tbody tr')
 
   const issue = stored.find((e) => e.kind === 30851)
   check(
-    'the issue landed in the same Folder as the project',
-    !!issue && tagValue(issue!, 'h') === tagValue(project!, 'h'),
+    'the issue landed in the Folder the project points at',
+    !!issue && !!project && tagValue(issue, 'h') === tagValue(project, 'buzz-channel'),
   )
   check('the issue names its parent project', !!issue && !!tagValue(issue!, 'a'))
   await shot(page, '03-project-overview')
@@ -204,60 +304,76 @@ async function main() {
   check('the table renders a row per issue', (await page.locator('table tbody tr').count()) === 1)
   await shot(page, '04-project-table')
 
-  await page.getByRole('link', { name: 'Board' }).click()
-  await page.waitForSelector('[data-view="board"] .board .column')
+  await page.getByRole('tab', { name: 'Board' }).click()
+  await page.waitForSelector('[data-surface="project"][data-view="board"]')
   check(
     'the toggle swaps the list in place, same page',
-    (await page.locator('[data-surface="project"] .conversations').count()) === 1,
+    (await sectionFor('Conversations').count()) === 1 && page.url().includes('/project/'),
   )
-  check('the board renders a column per status', (await page.locator('.board .column').count()) === 4)
-  check('the issue starts in the first column', (await page.locator('.column').first().locator('.kanban-card').count()) === 1)
+  const board = page.locator('[data-surface="project"][data-view="board"]')
+  check('the board renders a column per status', (await board.locator('section section').count()) === 4)
+  check(
+    'the issue starts in the first column',
+    (await board.locator('section section').first().getByRole('link').count()) === 1,
+  )
   await shot(page, '05-project-board')
 
   // ── Issue detail, and a status change ─────────────────────────────────────
-  await page.locator('.kanban-card .issue-title').first().click()
+  await board.locator('section section').first().getByRole('link').first().click()
   await page.waitForSelector('[data-surface="issue"]')
   check('the issue detail opens', page.url().includes('/issue/'))
 
-  await page.locator('.detail-side select').first().selectOption('in_progress')
-  await page.waitForFunction(() => document.querySelectorAll('.feed-item').length > 0)
+  const activity = sectionFor('Activity')
+  await pick('Status', 'In Progress')
+  await activity.locator('li').first().waitFor()
   const change = stored.find((e) => e.kind === 1851)
   check('a kind:1851 change was published, not an edit', !!change)
   check(
-    'the change carries the issue\'s Folder',
-    !!change && tagValue(change!, 'h') === tagValue(issue!, 'h'),
+    "the change carries the issue's Folder",
+    !!change && !!issue && tagValue(change, 'h') === tagValue(issue, 'h'),
   )
   check(
     'the change is authored by the actor',
-    !!change && !!issue && change!.pubkey === issue!.pubkey,
+    !!change && !!issue && change.pubkey === issue.pubkey,
   )
 
-  // ── Comment, assignee ─────────────────────────────────────────────────────
-  await page.locator('.composer input').fill('Blocked on the Stripe key.')
-  await page.getByRole('button', { name: 'Post' }).click()
-  await page.waitForSelector('.message-body')
-  const message = stored.find((e) => e.kind === 9)
-  check('a conversation is a kind:9 — the same kind Peek writes', !!message)
+  // ── Comment, reply, assignee ──────────────────────────────────────────────
+  const conversations = sectionFor('Conversations')
+  await conversations.getByPlaceholder('Start a conversation…').fill('Blocked on the Stripe key.')
+  await conversations.getByRole('button', { name: 'Post', exact: true }).click()
+  await conversations.locator('article').first().waitFor()
+
+  const comment = stored.find((e) => e.kind === 1111)
+  const issueAddr = `30851:${issue!.pubkey}:${tagValue(issue!, 'd')}`
+  check('a root comment is a NIP-22 kind:1111 (REW-10)', !!comment)
   check(
-    '  …attached to the issue by an `a` tag',
-    tagValue(message!, 'a') === `30851:${issue!.pubkey}:${tagValue(issue!, 'd')}`,
+    '  …naming the issue as its root, in both cases',
+    !!comment && tagValue(comment, 'A') === issueAddr && tagValue(comment, 'a') === issueAddr,
   )
   check(
     '  …carrying the issue reference so Peek can render it',
-    message!.content.includes('nostr:naddr'),
+    !!comment && comment.content.includes('nostr:naddr'),
   )
-  check('  …and it is a root message, not a reply', !message!.tags.some((t) => t[0] === 'e'))
+  check('  …and it is a root message, not a reply', !comment!.tags.some((t) => t[0] === 'e'))
+  check('  …and no kind:9 was written for it', !stored.some((e) => e.kind === 9))
 
-  await page.locator('.reply-form input').first().fill('Key is in 1Password now.')
-  await page.getByRole('button', { name: 'Reply' }).click()
-  await page.waitForSelector('.message.reply')
+  await conversations.getByPlaceholder('Reply…').first().fill('Key is in 1Password now.')
+  await conversations.getByRole('button', { name: 'Reply', exact: true }).first().click()
+  await page.waitForFunction(
+    () => document.querySelectorAll('section article').length >= 2,
+  )
+  // Still a kind:9, deliberately — see the header. This asserts the split rather
+  // than the aspiration, so the day a reply becomes a 1111 this fails loudly.
   const reply = stored.filter((e) => e.kind === 9).at(-1)
-  check('replying threads under the root', reply!.tags.some((t) => t[0] === 'e' && t[1] === message!.id))
-  check('  …and renders nested', (await page.locator('.message.reply').count()) === 1)
+  check('a reply is still a kind:9, by design', !!reply)
+  check(
+    '  …threaded under the root comment',
+    !!reply && !!comment && reply.tags.some((t) => t[0] === 'e' && t[1] === comment.id),
+  )
+  check('  …and renders nested', (await conversations.locator('article').count()) === 2)
 
-  const assignee = page.locator('.detail-side select').nth(1)
-  await assignee.selectOption({ index: 1 })
-  await page.waitForFunction(() => document.querySelectorAll('.feed-item').length > 1)
+  await pick('Assignee', 1)
+  await page.waitForFunction(() => document.querySelectorAll('section li').length > 1)
   check(
     'assigning publishes a second change',
     stored.filter((e) => e.kind === 1851 && tagValue(e, 'field') === 'assignee').length === 1,
@@ -267,66 +383,90 @@ async function main() {
   // ── The inbound leg: a reference pasted from Peek ─────────────────────────
   // Encoded with the app's own encoder, so this cannot pass against a shape
   // Estiva Ship would never itself produce.
-  const addr = `30851:${issue!.pubkey}:${tagValue(issue!, 'd')}`
-  const naddr = addrToNaddr(addr, ['http://localhost:3000'])
-  await page.goto(`http://localhost:${PORT}/ship/#/o/${naddr}`)
+  const naddr = addrToNaddr(issueAddr, ['http://localhost:3000'])
+  await page.goto(`http://localhost:${PORT}/#/o/${naddr}`)
   await page.waitForSelector('[data-surface="issue"]', { timeout: 10000 })
   check('an inbound naddr resolves to the issue surface', page.url().includes('/issue/'))
   check(
     '  …and it resolved the Folder itself, with no #h filter',
-    (await page.locator('.title-input, .editable').first().textContent())?.includes('Billing entry') ??
-      false,
+    (await page.locator('[data-surface="issue"]').innerText()).includes('Billing entry'),
   )
   await shot(page, '07-inbound-deep-link')
 
   // ── Back to the issue list ────────────────────────────────────────────────
-  await page.getByRole('link', { name: /^Issues/ }).first().click()
-  await page.waitForSelector('[data-surface="issues"] .row .issue-title')
-  check('the issue appears in the workspace-wide list', (await page.locator('.row').count()) >= 1)
+  await sidebar().getByRole('link', { name: /^Issues/ }).click()
+  await page.waitForSelector('[data-surface="issues"]')
+  const issues = page.locator('[data-surface="issues"]')
+  check('the issue appears in the workspace-wide list', (await issues.getByRole('link').count()) >= 1)
   check(
     'it is grouped under its new status',
-    (await page.locator('.group-head').first().textContent())?.includes('In Progress') ?? false,
+    (await issues.innerText()).includes('In Progress'),
   )
   await shot(page, '08-issues-list')
 
   // ── Archive, and getting it back ──────────────────────────────────────────
-  await page.goto(`http://localhost:${PORT}/ship/#/project/${encodeURIComponent(
-    `30850:${project!.pubkey}:${tagValue(project!, 'd')}`,
-  )}`)
+  const projectAddr = `30850:${project!.pubkey}:${tagValue(project!, 'd')}`
+  await page.goto(`http://localhost:${PORT}/#/project/${encodeURIComponent(projectAddr)}`)
   await page.waitForSelector('[data-surface="project"]')
   await page.getByRole('button', { name: 'Archive project' }).click()
-  await page.waitForSelector('.crumbs .pill')
+  await page.getByRole('button', { name: 'Unarchive project' }).waitFor()
   check(
     'archiving publishes a change, not a deletion',
     stored.some((e) => e.kind === 1851 && tagValue(e, 'field') === 'archived'),
   )
-  check('  …and is reversible from the same control',
-    await page.getByRole('button', { name: 'Unarchive project' }).isVisible())
+  check(
+    '  …and is reversible from the same control',
+    await page.getByRole('button', { name: 'Unarchive project' }).isVisible(),
+  )
 
   // Scoped to the sidebar: the project detail's breadcrumb also says "Projects".
-  await page.locator('#sidebar').getByRole('link', { name: /^Projects/ }).click()
+  await sidebar().getByRole('link', { name: /^Projects/ }).click()
   await page.waitForSelector('[data-surface="projects"]')
-  check('an archived project leaves the sidebar', (await page.locator('.nav-item').count()) === 2)
-  check('  …and the active list', (await page.locator('.card').count()) === 0)
-  check('  …but is reachable behind a tab', await page.getByRole('link', { name: /^Archived/ }).isVisible())
-  await page.getByRole('link', { name: /^Archived/ }).click()
-  await page.waitForSelector('.card')
-  check('  …which shows it', (await page.locator('.card').count()) === 1)
+  check('an archived project leaves the sidebar', (await sidebar().getByRole('link').count()) === 2)
+  const projects = page.locator('[data-surface="projects"]')
+  check('  …and the active list', (await projects.getByRole('link').count()) === 0)
+  check('  …but is reachable behind a tab', await page.getByRole('tab', { name: /^Archived/ }).isVisible())
+  await page.getByRole('tab', { name: /^Archived/ }).click()
+  await projects.getByRole('link').first().waitFor()
+  check('  …which shows it', (await projects.getByRole('link').count()) === 1)
   await shot(page, '10-archived')
 
   // ── The profile menu ──────────────────────────────────────────────────────
-  await page.locator('.dropdown-trigger').click()
-  await page.waitForSelector('.dropdown-panel')
-  // Case-insensitive: `innerText` reflects rendered text, and the labels are
-  // uppercased in CSS.
-  const menu = (await page.locator('.dropdown-panel').innerText()).toLowerCase()
-  check('the profile menu names the relay as the workspace', menu.includes('localhost:3000'))
-  check('  …and the identity', menu.includes('signed in as'))
+  // By what it does, not by what it says: the trigger's accessible name is the
+  // person's display name, which for an anonymous key is a shortened pubkey and
+  // therefore different on every run. `aria-haspopup="menu"` is the trigger's
+  // actual contract — and distinguishes it from a `Select`, whose trigger
+  // advertises `listbox`.
+  await page.locator('button[aria-haspopup="menu"]').first().click()
+  const menu = page.getByRole('menu')
+  await menu.waitFor()
+  const text = (await menu.innerText()).toLowerCase()
+  check('the profile menu names the relay as the workspace', text.includes('localhost:3000'))
+  // "Acting as", not "Signed in as": this build has an empty `ID_BASE`, which is
+  // anonymous-only on purpose — a local build cannot reach production identity
+  // by accident. The wording is the app being honest about which one it is.
+  check('  …and says who it is acting as', text.includes('acting as'))
+  check('  …and offers no sign-out it cannot perform', !text.includes('sign out'))
   await shot(page, '09-profile-menu')
   await page.keyboard.press('Escape')
-  check('  …and closes on Escape', (await page.locator('.dropdown-panel').count()) === 0)
+  await menu.waitFor({ state: 'detached' })
+  check('  …and closes on Escape', (await page.getByRole('menu').count()) === 0)
 
+  check(
+    "it measured the relay's clock before signing anything",
+    clockProbes > 0,
+    `${clockProbes} probe(s)`,
+  )
   check('no uncaught errors in the console', errors.length === 0, errors.slice(0, 3).join(' | '))
+  // Not a style check. Anything reaching the relay that this stub answers with a
+  // bare `[]` is a code path the smoke test is silently not exercising, and the
+  // clock probe above is exactly that: it arrived as an unmodelled `GET /`,
+  // which is how it was found.
+  check(
+    'the app asked the relay nothing this stub cannot model',
+    unmodelled.length === 0,
+    [...new Set(unmodelled)].join(', '),
+  )
 
   await browser.close()
   server.close()

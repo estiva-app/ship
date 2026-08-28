@@ -15,7 +15,7 @@
     "test:nip19": "tsx scripts/nip19.test.ts",
     "test:app": "tsx scripts/app.test.ts",
     "test:signer": "tsx scripts/signer.test.ts",
-    "smoke": "node build.mjs && tsx scripts/smoke.ts",
+    "smoke": "npm --prefix web run build && tsx scripts/smoke.ts",
     "seed:peek": "tsx scripts/seed-for-peek.ts"
   },
   "dependencies": {
