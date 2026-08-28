@@ -447,10 +447,17 @@ export class Store {
    * array** of filters — a single filter object gets
    * `invalid type: map, expected a sequence` (FRICTION.md A5).
    *
-   * `limit` is generous rather than paged: the fold needs the *complete* change
-   * stream to be correct, and a truncated stream would silently produce a stale
-   * status rather than an error. Paging this properly means folding
-   * incrementally, which the MVP does not need.
+   * Paged rather than bounded by a generous literal. The fold needs the
+   * *complete* change stream to be correct — a truncated stream produces a
+   * stale status rather than an error — and `limit: 2000` stopped delivering
+   * that when the relay's ceiling halved to 1000. `queryAll` pages on the
+   * `until` cursor, so completeness no longer depends on a number this file
+   * guesses about a relay it does not control.
+   *
+   * Note the relay clamps **per filter**, not per response
+   * (`buzz-db/src/event.rs`: `q.limit.unwrap_or(100).min(clamp)`, called once
+   * per filter). So a filter carrying no `limit` at all gets **100**, not the
+   * ceiling — which is why the fix is `queryAll`, not deleting the limit.
    *
    * **This and `loadFolders` filter by `#h`, so they do not see a global project
    * record** — one carrying `buzz-channel` instead of `h`. Such a Folder reads
@@ -460,8 +467,8 @@ export class Store {
    * what both the app and the agent use; these two are for scripts and for
    * reading one container in isolation.
    */
-  async loadFolder(folder: string, limit = 2000): Promise<FolderState> {
-    return foldFolder(await this.rawFolders([folder], limit), referencedAddresses)
+  async loadFolder(folder: string): Promise<FolderState> {
+    return foldFolder(await this.rawFolders([folder]), referencedAddresses)
   }
 
   /**
@@ -471,8 +478,8 @@ export class Store {
    * point of loading a workspace is that it fans out over every project, and
    * doing that serially would make the issue list N round trips deep.
    */
-  async loadFolders(folders: string[], limit = 2000): Promise<FolderState> {
-    return foldFolder(await this.rawFolders(folders, limit), referencedAddresses)
+  async loadFolders(folders: string[]): Promise<FolderState> {
+    return foldFolder(await this.rawFolders(folders), referencedAddresses)
   }
 
   /**
@@ -503,7 +510,7 @@ export class Store {
    * optimisation — a re-linked project's record and its older issues sit in
    * different Folders, and folding those separately would drop changes.
    */
-  async loadAll(limit = 2000): Promise<FolderState> {
+  async loadAll(): Promise<FolderState> {
     /*
       Two discovery queries, not one, and the second is the whole of SHI-7.
 
@@ -518,9 +525,9 @@ export class Store {
       report already used to *count* them. The count was honest and the read
       was not; this closes that gap.
     */
-    let events = await this.relay.query([
-      { kinds: [KIND.PROJECT], limit },
-      { kinds: [KIND.ISSUE], limit },
+    let events = await this.relay.queryAll([
+      { kinds: [KIND.PROJECT] },
+      { kinds: [KIND.ISSUE] },
     ])
     const fetched = new Set<string>()
 
@@ -571,7 +578,7 @@ export class Store {
       }
       if (!wanted.size) break
       for (const folder of wanted) fetched.add(folder)
-      events = [...events, ...(await this.rawFolders([...wanted], limit))]
+      events = [...events, ...(await this.rawFolders([...wanted]))]
     }
 
     return foldFolder(events, referencedAddresses)
@@ -590,11 +597,13 @@ export class Store {
    * object per project is cheap next to that; it is still a single round trip,
    * because `POST /query` takes a **bare array** of filters (FRICTION.md A5).
    */
-  async rawFolders(folders: string[], limit = 2000): Promise<SignedEvent[]> {
+  async rawFolders(folders: string[]): Promise<SignedEvent[]> {
     for (const folder of folders) assertFolderId(folder)
     if (!folders.length) return []
-    return this.relay.query(
-      folders.map((folder) => ({ kinds: FOLDER_KINDS, '#h': [folder], limit })),
+    // One filter per Folder, and the relay clamps per filter — so this gets the
+    // ceiling for each Folder rather than sharing one across all of them.
+    return this.relay.queryAll(
+      folders.map((folder) => ({ kinds: FOLDER_KINDS, '#h': [folder] })),
     )
   }
 
