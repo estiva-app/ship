@@ -26,7 +26,8 @@ export interface ProjectsViewProps {
 export function ProjectsView({ active, archived, showArchived, onShowArchived, onAddProject, addDisabledReason }: ProjectsViewProps) {
   const shown = showArchived ? archived : active
   return (
-    <div className="flex flex-col gap-4 px-6 py-5">
+    // `data-surface` is the smoke test's waypoint — see IssuesView.
+    <div data-surface="projects" className="flex flex-col gap-4 px-6 py-5">
       <div className="flex items-center gap-3">
         <h1 className="flex-1 text-h3 text-text-primary">Projects</h1>
         {addDisabledReason ? (

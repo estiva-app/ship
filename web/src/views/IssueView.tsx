@@ -32,7 +32,8 @@ export function IssueView({ crumbs, title, description, onRename, onDescribe, th
   if (crumbs.ref) items.push({ label: crumbs.ref, mono: true })
 
   return (
-    <div className="grid h-full min-h-0 grid-cols-[minmax(0,1fr)_1px_auto] grid-rows-[auto_minmax(0,1fr)] gap-y-4">
+    // `data-surface` is the smoke test's waypoint — see IssuesView.
+    <div data-surface="issue" className="grid h-full min-h-0 grid-cols-[minmax(0,1fr)_1px_auto] grid-rows-[auto_minmax(0,1fr)] gap-y-4">
       <div className="col-start-1 row-start-1 pl-6 pt-5">
         <Breadcrumb items={items} />
       </div>
