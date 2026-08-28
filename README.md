@@ -56,27 +56,40 @@ to be independent implementations, not siblings sharing a package.
   never opened this app. Neither app has the other's user table and both read
   the same profiles, which is the whole of cross-app identity
 
-`apps/ship/` — the UI. Plain DOM, no framework. `router.ts` is hash
-routing, `views/` is one module per surface, `ui.ts` the shared primitives.
+`web/` — the app. React + Vite + Tailwind, with `@estiva-app/ui` for the shared
+primitives. `src/router.ts` is hash routing, `src/pages/` wires each surface to
+the data, `src/views/` is the surface itself, `src/api/` is the seam onto
+`../src` and `../lib`. Its own `package.json`, so it builds and tests
+independently of the shared code below it.
+
+There is no `apps/` any more: the vanilla-DOM app it replaced was deleted in
+REW-9, after the React app had served production. It is in git history if you
+need to see what a behaviour used to do.
 
 `scripts/` — `probe-kinds.ts` asks the relay which kinds it will accept;
 `verify.ts` is the end-to-end check that Ravi can close Ana's issue;
-`app.test.ts` pins the things that fail silently; `smoke.ts` drives the real UI
-in a browser against an in-memory relay.
+`app.test.ts` pins the things that fail silently; `smoke.ts` builds `web/` and
+drives it in a real browser against an in-memory relay.
 
 ## The Folder *is* the project
 
 This is the one structural thing to understand before reading any of it.
 
-A project's `h` is its own Folder. Its record, its issues, their change events
-and its conversation all carry that same `h`. There is nothing above it.
+A project *is* a Folder. Its issues, their change events and its conversation
+all carry that Folder as their `h`. There is nothing above it.
 
-| Event | `h` |
+The record itself is the exception, and deliberately so (REW-11): it carries no
+`h` at all and names its Folder with `buzz-channel` instead. A channel-scoped
+event is only readable by someone who already knows the channel, so a record
+filed inside its own Folder could not be discovered by anyone who had not
+already been told where to look. Global, it answers a plain `kind:30850` query.
+
+| Event | scope |
 | --- | --- |
-| `30850` Project | the project's Folder |
-| `30851` Issue | the same Folder |
-| `1851` change to either | the same Folder |
-| `1111` comment on either | the same Folder |
+| `30850` Project | **global**, naming its Folder with `buzz-channel` |
+| `30851` Issue | `h` = the project's Folder |
+| `1851` change to either | `h` = the same Folder |
+| `1111` comment on either | `h` = the same Folder |
 
 **There is no workspace object, deliberately.** Buzz already answers "what is
 the organisation", and the answer is not an event: a *community* is resolved
@@ -169,18 +182,21 @@ All four properties are pinned in `npm run verify`.
 Needs a Buzz relay on `:3000` — see `RUNNING.md` above.
 
 ```bash
-npm install
-npm run serve      # builds and serves dist/ on :5190
+npm install                  # the shared code below web/
+npm install --prefix web     # and the app itself
+npm --prefix web run dev     # Vite on :5191, with hot reload
 ```
 
-Then open **http://localhost:5190/ship/** and add a project. It gets its
+Then open **http://localhost:5191/** and add a project. It gets its
 own Folder; the *Folder* panel on the project's page is what you paste into Peek
 to pair a topic with it — or paste a topic's Folder link when creating the
 project, and they are the same container from the start.
 
 ```bash
-npm run typecheck  # tsc --noEmit
-npm test           # pure logic: Folder placement, routing, grouping
+npm run typecheck  # tsc --noEmit, over lib/ src/ scripts/
+npm test           # pure logic: Folder placement, the manifest, profiles
+npm --prefix web run test    # the app: components, pages, router, auth boot
+npm --prefix web run build   # tsc -b && vite build → dist/ship
 npm run probe      # does the relay accept our kinds?
 npm run verify     # full round trip against the relay, two identities
 npm run manifest   # publish the NIP-89 manifest and check it is satisfiable

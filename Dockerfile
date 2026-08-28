@@ -36,22 +36,9 @@ COPY tsconfig.json ./
 COPY lib ./lib
 COPY src ./src
 
-# `apps/` is here for one file, and not for the app it is named after.
-#
-# web/src/router.ts re-exports ../../apps/ship/router rather than copying it:
-# the hash router is pure, already tested, and every route it defines — including
-# the inbound `#/o/<naddr>` that Peek's "open in Ship" links carry — has to
-# survive the rewrite byte for byte. That was the right call while the image
-# built the old app and `apps/` was present regardless.
-#
-# It is a real constraint on REW-9: deleting apps/ without first moving
-# router.ts into web/ breaks this build with two TS2307s that name a path nobody
-# would expect the React app to reference. Nothing else here compiles apps/, and
-# build.mjs is deliberately absent — the fallback for a bad cutover is the
-# previous image's sha tag, not a second bundle inside this one.
-COPY apps ./apps
-
-# The React app (REW-8).
+# The app (REW-8). `apps/` and build.mjs are gone — REW-9 deleted the vanilla
+# app, and web/src/router.ts now holds the hash router outright instead of
+# re-exporting it from there, which is what made the deletion possible.
 COPY web/package.json web/package-lock.json ./web/
 RUN npm ci --prefix web
 

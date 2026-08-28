@@ -41,18 +41,22 @@ jobs:
       # `npm run smoke` is deliberately absent: it needs chromium system
       # libraries Playwright does not bundle, which is a CI rabbit hole for
       # little gain when typecheck and tests already gate the deploy.
+      #
+      # There is no Build step here any more either. It ran `node build.mjs`,
+      # the vanilla app's bundler, which REW-9 deleted along with the app. The
+      # only build that exists now is web/'s, and the `web` job below runs it —
+      # on pull requests too, which is what this step was for. Adding a root
+      # `build` that shelled into web/ would need web/'s dependencies installed
+      # in this job as well, to run the same command twice.
 
-      # Catches a broken build on pull requests too, where the publish job below
-      # does not run.
-      - name: Build
-        run: npm run build
-
-  # The rewrite lives in web/ with its own package.json, and the job above sees
-  # none of it: the root `tsc --noEmit` reads tsconfig.json, whose `include` is
-  # ["lib", "src", "apps", "scripts"], and the root `npm test` runs the old
-  # app's tsx scripts. Without this job the whole React front end is unchecked
-  # while the workflow reports success — a green tick about the old app,
-  # standing next to a rewrite nothing has compiled.
+  # The app itself. It lives in web/ with its own package.json, and the job
+  # above sees none of it: the root `tsc --noEmit` reads tsconfig.json, whose
+  # `include` is ["lib", "src", "scripts"] — the shared wire and fold code — and
+  # the root `npm test` runs the tsx scripts that cover those.
+  #
+  # So this job is not a supplement; it is the only thing that compiles or tests
+  # what `ship.estiva.app` serves. Without it the workflow can go green having
+  # checked nothing a person can see, which is why `publish` requires it.
   web:
     runs-on: ubuntu-latest
     defaults:
