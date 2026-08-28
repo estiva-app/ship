@@ -311,8 +311,8 @@ async function main() {
   // How the project list is actually built: ask the relay for the kind, with no
   // `#h` at all, and let access control decide. If this ever stops working the
   // sidebar goes empty for everyone who is not the author.
-  const discovered = await new Relay(RELAY_URL, ravi.signer).query([
-    { kinds: [KIND.PROJECT], limit: 200 },
+  const discovered = await new Relay(RELAY_URL, ravi.signer).queryAll([
+    { kinds: [KIND.PROJECT] },
   ])
   check(
     'a reader discovers the project with no Folder filter',
