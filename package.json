@@ -19,6 +19,7 @@
     "seed:peek": "tsx scripts/seed-for-peek.ts"
   },
   "dependencies": {
+    "@estiva-app/identity": "^0.1.1",
     "@estiva-app/protocol": "^0.1.0",
     "@noble/curves": "1.9.2",
     "@noble/hashes": "1.8.0"
