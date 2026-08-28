@@ -19,6 +19,21 @@ describe('groupByStatus — production’s rule', () => {
     expect(statusLabel('in_progress', ISSUE_STATUSES)).toBe('In Progress')
     expect(statusLabel('blocked', ISSUE_STATUSES)).toBe('blocked')
   })
+
+  /**
+   * Moved from `scripts/app.test.ts` in REW-9, where it sat under the heading
+   * "an issue is never invisible" and covered `byStatus` in the old app's
+   * `views/issue-list.ts`. Everything else that file asserted about grouping was
+   * already covered above; this was not, and it is the one that matters most —
+   * the others describe how groups are *arranged*, and this is the only one that
+   * says nothing was dropped on the way.
+   */
+  it('never loses an issue: every one appears in exactly one group', () => {
+    const groups = groupByStatus(ROWS, ISSUE_STATUSES)
+    expect(groups.reduce((total, group) => total + group.items.length, 0)).toBe(ROWS.length)
+    const seen = groups.flatMap((group) => group.items.map((item) => item.addr))
+    expect(new Set(seen).size).toBe(ROWS.length)
+  })
 })
 
 describe('IssueRow', () => {

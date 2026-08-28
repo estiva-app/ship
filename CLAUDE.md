@@ -6,6 +6,43 @@ A minimal issue tracker — projects, issues, comments — built on Nostr.
 This app reads and writes **production**, `estiva.estiva.app`. There is no
 staging workspace.
 
+## The app is `web/`, and nothing at the root tests it
+
+Two package.json files. The root holds the shared wire and fold code — `src/`,
+`lib/nostr/`, `scripts/` — and `web/` holds the app: React + Vite + Tailwind,
+with `@estiva-app/ui` for the primitives. The vanilla-DOM app that used to live
+in `apps/` was deleted in REW-9 once the React app had served production; it is
+in git history.
+
+**The trap is that the root's checks look complete and are not.** `npm run
+typecheck` is `tsc --noEmit` over `["lib", "src", "scripts"]`, and root `npm
+test` runs the tsx scripts covering those. Neither sees a single line of the app.
+So the root suite can be entirely green while nothing a person can see has been
+compiled — which is why CI has a separate `web` job and why `publish` requires
+it. Run both:
+
+```bash
+npm test && npm --prefix web run test
+npm run typecheck && npm --prefix web run build   # web's build IS its typecheck: tsc -b
+```
+
+There is deliberately no `npm run build` at the root any more. It was
+`node build.mjs`, the vanilla app's bundler, and the only build that exists now
+is `web/`'s — it writes `../dist/ship`, which is exactly what the image serves.
+
+Two smaller things the rewrite settled, both easy to undo by accident:
+
+- **`data-surface` and `data-view` on the four views are load-bearing.** They are
+  `scripts/smoke.ts`'s only non-semantic selectors, present because "which
+  surface is on screen" is not expressible as a role. Everything else that test
+  clicks it finds by role and accessible name, on purpose — a class-name
+  selector proves nothing about whether a person using a screen reader can get
+  there.
+- **Comments across `web/src/` cite `apps/ship/*` paths** as the provenance of
+  ported behaviour ("copied from the old app's `ago()`"). Those files no longer
+  exist. The references are kept because they say *why* the code is shaped as it
+  is, and git still has them; do not "fix" them by deleting the reasoning.
+
 ## The agent lives in `estiva-agent` now
 
 Reading this workspace from Claude Desktop, Claude Code or a terminal is
@@ -89,8 +126,13 @@ design.
 ### Tests
 
 ```bash
-npm test                                # everything offline
+npm test                                # the shared code, offline
+npm --prefix web run test               # the app, offline
 npx tsx scripts/conformance.test.ts     # this app still agrees with estiva-agent
+npm run smoke                           # builds web/ and drives it in chromium
 ```
 
-`npm test` needs no credentials and no network.
+The first three need no credentials and no network. `npm run smoke` needs
+chromium's system libraries, which Playwright does not bundle — that is why CI
+does not run it, and why it is worth running by hand before anything that
+touches a surface.

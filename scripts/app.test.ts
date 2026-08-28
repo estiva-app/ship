@@ -1,11 +1,18 @@
 /**
  * Unit tests for the parts that fail silently.
  *
- * Three things in this app go wrong without an error: an event written with the
- * wrong `h` (rejected at ingest, or worse, accepted into a container nobody
- * reads), a route that does not survive a round trip through the URL bar, and
- * an issue whose status is outside the vocabulary and vanishes from every list.
- * None of them are visible in a screenshot, so they are pinned here.
+ * What goes wrong without an error here: an event written with the wrong `h` —
+ * rejected at ingest, or worse, accepted into a container nobody reads — a
+ * manifest that misdescribes what the app can do, and a `kind:0` from another
+ * app that costs a whole directory rather than one name. None of them are
+ * visible in a screenshot, so they are pinned here.
+ *
+ * Two more used to be: a route that does not survive a round trip through the
+ * URL bar, and an issue whose status is outside the vocabulary and vanishes from
+ * every list. Both subjects moved into `web/` with the rewrite, so their checks
+ * moved with them (REW-9) — routing to `web/src/router.test.tsx`, grouping to
+ * `web/src/components/batch2.test.tsx`. They are not gone, and this note is here
+ * because a deleted test and a relocated one look identical in a diff.
  *
  * No DOM: everything below is pure. Rendering is checked by `smoke.ts`.
  *
@@ -15,9 +22,6 @@ import { buildChange, buildConversationMessage, buildIssue, buildProject } from 
 import { buildManifest } from '../src/manifest'
 import { foldFolder, projectFolders, type Change, type Project } from '../src/fold'
 import { directoryFrom, initials, parseProfile } from '../src/profiles'
-import { href, parse } from '../apps/ship/router'
-import { byStatus } from '../apps/ship/views/issue-list'
-import type { Issue } from '../src/fold'
 import type { SignedEvent } from '@estiva-app/protocol'
 
 let failures = 0
@@ -384,69 +388,6 @@ check(
 check(
   'and the union is ordered oldest first',
   projectFolders(relinked, [relink])[0] === CONTENT,
-)
-
-// ── Routing ─────────────────────────────────────────────────────────────────
-
-console.log('\n# routes survive a round trip through the URL\n')
-
-const routes = [
-  { name: 'issues' },
-  { name: 'projects', archived: false },
-  { name: 'projects', archived: true },
-  { name: 'project', addr: `30850:${PK}:p1`, view: 'table' },
-  { name: 'project', addr: `30850:${PK}:p1`, view: 'board' },
-  { name: 'issue', addr: `30851:${PK}:i1` },
-] as const
-
-for (const route of routes) {
-  const back = parse(href(route))
-  check(
-    `${route.name}${'view' in route ? `:${route.view}` : ''} round-trips`,
-    JSON.stringify(back) === JSON.stringify(route),
-    href(route),
-  )
-}
-
-check('an unknown hash falls back to the issue list', parse('#/nonsense').name === 'issues')
-check('an empty hash is the issue list', parse('').name === 'issues')
-check('an inbound naddr is recognised', parse('#/o/naddr1abc').name === 'inbound')
-check(
-  'an unknown project view falls back to the default',
-  (parse('#/project/x?view=nonsense') as { view: string }).view === 'table',
-)
-check(
-  'the default view is not written into the URL',
-  !href({ name: 'project', addr: 'x', view: 'table' }).includes('view='),
-)
-
-// ── Grouping ────────────────────────────────────────────────────────────────
-
-console.log('\n# an issue is never invisible\n')
-
-const stub = (status: string): Issue => ({
-  addr: `30851:${PK}:${status}`,
-  id: status,
-  author: PK,
-  createdAt: 0,
-  title: status,
-  description: '',
-  folder: CONTENT,
-  status,
-  fields: {},
-})
-
-const groups = byStatus([stub('todo'), stub('done'), stub('escalated')])
-check('known statuses group in vocabulary order', groups[0]?.status === 'todo')
-check('empty groups are dropped', !groups.some((group) => group.issues.length === 0))
-check(
-  'a status written by another app still gets a group',
-  groups.some((group) => group.status === 'escalated'),
-  groups.map((g) => g.status).join(', '),
-)
-check(
-  'every issue appears exactly once',
-  groups.reduce((total, group) => total + group.issues.length, 0) === 3,
 )
 
 // ── Profiles ────────────────────────────────────────────────────────────────
