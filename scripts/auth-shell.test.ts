@@ -1,17 +1,13 @@
 /**
  * The auth shell contract (PEEK-115/116).
  *
- * `lib/auth/shell/contract.ts` is duplicated verbatim in Peek, because the two
- * repos are independent and there is no package registry between them. That is
- * the same arrangement as the Nostr event code, and it needs the same defence:
- * a test that fails when the copies drift. Peek runs equivalent assertions
- * against its copy under Vitest.
- *
- * The interesting cases are the awkward ones. A shell that enters when it can
- * is easy; a shell that refuses to bounce forever is the actual feature.
- *
- *   npx tsx scripts/auth-shell.test.ts
- */
+ * The contract now lives in `@estiva-app/identity` (SHA-4). It used to be
+ * `lib/auth/shell/contract.ts`, duplicated verbatim in Peek — byte-identical
+ * apart from each copy's header naming the other as its duplicate. This test
+ * outlived that arrangement and is worth keeping: it covers the decision logic
+ * Ship boots on, and a package's tests passing is not the same claim as this
+ * app's boot still deciding what it used to decide.
+*/
 import {
   CONTINUE_LABEL,
   GUARD_TTL_MS,
@@ -21,7 +17,7 @@ import {
   decideBoot,
   isRecoverable,
   reasonForCallbackError,
-} from '../lib/auth/shell/contract'
+} from '@estiva-app/identity'
 
 let failures = 0
 function check(label: string, condition: boolean, detail = '') {

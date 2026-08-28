@@ -16,7 +16,7 @@ import {
   SHELL_COPY,
   type ShellState,
   isRecoverable,
-} from './contract'
+} from '@estiva-app/identity'
 
 const ROOT_ID = 'auth-shell'
 

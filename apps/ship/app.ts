@@ -36,7 +36,7 @@ import {
   decideBoot,
   logShellEvent,
   readGuard,
-} from '../../lib/auth/shell/contract'
+} from '@estiva-app/identity'
 import { clearAuthShell, renderAuthShell } from '../../lib/auth/shell/shell'
 import { lookupMembers, type MemberDirectory } from '../../lib/estiva-id/directory'
 import { naddrToAddr } from '@estiva-app/protocol'
@@ -91,7 +91,7 @@ const POLL_MS = 5000
  * out: a throwaway per-browser key, exactly as before. `Store` cannot tell the
  * difference, which is the whole point of the signer seam (PEEK-44).
  */
-let estivaSession = ID_CONFIG ? currentSession() : null
+let estivaSession = ID_CONFIG ? currentSession(ID_CONFIG) : null
 const signer: Signer =
   ID_CONFIG && estivaSession
     ? estivaIdSigner({

@@ -1,55 +1,43 @@
 /**
- * Signing in with Estiva ID, from a browser, on another origin (PEEK-47).
+ * Ship's Estiva ID client: the package, bound to Ship's choices.
  *
- * Authorization code with PKCE, because nothing simpler works: Estiva ID's
- * session cookie is `SameSite=Lax` and it serves no CORS, so a cross-origin
- * `fetch` for a token is blocked twice over. Both are deliberate on the origin
- * that holds every custodied key, so the redirect flow is the way in (PEEK-90).
+ * The PKCE flow, token storage, silent renewal and sign-out moved into
+ * `@estiva-app/identity` with SHA-4, and `shell/contract.ts` went with them —
+ * that file was byte-identical to Peek's apart from a comment saying so.
  *
- * ## This is one signer among several, on purpose
+ * What is left here is configuration and a thin adapter. Ship's own vocabulary
+ * (`EstivaIdSession.token`, `SignInOutcome`) is kept rather than renamed through
+ * the app, because REW-9 deletes this app and renaming a codebase on death row
+ * buys nothing. `web/` will consume the package directly.
  *
- * Ship depends on a `Signer`, not on Estiva ID (PEEK-44). Everything here
- * produces a token that `estivaIdSigner` consumes; the anonymous per-browser
- * key stays exactly as it was. An app that only worked for people with an
- * Estiva account would undercut the claim the repo is built to demonstrate.
+ * ## Ship needs TWO stores, and that is what wiring it found
  *
- * ## Tokens are short-lived and there is no refresh
+ * The session lives in `localStorage` so it outlives a tab. The in-flight PKCE
+ * credentials — verifier, state, route, and the silent-attempt guard — live in
+ * `sessionStorage`, because the flow starts and ends in one tab and a genuinely
+ * new tab is entitled to a fresh attempt.
  *
- * `JWT_TTL_SECONDS` is an hour and PEEK-90 issues no refresh token, so when one
- * expires the answer is to run the redirect again. That is silent when the
- * Estiva ID session is still live — `/authorize` bounces straight back without
- * asking anything — and it costs a page navigation and whatever was on screen.
- * PEEK-108 is what removes that cost; until it lands, an expiry mid-session is
- * an interruption the shell can make quiet but cannot make free.
+ * The package assumed **one** store until this file was written, because it was
+ * extracted from Peek, which uses one. That is the "a library pulled from one app
+ * comes out shaped like that app" failure SHA-4 names, and it was found by the
+ * mechanism SHA-4 prescribes: wiring the second consumer. `pendingStore` is what
+ * came of it.
  *
- * A hidden iframe would avoid the navigation and does not work: `SameSite=Lax`
- * withholds the cookie from anything that is not a top-level navigation, which
- * is precisely the property that makes the redirect flow necessary.
+ * ## Ship needs no data-layer adapter, which is the other thing being proved
  *
- * ## The shell drives this now (PEEK-119)
- *
- * `beginSignIn(config, { silent: true })` is the probe an app boots on. See
- * `shell/contract.ts` and `estiva-id/docs/AUTH-SHELL.md`.
+ * Peek keeps `useEstivaIdAuth.ts` — a hook shaped to Convex's `useAuth` contract.
+ * Ship has no equivalent and needs none: it hands the token to `estivaIdSigner`,
+ * which hands it to the relay client. That absence is SHA-4's seam decision
+ * holding, and it is the check a grep cannot do.
  */
+import {
+  type ShellReason,
+  createEstivaId,
+  reasonForCallbackError,
+} from '@estiva-app/identity'
 
-import { clearGuard, markGuard, reasonForCallbackError, type ShellReason } from './shell/contract'
-
-/** Where the token and its metadata live between page loads. */
-const SESSION_KEY = 'ship.estiva-id.session'
-/** The PKCE verifier, in flight. Per-tab: the flow starts and ends in one tab. */
-const VERIFIER_KEY = 'ship.estiva-id.verifier'
-const STATE_KEY = 'ship.estiva-id.state'
-/**
- * The hash route to restore afterwards.
- *
- * Ship routes on `location.hash`, and `redirectUri()` deliberately carries no
- * fragment because it has to match the registered URI exactly. The fragment is
- * lost at the first navigation to `/authorize` — not through the redirect
- * chain, so nothing brings it back — which meant every deep link into Ship
- * dropped its route on entry. Harmless when only a sign-in click did it;
- * unmissable once the shell probes on every cold load (PEEK-123).
- */
-const ROUTE_KEY = 'ship.estiva-id.route'
+/** Where the token and its metadata live between page loads — and between tabs. */
+const SESSION_KEY_PREFIX = 'ship.estiva-id'
 
 export interface EstivaIdSession {
   token: string
@@ -74,20 +62,16 @@ export interface EstivaIdConfig {
   clientId: string
 }
 
-const base64url = (bytes: Uint8Array) => {
-  let binary = ''
-  for (const b of bytes) binary += String.fromCharCode(b)
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-}
-
-const randomUrlSafe = (length: number) =>
-  base64url(crypto.getRandomValues(new Uint8Array(length)))
-
-/** base64url(sha256(verifier)) — RFC 7636 §4.2. */
-async function challengeFor(verifier: string): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))
-  return base64url(new Uint8Array(digest))
-}
+export type SignInOutcome =
+  | { kind: 'none' }
+  | { kind: 'signed-in'; session: EstivaIdSession }
+  /**
+   * `reason` is for a person; `shellReason` is for the shell, which decides
+   * from it whether to offer a passkey or say that nobody here can help.
+   * `login_required` arrives on this path too — it is the expected negative
+   * answer to a silent probe, not a fault.
+   */
+  | { kind: 'failed'; reason: string; shellReason: ShellReason }
 
 /**
  * Where Estiva ID sends people back to.
@@ -95,144 +79,90 @@ async function challengeFor(verifier: string): Promise<string> {
  * The app's own origin and path, with no query — it must match a registered
  * `redirect_uri` **exactly**, since an identity provider that prefix-matches is
  * an open redirector handing out authorization codes.
+ *
+ * Peek's equivalent is a fixed `/auth/callback`. Ship's is the current pathname
+ * because it routes on `location.hash`, and a fragment cannot survive the
+ * redirect chain — which is why the route is stashed separately below.
  */
 export function redirectUri(): string {
   return `${window.location.origin}${window.location.pathname}`
 }
 
-/** A stored session, if there is one and it has not expired. */
-export function currentSession(): EstivaIdSession | null {
-  const raw = localStorage.getItem(SESSION_KEY)
-  if (!raw) return null
-  try {
-    const session = JSON.parse(raw) as EstivaIdSession
-    // A minute of slack: a token that expires mid-request is worse than one
-    // refreshed slightly early, and re-running the flow is silent anyway.
-    if (session.expiresAt - 60_000 <= Date.now()) return null
-    return session
-  } catch {
-    return null
-  }
-}
+/** The hash route to restore afterwards. Per-tab, like the rest of the attempt. */
+const ROUTE_KEY = `${SESSION_KEY_PREFIX}.route`
+
+let configured: EstivaIdConfig | null = null
 
 /**
- * The stored session as written, expired or not.
- *
- * `currentSession` deliberately hides an expired one, which is precisely the
- * case a renewal exists to handle — the access token is dead and the refresh
- * token beside it is the way out.
+ * Built lazily and once, because `EstivaIdConfig` arrives from the app's own
+ * config module and an empty `base` means sign-in is not offered at all — the
+ * anonymous-only build is a real mode, not a broken one.
  */
-function currentSessionRaw(): EstivaIdSession | null {
-  const raw = localStorage.getItem(SESSION_KEY)
-  if (!raw) return null
-  try {
-    return JSON.parse(raw) as EstivaIdSession
-  } catch {
-    return null
+function client(config: EstivaIdConfig) {
+  if (!configured || configured.base !== config.base || configured.clientId !== config.clientId) {
+    configured = config
+    cached = createEstivaId({
+      base: config.base,
+      clientId: config.clientId,
+      redirectUri,
+      // The session outlives a tab.
+      storage: () => (typeof localStorage === 'undefined' ? null : localStorage),
+      // The attempt does not. See the header.
+      pendingStore: () => (typeof sessionStorage === 'undefined' ? null : sessionStorage),
+      keyPrefix: SESSION_KEY_PREFIX,
+      navigate: (url) => window.location.assign(url),
+    })
   }
+  return cached!
 }
+let cached: ReturnType<typeof createEstivaId> | null = null
 
-export function signOut(): void {
-  localStorage.removeItem(SESSION_KEY)
-}
+/** The package's `StoredToken` in Ship's vocabulary. Goes away with REW-9. */
+const asSession = (t: { accessToken: string; pubkey: string; expiresAt: number; refreshToken?: string }): EstivaIdSession => ({
+  token: t.accessToken,
+  pubkey: t.pubkey,
+  expiresAt: t.expiresAt,
+  ...(t.refreshToken ? { refreshToken: t.refreshToken } : {}),
+})
 
 /**
- * Send the person to Estiva ID.
+ * A stored session, if there is one and it has not expired.
  *
- * Navigates away, so nothing after this runs. `state` is checked on the way
- * back — it is what stops somebody feeding this app a code they obtained
- * elsewhere.
+ * A minute of slack, which is Ship's own choice and stricter than the package's
+ * 30s: a token that expires mid-request is worse than one refreshed slightly
+ * early, and re-running the flow is silent anyway.
  */
+export function currentSession(config: EstivaIdConfig): EstivaIdSession | null {
+  const t = client(config).validToken(Date.now() + 60_000)
+  return t ? asSession(t) : null
+}
+
+export function signOut(config: EstivaIdConfig): void {
+  client(config).clearSession()
+}
+
+/** Send the person to Estiva ID. Navigates away, so nothing after this runs. */
 export async function beginSignIn(
   config: EstivaIdConfig,
   { silent = false }: { silent?: boolean } = {},
 ): Promise<void> {
-  const verifier = randomUrlSafe(32)
-  const state = randomUrlSafe(16)
-  sessionStorage.setItem(VERIFIER_KEY, verifier)
-  sessionStorage.setItem(STATE_KEY, state)
-
-  const url = new URL('/authorize', config.base)
-  url.searchParams.set('client_id', config.clientId)
-  url.searchParams.set('redirect_uri', redirectUri())
-  url.searchParams.set('response_type', 'code')
-  url.searchParams.set('code_challenge', await challengeFor(verifier))
-  url.searchParams.set('code_challenge_method', 'S256')
-  url.searchParams.set('state', state)
-
-  /**
-   * A silent attempt asks not to be prompted (PEEK-117): a browser with no
-   * session comes straight back with `error=login_required` rather than
-   * landing on the identity origin's sign-in page.
-   *
-   * The guard is marked **before** navigating, because nothing after this line
-   * runs. That marker is what makes this one attempt instead of a bounce.
-   */
-  if (silent) {
-    url.searchParams.set('prompt', 'none')
-    markGuard(sessionStorage, Date.now())
-  }
-
-  // Kept locally for the same reason `state` is not widened into a payload:
-  // what comes back from the identity service is compared, never trusted.
+  // Kept locally for the same reason `state` is not widened into a payload: what
+  // comes back from the identity service is compared, never trusted. Ship's route
+  // is a fragment, which the package cannot know about — so it is stashed here
+  // and `returnTo` carries it.
   if (window.location.hash) sessionStorage.setItem(ROUTE_KEY, window.location.hash)
-
-  window.location.assign(url.toString())
+  await client(config).beginSignIn(window.location.hash || '/', { silent })
 }
 
 /**
  * Renew the access token without leaving the page (PEEK-108).
  *
  * Handed to `estivaIdSigner` as its `renew`, so a `401` from `/sign` becomes an
- * invisible retry rather than an error the person sees. That matters more than
- * it used to: access tokens live ten minutes now, so any session of real length
- * crosses an expiry.
- *
- * Returns the new bearer token, or `null` if renewal is not possible — no
- * refresh token, or Estiva ID refused it because the session ended. The stored
- * session is dropped on refusal so a spent refresh token is never presented
- * twice; a replay is what Estiva ID treats as theft.
+ * invisible retry rather than an error the person sees.
  */
 export async function renewAccessToken(config: EstivaIdConfig): Promise<string | null> {
-  const current = currentSessionRaw()
-  if (!current?.refreshToken) return null
-
-  let response: Response
-  try {
-    response = await fetch(`${config.base.replace(/\/+$/, '')}/token`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        grantType: 'refresh_token',
-        refreshToken: current.refreshToken,
-        clientId: config.clientId,
-      }),
-    })
-  } catch {
-    // Unreachable, not refused. The session may still be perfectly good, so
-    // this must not sign anybody out.
-    return null
-  }
-
-  if (!response.ok) {
-    signOut()
-    return null
-  }
-
-  const body = (await response.json()) as {
-    access_token: string
-    pubkey?: string
-    expires_in: number
-    refresh_token?: string
-  }
-  const next: EstivaIdSession = {
-    token: body.access_token,
-    pubkey: body.pubkey ?? current.pubkey,
-    expiresAt: Date.now() + body.expires_in * 1000,
-    ...(body.refresh_token ? { refreshToken: body.refresh_token } : {}),
-  }
-  localStorage.setItem(SESSION_KEY, JSON.stringify(next))
-  return next.token
+  const next = await client(config).refreshAccessToken()
+  return next?.accessToken ?? null
 }
 
 /**
@@ -251,48 +181,30 @@ export function restoreRoute(): void {
 /**
  * Leave for Estiva ID to end the session there (PEEK-122).
  *
- * `signOut()` only forgets this app's token; the `estiva_id_session` cookie is
+ * Clearing the local token is not signing out: the `estiva_id_session` cookie is
  * untouched, so the shell's silent probe succeeds on the next boot and puts the
  * person straight back in. The cookie can only be reached by going there.
  */
 export function beginSignOut(config: EstivaIdConfig): void {
-  signOut()
-  const url = new URL('/logout', config.base)
-  url.searchParams.set('client_id', config.clientId)
-  url.searchParams.set('post_logout_redirect_uri', redirectUri())
-  window.location.assign(url.toString())
+  client(config).beginSignOut()
 }
 
-export type SignInOutcome =
-  | { kind: 'none' }
-  | { kind: 'signed-in'; session: EstivaIdSession }
-  /**
-   * `reason` is for a person; `shellReason` is for the shell, which decides
-   * from it whether to offer a passkey or say that nobody here can help.
-   * `login_required` arrives on this path too — it is the expected negative
-   * answer to a silent probe, not a fault.
-   */
-  | { kind: 'failed'; reason: string; shellReason: ShellReason }
-
 /**
- * Finish the flow if this page load is the one coming back.
+ * Finish the round trip, in Ship's outcome vocabulary.
  *
- * Call once at boot, before deciding which signer to use. The query is cleared
- * either way: a code is single-use, and leaving it in the address bar puts a
- * spent credential in history and in every screenshot.
+ * The package throws `SignInError`; Ship returns an outcome, because its shell is
+ * driven by a returned state rather than by an exception boundary. Mapping the
+ * failure to a `ShellReason` uses the package's own `reasonForCallbackError`, so
+ * the two apps still agree on what each error means — only the presentation
+ * differs, which is exactly the line the package draws.
  */
 export async function completeSignIn(config: EstivaIdConfig): Promise<SignInOutcome> {
   const params = new URLSearchParams(window.location.search)
   const code = params.get('code')
   const error = params.get('error')
-  const state = params.get('state')
-
   if (!code && !error) return { kind: 'none' }
 
-  const expectedState = sessionStorage.getItem(STATE_KEY)
-  const verifier = sessionStorage.getItem(VERIFIER_KEY)
-  sessionStorage.removeItem(STATE_KEY)
-  sessionStorage.removeItem(VERIFIER_KEY)
+  const search = window.location.search
   clearQuery()
 
   // Estiva ID sends people back with `?error=` for anything it can attribute to
@@ -305,51 +217,19 @@ export async function completeSignIn(config: EstivaIdConfig): Promise<SignInOutc
     }
   }
 
-  if (!expectedState || state !== expectedState) {
-    return { kind: 'failed', reason: 'That sign-in did not start here.', shellReason: 'exchange_failed' }
-  }
-  if (!verifier) {
-    return { kind: 'failed', reason: 'That sign-in did not start here.', shellReason: 'exchange_failed' }
-  }
-
-  const response = await fetch(`${config.base.replace(/\/+$/, '')}/token`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
-      grantType: 'authorization_code',
-      code,
-      clientId: config.clientId,
-      redirectUri: redirectUri(),
-      codeVerifier: verifier,
-    }),
-  })
-
-  if (!response.ok) {
-    // Every refusal is `invalid_grant` by design — the specific reason is in
-    // Estiva ID's audit log, not in this reply.
+  try {
+    const { token } = await client(config).completeSignIn(search)
+    return { kind: 'signed-in', session: asSession(token) }
+  } catch (cause) {
+    // Every refusal from `/token` is `invalid_grant` by design — the specific
+    // reason is in Estiva ID's audit log, not in this reply. So the message a
+    // person sees is deliberately uniform, and the shell reason is what varies.
     return {
       kind: 'failed',
-      reason: 'Could not complete sign-in. Try again.',
+      reason: (cause as Error).message || 'Could not complete sign-in. Try again.',
       shellReason: 'exchange_failed',
     }
   }
-
-  const body = (await response.json()) as {
-    access_token: string
-    pubkey: string
-    expires_in: number
-    refresh_token?: string
-  }
-  const session: EstivaIdSession = {
-    token: body.access_token,
-    pubkey: body.pubkey,
-    expiresAt: Date.now() + body.expires_in * 1000,
-    ...(body.refresh_token ? { refreshToken: body.refresh_token } : {}),
-  }
-  localStorage.setItem(SESSION_KEY, JSON.stringify(session))
-  // The attempt worked, so the next boot is entitled to a fresh silent one.
-  clearGuard(sessionStorage)
-  return { kind: 'signed-in', session }
 }
 
 /** Drop `?code=…` and friends without reloading or touching the hash route. */
