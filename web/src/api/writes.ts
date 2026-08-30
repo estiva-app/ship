@@ -30,6 +30,18 @@ import { store } from './store'
  *   (`project.originFolder`);
  * - a project's conversation and its new issues go to its content Folder
  *   (`project.contentFolder`).
+ *
+ * Getting it wrong does **not** fail. Measured against production on
+ * 2026-08-29: a project change published against the content Folder instead
+ * of the record's is accepted by the relay, `ok: true`, no reason given. The
+ * fold keys changes by target address, so `foldFolder` over the whole
+ * workspace applies it and the app looks correct — but `loadFolder` and
+ * `loadFolders` filter by `#h`, so anything reading the record's own Folder
+ * never sees it. The edit exists for one reader and not for another,
+ * permanently, with nothing anywhere reporting a problem.
+ *
+ * The three lines above are load-bearing for that reason, not because
+ * something downstream would catch a mistake. It would not.
  */
 export type WriteResult = { ok: true } | { ok: false; reason: string }
 export type CreateResult = { ok: true; addr: string } | { ok: false; reason: string }
