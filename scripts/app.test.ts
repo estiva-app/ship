@@ -2,7 +2,8 @@
  * Unit tests for the parts that fail silently.
  *
  * What goes wrong without an error here: an event written with the wrong `h` —
- * rejected at ingest, or worse, accepted into a container nobody reads — a
+ * accepted into a container nobody reads, which is what measuring it against
+ * production actually showed rather than the ingest rejection assumed here — a
  * manifest that misdescribes what the app can do, and a `kind:0` from another
  * app that costs a whole directory rather than one name. None of them are
  * visible in a screenshot, so they are pinned here.
