@@ -21,11 +21,24 @@ export interface EditableTextProps {
   className?: string
   /** The accessible name of the field — "Title", "Description". */
   label: string
+  /**
+   * What to *show* when not editing, when that differs from what is edited.
+   *
+   * Added by PRO-7 for one case: a description containing `nostr:naddr…`, which
+   * is rendered as a live object below the text. Showing the raw reference as
+   * well means the reader sees a wall of bech32 *and* the thing it names — and
+   * the bech32 is the half that means nothing to them.
+   *
+   * It overrides the display branch only. `value` is still what the editor
+   * opens with and what a commit compares against, so nothing is silently lost
+   * — which is the failure a naive `value={stripped}` would cause.
+   */
+  display?: string
   /** Show the value only — no edit affordance. For a reader who cannot write. */
   readOnly?: boolean
 }
 
-export function EditableText({ value, placeholder, onCommit, multiline = false, className, label, readOnly = false }: EditableTextProps) {
+export function EditableText({ value, display, placeholder, onCommit, multiline = false, className, label, readOnly = false }: EditableTextProps) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(value)
   const [busy, setBusy] = useState(false)
@@ -86,9 +99,9 @@ export function EditableText({ value, placeholder, onCommit, multiline = false, 
     return (
       <div
         aria-label={label}
-        className={cn('w-full px-2 py-1', multiline && 'whitespace-pre-wrap', value ? 'text-text-primary' : 'text-text-muted', className)}
+        className={cn('w-full px-2 py-1', multiline && 'whitespace-pre-wrap', (display ?? value) ? 'text-text-primary' : 'text-text-muted', className)}
       >
-        {value || placeholder}
+        {(display ?? value) || placeholder}
       </div>
     )
   }
@@ -129,11 +142,11 @@ export function EditableText({ value, placeholder, onCommit, multiline = false, 
       className={cn(
         'w-full rounded-md border border-transparent px-2 py-1 text-left transition-colors hover:border-border-default',
         multiline && 'whitespace-pre-wrap',
-        value ? 'text-text-primary' : 'text-text-muted',
+        (display ?? value) ? 'text-text-primary' : 'text-text-muted',
         className,
       )}
     >
-      {value || placeholder}
+      {(display ?? value) || placeholder}
     </button>
   )
 }

@@ -1,3 +1,4 @@
+import { stripNaddrs } from '@estiva-app/protocol'
 import { cn } from '@/lib/cn'
 import { Avatar } from './Avatar'
 import { Chip } from './Chip'
@@ -125,9 +126,16 @@ function ForeignMessage({ object, className }: ForeignObjectProps) {
           </span>
         </div>
         {/* Text, never markup. See the note at the top of this file. */}
-        {object.slots.body && (
+        {/*
+          References are stripped from a body for the same reason as the
+          description above: bech32 is not readable, and a message that is
+          *only* a reference then renders as an empty line rather than a wall
+          of it. Rendering the referenced object here instead is inline
+          transclusion — §6 anchoring, RIC-1, deliberately not this ticket.
+        */}
+        {object.slots.body && stripNaddrs(object.slots.body.value).trim() && (
           <p className="whitespace-pre-wrap break-words text-body-2 text-text-primary">
-            {object.slots.body.value}
+            {stripNaddrs(object.slots.body.value).trim()}
           </p>
         )}
       </div>
