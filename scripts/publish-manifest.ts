@@ -317,6 +317,38 @@ async function main() {
   )
 
   /*
+    Every status says what it *means*, not only what it is called.
+
+    PRO-2. A consumer that wants to report progress has to know which statuses
+    are finished, and before this it had to guess from the label — Peek matched
+    a hardcoded set of English words, so an app spelling its statuses
+    differently rendered a blank section. The stage is what makes that a
+    declaration instead of a guess, and a vocabulary missing one is the same
+    silent failure wearing a different hat: it publishes fine and shows up as a
+    counter that is quietly wrong.
+
+    `dropped` is checked for separately because it is the value with no natural
+    fallback. A consumer can survive a missing `started` by treating it as open;
+    there is nothing sensible to assume about a status that is neither
+    outstanding nor progress, and Ship has one (`cancelled`) in both vocabularies.
+  */
+  const STAGES = new Set(['open', 'started', 'done', 'dropped'])
+  const entries = Object.entries(manifest.vocabularies ?? {})
+  const missing = entries.flatMap(([name, values]) =>
+    values.filter((v) => !v.stage).map((v) => `${name}.${v.value}`),
+  )
+  check('every status declares a stage', missing.length === 0, missing.join(', ') || 'all declared')
+  const bad = entries.flatMap(([name, values]) =>
+    values.filter((v) => v.stage && !STAGES.has(v.stage)).map((v) => `${name}.${v.value}=${v.stage}`),
+  )
+  check('  …and every stage is one of the four', bad.length === 0, bad.join(', ') || [...STAGES].join('|'))
+  check(
+    '  …including a dropped status, which nothing can infer',
+    entries.every(([, values]) => values.some((v) => v.stage === 'dropped')),
+    entries.map(([n, vs]) => `${n}:${vs.filter((v) => v.stage === 'dropped').map((v) => v.value).join('/') || 'none'}`).join(' '),
+  )
+
+  /*
     Take the fixtures back out.
 
     The checks above need *real* published events, which is the point — a
