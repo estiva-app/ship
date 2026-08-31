@@ -100,7 +100,46 @@ function resolveSlot(
     return undefined
   }
   if ('field' in slot) return event.content
+  // A `children` slot is a query, not a value on this event. It is resolved
+  // separately, against the relay, by `checkListSlot` — returning undefined
+  // here would report the flagship slot as an empty optional and prove nothing.
+  if ('children' in slot) return undefined
   return folded[slot.fold]?.value ?? slot.default
+}
+
+/**
+ * Resolve a `list` slot the way a consumer will, and say what came back.
+ *
+ * This is the check the script exists for, applied to the one slot that cannot
+ * be answered from the root event. A `list` naming a kind nothing writes, or a
+ * `via` tag no child carries, is still valid JSON and still publishes fine — it
+ * fails in the consumer, later, as a project card with nothing underneath,
+ * which is indistinguishable from a project that genuinely has no issues.
+ */
+async function checkListSlot(
+  relay: Relay,
+  slot: Extract<SlotSource, { children: unknown }>,
+  parentAddress: string,
+  expectedChildAddress: string,
+): Promise<void> {
+  const { kind, via, limit } = slot.children
+  const children = await relay.query([{ kinds: [kind], [`#${via}`]: [parentAddress], limit: limit ?? 200 }])
+  check(
+    `list slot resolves children by #${via} → kind:${kind}`,
+    children.length > 0,
+    `${children.length} child(ren) of ${parentAddress.slice(0, 24)}…`,
+  )
+  // Named, not merely counted. A non-empty answer to the wrong query is the
+  // failure this is here to catch, and a count alone cannot tell them apart.
+  const ids = children.map((e) => {
+    const d = e.tags.find((t) => t[0] === 'd')?.[1] ?? ''
+    return `${e.kind}:${e.pubkey}:${d}`
+  })
+  check(
+    '  …and the issue just published is among them',
+    ids.includes(expectedChildAddress),
+    expectedChildAddress.slice(0, 32) + '…',
+  )
 }
 
 async function main() {
@@ -221,6 +260,13 @@ async function main() {
     for (const [slotName, source] of Object.entries(projection.slots)) {
       const sources = Array.isArray(source) ? source : [source]
       for (const slot of sources) {
+        // A `list` is a relay query rather than a read of this event, so it is
+        // checked against the child that was just published rather than
+        // resolved to a string like the others.
+        if ('children' in slot) {
+          await checkListSlot(relay, slot, project.addr, issue.addr)
+          continue
+        }
         const value = resolveSlot(slot, rootEvent, object.fields)
         const sourceLabel = 'tag' in slot ? `tag:${slot.tag}` : 'field' in slot ? 'content' : `fold:${slot.fold}`
         // `meta` slots are legitimately optional — an issue with no ref is
