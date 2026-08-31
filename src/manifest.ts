@@ -134,7 +134,12 @@ export interface ManifestContent {
     hiddenWhen?: { field: string; equals: string }
   }
   projections: Record<string, Projection>
-  vocabularies: Record<string, { value: string; label: string; colour: string }[]>
+  /**
+   * `stage` is what a status *means* (PRO-2) — see `Stage` in `kinds.ts`.
+   * Optional here because a manifest published before PRO-2 has no `stage` and
+   * cannot be given one, so a consumer must handle its absence.
+   */
+  vocabularies: Record<string, { value: string; label: string; colour: string; stage?: string }[]>
   actions: unknown[]
 }
 

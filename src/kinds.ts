@@ -67,12 +67,52 @@ export const KIND = {
   PROFILE: 0,
 } as const
 
-/** A status value plus how to render it. */
+/**
+ * Where a status sits in the work's lifecycle — **what it means**, as opposed
+ * to what it is called or what colour it is drawn in.
+ *
+ * Added by PRO-2. Without it a consumer wanting to say "4 of 7 done" has to
+ * guess from the label, and Peek did exactly that: a hardcoded set of English
+ * words (`'in progress'`, `'doing'`, `'in review'`) matched against lowercased
+ * labels, whose own comment admitted *"an app whose statuses are spelled
+ * differently shows an empty section until its values are added here."* For a
+ * layer that exists to make the third app cheap, that is a defect rather than
+ * an editorial position — the third app ships, its words are not in the set,
+ * and its panel comes up blank, which reads as "that app is broken".
+ *
+ * Ship is the expert on what a Ship status means, so Ship says it.
+ *
+ * | stage | means |
+ * | --- | --- |
+ * | `open` | outstanding, not started |
+ * | `started` | somebody is on it now |
+ * | `done` | finished, and it counts as progress |
+ * | `dropped` | closed without being done — never outstanding, never progress |
+ *
+ * **`dropped` is the one that earns its place.** A cancelled ticket is neither
+ * open nor done: counted as open it leaves a finished project stuck at 3/4 for
+ * ever, and counted as done it claims work that was abandoned. Only the owning
+ * app knows which of its statuses are that shape.
+ *
+ * This says nothing about what a consumer *does* with it. Drawing a counter, a
+ * progress bar, or nothing at all is the consumer's call — an owner that could
+ * specify that would be designing another app's UI, which is the objection
+ * RFC 0.4 §13.1 uses to rule out iframes.
+ */
+export type Stage = 'open' | 'started' | 'done' | 'dropped'
+
+/** A status value, what it means, and how to render it. */
 export interface VocabEntry {
   value: string
   label: string
   /** A semantic name, not a hex code — the consumer picks the actual colour. */
   colour: 'neutral' | 'blue' | 'green' | 'muted'
+  /**
+   * Optional on the type because a manifest published before PRO-2 does not
+   * carry it and cannot be made to — the same reason `emits.alsoRead` exists.
+   * Every entry Ship declares sets it; a consumer must still handle its absence.
+   */
+  stage?: Stage
 }
 
 /**
@@ -85,17 +125,17 @@ export interface VocabEntry {
  * rendering, for the status picker, and (at step 3) for cross-app validation.
  */
 export const PROJECT_STATUSES: VocabEntry[] = [
-  { value: 'planned', label: 'Planned', colour: 'neutral' },
-  { value: 'in_progress', label: 'In Progress', colour: 'blue' },
-  { value: 'completed', label: 'Completed', colour: 'green' },
-  { value: 'cancelled', label: 'Cancelled', colour: 'muted' },
+  { value: 'planned', label: 'Planned', colour: 'neutral', stage: 'open' },
+  { value: 'in_progress', label: 'In Progress', colour: 'blue', stage: 'started' },
+  { value: 'completed', label: 'Completed', colour: 'green', stage: 'done' },
+  { value: 'cancelled', label: 'Cancelled', colour: 'muted', stage: 'dropped' },
 ]
 
 export const ISSUE_STATUSES: VocabEntry[] = [
-  { value: 'todo', label: 'Todo', colour: 'neutral' },
-  { value: 'in_progress', label: 'In Progress', colour: 'blue' },
-  { value: 'done', label: 'Done', colour: 'green' },
-  { value: 'cancelled', label: 'Cancelled', colour: 'muted' },
+  { value: 'todo', label: 'Todo', colour: 'neutral', stage: 'open' },
+  { value: 'in_progress', label: 'In Progress', colour: 'blue', stage: 'started' },
+  { value: 'done', label: 'Done', colour: 'green', stage: 'done' },
+  { value: 'cancelled', label: 'Cancelled', colour: 'muted', stage: 'dropped' },
 ]
 
 /**
