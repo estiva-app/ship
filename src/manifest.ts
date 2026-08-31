@@ -79,6 +79,31 @@ export type SlotSource =
    * the root event to seed the field from — see addition 3 below.
    */
   | { fold: string; tag?: string; map?: string; as?: 'pubkey'; label?: string; default?: string }
+  /**
+   * **Child objects, found by the tag on the child that names this one.**
+   *
+   * The `list` slot (RFC 0.4 §13.3), and the only source here that does not
+   * read the root event. Every other variant answers "what does this event
+   * say?"; this one answers "what points at it?", which is why it is named
+   * `children` and `via` rather than reusing `tag`. A reader who confuses the
+   * two writes a query in the wrong direction and gets an empty list rather
+   * than an error.
+   *
+   * The inversion is forced by the data, not chosen. A project cannot carry a
+   * tag listing its issues: a `kind:30850` is replaceable **only by its
+   * author**, so every issue anyone else filed would need the project's author
+   * to republish, and REW-11 established that republishing stamps a
+   * `created_at` the relay will not backdate. The link therefore lives on the
+   * child, where the child's own author can write it.
+   *
+   * `limit` is the producer saying how many children are worth fetching, not a
+   * guarantee. **Recursion depth is the consumer's business and is not declared
+   * here** — a child resolved through its own projection may declare a `list`
+   * too, and the app at risk of the render loop is the one drawing it. §13.4's
+   * honour-system rule cuts this way: a producer that could set the consumer's
+   * recursion budget could hang it.
+   */
+  | { children: { kind: number; via: string; limit?: number }; label?: string }
 
 export interface Projection {
   /** One of the predefined widget types. The consumer owns the layout. */
@@ -197,6 +222,24 @@ export function manifestContent(): ManifestContent {
           // Seeded by the root's `lead` tag, overridden by a change — the same
           // rule `fold.ts` applies, now stated where a consumer can read it.
           meta: [{ label: 'Lead', fold: 'lead', tag: 'lead', as: 'pubkey' }],
+          /*
+           * The issues in this project — PRO-2.
+           *
+           * "A project card with its issues underneath" is the layout most
+           * cited as proof this mechanism works, and until now it was the one
+           * layout the mechanism could not express: a consumer had to infer the
+           * relation from the `add-issue` action's `toAddressOf: "self"`, which
+           * is reading a *write* declaration to answer a *read* question. It
+           * worked, and it was a guess. This says it outright.
+           *
+           * `via: 'a'` is the tag `buildIssue` writes (`src/events.ts`), and it
+           * is optional there — an issue may name no project. Such an issue is
+           * simply not in anyone's list, which is correct and is why the query
+           * is by tag rather than by folder: a Folder holds the conversation,
+           * the `a` tag holds the containment, and REW-11 made them different
+           * questions when it made the project record global.
+           */
+          list: { children: { kind: KIND.ISSUE, via: 'a', limit: 200 } },
         },
       },
       [KIND.ISSUE]: {
