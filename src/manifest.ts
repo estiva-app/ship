@@ -59,8 +59,19 @@ export type SlotSource =
    * one slot with several places to look.
    */
   | { tag: string | string[]; map?: string; as?: 'pubkey'; label?: string; truncate?: number }
-  /** A top-level event field — in practice only `content`. */
-  | { field: 'content'; truncate?: number; label?: string }
+  /**
+   * A top-level event field — in practice only `content`.
+   *
+   * **No `truncate` here, and that is deliberate (PRO-8).** `truncate` is a
+   * plain-text operation, and Ship's `content` is a structured field: 76 of 89
+   * descriptions on production carry markdown. Cutting one at 120 characters
+   * yields raw markup, not a summary. RFC 0.4 §13.3 states the rule; removing
+   * the option is what stops it being re-added by somebody who has not read it.
+   *
+   * `truncate` stays on the `tag` variant above, where a value is a plain
+   * string by construction.
+   */
+  | { field: 'content'; label?: string }
   /**
    * A field produced by folding change events.
    *
@@ -155,7 +166,33 @@ export function manifestContent(): ManifestContent {
           // which one you name. The issue below is untouched: REW-11 did not
           // rename anything there.
           title: { tag: ['name', 'title'] },
-          subtitle: { field: 'content', truncate: 120 },
+          /*
+           * No `subtitle`, on purpose — PRO-8.
+           *
+           * This slot used to be `{ field: 'content', truncate: 120 }`. Against
+           * the descriptions production actually holds — 76 of 89 carrying
+           * markdown structure, the longest 5,706 characters — that renders the
+           * first 120 characters of *raw markup* as an object's subtitle. A
+           * description beginning `# Goal` projected as the literal text
+           * "# Goal" followed by a sentence fragment.
+           *
+           * RFC 0.4 §13.3 draws the line this crossed: `truncate` is a
+           * plain-text operation and MUST NOT be applied to a structured field.
+           * `subtitle` carries a plain-text summary; `body` carries structure.
+           * An app whose description is structured owes the consumer the
+           * summary rather than expecting it to flatten a grammar it does not
+           * know.
+           *
+           * Declaring nothing is the honest interim state, and it is strictly
+           * better than what shipped: a consumer that omits a slot renders a
+           * named, resolvable object, because §13.3 makes `title` the required
+           * one and obliges a consumer to ignore what it cannot use. A
+           * consumer handed 120 characters of markup renders something wrong
+           * and cannot tell that it is wrong.
+           *
+           * The slot comes back when Ship can derive a real summary, which
+           * needs the `body` slot and the content-format decision behind it.
+           */
           status: { fold: 'status', map: 'statuses', default: DEFAULT_PROJECT_STATUS },
           // Seeded by the root's `lead` tag, overridden by a change — the same
           // rule `fold.ts` applies, now stated where a consumer can read it.
@@ -166,7 +203,13 @@ export function manifestContent(): ManifestContent {
         widget: 'row',
         slots: {
           title: { tag: 'title' },
-          subtitle: { field: 'content', truncate: 120 },
+          // No `subtitle` — same reason as the project above (PRO-8). Peek's
+          // current widget never rendered this one anyway: a `row` is a single
+          // line by definition, so it reads `subtitle` only for a `card`. That
+          // made the issue projection the quieter half of the same defect, not
+          // an exempt one — the declaration was wrong for any consumer that
+          // chose to use it, and a manifest describes the object rather than
+          // one consumer's layout.
           status: { fold: 'status', map: 'issueStatuses', default: DEFAULT_ISSUE_STATUS },
           meta: [
             { tag: 'ref' },
