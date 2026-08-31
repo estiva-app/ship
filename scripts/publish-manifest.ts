@@ -23,7 +23,7 @@ import { buildManifest, DEFAULT_APP_URL, MANIFEST_D_TAG, manifestContent, type M
 import { Store } from '../src/store'
 import { buildDeletion as buildEventDeletion } from '@estiva-app/protocol'
 import { KIND } from '../src/kinds'
-import { widgetChainProblem, CLOSED_WIDGETS } from '../interop/projection'
+import { widgetChainProblem, CLOSED_WIDGETS } from '@estiva-app/interop'
 
 const RELAY_URL = process.env.RELAY_URL ?? 'http://localhost:3000'
 const KEY_FILE = new URL('../.manifest-key', import.meta.url).pathname

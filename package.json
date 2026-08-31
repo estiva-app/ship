@@ -2,13 +2,13 @@
   "name": "estiva-ship",
   "private": true,
   "type": "module",
-  "description": "A minimal issue tracker on Nostr \u2014 projects, issues, comments",
+  "description": "A minimal issue tracker on Nostr — projects, issues, comments",
   "scripts": {
     "typecheck": "tsc --noEmit",
     "probe": "tsx scripts/probe-kinds.ts",
     "verify": "tsx scripts/verify.ts",
     "manifest": "tsx scripts/publish-manifest.ts",
-    "test": "tsx scripts/vendor.test.ts && tsx scripts/docker-context.test.ts && tsx scripts/nip19.test.ts && tsx scripts/app.test.ts && tsx scripts/signer.test.ts && tsx scripts/directory.test.ts && tsx scripts/auth-shell.test.ts && tsx scripts/conformance.test.ts",
+    "test": "tsx scripts/docker-context.test.ts && tsx scripts/nip19.test.ts && tsx scripts/app.test.ts && tsx scripts/signer.test.ts && tsx scripts/directory.test.ts && tsx scripts/auth-shell.test.ts && tsx scripts/conformance.test.ts",
     "test:directory": "tsx scripts/directory.test.ts",
     "test:nip19": "tsx scripts/nip19.test.ts",
     "test:app": "tsx scripts/app.test.ts",
@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@estiva-app/identity": "^0.1.1",
+    "@estiva-app/interop": "^0.1.0",
     "@estiva-app/protocol": "^0.2.0",
     "@noble/curves": "1.9.2",
     "@noble/hashes": "1.8.0"
