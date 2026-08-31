@@ -28,7 +28,7 @@
 import { readFileSync, existsSync } from 'node:fs'
 import { Relay } from '@estiva-app/protocol'
 import { secretKeySigner } from '../lib/nostr/signer'
-import { resolveForeignObject } from '../interop/projection'
+import { resolveForeignObject } from '@estiva-app/interop'
 
 const RELAY_URL = process.env.RELAY_URL ?? 'https://estiva.estiva.app'
 const KEY_FILE = new URL('../.manifest-key', import.meta.url).pathname

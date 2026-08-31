@@ -15,13 +15,13 @@
  * around here.
  */
 import type { SignedEvent } from '@estiva-app/protocol'
-import { resolveForeignObject, type ForeignObject } from '../../../interop/projection'
+import { resolveForeignObject, type ForeignObject } from '@estiva-app/interop'
 
 /** Chain-walking, from the runtime — one implementation, not one per consumer. */
-export { pickWidget } from '../../../interop/projection'
+export { pickWidget } from '@estiva-app/interop'
 import { relay } from './store'
 
-export type { ForeignObject, ResolvedSlot } from '../../../interop/projection'
+export type { ForeignObject, ResolvedSlot } from '@estiva-app/interop'
 
 /**
  * The one environment touch the runtime takes: a filter query.

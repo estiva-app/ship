@@ -36,16 +36,6 @@ COPY tsconfig.json ./
 COPY lib ./lib
 COPY src ./src
 
-# The vendored projection runtime (PRO-7). `web/src/api/foreign.ts` imports it
-# by relative path, so `tsc -b` inside the image resolves it or fails — and it
-# failed, because this line was not added with the directory.
-#
-# It is worth knowing why this reached main. The Docker build runs only in the
-# `publish` job, which is skipped on pull requests, so the `check` and `web`
-# jobs were green on a tree that could not be built into an image. Any file the
-# web build reaches which is not copied here fails at merge and nowhere earlier.
-COPY interop ./interop
-
 # The app (REW-8). `apps/` and build.mjs are gone — REW-9 deleted the vanilla
 # app, and web/src/router.ts now holds the hash router outright instead of
 # re-exporting it from there, which is what made the deletion possible.

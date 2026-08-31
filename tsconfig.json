@@ -21,7 +21,6 @@
   "include": [
     "lib",
     "src",
-    "scripts",
-    "interop"
+    "scripts"
   ]
 }
