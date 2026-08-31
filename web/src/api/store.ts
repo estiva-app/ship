@@ -41,4 +41,16 @@ export const signer: Signer =
       })
     : localSigner('ship.secretkey')
 
-export const store = new Store(new Relay(RELAY_URL, signer), signer)
+/**
+ * The relay, named so `foreign.ts` can query it (PRO-7).
+ *
+ * `Store` holds its own reference privately and offers Ship-shaped reads. The
+ * projection runtime needs something lower: an arbitrary filter query, because
+ * it is resolving another app's objects and Ship's methods only know Ship's.
+ *
+ * Still inside `api/`, so the rule above holds — nothing *outside* the seam
+ * sees a relay or a signer.
+ */
+export const relay = new Relay(RELAY_URL, signer)
+
+export const store = new Store(relay, signer)
