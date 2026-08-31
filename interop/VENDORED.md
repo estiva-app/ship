@@ -5,8 +5,8 @@
 | | |
 | --- | --- |
 | source | `estiva-app/peek`, `interop/projection.ts` |
-| vendored at | `1bf9ec2` (PR #83) |
-| sha256 | `a9adde0175a50dd43f5dcdd63f8e09a92a8527872b6051f73525ac09c914a4ee` |
+| vendored at | `1e91c24` (PR #85) |
+| sha256 | `5b01ddd138099623ebc9bde9d9f406dae8f90c3f810a1348138f7394a1bca9c4` |
 | why | PRO-7 — Ship is the projection layer's second consumer |
 
 ## Why a copy rather than a package

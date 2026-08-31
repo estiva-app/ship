@@ -1,6 +1,7 @@
 import { Breadcrumb, type Crumb } from '@/components/ui/Breadcrumb'
 import { Divider } from '@/components/ui/Divider'
 import { EditableText } from '@/components/ui/EditableText'
+import { ForeignReferences } from '@/components/ForeignReferences'
 import { ActivityFeed, type ActivityEntry } from '@/components/ActivityFeed'
 import { Conversations, type ThreadData } from '@/components/ConversationThread'
 import { IssueRail, type IssueRailProps } from '@/components/IssueRail'
@@ -45,6 +46,8 @@ export function IssueView({ crumbs, title, description, onRename, onDescribe, th
         <div className="flex flex-col gap-2">
           <EditableText label="Title" value={title} placeholder="Untitled issue" onCommit={onRename} readOnly={!!readOnlyReason} className="-mx-2 text-h2" />
           <EditableText label="Description" value={description} placeholder="Add a description…" onCommit={onDescribe} multiline readOnly={!!readOnlyReason} className="-mx-2 text-body-2" />
+          {/* Any object referenced in the description, live — PRO-7. */}
+          <ForeignReferences text={description} className="flex flex-col gap-2" />
         </div>
         <section className="flex flex-col gap-3">
           <h2 className="text-h4 text-text-primary">Conversations</h2>

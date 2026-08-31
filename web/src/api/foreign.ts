@@ -16,6 +16,9 @@
  */
 import type { SignedEvent } from '@estiva-app/protocol'
 import { resolveForeignObject, type ForeignObject } from '../../../interop/projection'
+
+/** Chain-walking, from the runtime — one implementation, not one per consumer. */
+export { pickWidget } from '../../../interop/projection'
 import { relay } from './store'
 
 export type { ForeignObject, ResolvedSlot } from '../../../interop/projection'
