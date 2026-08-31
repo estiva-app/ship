@@ -106,7 +106,20 @@ export type SlotSource =
   | { children: { kind: number; via: string; limit?: number }; label?: string }
 
 export interface Projection {
-  /** One of the predefined widget types. The consumer owns the layout. */
+  /**
+   * One of the predefined widget types. The consumer owns the layout.
+   *
+   * **Narrower than the protocol allows, deliberately.** SPEC §7.5 lets a
+   * manifest declare any widget name as an ordered chain terminating in one of
+   * these — `["profile", "card"]` — and Ship has no use for one: a project is a
+   * card and an issue is a row, both closed types. Keeping the union means the
+   * compiler makes an unpublishable declaration unwritable here, which is a
+   * stronger guarantee than the runtime check in `publish-manifest.ts` and the
+   * reason that check reads as belt-and-braces for this app.
+   *
+   * Widen it to `string | string[]` the day Ship needs a chain; the publish
+   * script already validates the wire shape either way.
+   */
   widget: 'card' | 'row' | 'table' | 'stat'
   slots: Record<string, SlotSource | SlotSource[]>
 }
