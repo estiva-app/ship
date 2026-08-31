@@ -16,7 +16,7 @@
 import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 
-const VENDORED_SHA256 = 'a9adde0175a50dd43f5dcdd63f8e09a92a8527872b6051f73525ac09c914a4ee'
+const VENDORED_SHA256 = '5b01ddd138099623ebc9bde9d9f406dae8f90c3f810a1348138f7394a1bca9c4'
 const FILE = new URL('../interop/projection.ts', import.meta.url).pathname
 
 let failures = 0

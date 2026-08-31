@@ -70,7 +70,7 @@ async function main() {
     const child = object.children[0]
     const author = child.slots.title?.value ?? ''
     console.log('  first child:')
-    console.log(`    widget      ${JSON.stringify(child.widget)}   (a chain — no consumer walks one yet)`)
+    console.log(`    widget      ${JSON.stringify(child.widget)}   (a chain — Ship walks it via pickWidget)`)
     console.log(`    addressable ${!!child.address}`)
     console.log(`    author      ${object.people?.[author]?.displayName ?? '(nobody published a kind:0)'}`)
     console.log(`    body        "${(child.slots.body?.value ?? '').replace(/\s+/g, ' ').slice(0, 60)}…"`)
