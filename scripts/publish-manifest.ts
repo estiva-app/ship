@@ -19,10 +19,11 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { Relay } from '@estiva-app/protocol'
 import { secretKeySigner } from '../lib/nostr/signer'
 import { publicKeyFromSecret, signEvent } from '@estiva-app/protocol'
-import { buildManifest, DEFAULT_APP_URL, MANIFEST_D_TAG, type ManifestContent, type SlotSource } from '../src/manifest'
+import { buildManifest, DEFAULT_APP_URL, MANIFEST_D_TAG, manifestContent, type ManifestContent, type SlotSource } from '../src/manifest'
 import { Store } from '../src/store'
 import { buildDeletion as buildEventDeletion } from '@estiva-app/protocol'
 import { KIND } from '../src/kinds'
+import { widgetChainProblem, CLOSED_WIDGETS } from '../interop/projection'
 
 const RELAY_URL = process.env.RELAY_URL ?? 'http://localhost:3000'
 const KEY_FILE = new URL('../.manifest-key', import.meta.url).pathname
@@ -152,6 +153,29 @@ async function main() {
   // Overridable so a deployment somewhere other than the dev port publishes a
   // `web` tag that actually resolves for whoever follows it.
   assertUrlsAgree(RELAY_URL, process.env.APP_URL ?? DEFAULT_APP_URL)
+
+  /*
+    Every widget declaration is publishable — PRO-3, and the same check Peek's
+    publish script runs, from the same function.
+
+    Ship's own `Projection.widget` is the closed union, so today the compiler
+    already makes a bad value unwritable here and this cannot fail. It is worth
+    running anyway for two reasons: the thing being checked is the *published
+    JSON*, which is what another app reads and what the type stops describing
+    the moment the union is widened to allow a chain; and one implementation
+    checking both producers is what stops the rule drifting between them, which
+    is the same argument that put `CLOSED_WIDGETS` in the runtime rather than in
+    each app.
+  */
+  for (const [kind, projection] of Object.entries(manifestContent().projections)) {
+    const problem = widgetChainProblem(projection.widget)
+    if (problem) {
+      console.error(`\n✋ Refusing to publish. kind:${kind} — ${problem}\n`)
+      process.exit(1)
+    }
+  }
+  check('every widget chain terminates in a closed type', true, CLOSED_WIDGETS.join(', '))
+
   const event = buildManifest(identity.pubkey, Date.now(), process.env.APP_URL)
   const published = await relay.publish(signEvent(event, identity.secretKeyHex))
   check('the relay accepts kind:31990', published.ok, published.reason ?? '')

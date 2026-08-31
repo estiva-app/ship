@@ -519,6 +519,53 @@ function truncate(text: string, limit?: number) {
  * not be allowed to see, and reports "that app is broken" about an app doing
  * exactly what it was told.
  */
+/**
+ * The widget types RFC 0.4 §13.3 closes. A chain MUST end in one of these.
+ *
+ * Exported because both halves need the same list and they must not drift: a
+ * producer checks its chain terminates here, a consumer's fallback is drawn
+ * from here. Two copies would disagree the first time the set grew, and the
+ * disagreement would show up as an object rendering blank in one app only.
+ */
+export const CLOSED_WIDGETS = ['card', 'row', 'table', 'stat'] as const
+
+/**
+ * Why a widget declaration is not publishable, or null when it is — PRO-3.
+ *
+ * **The producer half of the fallback chain.** `pickWidget` below makes a
+ * consumer safe against a chain it does not fully understand; this stops the
+ * unrenderable chain being published in the first place. Both are needed and
+ * they fail differently: without the consumer half an unknown widget renders
+ * blank, and without this one a *conformant* consumer renders blank through no
+ * fault of its own, having done exactly what it was told.
+ *
+ * A chain that does not terminate in a closed type is the PEE-10 failure with
+ * a longer fuse — every consumer that has not heard of `profile` walks
+ * `["profile"]` to the end and has nothing left to draw.
+ *
+ * Returns a sentence rather than a boolean because this is read by a person
+ * publishing a manifest, and "invalid widget" tells them nothing about which
+ * one or what to do.
+ */
+export function widgetChainProblem(declared: unknown): string | null {
+  if (typeof declared === 'string') {
+    return (CLOSED_WIDGETS as readonly string[]).includes(declared)
+      ? null
+      : `"${declared}" is not one of ${CLOSED_WIDGETS.join(', ')}. A widget outside the closed set must be declared as a chain ending in one of them — ["${declared}", "card"].`
+  }
+  if (!Array.isArray(declared) || declared.length === 0) {
+    return 'a widget must be a type or a non-empty ordered chain of them.'
+  }
+  if (declared.some((entry) => typeof entry !== 'string' || entry === '')) {
+    return 'every entry in a widget chain must be a non-empty string.'
+  }
+  const last = declared[declared.length - 1]
+  if (!(CLOSED_WIDGETS as readonly string[]).includes(last)) {
+    return `["${declared.join('", "')}"] ends in "${last}", which no consumer is required to implement. A chain must end in one of ${CLOSED_WIDGETS.join(', ')} so there is always something left to draw.`
+  }
+  return null
+}
+
 export function pickWidget<T extends string>(
   declared: string | string[],
   implemented: readonly T[],
@@ -1362,10 +1409,37 @@ export async function resolveFolderProject(
   //    archived is itself a folded field.
   const childKinds = [...new Set([...containers.values()].map((c) => c.childKind))]
   const discoveredRule = discovered?.records
-  const inFolder = await query([
+  const inFolderRaw = await query([
     { '#h': [folder], kinds: [...containers.keys(), ...childKinds], limit: 200 },
     ...(discoveredRule ? [{ '#h': [folder], kinds: [discoveredRule.changeKind], limit: 500 }] : []),
   ])
+
+  /*
+    **A Folder is not a file inside itself.**
+
+    A channel's own `kind:39000` comes back from an `#h` query for that channel.
+    It carries no `h` tag — the relay scopes a discovery event to the channel it
+    describes, so it arrives with the contents. What marks it out is that its
+    `d` *is* the folder uuid; a file sitting in a Folder has its own uuid,
+    different from the Folder's.
+
+    Dropped here, once, rather than at each use. Two places downstream ask "does
+    this Folder hold a container", and they have to agree: `holdsContainer`
+    decides whether to go looking for a project the Folder does not hold, and
+    `roots` decides which container is the subject. Filtering only the second
+    makes them disagree and the panel resolves to nothing at all.
+
+    Until Peek published a manifest this could not bite, because only Ship's
+    kinds were containers and a `39000` was never a candidate. PRO-6 declared
+    Topic a container — it holds messages — so the Topic became a candidate,
+    won the contest against the actual project, and the sidebar listed the
+    *messages* as tickets. Each was titled with its author's pubkey, because a
+    message resolved through Peek's own projection has `title: {field: "pubkey"}`.
+
+    App-neutral on purpose: this is a fact about folders and discovery events,
+    not about Peek.
+  */
+  const inFolder = inFolderRaw.filter((e) => tagValue(e, 'd') !== folder)
 
   const addressOfEvent = (event: SignedEvent) =>
     pointerToAddress({
