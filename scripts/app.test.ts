@@ -328,6 +328,45 @@ const commentAction = (JSON.parse(shipManifest.content) as {
 check('the manifest tells consumers to publish 1111', commentAction.emits.kind === 1111)
 check('  …and to keep reading the kind:9 it used to emit', commentAction.emits.alsoRead?.includes(9) === true)
 
+// ── Every action says what it does and what it costs (PRO-5) ───────────────
+
+/*
+  `ManifestContent.actions` is `unknown[]` on purpose: Ship is the *producer*
+  here, and typing its manifest against the consumer runtime's `ManifestAction`
+  would point the data layer at `@estiva-app/interop`, which is the wrong
+  direction — that package exists to read other apps' manifests, not to
+  constrain Ship's own.
+
+  So the shape is enforced here instead. A typo in `effect` is otherwise
+  invisible: the runtime drops a value it does not recognise, so `"write"` for
+  `"writes"` publishes an action that silently declares nothing.
+*/
+console.log('\n# every action carries description and effect\n')
+
+const EFFECTS = ['safe', 'writes', 'destructive']
+const allActions = (JSON.parse(buildManifest(PK, Date.now()).content) as {
+  actions: { id: string; label: string; description?: string; effect?: string }[]
+}).actions
+
+check('the manifest declares six actions', allActions.length === 6)
+for (const action of allActions) {
+  check(`  ${action.id} describes itself for a machine`, (action.description?.length ?? 0) > 40)
+  check(`  ${action.id} says it is not the label`, action.description !== action.label)
+  check(`  ${action.id} declares a known effect`, EFFECTS.includes(action.effect ?? ''))
+}
+
+/*
+  Ship offers no destructive action to another app, and that is an inventory
+  rather than an oversight — archive is a folded field a consumer honours via
+  `hiddenWhen`, and delete is a NIP-09 request honoured only for the author.
+  Asserted so that adding one is a deliberate act with a failing test in front
+  of it.
+*/
+check(
+  'no action is destructive, because none is offered',
+  allActions.every((a) => a.effect !== 'destructive'),
+)
+
 // ── The manifest still projects a renamed tag ───────────────────────────────
 
 /*
