@@ -1,15 +1,9 @@
-import { clsx, type ClassValue } from 'clsx'
-import { twMerge } from 'tailwind-merge'
-
 /**
- * Merge class names, last-one-wins on conflicting Tailwind utilities.
+ * Ship's `cn` is the shared one (2026-09-01) — the same clsx + tailwind-merge
+ * body this file carried as a verbatim copy of Peek's, now imported instead.
  *
- * Peek's `@/lib/utils` verbatim (same three dependencies, same versions), so a
- * component moved into `@estiva-app/ui` at SHA-5 needs no edit here. Note the
- * caveat Peek's tailwind config records: `tailwind-merge` silently drops a
- * custom `text-{size}` token that is followed by a `text-{colour}` class, so
- * shared components spell sizes as arbitrary values.
+ * The caveat still stands: `tailwind-merge` silently drops a custom
+ * `text-{size}` token that is followed by a `text-{colour}` class, so shared
+ * components spell sizes as arbitrary values.
  */
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
-}
+export { cn } from '@estiva-app/ui'
