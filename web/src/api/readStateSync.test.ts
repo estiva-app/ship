@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import type { MergedReadState } from './readState'
 
 /**
@@ -19,7 +19,8 @@ vi.mock('./store', () => ({
   signer: { pubkey: 'me', sign: async (e: unknown) => e },
 }))
 vi.mock('./nip44', () => ({ nip44: { encrypt: async (p: string) => p, decrypt: async () => undefined } }))
-vi.mock('../auth/estivaId', () => ({ signedIn: () => true }))
+const signedIn = vi.fn(() => true)
+vi.mock('../auth/estivaId', () => ({ signedIn: () => signedIn() }))
 vi.mock('./readState', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./readState')>()),
   fetchMergedReadState: (...a: unknown[]) => fetchMergedReadState(...(a as [])),
@@ -125,5 +126,67 @@ describe('an unreadable own slot blocks the publish', () => {
     await flushReadState()
 
     expect(publishReadState).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('a marker is never stranded by a transient failure', () => {
+  beforeEach(async () => {
+    vi.clearAllMocks()
+    vi.useFakeTimers()
+    const { resetReadStateForTests } = await import('./readStateSync')
+    resetReadStateForTests()
+  })
+  afterEach(() => vi.useRealTimers())
+
+  /**
+   * An access token expiring mid-session is ordinary — the signer renews itself.
+   * Before this, the flush returned, the debounce timer had already fired, and
+   * the marker sat in `pending` until the next read or a tab switch. Observed
+   * live: reading an issue in Ship simply never reached the relay.
+   */
+  it('retries after the session is unusable, and publishes once it is back', async () => {
+    const { markRead, flushReadState } = await import('./readStateSync')
+    fetchMergedReadState.mockResolvedValue({ reachable: true, merged: {}, own: undefined })
+    signedIn.mockReturnValue(false)
+
+    markRead([NEW], 2_000_000)
+    await flushReadState()
+    expect(publishReadState).not.toHaveBeenCalled()
+
+    signedIn.mockReturnValue(true)
+    await vi.advanceTimersByTimeAsync(5_000)
+    expect(publishReadState).toHaveBeenCalledTimes(1)
+  })
+
+  it('retries when our own slot could not be decrypted', async () => {
+    const { markRead, flushReadState } = await import('./readStateSync')
+    signedIn.mockReturnValue(true)
+    fetchMergedReadState.mockResolvedValue({
+      reachable: true, merged: {}, own: undefined, ownUndecryptable: true,
+    })
+
+    markRead([NEW], 2_000_000)
+    await flushReadState()
+    expect(publishReadState).not.toHaveBeenCalled()
+
+    fetchMergedReadState.mockResolvedValue({ reachable: true, merged: {}, own: undefined })
+    await vi.advanceTimersByTimeAsync(5_000)
+    expect(publishReadState).toHaveBeenCalledTimes(1)
+  })
+
+  it('backs off rather than busy-looping while it keeps failing', async () => {
+    const { markRead, flushReadState } = await import('./readStateSync')
+    signedIn.mockReturnValue(false)
+    markRead([NEW], 2_000_000)
+    await flushReadState()
+
+    // First retry at the debounce interval, the next at twice that — so a long
+    // outage costs a handful of checks rather than one every three seconds.
+    await vi.advanceTimersByTimeAsync(3_100)
+    const afterFirst = signedIn.mock.calls.length
+    await vi.advanceTimersByTimeAsync(3_100)
+    expect(signedIn.mock.calls.length).toBe(afterFirst)
+    await vi.advanceTimersByTimeAsync(3_100)
+    expect(signedIn.mock.calls.length).toBeGreaterThan(afterFirst)
   })
 })
