@@ -60,6 +60,8 @@ let published: Record<string, number> | undefined
 let hydrated = false
 let hydrating: Promise<void> | undefined
 let timer: ReturnType<typeof setTimeout> | undefined
+/** Grows while a flush keeps failing, so a long outage is not a busy loop. */
+let retryMs = 0
 let inFlight: Promise<void> = Promise.resolve()
 
 function currentIdentity(): SlotIdentity {
@@ -125,6 +127,26 @@ async function hydrate(): Promise<void> {
 }
 
 /** Publish anything pending now. */
+/**
+ * Try again later, because markers are still pending.
+ *
+ * Every early return below leaves `pending` populated, and the debounce timer
+ * has already fired and been cleared — so without this the markers sit stranded
+ * until the next `record` or the tab is hidden. Observed twice: once behind a
+ * `/nip44` rate limit and once behind an access token expiring mid-session, and
+ * both times reading an issue simply never reached the relay.
+ *
+ * Backs off so a long outage is not a busy loop, and resets on success.
+ */
+function retryLater(): void {
+  if (timer !== undefined) return
+  retryMs = retryMs === 0 ? PUBLISH_DEBOUNCE_MS : Math.min(retryMs * 2, 60_000)
+  timer = setTimeout(() => {
+    timer = undefined
+    void flushReadState()
+  }, retryMs)
+}
+
 export function flushReadState(): Promise<void> {
   if (timer !== undefined) {
     clearTimeout(timer)
@@ -132,9 +154,13 @@ export function flushReadState(): Promise<void> {
   }
   inFlight = inFlight.then(async () => {
     if (Object.keys(pending).length === 0) return
-    if (!signedIn()) return
+    // No usable token — an access token expiring mid-session is ordinary, and
+    // the signer renews itself. Keep the markers and come back.
+    if (!signedIn()) return retryLater()
     await hydrate()
-    if (!hydrated) return
+    // Unreachable, or our own slot is there and unreadable. Both mean we must
+    // not publish; neither means the markers should be abandoned.
+    if (!hydrated) return retryLater()
     const sending = pending
     const contexts = { ...known }
     pending = {}
@@ -146,13 +172,16 @@ export function flushReadState(): Promise<void> {
       const result = await publishReadState(relay, signer, nip44, currentIdentity(), contexts)
       if (result.ok) {
         published = contexts
+        retryMs = 0
       } else {
         console.warn('[read-state] publish rejected:', result.reason)
         pending = advanceContexts(pending, sending)
+        retryLater()
       }
     } catch (error) {
       console.warn('[read-state] publish failed:', error)
       pending = advanceContexts(pending, sending)
+      retryLater()
     }
   })
   return inFlight
@@ -196,6 +225,7 @@ export function resetReadStateForTests(): void {
   pending = {}
   published = undefined
   hydrated = false
+  retryMs = 0
   hydrating = undefined
   inFlight = Promise.resolve()
 }
