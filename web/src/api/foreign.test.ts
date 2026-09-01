@@ -15,13 +15,29 @@ const AUTHOR = 'a'.repeat(64)
 const KIND = 30850
 const ADDRESS = `${KIND}:${AUTHOR}:p1`
 
+/*
+  Typed rather than spread into an index signature: `...partial` on a
+  `Record<string, unknown>` widens nothing, so `e.kind` is not a known property
+  and `tsc -b` refuses it — which `vitest` does not, since it strips types
+  rather than checking them.
+*/
+interface TestEvent {
+  id: string
+  sig: string
+  pubkey: string
+  created_at: number
+  kind: number
+  tags: string[][]
+  content: string
+}
+
 let seq = 0
-const event = (partial: Record<string, unknown>) => ({
+const event = (partial: Partial<TestEvent> & { kind: number }): TestEvent => ({
   id: String(++seq).padStart(64, '0'),
   sig: '',
   pubkey: AUTHOR,
   created_at: 1_700_000_000 + seq,
-  tags: [] as string[][],
+  tags: [],
   content: '',
   ...partial,
 })
@@ -43,11 +59,11 @@ beforeEach(() => {
   query.mockImplementation(async (filters: Record<string, unknown>[]) =>
     world.filter((e) =>
       filters.some((f) => {
-        if (f.kinds && !(f.kinds as number[]).includes(e.kind as number)) return false
+        if (f.kinds && !(f.kinds as number[]).includes(e.kind)) return false
         if (f.authors && !(f.authors as string[]).includes(e.pubkey)) return false
         for (const [key, want] of Object.entries(f)) {
           if (!key.startsWith('#')) continue
-          const held = (e.tags as string[][]).filter((t) => t[0] === key.slice(1)).map((t) => t[1])
+          const held = e.tags.filter((t) => t[0] === key.slice(1)).map((t) => t[1])
           if (!(want as string[]).some((v) => held.includes(v))) return false
         }
         return true
