@@ -370,8 +370,18 @@ export interface Nip44 {
 export interface MergedReadState {
   reachable: boolean
   merged: Record<string, number>
-  /** This installation's own blob, when the relay holds one. */
+  /** This installation's own blob, when the relay holds one and it decrypted. */
   own?: ReadStateBlob
+  /**
+   * Our own slot **exists on the relay and could not be read**.
+   *
+   * Kept apart from `own: undefined`, which means the coordinate is genuinely
+   * empty — a first run. This one is the dangerous case: the blob is there, we
+   * cannot see inside it, and publishing anyway would replace it with only what
+   * this session recorded. The realistic cause is a `429` from `/nip44/decrypt`,
+   * which is a transient condition that must not cost a person their read state.
+   */
+  ownUndecryptable?: boolean
 }
 
 /** Fetch every slot, decrypt what decrypts, and merge with the max rule. */
@@ -390,19 +400,24 @@ export async function fetchMergedReadState(
   }
   const blobs: ReadStateBlob[] = []
   let own: ReadStateBlob | undefined
+  let ownUndecryptable = false
   const ownDTag = readStateDTag(identity.slotId)
   for (const event of events) {
     const dTag = event.tags.find((t) => t[0] === 'd')?.[1]
     if (!dTag?.startsWith(READ_STATE_D_PREFIX)) continue
-    // A blob that will not decrypt belongs to a rotated key. Skipped quietly,
-    // per the spec: surfacing it turns "one old installation is unreadable"
-    // into an error on a path whose whole job is a best-effort hint.
+    // Somebody else's blob that will not decrypt belongs to a rotated key.
+    // Skipped quietly, per the spec: surfacing it turns "one old installation is
+    // unreadable" into an error on a path whose whole job is a best-effort hint.
     const blob = parseReadStateBlob(await nip44.decrypt(event.content))
-    if (!blob) continue
+    if (!blob) {
+      // Our own is different. See `ownUndecryptable`.
+      if (dTag === ownDTag) ownUndecryptable = true
+      continue
+    }
     blobs.push(blob)
     if (dTag === ownDTag) own = blob
   }
-  return { reachable: true, merged: mergeBlobs(blobs), own }
+  return { reachable: true, merged: mergeBlobs(blobs), own, ownUndecryptable }
 }
 
 /** Encrypt, sign and publish one slot's blob. */
