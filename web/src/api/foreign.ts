@@ -15,7 +15,7 @@
  * around here.
  */
 import type { SignedEvent } from '@estiva-app/protocol'
-import { createProjectionCache, resolveForeignObject, type ForeignObject } from '@estiva-app/interop'
+import { createPeopleCache, createProjectionCache, resolveForeignObject, type ForeignObject } from '@estiva-app/interop'
 
 /** Chain-walking, from the runtime — one implementation, not one per consumer. */
 export { pickWidget } from '@estiva-app/interop'
@@ -62,9 +62,28 @@ const query = (filters: Record<string, unknown>[]): Promise<SignedEvent[]> =>
  */
 const manifests = createProjectionCache()
 
+/**
+ * Who the people in a foreign object are, remembered for this tab (SHA-16).
+ *
+ * Ship passed nothing here, so the default lookup re-read `kind:0` for every
+ * author of every child on every tick. A Ship object has few authors and never
+ * noticed; a referenced **Peek topic** has one per message, and cost 2 requests
+ * a tick where a Ship object cost 1 — the cross-app case PRO-7 exists for being
+ * the dearest reference rather than the cheapest.
+ *
+ * A miss expires much sooner than a hit, which is the part worth not
+ * reinventing: somebody with no profile yet is precisely the person whose name
+ * is about to arrive, and caching that as long as a name makes them render as
+ * `nostr:<8 chars>` until a reload. Peek found that (PEE-3) and the runtime now
+ * owns it.
+ *
+ * Module scope, beside `manifests`, so every widget shares one answer.
+ */
+const profiles = createPeopleCache()
+
 export function resolveForeign(reference: string): Promise<ForeignObject | null> {
-  // `undefined` and `0`: Ship takes the default people lookup and starts at the
-  // top of the list budget. Positional because that is the runtime's signature;
-  // naming them here would be inventing an adapter the seam does not need.
-  return resolveForeignObject(reference, query, undefined, 0, manifests)
+  // `0` is the list-depth budget, at the top. Positional because that is the
+  // runtime's signature; naming them here would be inventing an adapter the
+  // seam does not need.
+  return resolveForeignObject(reference, query, profiles.viaRelay(query), 0, manifests)
 }

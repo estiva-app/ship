@@ -47,12 +47,21 @@ const manifest = event({
   tags: [['d', 'some-app'], ['k', String(KIND)]],
   content: JSON.stringify({
     name: 'Some app',
-    projections: { [KIND]: { widget: 'card', slots: { title: { tag: 'title' } } } },
+    projections: {
+      [KIND]: {
+        widget: 'card',
+        // `as: 'pubkey'` is what makes the runtime ask who somebody is. Ship's
+        // own manifest declares `lead` this way, and without such a slot the
+        // people test below would assert nothing.
+        slots: { title: { tag: 'title' }, meta: { tag: 'lead', as: 'pubkey' } },
+      },
+    },
   }),
 })
-const object = event({ kind: KIND, tags: [['d', 'p1'], ['title', 'A project']] })
+const object = event({ kind: KIND, tags: [['d', 'p1'], ['title', 'A project'], ['lead', AUTHOR]] })
+const profile = event({ kind: 0, content: JSON.stringify({ name: 'Ada' }) })
 
-const world = [manifest, object]
+const world = [manifest, object, profile]
 
 beforeEach(() => {
   query.mockReset()
@@ -103,5 +112,33 @@ describe('resolveForeign — a widget that refreshes must not re-discover the ap
 
     expect(after?.slots.title?.value).toBe('Renamed elsewhere')
     world[1] = object
+  })
+})
+
+describe('resolveForeign — who the people are is remembered too (SHA-16)', () => {
+  it('does not re-read kind:0 on the next tick', async () => {
+    /*
+      Ship passed no people lookup, so the default re-read every author of every
+      child on every tick. A Ship object has few authors and never noticed; a
+      referenced Peek topic has one per message, and cost 2 requests a tick
+      where a Ship object cost 1.
+
+      Counted by kind, because the assertion is about *which* request stopped
+      happening rather than how many. The first resolve is deliberately not
+      asserted on: the cache is at module scope, so an earlier test in this file
+      may already have warmed it — which is exactly the sharing it is there for.
+    */
+    const found = await resolveForeign(ADDRESS)
+    // Without this the test is vacuous: nothing looks anybody up unless a slot
+    // is declared `as: 'pubkey'`, and then a missing cache would also ask zero.
+    expect(found?.slots.meta?.isPubkey).toBe(true)
+
+    query.mockClear()
+    await resolveForeign(ADDRESS)
+
+    const profileAsks = query.mock.calls.filter((call) =>
+      (call[0] as { kinds?: number[] }[]).some((f) => f.kinds?.includes(0)),
+    ).length
+    expect(profileAsks).toBe(0)
   })
 })
