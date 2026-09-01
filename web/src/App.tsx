@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { me, peopleIn, resolveInbound, useDirectory, useWorkspace, type DirectoryView, type FolderState } from '@/api'
+import { me, peopleIn, resolveInbound, useDirectory, useWorkspace, type DirectoryView, type FolderState, installReadStateFlush } from '@/api'
 import { AppShell } from '@/components/AppShell'
 import { Banner } from '@/components/Banner'
 import { IdentityMenu } from '@/components/IdentityMenu'
@@ -31,6 +31,10 @@ export default function App() {
 
   useCanonicalHash(route)
   useInbound(route, say)
+  /* Read markers are debounced, so the last few of a session would be lost when
+     the tab goes away. `visibilitychange` is the one mobile browsers reliably
+     fire when a tab is backgrounded or killed (CRO-8). */
+  useEffect(() => installReadStateFlush(), [])
 
   const copyKey = useCallback(async () => {
     try {

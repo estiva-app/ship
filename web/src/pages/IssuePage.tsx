@@ -1,5 +1,6 @@
+import { useMarkRead } from '@/lib/useMarkRead'
 import { useMemo } from 'react'
-import { ISSUE_STATUSES, conversationsAbout, referenceFor, reply, setIssueField, startConversation, type DirectoryView, type FolderState } from '@/api'
+import { ISSUE_STATUSES, conversationsAbout, referenceFor, reply, setIssueField, startConversation, type DirectoryView, type FolderState, threadContext } from '@/api'
 import type { ActivityEntry } from '@/components/ActivityFeed'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { IssueView } from '@/views/IssueView'
@@ -39,6 +40,11 @@ export function IssuePage({ state, directory, addr, say, refresh }: { state: Fol
   const project = issue?.projectAddr ? state.projects.find((candidate) => candidate.addr === issue.projectAddr) : undefined
 
   const conversations = useMemo(() => (issue ? conversationsAbout(state.conversations, issue.addr) : []), [issue, state])
+  /* An issue is an object *inside* a Folder, not a container of its own, so it
+     advances one `thread:` context per discussion and never the project's
+     container — SPEC §11.2. Doing it the other way would make reading one issue
+     mark the whole project read. */
+  useMarkRead(useMemo(() => conversations.map((c) => threadContext(c.id)), [conversations]))
   const threads = useMemo(() => conversations.map((c) => threadFor(c, directory)), [conversations, directory])
   const activity = useMemo(() => (issue ? activityFor(issue.addr, state, directory) : []), [issue, state, directory])
   const people = useMemo(() => railPeople(state, directory), [state, directory])

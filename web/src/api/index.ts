@@ -25,6 +25,11 @@ export { conversationsAbout } from '../../../src/fold'
 export { useWorkspace } from './useWorkspace'
 export { useDirectory, type DirectoryView, type Person } from './useDirectory'
 export { peopleIn, short } from './people'
+/* Read state on the relay (CRO-8). The context grammar is exported so a page
+   builds ids through it rather than inventing one — the mapping is the part the
+   ticket says to get right, and a wrong id is permanent in a grow-only blob. */
+export { projectContext, threadContext, messageContext } from './readState'
+export { markRead, flushReadState, installReadStateFlush, READ_DWELL_MS } from './readStateSync'
 export {
   archiveProject,
   createIssue,
