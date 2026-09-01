@@ -1,3 +1,4 @@
+import { useMarkRead } from '@/lib/useMarkRead'
 import { useMemo, useState } from 'react'
 import {
   ISSUE_STATUSES,
@@ -12,6 +13,7 @@ import {
   reply,
   setProjectField,
   startConversation,
+  projectContext,
   type DirectoryView,
   type FolderState,
 } from '@/api'
@@ -104,6 +106,10 @@ export function ProjectPage({
   }, [project, state, directory])
 
   const conversations = useMemo(() => (project ? state.conversations.filter((c) => c.root.folder === project.contentFolder) : []), [project, state])
+  /* A project *is* a container, so it takes the container context: its Folder's
+     bare channel uuid (SPEC §11.1). Looking at the project marks the container
+     read; its issues' discussions are separate contexts and are untouched. */
+  useMarkRead([projectContext(project?.contentFolder)])
   const threads = useMemo(() => conversations.map((c) => threadFor(c, directory)), [conversations, directory])
   const people = useMemo(() => railPeople(state, directory), [state, directory])
 

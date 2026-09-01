@@ -1,0 +1,179 @@
+/**
+ * Marking things read, and getting it onto the relay (CRO-8).
+ *
+ * One queue for the tab, because NIP-RS is one blob per **installation**. A
+ * per-component queue would hold a partial context map each, and since the blob
+ * is a replaceable snapshot they would take turns overwriting one another's
+ * contexts — the whole-blob rule broken by construction rather than by a bug.
+ *
+ * ## Debounced on read events, never on the poll
+ *
+ * Ship re-reads every 5 seconds. Hanging a publish off that would put a
+ * `/nip44/encrypt`, a `/sign` and a bridge round trip on every tick, against a
+ * budget of 120 operations per minute — and it would say nothing new, because a
+ * refresh is not somebody reading anything. So `markRead` is called from the
+ * pages, on the object being looked at, and the publish is debounced behind it.
+ *
+ * ## Whole blob, always
+ *
+ * The coordinate is replaced, not patched, so every publish carries the complete
+ * map. That is why this hydrates from the relay before its first write: a
+ * partial blob does not fail, it silently drops every context it omitted, and
+ * because the cross-slot merge is grow-only the loss stays invisible until this
+ * is the last slot standing.
+ */
+import { relay, signer } from './store'
+import { nip44 } from './nip44'
+import { signedIn } from '../auth/estivaId'
+import {
+  advanceContexts,
+  fetchMergedReadState,
+  loadSlotIdentity,
+  publishReadState,
+  toContextSeconds,
+  type SlotIdentity,
+} from './readState'
+
+/** Long enough to batch opening a few issues, short enough to survive a tab close. */
+export const PUBLISH_DEBOUNCE_MS = 3000
+
+/**
+ * How long an object must be on screen before it counts as read.
+ *
+ * Without a dwell, arrowing through an issue list would burn every issue's
+ * unread state on the way past. Peek uses the same idea for the same reason.
+ */
+export const READ_DWELL_MS = 1500
+
+let identity: SlotIdentity | undefined
+/** Everything this slot knows: hydrated from the relay, plus what was recorded. */
+let known: Record<string, number> = {}
+/** Recorded but not yet in an accepted publish. */
+let pending: Record<string, number> = {}
+/** What the relay is believed to hold, so an unchanged blob is not republished. */
+let published: Record<string, number> | undefined
+let hydrated = false
+let hydrating: Promise<void> | undefined
+let timer: ReturnType<typeof setTimeout> | undefined
+let inFlight: Promise<void> = Promise.resolve()
+
+function currentIdentity(): SlotIdentity {
+  if (!identity) identity = loadSlotIdentity()
+  return identity
+}
+
+const sameContexts = (a: Record<string, number>, b: Record<string, number>): boolean => {
+  const keys = Object.keys(a)
+  return keys.length === Object.keys(b).length && keys.every((k) => a[k] === b[k])
+}
+
+async function hydrate(): Promise<void> {
+  if (hydrated) return
+  if (!hydrating) {
+    hydrating = (async () => {
+      const state = await fetchMergedReadState(relay, signer.pubkey, nip44, currentIdentity())
+      /*
+       * Unreachable is not empty. Staying unhydrated means the next attempt
+       * tries again; treating it as empty would publish a blob that drops every
+       * context recorded before this session. An empty *coordinate*, by
+       * contrast, is the ordinary first run and hydrates to nothing — the
+       * distinction Peek had to ship a fix for.
+       */
+      if (!state.reachable) return
+      // Seeded from the **merge**, not from our own slot alone: what another
+      // installation has already read is state this one should not re-publish
+      // as unread, and the max rule makes carrying it harmless.
+      known = advanceContexts(state.merged, known)
+      published = state.own?.contexts ?? {}
+      hydrated = true
+    })().finally(() => {
+      hydrating = undefined
+    })
+  }
+  await hydrating
+}
+
+/** Publish anything pending now. */
+export function flushReadState(): Promise<void> {
+  if (timer !== undefined) {
+    clearTimeout(timer)
+    timer = undefined
+  }
+  inFlight = inFlight.then(async () => {
+    if (Object.keys(pending).length === 0) return
+    if (!signedIn()) return
+    await hydrate()
+    if (!hydrated) return
+    const sending = pending
+    const contexts = { ...known }
+    pending = {}
+    // Hydration can supersede everything pending — a marker older than the
+    // relay's own is not a change, and republishing an identical blob costs
+    // three round trips to say nothing.
+    if (published && sameContexts(published, contexts)) return
+    try {
+      const result = await publishReadState(relay, signer, nip44, currentIdentity(), contexts)
+      if (result.ok) {
+        published = contexts
+      } else {
+        console.warn('[read-state] publish rejected:', result.reason)
+        pending = advanceContexts(pending, sending)
+      }
+    } catch (error) {
+      console.warn('[read-state] publish failed:', error)
+      pending = advanceContexts(pending, sending)
+    }
+  })
+  return inFlight
+}
+
+function record(context: string | undefined, atMs: number): void {
+  if (!context) return
+  const seconds = toContextSeconds(atMs)
+  const advanced = advanceContexts(known, { [context]: seconds })
+  // `advanceContexts` drops what it will not publish, so an unchanged map means
+  // the marker was invalid or not newer. Scheduling anyway would republish an
+  // identical blob.
+  if (advanced[context] === known[context]) return
+  known = advanced
+  pending = advanceContexts(pending, { [context]: seconds })
+  if (timer !== undefined) clearTimeout(timer)
+  timer = setTimeout(() => {
+    timer = undefined
+    void flushReadState()
+  }, PUBLISH_DEBOUNCE_MS)
+}
+
+/**
+ * Mark a set of contexts read, now.
+ *
+ * Takes already-built context ids so the mapping decision stays in one place
+ * (`readState.ts`) and a caller cannot accidentally hand an issue address where
+ * a container belongs — which is the mistake that would mark a whole project
+ * read (SPEC §11.2).
+ */
+export function markRead(contexts: (string | undefined)[], atMs: number = Date.now()): void {
+  for (const context of contexts) record(context, atMs)
+}
+
+/** Test seam: drop the tab's state so a suite can start clean. */
+export function resetReadStateForTests(): void {
+  if (timer !== undefined) clearTimeout(timer)
+  timer = undefined
+  identity = undefined
+  known = {}
+  pending = {}
+  published = undefined
+  hydrated = false
+  hydrating = undefined
+  inFlight = Promise.resolve()
+}
+
+/** Flush before the tab goes away — `visibilitychange` is the one mobile fires. */
+export function installReadStateFlush(): () => void {
+  const onHidden = () => {
+    if (document.visibilityState === 'hidden') void flushReadState()
+  }
+  document.addEventListener('visibilitychange', onHidden)
+  return () => document.removeEventListener('visibilitychange', onHidden)
+}
