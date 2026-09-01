@@ -292,10 +292,39 @@ export function manifestContent(): ManifestContent {
     // The consumer publishes the event itself; this says what to publish.
     // Note every action emits a CHANGE, never a rewrite — that is what lets
     // someone who is not the author act at all.
+    /*
+      Every action carries `description` and `effect` (PRO-5, RFC 0.4 §13.4).
+
+      `label` is a button caption — "Change status" tells a person which control
+      to press and tells a caller choosing *between* actions nothing. The
+      description is prose aimed at a machine, and each one here carries a fact
+      the label cannot: that a status lives on the change stream rather than on
+      the issue, that a project's lead is not an issue's assignee, that an
+      issue's root event holds immutable facts only.
+
+      **All six are `writes`, and none is `destructive` — because Ship offers no
+      destructive action to anyone else.** Archiving and deleting a project are
+      real operations with real UI, and neither is declared here, so no other
+      app can invoke them. That is a decision rather than an oversight: delete
+      is a NIP-09 request honoured only for the author, and archive is a folded
+      field a consumer already honours through `hiddenWhen`. Worth stating
+      because "no destructive actions" otherwise reads as an unexercised
+      vocabulary rather than as an inventory.
+
+      Nothing reads either field yet. They are here because adding a field costs
+      a line and adding one after several apps have published manifests is a
+      migration across every one of them, and a manifest is republished by its
+      owner alone.
+    */
     actions: [
       {
         id: 'set-issue-status',
         label: 'Change status',
+        description:
+          'Move an issue through its lifecycle by setting its status to one of the issueStatuses values. ' +
+          'The status is not on the issue \u2014 it lives on the change stream \u2014 so this is the only way to move it, ' +
+          'and every move stays attributable to whoever made it.',
+        effect: 'writes',
         appliesTo: String(KIND.ISSUE),
         emits: { kind: KIND.CHANGE, field: 'status' },
         input: { type: 'string', enum: 'issueStatuses' },
@@ -303,6 +332,10 @@ export function manifestContent(): ManifestContent {
       {
         id: 'assign-issue',
         label: 'Assign',
+        description:
+          'Say who is doing an issue, by public key. An empty value clears the assignment. ' +
+          'Distinct from a project lead, which is accountability for a whole project rather than for this one issue.',
+        effect: 'writes',
         appliesTo: String(KIND.ISSUE),
         emits: { kind: KIND.CHANGE, field: 'assignee' },
         input: { type: 'pubkey' },
@@ -320,6 +353,10 @@ export function manifestContent(): ManifestContent {
       {
         id: 'set-project-status',
         label: 'Change status',
+        description:
+          'Set a whole project\u2019s status to one of the statuses values \u2014 use when the project itself starts, ' +
+          'finishes or is abandoned. Not for the state of the issues inside it, which each carry their own status.',
+        effect: 'writes',
         appliesTo: String(KIND.PROJECT),
         emits: { kind: KIND.CHANGE, field: 'status' },
         input: { type: 'string', enum: 'statuses' },
@@ -327,6 +364,10 @@ export function manifestContent(): ManifestContent {
       {
         id: 'assign-project',
         label: 'Assign',
+        description:
+          'Say who is accountable for a project, by public key. An empty value clears it. ' +
+          'The tag is `lead` rather than `assignee`; they are the same idea at two levels and not interchangeable.',
+        effect: 'writes',
         appliesTo: String(KIND.PROJECT),
         emits: { kind: KIND.CHANGE, field: 'lead' },
         input: { type: 'pubkey' },
@@ -334,6 +375,10 @@ export function manifestContent(): ManifestContent {
       {
         id: 'comment',
         label: 'Comment',
+        description:
+          'Say something about a project or an issue that is not a change to one of its fields. ' +
+          'The comment lands in the Folder both apps read, so it appears in the paired conversation as well as on the object.',
+        effect: 'writes',
         /**
          * Emits NIP-22 `kind:1111`, and **also declares the `kind:9` it used
          * to**. Both halves matter and they are not the same statement.
@@ -369,6 +414,10 @@ export function manifestContent(): ManifestContent {
       {
         id: 'add-issue',
         label: 'Add issue',
+        description:
+          'File a new issue under a project. Only a title is required, and only immutable facts belong on the root event: ' +
+          'status and assignee are set afterwards by their own actions, never here.',
+        effect: 'writes',
         appliesTo: String(KIND.PROJECT),
         emits: { kind: KIND.ISSUE, setTag: 'a', toAddressOf: 'self' },
         input: {
