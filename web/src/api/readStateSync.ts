@@ -22,6 +22,8 @@
  * because the cross-slot merge is grow-only the loss stays invisible until this
  * is the last slot standing.
  */
+import { useCallback, useEffect, useState } from 'react'
+import { useRefresh } from '@/lib/useRefresh'
 import { relay, signer } from './store'
 import { nip44 } from './nip44'
 import { signedIn } from '../auth/estivaId'
@@ -192,4 +194,42 @@ export function installReadStateFlush(): () => void {
   }
   document.addEventListener('visibilitychange', onHidden)
   return () => document.removeEventListener('visibilitychange', onHidden)
+}
+
+/**
+ * The person's merged read frontier, kept fresh (CRO-13).
+ *
+ * Ship has no database to reconcile, so the merged state **is** its read state —
+ * there is no cache and no dual-run, because there is no incumbent to compare
+ * against. That is the whole reason Ship was the easy side.
+ *
+ * Refreshed on Ship's ordinary cadence rather than a private one: the same
+ * `useRefresh` every other read here uses, so a tab that has been hidden does
+ * not show a ten-minute-old frontier the moment it is looked at.
+ *
+ * Returns an empty map until the first fetch settles. That reads as "nothing is
+ * new", which is the right way to be wrong for a moment — the alternative
+ * flashes a divider onto every thread and then takes it away.
+ */
+export function useMergedReadState(): Record<string, number> {
+  const [merged, setMerged] = useState<Record<string, number>>({})
+
+  const load = useCallback(async () => {
+    if (!signedIn()) return
+    try {
+      const state = await fetchMergedReadState(relay, signer.pubkey, nip44, currentIdentity())
+      // Unreachable is not empty — keep the last good frontier rather than
+      // blanking every divider because one fetch failed.
+      if (state.reachable) setMerged(state.merged)
+    } catch (error) {
+      console.warn('[read-state] could not read the merged frontier:', error)
+    }
+  }, [])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+  useRefresh(load)
+
+  return merged
 }

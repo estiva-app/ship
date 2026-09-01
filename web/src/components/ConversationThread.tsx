@@ -1,3 +1,4 @@
+import { Fragment } from 'react'
 import { cn } from '@/lib/cn'
 import { ago } from '@/lib/time'
 import { Avatar } from '@/components/ui/Avatar'
@@ -23,6 +24,8 @@ export interface MessageData {
   /** Seconds. */
   at: number
   body: string
+  /** Author pubkey. Only used to decide unread — your own writing is never new. */
+  by?: string
 }
 
 export interface ThreadData {
@@ -45,12 +48,33 @@ export function MessageCard({ message, reply = false }: { message: MessageData; 
   )
 }
 
-export function ConversationThread({ thread, onReply, disabledReason }: { thread: ThreadData; onReply: (threadId: string, text: string) => Promise<boolean | void> | boolean | void; disabledReason?: string }) {
+/**
+ * Where "new since you looked" begins (CRO-13).
+ *
+ * A rule rather than a badge: the divider sits above the first message the
+ * reader has not seen, and everything below it is new. Ship's lists stay clean —
+ * the signal lives where the reading happens.
+ */
+function NewSinceHere() {
+  return (
+    <div className="flex items-center gap-2 py-1" role="separator" aria-label="New since you last read this">
+      <span className="h-px flex-1 bg-accent-default/40" />
+      <span className="shrink-0 text-caption text-accent-default">New since you last read this</span>
+      <span className="h-px flex-1 bg-accent-default/40" />
+    </div>
+  )
+}
+
+export function ConversationThread({ thread, onReply, disabledReason, unreadFrom }: { thread: ThreadData; onReply: (threadId: string, text: string) => Promise<boolean | void> | boolean | void; disabledReason?: string; unreadFrom?: string }) {
   return (
     <div className="flex flex-col gap-1 rounded-lg border border-border-default bg-bg-surface px-3 py-2.5">
+      {unreadFrom === thread.root.id && <NewSinceHere />}
       <MessageCard message={thread.root} />
       {thread.replies.map((reply) => (
-        <MessageCard key={reply.id} message={reply} reply />
+        <Fragment key={reply.id}>
+          {unreadFrom === reply.id && <NewSinceHere />}
+          <MessageCard message={reply} reply />
+        </Fragment>
       ))}
       <Composer kind="reply" onSubmit={(text) => onReply(thread.id, text)} disabledReason={disabledReason} className="ml-3.5 mt-1" />
     </div>
@@ -59,6 +83,8 @@ export function ConversationThread({ thread, onReply, disabledReason }: { thread
 
 export interface ConversationsProps {
   threads: ThreadData[]
+  /** Thread id → the id of its first unread message. Omitted threads have nothing new. */
+  unread?: Record<string, string>
   onStart: (text: string) => Promise<boolean | void> | boolean | void
   onReply: (threadId: string, text: string) => Promise<boolean | void> | boolean | void
   /** Why nothing can be posted right now — every composer here is disabled with it. */
@@ -66,12 +92,14 @@ export interface ConversationsProps {
   className?: string
 }
 
-export function Conversations({ threads, onStart, onReply, disabledReason, className }: ConversationsProps) {
+export function Conversations({ threads, onStart, onReply, disabledReason, className, unread }: ConversationsProps) {
   return (
     <div className={cn('flex flex-col gap-2.5', className)}>
       <Composer onSubmit={onStart} disabledReason={disabledReason} className="mb-1" />
       {threads.length ? (
-        threads.map((thread) => <ConversationThread key={thread.id} thread={thread} onReply={onReply} disabledReason={disabledReason} />)
+        threads.map((thread) => (
+          <ConversationThread key={thread.id} thread={thread} onReply={onReply} disabledReason={disabledReason} unreadFrom={unread?.[thread.id]} />
+        ))
       ) : (
         <EmptyState className="py-8" message="No conversations yet." />
       )}

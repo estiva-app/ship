@@ -14,6 +14,8 @@ import {
   setProjectField,
   startConversation,
   projectContext,
+  useMergedReadState,
+  firstUnreadByThread,
   type DirectoryView,
   type FolderState,
 } from '@/api'
@@ -46,6 +48,8 @@ export function threadFor(conversation: FolderState['conversations'][number], di
     author: directory.personOf(m.author),
     at: m.createdAt,
     body: stripReferences(m.body),
+    // Carried for the unread rule only: your own writing is never new to you.
+    by: m.author,
   })
   return { id: conversation.id, root: message(conversation.root), replies: conversation.replies.map(message) }
 }
@@ -111,6 +115,13 @@ export function ProjectPage({
      read; its issues' discussions are separate contexts and are untouched. */
   useMarkRead([projectContext(project?.contentFolder)])
   const threads = useMemo(() => conversations.map((c) => threadFor(c, directory)), [conversations, directory])
+  /* The divider in the feed (CRO-13). A project IS the container, so its own
+     marker governs the roots and propagates down to their replies. */
+  const merged = useMergedReadState()
+  const unread = useMemo(
+    () => firstUnreadByThread(threads, merged, projectContext(project?.contentFolder), me),
+    [threads, merged, project],
+  )
   const people = useMemo(() => railPeople(state, directory), [state, directory])
 
   if (!project) {
@@ -138,6 +149,7 @@ export function ProjectPage({
         issueStatuses={ISSUE_STATUSES}
         hrefFor={hrefForIssue}
         threads={threads}
+        unread={unread}
         // A project conversation is already in the topic it belongs to, so a
         // reference would be noise (withReference: false), as the old app has it.
         onStartConversation={(body) => act('Message', () => startConversation({ folder: project.contentFolder, about: project.addr, withReference: false, body }), say, refresh)}

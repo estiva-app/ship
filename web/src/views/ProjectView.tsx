@@ -30,6 +30,8 @@ export interface ProjectViewProps {
   issueStatuses: StatusEntry[]
   hrefFor: (issue: IssueRowData) => string
   threads: ThreadData[]
+  /** Thread id → first unread message id. Drives the feed divider (CRO-13). */
+  unread?: Record<string, string>
   onStartConversation: (text: string) => Promise<boolean | void> | boolean | void
   onReply: (threadId: string, text: string) => Promise<boolean | void> | boolean | void
   rail: {
@@ -52,7 +54,7 @@ export interface ProjectViewProps {
   readOnlyReason?: string
 }
 
-export function ProjectView({ crumbs, header, onAddIssue, view, onView, issues, issueStatuses, hrefFor, threads, onStartConversation, onReply, rail, readOnlyReason }: ProjectViewProps) {
+export function ProjectView({ crumbs, header, onAddIssue, view, onView, issues, issueStatuses, hrefFor, threads, unread, onStartConversation, onReply, rail, readOnlyReason }: ProjectViewProps) {
   const addIssue = readOnlyReason ? (
     <WithTooltip label={readOnlyReason}>
       <Button variant="primary" disabled>
@@ -101,7 +103,7 @@ export function ProjectView({ crumbs, header, onAddIssue, view, onView, issues, 
         </section>
         <section className="flex flex-col gap-3">
           <h2 className="text-h4 text-text-primary">Conversations</h2>
-          <Conversations threads={threads} onStart={onStartConversation} onReply={onReply} disabledReason={readOnlyReason} />
+          <Conversations threads={threads} unread={unread} onStart={onStartConversation} onReply={onReply} disabledReason={readOnlyReason} />
         </section>
       </div>
       <Divider orientation="vertical" className="col-start-2 row-span-2 row-start-1" />
