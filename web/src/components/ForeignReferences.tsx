@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { findNaddrs } from '@estiva-app/protocol'
 import { resolveForeign, type ForeignObject as Data } from '@/api/foreign'
 import { ForeignObject } from './ui/ForeignObject'
 import { SkeletonBar } from './ui/Skeleton'
+import { useRefresh } from '@/lib/useRefresh'
 
 /**
  * Every `nostr:naddr…` in a body of text, rendered as the object it names.
@@ -39,13 +40,33 @@ export function ForeignReferences({ text, className }: { text: string; className
   // re-resolve on every keystroke in the description above.
   const key = references.join(',')
 
-  useEffect(() => {
+  /*
+    Re-resolve on Ship's own cadence, not once on mount.
+
+    A referenced object is *another app's*, and this app controls none of its
+    lifecycle: somebody replies in Peek and a Ship reader is looking at a
+    conversation that has moved on. Resolving once made the widget a screenshot
+    with a timestamp nobody can see, which is worse than a stale list — a list
+    that is obviously a list invites a refresh, and a live-looking card does not.
+    PRO-10's central claim is liveness, and it was not true.
+
+    `useRefresh` rather than a socket, deliberately: it is what every other view
+    in this app already uses (5s while visible, immediately on focus, never in a
+    hidden tab), so a reference is exactly as fresh as the issue around it. Ship
+    has no relay socket, and adding one here to make one widget fresher than its
+    own page would be a strange first place to put it.
+  */
+  const [nonce, setNonce] = useState(0)
+
+  const resolve = useCallback(() => {
     if (references.length === 0) {
       setObjects([])
-      return
+      return undefined
     }
     let cancelled = false
-    setObjects(undefined)
+    // Only the *first* resolve blanks the list. A refresh that cleared it would
+    // flash a skeleton over a card that is already correct, every five seconds.
+    setObjects((held) => (held === undefined ? undefined : held))
     Promise.all(references.map((r) => resolveForeign(r).catch(() => null))).then((found) => {
       // The description can change while this is in flight, and a late answer
       // about a reference that is no longer there would be worse than none.
@@ -56,6 +77,14 @@ export function ForeignReferences({ text, className }: { text: string; className
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key])
+
+  useEffect(() => {
+    setObjects(undefined)
+    return resolve()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key, nonce])
+
+  useRefresh(() => setNonce((n) => n + 1))
 
   if (references.length === 0) return null
 
