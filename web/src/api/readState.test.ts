@@ -311,3 +311,48 @@ describe('publishReadState', () => {
     expect(result).toEqual({ ok: false, reason: 'kind_not_allowed' })
   })
 })
+
+describe('an own slot that will not decrypt is not an empty one', () => {
+  const undecryptable: Nip44 = { encrypt: async (p) => p, decrypt: async () => undefined }
+  const slotEvent = (slotId: string) => ({
+    id: 'x', pubkey: 'me', created_at: 1, kind: 30078,
+    tags: [['d', `read-state:${slotId}`], ['t', 'read-state']],
+    content: 'ciphertext-we-cannot-read', sig: 's',
+  })
+
+  /**
+   * The dangerous case, and it looks exactly like a first run: the blob is on
+   * the relay, we cannot see inside it, and publishing anyway replaces it with
+   * only what this session recorded. A `429` from `/nip44/decrypt` is the
+   * realistic cause — transient, and it must not cost a person their read state.
+   */
+  it('flags our own slot when it is present but unreadable', async () => {
+    const relay = { query: async () => [slotEvent(SLOT)] }
+    const state = await fetchMergedReadState(relay as never, 'me', undecryptable, {
+      slotId: SLOT,
+      clientId: 'ship-a',
+    })
+    expect(state.reachable).toBe(true)
+    expect(state.own).toBeUndefined()
+    expect(state.ownUndecryptable).toBe(true)
+  })
+
+  it('does not flag a genuinely empty coordinate — that is a first run', async () => {
+    const relay = { query: async () => [] }
+    const state = await fetchMergedReadState(relay as never, 'me', undecryptable, {
+      slotId: SLOT,
+      clientId: 'ship-a',
+    })
+    expect(state.own).toBeUndefined()
+    expect(state.ownUndecryptable).toBe(false)
+  })
+
+  it("does not flag somebody else's unreadable slot — that is a rotated key", async () => {
+    const relay = { query: async () => [slotEvent('f'.repeat(32))] }
+    const state = await fetchMergedReadState(relay as never, 'me', undecryptable, {
+      slotId: SLOT,
+      clientId: 'ship-a',
+    })
+    expect(state.ownUndecryptable).toBe(false)
+  })
+})

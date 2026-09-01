@@ -84,3 +84,46 @@ describe('the slot holds what THIS installation read', () => {
     expect(publishReadState).not.toHaveBeenCalled()
   })
 })
+
+describe('an unreadable own slot blocks the publish', () => {
+  beforeEach(async () => {
+    vi.clearAllMocks()
+    const { resetReadStateForTests } = await import('./readStateSync')
+    resetReadStateForTests()
+  })
+
+  /**
+   * The loss this prevents: our slot is on the relay, `/nip44/decrypt` 429s, and
+   * publishing would replace it with only this session's markers. Permanently —
+   * the merge is a maximum, but a context that is gone from every slot is gone.
+   */
+  it('refuses to publish when our own slot is present but undecryptable', async () => {
+    const { markRead, flushReadState } = await import('./readStateSync')
+    fetchMergedReadState.mockResolvedValue({
+      reachable: true,
+      merged: { [OURS]: 1000 },
+      own: undefined,
+      ownUndecryptable: true,
+    })
+
+    markRead([NEW], 2_000_000)
+    await flushReadState()
+
+    expect(publishReadState).not.toHaveBeenCalled()
+  })
+
+  it('still publishes on a genuinely empty coordinate', async () => {
+    const { markRead, flushReadState } = await import('./readStateSync')
+    fetchMergedReadState.mockResolvedValue({
+      reachable: true,
+      merged: {},
+      own: undefined,
+      ownUndecryptable: false,
+    })
+
+    markRead([NEW], 2_000_000)
+    await flushReadState()
+
+    expect(publishReadState).toHaveBeenCalledTimes(1)
+  })
+})

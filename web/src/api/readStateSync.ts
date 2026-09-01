@@ -47,6 +47,9 @@ export const PUBLISH_DEBOUNCE_MS = 3000
  */
 export const READ_DWELL_MS = 1500
 
+/** How often the merged frontier is re-read. Deliberately not the 5s poll. */
+export const READ_STATE_REFRESH_MS = 30_000
+
 let identity: SlotIdentity | undefined
 /** Everything this slot knows: hydrated from the relay, plus what was recorded. */
 let known: Record<string, number> = {}
@@ -82,6 +85,16 @@ async function hydrate(): Promise<void> {
        * distinction Peek had to ship a fix for.
        */
       if (!state.reachable) return
+      /*
+       * Our slot is there and unreadable — almost always a `429` from
+       * `/nip44/decrypt`. Publishing now would replace it with only what this
+       * session recorded and drop the rest, permanently. Stay unhydrated and
+       * try again; a transient rate limit must not cost read state.
+       */
+      if (state.ownUndecryptable) {
+        console.warn('[read-state] own slot could not be decrypted; not publishing over it')
+        return
+      }
       /*
        * Seeded from **our own slot**, not from the merge.
        *
@@ -229,7 +242,14 @@ export function useMergedReadState(): Record<string, number> {
   useEffect(() => {
     void load()
   }, [load])
-  useRefresh(load)
+  /*
+   * Slower than Ship's 5s workspace poll, deliberately. Each pass costs a
+   * `/sign`, a `/query` and one `/nip44/decrypt` **per slot** — at 5s that is
+   * a request every few hundred milliseconds and it walks into the 120-per-
+   * minute limit on `/nip44/*`, whose failure mode is an undecryptable own slot.
+   * Read state moves at human speed; 30s matches what Peek settled on.
+   */
+  useRefresh(load, { intervalMs: READ_STATE_REFRESH_MS })
 
   return merged
 }
