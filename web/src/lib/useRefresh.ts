@@ -1,7 +1,29 @@
 import { useEffect, useRef } from 'react'
+import { pausedForMs } from './relayBudget'
 
-/** How often a visible tab re-reads. Matches the old app's POLL_MS. */
-export const REFRESH_MS = 5000
+/**
+ * How often a visible tab re-reads.
+ *
+ * Was 5000 — the old app's POLL_MS, carried over — until SHI-12 did the
+ * arithmetic against what the relay actually allows. Buzz meters `POST /query`
+ * at 300 a minute, and three readers share this one tick: the workspace read
+ * (34 requests against production, measured), the read-state frontier (1), and
+ * the foreign-reference widgets (4 per reference on the open issue).
+ *
+ * At five seconds that is 12 ticks a minute and 420 requests before a single
+ * reference is on screen — over the ceiling, and `rate-limited: quota exceeded`
+ * is what a person then gets instead of their own status change appearing. At
+ * ten seconds it is 210, with room for four references.
+ *
+ * **Freshness of one's own actions does not depend on this number.** A write
+ * re-reads immediately through `Workspace.refresh`; this governs only how
+ * quickly somebody *else's* change turns up.
+ *
+ * Not a number that stays right on its own: the workspace read costs one
+ * request per Folder, so the ceiling falls as the workspace grows. See
+ * `relayBudget` for the part that holds when it does.
+ */
+export const REFRESH_MS = 10_000
 
 /**
  * Two events often fire for one gesture — switching to a tab raises both
@@ -40,6 +62,11 @@ export function useRefresh(refresh: () => void | Promise<void>, { intervalMs = R
     const tick = () => {
       const now = Date.now()
       if (now - lastAt < COALESCE_MS) return
+      // The relay has refused on quota and said how long to wait. Skipping is
+      // the whole backoff: `lastAt` is left alone, so the first tick after the
+      // pause expires runs immediately rather than waiting out another
+      // interval. See `relayBudget` for why this is the right place.
+      if (pausedForMs(now) > 0) return
       lastAt = now
       void latest.current()
     }

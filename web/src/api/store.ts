@@ -1,4 +1,5 @@
-import { Relay } from '@estiva-app/protocol'
+import { Relay, type FetchLike } from '@estiva-app/protocol'
+import { isRateLimited, noteRateLimited } from '@/lib/relayBudget'
 import { estivaIdSigner, localSigner, type Signer } from '../../../lib/nostr/signer'
 import { Store } from '../../../src/store'
 import { ID_CONFIG, RELAY_URL } from '../config'
@@ -51,6 +52,26 @@ export const signer: Signer =
  * Still inside `api/`, so the rule above holds — nothing *outside* the seam
  * sees a relay or a signer.
  */
-export const relay = new Relay(RELAY_URL, signer)
+/**
+ * Every relay response passes through here so a quota refusal is *seen* (SHI-12).
+ *
+ * The three pollers each swallow their own read errors — none of them wants a
+ * failed poll to blank the screen — so none of them can notice that the tab as
+ * a whole is over budget. The transport sees every 429, and is the one place
+ * that does.
+ *
+ * The body is read once and handed on, because `FetchLike` promises a `text()`
+ * the caller will await and a stream can only be consumed once.
+ */
+const fetchReportingQuota: FetchLike = async (url, init) => {
+  const response = await fetch(url, init)
+  const body = await response.text()
+  if (response.status === 429 || (response.status >= 400 && isRateLimited(body))) {
+    noteRateLimited(body)
+  }
+  return { status: response.status, text: async () => body }
+}
+
+export const relay = new Relay(RELAY_URL, signer, { fetch: fetchReportingQuota })
 
 export const store = new Store(relay, signer)

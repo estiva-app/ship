@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FolderState } from '../../../src/fold'
 import { useRefresh } from '../lib/useRefresh'
+import { isRateLimited } from '../lib/relayBudget'
 import { loadAll } from './index'
 
 export interface Workspace {
@@ -52,7 +53,22 @@ export function useWorkspace(): Workspace {
       })
       .catch((reason: unknown) => {
         if (!mounted.current || ticket !== latest.current) return
-        setError(reason instanceof Error ? reason.message : String(reason))
+        const text = reason instanceof Error ? reason.message : String(reason)
+        /*
+          A quota refusal is not a broken relay and must not be reported as one.
+
+          `relayBudget` has already recorded how long to wait and the poll is
+          holding off; the workspace on screen is the last good read and stays
+          correct until it resumes. Showing "Could not read from the relay"
+          over it would describe a working app as failing, and — because the
+          banner outranks every other one — would sit there through a condition
+          that clears itself in seconds.
+
+          The stale state is kept either way. This only decides whether a person
+          is told about a wait they cannot act on. SHI-12.
+        */
+        if (isRateLimited(text)) return
+        setError(text)
       })
       .finally(() => {
         // Only if it is still ours: a newer read may already have claimed it.
