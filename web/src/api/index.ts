@@ -29,7 +29,8 @@ export { peopleIn, short } from './people'
    builds ids through it rather than inventing one — the mapping is the part the
    ticket says to get right, and a wrong id is permanent in a grow-only blob. */
 export { projectContext, threadContext, messageContext } from './readState'
-export { markRead, flushReadState, installReadStateFlush, READ_DWELL_MS } from './readStateSync'
+export { markRead, flushReadState, installReadStateFlush, useMergedReadState, READ_DWELL_MS } from './readStateSync'
+export { firstUnreadByThread } from './unreadFeed'
 export {
   archiveProject,
   createIssue,

@@ -20,6 +20,8 @@ export interface IssueViewProps {
   onRename: (v: string) => Promise<boolean> | boolean
   onDescribe: (v: string) => Promise<boolean> | boolean
   threads: ThreadData[]
+  /** Thread id → first unread message id. Drives the feed divider (CRO-13). */
+  unread?: Record<string, string>
   onStartConversation: (text: string) => Promise<boolean | void> | boolean | void
   onReply: (threadId: string, text: string) => Promise<boolean | void> | boolean | void
   activity: ActivityEntry[]
@@ -28,7 +30,7 @@ export interface IssueViewProps {
   readOnlyReason?: string
 }
 
-export function IssueView({ crumbs, title, description, onRename, onDescribe, threads, onStartConversation, onReply, activity, rail, readOnlyReason }: IssueViewProps) {
+export function IssueView({ crumbs, title, description, onRename, onDescribe, threads, unread, onStartConversation, onReply, activity, rail, readOnlyReason }: IssueViewProps) {
   const items: Crumb[] = [{ label: 'Issues', href: crumbs.issuesHref }]
   if (crumbs.project) items.push({ label: crumbs.project.title, href: crumbs.project.href })
   if (crumbs.ref) items.push({ label: crumbs.ref, mono: true })
@@ -52,7 +54,7 @@ export function IssueView({ crumbs, title, description, onRename, onDescribe, th
         </div>
         <section className="flex flex-col gap-3">
           <h2 className="text-h4 text-text-primary">Conversations</h2>
-          <Conversations threads={threads} onStart={onStartConversation} onReply={onReply} disabledReason={readOnlyReason} />
+          <Conversations threads={threads} unread={unread} onStart={onStartConversation} onReply={onReply} disabledReason={readOnlyReason} />
         </section>
         <section className="flex flex-col gap-3">
           <h2 className="text-h4 text-text-primary">Activity</h2>

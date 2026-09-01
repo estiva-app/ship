@@ -1,6 +1,6 @@
 import { useMarkRead } from '@/lib/useMarkRead'
 import { useMemo } from 'react'
-import { ISSUE_STATUSES, conversationsAbout, referenceFor, reply, setIssueField, startConversation, type DirectoryView, type FolderState, threadContext } from '@/api'
+import { ISSUE_STATUSES, conversationsAbout, referenceFor, reply, setIssueField, startConversation, type DirectoryView, type FolderState, threadContext, useMergedReadState, firstUnreadByThread, projectContext, me } from '@/api'
 import type { ActivityEntry } from '@/components/ActivityFeed'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { IssueView } from '@/views/IssueView'
@@ -46,6 +46,14 @@ export function IssuePage({ state, directory, addr, say, refresh }: { state: Fol
      mark the whole project read. */
   useMarkRead(useMemo(() => conversations.map((c) => threadContext(c.id)), [conversations]))
   const threads = useMemo(() => conversations.map((c) => threadFor(c, directory)), [conversations, directory])
+  /* The divider in the feed (CRO-13). `issue.folder` is the container these
+     conversations live in, so §11.3's hierarchy can apply — marking the project
+     read clears replies that predate it. */
+  const merged = useMergedReadState()
+  const unread = useMemo(
+    () => firstUnreadByThread(threads, merged, projectContext(issue?.folder), me),
+    [threads, merged, issue],
+  )
   const activity = useMemo(() => (issue ? activityFor(issue.addr, state, directory) : []), [issue, state, directory])
   const people = useMemo(() => railPeople(state, directory), [state, directory])
   const projects = useMemo(
@@ -77,6 +85,7 @@ export function IssuePage({ state, directory, addr, say, refresh }: { state: Fol
       onRename={(value) => set('title', value, 'Rename')}
       onDescribe={(value) => set('description', value, 'Description')}
       threads={threads}
+      unread={unread}
       // Threads about an issue carry a reference in the body so Peek renders
       // the issue's widget above them (withReference: true), as the old app has it.
       onStartConversation={(body) => act('Message', () => startConversation({ folder: issue.folder, about: issue.addr, withReference: true, body }), say, refresh)}
