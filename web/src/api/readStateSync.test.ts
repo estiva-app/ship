@@ -190,3 +190,59 @@ describe('a marker is never stranded by a transient failure', () => {
     expect(signedIn.mock.calls.length).toBeGreaterThan(afterFirst)
   })
 })
+
+describe('the diagnostic reports why a publish did not happen', () => {
+  beforeEach(async () => {
+    vi.clearAllMocks()
+    const { resetReadStateForTests } = await import('./readStateSync')
+    resetReadStateForTests()
+    signedIn.mockReturnValue(true)
+  })
+
+  const diag = () => (window as unknown as { __readState: () => Record<string, unknown> }).__readState()
+
+  /**
+   * The whole reason this exists: `pending` non-empty with a named reason is the
+   * one thing no external probe can see, and it is exactly what four hand-driven
+   * production passes needed and could not get.
+   */
+  it('names a stranded marker and the reason it is stranded', async () => {
+    const { installReadStateDiagnostic, markRead, flushReadState } = await import('./readStateSync')
+    installReadStateDiagnostic()
+    signedIn.mockReturnValue(false)
+
+    markRead([NEW], 2_000_000)
+    await flushReadState()
+
+    const d = diag()
+    expect(Object.keys(d.pending as object)).toEqual([NEW])
+    expect((d.lastAttempt as { outcome: string }).outcome).toBe('no-session')
+    expect(d.retryInS).toBeGreaterThan(0)
+  })
+
+  it('reports a successful publish, with pending emptied', async () => {
+    const { installReadStateDiagnostic, markRead, flushReadState } = await import('./readStateSync')
+    installReadStateDiagnostic()
+    fetchMergedReadState.mockResolvedValue({ reachable: true, merged: {}, own: undefined })
+
+    markRead([NEW], 2_000_000)
+    await flushReadState()
+
+    const d = diag()
+    expect((d.lastAttempt as { outcome: string }).outcome).toBe('published')
+    expect(d.pending).toEqual({})
+  })
+
+  it('distinguishes an undecryptable own slot from an empty one', async () => {
+    const { installReadStateDiagnostic, markRead, flushReadState } = await import('./readStateSync')
+    installReadStateDiagnostic()
+    fetchMergedReadState.mockResolvedValue({
+      reachable: true, merged: {}, own: undefined, ownUndecryptable: true,
+    })
+
+    markRead([NEW], 2_000_000)
+    await flushReadState()
+
+    expect((diag().lastAttempt as { outcome: string }).outcome).toBe('not-hydrated')
+  })
+})

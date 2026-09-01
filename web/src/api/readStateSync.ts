@@ -32,6 +32,7 @@ import {
   fetchMergedReadState,
   loadSlotIdentity,
   publishReadState,
+  readStateDTag,
   toContextSeconds,
   type SlotIdentity,
 } from './readState'
@@ -63,6 +64,15 @@ let timer: ReturnType<typeof setTimeout> | undefined
 /** Grows while a flush keeps failing, so a long outage is not a busy loop. */
 let retryMs = 0
 let inFlight: Promise<void> = Promise.resolve()
+
+/** What the last flush attempt did, for the diagnostic below. */
+let lastAttempt: { at: number; outcome: string; detail?: string; contexts?: number } | undefined
+/** The last merged frontier this tab fetched, so the diagnostic need not re-fetch. */
+let lastMerged: Record<string, number> = {}
+
+function noteAttempt(outcome: string, detail?: string, contexts?: number): void {
+  lastAttempt = { at: Date.now(), outcome, ...(detail ? { detail } : {}), ...(contexts !== undefined ? { contexts } : {}) }
+}
 
 function currentIdentity(): SlotIdentity {
   if (!identity) identity = loadSlotIdentity()
@@ -153,33 +163,42 @@ export function flushReadState(): Promise<void> {
     timer = undefined
   }
   inFlight = inFlight.then(async () => {
-    if (Object.keys(pending).length === 0) return
+    if (Object.keys(pending).length === 0) return noteAttempt('nothing-pending')
     // No usable token — an access token expiring mid-session is ordinary, and
     // the signer renews itself. Keep the markers and come back.
-    if (!signedIn()) return retryLater()
+    if (!signedIn()) {
+      noteAttempt('no-session', 'retrying')
+      return retryLater()
+    }
     await hydrate()
     // Unreachable, or our own slot is there and unreadable. Both mean we must
     // not publish; neither means the markers should be abandoned.
-    if (!hydrated) return retryLater()
+    if (!hydrated) {
+      noteAttempt('not-hydrated', 'relay unreachable, or our slot would not decrypt; retrying')
+      return retryLater()
+    }
     const sending = pending
     const contexts = { ...known }
     pending = {}
     // Hydration can supersede everything pending — a marker older than the
     // relay's own is not a change, and republishing an identical blob costs
     // three round trips to say nothing.
-    if (published && sameContexts(published, contexts)) return
+    if (published && sameContexts(published, contexts)) return noteAttempt('unchanged')
     try {
       const result = await publishReadState(relay, signer, nip44, currentIdentity(), contexts)
       if (result.ok) {
         published = contexts
         retryMs = 0
+        noteAttempt('published', undefined, Object.keys(contexts).length)
       } else {
         console.warn('[read-state] publish rejected:', result.reason)
+        noteAttempt('rejected', result.reason)
         pending = advanceContexts(pending, sending)
         retryLater()
       }
     } catch (error) {
       console.warn('[read-state] publish failed:', error)
+      noteAttempt('failed', error instanceof Error ? error.message : String(error))
       pending = advanceContexts(pending, sending)
       retryLater()
     }
@@ -226,6 +245,8 @@ export function resetReadStateForTests(): void {
   published = undefined
   hydrated = false
   retryMs = 0
+  lastAttempt = undefined
+  lastMerged = {}
   hydrating = undefined
   inFlight = Promise.resolve()
 }
@@ -263,7 +284,10 @@ export function useMergedReadState(): Record<string, number> {
       const state = await fetchMergedReadState(relay, signer.pubkey, nip44, currentIdentity())
       // Unreachable is not empty — keep the last good frontier rather than
       // blanking every divider because one fetch failed.
-      if (state.reachable) setMerged(state.merged)
+      if (state.reachable) {
+        setMerged(state.merged)
+        lastMerged = state.merged
+      }
     } catch (error) {
       console.warn('[read-state] could not read the merged frontier:', error)
     }
@@ -282,4 +306,89 @@ export function useMergedReadState(): Record<string, number> {
   useRefresh(load, { intervalMs: READ_STATE_REFRESH_MS })
 
   return merged
+}
+
+// ---------------------------------------------------------------------------
+// The diagnostic
+// ---------------------------------------------------------------------------
+
+/**
+ * `window.__readState()` — what this tab believes about read state.
+ *
+ * Exists because verifying this by hand cost four rounds with a person driving a
+ * browser, and three of those failed on the *test* rather than the system: a
+ * hand-rolled devtools snippet re-implemented the bridge and got the query shape,
+ * the NIP-98 nonce and the response envelope wrong in turn, and none of it could
+ * see the one thing that mattered — whether a marker had actually been published,
+ * or was sitting in `pending` behind a transient failure.
+ *
+ * Read-only apart from the two explicit verbs. It reports this tab's private
+ * queue state, which is exactly what no external probe can observe.
+ *
+ * ```
+ * __readState()                      what is known, pending, published, and why
+ * __readState.flush()                publish now instead of waiting for the debounce
+ * __readState.refresh()              re-read the merged frontier from the relay
+ * __readState.marker('<context>')    one context's merged value, as a date
+ * ```
+ */
+export interface ReadStateDiagnostic {
+  slot: string
+  clientId: string
+  /** Everything this slot believes it has read. */
+  known: Record<string, number>
+  /** Recorded but not yet in an accepted publish. Non-empty here is the smell. */
+  pending: Record<string, number>
+  /** What the relay is believed to hold for our slot. */
+  published: Record<string, number> | undefined
+  hydrated: boolean
+  /** Seconds until the next retry, or 0 when nothing is scheduled. */
+  retryInS: number
+  /** The last flush attempt and how it ended. */
+  lastAttempt: typeof lastAttempt
+  /** The merged frontier as of the last fetch. */
+  merged: Record<string, number>
+}
+
+function snapshot(): ReadStateDiagnostic {
+  const id = currentIdentity()
+  return {
+    slot: readStateDTag(id.slotId),
+    clientId: id.clientId,
+    known: { ...known },
+    pending: { ...pending },
+    published: published ? { ...published } : undefined,
+    hydrated,
+    retryInS: Math.round(retryMs / 1000),
+    lastAttempt,
+    merged: { ...lastMerged },
+  }
+}
+
+/**
+ * Attach it. Called once from the api barrel's module scope.
+ *
+ * Not gated on a build flag: Ship is an internal tool, this reads only the
+ * viewer's own state in their own browser, and a diagnostic that is absent from
+ * production is a diagnostic that is never there when it is needed.
+ */
+export function installReadStateDiagnostic(): void {
+  if (typeof window === 'undefined') return
+  const fn = () => snapshot()
+  fn.flush = async () => {
+    await flushReadState()
+    return snapshot().lastAttempt
+  }
+  fn.refresh = async () => {
+    const seam = signedIn()
+    if (!seam) return 'no session'
+    const state = await fetchMergedReadState(relay, signer.pubkey, nip44, currentIdentity())
+    if (state.reachable) lastMerged = state.merged
+    return { reachable: state.reachable, ownUndecryptable: state.ownUndecryptable ?? false, contexts: Object.keys(state.merged).length }
+  }
+  fn.marker = (context: string) => {
+    const at = lastMerged[context]
+    return at === undefined ? 'absent' : `${at}  ${new Date(at * 1000).toISOString()}`
+  }
+  ;(window as unknown as Record<string, unknown>).__readState = fn
 }
