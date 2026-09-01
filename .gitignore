@@ -6,3 +6,5 @@ extension/build
 extension/*.mcpb
 
 .pro7/
+
+.pro10/
