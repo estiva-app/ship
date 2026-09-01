@@ -112,3 +112,29 @@ describe('useWorkspace — a read a write is waiting on must have begun after th
     expect(loadAll).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('useWorkspace — a quota refusal is a wait, not a broken relay (SHI-12)', () => {
+  it('keeps the last good workspace and raises no error banner', async () => {
+    vi.mocked(loadAll)
+      .mockResolvedValueOnce(stateWith('in_progress'))
+      .mockRejectedValueOnce(new Error('query failed: rate-limited: quota exceeded; retry in 10s'))
+
+    const { result } = renderHook(() => useWorkspace())
+    await waitFor(() => expect(statusOf(result.current.state)).toBe('in_progress'))
+
+    await act(async () => {
+      await result.current.refresh()
+    })
+
+    expect(result.current.error).toBeNull()
+    expect(statusOf(result.current.state)).toBe('in_progress')
+  })
+
+  it('still reports a refusal that a person could act on', async () => {
+    vi.mocked(loadAll).mockRejectedValue(new Error('query failed: relay_membership_required'))
+
+    const { result } = renderHook(() => useWorkspace())
+
+    await waitFor(() => expect(result.current.error).toMatch(/relay_membership_required/))
+  })
+})
