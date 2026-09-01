@@ -80,10 +80,26 @@ async function hydrate(): Promise<void> {
        * distinction Peek had to ship a fix for.
        */
       if (!state.reachable) return
-      // Seeded from the **merge**, not from our own slot alone: what another
-      // installation has already read is state this one should not re-publish
-      // as unread, and the max rule makes carrying it harmless.
-      known = advanceContexts(state.merged, known)
+      /*
+       * Seeded from **our own slot**, not from the merge.
+       *
+       * Seeding from the merge looked harmless — the rule is a maximum, so
+       * carrying another installation's contexts loses nothing — and the
+       * cross-app verification showed what it actually costs: Ship's slot came
+       * back holding 53 contexts against Peek's 47, having absorbed Peek's and
+       * republished them as its own. Every slot converges to the union.
+       *
+       * Nothing is *wrong* with that, and two things about it are bad. Each
+       * slot becomes O(everything the person has read) rather than O(what this
+       * app read), so all of them approach the reference client's 32,768-byte
+       * plaintext limit together instead of one at a time. And `client_id`
+       * stops meaning "the app that read this", which is the only signal there
+       * is about where a marker came from.
+       *
+       * A slot is this installation's account of what *it* read. The union is
+       * what the merge is for, and it is computed at read time.
+       */
+      known = advanceContexts(state.own?.contexts ?? {}, known)
       published = state.own?.contexts ?? {}
       hydrated = true
     })().finally(() => {
