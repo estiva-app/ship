@@ -182,7 +182,7 @@ describe('Issues page — rows from the fold', () => {
 })
 
 describe('Project page — one project from the fold', () => {
-  it('draws the table with Updated from the last change, the Folder threads, the rail — and no Delete for a non-author', () => {
+  it('draws the table with Updated from the last change, the Folder threads, the rail — and offers Delete to a non-author', () => {
     location.hash = '#/project/30850%3Ax%3Alive'
     render(<App />)
     const main = within(screen.getByRole('main'))
@@ -194,12 +194,21 @@ describe('Project page — one project from the fold', () => {
     expect(main.getByRole('button', { name: 'Status' })).toBeEnabled()
     expect(main.getByRole('button', { name: 'Copy Folder link' })).toBeEnabled()
     expect(main.getByRole('button', { name: /Archive project/ })).toBeEnabled()
-    expect(main.queryByRole('button', { name: 'Delete project' })).not.toBeInTheDocument()
+    /*
+      Offered even though this viewer did not author the project (SHI-14). The
+      relay accepts a deletion from the author *or* from the owner of an
+      authoring agent, and ownership lives in `users.agent_owner_pubkey` —
+      which no event carries and no route returns, so the page cannot evaluate
+      it. Hiding the control guessed the narrower half of the rule and hid it
+      from the person most likely to be entitled to it. Archive already works
+      this way: offer, and report what the relay says.
+    */
+    expect(main.getByRole('button', { name: 'Delete project' })).toBeEnabled()
     expect(main.getByText('1 of 2 done')).toBeInTheDocument()
     expect(main.getByRole('button', { name: 'Add issue' })).toBeEnabled()
   })
 
-  it('offers Delete to the author, asks first, and requests the deletion', async () => {
+  it('asks before deleting, and requests the deletion', async () => {
     vi.mocked(deleteProject).mockResolvedValue({ ok: true })
     location.hash = '#/project/30850%3Ax%3Amine?view=board'
     render(<App />)

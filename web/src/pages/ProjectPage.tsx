@@ -184,7 +184,6 @@ export function ProjectPage({
               if (ok) say(project.archived ? 'Project restored.' : 'Project archived.')
             }),
           onDelete: () => setDialog('delete'),
-          canDelete: project.author === me,
         }}
       />
 

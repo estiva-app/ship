@@ -107,8 +107,16 @@ export function archiveProject(project: Project, archived: boolean): Promise<Wri
 
 /**
  * Delete is a NIP-09 *request*: relays may decline, copies elsewhere are
- * untouched, and only the author's request is honoured — the page offers it
- * to nobody else. It removes the record, not the issues.
+ * untouched, and it removes the record, not the issues.
+ *
+ * The page offers it to everyone and lets the relay adjudicate, the way
+ * archiving already does. It used to be hidden from anyone but the author,
+ * which was narrower than the rule it was modelling: the relay accepts a
+ * deletion from the author **or** from the owner of an authoring agent
+ * (`is_agent_owner`). Ship cannot evaluate that half — ownership lives in
+ * `users.agent_owner_pubkey`, which no event carries and no route returns —
+ * so guessing it hid the control from the one person most likely to want it,
+ * and left an agent-authored project nobody could remove (SHI-14).
  */
 export function deleteProject(project: Project): Promise<WriteResult> {
   return publish(() => store.deleteProject({ recordFolder: project.originFolder, project: project.addr }))
