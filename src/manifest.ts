@@ -87,10 +87,14 @@ export type SlotSource =
        *
        * Added by PRO-2, because a description is the one field an app puts in
        * `content` and neither of Ship's could be declared without it.
-       * `fold.ts` reads an issue's as `fields.description?.value ??
+       * `fold.ts` read an issue's as `fields.description?.value ??
        * event.content` and a project's as that with a `description` tag in
        * between; a manifest could express neither. Same argument as the `tag`
        * seed above, one field along.
+       *
+       * The asymmetry is gone: both now read change, then tag, then content
+       * (`recordDescription`), because `add-issue` takes a description and the
+       * runtime delivers it on a tag.
        */
       field?: 'content'
       map?: string
@@ -318,7 +322,13 @@ export function manifestContent(): ManifestContent {
           // description straight to `.content` and an issue root carries no
           // `description` tag at all (`events.ts`). Declaring one would be a
           // spelling nothing has ever written.
-          body: { fold: 'description', field: 'content' },
+/*
+            `tag` added with `add-issue`'s description field: an issue filed by a
+            foreign consumer carries the body on a `description` tag, and the
+            chain without it renders blank for exactly the issues this app did
+            not create. Now identical to the project's above.
+          */
+          body: { fold: 'description', tag: 'description', field: 'content' },
         },
       },
     },
@@ -458,14 +468,32 @@ export function manifestContent(): ManifestContent {
         id: 'add-issue',
         label: 'Add issue',
         description:
-          'File a new issue under a project. Only a title is required, and only immutable facts belong on the root event: ' +
-          'status and assignee are set afterwards by their own actions, never here.',
+          'File a new issue under a project. Only a title is required; a description is optional and becomes the ' +
+          'issue body. Status and assignee are not set here — they are their own actions afterwards, because only ' +
+          'what the issue *is* belongs on the root event.',
         effect: 'writes',
         appliesTo: String(KIND.PROJECT),
         emits: { kind: KIND.ISSUE, setTag: 'a', toAddressOf: 'self' },
+        /*
+          A title alone was a worse capture than the context switch it replaced:
+          the whole point of filing from a conversation is carrying what was said
+          into the issue, and there was nowhere to put it.
+
+          `description` is optional, so a title-only capture still works exactly
+          as before. It is not `required`, and it must not be — a person who has
+          a title and no more should not be blocked.
+
+          **Adding it here alone would have published descriptions nothing
+          renders.** The runtime writes each declared property to a tag of its
+          own name, so this arrives as `["description", …]` with empty content,
+          and both of Ship's readers wanted `.content`: `fold.ts` (now
+          `recordDescription`) and the issue projection's `body` slot below,
+          which needed the same `tag: 'description'` a project's already had.
+          Three places, all of which had to agree.
+        */
         input: {
           type: 'object',
-          properties: { title: { type: 'string' } },
+          properties: { title: { type: 'string' }, description: { type: 'string' } },
           required: ['title'],
         },
       },
