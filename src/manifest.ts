@@ -273,7 +273,10 @@ export function manifestContent(): ManifestContent {
           // one consumer's layout.
           status: { fold: 'status', map: 'issueStatuses', default: DEFAULT_ISSUE_STATUS },
           meta: [
-            { tag: 'ref' },
+            // Folded, seeded from the tag — see `fold.ts`. Declared this way so
+            // a consumer reading the slot gets the assigned key rather than the
+            // absence the root carries when somebody else created the issue.
+            { fold: 'ref', tag: 'ref' },
             { label: 'Assignee', fold: 'assignee', as: 'pubkey' },
           ],
         },

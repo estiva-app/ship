@@ -108,6 +108,49 @@ check('the issue took its change', folded.issues[0]?.status === 'done')
 check('the project took its change', folded.projects[0]?.status === 'completed')
 check('the project reports its Folder', folded.projects[0]?.contentFolder === CONTENT)
 
+// ── A ref can arrive after the issue does ───────────────────────────────────
+
+/*
+  An issue created by another app through the manifest carries no `ref`: a
+  display key is the project title's first three letters and a count of its
+  siblings, so only Ship can compute one. And Ship cannot add it to the root —
+  a NIP-33 address is `(kind, pubkey, d)`, so the root belongs permanently to
+  whoever signed it. A change event is the only move available.
+
+  Measured on production when this was found: 168 of 170 issues carried a ref,
+  and the one created from Peek showed a dash for ever while its status and
+  assignee arrived normally — because those were folded and this was not. `ref`
+  was the only field on an issue read from the root alone.
+*/
+console.log('\n# a ref can be assigned after the fact\n')
+
+const unreffed = buildIssue(PK, Date.now(), {
+  issueId: 'i2',
+  title: 'Testing issue created directly from Peek',
+  folder: CONTENT,
+  projectAddr: `30850:${PK}:p1`,
+})
+check('an issue may be created with no ref at all', tag(unreffed, 'ref') === undefined)
+
+const refChange = buildChange(PK, Date.now(), {
+  target: `30851:${PK}:i2`,
+  field: 'ref',
+  value: 'PAY-7',
+  folder: CONTENT,
+})
+const withLateRef = foldFolder([sign(project, 'r1'), sign(unreffed, 'r2'), sign(refChange, 'r3')])
+check('  …and take a ref from the change stream afterwards', withLateRef.issues[0]?.ref === 'PAY-7')
+
+const refOnRoot = buildIssue(PK, Date.now(), {
+  issueId: 'i3',
+  title: 'Filed in Ship',
+  folder: CONTENT,
+  projectAddr: `30850:${PK}:p1`,
+  ref: 'PAY-1',
+})
+const rootOnly = foldFolder([sign(project, 's1'), sign(refOnRoot, 's2')])
+check('  …while a ref written on the root still reads, as every existing issue does', rootOnly.issues[0]?.ref === 'PAY-1')
+
 // ── Two project wire shapes, read together ──────────────────────────────────
 
 /*

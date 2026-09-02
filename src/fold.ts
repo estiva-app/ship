@@ -575,7 +575,22 @@ export function foldFolder(
       description: fields.description?.value ?? event.content,
       folder: tag(event, 'h') ?? '',
       projectAddr: fields.project?.value ?? parent,
-      ref: tag(event, 'ref'),
+      /*
+        Folded, seeded from the root tag — the same shape as a project's `lead`
+        above, and `ref` was the one field on an issue that was not.
+
+        It mattered the moment something other than Ship created an issue. A
+        display key is derived from the project's title and a count of its
+        siblings, so only the owning app can compute one; and an owning app
+        cannot rewrite a root it did not sign, because a NIP-33 address is
+        `(kind, pubkey, d)`. Reading the tag alone therefore meant an issue
+        created from another app could never acquire a ref at all — it showed a
+        dash for ever, while its status and assignee arrived normally, because
+        those were already folded.
+
+        Nobody had noticed the asymmetry because Ship created every issue.
+      */
+      ref: fields.ref?.value ?? tag(event, 'ref'),
       status: fields.status?.value ?? DEFAULT_ISSUE_STATUS,
       assignee: fields.assignee?.value,
       fields,
