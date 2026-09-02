@@ -462,6 +462,8 @@ export class Store {
     field: string
     value: string
     note?: string
+    /** SPEC §13.4, for a field that carries a body. See `buildChange`. */
+    contentFormat?: string
   }): Promise<PublishResult> {
     return this.publish(buildChange(this.signer.pubkey, Date.now(), args))
   }

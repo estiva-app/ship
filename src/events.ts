@@ -214,6 +214,16 @@ export function buildChange(
     folder: string
     /** Optional human note — this is what makes the activity feed readable. */
     note?: string
+    /**
+     * Which content model `value` is written in — SPEC §13.4, for a body.
+     *
+     * Omitted for every scalar field, and that is not laziness: **absence is a
+     * declaration.** A folded status arrives through the same `value` tag a
+     * folded description does, so tagging everything would claim a content
+     * model for `todo`. Only a field that carries a body says anything, and a
+     * body with nothing to say is marker text, permanently.
+     */
+    contentFormat?: string
   },
 ): UnsignedEvent {
   assertFolderId(args.folder)
@@ -226,6 +236,7 @@ export function buildChange(
       ['field', args.field],
       ['value', args.value],
       ['h', args.folder],
+      ...(args.contentFormat ? [['content-format', args.contentFormat]] : []),
       // Appended last so the four tags the spec fixes keep their documented
       // order. An app that does not know `ts` ignores it and still folds — just
       // at one-second resolution.

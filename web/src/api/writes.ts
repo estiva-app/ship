@@ -1,4 +1,5 @@
 import type { PublishResult } from '@estiva-app/protocol'
+import { descriptionForPublishing } from '@/lib/description'
 import { addrToNaddr } from '@estiva-app/protocol'
 import type { Conversation, Issue, Project } from '../../../src/fold'
 import { nextRef, refPrefix } from '../../../src/store'
@@ -97,7 +98,12 @@ export async function createProject(draft: { title: string; description: string;
 
 /** One field of a project record: title, description, status, lead. The record's own Folder. */
 export function setProjectField(project: Project, field: 'title' | 'description' | 'status' | 'lead', value: string, note: string): Promise<WriteResult> {
-  return publish(() => store.setField({ folder: project.originFolder, target: project.addr, field, value, note }))
+  // A description is a rich text field (SPEC §13) and goes on the wire as a
+  // block document; every other field is a scalar and goes as it arrived.
+  const body = field === 'description'
+    ? descriptionForPublishing(value, project.description, project.descriptionFormat)
+    : { value, contentFormat: undefined }
+  return publish(() => store.setField({ folder: project.originFolder, target: project.addr, field, ...body, note }))
 }
 
 /** Archive hides the project from the lists, reversibly, by a change anyone in the Folder can make. */
@@ -182,7 +188,10 @@ export async function createIssue(project: Project, existing: Issue[], draft: { 
 
 /** One field of an issue: title, description, status, assignee, project. The issue's own Folder. */
 export function setIssueField(issue: Issue, field: 'title' | 'description' | 'status' | 'assignee' | 'project' | 'ref', value: string, note: string): Promise<WriteResult> {
-  return publish(() => store.setField({ folder: issue.folder, target: issue.addr, field, value, note }))
+  const body = field === 'description'
+    ? descriptionForPublishing(value, issue.description, issue.descriptionFormat)
+    : { value, contentFormat: undefined }
+  return publish(() => store.setField({ folder: issue.folder, target: issue.addr, field, ...body, note }))
 }
 
 // ── Conversations ───────────────────────────────────────────────────────────

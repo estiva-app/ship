@@ -4,6 +4,7 @@ import { Chip } from '@/components/ui/Chip'
 import type { ContentFormat } from '@estiva-app/protocol'
 import { EditableText } from '@/components/ui/EditableText'
 import { RichText } from '@/components/ui/RichText'
+import { descriptionForEditing } from '@/lib/description'
 
 /**
  * The top of the project page, as production: the title (click to edit) with
@@ -44,7 +45,7 @@ export function ProjectHeader({ title, description, descriptionFormat, archived 
       </div>
       <EditableText readOnly={readOnly}
         label="Description"
-        value={description}
+        value={descriptionForEditing(description, descriptionFormat)}
         displayNode={<RichText value={description} format={descriptionFormat} />}
         placeholder="Add a description…"
         onCommit={onDescribe}
