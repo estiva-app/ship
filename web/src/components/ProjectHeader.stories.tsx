@@ -10,7 +10,8 @@ const meta = {
   component: ProjectHeader,
   args: {
     title: 'Relay Migration',
-    description: 'Moving every workspace read and write onto the relay, one surface at a time.',
+    description: 'Moving every workspace read and write onto the relay, one surface at a time.\n\n## What is left\n\n- the **board**, which reads two folders\n- `publish-manifest.ts`, once the slots settle',
+    descriptionFormat: 'marker',
     onRename: fn<ProjectHeaderProps['onRename']>(() => true),
     onDescribe: fn<ProjectHeaderProps['onDescribe']>(() => true),
   },
