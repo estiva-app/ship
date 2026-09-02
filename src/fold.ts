@@ -515,14 +515,28 @@ function projectName(event: SignedEvent): string | undefined {
 }
 
 /**
- * A project's description: upstream's `description` tag, or Ship's `.content`.
+ * A record's description: a `description` tag, or its `.content`.
  *
  * `.content` is the fallback rather than the other way round, so a record that
  * carries the tag is taken at its word even when something also left content
  * behind. An absent tag and an empty one are deliberately different: a record
  * that says its description is empty is not a record that never said.
+ *
+ * **Read by an issue as well as a project since `add-issue` grew a description
+ * field.** It was `projectDescription` and an issue read only `.content`, which
+ * was fine while Ship's own composer was the only thing creating one — it puts
+ * the body in `content` (`buildIssue`). A foreign consumer cannot: the runtime
+ * writes each declared property to a **tag of its own name**, so an issue filed
+ * from Peek's launcher carries `["description", …]` and an empty content. An
+ * issue reading only content would have rendered every one of those blank while
+ * the description sat on the event, published and correct.
+ *
+ * **This decides the text, never the format.** `descriptionFormat` comes from
+ * the event's `content-format` tag (`contentFormatOf`), and §13.4 forbids
+ * inferring a format from the body — so moving the text to a tag does not move
+ * the format question with it. Do not make this function answer both.
  */
-function projectDescription(event: SignedEvent): string {
+function recordDescription(event: SignedEvent): string {
   return tag(event, 'description') ?? event.content
 }
 
@@ -569,7 +583,7 @@ export function foldFolder(
       // Two wire shapes, read in one pass, and it stays that way — see
       // `projectFolder` and `projectName` below for why there is no migration.
       title: fields.title?.value ?? projectName(event) ?? '(untitled project)',
-      description: fields.description?.value ?? projectDescription(event),
+      description: fields.description?.value ?? recordDescription(event),
       descriptionFormat: fields.description?.format ?? contentFormatOf(event),
       // The project's Folder is the one its record names — the Folder *is* the
       // project. A change may re-point it at an existing Peek topic; that
@@ -600,7 +614,7 @@ export function foldFolder(
       author: event.pubkey,
       createdAt: event.created_at,
       title: fields.title?.value ?? tag(event, 'title') ?? '(untitled issue)',
-      description: fields.description?.value ?? event.content,
+      description: fields.description?.value ?? recordDescription(event),
       descriptionFormat: fields.description?.format ?? contentFormatOf(event),
       folder: tag(event, 'h') ?? '',
       projectAddr: fields.project?.value ?? parent,
