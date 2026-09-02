@@ -78,7 +78,26 @@ export type SlotSource =
    * `default` is what to show when nobody has set it yet. `tag` names a tag on
    * the root event to seed the field from — see addition 3 below.
    */
-  | { fold: string; tag?: string; map?: string; as?: 'pubkey'; label?: string; default?: string }
+  | {
+      fold: string
+      tag?: string
+      /**
+       * Seed the fold from the event's own body when no change has set it and
+       * no seed tag resolves — the chain is fold, tag, content.
+       *
+       * Added by PRO-2, because a description is the one field an app puts in
+       * `content` and neither of Ship's could be declared without it.
+       * `fold.ts` reads an issue's as `fields.description?.value ??
+       * event.content` and a project's as that with a `description` tag in
+       * between; a manifest could express neither. Same argument as the `tag`
+       * seed above, one field along.
+       */
+      field?: 'content'
+      map?: string
+      as?: 'pubkey'
+      label?: string
+      default?: string
+    }
   /**
    * **Child objects, found by the tag on the child that names this one.**
    *
@@ -258,6 +277,22 @@ export function manifestContent(): ManifestContent {
            * questions when it made the project record global.
            */
           list: { children: { kind: KIND.ISSUE, via: 'a', limit: 200 } },
+          /*
+           * The description — PRO-2's third slot, unblocked by RIC-1.
+           *
+           * The chain is exactly `projectDescription()` in `fold.ts`: a change
+           * event, else the `description` tag, else `.content`. Declaring any
+           * shorter version renders something wrong — the tag alone loses every
+           * edit, the fold alone renders blank for a project nobody has edited.
+           *
+           * **No `truncate`, and no `subtitle` yet.** SPEC §13.5 makes rendering
+           * a body as plain text conformant, so a consumer can show this today;
+           * what it cannot do is flatten marker text into a one-line summary
+           * without a parser, and that parser is RIC-4. PRO-8's rule stands
+           * until then: an app whose description is structured owes the
+           * consumer the summary rather than expecting it to guess.
+           */
+          body: { fold: 'description', tag: 'description', field: 'content' },
         },
       },
       [KIND.ISSUE]: {
@@ -279,6 +314,11 @@ export function manifestContent(): ManifestContent {
             { fold: 'ref', tag: 'ref' },
             { label: 'Assignee', fold: 'assignee', as: 'pubkey' },
           ],
+          // No `tag` seed here, unlike the project: `buildIssue` writes the
+          // description straight to `.content` and an issue root carries no
+          // `description` tag at all (`events.ts`). Declaring one would be a
+          // spelling nothing has ever written.
+          body: { fold: 'description', field: 'content' },
         },
       },
     },
@@ -530,4 +570,65 @@ export function buildManifest(
     tags,
     content: JSON.stringify(manifestContent()),
   }
+}
+
+/**
+ * A slot's value, resolved the way a consumer resolves it.
+ *
+ * **Here rather than in `scripts/publish-manifest.ts`**, which is where it
+ * lived, because that script calls `main()` at import and so nothing could test
+ * it. It was wrong, and had been since PRO-11 (see the ordering note inside).
+ * Next to the `SlotSource` type it interprets, it is `manifest-slots.test.ts`'s
+ * subject instead.
+ *
+ * It stays a second implementation of what `@estiva-app/interop` already does,
+ * which is the drift SHA-19 is about. The reason it exists at all is that the
+ * publish check must be able to say "this declaration resolves against a real
+ * object" without the consumer runtime agreeing that it does — a check that
+ * shares an implementation with the thing it checks cannot catch that
+ * implementation being wrong. That argument justifies the copy; it does not
+ * justify the copy having *different* semantics, which is what this fixes.
+ */
+export function resolveSlotValue(
+  slot: SlotSource,
+  event: { tags: string[][]; content: string },
+  folded: Record<string, { value: string }>,
+): string | undefined {
+  // A `children` slot is a query, not a value on this event. It is resolved
+  // separately, against the relay, by `checkListSlot` — returning undefined
+  // here would report the flagship slot as an empty optional and prove nothing.
+  if ('children' in slot) return undefined
+
+  /*
+    **The fold first**, then the seed tag, then content, then the default.
+
+    This used to branch on `'tag' in slot` before anything else, under a comment
+    claiming it mirrored consumers "so the check and the rendering cannot
+    disagree". It did not: a slot that is *both* fold and tag — `{fold: "ref",
+    tag: "ref"}` has been declared here since PRO-11 — took the tag branch and
+    returned the seed, or undefined, without ever reading the fold. The check
+    reported the value the object was created with while every consumer rendered
+    the current one, which is the disagreement the comment ruled out.
+
+    Invisible because it was only ever wrong for a *changed* field, and this
+    script builds a fresh object and changes one thing: the status, which is
+    declared as a bare fold and so never entered the tag branch.
+  */
+  if ('fold' in slot) {
+    const changed = folded[slot.fold]?.value
+    if (changed !== undefined) return changed
+  }
+  if ('tag' in slot && slot.tag) {
+    // `tag` may name several spellings, meaning first that resolves — a slot
+    // whose tag was renamed has to reach records written under both. An empty
+    // value is skipped rather than accepted: it is the absence of an answer,
+    // and stopping there would report a blank slot with a good fallback behind
+    // it.
+    for (const name of Array.isArray(slot.tag) ? slot.tag : [slot.tag]) {
+      const value = event.tags.find((t) => t[0] === name)?.[1]
+      if (value !== undefined && value !== '') return value
+    }
+  }
+  if ('field' in slot && slot.field && event.content !== '') return event.content
+  return 'fold' in slot ? slot.default : undefined
 }

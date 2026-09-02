@@ -19,7 +19,15 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { Relay } from '@estiva-app/protocol'
 import { secretKeySigner } from '../lib/nostr/signer'
 import { publicKeyFromSecret, signEvent } from '@estiva-app/protocol'
-import { buildManifest, DEFAULT_APP_URL, MANIFEST_D_TAG, manifestContent, type ManifestContent, type SlotSource } from '../src/manifest'
+import {
+  buildManifest,
+  DEFAULT_APP_URL,
+  MANIFEST_D_TAG,
+  manifestContent,
+  resolveSlotValue as resolveSlot,
+  type ManifestContent,
+  type SlotSource,
+} from '../src/manifest'
 import { Store } from '../src/store'
 import { buildDeletion as buildEventDeletion } from '@estiva-app/protocol'
 import { KIND } from '../src/kinds'
@@ -82,31 +90,6 @@ function assertUrlsAgree(relayUrl: string, appUrl: string): void {
   }
 }
 
-function resolveSlot(
-  slot: SlotSource,
-  event: { tags: string[][]; content: string },
-  folded: Record<string, { value: string }>,
-): string | undefined {
-  if ('tag' in slot) {
-    // `tag` may name several spellings, meaning first that resolves — a slot
-    // whose tag was renamed has to reach records written under both. An empty
-    // value is skipped rather than accepted: it is the absence of an answer,
-    // and stopping there would report a blank slot with a good fallback behind
-    // it. Consumers do the same; this mirrors them so the check and the
-    // rendering cannot disagree.
-    for (const name of Array.isArray(slot.tag) ? slot.tag : [slot.tag]) {
-      const value = event.tags.find((t) => t[0] === name)?.[1]
-      if (value !== undefined && value !== '') return value
-    }
-    return undefined
-  }
-  if ('field' in slot) return event.content
-  // A `children` slot is a query, not a value on this event. It is resolved
-  // separately, against the relay, by `checkListSlot` — returning undefined
-  // here would report the flagship slot as an empty optional and prove nothing.
-  if ('children' in slot) return undefined
-  return folded[slot.fold]?.value ?? slot.default
-}
 
 /**
  * Resolve a `list` slot the way a consumer will, and say what came back.
@@ -292,7 +275,16 @@ async function main() {
           continue
         }
         const value = resolveSlot(slot, rootEvent, object.fields)
-        const sourceLabel = 'tag' in slot ? `tag:${slot.tag}` : 'field' in slot ? 'content' : `fold:${slot.fold}`
+        // The whole chain, in the order it is tried — a slot that is fold, tag
+        // and content read as just "tag:description" is how the ordering bug
+        // above stayed invisible in the output.
+        const sourceLabel = [
+          'fold' in slot ? `fold:${slot.fold}` : '',
+          'tag' in slot && slot.tag ? `tag:${slot.tag}` : '',
+          'field' in slot && slot.field ? 'content' : '',
+        ]
+          .filter(Boolean)
+          .join(' → ')
         // `meta` slots are legitimately optional — an issue with no ref is
         // fine. Required slots are not.
         const required = slotName === 'title' || slotName === 'status'
