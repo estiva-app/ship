@@ -8,3 +8,6 @@ extension/*.mcpb
 .pro7/
 
 .pro10/
+
+# `tsc -b` writes this; it is a build cache, not source.
+*.tsbuildinfo
