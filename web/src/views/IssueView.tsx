@@ -1,4 +1,6 @@
 import { Breadcrumb, type Crumb } from '@/components/ui/Breadcrumb'
+import type { ContentFormat } from '@estiva-app/protocol'
+import { RichText } from '@/components/ui/RichText'
 import { Divider } from '@/components/ui/Divider'
 import { EditableText } from '@/components/ui/EditableText'
 import { stripNaddrs } from '@estiva-app/protocol'
@@ -17,6 +19,8 @@ export interface IssueViewProps {
   crumbs: { issuesHref: string; project?: { title: string; href: string }; ref?: string }
   title: string
   description: string
+  /** Which content model the description is in — from the fold, never sniffed. */
+  descriptionFormat: ContentFormat
   onRename: (v: string) => Promise<boolean> | boolean
   onDescribe: (v: string) => Promise<boolean> | boolean
   threads: ThreadData[]
@@ -30,7 +34,7 @@ export interface IssueViewProps {
   readOnlyReason?: string
 }
 
-export function IssueView({ crumbs, title, description, onRename, onDescribe, threads, unread, onStartConversation, onReply, activity, rail, readOnlyReason }: IssueViewProps) {
+export function IssueView({ crumbs, title, description, descriptionFormat, onRename, onDescribe, threads, unread, onStartConversation, onReply, activity, rail, readOnlyReason }: IssueViewProps) {
   const items: Crumb[] = [{ label: 'Issues', href: crumbs.issuesHref }]
   if (crumbs.project) items.push({ label: crumbs.project.title, href: crumbs.project.href })
   if (crumbs.ref) items.push({ label: crumbs.ref, mono: true })
@@ -48,7 +52,17 @@ export function IssueView({ crumbs, title, description, onRename, onDescribe, th
       <div className="col-start-1 row-start-2 flex min-h-0 min-w-0 flex-col gap-6 overflow-y-auto px-6 pb-5">
         <div className="flex flex-col gap-2">
           <EditableText label="Title" value={title} placeholder="Untitled issue" onCommit={onRename} readOnly={!!readOnlyReason} className="-mx-2 text-h2" />
-          <EditableText label="Description" value={description} display={stripNaddrs(description).trim()} placeholder="Add a description…" onCommit={onDescribe} multiline readOnly={!!readOnlyReason} className="-mx-2 text-body-2" />
+          <EditableText
+            label="Description"
+            value={description}
+            display={stripNaddrs(description).trim()}
+            displayNode={<RichText value={stripNaddrs(description).trim()} format={descriptionFormat} />}
+            placeholder="Add a description…"
+            onCommit={onDescribe}
+            multiline
+            readOnly={!!readOnlyReason}
+            className="-mx-2 text-body-2"
+          />
           {/* Any object referenced in the description, live — PRO-7. */}
           <ForeignReferences text={description} className="flex flex-col gap-2" />
         </div>

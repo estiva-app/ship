@@ -453,6 +453,7 @@ const relink: Change = {
   target: `30850:${PK}:p1`,
   field: 'folder',
   value: TOPIC,
+  format: 'marker',
   note: '',
 }
 const relinked: Project = { ...folded.projects[0], contentFolder: TOPIC }
