@@ -1,6 +1,7 @@
 import { Breadcrumb, type Crumb } from '@/components/ui/Breadcrumb'
 import type { ContentFormat } from '@estiva-app/protocol'
 import { RichText } from '@/components/ui/RichText'
+import { descriptionForEditing } from '@/lib/description'
 import { Divider } from '@/components/ui/Divider'
 import { EditableText } from '@/components/ui/EditableText'
 import { stripNaddrs } from '@estiva-app/protocol'
@@ -54,8 +55,8 @@ export function IssueView({ crumbs, title, description, descriptionFormat, onRen
           <EditableText label="Title" value={title} placeholder="Untitled issue" onCommit={onRename} readOnly={!!readOnlyReason} className="-mx-2 text-h2" />
           <EditableText
             label="Description"
-            value={description}
-            display={stripNaddrs(description).trim()}
+            value={descriptionForEditing(description, descriptionFormat)}
+            display={stripNaddrs(descriptionForEditing(description, descriptionFormat)).trim()}
             displayNode={<RichText value={stripNaddrs(description).trim()} format={descriptionFormat} />}
             placeholder="Add a description…"
             onCommit={onDescribe}
