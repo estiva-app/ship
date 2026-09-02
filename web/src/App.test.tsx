@@ -18,13 +18,14 @@ vi.mock('@/api', async (importOriginal) => {
     setProjectField: vi.fn(),
     archiveProject: vi.fn(),
     deleteProject: vi.fn(),
+    deleteIssue: vi.fn(),
     pairProjectFolder: vi.fn(),
     startConversation: vi.fn(),
     reply: vi.fn(),
   }
 })
 
-import { createIssue, createProject, deleteProject, resolveInbound, setIssueField, startConversation, useDirectory, useWorkspace } from '@/api'
+import { createIssue, createProject, deleteIssue, deleteProject, resolveInbound, setIssueField, startConversation, useDirectory, useWorkspace } from '@/api'
 import { fireEvent } from '@testing-library/react'
 import App, { sidebarProps } from './App'
 
@@ -59,7 +60,7 @@ const refresh = vi.fn().mockResolvedValue(undefined)
 beforeEach(() => {
   location.hash = ''
   refresh.mockClear()
-  for (const write of [createProject, createIssue, setIssueField, deleteProject, startConversation]) vi.mocked(write).mockReset()
+  for (const write of [createProject, createIssue, setIssueField, deleteProject, deleteIssue, startConversation]) vi.mocked(write).mockReset()
   vi.mocked(useWorkspace).mockReturnValue({ state: STATE, error: null, refresh })
   vi.mocked(useDirectory).mockReturnValue({
     directory: new Map(),
@@ -273,6 +274,33 @@ describe('Issue page — one issue from the fold', () => {
     expect(await screen.findByText(/Status → cancelled rejected — relay said no/)).toBeInTheDocument()
     expect(refresh).toHaveBeenCalledTimes(1)
     expect(main.getByRole('button', { name: 'Status' })).toHaveTextContent('In Progress')
+  })
+
+  it('asks before deleting an issue, says the conversations survive, and requests the deletion', async () => {
+    vi.mocked(deleteIssue).mockResolvedValue({ ok: true })
+    location.hash = '#/issue/30851%3Ax%3A4'
+    render(<App />)
+    const main = within(screen.getByRole('main'))
+    fireEvent.click(main.getByRole('button', { name: 'Delete issue' }))
+    const dialog = within(screen.getByRole('dialog', { name: /Delete/ }))
+    expect(deleteIssue).not.toHaveBeenCalled()
+    // SHI-3 is explicit that this must not read as deleting the discussion.
+    expect(dialog.getByText(/not deleted/)).toBeInTheDocument()
+    fireEvent.click(dialog.getByRole('button', { name: 'Delete issue' }))
+    await waitFor(() => expect(deleteIssue).toHaveBeenCalledWith(expect.objectContaining({ addr: '30851:x:4' })))
+    expect(await screen.findByText('Deletion requested.')).toBeInTheDocument()
+  })
+
+  it('reports a refused deletion and stays on the issue', async () => {
+    vi.mocked(deleteIssue).mockResolvedValue({ ok: false, reason: 'must be event author' })
+    location.hash = '#/issue/30851%3Ax%3A4'
+    render(<App />)
+    const main = within(screen.getByRole('main'))
+    fireEvent.click(main.getByRole('button', { name: 'Delete issue' }))
+    const dialog = within(screen.getByRole('dialog', { name: /Delete/ }))
+    fireEvent.click(dialog.getByRole('button', { name: 'Delete issue' }))
+    expect(await screen.findByText(/Delete rejected — must be event author/)).toBeInTheDocument()
+    expect(location.hash).toBe('#/issue/30851%3Ax%3A4')
   })
 
   it('starts a thread about the issue with the reference Peek needs', async () => {

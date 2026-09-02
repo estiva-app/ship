@@ -39,6 +39,7 @@ export {
   archiveProject,
   createIssue,
   createProject,
+  deleteIssue,
   deleteProject,
   explainRejection,
   pairProjectFolder,

@@ -1,10 +1,11 @@
 import { useMarkRead } from '@/lib/useMarkRead'
-import { useMemo } from 'react'
-import { ISSUE_STATUSES, conversationsAbout, referenceFor, reply, setIssueField, startConversation, type DirectoryView, type FolderState, threadContext, useMergedReadState, firstUnreadByThread, projectContext, me } from '@/api'
+import { useMemo, useState } from 'react'
+import { ISSUE_STATUSES, conversationsAbout, deleteIssue, referenceFor, reply, setIssueField, startConversation, type DirectoryView, type FolderState, threadContext, useMergedReadState, firstUnreadByThread, projectContext, me } from '@/api'
 import type { ActivityEntry } from '@/components/ActivityFeed'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { IssueView } from '@/views/IssueView'
-import { href } from '../router'
+import { go, href } from '../router'
 import { act, type Say } from './act'
 import { copyText, railPeople, threadFor } from './ProjectPage'
 
@@ -60,6 +61,7 @@ export function IssuePage({ state, directory, addr, say, refresh }: { state: Fol
     () => [{ value: '', label: 'No project' }, ...state.projects.map((p) => ({ value: p.addr, label: p.title }))],
     [state],
   )
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
 
   if (!issue) {
     return (
@@ -74,44 +76,75 @@ export function IssuePage({ state, directory, addr, say, refresh }: { state: Fol
     act(note, () => setIssueField(issue, field, value, note), say, refresh)
 
   return (
-    <IssueView
-      crumbs={{
-        issuesHref: href({ name: 'issues' }),
-        project: project ? { title: project.title, href: href({ name: 'project', addr: project.addr, view: 'table' }) } : undefined,
-        ref: issue.ref,
-      }}
-      title={issue.title}
-      description={issue.description}
-      onRename={(value) => set('title', value, 'Rename')}
-      onDescribe={(value) => set('description', value, 'Description')}
-      threads={threads}
-      unread={unread}
-      // Threads about an issue carry a reference in the body so Peek renders
-      // the issue's widget above them (withReference: true), as the old app has it.
-      onStartConversation={(body) => act('Message', () => startConversation({ folder: issue.folder, about: issue.addr, withReference: true, body }), say, refresh)}
-      onReply={(threadId, body) => {
-        const conversation = conversations.find((c) => c.id === threadId)
-        if (!conversation) return false
-        return act('Reply', () => reply(conversation, issue.folder, body), say, refresh)
-      }}
-      activity={activity}
-      rail={{
-        status: issue.status,
-        statuses: ISSUE_STATUSES.map(({ value, label }) => ({ value, label })),
-        onStatusChange: (value) => void set('status', value, `Status → ${value}`),
-        assignee: issue.assignee ?? '',
-        people,
-        onAssigneeChange: (value) => void set('assignee', value, value ? 'Assign' : 'Unassign'),
-        project: issue.projectAddr ?? '',
-        projects,
-        onProjectChange: (value) => {
-          const target = state.projects.find((p) => p.addr === value)
-          void set('project', value, `Move to ${target?.title ?? 'No project'}`)
-        },
-        openedBy: directory.personOf(issue.author),
-        openedAt: issue.createdAt,
-        onCopyReference: () => void copyText(referenceFor(issue.addr), 'Reference copied — paste it into a Peek message.', 'Copy this reference:', say),
-      }}
-    />
+    <>
+      <IssueView
+        crumbs={{
+          issuesHref: href({ name: 'issues' }),
+          project: project ? { title: project.title, href: href({ name: 'project', addr: project.addr, view: 'table' }) } : undefined,
+          ref: issue.ref,
+        }}
+        title={issue.title}
+        description={issue.description}
+        onRename={(value) => set('title', value, 'Rename')}
+        onDescribe={(value) => set('description', value, 'Description')}
+        threads={threads}
+        unread={unread}
+        // Threads about an issue carry a reference in the body so Peek renders
+        // the issue's widget above them (withReference: true), as the old app has it.
+        onStartConversation={(body) => act('Message', () => startConversation({ folder: issue.folder, about: issue.addr, withReference: true, body }), say, refresh)}
+        onReply={(threadId, body) => {
+          const conversation = conversations.find((c) => c.id === threadId)
+          if (!conversation) return false
+          return act('Reply', () => reply(conversation, issue.folder, body), say, refresh)
+        }}
+        activity={activity}
+        rail={{
+          status: issue.status,
+          statuses: ISSUE_STATUSES.map(({ value, label }) => ({ value, label })),
+          onStatusChange: (value) => void set('status', value, `Status → ${value}`),
+          assignee: issue.assignee ?? '',
+          people,
+          onAssigneeChange: (value) => void set('assignee', value, value ? 'Assign' : 'Unassign'),
+          project: issue.projectAddr ?? '',
+          projects,
+          onProjectChange: (value) => {
+            const target = state.projects.find((p) => p.addr === value)
+            void set('project', value, `Move to ${target?.title ?? 'No project'}`)
+          },
+          openedBy: directory.personOf(issue.author),
+          openedAt: issue.createdAt,
+          onCopyReference: () => void copyText(referenceFor(issue.addr), 'Reference copied — paste it into a Peek message.', 'Copy this reference:', say),
+          onDelete: () => setConfirmingDelete(true),
+        }}
+      />
+      {confirmingDelete && (
+        <ConfirmDialog
+          title={`Delete “${issue.title}”?`}
+          confirmLabel="Delete issue"
+          destructive
+          onClose={() => setConfirmingDelete(false)}
+          onConfirm={async () => {
+            const result = await deleteIssue(issue)
+            if (!result.ok) {
+              say(`Delete rejected — ${result.reason}`, 'error')
+              return false
+            }
+            say('Deletion requested.')
+            // Nothing left to render here.
+            go(project ? { name: 'project', addr: project.addr, view: 'table' } : { name: 'issues' })
+            await refresh()
+            return true
+          }}
+        >
+          <p>This publishes a NIP-09 deletion request. Relays may decline it, and copies held elsewhere are unaffected.</p>
+          {conversations.length > 0 && (
+            <p>
+              Its {conversations.length} {conversations.length === 1 ? 'conversation is a separate event and is' : 'conversations are separate events and are'} not deleted — they stay
+              in the Folder and stop being reachable from here.
+            </p>
+          )}
+        </ConfirmDialog>
+      )}
+    </>
   )
 }
