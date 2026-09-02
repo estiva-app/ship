@@ -11,6 +11,7 @@ import {
   pairProjectFolder,
   peopleIn,
   reply,
+  assignRef,
   setProjectField,
   startConversation,
   projectContext,
@@ -148,6 +149,12 @@ export function ProjectPage({
         issues={issues}
         issueStatuses={ISSUE_STATUSES}
         hrefFor={hrefForIssue}
+        onAssignRef={(row) => {
+          const target = state.issues.find((i) => i.addr === row.addr)
+          if (!target) return
+          const siblings = state.issues.filter((i) => i.projectAddr === project.addr)
+          void act('Assign key', () => assignRef(target, project, siblings), say, refresh)
+        }}
         threads={threads}
         unread={unread}
         // A project conversation is already in the topic it belongs to, so a

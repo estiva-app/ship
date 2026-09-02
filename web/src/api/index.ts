@@ -43,6 +43,7 @@ export {
   explainRejection,
   pairProjectFolder,
   reply,
+  assignRef,
   setIssueField,
   setProjectField,
   startConversation,
