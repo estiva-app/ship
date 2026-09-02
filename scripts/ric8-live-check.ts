@@ -84,9 +84,13 @@ async function main() {
     return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
   })
 
-  const target = fixture.expected.projects.find((p: { description?: string }) => (p.description ?? '').length > 3000)
-  await page.goto(`http://localhost:${PORT}/#/project/${encodeURIComponent(target.addr)}`)
-  await page.waitForSelector('[data-surface="project"]', { timeout: 15000 }).catch(() => {})
+  const surface = process.argv.includes('--issue') ? 'issue' : 'project'
+  const target = surface === 'issue'
+    ? fixture.expected.issues[0]
+    : fixture.expected.projects.find((p: { description?: string }) => (p.description ?? '').length > 3000)
+  console.log(`surface: ${surface} — ${target.title}`)
+  await page.goto(`http://localhost:${PORT}/#/${surface === 'issue' ? 'issue' : 'project'}/${encodeURIComponent(target.addr)}`)
+  await page.waitForSelector(`[data-surface="${surface}"]`, { timeout: 15000 }).catch(() => {})
   await page.waitForTimeout(800)
 
   // ── Edit the description the way a person does ──────────────────────────
@@ -99,7 +103,7 @@ async function main() {
   // Escape cancels; commit by blurring instead, which is what a click away does.
   await page.getByRole('button', { name: 'Edit description' }).click()
   await field.fill(NEXT)
-  await page.locator('h1, [data-surface="project"]').first().click({ position: { x: 5, y: 5 } })
+  await page.locator(`[data-surface="${surface}"]`).first().click({ position: { x: 5, y: 5 } })
   await page.waitForTimeout(1200)
 
   const change = published.find((e) => e.kind === 1851 && tag(e, 'field') === 'description')
@@ -130,7 +134,7 @@ async function main() {
 
   // ── The app reads its own writing back ──────────────────────────────────
   await page.reload()
-  await page.waitForSelector('[data-surface="project"]', { timeout: 15000 }).catch(() => {})
+  await page.waitForSelector(`[data-surface="${surface}"]`, { timeout: 15000 }).catch(() => {})
   await page.waitForTimeout(1000)
   const desc = page.getByLabel('Description').first()
   const drawn = await desc.evaluate((el) => ({
