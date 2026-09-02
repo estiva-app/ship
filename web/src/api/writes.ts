@@ -123,6 +123,18 @@ export function deleteProject(project: Project): Promise<WriteResult> {
 }
 
 /**
+ * Delete an issue. Same contract as `deleteProject`, one level down: a NIP-09
+ * request, offered to everyone, adjudicated by the relay.
+ *
+ * It removes the issue record. The conversations about it are separate events
+ * in the same Folder and are not touched — SHI-3 is explicit that "delete the
+ * issue" must not read as "delete the discussion", so the dialog says so.
+ */
+export function deleteIssue(issue: Issue): Promise<WriteResult> {
+  return publish(() => store.deleteIssue({ folder: issue.folder, issue: issue.addr }))
+}
+
+/**
  * Re-point a project at another Folder. Two writes: the change that decides
  * it, and the same statement inside the Folder being paired so other apps
  * can find the project there. The second can be refused on its own — a

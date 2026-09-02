@@ -1,3 +1,4 @@
+import type { ReactElement } from 'react'
 import { cn } from '@/lib/cn'
 import { ago } from '@/lib/time'
 import { Button } from '@/components/ui/Button'
@@ -5,6 +6,7 @@ import { Divider } from '@/components/ui/Divider'
 import { Person } from '@/components/ui/Person'
 import { Property } from '@/components/ui/Property'
 import { Select, type SelectOption } from '@/components/ui/Select'
+import { WithTooltip } from '@/components/ui/Tooltip'
 import { peopleOptions, type RailPerson } from './ProjectRail'
 
 /**
@@ -30,6 +32,7 @@ export interface IssueRailProps {
   /** Seconds, as the relay keeps them. */
   openedAt: number
   onCopyReference: () => void
+  onDelete: () => void
   /** Why writes are unavailable: disables the three selects. Copy stays. */
   readOnlyReason?: string
   className?: string
@@ -48,10 +51,12 @@ export function IssueRail({
   openedBy,
   openedAt,
   onCopyReference,
+  onDelete,
   readOnlyReason,
   className,
 }: IssueRailProps) {
   const locked = !!readOnlyReason
+  const held = (button: ReactElement) => (readOnlyReason ? <WithTooltip label={readOnlyReason}>{button}</WithTooltip> : button)
   return (
     <aside className={cn('flex w-[250px] shrink-0 flex-col gap-4', className)}>
       <Property layout="stacked" label="Status">
@@ -72,6 +77,12 @@ export function IssueRail({
       <Button size="small" variant="outlined" className="self-start" onClick={onCopyReference}>
         Copy reference for Peek
       </Button>
+      <Divider className="mx-0" />
+      {held(
+        <Button size="small" variant="destructive" className="self-start" onClick={onDelete} disabled={locked}>
+          Delete issue
+        </Button>,
+      )}
     </aside>
   )
 }

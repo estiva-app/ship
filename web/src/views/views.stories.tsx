@@ -139,6 +139,7 @@ export const Issue: Story = {
             openedBy: issue.openedBy,
             openedAt: issue.at,
             onCopyReference: fn(),
+            onDelete: fn(),
           }}
         />
       </Shell>

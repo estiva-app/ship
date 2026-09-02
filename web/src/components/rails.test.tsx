@@ -47,8 +47,9 @@ describe('ProjectRail', () => {
 })
 
 describe('IssueRail', () => {
-  it('names who opened it as a person, never a key, and offers the Peek reference', () => {
+  it('names who opened it as a person, never a key, and offers the Peek reference and Delete', () => {
     const onCopyReference = vi.fn()
+    const onDelete = vi.fn()
     render(
       <IssueRail
         status="todo"
@@ -63,6 +64,7 @@ describe('IssueRail', () => {
         openedBy={{}}
         openedAt={Math.floor(Date.now() / 1000) - 36000}
         onCopyReference={onCopyReference}
+        onDelete={onDelete}
       />,
     )
     expect(screen.getByText(/Opened by/)).toBeInTheDocument()
@@ -70,5 +72,8 @@ describe('IssueRail', () => {
     expect(screen.getByText(/10h ago/)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Copy reference for Peek' }))
     expect(onCopyReference).toHaveBeenCalledTimes(1)
+    // Offered to everyone; the relay decides who may (SHI-14, and SHI-3 for issues).
+    fireEvent.click(screen.getByRole('button', { name: 'Delete issue' }))
+    expect(onDelete).toHaveBeenCalledTimes(1)
   })
 })
