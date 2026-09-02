@@ -1,5 +1,6 @@
 import { useMarkRead } from '@/lib/useMarkRead'
-import { useMemo, useState } from 'react'
+import { signedIn } from '@/auth/estivaId'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ISSUE_STATUSES,
   PROJECT_STATUSES,
@@ -11,7 +12,7 @@ import {
   pairProjectFolder,
   peopleIn,
   reply,
-  assignRef,
+  assignMissingRefs,
   setProjectField,
   startConversation,
   projectContext,
@@ -129,6 +130,33 @@ export function ProjectPage({
     return <EmptyState className="py-12" message="That project is not in this workspace, or lives in a Folder you cannot read." />
   }
 
+  /*
+    Number the issues Ship has not numbered yet.
+
+    An issue created through the manifest by another app arrives with no display
+    key, because only Ship can compute one — it is the project title plus a count
+    of the siblings, which a consumer cannot see. Ship is the only participant
+    that can, so Ship does it, here, where the siblings are known. The issues
+    list spans projects and has no answer.
+
+    Signed in only: a change event has to be signed by somebody, and the
+    anonymous reader key would be publishing under an identity that is not a
+    person. A reader without an account sees the dash, which is honest.
+
+    `attempted` stops the five-second poll from re-firing while the writes are in
+    flight — the state it reads has not refreshed yet, so without it every tick
+    would queue the same batch again.
+  */
+  const attempted = useRef(new Set<string>())
+  useEffect(() => {
+    if (!project || !signedIn()) return
+    const missing = issues.filter((row) => !row.ref && !attempted.current.has(row.addr))
+    if (missing.length === 0) return
+    for (const row of missing) attempted.current.add(row.addr)
+    const mine = state.issues.filter((issue) => issue.projectAddr === project.addr)
+    void assignMissingRefs(project, mine).then(() => refresh())
+  }, [project, issues, state.issues, refresh])
+
   const done = issues.filter((issue) => issue.status === 'done').length
   const set = (field: 'title' | 'description' | 'status' | 'lead', value: string, note: string) => act(note, () => setProjectField(project, field, value, note), say, refresh)
 
@@ -149,12 +177,6 @@ export function ProjectPage({
         issues={issues}
         issueStatuses={ISSUE_STATUSES}
         hrefFor={hrefForIssue}
-        onAssignRef={(row) => {
-          const target = state.issues.find((i) => i.addr === row.addr)
-          if (!target) return
-          const siblings = state.issues.filter((i) => i.projectAddr === project.addr)
-          void act('Assign key', () => assignRef(target, project, siblings), say, refresh)
-        }}
         threads={threads}
         unread={unread}
         // A project conversation is already in the topic it belongs to, so a
