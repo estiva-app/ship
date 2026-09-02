@@ -61,7 +61,7 @@ const here = dirname(fileURLToPath(import.meta.url))
  * is a deliberate change in two places, which is the correct amount of friction
  * for editing a contract between repositories.
  */
-const EVENTS_SHA256 = '5fad457070fc19c398975884a82b3c84cbc9cea02e598c3255978c4142927f6f'
+const EVENTS_SHA256 = '64cd76f53c9ab7ab346c5dd352fd81b58cfedcece1bd9e944c22817368eac14e'
 
 let failures = 0
 function check(label: string, condition: boolean, detail = '') {
