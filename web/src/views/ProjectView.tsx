@@ -50,7 +50,6 @@ export interface ProjectViewProps {
     onPairFolder: () => void
     onArchive: () => void
     onDelete: () => void
-    canDelete?: boolean
   }
   /** Why writes are unavailable — every write control on the page is disabled with it. */
   readOnlyReason?: string

@@ -41,8 +41,6 @@ export interface ProjectRailProps {
   archived: boolean
   onArchive: () => void
   onDelete: () => void
-  /** Delete is author-only (NIP-09); absent, not disabled, for anyone else. */
-  canDelete?: boolean
   /** Why writes are unavailable: disables the selects and the write buttons, as a tooltip. Copy stays. */
   readOnlyReason?: string
   className?: string
@@ -75,7 +73,6 @@ export function ProjectRail({
   archived,
   onArchive,
   onDelete,
-  canDelete = true,
   readOnlyReason,
   className,
 }: ProjectRailProps) {
@@ -117,12 +114,11 @@ export function ProjectRail({
             {archived ? 'Unarchive project' : 'Archive project'}
           </Button>,
         )}
-        {canDelete &&
-          held(
-            <Button size="small" variant="destructive" onClick={onDelete} disabled={locked}>
-              Delete project
-            </Button>,
-          )}
+        {held(
+          <Button size="small" variant="destructive" onClick={onDelete} disabled={locked}>
+            Delete project
+          </Button>,
+        )}
       </div>
     </aside>
   )
