@@ -1,4 +1,5 @@
 import { IconLayoutKanban, IconTable } from '@tabler/icons-react'
+import type { ContentFormat } from '@estiva-app/protocol'
 import { Breadcrumb } from '@/components/ui/Breadcrumb'
 import { Button } from '@/components/ui/Button'
 import { Divider } from '@/components/ui/Divider'
@@ -21,7 +22,7 @@ import { ProjectRail, type RailPerson } from '@/components/ProjectRail'
  */
 export interface ProjectViewProps {
   crumbs: { projectsHref: string; title: string }
-  header: { title: string; description: string; archived: boolean; onRename: (v: string) => Promise<boolean> | boolean; onDescribe: (v: string) => Promise<boolean> | boolean }
+  header: { title: string; description: string; descriptionFormat: ContentFormat; archived: boolean; onRename: (v: string) => Promise<boolean> | boolean; onDescribe: (v: string) => Promise<boolean> | boolean }
   /** Production's "Add issue" beside the title. */
   onAddIssue?: () => void
   view: 'table' | 'board'

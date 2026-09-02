@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react'
 import { cn } from '@/lib/cn'
 import { Chip } from '@/components/ui/Chip'
+import type { ContentFormat } from '@estiva-app/protocol'
 import { EditableText } from '@/components/ui/EditableText'
+import { RichText } from '@/components/ui/RichText'
 
 /**
  * The top of the project page, as production: the title (click to edit) with
@@ -12,6 +14,8 @@ import { EditableText } from '@/components/ui/EditableText'
 export interface ProjectHeaderProps {
   title: string
   description: string
+  /** Which content model the description is in — from the fold, never sniffed. */
+  descriptionFormat: ContentFormat
   archived?: boolean
   onRename: (title: string) => Promise<boolean> | boolean
   onDescribe: (description: string) => Promise<boolean> | boolean
@@ -22,7 +26,7 @@ export interface ProjectHeaderProps {
   className?: string
 }
 
-export function ProjectHeader({ title, description, archived = false, onRename, onDescribe, className, readOnly = false, action }: ProjectHeaderProps) {
+export function ProjectHeader({ title, description, descriptionFormat, archived = false, onRename, onDescribe, className, readOnly = false, action }: ProjectHeaderProps) {
   return (
     <div className={cn('flex flex-col gap-2', className)}>
       <div className="flex items-start gap-2">
@@ -41,6 +45,7 @@ export function ProjectHeader({ title, description, archived = false, onRename, 
       <EditableText readOnly={readOnly}
         label="Description"
         value={description}
+        displayNode={<RichText value={description} format={descriptionFormat} />}
         placeholder="Add a description…"
         onCommit={onDescribe}
         multiline

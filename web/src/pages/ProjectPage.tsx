@@ -167,6 +167,7 @@ export function ProjectPage({
         header={{
           title: project.title,
           description: project.description,
+          descriptionFormat: project.descriptionFormat,
           archived: project.archived,
           onRename: (value) => set('title', value, 'Rename'),
           onDescribe: (value) => set('description', value, 'Description'),

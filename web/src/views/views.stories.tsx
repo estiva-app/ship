@@ -76,7 +76,7 @@ export const Project: Story = {
         <ProjectView
           onAddIssue={fn()}
           crumbs={{ projectsHref: '#/projects', title }}
-          header={{ title, description, archived: false, onRename: (v) => (setTitle(v), true), onDescribe: (v) => (setDescription(v), true) }}
+          header={{ title, description, descriptionFormat: 'marker', archived: false, onRename: (v) => (setTitle(v), true), onDescribe: (v) => (setDescription(v), true) }}
           view={view}
           onView={setView}
           issues={ISSUES}
