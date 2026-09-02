@@ -42,7 +42,14 @@ export function IssuesTable({ issues, statuses, hrefFor, className }: IssuesTabl
       <table className="w-full min-w-[840px] table-fixed border-collapse">
         <thead className="bg-bg-surface">
           <tr className="border-b border-border-default">
-            <th className={cn(TH, 'w-16')}>
+            {/* `relative` is load-bearing: `sr-only` is position:absolute, and
+                with no positioned ancestor its containing block is the viewport
+                — it escapes every scroll container on the page and hands the
+                document its static position as scroll range. On any project
+                whose description pushes this table below the first screen, the
+                WHOLE page (sidebar and top bar included) became scrollable by
+                exactly that distance. */}
+            <th className={cn(TH, 'relative w-16')}>
               <span className="sr-only">Ref</span>
             </th>
             <th className={TH}>Title</th>
