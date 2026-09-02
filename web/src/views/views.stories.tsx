@@ -20,8 +20,9 @@ function Shell({ current, children }: { current: 'issues' | 'projects' | { proje
   return (
     <div className="h-screen">
       <AppShell
+        logo="Estiva Ship"
         identity={<IdentityMenu me={ANA} signedIn idBase="https://id.estiva.app" relayUrl="http://localhost:3000" onCopyKey={fn()} onSignOut={fn()} />}
-        sidebar={<Sidebar openIssues={18} issuesHref="#/issues" projectsHref="#/projects" projects={SIDEBAR_PROJECTS} current={current} />}
+        nav={<Sidebar openIssues={18} issuesHref="#/issues" projectsHref="#/projects" projects={SIDEBAR_PROJECTS} current={current} />}
       >
         {children}
       </AppShell>
