@@ -30,10 +30,10 @@ import { fireEvent } from '@testing-library/react'
 import App, { sidebarProps } from './App'
 
 const project = (addr: string, title: string, archived = false) => ({
-  addr, id: addr, author: OTHER, createdAt: 1, title, description: '', contentFolder: 'f', originFolder: 'f', status: 'planned', archived, fields: {},
+  addr, id: addr, author: OTHER, createdAt: 1, title, description: '', descriptionFormat: 'marker' as const, contentFolder: 'f', originFolder: 'f', status: 'planned', archived, fields: {},
 })
 const issue = (addr: string, projectAddr: string | undefined, status: string) => ({
-  addr, id: addr, author: OTHER, createdAt: 1, title: addr, description: '', folder: 'f', projectAddr, status, fields: {},
+  addr, id: addr, author: OTHER, createdAt: 1, title: addr, description: '', descriptionFormat: 'marker' as const, folder: 'f', projectAddr, status, fields: {},
 })
 
 const STATE: FolderState = {
@@ -45,9 +45,9 @@ const STATE: FolderState = {
     { ...issue('30851:x:4', undefined, 'in_progress'), assignee: ME, ref: 'X-4' },
   ],
   activity: [
-    { id: 'ch1', author: OTHER, createdAt: 99, target: '30851:x:1', field: 'status', value: 'todo', note: '' },
-    { id: 'ch2', author: OTHER, createdAt: 100, target: '30851:x:4', field: 'assignee', value: ME, note: '' },
-    { id: 'ch3', author: ME, createdAt: 101, target: '30851:x:4', field: 'status', value: 'in_progress', note: '' },
+    { id: 'ch1', author: OTHER, createdAt: 99, target: '30851:x:1', field: 'status', value: 'todo', note: '', format: 'marker' as const },
+    { id: 'ch2', author: OTHER, createdAt: 100, target: '30851:x:4', field: 'assignee', value: ME, note: '', format: 'marker' as const },
+    { id: 'ch3', author: ME, createdAt: 101, target: '30851:x:4', field: 'status', value: 'in_progress', note: '', format: 'marker' as const },
   ],
   conversations: [
     { id: 'c1', root: { id: 'c1', author: OTHER, createdAt: 5, body: 'hi nostr:naddr1qqxyz', folder: 'f', about: ['30851:x:4'] }, replies: [], about: ['30851:x:4'], createdAt: 5, lastAt: 5 },

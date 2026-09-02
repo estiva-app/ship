@@ -121,6 +121,7 @@ export const Issue: Story = {
           crumbs={{ issuesHref: '#/issues', project: { title: 'Relay Migration', href: '#/project/30850%3Aa%3Arel' }, ref: issue.ref }}
           title={title}
           description={description}
+          descriptionFormat="marker"
           onRename={(v) => (setTitle(v), true)}
           onDescribe={(v) => (setDescription(v), true)}
           threads={THREADS}

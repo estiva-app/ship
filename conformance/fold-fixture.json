@@ -2824,6 +2824,7 @@
         "createdAt": 1787348120,
         "title": "Peek: Real-time Ship→Peek updates",
         "description": "Ship→Peek updates are not real-time and cannot explain themselves. Source ticket: PEEK-109.\n\n## The actual diagnosis\n\nThere is no polling. Peek reads the relay **once per topic mount** and never again — `useTopicView.tsx` keys its sync effect on `[topicId, topicFolderId, relayUrl, convex]`, none of which change while you sit in a topic. \"Replies take time to appear\" is really \"replies appear on remount\", which is why a reload fixes it.\n\nFour independent staleness sources, each matching a reported symptom:\n\n1. **Messages/replies** — one fetch per mount (`useTopicView.tsx:144-159`). Reactions and deletions are additionally capped to the newest 100 messages per topic (`convex/nostr/sync.ts:41`), so an older message never picks up a reaction at all.\n2. **Ship projects/issues in the sidebar** — `TopicProjectPanel.tsx:250-269` resolves once, keyed on a folder id that never changes. The file admits it: \"the panel reflects the moment it resolved and does not live-update\". A project created in Ship after the panel mounted never appears.\n3. **Everything outside topics never syncs at all** — the only relay-read call sites are `useTopicView` (channel) and `AuthGate` (profiles). DMs, inbox, Desk and Screener have no read path.\n4. **Auth failure is silent** — `useTopicView.tsx:150` calls `validToken()` and returns with no signal; relay failures below are `console.warn`. Silent refresh exists (PEEK-108) but it is a `setTimeout`, which browsers throttle in background tabs. The UI cannot distinguish \"nothing changed\" from \"I stopped being able to ask\".\n\n## What is already true (verified live, 2026-08-21)\n\n- `wss://estiva.estiva.app` accepts a WebSocket upgrade through Cloudflare from Peek's origin and immediately sends `[\"AUTH\",\"<challenge>\"]`. Verified with curl; **pass `--http1.1`** or the same request returns NIP-11 JSON, because `Connection`/`Upgrade` are not HTTP/2 headers.\n- NIP-11 reports `supported_nips` including 42, `auth_required: true`, `max_subscriptions: 1024`, `max_filters: 10`.\n- **One subscription covers messages, reactions AND deletions.** `buzz-core/src/filter.rs:68-90` has an explicit `#h` fallback to `StoredEvent.channel_id` for events carrying no `h` tag (kind:7, kind:5, whose channel is derived at ingest). So `{\"#h\":[channelUuid]}` delivers messages + reactions + deletions + assertions in one REQ. The current HTTP path needs four sequential round trips to do less.\n- **The projection is reusable unchanged.** PEEK-106 already split credential from projection: `importChannel` / `importReactions` / `importResolutions` take events, not tokens.\n- **Convex is already reactive.** Once a row lands, every open view updates. The only missing link is relay→Convex.\n\n## Two gates\n\n**Gate 1 — Estiva ID must sign kind:22242 (blocking).** `estiva-id/src/db/seed.ts:79` gives Peek `[9,7,5,9007,27235,1851,9101,9002]` — no 22242, so Peek cannot answer the AUTH challenge and every REQ returns `auth-required`. The socket looks healthy and delivers nothing. Deploying needs a **manual re-seed**: `update.sh` runs `migrate`, never `seed`. Unlike PEEK-128 this is only one gate — AUTH never goes through `ingest.rs`, `Kind::Authentication` is built into `buzz-auth/src/nip42.rs:52`, so no Buzz change and no relay deploy.\n\n**Gate 2 — one subscription per channel (silent trap).** `buzz-relay/src/handlers/req.rs:1013` returns `None` when filters name more than one distinct `#h`; `subscription.rs:84-113` then registers the subscription as *global*, and `fan_out_scoped:273-288` consults only the channel indexes for channel-scoped events. The invariant is stated at `subscription.rs:321-325`. A multi-channel subscription returns correct history at EOSE and then receives **zero** live events. One REQ per channel; 1024 per connection is no practical ceiling.\n\n## Why the socket stays in the browser\n\n`convex/nostr/sync.ts:18-20` proposes an external consumer holding the socket. An identity is obtainable — `estiva-id/src/domain/roles.ts` has role identities with a client-credentials grant. But Buzz gates reads **per channel**: `handlers/event.rs:181-196` filters live fan-out through `is_member_cached(community, channel, pubkey)` and fails closed on private channels. A service identity would need membership in every topic — a product decision (a bot in every conversation), not an implementation detail. `convex/crons.ts` already reached this conclusion. Convex keeps the projection; only the socket moves.\n\n## Shape of the fix\n\nOne shared WebSocket per tab. One subscription per open channel. Live events routed into the existing Convex import actions. Convex reactivity carries it to the UI. The HTTP path stays as the backfill on subscribe (it owns the `since` cursor and paging) and as the fallback when the socket is down — so the change is additive and a WS failure degrades to today's behaviour rather than to nothing.\n\nOrdering caveat to design for: `created_at` is in seconds and several events routinely land in the same one (SPEC §6.2). Imports are idempotent by event id and `nostrSyncedAt` only moves forward (`convex/nostr/data.ts:523`), so live and backfill can overlap safely.\n\n## Milestones\n\n- **M1 — Un-gated relief.** Refetch on focus/visibility plus a short interval, in both the topic sync and the project panel; TTL the profile cache. Turns \"until remount\" into \"within 30 seconds\" and probably clears most reported symptoms. Nothing blocks this.\n- **M2 — Open the 22242 gate.** Add it to Peek's allowed kinds, scoped by `relay` tag, deploy, **re-seed**, verify the row.\n- **M3 — The live socket.** WS client with NIP-42 AUTH and reconnect; refcounted per-channel subscription manager; live events into the Convex projection; `useTopicView` subscribing with HTTP as backfill and fallback.\n- **M4 — Honest state.** One derived connection state surfaced once, and relay read failures made visible instead of swallowed.\n- **M5 — Beyond topics.** Subscriptions for the inbox, Desk and DMs, which have no relay read path at all today.\n\n## Not yet verified\n\n- The **live** `allowed_kinds` row for peek. `seed.ts` has no 22242; the read to confirm production matches was blocked. Run `docker compose exec -T postgres psql -U estiva_id -d estiva_id -tAc \"select client_id, allowed_kinds from app_credentials\"` before planning on it.\n- No end-to-end 22242 signing test — needs a live user token.\n\nIssues are filed in implementation order. Each is written to be picked up cold by Claude Code.",
+        "descriptionFormat": "marker",
         "contentFolder": "996ab3d4-5565-4335-9e17-2284fda675a0",
         "originFolder": "996ab3d4-5565-4335-9e17-2284fda675a0",
         "status": "planned",
@@ -2837,6 +2838,7 @@
         "createdAt": 1787129612,
         "title": "Other",
         "description": "",
+        "descriptionFormat": "marker",
         "contentFolder": "806fb4e3-ebc9-4b6a-a18c-0ca59379aa1d",
         "originFolder": "806fb4e3-ebc9-4b6a-a18c-0ca59379aa1d",
         "status": "planned",
@@ -2850,6 +2852,7 @@
         "createdAt": 1787069189,
         "title": "Ship: Feedback & Bugs",
         "description": "",
+        "descriptionFormat": "marker",
         "contentFolder": "88de5526-366a-4016-83a3-417a1748baa8",
         "originFolder": "88de5526-366a-4016-83a3-417a1748baa8",
         "status": "planned",
@@ -2863,6 +2866,7 @@
         "createdAt": 1787068269,
         "title": "Estiva ID: Feedback & Bugs",
         "description": "",
+        "descriptionFormat": "marker",
         "contentFolder": "fcfe9d61-2d05-4d25-b113-40b2d2e601ee",
         "originFolder": "fcfe9d61-2d05-4d25-b113-40b2d2e601ee",
         "status": "planned",
@@ -2871,7 +2875,8 @@
           "description": {
             "value": "",
             "by": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
-            "at": 1787068289
+            "at": 1787068289,
+            "format": "marker"
           }
         }
       },
@@ -2882,6 +2887,7 @@
         "createdAt": 1787067967,
         "title": "Peek: Feedback & Bugs",
         "description": "",
+        "descriptionFormat": "marker",
         "contentFolder": "2303e8c1-c866-43b8-9b4c-e263f313a683",
         "originFolder": "2303e8c1-c866-43b8-9b4c-e263f313a683",
         "lead": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
@@ -2891,17 +2897,20 @@
           "lead": {
             "value": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
             "by": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
-            "at": 1787068597
+            "at": 1787068597,
+            "format": "marker"
           },
           "title": {
             "value": "Peek: Feedback & Bugs",
             "by": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
-            "at": 1787068631
+            "at": 1787068631,
+            "format": "marker"
           },
           "status": {
             "value": "in_progress",
             "by": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
-            "at": 1787252554
+            "at": 1787252554,
+            "format": "marker"
           }
         }
       },
@@ -2912,6 +2921,7 @@
         "createdAt": 1786359898,
         "title": "Payment integration",
         "description": "Stripe Checkout.",
+        "descriptionFormat": "marker",
         "contentFolder": "0804b906-ba87-4c63-8d2f-53df1bb6d52e",
         "originFolder": "0804b906-ba87-4c63-8d2f-53df1bb6d52e",
         "status": "planned",
@@ -2920,7 +2930,8 @@
           "archived": {
             "value": "true",
             "by": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
-            "at": 1786698978
+            "at": 1786698978,
+            "format": "marker"
           }
         }
       },
@@ -2931,6 +2942,7 @@
         "createdAt": 1786359876,
         "title": "Payment integration",
         "description": "Stripe Checkout.",
+        "descriptionFormat": "marker",
         "contentFolder": "204e73cc-5ccd-43f9-a982-052e71622631",
         "originFolder": "204e73cc-5ccd-43f9-a982-052e71622631",
         "status": "planned",
@@ -2939,7 +2951,8 @@
           "archived": {
             "value": "true",
             "by": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
-            "at": 1786698963
+            "at": 1786698963,
+            "format": "marker"
           }
         }
       }
@@ -2952,6 +2965,7 @@
         "createdAt": 1787316300,
         "title": "Agent write path check (PEEK-147)",
         "description": "Created by the Claude service identity to verify the write path end to end. Safe to cancel or ignore.",
+        "descriptionFormat": "marker",
         "folder": "806fb4e3-ebc9-4b6a-a18c-0ca59379aa1d",
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:2c5fbeff-4014-4bea-a69c-3bfc10354d6f",
         "ref": "OTH-2",
@@ -2961,12 +2975,14 @@
           "status": {
             "value": "cancelled",
             "by": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
-            "at": 1787316712
+            "at": 1787316712,
+            "format": "marker"
           },
           "assignee": {
             "value": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
             "by": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
-            "at": 1787316312
+            "at": 1787316312,
+            "format": "marker"
           }
         }
       },
@@ -2977,6 +2993,7 @@
         "createdAt": 1787302063,
         "title": "Draft messages",
         "description": "Draft messages\nBug if you start typing and message and you switch different topic, the text is kept there, which is weird.\nIf you start writing in thread and then go somewhere else and then go back to the thread to finish the message, the draft is gone",
+        "descriptionFormat": "marker",
         "folder": "2303e8c1-c866-43b8-9b4c-e263f313a683",
         "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c",
         "ref": "PEE-7",
@@ -2986,7 +3003,8 @@
           "assignee": {
             "value": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
             "by": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
-            "at": 1787327461
+            "at": 1787327461,
+            "format": "marker"
           }
         }
       },
@@ -2997,6 +3015,7 @@
         "createdAt": 1787217132,
         "title": "If item is already in Open Work, it shouldn't show in Screener",
         "description": "Because then it feels like duplicate. You're trying to open item that is already open.",
+        "descriptionFormat": "marker",
         "folder": "2303e8c1-c866-43b8-9b4c-e263f313a683",
         "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c",
         "ref": "PEE-6",
@@ -3010,6 +3029,7 @@
         "createdAt": 1787211122,
         "title": "Reply timestamps lose their date once the day has passed",
         "description": "",
+        "descriptionFormat": "marker",
         "folder": "2303e8c1-c866-43b8-9b4c-e263f313a683",
         "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c",
         "ref": "PEE-5",
@@ -3018,7 +3038,8 @@
           "status": {
             "value": "done",
             "by": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
-            "at": 1787212820
+            "at": 1787212820,
+            "format": "marker"
           }
         }
       },
@@ -3029,6 +3050,7 @@
         "createdAt": 1787129664,
         "title": "Analyze Buzz Projects comparing to Ship",
         "description": "Compare the Buzz Projects https://engineering.block.xyz/blog/projects-in-buzz with our Ship to see if we are doing in similar way or differ so we can enhance Ship.",
+        "descriptionFormat": "marker",
         "folder": "806fb4e3-ebc9-4b6a-a18c-0ca59379aa1d",
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:2c5fbeff-4014-4bea-a69c-3bfc10354d6f",
         "ref": "OTH-1",
@@ -3038,7 +3060,8 @@
           "assignee": {
             "value": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
             "by": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
-            "at": 1787129683
+            "at": 1787129683,
+            "format": "marker"
           }
         }
       },
@@ -3049,6 +3072,7 @@
         "createdAt": 1787073710,
         "title": "It's not possible to delete projects (from Projects page) and issues",
         "description": "",
+        "descriptionFormat": "marker",
         "folder": "88de5526-366a-4016-83a3-417a1748baa8",
         "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:cf23dbca-64fb-4802-a804-e0119b0d8584",
         "ref": "SHI-3",
@@ -3057,7 +3081,8 @@
           "title": {
             "value": "It's not possible to delete projects (from Projects page) and issues",
             "by": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
-            "at": 1787073749
+            "at": 1787073749,
+            "format": "marker"
           }
         }
       },
@@ -3068,6 +3093,7 @@
         "createdAt": 1787073444,
         "title": "Topic/DM view should not start from the top - scroll down to last conversation",
         "description": "",
+        "descriptionFormat": "marker",
         "folder": "2303e8c1-c866-43b8-9b4c-e263f313a683",
         "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c",
         "ref": "PEE-4",
@@ -3077,12 +3103,14 @@
           "status": {
             "value": "done",
             "by": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
-            "at": 1787137428
+            "at": 1787137428,
+            "format": "marker"
           },
           "assignee": {
             "value": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
             "by": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
-            "at": 1787137431
+            "at": 1787137431,
+            "format": "marker"
           }
         }
       },
@@ -3093,6 +3121,7 @@
         "createdAt": 1787069672,
         "title": "Files panel and relevant IconButtons aren't available when opening topics in Desk",
         "description": "",
+        "descriptionFormat": "marker",
         "folder": "2303e8c1-c866-43b8-9b4c-e263f313a683",
         "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c",
         "ref": "PEE-3",
@@ -3101,12 +3130,14 @@
           "title": {
             "value": "Files panel and relevant IconButtons aren't available when opening topics in Desk",
             "by": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
-            "at": 1787069686
+            "at": 1787069686,
+            "format": "marker"
           },
           "status": {
             "value": "done",
             "by": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
-            "at": 1787144358
+            "at": 1787144358,
+            "format": "marker"
           }
         }
       },
@@ -3117,6 +3148,7 @@
         "createdAt": 1787069301,
         "title": "It's not possible to attach files in descriptions or conversations",
         "description": "",
+        "descriptionFormat": "marker",
         "folder": "88de5526-366a-4016-83a3-417a1748baa8",
         "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:cf23dbca-64fb-4802-a804-e0119b0d8584",
         "ref": "SHI-2",
@@ -3130,6 +3162,7 @@
         "createdAt": 1787069258,
         "title": "Screenshots and reference widgets aren't rendered in conversation or replies",
         "description": "Avatar + name + timestamp only",
+        "descriptionFormat": "marker",
         "folder": "88de5526-366a-4016-83a3-417a1748baa8",
         "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:cf23dbca-64fb-4802-a804-e0119b0d8584",
         "ref": "SHI-1",
@@ -3143,6 +3176,7 @@
         "createdAt": 1787069090,
         "title": "Editing / renaming topics",
         "description": "It would be useful for me to be able to go back to current topic and rename it as maybe the nature of the topic shift and it would be to capture it.",
+        "descriptionFormat": "marker",
         "folder": "2303e8c1-c866-43b8-9b4c-e263f313a683",
         "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c",
         "ref": "PEE-2",
@@ -3151,7 +3185,8 @@
           "status": {
             "value": "done",
             "by": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
-            "at": 1787208330
+            "at": 1787208330,
+            "format": "marker"
           }
         }
       },
@@ -3162,6 +3197,7 @@
         "createdAt": 1787069006,
         "title": "It's not possible to select different assignee other than yourself",
         "description": "I would expect a list of available people to show up, like in Ship. \nIt would be nice to be able to remove myself or have option \"Unassigned\"\nTo be applied in files panel and reference widgets",
+        "descriptionFormat": "marker",
         "folder": "2303e8c1-c866-43b8-9b4c-e263f313a683",
         "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c",
         "ref": "PEE-1",
@@ -3170,7 +3206,8 @@
           "description": {
             "value": "I would expect a list of available people to show up, like in Ship. \nIt would be nice to be able to remove myself or have option \"Unassigned\"\nTo be applied in files panel and reference widgets",
             "by": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
-            "at": 1787069802
+            "at": 1787069802,
+            "format": "marker"
           }
         }
       },
@@ -3181,6 +3218,7 @@
         "createdAt": 1787068454,
         "title": "Reference widget missing skeleton on load",
         "description": "Result is empty space or jumping content",
+        "descriptionFormat": "marker",
         "folder": "2303e8c1-c866-43b8-9b4c-e263f313a683",
         "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c",
         "ref": "FEE-3",
@@ -3189,12 +3227,14 @@
           "description": {
             "value": "Result is empty space or jumping content",
             "by": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
-            "at": 1787068720
+            "at": 1787068720,
+            "format": "marker"
           },
           "status": {
             "value": "done",
             "by": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
-            "at": 1787209250
+            "at": 1787209250,
+            "format": "marker"
           }
         }
       },
@@ -3205,6 +3245,7 @@
         "createdAt": 1787068368,
         "title": "Reference widget won't show up in some cases",
         "description": "1. When editing already sent message + pasting link\n2. When starting conversation from Ship",
+        "descriptionFormat": "marker",
         "folder": "2303e8c1-c866-43b8-9b4c-e263f313a683",
         "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c",
         "ref": "FEE-2",
@@ -3214,22 +3255,26 @@
           "title": {
             "value": "Reference widget won't show up in some cases",
             "by": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
-            "at": 1787068468
+            "at": 1787068468,
+            "format": "marker"
           },
           "description": {
             "value": "1. When editing already sent message + pasting link\n2. When starting conversation from Ship",
             "by": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
-            "at": 1787070178
+            "at": 1787070178,
+            "format": "marker"
           },
           "status": {
             "value": "done",
             "by": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
-            "at": 1787210113
+            "at": 1787210113,
+            "format": "marker"
           },
           "assignee": {
             "value": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
             "by": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
-            "at": 1787217369
+            "at": 1787217369,
+            "format": "marker"
           }
         }
       },
@@ -3240,6 +3285,7 @@
         "createdAt": 1787068311,
         "title": "Weird log out on Ship",
         "description": "An issue appeared, might be worth taking a look. I signed in on Ship and left it open for some time. Then returned and found an error banner that I'm not signed, even though my avatar was still correct and there was no option to sign in in the menu, just sign out",
+        "descriptionFormat": "marker",
         "folder": "fcfe9d61-2d05-4d25-b113-40b2d2e601ee",
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:360327a9-18c5-40e5-9747-9166dc284ddc",
         "ref": "EST-1",
@@ -3253,6 +3299,7 @@
         "createdAt": 1787068073,
         "title": "Assignee avatar and full name is missing in files panel & reference widget",
         "description": "",
+        "descriptionFormat": "marker",
         "folder": "2303e8c1-c866-43b8-9b4c-e263f313a683",
         "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c",
         "ref": "FEE-1",
@@ -3262,17 +3309,20 @@
           "assignee": {
             "value": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
             "by": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
-            "at": 1787149573
+            "at": 1787149573,
+            "format": "marker"
           },
           "title": {
             "value": "Assignee avatar and full name is missing in files panel & reference widget",
             "by": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
-            "at": 1787149596
+            "at": 1787149596,
+            "format": "marker"
           },
           "status": {
             "value": "done",
             "by": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
-            "at": 1787209201
+            "at": 1787209201,
+            "format": "marker"
           }
         }
       },
@@ -3283,6 +3333,7 @@
         "createdAt": 1786359898,
         "title": "Billing entry",
         "description": "Settings entry point.",
+        "descriptionFormat": "marker",
         "folder": "0804b906-ba87-4c63-8d2f-53df1bb6d52e",
         "projectAddr": "30850:88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13:360ddc81-afb0-4137-87bd-1cdd2f29529b",
         "ref": "PAY-1",
@@ -3292,12 +3343,14 @@
           "status": {
             "value": "cancelled",
             "by": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
-            "at": 1787119070
+            "at": 1787119070,
+            "format": "marker"
           },
           "assignee": {
             "value": "88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13",
             "by": "88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13",
-            "at": 1786359898
+            "at": 1786359898,
+            "format": "marker"
           }
         }
       },
@@ -3308,6 +3361,7 @@
         "createdAt": 1786359876,
         "title": "Billing entry",
         "description": "Settings entry point.",
+        "descriptionFormat": "marker",
         "folder": "204e73cc-5ccd-43f9-a982-052e71622631",
         "projectAddr": "30850:88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13:3cce07c5-c365-486c-ae67-17b29e0c773d",
         "ref": "PAY-1",
@@ -3317,12 +3371,14 @@
           "status": {
             "value": "cancelled",
             "by": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
-            "at": 1787119092
+            "at": 1787119092,
+            "format": "marker"
           },
           "assignee": {
             "value": "88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13",
             "by": "88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13",
-            "at": 1786359876
+            "at": 1786359876,
+            "format": "marker"
           }
         }
       }
@@ -3336,6 +3392,7 @@
         "target": "30851:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:56119588-4b40-491f-a517-09b579d4798c",
         "field": "status",
         "value": "todo",
+        "format": "marker",
         "note": "hostile ts, must not win"
       },
       {
@@ -3346,6 +3403,7 @@
         "target": "30851:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:56119588-4b40-491f-a517-09b579d4798c",
         "field": "status",
         "value": "in_progress",
+        "format": "marker",
         "note": "trusted ts, finer than a second"
       },
       {
@@ -3355,6 +3413,7 @@
         "target": "30851:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:56119588-4b40-491f-a517-09b579d4798c",
         "field": "assignee",
         "value": "4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa",
+        "format": "marker",
         "note": "tie a"
       },
       {
@@ -3364,6 +3423,7 @@
         "target": "30851:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:56119588-4b40-491f-a517-09b579d4798c",
         "field": "assignee",
         "value": "",
+        "format": "marker",
         "note": "tie c"
       },
       {
@@ -3373,6 +3433,7 @@
         "target": "30851:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:56119588-4b40-491f-a517-09b579d4798c",
         "field": "assignee",
         "value": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
+        "format": "marker",
         "note": "tie b"
       },
       {
@@ -3383,6 +3444,7 @@
         "target": "30851:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:56119588-4b40-491f-a517-09b579d4798c",
         "field": "status",
         "value": "done",
+        "format": "marker",
         "note": "drifted ts, refused at 1s of slack"
       },
       {
@@ -3392,6 +3454,7 @@
         "target": "30851:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:56119588-4b40-491f-a517-09b579d4798c",
         "field": "status",
         "value": "cancelled",
+        "format": "marker",
         "note": "later by created_at, wins while the window is 1s"
       },
       {
@@ -3402,6 +3465,7 @@
         "target": "30851:88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13:79517829-1e67-45d3-bd78-3c16be3095f5",
         "field": "status",
         "value": "in_progress",
+        "format": "marker",
         "note": ""
       },
       {
@@ -3412,6 +3476,7 @@
         "target": "30851:88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13:79517829-1e67-45d3-bd78-3c16be3095f5",
         "field": "assignee",
         "value": "88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13",
+        "format": "marker",
         "note": ""
       },
       {
@@ -3422,6 +3487,7 @@
         "target": "30851:88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13:4aff182e-6851-407f-9249-23ee1604d377",
         "field": "status",
         "value": "in_progress",
+        "format": "marker",
         "note": ""
       },
       {
@@ -3432,6 +3498,7 @@
         "target": "30851:88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13:4aff182e-6851-407f-9249-23ee1604d377",
         "field": "assignee",
         "value": "88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13",
+        "format": "marker",
         "note": ""
       },
       {
@@ -3442,6 +3509,7 @@
         "target": "30850:88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13:3cce07c5-c365-486c-ae67-17b29e0c773d",
         "field": "archived",
         "value": "true",
+        "format": "marker",
         "note": "archived"
       },
       {
@@ -3452,6 +3520,7 @@
         "target": "30850:88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13:360ddc81-afb0-4137-87bd-1cdd2f29529b",
         "field": "archived",
         "value": "true",
+        "format": "marker",
         "note": "archived"
       },
       {
@@ -3462,6 +3531,7 @@
         "target": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c",
         "field": "lead",
         "value": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "format": "marker",
         "note": ""
       },
       {
@@ -3472,6 +3542,7 @@
         "target": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:360327a9-18c5-40e5-9747-9166dc284ddc",
         "field": "description",
         "value": "An issue appeared, might be worth taking a look. I signed in on Ship and left it open for some time. Then returned and found an error banner that I'm not signed, even though my avatar was still correct and there was no option to sign in in the menu, just sign out",
+        "format": "marker",
         "note": "Description"
       },
       {
@@ -3482,6 +3553,7 @@
         "target": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:360327a9-18c5-40e5-9747-9166dc284ddc",
         "field": "description",
         "value": "",
+        "format": "marker",
         "note": "Description"
       },
       {
@@ -3492,6 +3564,7 @@
         "target": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:20446118-7466-4281-a483-fa095d3ed935",
         "field": "title",
         "value": "Reference widget won't show up in some cases",
+        "format": "marker",
         "note": "Rename"
       },
       {
@@ -3502,6 +3575,7 @@
         "target": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c",
         "field": "lead",
         "value": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "format": "marker",
         "note": ""
       },
       {
@@ -3512,6 +3586,7 @@
         "target": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c",
         "field": "title",
         "value": "Peek: Feedback % Bugs",
+        "format": "marker",
         "note": "Rename"
       },
       {
@@ -3522,6 +3597,7 @@
         "target": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c",
         "field": "title",
         "value": "Peek: Feedback & Bugs",
+        "format": "marker",
         "note": "Rename"
       },
       {
@@ -3532,6 +3608,7 @@
         "target": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:59c2a37c-bd29-4ff0-8583-9d4b91b2de7c",
         "field": "description",
         "value": "Result is empty space or jumping content",
+        "format": "marker",
         "note": "Description"
       },
       {
@@ -3542,6 +3619,7 @@
         "target": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:3c582b93-052f-45d4-a8d0-1054f24687a4",
         "field": "description",
         "value": "I would expect a list of available people to show up, like in Ship. \nIt would be nice to be able to remove myself or have option \"Unassigned\"",
+        "format": "marker",
         "note": "Description"
       },
       {
@@ -3552,6 +3630,7 @@
         "target": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:d92ac2b8-7ffb-4a15-9824-00044cce9cf5",
         "field": "title",
         "value": "Files panel and relevant IconButtons aren't available when opening topics in Desk",
+        "format": "marker",
         "note": "Rename"
       },
       {
@@ -3562,6 +3641,7 @@
         "target": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:3c582b93-052f-45d4-a8d0-1054f24687a4",
         "field": "description",
         "value": "I would expect a list of available people to show up, like in Ship. \nIt would be nice to be able to remove myself or have option \"Unassigned\"\nTo be applied in files panel and reference widgets",
+        "format": "marker",
         "note": "Description"
       },
       {
@@ -3572,6 +3652,7 @@
         "target": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:20446118-7466-4281-a483-fa095d3ed935",
         "field": "description",
         "value": "1. When editing already sent message + pasting link\n2. When starting conversation from Ship",
+        "format": "marker",
         "note": "Description"
       },
       {
@@ -3582,6 +3663,7 @@
         "target": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:ceb9ec2e-96bf-40df-85d8-37d68dc254a5",
         "field": "title",
         "value": "It's not possible to delete projects (from Projects page) and issues",
+        "format": "marker",
         "note": "Rename"
       },
       {
@@ -3592,6 +3674,7 @@
         "target": "30851:88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13:4aff182e-6851-407f-9249-23ee1604d377",
         "field": "status",
         "value": "cancelled",
+        "format": "marker",
         "note": "Status → cancelled"
       },
       {
@@ -3602,6 +3685,7 @@
         "target": "30851:88ac6aae1a874652ef05e2deba8c8a9526cda0c78e6b7d98b815cd0b5a710d13:79517829-1e67-45d3-bd78-3c16be3095f5",
         "field": "status",
         "value": "cancelled",
+        "format": "marker",
         "note": "Status → cancelled"
       },
       {
@@ -3612,6 +3696,7 @@
         "target": "30851:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:77041a63-d57f-4283-8daf-54b91138b9cd",
         "field": "assignee",
         "value": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+        "format": "marker",
         "note": "Assign"
       },
       {
@@ -3622,6 +3707,7 @@
         "target": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:5c20ef8d-6bc4-4ac9-adf8-aa8e0398dec5",
         "field": "status",
         "value": "done",
+        "format": "marker",
         "note": "Status → done"
       },
       {
@@ -3632,6 +3718,7 @@
         "target": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:5c20ef8d-6bc4-4ac9-adf8-aa8e0398dec5",
         "field": "assignee",
         "value": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "format": "marker",
         "note": "Assign"
       },
       {
@@ -3642,6 +3729,7 @@
         "target": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:20446118-7466-4281-a483-fa095d3ed935",
         "field": "status",
         "value": "in_progress",
+        "format": "marker",
         "note": "Status → in_progress"
       },
       {
@@ -3652,6 +3740,7 @@
         "target": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:20446118-7466-4281-a483-fa095d3ed935",
         "field": "assignee",
         "value": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "format": "marker",
         "note": "Assign"
       },
       {
@@ -3662,6 +3751,7 @@
         "target": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c",
         "field": "status",
         "value": "in_progress",
+        "format": "marker",
         "note": ""
       },
       {
@@ -3672,6 +3762,7 @@
         "target": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:59c2a37c-bd29-4ff0-8583-9d4b91b2de7c",
         "field": "status",
         "value": "in_progress",
+        "format": "marker",
         "note": "Status → in_progress"
       },
       {
@@ -3682,6 +3773,7 @@
         "target": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:d92ac2b8-7ffb-4a15-9824-00044cce9cf5",
         "field": "status",
         "value": "in_progress",
+        "format": "marker",
         "note": "Status → in_progress"
       },
       {
@@ -3692,6 +3784,7 @@
         "target": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:d92ac2b8-7ffb-4a15-9824-00044cce9cf5",
         "field": "status",
         "value": "done",
+        "format": "marker",
         "note": "Status → done"
       },
       {
@@ -3702,6 +3795,7 @@
         "target": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:cbd92b45-39c0-4e38-9eed-fb79656de101",
         "field": "assignee",
         "value": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "format": "marker",
         "note": ""
       },
       {
@@ -3712,6 +3806,7 @@
         "target": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:cbd92b45-39c0-4e38-9eed-fb79656de101",
         "field": "title",
         "value": "Assignee avatar and full name is missing in files panel & reference widget",
+        "format": "marker",
         "note": "Rename"
       },
       {
@@ -3722,6 +3817,7 @@
         "target": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:cbd92b45-39c0-4e38-9eed-fb79656de101",
         "field": "status",
         "value": "done",
+        "format": "marker",
         "note": "Status → done"
       },
       {
@@ -3732,6 +3828,7 @@
         "target": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2c5237d9-48ee-4d69-aa6c-cd1cb6b13c0d",
         "field": "status",
         "value": "in_progress",
+        "format": "marker",
         "note": "Status → in_progress"
       },
       {
@@ -3742,6 +3839,7 @@
         "target": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2c5237d9-48ee-4d69-aa6c-cd1cb6b13c0d",
         "field": "status",
         "value": "done",
+        "format": "marker",
         "note": "Status → done"
       },
       {
@@ -3752,6 +3850,7 @@
         "target": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:cbd92b45-39c0-4e38-9eed-fb79656de101",
         "field": "status",
         "value": "in_progress",
+        "format": "marker",
         "note": ""
       },
       {
@@ -3762,6 +3861,7 @@
         "target": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:cbd92b45-39c0-4e38-9eed-fb79656de101",
         "field": "status",
         "value": "done",
+        "format": "marker",
         "note": "Status → done"
       },
       {
@@ -3772,6 +3872,7 @@
         "target": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:59c2a37c-bd29-4ff0-8583-9d4b91b2de7c",
         "field": "status",
         "value": "done",
+        "format": "marker",
         "note": "Status → done"
       },
       {
@@ -3782,6 +3883,7 @@
         "target": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:20446118-7466-4281-a483-fa095d3ed935",
         "field": "status",
         "value": "done",
+        "format": "marker",
         "note": ""
       },
       {
@@ -3792,6 +3894,7 @@
         "target": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:547a0ac3-954d-40a4-a468-3fd5832f0e20",
         "field": "status",
         "value": "done",
+        "format": "marker",
         "note": "Status → done"
       },
       {
@@ -3802,6 +3905,7 @@
         "target": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:20446118-7466-4281-a483-fa095d3ed935",
         "field": "assignee",
         "value": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+        "format": "marker",
         "note": ""
       },
       {
@@ -3812,6 +3916,7 @@
         "target": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:20446118-7466-4281-a483-fa095d3ed935",
         "field": "assignee",
         "value": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+        "format": "marker",
         "note": ""
       },
       {
@@ -3822,6 +3927,7 @@
         "target": "30851:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:20446118-7466-4281-a483-fa095d3ed935",
         "field": "assignee",
         "value": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
+        "format": "marker",
         "note": "Assign"
       },
       {
@@ -3832,6 +3938,7 @@
         "target": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c",
         "field": "status",
         "value": "planned",
+        "format": "marker",
         "note": ""
       },
       {
@@ -3842,6 +3949,7 @@
         "target": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c",
         "field": "status",
         "value": "in_progress",
+        "format": "marker",
         "note": "Status → in_progress"
       },
       {
@@ -3852,6 +3960,7 @@
         "target": "30851:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:56119588-4b40-491f-a517-09b579d4798c",
         "field": "status",
         "value": "in_progress",
+        "format": "marker",
         "note": ""
       },
       {
@@ -3862,6 +3971,7 @@
         "target": "30851:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:56119588-4b40-491f-a517-09b579d4798c",
         "field": "assignee",
         "value": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
+        "format": "marker",
         "note": ""
       },
       {
@@ -3872,6 +3982,7 @@
         "target": "30851:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:56119588-4b40-491f-a517-09b579d4798c",
         "field": "status",
         "value": "cancelled",
+        "format": "marker",
         "note": ""
       },
       {
@@ -3882,6 +3993,7 @@
         "target": "30851:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:f79e754f-5577-42fa-a7f8-44b0b952e272",
         "field": "assignee",
         "value": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
+        "format": "marker",
         "note": "Assign"
       }
     ],

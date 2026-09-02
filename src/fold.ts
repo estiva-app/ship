@@ -15,7 +15,7 @@
  * here is deterministic, which is what makes "two apps agree on the state"
  * checkable rather than hopeful.
  */
-import type { SignedEvent } from '@estiva-app/protocol'
+import { contentFormatOf, type ContentFormat, type SignedEvent } from '@estiva-app/protocol'
 import { DEFAULT_ISSUE_STATUS, DEFAULT_PROJECT_STATUS, KIND } from './kinds'
 
 /** First value of a tag, or undefined. Tags are `[name, value, …]`. */
@@ -97,12 +97,22 @@ export interface Change {
   target: string
   field: string
   value: string
+  /**
+   * Which content model `value` is written in — SPEC §13.4.
+   *
+   * It travels with the change rather than with the object, because the tag is
+   * on the event the value came from: a description created as marker text and
+   * later edited into blocks is an untagged root plus a tagged change, and the
+   * fold takes the change's value. Reading the root's tag would report the
+   * format of a value that is no longer displayed.
+   */
+  format: ContentFormat
   /** Optional human note from `.content`. */
   note: string
 }
 
 /** Fields on a Project or Issue that changes are allowed to set. */
-export type FoldedFields = Record<string, { value: string; by: string; at: number }>
+export type FoldedFields = Record<string, { value: string; by: string; at: number; format: ContentFormat }>
 
 export interface Project {
   addr: string
@@ -111,6 +121,14 @@ export interface Project {
   createdAt: number
   title: string
   description: string
+  /**
+   * Which content model `description` is in — SPEC §13.4, resolved.
+   *
+   * From the winning change when one set the description, otherwise from the
+   * root's own tag. Absent means marker text, permanently: 731 published
+   * bodies carry no tag and none of them can be given one.
+   */
+  descriptionFormat: ContentFormat
   /**
    * The Folder this project *is* — where its issues and conversation live.
    *
@@ -155,6 +173,14 @@ export interface Issue {
   createdAt: number
   title: string
   description: string
+  /**
+   * Which content model `description` is in — SPEC §13.4, resolved.
+   *
+   * From the winning change when one set the description, otherwise from the
+   * root's own tag. Absent means marker text, permanently: 731 published
+   * bodies carry no tag and none of them can be given one.
+   */
+  descriptionFormat: ContentFormat
   folder: string
   /** Parent project address, when the issue has one. */
   projectAddr?: string
@@ -184,6 +210,7 @@ export function parseChange(event: SignedEvent): Change | null {
     target,
     field,
     value,
+    format: contentFormatOf(event),
     note: event.content,
   }
 }
@@ -234,7 +261,7 @@ function foldChanges(changes: Change[]): Map<string, FoldedFields> {
   }
   for (const change of winners.values()) {
     const fields = byTarget.get(change.target) ?? {}
-    fields[change.field] = { value: change.value, by: change.author, at: change.createdAt }
+    fields[change.field] = { value: change.value, by: change.author, at: change.createdAt, format: change.format }
     byTarget.set(change.target, fields)
   }
   return byTarget
@@ -543,6 +570,7 @@ export function foldFolder(
       // `projectFolder` and `projectName` below for why there is no migration.
       title: fields.title?.value ?? projectName(event) ?? '(untitled project)',
       description: fields.description?.value ?? projectDescription(event),
+      descriptionFormat: fields.description?.format ?? contentFormatOf(event),
       // The project's Folder is the one its record names — the Folder *is* the
       // project. A change may re-point it at an existing Peek topic; that
       // override wins, but the original still has to be read
@@ -573,6 +601,7 @@ export function foldFolder(
       createdAt: event.created_at,
       title: fields.title?.value ?? tag(event, 'title') ?? '(untitled issue)',
       description: fields.description?.value ?? event.content,
+      descriptionFormat: fields.description?.format ?? contentFormatOf(event),
       folder: tag(event, 'h') ?? '',
       projectAddr: fields.project?.value ?? parent,
       /*

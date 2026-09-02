@@ -19,8 +19,8 @@ import { archiveProject, createIssue, createProject, deleteProject, explainRejec
 
 const s = store as unknown as Record<string, ReturnType<typeof vi.fn>>
 const PK = 'ab'.repeat(32)
-const PROJECT = { addr: `30850:${PK}:1`, id: '1', author: PK, createdAt: 1, title: 'Relay Migration', description: '', contentFolder: 'content-folder', originFolder: 'origin-folder', status: 'planned', archived: false, fields: {} }
-const ISSUE = { addr: `30851:${PK}:2`, id: '2', author: PK, createdAt: 1, title: 'I', description: '', folder: 'issue-folder', projectAddr: PROJECT.addr, ref: 'REL-2', status: 'todo', fields: {} }
+const PROJECT = { addr: `30850:${PK}:1`, id: '1', author: PK, createdAt: 1, title: 'Relay Migration', description: '', descriptionFormat: 'marker' as const, contentFolder: 'content-folder', originFolder: 'origin-folder', status: 'planned', archived: false, fields: {} }
+const ISSUE = { addr: `30851:${PK}:2`, id: '2', author: PK, createdAt: 1, title: 'I', description: '', descriptionFormat: 'marker' as const, folder: 'issue-folder', projectAddr: PROJECT.addr, ref: 'REL-2', status: 'todo', fields: {} }
 
 beforeEach(() => {
   vi.mocked(clockProblem).mockResolvedValue(null)
