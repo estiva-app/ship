@@ -216,28 +216,37 @@ export function reply(conversation: Conversation, fallbackFolder: string, body: 
 }
 
 /**
- * Give a display key to an issue that arrived without one.
+ * Give display keys to a project's issues that arrived without one.
  *
- * Only Ship can compute a ref: it is the project title's first three letters
- * and a count of that project's issues, so a consumer creating an issue through
- * the manifest cannot produce one — it cannot see the siblings, and two
- * creators would collide anyway. And Ship cannot put it on the root, because a
- * NIP-33 address is `(kind, pubkey, d)` and the root belongs to whoever signed
- * it. A change event is the only move available, which is why `ref` is folded
- * now (`fold.ts`).
+ * Only Ship can mint a ref: it is the project title's first three letters and a
+ * count of that project's issues, so a consumer creating an issue through the
+ * manifest cannot produce one — it cannot see the siblings. And Ship cannot put
+ * it on the root, because a NIP-33 address is `(kind, pubkey, d)` and the root
+ * belongs to whoever signed it. A change event is the only move available,
+ * which is why `ref` is folded now (`fold.ts`).
  *
- * **Deliberately not automatic.** Ship could assign these whenever it noticed
- * one missing, and that would be a write performed by whoever happened to open
- * a page — surprising, racy between tabs, and impossible to decline. Naming it
- * as an action keeps a write something a person asked for, which is the same
- * reason archiving is a change rather than a side effect of a filter.
+ * **Ship does this itself rather than asking.** A key is the app's own
+ * bookkeeping, and an empty column with a button in it hands a person a chore
+ * that exists only because two apps disagree about who fills a field. Nobody
+ * would decline it, so nobody should be asked.
  *
- * Idempotent in the way that matters: once folded, `issue.ref` is set, so the
- * caller stops offering it. Two people racing produce two changes for one
- * field, and last-write-wins settles it — a cosmetic collision the ref format
- * already tolerates by design (`nextRef`).
+ * The whole batch is numbered in one pass rather than a call per issue: each
+ * `nextRef` reads the refs assigned so far, so issuing them one at a time
+ * against unrefreshed state would give every one of them the same number.
+ *
+ * Racing another tab produces two changes for one field and last-write-wins
+ * settles it — a cosmetic collision `nextRef` already tolerates by design,
+ * since it counts what it can see rather than owning a counter.
  */
-export function assignRef(issue: Issue, project: Project, siblings: Issue[]): Promise<WriteResult> {
-  const ref = nextRef(refPrefix(project.title), siblings.map((s) => s.ref))
-  return setIssueField(issue, 'ref', ref, `Ref → ${ref}`)
+export async function assignMissingRefs(project: Project, issues: Issue[]): Promise<WriteResult[]> {
+  const assigned = issues.map((issue) => issue.ref)
+  const results: WriteResult[] = []
+  // Oldest first, so the numbers run in the order the issues were filed.
+  const missing = issues.filter((issue) => !issue.ref).sort((a, b) => a.createdAt - b.createdAt)
+  for (const issue of missing) {
+    const ref = nextRef(refPrefix(project.title), assigned)
+    assigned.push(ref)
+    results.push(await setIssueField(issue, 'ref', ref, `Ref → ${ref}`))
+  }
+  return results
 }

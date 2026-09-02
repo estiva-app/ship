@@ -24,15 +24,6 @@ export interface IssuesTableProps {
   issues: IssuesTableRow[]
   statuses: StatusEntry[]
   hrefFor: (issue: IssueRowData) => string
-  /**
-   * Give an issue a display key, when one can be given here.
-   *
-   * Only offered where the project is known, because a ref continues *that*
-   * project's numbering — the issues list spans projects and has no answer.
-   * Absent means the dash stays a dash, which is the honest rendering of "no
-   * key, and nothing here can mint one".
-   */
-  onAssignRef?: (issue: IssueRowData) => void
   className?: string
 }
 
@@ -45,7 +36,7 @@ const TH = 'h-9 px-3 text-left text-[9px] font-medium uppercase leading-[115%] t
 const TD = 'h-10 px-3 text-body-2'
 const SMALL = 'text-[12px] leading-[120%]'
 
-export function IssuesTable({ issues, statuses, hrefFor, onAssignRef, className }: IssuesTableProps) {
+export function IssuesTable({ issues, statuses, hrefFor, className }: IssuesTableProps) {
   return (
     <div className={cn('overflow-x-auto rounded-lg border border-border-default', className)}>
       <table className="w-full min-w-[840px] table-fixed border-collapse">
@@ -64,26 +55,11 @@ export function IssuesTable({ issues, statuses, hrefFor, onAssignRef, className 
         <tbody>
           {issues.map((issue) => (
             <tr key={issue.addr} className="border-b border-border-subtle last:border-b-0 hover:bg-bg-hover">
-              <td className={cn(TD, 'font-mono', SMALL, issue.ref ? 'text-text-muted' : 'text-text-disabled')}>
-                {issue.ref ?? (
-                  onAssignRef ? (
-                    // An issue created through the manifest by another app has
-                    // no key, because only Ship can compute one. Offered rather
-                    // than assigned on sight: a write nobody asked for, made by
-                    // whoever happened to open the page, is a surprise.
-                    <button
-                      type="button"
-                      onClick={() => onAssignRef(issue)}
-                      className="underline decoration-dotted underline-offset-2 hover:text-text-primary"
-                      title="Give this issue a key"
-                    >
-                      —
-                    </button>
-                  ) : (
-                    '—'
-                  )
-                )}
-              </td>
+              {/* A dash while Ship has not numbered this one yet — an issue created
+                  through the manifest by another app arrives without a key, and
+                  the project page assigns one. Nothing to click: it is the
+                  app's bookkeeping, not a chore for whoever opened the page. */}
+              <td className={cn(TD, 'font-mono', SMALL, issue.ref ? 'text-text-muted' : 'text-text-disabled')}>{issue.ref ?? '—'}</td>
               <td className={TD}>
                 <a href={hrefFor(issue)} className="block truncate text-text-primary hover:underline">
                   {issue.title}

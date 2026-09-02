@@ -29,8 +29,6 @@ export interface ProjectViewProps {
   issues: IssuesTableRow[]
   issueStatuses: StatusEntry[]
   hrefFor: (issue: IssueRowData) => string
-  /** Give an issue a key — only the project page can, see `IssuesTable`. */
-  onAssignRef?: (issue: IssueRowData) => void
   threads: ThreadData[]
   /** Thread id → first unread message id. Drives the feed divider (CRO-13). */
   unread?: Record<string, string>
@@ -55,7 +53,7 @@ export interface ProjectViewProps {
   readOnlyReason?: string
 }
 
-export function ProjectView({ crumbs, header, onAddIssue, view, onView, issues, issueStatuses, hrefFor, onAssignRef, threads, unread, onStartConversation, onReply, rail, readOnlyReason }: ProjectViewProps) {
+export function ProjectView({ crumbs, header, onAddIssue, view, onView, issues, issueStatuses, hrefFor, threads, unread, onStartConversation, onReply, rail, readOnlyReason }: ProjectViewProps) {
   const addIssue = readOnlyReason ? (
     <WithTooltip label={readOnlyReason}>
       <Button variant="primary" disabled>
@@ -99,7 +97,7 @@ export function ProjectView({ crumbs, header, onAddIssue, view, onView, issues, 
           ) : view === 'board' ? (
             <Board issues={issues} statuses={issueStatuses} hrefFor={hrefFor} />
           ) : (
-            <IssuesTable issues={issues} statuses={issueStatuses} hrefFor={hrefFor} onAssignRef={onAssignRef} />
+            <IssuesTable issues={issues} statuses={issueStatuses} hrefFor={hrefFor} />
           )}
         </section>
         <section className="flex flex-col gap-3">

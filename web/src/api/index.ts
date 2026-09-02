@@ -44,7 +44,7 @@ export {
   explainRejection,
   pairProjectFolder,
   reply,
-  assignRef,
+  assignMissingRefs,
   setIssueField,
   setProjectField,
   startConversation,
