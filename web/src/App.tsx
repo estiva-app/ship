@@ -47,6 +47,7 @@ export default function App() {
 
   return (
     <AppShell
+      logo="Estiva Ship"
       identity={
         <IdentityMenu
           me={{ name: directory.nameOf(me), picture: directory.personOf(me).picture }}
@@ -71,7 +72,7 @@ export default function App() {
           <Banner tone={banner.tone}>{banner.text}</Banner>
         ) : undefined
       }
-      sidebar={<Sidebar {...sidebarProps(state, route)} />}
+      nav={<Sidebar {...sidebarProps(state, route)} />}
     >
       <Page route={route} state={state} directory={directory} say={say} refresh={refresh} />
     </AppShell>
