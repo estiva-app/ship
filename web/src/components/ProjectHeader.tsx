@@ -16,6 +16,8 @@ export interface ProjectHeaderProps {
   description: string
   /** Which content model the description is in — from the fold, never sniffed. */
   descriptionFormat: ContentFormat
+  /** Resolve a mentioned key to a name — SPEC §13.1. */
+  nameOf?: (pubkey: string) => string
   archived?: boolean
   onRename: (title: string) => Promise<boolean> | boolean
   onDescribe: (description: string) => Promise<boolean> | boolean
@@ -26,7 +28,8 @@ export interface ProjectHeaderProps {
   className?: string
 }
 
-export function ProjectHeader({ title, description, descriptionFormat, archived = false, onRename, onDescribe, className, readOnly = false, action }: ProjectHeaderProps) {
+export function ProjectHeader({ title, description, descriptionFormat,
+  nameOf, archived = false, onRename, onDescribe, className, readOnly = false, action }: ProjectHeaderProps) {
   return (
     <div className={cn('flex flex-col gap-2', className)}>
       <div className="flex items-start gap-2">
@@ -47,6 +50,7 @@ export function ProjectHeader({ title, description, descriptionFormat, archived 
         format={descriptionFormat}
         onCommit={onDescribe}
         readOnly={readOnly}
+        nameOf={nameOf}
       />
     </div>
   )

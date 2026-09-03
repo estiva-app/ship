@@ -22,7 +22,7 @@ import { ProjectRail, type RailPerson } from '@/components/ProjectRail'
  */
 export interface ProjectViewProps {
   crumbs: { projectsHref: string; title: string }
-  header: { title: string; description: string; descriptionFormat: ContentFormat; archived: boolean; onRename: (v: string) => Promise<boolean> | boolean; onDescribe: (v: string) => Promise<boolean> | boolean }
+  header: { title: string; description: string; descriptionFormat: ContentFormat; nameOf?: (pubkey: string) => string; archived: boolean; onRename: (v: string) => Promise<boolean> | boolean; onDescribe: (v: string) => Promise<boolean> | boolean }
   /** Production's "Add issue" beside the title. */
   onAddIssue?: () => void
   view: 'table' | 'board'
