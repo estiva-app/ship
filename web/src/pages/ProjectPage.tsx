@@ -186,6 +186,7 @@ export function ProjectPage({
           title: project.title,
           description: project.description,
           descriptionFormat: project.descriptionFormat,
+          nameOf: directory.nameOf,
           archived: project.archived,
           onRename: (value) => set('title', value, 'Rename'),
           onDescribe: (value) => set('description', value, 'Description'),

@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { MentionChip } from './MentionChip'
 import { toRenderTree, type RenderBlock, type ContentFormat, type RenderInline } from '@estiva-app/protocol'
 import { cn } from '@/lib/cn'
 
@@ -29,11 +30,14 @@ export function RichText({
   value,
   format,
   className,
+  nameOf,
   onCommentOn,
 }: {
   value: string
   format: ContentFormat
   className?: string
+  /** Resolve a mentioned key to a name — SPEC §13.1. The workspace directory's. */
+  nameOf?: (pubkey: string) => string
   /**
    * Offer to comment on one block — SPEC §13.6.
    *
@@ -52,7 +56,7 @@ export function RichText({
       {blocks.map((block, i) =>
         onCommentOn && block.id ? (
           <div key={block.id} className="group/block relative">
-            {renderBlock(block, i)}
+            {renderBlock(block, i, nameOf)}
             <button
               type="button"
               onClick={() => onCommentOn(block.id as string)}
@@ -71,7 +75,7 @@ export function RichText({
             </button>
           </div>
         ) : (
-          renderBlock(block, i)
+          renderBlock(block, i, nameOf)
         ),
       )}
     </div>
@@ -79,9 +83,23 @@ export function RichText({
 }
 
 /** A `\n` inside an inline run is a line break, in both content models. */
-function renderInline(inline: readonly RenderInline[] | undefined, keyPrefix: string): ReactNode {
+function renderInline(
+  inline: readonly RenderInline[] | undefined,
+  keyPrefix: string,
+  nameOf?: (pubkey: string) => string,
+): ReactNode {
   if (!inline) return null
   return inline.map((run, i) => {
+    if (run.reference) {
+      /*
+        A `nostr:` reference — SPEC §13.1. The parser has already decided this
+        run is one, so it is drawn rather than pattern-matched back out of the
+        text. That is the difference from the display-name form: nothing here
+        has to recognise a name, which is why it works for a body Ship did not
+        write.
+      */
+      return <MentionChip key={`${keyPrefix}-${i}`} uri={run.reference} nameOf={nameOf} />
+    }
     if (run.marks.includes('code')) {
       // `code` never combines with another mark (SPEC §13.1), so this branch
       // needs none of the others.
@@ -112,9 +130,9 @@ function renderInline(inline: readonly RenderInline[] | undefined, keyPrefix: st
   })
 }
 
-function renderBlock(block: RenderBlock, i: number): ReactNode {
+function renderBlock(block: RenderBlock, i: number, nameOf?: (pubkey: string) => string): ReactNode {
   const key = block.id ?? `b${i}`
-  const inline = renderInline(block.inline, key)
+  const inline = renderInline(block.inline, key, nameOf)
 
   switch (block.type) {
     case 'heading': {
@@ -124,13 +142,13 @@ function renderBlock(block: RenderBlock, i: number): ReactNode {
     case 'bulletList':
       return (
         <ul key={key} data-block-id={block.id} className="list-disc pl-5">
-          {block.children?.map((child, j) => <li key={child.id ?? j} data-block-id={child.id}>{renderInline(child.inline, `${key}-${j}`)}</li>)}
+          {block.children?.map((child, j) => <li key={child.id ?? j} data-block-id={child.id}>{renderInline(child.inline, `${key}-${j}`, nameOf)}</li>)}
         </ul>
       )
     case 'orderedList':
       return (
         <ol key={key} data-block-id={block.id} className="list-decimal pl-5">
-          {block.children?.map((child, j) => <li key={child.id ?? j} data-block-id={child.id}>{renderInline(child.inline, `${key}-${j}`)}</li>)}
+          {block.children?.map((child, j) => <li key={child.id ?? j} data-block-id={child.id}>{renderInline(child.inline, `${key}-${j}`, nameOf)}</li>)}
         </ol>
       )
     case 'blockquote':
@@ -162,7 +180,7 @@ function renderBlock(block: RenderBlock, i: number): ReactNode {
       return (
         <div key={key} data-block-id={block.id} data-block-type={block.typeName ?? block.type}>
           {inline}
-          {block.children?.map(renderBlock)}
+          {block.children?.map((child, j) => renderBlock(child, j, nameOf))}
         </div>
       )
   }

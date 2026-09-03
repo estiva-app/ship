@@ -20,6 +20,8 @@ export interface IssueViewProps {
   description: string
   /** Which content model the description is in — from the fold, never sniffed. */
   descriptionFormat: ContentFormat
+  /** Resolve a mentioned key to a name — SPEC §13.1. */
+  nameOf?: (pubkey: string) => string
   onRename: (v: string) => Promise<boolean> | boolean
   onDescribe: (v: string) => Promise<boolean> | boolean
   threads: ThreadData[]
@@ -34,7 +36,8 @@ export interface IssueViewProps {
   readOnlyReason?: string
 }
 
-export function IssueView({ crumbs, title, description, descriptionFormat, onRename, onDescribe, threads, unread, onStartConversation, onReply, activity, rail, readOnlyReason }: IssueViewProps) {
+export function IssueView({ crumbs, title, description, descriptionFormat,
+  nameOf, onRename, onDescribe, threads, unread, onStartConversation, onReply, activity, rail, readOnlyReason }: IssueViewProps) {
   /* Which block the next comment is about — SPEC §13.6. Held here rather than
      in the composer because the choice is made by clicking the description,
      which is a different part of the page. */
@@ -63,6 +66,7 @@ export function IssueView({ crumbs, title, description, descriptionFormat, onRen
             onCommit={onDescribe}
             readOnly={!!readOnlyReason}
             onCommentOn={readOnlyReason ? undefined : setAnchorTo}
+            nameOf={nameOf}
           />
         </div>
         <section className="flex flex-col gap-3">

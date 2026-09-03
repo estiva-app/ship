@@ -89,6 +89,7 @@ export function IssuePage({ state, directory, d, say, refresh }: { state: Folder
         title={issue.title}
         description={issue.description}
         descriptionFormat={issue.descriptionFormat}
+        nameOf={directory.nameOf}
         onRename={(value) => set('title', value, 'Rename')}
         onDescribe={(value) => set('description', value, 'Description')}
         threads={threads}

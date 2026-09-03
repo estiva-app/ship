@@ -34,6 +34,7 @@ export function Description({
   onCommit,
   readOnly = false,
   onCommentOn,
+  nameOf,
   className,
 }: {
   value: string
@@ -42,6 +43,8 @@ export function Description({
   readOnly?: boolean
   /** Offer to comment on one block — SPEC §13.6. Omitted where nobody may write. */
   onCommentOn?: (blockId: string) => void
+  /** Resolve a mentioned key to a name — SPEC §13.1. The workspace directory's. */
+  nameOf?: (pubkey: string) => string
   className?: string
 }) {
   const editable = descriptionForEditing(value, format)
@@ -51,7 +54,7 @@ export function Description({
         label="Description"
         value={editable}
         display={stripNaddrs(editable).trim()}
-        displayNode={<RichText value={stripNaddrs(value).trim()} format={format} onCommentOn={onCommentOn} />}
+        displayNode={<RichText value={stripNaddrs(value).trim()} format={format} onCommentOn={onCommentOn} nameOf={nameOf} />}
         placeholder="Add a description…"
         onCommit={onCommit}
         multiline
