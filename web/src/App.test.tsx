@@ -29,36 +29,52 @@ import { createIssue, createProject, deleteIssue, deleteProject, resolveInbound,
 import { fireEvent } from '@testing-library/react'
 import App, { sidebarProps } from './App'
 
-const project = (addr: string, title: string, archived = false) => ({
-  addr, id: addr, author: OTHER, createdAt: 1, title, description: '', descriptionFormat: 'marker' as const, contentFolder: 'f', originFolder: 'f', status: 'planned', archived, fields: {},
+/**
+ * Fixture identities are real uuids, because a route now carries the `d` alone
+ * (RFC 0.5 §7.2) and `identifierFromRef` reads it off the tail. An `id` like
+ * `30850:x:live` builds a path that parses back to nothing, so a test using one
+ * would land on the issue list and look like a routing bug.
+ */
+const D = (n: string) => `00000000-0000-4000-8000-0000000000${n}`
+const LIVE = D('01')
+const OLD = D('02')
+const MINE = D('03')
+
+const project = (d: string, title: string, archived = false) => ({
+  addr: `30850:x:${d}`, id: d, author: OTHER, createdAt: 1, title, description: '', descriptionFormat: 'marker' as const, contentFolder: 'f', originFolder: 'f', status: 'planned', archived, fields: {},
 })
-const issue = (addr: string, projectAddr: string | undefined, status: string) => ({
-  addr, id: addr, author: OTHER, createdAt: 1, title: addr, description: '', descriptionFormat: 'marker' as const, folder: 'f', projectAddr, status, fields: {},
+const issue = (d: string, projectAddr: string | undefined, status: string) => ({
+  addr: `30851:x:${d}`, id: d, author: OTHER, createdAt: 1, title: `issue ${d.slice(-2)}`, description: '', descriptionFormat: 'marker' as const, folder: 'f', projectAddr, status, fields: {},
 })
 
 const STATE: FolderState = {
-  projects: [project('30850:x:live', 'Live'), project('30850:x:old', 'Old', true), { ...project('30850:x:mine', 'Mine'), author: ME, lead: OTHER }],
+  projects: [project(LIVE, 'Live'), project(OLD, 'Old', true), { ...project(MINE, 'Mine'), author: ME, lead: OTHER }],
   issues: [
-    issue('30851:x:1', '30850:x:live', 'todo'),
-    issue('30851:x:2', '30850:x:live', 'done'),
-    issue('30851:x:3', '30850:x:old', 'todo'),
-    { ...issue('30851:x:4', undefined, 'in_progress'), assignee: ME, ref: 'X-4' },
+    issue(D('11'), `30850:x:${LIVE}`, 'todo'),
+    issue(D('12'), `30850:x:${LIVE}`, 'done'),
+    issue(D('13'), `30850:x:${OLD}`, 'todo'),
+    { ...issue(D('14'), undefined, 'in_progress'), assignee: ME, ref: 'X-4' },
   ],
   activity: [
-    { id: 'ch1', author: OTHER, createdAt: 99, target: '30851:x:1', field: 'status', value: 'todo', note: '', format: 'marker' as const },
-    { id: 'ch2', author: OTHER, createdAt: 100, target: '30851:x:4', field: 'assignee', value: ME, note: '', format: 'marker' as const },
-    { id: 'ch3', author: ME, createdAt: 101, target: '30851:x:4', field: 'status', value: 'in_progress', note: '', format: 'marker' as const },
+    { id: 'ch1', author: OTHER, createdAt: 99, target: `30851:x:${D('11')}`, field: 'status', value: 'todo', note: '', format: 'marker' as const },
+    { id: 'ch2', author: OTHER, createdAt: 100, target: `30851:x:${D('14')}`, field: 'assignee', value: ME, note: '', format: 'marker' as const },
+    { id: 'ch3', author: ME, createdAt: 101, target: `30851:x:${D('14')}`, field: 'status', value: 'in_progress', note: '', format: 'marker' as const },
   ],
   conversations: [
-    { id: 'c1', root: { id: 'c1', author: OTHER, createdAt: 5, body: 'hi nostr:naddr1qqxyz', folder: 'f', about: ['30851:x:4'] }, replies: [], about: ['30851:x:4'], createdAt: 5, lastAt: 5 },
+    { id: 'c1', root: { id: 'c1', author: OTHER, createdAt: 5, body: 'hi nostr:naddr1qqxyz', folder: 'f', about: [`30851:x:${D('14')}`] }, replies: [], about: [`30851:x:${D('14')}`], createdAt: 5, lastAt: 5 },
     { id: 'c2', root: { id: 'c2', author: ME, createdAt: 6, body: 'about the project', folder: 'f', about: [] }, replies: [{ id: 'c3', author: OTHER, createdAt: 7, body: 'reply', folder: 'f', about: [] }], about: [], createdAt: 6, lastAt: 7 },
   ],
 }
 
 const refresh = vi.fn().mockResolvedValue(undefined)
 
+const goTo = (path: string) => {
+  history.replaceState(null, '', path)
+  dispatchEvent(new PopStateEvent('popstate'))
+}
+
 beforeEach(() => {
-  location.hash = ''
+  goTo('/')
   refresh.mockClear()
   for (const write of [createProject, createIssue, setIssueField, deleteProject, deleteIssue, startConversation]) vi.mocked(write).mockReset()
   vi.mocked(useWorkspace).mockReturnValue({ state: STATE, error: null, refresh })
@@ -81,7 +97,7 @@ describe('sidebarProps — the old app\'s counting rules', () => {
   })
 
   it('marks the open project as current', () => {
-    expect(sidebarProps(STATE, { name: 'project', addr: '30850:x:live', view: 'table' }).current).toEqual({ projectAddr: '30850:x:live' })
+    expect(sidebarProps(STATE, { name: 'project', d: LIVE, view: 'table' }).current).toEqual({ projectAddr: `30850:x:${LIVE}` })
   })
 })
 
@@ -90,7 +106,7 @@ describe('App — the shell around the route', () => {
     render(<App />)
     expect(within(screen.getByRole('banner')).getByText('Me Myself')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /^Issues/ })).toHaveTextContent('2')
-    await waitFor(() => expect(location.hash).toBe('#/issues'))
+    await waitFor(() => expect(location.pathname).toBe('/issues'))
   })
 
   it('shows the read error as a banner and keeps the shell', () => {
@@ -101,25 +117,26 @@ describe('App — the shell around the route', () => {
   })
 
   it('lands an inbound reference on the object it names', async () => {
-    vi.mocked(resolveInbound).mockResolvedValue({ addr: '30851:x:1', kind: 'issue' })
-    location.hash = '#/o/naddr1abc'
+    vi.mocked(resolveInbound).mockResolvedValue({ addr: `30851:x:${D('11')}`, kind: 'issue' })
+    goTo('/o/naddr1abc')
     render(<App />)
-    await waitFor(() => expect(location.hash).toBe('#/issue/30851%3Ax%3A1'))
+    // The address it resolved to becomes a §7.2 path — the `d` alone.
+    await waitFor(() => expect(location.pathname).toBe(`/issue/${D('11')}`))
     expect(resolveInbound).toHaveBeenCalledWith('naddr1abc')
   })
 
   it('falls back to the issue list, with a reason, when the reference cannot be resolved', async () => {
     vi.mocked(resolveInbound).mockResolvedValue(null)
-    location.hash = '#/o/naddr1unknown'
+    goTo('/o/naddr1unknown')
     render(<App />)
-    await waitFor(() => expect(location.hash).toBe('#/issues'))
+    await waitFor(() => expect(location.pathname).toBe('/issues'))
     expect(screen.getByText(/Could not resolve that reference/)).toBeInTheDocument()
   })
 })
 
 describe('Projects page — cards from the fold', () => {
   it('draws the active projects with their counts, and the archived one behind the tab', () => {
-    location.hash = '#/projects'
+    goTo('/projects')
     render(<App />)
     const main = within(screen.getByRole('main'))
     expect(main.getByRole('heading', { name: 'Projects' })).toBeInTheDocument()
@@ -130,7 +147,7 @@ describe('Projects page — cards from the fold', () => {
 
   it('creates a project through the dialog, then re-reads the relay and says so', async () => {
     vi.mocked(createProject).mockResolvedValue({ ok: true, addr: '30850:x:new' })
-    location.hash = '#/projects'
+    goTo('/projects')
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: 'Add project' }))
     const dialog = within(screen.getByRole('dialog', { name: 'New project' }))
@@ -144,7 +161,7 @@ describe('Projects page — cards from the fold', () => {
 
   it('keeps the dialog open and says why when the relay refuses', async () => {
     vi.mocked(createProject).mockResolvedValue({ ok: false, reason: 'not a channel member' })
-    location.hash = '#/projects'
+    goTo('/projects')
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: 'Add project' }))
     const dialog = within(screen.getByRole('dialog', { name: 'New project' }))
@@ -156,7 +173,7 @@ describe('Projects page — cards from the fold', () => {
   })
 
   it('shows the archived list when the route asks for it', () => {
-    location.hash = '#/projects?archived'
+    goTo('/projects?archived')
     render(<App />)
     const main = within(screen.getByRole('main'))
     expect(main.getByRole('link', { name: /Old/ })).toBeInTheDocument()
@@ -166,7 +183,7 @@ describe('Projects page — cards from the fold', () => {
 
 describe('Issues page — rows from the fold', () => {
   it('groups every issue by status with its counts, and filters to mine', () => {
-    location.hash = '#/issues'
+    goTo('/issues')
     render(<App />)
     const main = within(screen.getByRole('main'))
     expect(main.getByRole('tab', { name: /^All/ })).toHaveTextContent('4')
@@ -178,13 +195,13 @@ describe('Issues page — rows from the fold', () => {
 
     fireEvent.click(main.getByRole('tab', { name: /Assigned to me/ }))
     expect(main.getAllByRole('link')).toHaveLength(1)
-    expect(main.getByRole('link', { name: /X-4/ })).toHaveAttribute('href', '#/issue/30851%3Ax%3A4')
+    expect(main.getByRole('link', { name: /X-4/ })).toHaveAttribute('href', `/issue/issue-14-${D('14')}`)
   })
 })
 
 describe('Project page — one project from the fold', () => {
   it('draws the table with Updated from the last change, the Folder threads, the rail — and offers Delete to a non-author', () => {
-    location.hash = '#/project/30850%3Ax%3Alive'
+    goTo(`/project/live-${LIVE}`)
     render(<App />)
     const main = within(screen.getByRole('main'))
     expect(main.getByRole('button', { name: 'Edit title' })).toHaveTextContent('Live')
@@ -211,7 +228,7 @@ describe('Project page — one project from the fold', () => {
 
   it('asks before deleting, and requests the deletion', async () => {
     vi.mocked(deleteProject).mockResolvedValue({ ok: true })
-    location.hash = '#/project/30850%3Ax%3Amine?view=board'
+    goTo(`/project/mine-${MINE}?view=board`)
     render(<App />)
     const main = within(screen.getByRole('main'))
     expect(main.queryByRole('table')).not.toBeInTheDocument()
@@ -219,24 +236,24 @@ describe('Project page — one project from the fold', () => {
     const dialog = within(screen.getByRole('dialog', { name: /Delete .Mine./ }))
     expect(deleteProject).not.toHaveBeenCalled()
     fireEvent.click(dialog.getByRole('button', { name: 'Delete project' }))
-    await waitFor(() => expect(deleteProject).toHaveBeenCalledWith(expect.objectContaining({ addr: '30850:x:mine' })))
+    await waitFor(() => expect(deleteProject).toHaveBeenCalledWith(expect.objectContaining({ addr: `30850:x:${MINE}` })))
     expect(await screen.findByText('Deletion requested.')).toBeInTheDocument()
-    await waitFor(() => expect(location.hash).toBe('#/projects'))
+    await waitFor(() => expect(location.pathname).toBe('/projects'))
   })
 
   it('posts a project conversation into its content Folder and re-reads', async () => {
     vi.mocked(startConversation).mockResolvedValue({ ok: true })
-    location.hash = '#/project/30850%3Ax%3Alive'
+    goTo(`/project/live-${LIVE}`)
     render(<App />)
     const main = within(screen.getByRole('main'))
     fireEvent.change(main.getByPlaceholderText('Start a conversation…'), { target: { value: 'hello' } })
     fireEvent.click(main.getByRole('button', { name: 'Post' }))
-    await waitFor(() => expect(startConversation).toHaveBeenCalledWith({ folder: 'f', about: '30850:x:live', withReference: false, body: 'hello' }))
+    await waitFor(() => expect(startConversation).toHaveBeenCalledWith({ folder: 'f', about: `30850:x:${LIVE}`, withReference: false, body: 'hello' }))
     await waitFor(() => expect(refresh).toHaveBeenCalled())
   })
 
   it('says so when the project is not in this workspace', () => {
-    location.hash = '#/project/30850%3Ax%3Anope'
+    goTo(`/project/nope-${D('99')}`)
     render(<App />)
     expect(screen.getByText(/not in this workspace/)).toBeInTheDocument()
   })
@@ -244,10 +261,10 @@ describe('Project page — one project from the fold', () => {
 
 describe('Issue page — one issue from the fold', () => {
   it('draws the trail, the conversation about it, the history in words newest first, and the rail', () => {
-    location.hash = '#/issue/30851%3Ax%3A4'
+    goTo(`/issue/${D('14')}`)
     render(<App />)
     const main = within(screen.getByRole('main'))
-    expect(main.getByRole('button', { name: 'Edit title' })).toHaveTextContent('30851:x:4')
+    expect(main.getByRole('button', { name: 'Edit title' })).toHaveTextContent('issue 14')
     expect(main.getByText('X-4')).toBeInTheDocument()
     expect(main.queryByRole('link', { name: 'Live' })).not.toBeInTheDocument()
     expect(main.getByText('hi')).toBeInTheDocument()
@@ -260,12 +277,12 @@ describe('Issue page — one issue from the fold', () => {
 
   it('a status change is one change event to the issue, then a re-read; a refusal is said and changes nothing', async () => {
     vi.mocked(setIssueField).mockResolvedValue({ ok: true })
-    location.hash = '#/issue/30851%3Ax%3A4'
+    goTo(`/issue/${D('14')}`)
     render(<App />)
     const main = within(screen.getByRole('main'))
     fireEvent.click(main.getByRole('button', { name: 'Status' }))
     fireEvent.mouseDown(screen.getByRole('option', { name: 'Done' }))
-    await waitFor(() => expect(setIssueField).toHaveBeenCalledWith(expect.objectContaining({ addr: '30851:x:4' }), 'status', 'done', 'Status → done'))
+    await waitFor(() => expect(setIssueField).toHaveBeenCalledWith(expect.objectContaining({ addr: `30851:x:${D('14')}` }), 'status', 'done', 'Status → done'))
     await waitFor(() => expect(refresh).toHaveBeenCalledTimes(1))
 
     vi.mocked(setIssueField).mockResolvedValue({ ok: false, reason: 'relay said no' })
@@ -278,7 +295,7 @@ describe('Issue page — one issue from the fold', () => {
 
   it('asks before deleting an issue, says the conversations survive, and requests the deletion', async () => {
     vi.mocked(deleteIssue).mockResolvedValue({ ok: true })
-    location.hash = '#/issue/30851%3Ax%3A4'
+    goTo(`/issue/${D('14')}`)
     render(<App />)
     const main = within(screen.getByRole('main'))
     fireEvent.click(main.getByRole('button', { name: 'Delete issue' }))
@@ -287,41 +304,41 @@ describe('Issue page — one issue from the fold', () => {
     // SHI-3 is explicit that this must not read as deleting the discussion.
     expect(dialog.getByText(/not deleted/)).toBeInTheDocument()
     fireEvent.click(dialog.getByRole('button', { name: 'Delete issue' }))
-    await waitFor(() => expect(deleteIssue).toHaveBeenCalledWith(expect.objectContaining({ addr: '30851:x:4' })))
+    await waitFor(() => expect(deleteIssue).toHaveBeenCalledWith(expect.objectContaining({ addr: `30851:x:${D('14')}` })))
     expect(await screen.findByText('Deletion requested.')).toBeInTheDocument()
   })
 
   it('reports a refused deletion and stays on the issue', async () => {
     vi.mocked(deleteIssue).mockResolvedValue({ ok: false, reason: 'must be event author' })
-    location.hash = '#/issue/30851%3Ax%3A4'
+    goTo(`/issue/${D('14')}`)
     render(<App />)
     const main = within(screen.getByRole('main'))
     fireEvent.click(main.getByRole('button', { name: 'Delete issue' }))
     const dialog = within(screen.getByRole('dialog', { name: /Delete/ }))
     fireEvent.click(dialog.getByRole('button', { name: 'Delete issue' }))
     expect(await screen.findByText(/Delete rejected — must be event author/)).toBeInTheDocument()
-    expect(location.hash).toBe('#/issue/30851%3Ax%3A4')
+    expect(location.pathname).toBe(`/issue/${D('14')}`)
   })
 
   it('starts a thread about the issue with the reference Peek needs', async () => {
     vi.mocked(startConversation).mockResolvedValue({ ok: true })
-    location.hash = '#/issue/30851%3Ax%3A4'
+    goTo(`/issue/${D('14')}`)
     render(<App />)
     const main = within(screen.getByRole('main'))
     fireEvent.change(main.getByPlaceholderText('Start a conversation…'), { target: { value: 'seen this?' } })
     fireEvent.click(main.getByRole('button', { name: 'Post' }))
-    await waitFor(() => expect(startConversation).toHaveBeenCalledWith({ folder: 'f', about: '30851:x:4', withReference: true, body: 'seen this?' }))
+    await waitFor(() => expect(startConversation).toHaveBeenCalledWith({ folder: 'f', about: `30851:x:${D('14')}`, withReference: true, body: 'seen this?' }))
   })
 
   it('links the project in the trail when the issue has one', () => {
-    location.hash = '#/issue/30851%3Ax%3A1'
+    goTo(`/issue/${D('11')}`)
     render(<App />)
     const main = within(screen.getByRole('main'))
-    expect(main.getByRole('link', { name: 'Live' })).toHaveAttribute('href', '#/project/30850%3Ax%3Alive')
+    expect(main.getByRole('link', { name: 'Live' })).toHaveAttribute('href', `/project/live-${LIVE}`)
   })
 
   it('says so when the issue is not in this workspace', () => {
-    location.hash = '#/issue/30851%3Ax%3Anope'
+    goTo(`/issue/${D('98')}`)
     render(<App />)
     expect(screen.getByText(/not in this workspace/)).toBeInTheDocument()
   })

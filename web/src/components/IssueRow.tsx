@@ -19,6 +19,11 @@ import { StatusLabel } from '@/components/ui/StatusLabel'
 export interface IssueRowData {
   /** The identity. */
   addr: string
+  /**
+   * The `d` — the uuid half of the address, and the only part a URL carries
+   * under RFC 0.5 §7.2. Here because a row is what a link is built from.
+   */
+  id: string
   ref?: string
   title: string
   /** Shown under the title, clamped to two lines, as production does. */

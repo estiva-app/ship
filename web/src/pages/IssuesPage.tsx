@@ -10,6 +10,7 @@ import { type Say } from './act'
 export function rowFor(issue: FolderState['issues'][number], state: FolderState, directory: DirectoryView): IssueRowData {
   return {
     addr: issue.addr,
+    id: issue.id,
     ref: issue.ref,
     title: issue.title,
     description: issue.description || undefined,
@@ -21,7 +22,8 @@ export function rowFor(issue: FolderState['issues'][number], state: FolderState,
   }
 }
 
-export const hrefForIssue = (issue: { addr: string }) => href({ name: 'issue', addr: issue.addr })
+export const hrefForIssue = (issue: { id: string; title?: string }) =>
+  href({ name: 'issue', d: issue.id, slug: issue.title })
 
 /**
  * Every issue the reader can see, as the old app's issuesView: the All /
