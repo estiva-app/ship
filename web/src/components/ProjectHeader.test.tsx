@@ -9,6 +9,9 @@
  */
 import { describe, it, expect, vi } from 'vitest'
 import { render } from '@testing-library/react'
+
+// `ForeignReferences` resolves against the relay; what is under test is the prose.
+vi.mock('@/api/foreign', () => ({ resolveForeign: vi.fn(async () => []) }))
 import { ProjectHeader } from './ProjectHeader'
 
 const show = (description: string, format: 'marker' | 'blocks' | 'unknown' = 'marker') =>
@@ -49,5 +52,17 @@ describe('ProjectHeader draws its description', () => {
     const c = show('<b>not bold</b>')
     expect(c.querySelector('b')).toBeNull()
     expect(c.textContent).toContain('<b>not bold</b>')
+  })
+
+  it('keeps a nostr pointer out of the prose, as an issue does — RIC-9', () => {
+    // The regression this file is guarding. The project surface rendered the
+    // raw bech32 and drew nothing for the object it named, while the issue
+    // surface had done both since PRO-7. Both mount `Description` now, so the
+    // asymmetry cannot be reintroduced by editing one call site.
+    const naddr =
+      'nostr:naddr1qqjxzde5xfjnvdee943kzwrr956rswr995uxgd3s95unsvekvd3nsvtzv3jnyqg4dp68gup69uhkcmmrv9kxsmmnwsarxvpsxqpzpvankwem8vankwem8vankwem8vankwem8vankwem8vankwem8vanqvzqqqrcsvczkget'
+    const c = show(`Tracked in ${naddr} for now.`)
+    expect(c.textContent).not.toContain('naddr1')
+    expect(c.textContent).toContain('Tracked in')
   })
 })

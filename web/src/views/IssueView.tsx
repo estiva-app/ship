@@ -1,12 +1,9 @@
 import { useState } from 'react'
 import { Breadcrumb, type Crumb } from '@/components/ui/Breadcrumb'
 import type { ContentFormat } from '@estiva-app/protocol'
-import { RichText } from '@/components/ui/RichText'
-import { descriptionForEditing } from '@/lib/description'
 import { Divider } from '@/components/ui/Divider'
 import { EditableText } from '@/components/ui/EditableText'
-import { stripNaddrs } from '@estiva-app/protocol'
-import { ForeignReferences } from '@/components/ForeignReferences'
+import { Description } from '@/components/Description'
 import { ActivityFeed, type ActivityEntry } from '@/components/ActivityFeed'
 import { Conversations, type ThreadData } from '@/components/ConversationThread'
 import { IssueRail, type IssueRailProps } from '@/components/IssueRail'
@@ -60,25 +57,13 @@ export function IssueView({ crumbs, title, description, descriptionFormat, onRen
       <div className="col-start-1 row-start-2 flex min-h-0 min-w-0 flex-col gap-6 overflow-y-auto px-6 pb-5">
         <div className="flex flex-col gap-2">
           <EditableText label="Title" value={title} placeholder="Untitled issue" onCommit={onRename} readOnly={!!readOnlyReason} className="-mx-2 text-h2" />
-          <EditableText
-            label="Description"
-            value={descriptionForEditing(description, descriptionFormat)}
-            display={stripNaddrs(descriptionForEditing(description, descriptionFormat)).trim()}
-            displayNode={
-              <RichText
-                value={stripNaddrs(description).trim()}
-                format={descriptionFormat}
-                onCommentOn={readOnlyReason ? undefined : setAnchorTo}
-              />
-            }
-            placeholder="Add a description…"
+          <Description
+            value={description}
+            format={descriptionFormat}
             onCommit={onDescribe}
-            multiline
             readOnly={!!readOnlyReason}
-            className="-mx-2 text-body-2"
+            onCommentOn={readOnlyReason ? undefined : setAnchorTo}
           />
-          {/* Any object referenced in the description, live — PRO-7. */}
-          <ForeignReferences text={description} className="flex flex-col gap-2" />
         </div>
         <section className="flex flex-col gap-3">
           <h2 className="text-h4 text-text-primary">Conversations</h2>
