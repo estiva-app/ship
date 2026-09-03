@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Breadcrumb, type Crumb } from '@/components/ui/Breadcrumb'
 import type { ContentFormat } from '@estiva-app/protocol'
 import { RichText } from '@/components/ui/RichText'
@@ -27,7 +28,8 @@ export interface IssueViewProps {
   threads: ThreadData[]
   /** Thread id → first unread message id. Drives the feed divider (CRO-13). */
   unread?: Record<string, string>
-  onStartConversation: (text: string) => Promise<boolean | void> | boolean | void
+  /** `blockId` is set when the reader clicked a specific block — SPEC §13.6. */
+  onStartConversation: (text: string, blockId?: string) => Promise<boolean | void> | boolean | void
   onReply: (threadId: string, text: string) => Promise<boolean | void> | boolean | void
   activity: ActivityEntry[]
   rail: Omit<IssueRailProps, 'className'>
@@ -36,6 +38,11 @@ export interface IssueViewProps {
 }
 
 export function IssueView({ crumbs, title, description, descriptionFormat, onRename, onDescribe, threads, unread, onStartConversation, onReply, activity, rail, readOnlyReason }: IssueViewProps) {
+  /* Which block the next comment is about — SPEC §13.6. Held here rather than
+     in the composer because the choice is made by clicking the description,
+     which is a different part of the page. */
+  const [anchorTo, setAnchorTo] = useState<string | undefined>(undefined)
+
   const items: Crumb[] = [{ label: 'Issues', href: crumbs.issuesHref }]
   if (crumbs.project) items.push({ label: crumbs.project.title, href: crumbs.project.href })
   if (crumbs.ref) items.push({ label: crumbs.ref, mono: true })
@@ -57,7 +64,13 @@ export function IssueView({ crumbs, title, description, descriptionFormat, onRen
             label="Description"
             value={descriptionForEditing(description, descriptionFormat)}
             display={stripNaddrs(descriptionForEditing(description, descriptionFormat)).trim()}
-            displayNode={<RichText value={stripNaddrs(description).trim()} format={descriptionFormat} />}
+            displayNode={
+              <RichText
+                value={stripNaddrs(description).trim()}
+                format={descriptionFormat}
+                onCommentOn={readOnlyReason ? undefined : setAnchorTo}
+              />
+            }
             placeholder="Add a description…"
             onCommit={onDescribe}
             multiline
@@ -69,7 +82,15 @@ export function IssueView({ crumbs, title, description, descriptionFormat, onRen
         </div>
         <section className="flex flex-col gap-3">
           <h2 className="text-h4 text-text-primary">Conversations</h2>
-          <Conversations threads={threads} unread={unread} onStart={onStartConversation} onReply={onReply} disabledReason={readOnlyReason} />
+          <Conversations
+            threads={threads}
+            unread={unread}
+            onStart={(text) => onStartConversation(text, anchorTo)}
+            onReply={onReply}
+            disabledReason={readOnlyReason}
+            anchoredTo={anchorTo}
+            onClearAnchor={() => setAnchorTo(undefined)}
+          />
         </section>
         <section className="flex flex-col gap-3">
           <h2 className="text-h4 text-text-primary">Activity</h2>

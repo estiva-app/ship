@@ -202,12 +202,14 @@ export function setIssueField(issue: Issue, field: 'title' | 'description' | 'st
  * widget above the message; about a project, the message is already in the
  * topic it belongs to and a reference would be noise.
  */
-export function startConversation(args: { folder: string; about: string; withReference: boolean; body: string }): Promise<WriteResult> {
+export function startConversation(args: { folder: string; about: string; withReference: boolean; body: string; blockId?: string }): Promise<WriteResult> {
   return publish(() =>
     store.postMessage({
       folder: args.folder,
       body: args.body,
       about: args.about,
+      // SPEC §13.6 — present only when the author was commenting on one block.
+      blockId: args.blockId,
       aboutRef: args.withReference ? `nostr:${addrToNaddr(args.about, [RELAY_URL])}` : undefined,
     }),
   )

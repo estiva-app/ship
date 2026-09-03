@@ -1,4 +1,5 @@
 import { useMarkRead } from '@/lib/useMarkRead'
+import { resolveBlockAnchor, type ContentFormat } from '@estiva-app/protocol'
 import { signedIn } from '@/auth/estivaId'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
@@ -44,12 +45,25 @@ export function stripReferences(body: string): string {
 }
 
 /** A conversation from the fold as the thread card draws it: names and faces for keys, the fold's order kept. */
-export function threadFor(conversation: FolderState['conversations'][number], directory: DirectoryView): ThreadData {
+export function threadFor(
+  conversation: FolderState['conversations'][number],
+  directory: DirectoryView,
+  /*
+    The body a comment's anchor is resolved against — SPEC §13.6. Passed in
+    because only the page knows which object's description these comments are
+    about, and because the anchor has to be resolved against the description as
+    it is *now*: that is what makes a deleted block show as deleted rather than
+    as no anchor at all. Omitted where there is no single object, and every
+    anchor is then reported unaddressable rather than silently dropped.
+  */
+  body?: { value: string; format: ContentFormat },
+): ThreadData {
   const message = (m: FolderState['conversations'][number]['root']) => ({
     id: m.id,
     author: directory.personOf(m.author),
     at: m.createdAt,
     body: stripReferences(m.body),
+    anchor: resolveBlockAnchor(m.blockId, body?.value ?? '', body?.format ?? 'marker'),
     // Carried for the unread rule only: your own writing is never new to you.
     by: m.author,
   })
@@ -116,7 +130,10 @@ export function ProjectPage({
      bare channel uuid (SPEC §11.1). Looking at the project marks the container
      read; its issues' discussions are separate contexts and are untouched. */
   useMarkRead([projectContext(project?.contentFolder)])
-  const threads = useMemo(() => conversations.map((c) => threadFor(c, directory)), [conversations, directory])
+  const threads = useMemo(
+    () => conversations.map((c) => threadFor(c, directory, project ? { value: project.description, format: project.descriptionFormat } : undefined)),
+    [conversations, directory, project],
+  )
   /* The divider in the feed (CRO-13). A project IS the container, so its own
      marker governs the roots and propagates down to their replies. */
   const merged = useMergedReadState()

@@ -26,7 +26,22 @@ const PORT = 5198
 interface Event { id: string; kind: number; tags: string[][]; content: string; created_at: number; pubkey: string }
 
 const fixture = JSON.parse(readFileSync(join(here, '..', 'conformance', 'fold-fixture.json'), 'utf8'))
-const seeded = fixture.events as Event[]
+
+/**
+ * The recorded production events, without the fixture's adversarial ones.
+ *
+ * `fold-fixture.json` carries nine synthetic events whose folder is
+ * `fixture-folder` — they exist to exercise ordering rules a healthy workspace
+ * cannot demonstrate, and they are fed to `foldFolder` **offline**. Feeding
+ * them to the *app* is a different thing: its read path validates a folder id
+ * before querying, so it refuses them and renders "could not read from the
+ * relay", correctly. Filtering by that is exact — nine events, nine
+ * adversarial, and no overlap.
+ */
+const FOLDER_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+const recorded = (fixture.events as Event[]).filter((e) =>
+  e.tags.every((t) => t[0] !== 'h' || FOLDER_UUID.test(t[1])),
+)
 
 let failures = 0
 const check = (label: string, ok: boolean, detail = '') => {
@@ -39,6 +54,42 @@ const TYPES: Record<string, string> = {
   '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json',
 }
 const tag = (e: Event, k: string) => e.tags.find((t) => t[0] === k)?.[1]
+
+/**
+ * The stub's filter, ported from `smoke.ts`.
+ *
+ * **Returning every event for every filter is not a simplification, it is a
+ * different relay.** The first version of this script did exactly that, and it
+ * worked until the conformance fixture grew to 1082 events — at which point
+ * `queryAll` correctly refused to page, because a full page of events sharing
+ * one `created_at` has no cursor that can advance. The app was right and the
+ * stub was wrong, and it read as the app failing to load.
+ */
+function matches(event: Event, filter: Record<string, unknown>): boolean {
+  const kinds = filter.kinds as number[] | undefined
+  if (kinds && !kinds.includes(event.kind)) return false
+  const authors = filter.authors as string[] | undefined
+  if (authors && !authors.includes(event.pubkey)) return false
+  const until = filter.until as number | undefined
+  if (until !== undefined && event.created_at > until) return false
+  for (const [key, want] of Object.entries(filter)) {
+    if (!key.startsWith('#')) continue
+    const name = key.slice(1)
+    const values = event.tags.filter((t) => t[0] === name).map((t) => t[1])
+    // `h` as Buzz actually behaves — see smoke.ts for the measurement.
+    const candidates = name === 'h' ? (want as string[]).slice(0, 1) : (want as string[])
+    if (!candidates.some((value) => values.includes(value))) return false
+  }
+  return true
+}
+
+/** Newest first, then capped by the filter's own limit — as the relay does. */
+function answer(stored: Event[], filters: Record<string, unknown>[]): Event[] {
+  const hits = stored.filter((event) => filters.some((filter) => matches(event, filter)))
+  hits.sort((a, b) => b.created_at - a.created_at || a.id.localeCompare(b.id))
+  const limit = Math.max(...filters.map((f) => (f.limit as number) ?? hits.length))
+  return hits.slice(0, limit)
+}
 
 async function main() {
   mkdirSync(SHOTS, { recursive: true })
@@ -64,7 +115,7 @@ async function main() {
 
   /** Everything the app publishes, in order. */
   const published: Event[] = []
-  const stored: Event[] = [...seeded]
+  const stored: Event[] = [...recorded]
 
   await page.route('http://localhost:3000/**', async (route) => {
     const request = route.request()
@@ -79,7 +130,8 @@ async function main() {
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ accepted: true, event_id: event.id, message: '' }) })
     }
     if (Array.isArray(body)) {
-      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(stored) })
+      const hits = answer(stored, body as Record<string, unknown>[])
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(hits) })
     }
     return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
   })
