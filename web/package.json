@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@estiva-app/identity": "^0.1.1",
-    "@estiva-app/interop": "^0.9.1",
+    "@estiva-app/interop": "^0.10.0",
     "@estiva-app/protocol": "^0.11.0",
     "@estiva-app/ui": "^0.5.0",
     "@tabler/icons-react": "^3.41.1",

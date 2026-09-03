@@ -36,8 +36,8 @@ export function activityFor(issueAddr: string, state: FolderState, directory: Di
  * field edit is one change event to the issue's own Folder, followed by a
  * re-read; a refused one leaves the field as the relay has it.
  */
-export function IssuePage({ state, directory, addr, say, refresh }: { state: FolderState; directory: DirectoryView; addr: string; say: Say; refresh: () => Promise<void> }) {
-  const issue = state.issues.find((candidate) => candidate.addr === addr)
+export function IssuePage({ state, directory, d, say, refresh }: { state: FolderState; directory: DirectoryView; /** The object's `d`, which is all a §7.2 URL carries. */ d: string; say: Say; refresh: () => Promise<void> }) {
+  const issue = state.issues.find((candidate) => candidate.id === d)
   const project = issue?.projectAddr ? state.projects.find((candidate) => candidate.addr === issue.projectAddr) : undefined
 
   const conversations = useMemo(() => (issue ? conversationsAbout(state.conversations, issue.addr) : []), [issue, state])
@@ -83,7 +83,7 @@ export function IssuePage({ state, directory, addr, say, refresh }: { state: Fol
       <IssueView
         crumbs={{
           issuesHref: href({ name: 'issues' }),
-          project: project ? { title: project.title, href: href({ name: 'project', addr: project.addr, view: 'table' }) } : undefined,
+          project: project ? { title: project.title, href: href({ name: 'project', d: project.id, slug: project.title, view: 'table' }) } : undefined,
           ref: issue.ref,
         }}
         title={issue.title}
@@ -135,7 +135,7 @@ export function IssuePage({ state, directory, addr, say, refresh }: { state: Fol
             }
             say('Deletion requested.')
             // Nothing left to render here.
-            go(project ? { name: 'project', addr: project.addr, view: 'table' } : { name: 'issues' })
+            go(project ? { name: 'project', d: project.id, slug: project.title, view: 'table' } : { name: 'issues' })
             await refresh()
             return true
           }}

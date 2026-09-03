@@ -585,11 +585,38 @@ export function buildManifest(
      * status, and the only way back to the issue itself was to alt-tab and hunt
      * for the row. A reference you cannot follow is a screenshot.
      *
-     * It points at `#/o/…` rather than a direct issue route on purpose — the
+     * It points at `/o/…` rather than a direct issue route on purpose — the
      * naddr does not carry the Folder, so the app has to resolve the object
      * before it knows which container, and therefore which URL, it belongs to.
+     *
+     * The hash came off with SHI-16, along with the rest of Ship's routes. A
+     * consumer holding an old `#/o/<naddr>` link still resolves it: `parse`
+     * reads both shapes, for the same reason `urls` declares both below.
      */
-    ['web', `${appUrl.replace(/\/+$/, '')}/#/o/<bech32>`, 'naddr'],
+    ['web', `${appUrl.replace(/\/+$/, '')}/o/<bech32>`, 'naddr'],
+    /*
+      RFC 0.5 §7.5's `urls` — the inbound half.
+
+      `web` is outbound: given an object, build a link that opens it. These are
+      inbound: given a link somebody pasted, recover which object it names. They
+      are different questions, which is why §7.5 makes them different fields,
+      and an app that changes its routes still has to read the links it
+      published under the old ones.
+
+      The third element is the kind. §7.2 says the kind comes from the path
+      segment — but `/issue/` means 30851 only *to Ship*, and a consumer has
+      never heard of "issue". Naming it here is what lets an app that knows
+      nothing about Ship resolve one of its links.
+
+      The hash form is declared too, and deliberately. Every link Ship published
+      before SHI-16 is `#/issue/<kind>:<pubkey>:<d>`, those are in other
+      people's messages, and a consumer matching only the current shape would
+      render them as plain links for ever.
+    */
+    ['urls', `${appUrl.replace(/\/+$/, '')}/project/<slug>-<d>`, String(KIND.PROJECT)],
+    ['urls', `${appUrl.replace(/\/+$/, '')}/issue/<slug>-<d>`, String(KIND.ISSUE)],
+    ['urls', `${appUrl.replace(/\/+$/, '')}/#/project/<d>`, String(KIND.PROJECT)],
+    ['urls', `${appUrl.replace(/\/+$/, '')}/#/issue/<d>`, String(KIND.ISSUE)],
   ]
   return {
     pubkey,

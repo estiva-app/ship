@@ -22,7 +22,7 @@ export function ProjectsPage({ state, directory, archived, say, refresh }: { sta
       const issues = state.issues.filter((issue) => issue.projectAddr === project.addr)
       const status = lookupStatus(PROJECT_STATUSES, project.status)
       return {
-        href: href({ name: 'project', addr: project.addr, view: 'table' }),
+        href: href({ name: 'project', d: project.id, slug: project.title, view: 'table' }),
         title: project.title,
         description: project.description || undefined,
         status: { value: status.value, label: status.label },

@@ -12,6 +12,7 @@ import type { Say } from '@/pages/act'
 import { ProjectsPage } from '@/pages/ProjectsPage'
 import { ID_CONFIG, RELAY_URL } from './config'
 import { beginSignIn, beginSignOut, signInAvailable, signedIn } from './auth/estivaId'
+import { identifierFromRef } from '@estiva-app/interop'
 import { href, replace, useRoute, type Route } from './router'
 
 /**
@@ -29,7 +30,7 @@ export default function App() {
   const people = useMemo(() => (state ? peopleIn(state, me) : [me]), [state])
   const directory = useDirectory(people, href(route))
 
-  useCanonicalHash(route)
+  useCanonicalPath(route)
   useInbound(route, say)
   /* Read markers are debounced, so the last few of a session would be lost when
      the tab goes away. `visibilitychange` is the one mobile browsers reliably
@@ -88,9 +89,9 @@ function Page({ route, state, directory, say, refresh }: { route: Route; state: 
     case 'issues':
       return <IssuesPage state={state} directory={directory} say={say} refresh={refresh} />
     case 'project':
-      return <ProjectPage state={state} directory={directory} addr={route.addr} view={route.view} say={say} refresh={refresh} />
+      return <ProjectPage state={state} directory={directory} d={route.d} view={route.view} say={say} refresh={refresh} />
     case 'issue':
-      return <IssuePage state={state} directory={directory} addr={route.addr} say={say} refresh={refresh} />
+      return <IssuePage state={state} directory={directory} d={route.d} say={say} refresh={refresh} />
     default:
       return <EmptyState className="py-12" message="Resolving reference…" />
   }
@@ -113,11 +114,13 @@ export function sidebarProps(state: FolderState | null, route: Route) {
     .map((p) => ({
       addr: p.addr,
       title: p.title,
-      href: href({ name: 'project', addr: p.addr, view: 'table' }),
+      href: href({ name: 'project', d: p.id, slug: p.title, view: 'table' }),
       openCount: issues.filter((i) => i.projectAddr === p.addr && isOpen(i.status)).length,
     }))
   const current =
-    route.name === 'project' ? { projectAddr: route.addr } : route.name === 'projects' ? ('projects' as const) : ('issues' as const)
+    route.name === 'project'
+      ? { projectAddr: projects.find((p) => p.id === route.d)?.addr ?? '' }
+      : route.name === 'projects' ? ('projects' as const) : ('issues' as const)
   return {
     openIssues,
     issuesHref: href({ name: 'issues' }),
@@ -141,14 +144,30 @@ function useBanner() {
 }
 
 /**
- * Normalise the address bar to the canonical form of wherever we ended up —
- * an empty or misspelt hash renders the issue list, and the URL should say
- * so. `replace` does not fire `hashchange`, so this cannot loop.
+ * Give the bare app URL a route, so `/` becomes `/issues`.
+ *
+ * **Only the bare URL.** This used to normalise the address bar to
+ * `href(route)` for *any* route, which SHI-16 made wrong twice over.
+ *
+ * It looped. The old comment said "`replace` does not fire `hashchange`, so
+ * this cannot loop" — true of a hash router, and no longer true: `replace` now
+ * dispatches `popstate` because the browser does not fire one for a
+ * `history` call the app made. Each dispatch re-parsed the location into a
+ * fresh route object, `[route]` saw a new identity, and the effect ran again.
+ * The test suite hung rather than failed, which is how it announced itself.
+ *
+ * And it would have eaten the slug. A route parsed from
+ * `/issue/billing-entry-<uuid>` carries no slug — §7.2 says nothing resolves
+ * through one — so `href` rebuilds the path without it, the strings differ, and
+ * the address bar loses the human-readable half of every link somebody follows.
+ *
+ * A misspelt path is left alone deliberately: it renders the issue list, and
+ * rewriting the URL would hide that the link was broken rather than fix it.
  */
-function useCanonicalHash(route: Route) {
+function useCanonicalPath(route: Route) {
   useEffect(() => {
     if (route.name === 'inbound') return
-    if (location.hash !== href(route)) replace(route)
+    if (location.pathname === '/' || location.pathname === '') replace(route)
   }, [route])
 }
 
@@ -168,7 +187,14 @@ function useInbound(route: Route, say: (text: string, tone?: 'ok' | 'error') => 
           say('Could not resolve that reference — you may not have access to its Folder.', 'error')
           return replace({ name: 'issues' })
         }
-        replace(found.kind === 'project' ? { name: 'project', addr: found.addr, view: 'table' } : { name: 'issue', addr: found.addr })
+        // The resolved object's `d` — its uuid — is the tail of the address,
+        // and §7.2's grammar carries nothing else.
+        const d = identifierFromRef(found.addr)
+        if (!d) {
+          say('That reference resolved to something without an identifier.', 'error')
+          return replace({ name: 'issues' })
+        }
+        replace(found.kind === 'project' ? { name: 'project', d, view: 'table' } : { name: 'issue', d })
       })
       .catch(() => {
         if (cancelled) return

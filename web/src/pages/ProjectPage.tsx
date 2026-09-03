@@ -100,19 +100,20 @@ export async function copyText(text: string, done: string, prompt: string, say: 
 export function ProjectPage({
   state,
   directory,
-  addr,
+  d,
   view,
   say,
   refresh,
 }: {
   state: FolderState
   directory: DirectoryView
-  addr: string
+  /** The object's `d`, which is all a §7.2 URL carries. */
+  d: string
   view: ProjectViewName
   say: Say
   refresh: () => Promise<void>
 }) {
-  const project = state.projects.find((candidate) => candidate.addr === addr)
+  const project = state.projects.find((candidate) => candidate.id === d)
   const [dialog, setDialog] = useState<'issue' | 'pair' | 'delete' | null>(null)
 
   const issues = useMemo<IssuesTableRow[]>(() => {
@@ -191,7 +192,7 @@ export function ProjectPage({
         }}
         onAddIssue={() => setDialog('issue')}
         view={view}
-        onView={(next) => go({ name: 'project', addr: project.addr, view: next })}
+        onView={(next) => go({ name: 'project', d: project.id, slug: project.title, view: next })}
         issues={issues}
         issueStatuses={ISSUE_STATUSES}
         hrefFor={hrefForIssue}
