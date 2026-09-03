@@ -3,8 +3,7 @@ import { cn } from '@/lib/cn'
 import { Chip } from '@/components/ui/Chip'
 import type { ContentFormat } from '@estiva-app/protocol'
 import { EditableText } from '@/components/ui/EditableText'
-import { RichText } from '@/components/ui/RichText'
-import { descriptionForEditing } from '@/lib/description'
+import { Description } from '@/components/Description'
 
 /**
  * The top of the project page, as production: the title (click to edit) with
@@ -43,14 +42,11 @@ export function ProjectHeader({ title, description, descriptionFormat, archived 
         </div>
         {action && <div className="flex shrink-0 items-center pt-0.5">{action}</div>}
       </div>
-      <EditableText readOnly={readOnly}
-        label="Description"
-        value={descriptionForEditing(description, descriptionFormat)}
-        displayNode={<RichText value={description} format={descriptionFormat} />}
-        placeholder="Add a description…"
+      <Description
+        value={description}
+        format={descriptionFormat}
         onCommit={onDescribe}
-        multiline
-        className="-mx-2 text-body-2"
+        readOnly={readOnly}
       />
     </div>
   )

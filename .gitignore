@@ -13,3 +13,4 @@ extension/*.mcpb
 *.tsbuildinfo
 .ric8/
 .ric7/
+.ric9/
