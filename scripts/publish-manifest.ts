@@ -213,8 +213,35 @@ async function main() {
   check('  …declared as an naddr, since both kinds are addressable', web?.[2] === 'naddr')
   check(
     '  …pointing at the inbound route, which resolves the Folder itself',
-    web?.[1]?.includes('#/o/') ?? false,
+    web?.[1]?.includes('/o/') ?? false,
     `base ${process.env.APP_URL ?? DEFAULT_APP_URL}`,
+  )
+  // A path now, not a fragment (SHI-16). This check asserted `#/o/` and caught
+  // the half of that change I had missed — the `web` tag moved and the check
+  // did not — which is the whole reason it is here rather than in a unit test.
+  check('  …as a path, since SHI-16 took the hash out of every route', !web?.[1]?.includes('#/'))
+
+  /*
+    RFC 0.5 §7.5's `urls` — the inbound half, and the thing PRO-15 matches a
+    pasted link against.
+
+    Checked on the stored event for the same reason `web` is: NIP-89 puts it in
+    a tag, so a manifest that parsed fine can still have published nothing.
+  */
+  const urls = stored.tags.filter((t) => t[0] === 'urls')
+  check('it declares the URL shapes it serves', urls.length > 0, `${urls.length} shape(s)`)
+  check(
+    '  …each naming the kind it resolves to',
+    urls.every((t) => Number.isInteger(Number(t[2]))),
+    urls.map((t) => `${t[1]} → ${t[2]}`).join('  '),
+  )
+  check(
+    '  …with a <d> placeholder, which is the only part that resolves',
+    urls.every((t) => t[1]?.includes('<d>')),
+  )
+  check(
+    '  …including the hash shape, so links published before SHI-16 still resolve',
+    urls.some((t) => t[1]?.includes('#/')),
   )
 
   // ── The check that matters: can the projections be satisfied? ─────────────
