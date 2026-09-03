@@ -46,7 +46,10 @@ export function IssuePage({ state, directory, addr, say, refresh }: { state: Fol
      container — SPEC §11.2. Doing it the other way would make reading one issue
      mark the whole project read. */
   useMarkRead(useMemo(() => conversations.map((c) => threadContext(c.id)), [conversations]))
-  const threads = useMemo(() => conversations.map((c) => threadFor(c, directory)), [conversations, directory])
+  const threads = useMemo(
+    () => conversations.map((c) => threadFor(c, directory, issue ? { value: issue.description, format: issue.descriptionFormat } : undefined)),
+    [conversations, directory, issue],
+  )
   /* The divider in the feed (CRO-13). `issue.folder` is the container these
      conversations live in, so §11.3's hierarchy can apply — marking the project
      read clears replies that predate it. */
@@ -92,7 +95,7 @@ export function IssuePage({ state, directory, addr, say, refresh }: { state: Fol
         unread={unread}
         // Threads about an issue carry a reference in the body so Peek renders
         // the issue's widget above them (withReference: true), as the old app has it.
-        onStartConversation={(body) => act('Message', () => startConversation({ folder: issue.folder, about: issue.addr, withReference: true, body }), say, refresh)}
+        onStartConversation={(body, blockId) => act('Message', () => startConversation({ folder: issue.folder, about: issue.addr, withReference: true, body, blockId }), say, refresh)}
         onReply={(threadId, body) => {
           const conversation = conversations.find((c) => c.id === threadId)
           if (!conversation) return false

@@ -25,10 +25,57 @@ import { cn } from '@/lib/cn'
  * the projection, the consumer decides how it looks — is why the package emits
  * a tree and not a component: Peek draws the same tree its own way.
  */
-export function RichText({ value, format, className }: { value: string; format: ContentFormat; className?: string }) {
+export function RichText({
+  value,
+  format,
+  className,
+  onCommentOn,
+}: {
+  value: string
+  format: ContentFormat
+  className?: string
+  /**
+   * Offer to comment on one block — SPEC §13.6.
+   *
+   * Only a block that *has* an id can be commented on, which is exactly the
+   * difference between the two content models: marker text has no addressable
+   * sub-unit (§13.1), so `toRenderTree` gives its blocks no id and no
+   * affordance appears. That is the honest behaviour rather than a limitation
+   * to work around — there is nothing there to point at.
+   */
+  onCommentOn?: (blockId: string) => void
+}) {
   const blocks = toRenderTree(value, format)
   if (blocks.length === 0) return null
-  return <div className={cn('flex flex-col gap-2', className)}>{blocks.map(renderBlock)}</div>
+  return (
+    <div className={cn('flex flex-col gap-2', className)}>
+      {blocks.map((block, i) =>
+        onCommentOn && block.id ? (
+          <div key={block.id} className="group/block relative">
+            {renderBlock(block, i)}
+            <button
+              type="button"
+              onClick={() => onCommentOn(block.id as string)}
+              aria-label="Comment on this block"
+              // Which block it offers to comment on. The button only exists
+              // while its block is hovered, so ordinal selectors cannot address
+              // it — a checker has to say which one it means.
+              data-comment-on={block.id}
+              className="absolute -left-6 top-0 hidden rounded-sm px-1 text-caption text-text-muted hover:text-text-primary group-hover/block:block"
+            >
+              {/* The glyph is decoration; `aria-label` is the name. Without
+                  `aria-hidden` it joins the description's own text — a reader
+                  gets "Rewritten✎A bold claim", and so does anything reading
+                  the body out loud. */}
+              <span aria-hidden="true">&#9998;</span>
+            </button>
+          </div>
+        ) : (
+          renderBlock(block, i)
+        ),
+      )}
+    </div>
+  )
 }
 
 /** A `\n` inside an inline run is a line break, in both content models. */

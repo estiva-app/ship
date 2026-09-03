@@ -15,7 +15,7 @@
  * here is deterministic, which is what makes "two apps agree on the state"
  * checkable rather than hopeful.
  */
-import { contentFormatOf, type ContentFormat, type SignedEvent } from '@estiva-app/protocol'
+import { blockAnchorOf, contentFormatOf, type ContentFormat, type SignedEvent } from '@estiva-app/protocol'
 import { DEFAULT_ISSUE_STATUS, DEFAULT_PROJECT_STATUS, KIND } from './kinds'
 
 /** First value of a tag, or undefined. Tags are `[name, value, …]`. */
@@ -283,6 +283,15 @@ export interface Message {
   parentId?: string
   /** Object addresses this message is about — `a` tags plus naddrs in the body. */
   about: string[]
+  /**
+   * The block this comment is anchored to — SPEC §13.6.
+   *
+   * The address in `about` says *which object*; this says *which part of it*.
+   * Undefined is a comment about the whole object, and that is a different
+   * thing from an anchor that no longer resolves — `resolveBlockAnchor` is what
+   * tells those apart, and §13.6 forbids collapsing them.
+   */
+  blockId?: string
 }
 
 /**
@@ -341,6 +350,7 @@ export function parseMessage(event: SignedEvent, resolveRefs: (body: string) => 
     // Both routes to "what is this about": an explicit `a` tag, and a
     // `nostr:naddr…` typed into the body by a person in Peek.
     about: [...new Set([...tags(event, 'a'), ...resolveRefs(event.content)])],
+    ...(blockAnchorOf(event) ? { blockId: blockAnchorOf(event) } : {}),
   }
 }
 
@@ -402,6 +412,7 @@ function parseNip22Comment(
         ...resolveRefs(event.content),
       ]),
     ],
+    ...(blockAnchorOf(event) ? { blockId: blockAnchorOf(event) } : {}),
   }
 }
 

@@ -367,6 +367,8 @@ export class Store {
     body: string
     replyTo?: ThreadRef
     about?: string
+    /** A block of that object, when the comment is about one part — §13.6. */
+    blockId?: string
     /** Reference to append so other apps can see what this is about. */
     aboutRef?: string
   }): Promise<PublishResult> {
@@ -377,6 +379,7 @@ export class Store {
         body,
         replyTo: args.replyTo,
         about: args.about,
+        blockId: args.blockId,
       }),
     )
   }

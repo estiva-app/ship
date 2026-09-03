@@ -312,7 +312,7 @@ export function buildChange(
 function buildNip22Comment(
   pubkey: string,
   createdAtMs: number,
-  args: { folder: string; body: string; about: string },
+  args: { folder: string; body: string; about: string; blockId?: string },
 ): UnsignedEvent {
   const [kind, author] = args.about.split(':')
   return {
@@ -326,6 +326,13 @@ function buildNip22Comment(
       ['a', args.about],
       ['k', kind],
       ['p', author],
+      /*
+        SPEC §13.6. The address above says which object; this says which part.
+        Written only when the author was looking at a block — a comment about
+        the whole object carries no tag, and §13.6 requires a reader to keep
+        that distinct from an anchor that has stopped resolving.
+      */
+      ...(args.blockId ? [['block', args.blockId]] : []),
       ['h', args.folder],
       // Same `ts` as everything else Ship writes, for the same reason: see
       // `buildConversationMessage` below.
@@ -345,6 +352,8 @@ export function buildConversationMessage(
     replyTo?: ThreadRef
     /** Address of the Issue or Project this conversation is about. */
     about?: string
+    /** A block of that object, when the comment is about one part — §13.6. */
+    blockId?: string
   },
 ): UnsignedEvent {
   assertFolderId(args.folder)
@@ -357,6 +366,7 @@ export function buildConversationMessage(
       folder: args.folder,
       body: args.body,
       about: args.about,
+      blockId: args.blockId,
     })
   }
 
