@@ -16,7 +16,12 @@ import { render, screen, fireEvent } from '@testing-library/react'
 // The reference resolver reaches the relay. What is under test is which text
 // reaches the screen, so it is stubbed to resolve nothing — `ForeignReferences`
 // draws its own empty state and the prose is unaffected either way.
-vi.mock('@/api/foreign', () => ({ resolveForeign: vi.fn(async () => []) }))
+// Only the network call is stubbed. `Description` renders `ForeignObject` for a
+// standalone reference, which needs the rest of this module.
+vi.mock(import('@/api/foreign'), async (importOriginal) => ({
+  ...(await importOriginal()),
+  resolveForeign: vi.fn(async () => null),
+}))
 
 import { Description } from './Description'
 
@@ -27,11 +32,31 @@ const show = (value: string) =>
   render(<Description value={value} format="marker" onCommit={() => true} />).container
 
 describe('Description', () => {
-  it('keeps the pointer out of the prose', () => {
+  /*
+    RIC-9 asserted that no `naddr1` appeared in the prose at all, because every
+    pointer was cut out of the body before rendering. RIC-10 changes that
+    deliberately: a pointer *inside a sentence* is now drawn in place, so the
+    sentence survives.
+
+    The property that still holds, and the one worth asserting, is that a reader
+    never sees a raw full-length pointer. Unresolved it is a shortened chip
+    (§13.1: never blank); resolved it is the object's title.
+  */
+  it('draws a mid-sentence pointer in place, keeping the sentence', () => {
     const c = show(`See ${NADDR} for the detail.`)
-    expect(c.textContent).not.toContain('naddr1')
     expect(c.textContent).toContain('See')
     expect(c.textContent).toContain('for the detail.')
+    expect(c.querySelector('[data-reference]')).not.toBeNull()
+    // Shortened, not the 200-character pointer the author typed.
+    expect(c.textContent!.length).toBeLessThan(NADDR.length)
+  })
+
+  it('keeps a pointer that is the whole paragraph out of the prose', () => {
+    // The attachment variant: alone on its line it is drawn below the text, so
+    // it leaves the prose entirely. That is RIC-9's behaviour, still true for
+    // the case RIC-9 was actually about.
+    const c = show(NADDR)
+    expect(c.textContent).not.toContain('naddr1')
   })
 
   it('still edits the text that was written, pointer included', () => {

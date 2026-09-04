@@ -145,7 +145,20 @@ async function main() {
     const shown = (await page.getByLabel('Description').first().textContent()) ?? ''
     const surfaceText = (await page.locator(`[data-surface="${surface}"]`).first().textContent()) ?? ''
     await page.screenshot({ path: join(SHOTS, `${surface}.png`) })
-    return { bech32InProse: shown.includes('naddr1'), prose: shown.trim().slice(0, 48), namesThePointee: surfaceText.includes(pointee.title) }
+    // RIC-10: a pointer inside a sentence is drawn *in place* as a chip, so the
+    // sentence survives and the reader sees the object's title where the author
+    // wrote the pointer. Asserted rather than inferred from the prose, because
+    // the older assertions below are satisfied by the attachment variant too.
+    // Scoped to the surface, not to the field: `EditableText` renders the
+    // display node inside its "Edit description" button, so an
+    // `aria-label="Description"` scope finds the textarea and nothing else.
+    const inlineChip = await page.locator(`[data-surface="${surface}"] [data-reference]`).count()
+    return {
+      bech32InProse: shown.includes('naddr1'),
+      prose: shown.trim().slice(0, 48),
+      namesThePointee: surfaceText.includes(pointee.title),
+      inlineChip: inlineChip > 0,
+    }
   }
 
   const project = fixture.expected.projects[0]
@@ -161,6 +174,7 @@ async function main() {
   check('the issue does too, as it always did', !i.bech32InProse)
   check('the project draws the object it points at', p.namesThePointee)
   check('the issue draws it as well', i.namesThePointee)
+  check('a mid-sentence pointer is drawn in place — RIC-10', p.inlineChip && i.inlineChip)
   check('the two surfaces now agree', p.bech32InProse === i.bech32InProse && p.namesThePointee === i.namesThePointee)
   check('no uncaught errors in the console', errors.length === 0, errors.slice(0, 2).join(' | '))
 

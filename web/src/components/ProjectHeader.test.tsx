@@ -11,7 +11,12 @@ import { describe, it, expect, vi } from 'vitest'
 import { render } from '@testing-library/react'
 
 // `ForeignReferences` resolves against the relay; what is under test is the prose.
-vi.mock('@/api/foreign', () => ({ resolveForeign: vi.fn(async () => []) }))
+// Only the network call is stubbed. `Description` renders `ForeignObject` for a
+// standalone reference, which needs the rest of this module.
+vi.mock(import('@/api/foreign'), async (importOriginal) => ({
+  ...(await importOriginal()),
+  resolveForeign: vi.fn(async () => null),
+}))
 import { ProjectHeader } from './ProjectHeader'
 
 const show = (description: string, format: 'marker' | 'blocks' | 'unknown' = 'marker') =>
@@ -61,8 +66,14 @@ describe('ProjectHeader draws its description', () => {
     // asymmetry cannot be reintroduced by editing one call site.
     const naddr =
       'nostr:naddr1qqjxzde5xfjnvdee943kzwrr956rswr995uxgd3s95unsvekvd3nsvtzv3jnyqg4dp68gup69uhkcmmrv9kxsmmnwsarxvpsxqpzpvankwem8vankwem8vankwem8vankwem8vankwem8vankwem8vanqvzqqqrcsvczkget'
+    // RIC-10 draws a mid-sentence pointer in place rather than cutting it out,
+    // so the assertion is that the sentence survives and the reader gets a chip
+    // rather than a 200-character pointer — not that no pointer text exists.
     const c = show(`Tracked in ${naddr} for now.`)
-    expect(c.textContent).not.toContain('naddr1')
     expect(c.textContent).toContain('Tracked in')
+    expect(c.textContent).toContain('for now.')
+    expect(c.querySelector('[data-reference]')).not.toBeNull()
+    // And alone on its line it still leaves the prose entirely.
+    expect(show(naddr).textContent).not.toContain('naddr1')
   })
 })
