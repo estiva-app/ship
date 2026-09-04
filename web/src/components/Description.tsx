@@ -1,10 +1,8 @@
 import { referencesIn, standaloneReference, toRenderTree, type ContentFormat } from '@estiva-app/protocol'
-import { EditableText } from '@/components/ui/EditableText'
-import { RichText } from '@/components/ui/RichText'
+import { DescriptionEditor } from '@/components/ui/DescriptionEditor'
 import { ForeignObject } from '@/components/ui/ForeignObject'
 import { SkeletonBar } from '@/components/ui/Skeleton'
 import { byReference, useForeignObjects } from '@/api/useForeignObjects'
-import { descriptionForEditing } from '@/lib/description'
 import { cn } from '@/lib/cn'
 
 /**
@@ -25,10 +23,10 @@ import { cn } from '@/lib/cn'
  * the other: showing the bech32 *and* the object is worse than either, and
  * showing neither is what a project description did.
  *
- * The `display`/`displayNode` split is `EditableText`'s: the string decides
- * emptiness so a blank description still shows its placeholder, and the node is
- * what gets drawn. `value` is untouched by both, so what a person edits is the
- * text they wrote, pointers included — they are only hidden from the *reading*.
+ * **Editing is `DescriptionEditor` since RIC-14**, and the `display`/
+ * `displayNode` split this used to need went with `EditableText`: there is no
+ * second string to keep in step, because reading and writing are now the same
+ * document rather than a rendering and its source.
  */
 export function Description({
   value,
@@ -41,7 +39,14 @@ export function Description({
 }: {
   value: string
   format: ContentFormat
-  onCommit: (next: string) => Promise<boolean> | boolean
+  /**
+   * The body to publish, and the format tag that says what it is — RIC-14.
+   *
+   * The tag travels because the editor is what built the document; §13.4's
+   * rule is that a body's format is on the event and never guessed from the
+   * body, so the one component that knows has to say.
+   */
+  onCommit: (next: string, contentFormat?: string) => Promise<boolean> | boolean
   readOnly?: boolean
   /** Offer to comment on one block — SPEC §13.6. Omitted where nobody may write. */
   onCommentOn?: (blockId: string) => void
@@ -49,8 +54,6 @@ export function Description({
   nameOf?: (pubkey: string) => string
   className?: string
 }) {
-  const editable = descriptionForEditing(value, format)
-
   /*
     RIC-10 — where each reference belongs.
 
@@ -73,25 +76,15 @@ export function Description({
 
   return (
     <div className={cn('flex flex-col gap-2', className)}>
-      <EditableText
-        label="Description"
-        value={editable}
-        display={editable.trim()}
-        displayNode={
-          <RichText
-            value={value}
-            format={format}
-            onCommentOn={onCommentOn}
-            nameOf={nameOf}
-            resolved={resolved}
-            hideStandalone
-          />
-        }
-        placeholder="Add a description…"
+      <DescriptionEditor
+        value={value}
+        format={format}
         onCommit={onCommit}
-        multiline
+        placeholder="Add a description…"
         readOnly={readOnly}
-        className="-mx-2 text-body-2"
+        onCommentOn={onCommentOn}
+        nameOf={nameOf}
+        resolved={resolved}
       />
       {attached.length > 0 && objects === undefined && (
         <SkeletonBar className="h-16 w-full rounded-lg" data-foreign-references="loading" />

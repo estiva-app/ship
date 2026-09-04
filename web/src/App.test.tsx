@@ -282,7 +282,9 @@ describe('Issue page — one issue from the fold', () => {
     const main = within(screen.getByRole('main'))
     fireEvent.click(main.getByRole('button', { name: 'Status' }))
     fireEvent.mouseDown(screen.getByRole('option', { name: 'Done' }))
-    await waitFor(() => expect(setIssueField).toHaveBeenCalledWith(expect.objectContaining({ addr: `30851:x:${D('14')}` }), 'status', 'done', 'Status → done'))
+    // The trailing `undefined` is the content format, which only a description
+    // carries (RIC-14) — a status is a scalar and says so by passing none.
+    await waitFor(() => expect(setIssueField).toHaveBeenCalledWith(expect.objectContaining({ addr: `30851:x:${D('14')}` }), 'status', 'done', 'Status → done', undefined))
     await waitFor(() => expect(refresh).toHaveBeenCalledTimes(1))
 
     vi.mocked(setIssueField).mockResolvedValue({ ok: false, reason: 'relay said no' })

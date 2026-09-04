@@ -1,0 +1,170 @@
+import { createContext, useContext } from 'react'
+import { Extension, Node } from '@tiptap/core'
+import { NodeViewWrapper, ReactNodeViewRenderer } from '@tiptap/react'
+import { inlineTextOf, type Block } from '@estiva-app/protocol'
+import type { ForeignObject } from '@/api/foreign'
+import { Reference } from './Reference'
+
+/**
+ * The three things Ship's editor needs that a stock schema does not have —
+ * RIC-14.
+ *
+ * Everything else a description can contain is already a ProseMirror node of
+ * the same name, which is why `StarterKit` covers it and this file is short.
+ * See `lib/blockEditor.ts` for why the two models line up at all.
+ */
+
+/** What a reference needs to draw itself, from the description around it. */
+export interface ReferenceContextValue {
+  resolved: Record<string, ForeignObject | null | undefined>
+  nameOf?: (pubkey: string) => string
+}
+
+const ReferenceContext = createContext<ReferenceContextValue>({ resolved: {} })
+export const ReferenceProvider = ReferenceContext.Provider
+
+/**
+ * `id` on every block, carried as an attribute.
+ *
+ * A global attribute rather than one per node type, because §13.3 puts an id
+ * on **every** block and a type that quietly lacked one would mint a fresh id
+ * on every save — detaching each anchored comment on it (RFC 0.4 §6) with
+ * nothing on screen to say so.
+ *
+ * Rendered as `data-block-id`, which is what `RichText` already emits, so the
+ * two surfaces address a block the same way.
+ */
+export const BlockId = Extension.create({
+  name: 'blockId',
+  addGlobalAttributes() {
+    return [
+      {
+        types: [
+          'paragraph',
+          'heading',
+          'bulletList',
+          'orderedList',
+          'listItem',
+          'blockquote',
+          'codeBlock',
+          'horizontalRule',
+        ],
+        attributes: {
+          blockId: {
+            default: null,
+            parseHTML: (element: HTMLElement) => element.getAttribute('data-block-id'),
+            renderHTML: (attributes: Record<string, unknown>) =>
+              attributes.blockId ? { 'data-block-id': String(attributes.blockId) } : {},
+          },
+        },
+      },
+    ]
+  },
+})
+
+/**
+ * A `nostr:` reference, drawn as the thing it points at — SPEC §13.1.
+ *
+ * An **atom**: it has no editable interior, because its text is the URI and
+ * nobody edits half a `naddr`. Selecting it selects the whole reference, which
+ * is also how deleting one works.
+ *
+ * It draws through the same {@link Reference} the reading surface uses, so a
+ * project keeps its name and its status while a person is typing beside it.
+ * That is the whole of "1:1" as far as this node is concerned — the
+ * alternative is bech32 in the middle of a sentence the moment you click.
+ */
+export const ReferenceNode = Node.create({
+  name: 'reference',
+  group: 'inline',
+  inline: true,
+  atom: true,
+  selectable: true,
+  draggable: false,
+
+  addAttributes() {
+    return {
+      uri: { default: '' },
+      /** The run's other marks, carried so a bold reference comes back bold. */
+      marks: { default: [] as string[] },
+    }
+  },
+
+  parseHTML() {
+    return [{ tag: 'span[data-reference]' }]
+  },
+
+  renderHTML({ node }) {
+    // Only reached by a copy to the clipboard as HTML; the editor itself draws
+    // the node view below.
+    return ['span', { 'data-reference': String(node.attrs.uri) }, String(node.attrs.uri)]
+  },
+
+  addNodeView() {
+    return ReactNodeViewRenderer(ReferenceView)
+  },
+})
+
+function ReferenceView({ node }: { node: { attrs: Record<string, unknown> } }) {
+  const { resolved, nameOf } = useContext(ReferenceContext)
+  const uri = String(node.attrs.uri ?? '')
+  return (
+    <NodeViewWrapper as="span" className="inline">
+      <Reference uri={uri} object={resolved[uri]} nameOf={nameOf} />
+    </NodeViewWrapper>
+  )
+}
+
+/**
+ * A block this editor has no design for, kept whole.
+ *
+ * §13.3: a reader MUST render an unknown block's inline text and MUST NOT drop
+ * it silently. **An editor is the dangerous case** — ProseMirror discards a
+ * node its schema does not know, and the save after that would delete somebody
+ * else's `table` or `widget` with no error anywhere on the way. So the block's
+ * own JSON rides in an attribute and `fromEditorDocument` hands it back
+ * untouched.
+ *
+ * Not editable, deliberately. Ship cannot draw a table yet, and an affordance
+ * that lets a person change something they cannot see is worse than one that
+ * says the content is there and belongs to another surface.
+ */
+export const UnknownBlock = Node.create({
+  name: 'unknownBlock',
+  group: 'block',
+  atom: true,
+  selectable: true,
+
+  addAttributes() {
+    return {
+      blockId: { default: null },
+      source: { default: null as Block | null },
+    }
+  },
+
+  parseHTML() {
+    return [{ tag: 'div[data-unknown-block]' }]
+  },
+
+  renderHTML({ node }) {
+    return ['div', { 'data-unknown-block': String(node.attrs.blockId ?? '') }, '']
+  },
+
+  addNodeView() {
+    return ReactNodeViewRenderer(UnknownBlockView)
+  },
+})
+
+function UnknownBlockView({ node }: { node: { attrs: Record<string, unknown> } }) {
+  const source = node.attrs.source as Block | null
+  const text = source ? inlineTextOf(source) : ''
+  return (
+    <NodeViewWrapper
+      data-block-id={source?.id}
+      data-block-type={source?.type}
+      className="rounded-md border border-border-default bg-bg-inset px-2 py-1 text-text-secondary"
+    >
+      {text || `A ${source?.type ?? 'block'} this app cannot edit yet.`}
+    </NodeViewWrapper>
+  )
+}

@@ -176,7 +176,7 @@ export function ProjectPage({
   }, [project, issues, state.issues, refresh])
 
   const done = issues.filter((issue) => issue.status === 'done').length
-  const set = (field: 'title' | 'description' | 'status' | 'lead', value: string, note: string) => act(note, () => setProjectField(project, field, value, note), say, refresh)
+  const set = (field: 'title' | 'description' | 'status' | 'lead', value: string, note: string, contentFormat?: string) => act(note, () => setProjectField(project, field, value, note, contentFormat), say, refresh)
 
   return (
     <>
@@ -189,7 +189,7 @@ export function ProjectPage({
           nameOf: directory.nameOf,
           archived: project.archived,
           onRename: (value) => set('title', value, 'Rename'),
-          onDescribe: (value) => set('description', value, 'Description'),
+          onDescribe: (value, contentFormat) => set('description', value, 'Description', contentFormat),
         }}
         onAddIssue={() => setDialog('issue')}
         view={view}
