@@ -33,7 +33,10 @@ const show = (description: string, format: 'marker' | 'blocks' | 'unknown' = 'ma
 describe('ProjectHeader draws its description', () => {
   it('renders structure as elements', () => {
     const c = show('# Heading\n\n- one\n- two\n\nand `code`')
-    expect(c.querySelector('.text-h3, .text-h4')).not.toBeNull()
+    // The element, not the class. RIC-14 moved the type styles onto the
+    // wrapper (`PROSE_BLOCKS`) so the editor and the reader cannot be styled
+    // apart, which means a heading is an `<h1>` here rather than a styled div.
+    expect(c.querySelector('h1, h2')).not.toBeNull()
     expect(c.querySelectorAll('li')).toHaveLength(2)
     expect(c.querySelector('code')?.textContent).toBe('code')
   })

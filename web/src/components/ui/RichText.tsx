@@ -3,6 +3,7 @@ import type { ForeignObject } from '@/api/foreign'
 import { Reference } from './Reference'
 import { standaloneReference, toRenderTree, type RenderBlock, type ContentFormat, type RenderInline } from '@estiva-app/protocol'
 import { cn } from '@/lib/cn'
+import { PROSE_BLOCKS } from './prose'
 
 /**
  * A body, drawn — SPEC §13.
@@ -73,7 +74,9 @@ export function RichText({
   const blocks = hideStandalone ? all.filter((b) => !standaloneReference(b)) : all
   if (blocks.length === 0) return null
   return (
-    <div className={cn('flex flex-col gap-2', className)}>
+    // The type styles are `PROSE_BLOCKS`, shared with the editor rather than
+    // written twice — see that file for why (RIC-14).
+    <div className={cn(PROSE_BLOCKS, className)}>
       {blocks.map((block, i) =>
         onCommentOn && block.id ? (
           <div key={block.id} className="group/block relative">
@@ -132,30 +135,30 @@ function renderInline(
     if (run.marks.includes('code')) {
       // `code` never combines with another mark (SPEC §13.1), so this branch
       // needs none of the others.
-      return (
-        <code key={`${keyPrefix}-${i}`} className="rounded-sm bg-bg-inset px-1 py-0.5 font-mono text-[0.9em]">
-          {run.text}
-        </code>
-      )
+      return <code key={`${keyPrefix}-${i}`}>{run.text}</code>
     }
     const lines = run.text.split('\n')
-    return (
-      <span
-        key={`${keyPrefix}-${i}`}
-        className={cn(
-          run.marks.includes('bold') && 'font-semibold',
-          run.marks.includes('italic') && 'italic',
-          run.marks.includes('underline') && 'underline underline-offset-2',
-        )}
-      >
-        {lines.map((line, j) => (
-          <span key={j}>
-            {j > 0 && <br />}
-            {line}
-          </span>
-        ))}
+    /*
+      `strong`/`em`/`u` rather than one span wearing classes — RIC-14.
+
+      The editor's marks are ProseMirror's, and ProseMirror emits these three
+      elements; drawing the same run as a classed `<span>` here would be two
+      spellings of one thing, styled in two places, free to drift. `PROSE_BLOCKS`
+      styles the elements, so both surfaces get whatever it says.
+
+      Still not `<b>`/`<i>`: the mark is meaning, and `RichText.test.tsx`
+      asserts a literal `<b>` typed by an author never reaches the DOM as one.
+    */
+    let node: ReactNode = lines.map((line, j) => (
+      <span key={j}>
+        {j > 0 && <br />}
+        {line}
       </span>
-    )
+    ))
+    if (run.marks.includes('underline')) node = <u>{node}</u>
+    if (run.marks.includes('italic')) node = <em>{node}</em>
+    if (run.marks.includes('bold')) node = <strong>{node}</strong>
+    return <span key={`${keyPrefix}-${i}`}>{node}</span>
   })
 }
 
@@ -169,25 +172,32 @@ function renderBlock(
   const inline = renderInline(block.inline, key, nameOf, resolved)
 
   switch (block.type) {
+    /*
+      Every case below draws the element ProseMirror draws, unstyled — RIC-14.
+      The look is `PROSE_BLOCKS` on the wrapper, which the editor wears too, so
+      neither surface can be restyled without the other.
+    */
     case 'heading': {
-      const cls = block.level === 1 ? 'text-h3' : block.level === 2 ? 'text-h4' : 'text-body-1 font-semibold'
-      return <div key={key} data-block-id={block.id} className={cn(cls, 'text-text-primary')}>{inline}</div>
+      const H = block.level === 1 ? 'h1' : block.level === 2 ? 'h2' : 'h3'
+      return <H key={key} data-block-id={block.id}>{inline}</H>
     }
+    case 'paragraph':
+      return <p key={key} data-block-id={block.id}>{inline}</p>
     case 'bulletList':
       return (
-        <ul key={key} data-block-id={block.id} className="list-disc pl-5">
+        <ul key={key} data-block-id={block.id}>
           {block.children?.map((child, j) => <li key={child.id ?? j} data-block-id={child.id}>{renderInline(child.inline, `${key}-${j}`, nameOf, resolved)}</li>)}
         </ul>
       )
     case 'orderedList':
       return (
-        <ol key={key} data-block-id={block.id} className="list-decimal pl-5">
+        <ol key={key} data-block-id={block.id}>
           {block.children?.map((child, j) => <li key={child.id ?? j} data-block-id={child.id}>{renderInline(child.inline, `${key}-${j}`, nameOf, resolved)}</li>)}
         </ol>
       )
     case 'blockquote':
       return (
-        <blockquote key={key} data-block-id={block.id} className="border-l-2 border-border-default pl-3 text-text-secondary">
+        <blockquote key={key} data-block-id={block.id}>
           {inline}
         </blockquote>
       )
@@ -195,12 +205,12 @@ function renderBlock(
       // A fence is literal by definition, and scrolls on its own so one long
       // line cannot widen the column.
       return (
-        <pre key={key} data-block-id={block.id} data-language={block.language} className="overflow-x-auto rounded-md bg-bg-inset p-2 font-mono text-[0.9em] text-text-primary">
+        <pre key={key} data-block-id={block.id} data-language={block.language}>
           <code>{(block.inline ?? []).map((r) => r.text).join('')}</code>
         </pre>
       )
     case 'horizontalRule':
-      return <hr key={key} data-block-id={block.id} className="border-border-default" />
+      return <hr key={key} data-block-id={block.id} />
     case 'listItem':
       return <div key={key} data-block-id={block.id}>{inline}</div>
     default:

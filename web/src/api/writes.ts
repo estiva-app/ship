@@ -1,5 +1,4 @@
 import type { PublishResult } from '@estiva-app/protocol'
-import { descriptionForPublishing } from '@/lib/description'
 import { addrToNaddr } from '@estiva-app/protocol'
 import type { Conversation, Issue, Project } from '../../../src/fold'
 import { nextRef, refPrefix } from '../../../src/store'
@@ -97,12 +96,22 @@ export async function createProject(draft: { title: string; description: string;
 }
 
 /** One field of a project record: title, description, status, lead. The record's own Folder. */
-export function setProjectField(project: Project, field: 'title' | 'description' | 'status' | 'lead', value: string, note: string): Promise<WriteResult> {
-  // A description is a rich text field (SPEC §13) and goes on the wire as a
-  // block document; every other field is a scalar and goes as it arrived.
-  const body = field === 'description'
-    ? descriptionForPublishing(value, project.description, project.descriptionFormat)
-    : { value, contentFormat: undefined }
+export function setProjectField(project: Project, field: 'title' | 'description' | 'status' | 'lead', value: string, note: string, contentFormat?: string): Promise<WriteResult> {
+  /*
+    A description is a rich text field (SPEC §13) and goes on the wire as a
+    block document; every other field is a scalar and goes as it arrived.
+
+    **The document arrives already built** (RIC-14). It used to be converted
+    here from the textarea's marker text, which is also where block ids were
+    carried across an edit — by matching the new text against the old
+    document. The editor holds the ids on the blocks themselves now, so they
+    survive a reorder, which that matching could not manage: it followed
+    position, and an anchored comment silently moved with it.
+
+    The tag travels with the body rather than being inferred from it, because
+    §13.4 says a body's format is on the event and is never guessed.
+  */
+  const body = field === 'description' ? { value, contentFormat } : { value, contentFormat: undefined }
   return publish(() => store.setField({ folder: project.originFolder, target: project.addr, field, ...body, note }))
 }
 
@@ -187,10 +196,10 @@ export async function createIssue(project: Project, existing: Issue[], draft: { 
 }
 
 /** One field of an issue: title, description, status, assignee, project. The issue's own Folder. */
-export function setIssueField(issue: Issue, field: 'title' | 'description' | 'status' | 'assignee' | 'project' | 'ref', value: string, note: string): Promise<WriteResult> {
-  const body = field === 'description'
-    ? descriptionForPublishing(value, issue.description, issue.descriptionFormat)
-    : { value, contentFormat: undefined }
+export function setIssueField(issue: Issue, field: 'title' | 'description' | 'status' | 'assignee' | 'project' | 'ref', value: string, note: string, contentFormat?: string): Promise<WriteResult> {
+  // The description arrives as a built document with its own tag — see
+  // `setProjectField`.
+  const body = field === 'description' ? { value, contentFormat } : { value, contentFormat: undefined }
   return publish(() => store.setField({ folder: issue.folder, target: issue.addr, field, ...body, note }))
 }
 

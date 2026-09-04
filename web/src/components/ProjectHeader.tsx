@@ -20,7 +20,8 @@ export interface ProjectHeaderProps {
   nameOf?: (pubkey: string) => string
   archived?: boolean
   onRename: (title: string) => Promise<boolean> | boolean
-  onDescribe: (description: string) => Promise<boolean> | boolean
+  /** The body, and the format tag the editor built it in — RIC-14. */
+  onDescribe: (description: string, contentFormat?: string) => Promise<boolean> | boolean
   /** Title and description as text only, for a reader who cannot write. */
   readOnly?: boolean
   /** Sits at the right of the title row — production's "Add issue" button. */

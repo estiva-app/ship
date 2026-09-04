@@ -11,7 +11,7 @@
  * checks that the project surface actually mounts it.
  */
 import { describe, expect, it, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 
 // The reference resolver reaches the relay. What is under test is which text
 // reaches the screen, so it is stubbed to resolve nothing — `ForeignReferences`
@@ -59,12 +59,30 @@ describe('Description', () => {
     expect(c.textContent).not.toContain('naddr1')
   })
 
-  it('still edits the text that was written, pointer included', () => {
-    // The pointer is hidden from the *reading*, never from the author. A naive
-    // `value={stripped}` would delete it the first time anyone edited around it.
+  it('opens an editor that still holds the pointer, drawn as what it points at', async () => {
+    /*
+      The pointer is hidden from the *reading* and never from the author: a
+      naive `value={stripped}` would delete it the first time anyone edited
+      around it.
+
+      RIC-14 changes how that is checked rather than whether. There is no
+      second string any more — the editor holds the same document the reader
+      does — so the assertion is that the reference is still *in* the editor,
+      as the chip it is drawn as, instead of reappearing as raw bech32 the
+      moment a person clicks. That difference was the whole report.
+    */
     show(`See ${NADDR} for the detail.`)
     fireEvent.click(screen.getByRole('button', { name: /edit description/i }))
-    expect((screen.getByLabelText('Description') as HTMLTextAreaElement).value).toContain('naddr1')
+
+    // `findBy`, because the editor is a lazy chunk: a reader never downloads
+    // ProseMirror, so the first click is what fetches it.
+    const editor = await screen.findByRole('textbox', { name: 'Description' })
+    expect(editor.textContent).toContain('See')
+    expect(editor.textContent).toContain('for the detail.')
+    // A node view is a React portal, so it lands a tick after the editor does.
+    await waitFor(() => expect(editor.querySelector('[data-reference]')).not.toBeNull())
+    // Not the 200-character pointer, which is what a textarea showed.
+    expect(editor.textContent!.length).toBeLessThan(NADDR.length)
   })
 
   it('renders structure as well', () => {
@@ -77,7 +95,11 @@ describe('Description', () => {
   })
 
   it('offers no edit affordance to a reader who cannot write', () => {
-    render(<Description value="text" format="marker" onCommit={() => true} readOnly />)
+    const c = render(<Description value="text" format="marker" onCommit={() => true} readOnly />).container
     expect(screen.queryByRole('button', { name: /edit description/i })).toBeNull()
+    // And clicking the prose does nothing: the affordance is the only way in,
+    // so removing it has to remove the capability rather than only the button.
+    fireEvent.click(c.querySelector('p')!)
+    expect(screen.queryByRole('textbox', { name: 'Description' })).toBeNull()
   })
 })

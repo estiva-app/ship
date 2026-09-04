@@ -23,7 +23,8 @@ export interface IssueViewProps {
   /** Resolve a mentioned key to a name — SPEC §13.1. */
   nameOf?: (pubkey: string) => string
   onRename: (v: string) => Promise<boolean> | boolean
-  onDescribe: (v: string) => Promise<boolean> | boolean
+  /** The body, and the format tag the editor built it in — RIC-14. */
+  onDescribe: (v: string, contentFormat?: string) => Promise<boolean> | boolean
   threads: ThreadData[]
   /** Thread id → first unread message id. Drives the feed divider (CRO-13). */
   unread?: Record<string, string>

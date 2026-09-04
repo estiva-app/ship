@@ -344,6 +344,61 @@ async function main() {
   await page.waitForSelector('[data-surface="issue"]')
   check('the issue detail opens', page.url().includes('/issue/'))
 
+  /*
+    ── The description is written where it is read (RIC-14) ─────────────────
+
+    > Miky, 2026-09-04 — "When you editing the project description, the rich
+    > text field got smaller. It should feel like Notion. You read and edit and
+    > it's 1:1."
+
+    Asserted in a browser because it is a claim about pixels and about a
+    ProseMirror instance, and neither survives being checked in jsdom: the unit
+    tests can say the editor mounted and cannot say it is the same size or that
+    a heading is still a heading inside it.
+
+    The four-row textarea this replaced would fail every line below.
+  */
+  const description = page.getByRole('button', { name: 'Edit description' })
+  await description.focus()
+  await description.click()
+  const editor = page.getByRole('textbox', { name: 'Description' })
+  await editor.waitFor()
+  check('the description opens an editor, not a textarea', (await page.locator('textarea').count()) === 0)
+
+  await editor.click()
+  await page.keyboard.type('# What we agreed\n')
+  await page.keyboard.type('- ship it\n')
+  // No leading dash: Enter already opened the next item, and typing one here
+  // puts a literal "- " inside it.
+  await page.keyboard.type('tell Katerina')
+  check(
+    'a heading typed in the editor is drawn as a heading, while typing',
+    (await editor.locator('h1').count()) === 1 && (await editor.locator('li').count()) === 2,
+  )
+  const editingBox = await editor.boundingBox()
+
+  // Blur commits, the way `EditableText` always did.
+  await page.getByRole('heading', { name: 'Activity' }).click()
+  await page.locator('[data-block-id] h1, h1[data-block-id]').first().waitFor()
+  const readingBox = await page.locator('[aria-label="Edit description"]').locator('..').boundingBox()
+  check(
+    'the field is the same size reading and writing — the report itself',
+    !!editingBox && !!readingBox && Math.abs(editingBox.height - readingBox.height) < 24,
+    `editing ${Math.round(editingBox?.height ?? 0)}px, reading ${Math.round(readingBox?.height ?? 0)}px`,
+  )
+
+  const described = stored.filter((e) => e.kind === 1851).find((e) => tagValue(e, 'field') === 'description')
+  check('the description was published as a block document', !!described)
+  check(
+    '  …declaring its format on the event, never in the body',
+    tagValue(described!, 'content-format') === 'estiva-blocks-1',
+    tagValue(described!, 'content-format'),
+  )
+  check(
+    '  …carrying a block id a comment can anchor to',
+    /"id":"[^"]{8,}"/.test(tagValue(described!, 'value') ?? ''),
+  )
+
   const activity = sectionFor('Activity')
   await pick('Status', 'In Progress')
   await activity.locator('li').first().waitFor()

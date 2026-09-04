@@ -75,8 +75,8 @@ export function IssuePage({ state, directory, d, say, refresh }: { state: Folder
     )
   }
 
-  const set = (field: 'title' | 'description' | 'status' | 'assignee' | 'project', value: string, note: string) =>
-    act(note, () => setIssueField(issue, field, value, note), say, refresh)
+  const set = (field: 'title' | 'description' | 'status' | 'assignee' | 'project', value: string, note: string, contentFormat?: string) =>
+    act(note, () => setIssueField(issue, field, value, note, contentFormat), say, refresh)
 
   return (
     <>
@@ -91,7 +91,7 @@ export function IssuePage({ state, directory, d, say, refresh }: { state: Folder
         descriptionFormat={issue.descriptionFormat}
         nameOf={directory.nameOf}
         onRename={(value) => set('title', value, 'Rename')}
-        onDescribe={(value) => set('description', value, 'Description')}
+        onDescribe={(value, contentFormat) => set('description', value, 'Description', contentFormat)}
         threads={threads}
         unread={unread}
         // Threads about an issue carry a reference in the body so Peek renders
