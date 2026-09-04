@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
-import { MentionChip } from './MentionChip'
-import { toRenderTree, type RenderBlock, type ContentFormat, type RenderInline } from '@estiva-app/protocol'
+import type { ForeignObject } from '@/api/foreign'
+import { Reference } from './Reference'
+import { standaloneReference, toRenderTree, type RenderBlock, type ContentFormat, type RenderInline } from '@estiva-app/protocol'
 import { cn } from '@/lib/cn'
 
 /**
@@ -31,6 +32,8 @@ export function RichText({
   format,
   className,
   nameOf,
+  resolved,
+  hideStandalone,
   onCommentOn,
 }: {
   value: string
@@ -38,6 +41,21 @@ export function RichText({
   className?: string
   /** Resolve a mentioned key to a name — SPEC §13.1. The workspace directory's. */
   nameOf?: (pubkey: string) => string
+  /**
+   * The body's references, already resolved — RIC-10.
+   *
+   * Keyed by URI and resolved once for the whole body, so an object named twice
+   * cannot be drawn in two states on one screen.
+   */
+  resolved?: Record<string, ForeignObject | null | undefined>
+  /**
+   * Skip a block that is nothing but one reference.
+   *
+   * Those are attachments and are drawn below the text by the caller. Passing
+   * this rather than deciding here keeps the rule in one place — the caller
+   * already has to know which references are standalone in order to draw them.
+   */
+  hideStandalone?: boolean
   /**
    * Offer to comment on one block — SPEC §13.6.
    *
@@ -49,14 +67,17 @@ export function RichText({
    */
   onCommentOn?: (blockId: string) => void
 }) {
-  const blocks = toRenderTree(value, format)
+  const all = toRenderTree(value, format)
+  // A block that is nothing but one reference is an attachment; the caller
+  // draws it below the text (SPEC §13.1, RIC-10).
+  const blocks = hideStandalone ? all.filter((b) => !standaloneReference(b)) : all
   if (blocks.length === 0) return null
   return (
     <div className={cn('flex flex-col gap-2', className)}>
       {blocks.map((block, i) =>
         onCommentOn && block.id ? (
           <div key={block.id} className="group/block relative">
-            {renderBlock(block, i, nameOf)}
+            {renderBlock(block, i, nameOf, resolved)}
             <button
               type="button"
               onClick={() => onCommentOn(block.id as string)}
@@ -75,7 +96,7 @@ export function RichText({
             </button>
           </div>
         ) : (
-          renderBlock(block, i, nameOf)
+          renderBlock(block, i, nameOf, resolved)
         ),
       )}
     </div>
@@ -87,6 +108,7 @@ function renderInline(
   inline: readonly RenderInline[] | undefined,
   keyPrefix: string,
   nameOf?: (pubkey: string) => string,
+  resolved?: Record<string, ForeignObject | null | undefined>,
 ): ReactNode {
   if (!inline) return null
   return inline.map((run, i) => {
@@ -98,7 +120,14 @@ function renderInline(
         has to recognise a name, which is why it works for a body Ship did not
         write.
       */
-      return <MentionChip key={`${keyPrefix}-${i}`} uri={run.reference} nameOf={nameOf} />
+      return (
+        <Reference
+          key={`${keyPrefix}-${i}`}
+          uri={run.reference}
+          object={resolved?.[run.reference]}
+          nameOf={nameOf}
+        />
+      )
     }
     if (run.marks.includes('code')) {
       // `code` never combines with another mark (SPEC §13.1), so this branch
@@ -130,9 +159,14 @@ function renderInline(
   })
 }
 
-function renderBlock(block: RenderBlock, i: number, nameOf?: (pubkey: string) => string): ReactNode {
+function renderBlock(
+  block: RenderBlock,
+  i: number,
+  nameOf?: (pubkey: string) => string,
+  resolved?: Record<string, ForeignObject | null | undefined>,
+): ReactNode {
   const key = block.id ?? `b${i}`
-  const inline = renderInline(block.inline, key, nameOf)
+  const inline = renderInline(block.inline, key, nameOf, resolved)
 
   switch (block.type) {
     case 'heading': {
@@ -142,13 +176,13 @@ function renderBlock(block: RenderBlock, i: number, nameOf?: (pubkey: string) =>
     case 'bulletList':
       return (
         <ul key={key} data-block-id={block.id} className="list-disc pl-5">
-          {block.children?.map((child, j) => <li key={child.id ?? j} data-block-id={child.id}>{renderInline(child.inline, `${key}-${j}`, nameOf)}</li>)}
+          {block.children?.map((child, j) => <li key={child.id ?? j} data-block-id={child.id}>{renderInline(child.inline, `${key}-${j}`, nameOf, resolved)}</li>)}
         </ul>
       )
     case 'orderedList':
       return (
         <ol key={key} data-block-id={block.id} className="list-decimal pl-5">
-          {block.children?.map((child, j) => <li key={child.id ?? j} data-block-id={child.id}>{renderInline(child.inline, `${key}-${j}`, nameOf)}</li>)}
+          {block.children?.map((child, j) => <li key={child.id ?? j} data-block-id={child.id}>{renderInline(child.inline, `${key}-${j}`, nameOf, resolved)}</li>)}
         </ol>
       )
     case 'blockquote':
@@ -180,7 +214,7 @@ function renderBlock(block: RenderBlock, i: number, nameOf?: (pubkey: string) =>
       return (
         <div key={key} data-block-id={block.id} data-block-type={block.typeName ?? block.type}>
           {inline}
-          {block.children?.map((child, j) => renderBlock(child, j, nameOf))}
+          {block.children?.map((child, j) => renderBlock(child, j, nameOf, resolved))}
         </div>
       )
   }
