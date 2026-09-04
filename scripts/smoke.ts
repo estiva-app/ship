@@ -144,7 +144,28 @@ async function main() {
       res.writeHead(200, { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream' })
       res.end(body)
     } catch {
-      res.writeHead(404).end('not found')
+      /*
+        A deep link falls back to index.html, which is how this app is actually
+        served — `deploy/nginx.conf` has `try_files $uri $uri/ /index.html` and
+        says why: "a deep link has to reach index.html and let the app route
+        it." This server had no such rule, so it modelled nginx correctly only
+        for as long as every route was a hash.
+
+        SHI-16 ended that. Ship's URLs became real paths, the first click past
+        the landing page navigates to `/projects`, and this server answered
+        404 — so the surface never appeared and the run died on the second
+        assertion of thirty-nine. The symptom is a missing element rather than
+        a failed request, which is why it read as an app bug and survived.
+
+        A request with an extension is still a 404. That is a missing asset,
+        and answering it with HTML would hide a broken bundle reference behind
+        a page that half works.
+      */
+      if (extname(path)) {
+        res.writeHead(404).end('not found')
+        return
+      }
+      res.writeHead(200, { 'content-type': 'text/html' }).end(readFileSync(join(DIST, 'index.html')))
     }
   })
   await new Promise<void>((resolve) => server.listen(PORT, resolve))
@@ -372,8 +393,18 @@ async function main() {
   )
   check('  …and renders nested', (await conversations.locator('article').count()) === 2)
 
+  /*
+    Waits for one more activity row than there were, not for "more than one".
+
+    The absolute count is already true before the click as soon as anything
+    else has written to this issue, so the wait returns immediately and the
+    assertion below reads `stored` before the change reaches it. Nothing about
+    the app is wrong; the check simply measures a moment too early, and it
+    stays green only while this issue has exactly one prior change.
+  */
+  const activityRows = await page.locator('section li').count()
   await pick('Assignee', 1)
-  await page.waitForFunction(() => document.querySelectorAll('section li').length > 1)
+  await page.waitForFunction((n) => document.querySelectorAll('section li').length > n, activityRows)
   check(
     'assigning publishes a second change',
     stored.filter((e) => e.kind === 1851 && tagValue(e, 'field') === 'assignee').length === 1,
