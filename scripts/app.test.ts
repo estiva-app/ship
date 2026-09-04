@@ -24,6 +24,7 @@ import { buildManifest } from '../src/manifest'
 import { foldFolder, projectFolders, type Change, type Project } from '../src/fold'
 import { directoryFrom, initials, parseProfile } from '../src/profiles'
 import type { SignedEvent } from '@estiva-app/protocol'
+import { actionProblems } from '@estiva-app/interop'
 
 let failures = 0
 function check(label: string, condition: boolean, detail = '') {
@@ -380,22 +381,32 @@ check('  …and to keep reading the kind:9 it used to emit', commentAction.emits
   direction — that package exists to read other apps' manifests, not to
   constrain Ship's own.
 
-  So the shape is enforced here instead. A typo in `effect` is otherwise
-  invisible: the runtime drops a value it does not recognise, so `"write"` for
-  `"writes"` publishes an action that silently declares nothing.
+  That still holds, and it never applied to a *test*. The rules these three
+  checks enforced were right and lived in the wrong place: the field they are
+  about is read across every app's manifest, and one app's private test cannot
+  cover that. So they moved into the package as `actionProblems` (PRO-16) and
+  this now runs the shared one — one rule, not two that can drift, and the next
+  app gets it on day one instead of discovering it by having its actions matched
+  badly.
+
+  `actionProblems` is advisory and nothing in resolution calls it, so importing
+  it here does not point the data layer anywhere. It reports what a producer
+  should fix before signing, which is exactly what this file is for.
 */
 console.log('\n# every action carries description and effect\n')
 
-const EFFECTS = ['safe', 'writes', 'destructive']
 const allActions = (JSON.parse(buildManifest(PK, Date.now()).content) as {
-  actions: { id: string; label: string; description?: string; effect?: string }[]
+  // `id` to name a failure and `effect` for the destructive inventory below.
+  // Everything the three checks used to read now belongs to `actionProblems`.
+  actions: { id: string; effect?: string }[]
 }).actions
 
 check('the manifest declares six actions', allActions.length === 6)
 for (const action of allActions) {
-  check(`  ${action.id} describes itself for a machine`, (action.description?.length ?? 0) > 40)
-  check(`  ${action.id} says it is not the label`, action.description !== action.label)
-  check(`  ${action.id} declares a known effect`, EFFECTS.includes(action.effect ?? ''))
+  // The problems are sentences naming the action, so a failure here says what
+  // to write rather than which assertion index went red.
+  const problems = actionProblems(action)
+  check(`  ${action.id} is publishable`, problems.length === 0, problems.join(' '))
 }
 
 /*
