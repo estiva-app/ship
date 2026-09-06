@@ -433,6 +433,26 @@ async function main() {
   check('  …and it is a root message, not a reply', !comment!.tags.some((t) => t[0] === 'e'))
   check('  …and no kind:9 was written for it', !stored.some((e) => e.kind === 9))
 
+  /*
+    SHI-1, read off the screen rather than off the event.
+
+    The two assertions above prove the pointer was *published*; neither says
+    anything about what a person sees, and what a person saw was the pointer
+    itself or — once it was stripped — nothing. So: the comment's own words are
+    on screen, and no bech32 is. Both halves are needed. Asserting only the
+    absence of `naddr1` passes just as well when the whole body has been deleted,
+    which is the bug this replaced.
+  */
+  const posted = conversations.locator('article').first()
+  check(
+    'the comment reads as what was typed',
+    (await posted.textContent())?.includes('Blocked on the Stripe key.') ?? false,
+  )
+  check(
+    '  …with the issue’s own pointer resolved away, not shown as bech32',
+    !(await conversations.textContent())?.includes('naddr1'),
+  )
+
   await conversations.getByPlaceholder('Reply…').first().fill('Key is in 1Password now.')
   await conversations.getByRole('button', { name: 'Reply', exact: true }).first().click()
   await page.waitForFunction(

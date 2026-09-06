@@ -55,8 +55,16 @@ export function RichText({
    * Those are attachments and are drawn below the text by the caller. Passing
    * this rather than deciding here keeps the rule in one place — the caller
    * already has to know which references are standalone in order to draw them.
+   *
+   * **A predicate, for a caller that cannot afford to hide one it will not
+   * draw** (SHI-1). A pointer nothing resolves is an attachment the caller has
+   * no card for, so hiding it unconditionally deletes it from the screen — fine
+   * inside a description, and not fine when the pointer is the whole message,
+   * which then renders as a name and a time above nothing. §13.1's rule is that
+   * a reference is never blank: a caller passing a predicate keeps the shortened
+   * chip for whatever it cannot draw below.
    */
-  hideStandalone?: boolean
+  hideStandalone?: boolean | ((reference: string) => boolean)
   /**
    * Offer to comment on one block — SPEC §13.6.
    *
@@ -71,7 +79,12 @@ export function RichText({
   const all = toRenderTree(value, format)
   // A block that is nothing but one reference is an attachment; the caller
   // draws it below the text (SPEC §13.1, RIC-10).
-  const blocks = hideStandalone ? all.filter((b) => !standaloneReference(b)) : all
+  const hide =
+    typeof hideStandalone === 'function' ? hideStandalone : hideStandalone ? () => true : () => false
+  const blocks = all.filter((b) => {
+    const reference = standaloneReference(b)
+    return !reference || !hide(reference)
+  })
   if (blocks.length === 0) return null
   return (
     // The type styles are `PROSE_BLOCKS`, shared with the editor rather than

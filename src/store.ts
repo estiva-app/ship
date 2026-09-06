@@ -27,6 +27,7 @@ import {
 } from './events'
 import { findNaddrs, naddrToAddr } from '@estiva-app/protocol'
 import { foldFolder, projectFolders, type FolderState } from './fold'
+import { taggedIndex, type TaggedIndex } from './references'
 import { directoryFrom, type Directory } from './profiles'
 import { KIND } from './kinds'
 import { buildRecommendation } from './manifest'
@@ -59,6 +60,32 @@ function referencedAddresses(body: string): string[] {
     }
   }
   return out
+}
+
+/**
+ * The fold, plus the one thing it deliberately does not record — CON-7.
+ *
+ * A superset of `FolderState`, never a replacement for it. `foldFolder` is a
+ * contract between this repository and `estiva-agent`, held to a recorded state
+ * by `scripts/conformance.test.ts`, and adding a field to it is a change to
+ * what the workspace *means* that has to land in both repos at once. Attachment
+ * strength is not that: the same events fold to the same state, and `tagged` is
+ * a second reading of the same input, taken here because this is the only place
+ * that still has the events in hand.
+ *
+ * See `references.ts` for why the distinction cannot be recovered downstream:
+ * `Conversation.about` is a union of tags and body text, unioned again across
+ * every message in the thread, and `startConversation` writes the same address
+ * into both — so no amount of subtracting one from the other separates them.
+ */
+export interface WorkspaceState extends FolderState {
+  /** Message id → the addresses it named in its tags. `references.ts` reads it. */
+  tagged: TaggedIndex
+}
+
+/** Fold a set of events, and read attachment strength off the same set. */
+function read(events: SignedEvent[]): WorkspaceState {
+  return { ...foldFolder(events, referencedAddresses), tagged: taggedIndex(events) }
 }
 
 export class Store {
@@ -498,8 +525,8 @@ export class Store {
    * what both the app and the agent use; these two are for scripts and for
    * reading one container in isolation.
    */
-  async loadFolder(folder: string): Promise<FolderState> {
-    return foldFolder(await this.rawFolders([folder]), referencedAddresses)
+  async loadFolder(folder: string): Promise<WorkspaceState> {
+    return read(await this.rawFolders([folder]))
   }
 
   /**
@@ -509,8 +536,8 @@ export class Store {
    * point of loading a workspace is that it fans out over every project, and
    * doing that serially would make the issue list N round trips deep.
    */
-  async loadFolders(folders: string[]): Promise<FolderState> {
-    return foldFolder(await this.rawFolders(folders), referencedAddresses)
+  async loadFolders(folders: string[]): Promise<WorkspaceState> {
+    return read(await this.rawFolders(folders))
   }
 
   /**
@@ -541,7 +568,7 @@ export class Store {
    * optimisation — a re-linked project's record and its older issues sit in
    * different Folders, and folding those separately would drop changes.
    */
-  async loadAll(): Promise<FolderState> {
+  async loadAll(): Promise<WorkspaceState> {
     /*
       Two discovery queries, not one, and the second is the whole of SHI-7.
 
@@ -612,7 +639,7 @@ export class Store {
       events = [...events, ...(await this.rawFolders([...wanted]))]
     }
 
-    return foldFolder(events, referencedAddresses)
+    return read(events)
   }
 
   /**

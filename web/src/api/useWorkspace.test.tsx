@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('./index', () => ({ loadAll: vi.fn() }))
 
-import type { FolderState } from '../../../src/fold'
+import type { WorkspaceState } from '../../../src/store'
 import { loadAll } from './index'
 import { useWorkspace } from './useWorkspace'
 
@@ -11,19 +11,19 @@ import { useWorkspace } from './useWorkspace'
  * A workspace holding one project, whose status is whatever the relay held
  * when the read that produced it *started*.
  */
-const stateWith = (status: string): FolderState =>
-  ({ projects: [{ addr: 'p', status }], issues: [], activity: [], conversations: [] }) as unknown as FolderState
+const stateWith = (status: string): WorkspaceState =>
+  ({ projects: [{ addr: 'p', status }], issues: [], activity: [], conversations: [] }) as unknown as WorkspaceState
 
 /** A read that resolves only when the test says so — the 8.8 s one, on demand. */
 function pendingRead() {
-  let release!: (state: FolderState) => void
-  const promise = new Promise<FolderState>((resolve) => {
+  let release!: (state: WorkspaceState) => void
+  const promise = new Promise<WorkspaceState>((resolve) => {
     release = resolve
   })
   return { promise, release }
 }
 
-const statusOf = (state: FolderState | null) => (state?.projects[0] as { status?: string } | undefined)?.status
+const statusOf = (state: WorkspaceState | null) => (state?.projects[0] as { status?: string } | undefined)?.status
 
 beforeEach(() => {
   vi.mocked(loadAll).mockReset()

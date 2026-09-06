@@ -1,10 +1,16 @@
-import { Fragment } from 'react'
+import { Fragment, useMemo } from 'react'
 import type { BlockAnchor } from '@estiva-app/protocol'
+import { referencesIn, standaloneReference, toRenderTree } from '@estiva-app/protocol'
 import { BlockAnchorNote } from './ui/BlockAnchorNote'
 import { cn } from '@/lib/cn'
 import { ago } from '@/lib/time'
 import { Avatar } from '@/components/ui/Avatar'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { ForeignObject } from '@/components/ui/ForeignObject'
+import { RichText } from '@/components/ui/RichText'
+import { SkeletonBar } from '@/components/ui/Skeleton'
+import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
+import { byReference, useForeignObjects } from '@/api/useForeignObjects'
 import { Composer } from './Composer'
 
 /**
@@ -16,9 +22,30 @@ import { Composer } from './Composer'
  * deeper. Cards sit 10px apart.
  *
  * A message is a face and a name, the time, the body. The body is untrusted
- * text from other people and other apps: rendered as text, never as markup,
- * with a client's trailing `nostr:naddr…` reference already stripped by the
- * caller. Ship-only: it knows what a thread is.
+ * text from other people and other apps, and it is drawn the way every other
+ * body in this app is drawn — `toRenderTree` then `RichText`, safe by
+ * construction (SPEC §13.5), never as markup. Ship-only: it knows what a
+ * thread is.
+ *
+ * ## What SHI-1 was
+ *
+ * Katerina: *"Screenshots and reference widgets aren't rendered in conversation
+ * or replies. Avatar + name + timestamp only."* The body reached here as a
+ * plain `<p>`, and the caller had already deleted every `nostr:naddr…` from it
+ * — so a comment whose whole content was a pointer at another object rendered
+ * as an empty paragraph under a name and a time. Descriptions had had the
+ * answer since PRO-7 and RIC-10; conversations had never been given it.
+ *
+ * `Description` is the sibling that already assembles these three pieces, and
+ * the pairing is the same one: strip a standalone pointer out of the prose,
+ * draw the object it names below, resolve an in-sentence pointer where it was
+ * written. Showing the bech32 *and* the object is worse than either.
+ *
+ * **The screenshots half of that report is not fixed here and cannot be fixed
+ * in Ship.** Peek's outbox publishes `content: m.body` and nothing else
+ * (`convex/nostr/outbox.ts`); an attachment lives in Convex storage and never
+ * reaches the relay, so there is no image for any other reader to draw. That is
+ * Peek's publish path, not Ship's rendering.
  */
 export interface MessageData {
   id: string
@@ -31,9 +58,26 @@ export interface MessageData {
   author: { name?: string; picture?: string }
   /** Seconds. */
   at: number
+  /**
+   * The body as it was published, minus the pointer at the object whose page
+   * this is — see `omitOwnReference`. Every other reference is still in here
+   * and is drawn as the object it names, not deleted.
+   */
   body: string
   /** Author pubkey. Only used to decide unread — your own writing is never new. */
   by?: string
+}
+
+/** Messages are marker text (SPEC §13.2); only a rich text *field* is a block document. */
+const MESSAGE_FORMAT = 'marker' as const
+
+/** Every `nostr:` pointer in a set of messages, deduplicated, in the order they appear. */
+export function referencesInMessages(messages: readonly MessageData[]): string[] {
+  const seen = new Set<string>()
+  for (const message of messages) {
+    for (const reference of referencesIn(toRenderTree(message.body, MESSAGE_FORMAT))) seen.add(reference)
+  }
+  return [...seen]
 }
 
 export interface ThreadData {
@@ -42,7 +86,27 @@ export interface ThreadData {
   replies: MessageData[]
 }
 
-export function MessageCard({ message, reply = false }: { message: MessageData; reply?: boolean }) {
+export function MessageCard({
+  message,
+  reply = false,
+  resolved,
+  resolving = false,
+  nameOf,
+}: {
+  message: MessageData
+  reply?: boolean
+  /** The thread's references, resolved once by `Conversations` — RIC-10's rule. */
+  resolved?: Record<string, ForeignObjectData | null | undefined>
+  /** The first resolve is still in flight, so an attachment gets a skeleton rather than nothing. */
+  resolving?: boolean
+  /** Resolve a mentioned key to a name — SPEC §13.1. */
+  nameOf?: (pubkey: string) => string
+}) {
+  const blocks = toRenderTree(message.body, MESSAGE_FORMAT)
+  // A block that is nothing but one pointer is an attachment and is drawn
+  // below; one inside a sentence is drawn where it was written (RIC-10).
+  const attached = blocks.map(standaloneReference).filter((r): r is string => !!r)
+  const attachments = attached.map((r) => resolved?.[r]).filter((o): o is ForeignObjectData => !!o)
   return (
     <article className={cn('flex flex-col gap-1 py-1.5', reply && 'ml-3.5 border-l-2 border-border-default pl-2.5')}>
       <BlockAnchorNote anchor={message.anchor} />
@@ -52,7 +116,29 @@ export function MessageCard({ message, reply = false }: { message: MessageData; 
         <span aria-hidden="true">·</span>
         <span className="shrink-0">{ago(message.at)}</span>
       </div>
-      <p className="whitespace-pre-wrap break-words text-body-2 text-text-primary">{message.body}</p>
+      <RichText
+        value={message.body}
+        format={MESSAGE_FORMAT}
+        /*
+          Hide a standalone pointer only while there is still a card coming for
+          it. `null` is the relay's real answer that nothing resolved — no card
+          will be drawn below, so the chip stays and the message says something
+          rather than rendering as a name and a time over a blank line. That is
+          the half of SHI-1 a description never had to care about.
+        */
+        hideStandalone={(reference) => resolved?.[reference] !== null}
+        nameOf={nameOf}
+        resolved={resolved}
+        className="break-words text-body-2 text-text-primary"
+      />
+      {attached.length > 0 && resolving && <SkeletonBar className="h-16 w-full rounded-lg" data-foreign-references="loading" />}
+      {attachments.length > 0 && (
+        <div className="flex flex-col gap-2" data-foreign-references={String(attachments.length)}>
+          {attachments.map((object) => (
+            <ForeignObject key={object.ref} object={object} />
+          ))}
+        </div>
+      )}
     </article>
   )
 }
@@ -74,15 +160,15 @@ function NewSinceHere() {
   )
 }
 
-export function ConversationThread({ thread, onReply, disabledReason, unreadFrom }: { thread: ThreadData; onReply: (threadId: string, text: string) => Promise<boolean | void> | boolean | void; disabledReason?: string; unreadFrom?: string }) {
+export function ConversationThread({ thread, onReply, disabledReason, unreadFrom, resolved, resolving, nameOf }: { thread: ThreadData; onReply: (threadId: string, text: string) => Promise<boolean | void> | boolean | void; disabledReason?: string; unreadFrom?: string; resolved?: Record<string, ForeignObjectData | null | undefined>; resolving?: boolean; nameOf?: (pubkey: string) => string }) {
   return (
     <div className="flex flex-col gap-1 rounded-lg border border-border-default bg-bg-surface px-3 py-2.5">
       {unreadFrom === thread.root.id && <NewSinceHere />}
-      <MessageCard message={thread.root} />
+      <MessageCard message={thread.root} resolved={resolved} resolving={resolving} nameOf={nameOf} />
       {thread.replies.map((reply) => (
         <Fragment key={reply.id}>
           {unreadFrom === reply.id && <NewSinceHere />}
-          <MessageCard message={reply} reply />
+          <MessageCard message={reply} reply resolved={resolved} resolving={resolving} nameOf={nameOf} />
         </Fragment>
       ))}
       <Composer kind="reply" onSubmit={(text) => onReply(thread.id, text)} disabledReason={disabledReason} className="ml-3.5 mt-1" />
@@ -101,10 +187,28 @@ export interface ConversationsProps {
   /** The block the next comment will be anchored to, if one was chosen — §13.6. */
   anchoredTo?: string
   onClearAnchor?: () => void
+  /** Resolve a mentioned key to a name — SPEC §13.1. The workspace directory's. */
+  nameOf?: (pubkey: string) => string
   className?: string
 }
 
-export function Conversations({ threads, onStart, onReply, disabledReason, className, unread, anchoredTo, onClearAnchor }: ConversationsProps) {
+export function Conversations({ threads, onStart, onReply, disabledReason, className, unread, anchoredTo, onClearAnchor, nameOf }: ConversationsProps) {
+  /*
+    Every reference in every message on this surface, resolved **once** — RIC-10.
+
+    Per message would be wrong twice over. `startConversation` appends the same
+    pointer to every comment on an issue, so a twelve-message thread would fetch
+    one object twelve times; and `useForeignObjects` re-resolves on the page's
+    own cadence, so two copies could legitimately land in different states and
+    draw the same object two ways on one screen.
+  */
+  const references = useMemo(
+    () => referencesInMessages(threads.flatMap((thread) => [thread.root, ...thread.replies])),
+    [threads],
+  )
+  const objects = useForeignObjects(references)
+  const resolved = byReference(references, objects)
+
   return (
     <div className={cn('flex flex-col gap-2.5', className)}>
       {/* Say what the next comment will be attached to, and offer to undo it.
@@ -121,7 +225,16 @@ export function Conversations({ threads, onStart, onReply, disabledReason, class
       <Composer onSubmit={onStart} disabledReason={disabledReason} className="mb-1" />
       {threads.length ? (
         threads.map((thread) => (
-          <ConversationThread key={thread.id} thread={thread} onReply={onReply} disabledReason={disabledReason} unreadFrom={unread?.[thread.id]} />
+          <ConversationThread
+            key={thread.id}
+            thread={thread}
+            onReply={onReply}
+            disabledReason={disabledReason}
+            unreadFrom={unread?.[thread.id]}
+            resolved={resolved}
+            resolving={objects === undefined}
+            nameOf={nameOf}
+          />
         ))
       ) : (
         <EmptyState className="py-8" message="No conversations yet." />

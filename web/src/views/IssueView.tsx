@@ -80,6 +80,7 @@ export function IssueView({ crumbs, title, description, descriptionFormat,
             disabledReason={readOnlyReason}
             anchoredTo={anchorTo}
             onClearAnchor={() => setAnchorTo(undefined)}
+            nameOf={nameOf}
           />
         </section>
         <section className="flex flex-col gap-3">
