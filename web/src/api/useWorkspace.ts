@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { FolderState } from '../../../src/fold'
+import type { WorkspaceState } from '../../../src/store'
 import { useRefresh } from '../lib/useRefresh'
 import { isRateLimited } from '../lib/relayBudget'
 import { loadAll } from './index'
 
 export interface Workspace {
   /** `null` until the first read completes. */
-  state: FolderState | null
+  state: WorkspaceState | null
   /** The last read's failure, or `null`. A stale `state` is kept alongside it. */
   error: string | null
   /**
@@ -27,7 +27,7 @@ export interface Workspace {
  * good state on screen and records the reason, rather than blanking the app.
  */
 export function useWorkspace(): Workspace {
-  const [state, setState] = useState<FolderState | null>(null)
+  const [state, setState] = useState<WorkspaceState | null>(null)
   const [error, setError] = useState<string | null>(null)
   const inFlight = useRef<Promise<void> | null>(null)
   const latest = useRef(0)
