@@ -80,6 +80,30 @@ export function referencesInMessages(messages: readonly MessageData[]): string[]
   return [...seen]
 }
 
+/**
+ * Resolve every reference on a surface, once — for whoever is drawing threads.
+ *
+ * Both surfaces that draw threads need this and neither may do it per message:
+ * `startConversation` appends the same pointer to every comment on an issue, so
+ * a twelve-message thread would fetch one object twelve times, and because
+ * `useForeignObjects` re-resolves on the page's own cadence two copies could
+ * legitimately land in different states and draw the same object two ways on
+ * one screen. RIC-10 extracted the hook for exactly that reason; this is the
+ * thread-shaped caller of it, shared so `Conversations` and `Activity` cannot
+ * drift into two answers.
+ */
+export function useThreadReferences(threads: readonly ThreadData[]): {
+  resolved: Record<string, ForeignObjectData | null | undefined>
+  resolving: boolean
+} {
+  const references = useMemo(
+    () => referencesInMessages(threads.flatMap((thread) => [thread.root, ...thread.replies])),
+    [threads],
+  )
+  const objects = useForeignObjects(references)
+  return { resolved: byReference(references, objects), resolving: objects === undefined }
+}
+
 export interface ThreadData {
   id: string
   root: MessageData
@@ -160,9 +184,17 @@ function NewSinceHere() {
   )
 }
 
-export function ConversationThread({ thread, onReply, disabledReason, unreadFrom, resolved, resolving, nameOf }: { thread: ThreadData; onReply: (threadId: string, text: string) => Promise<boolean | void> | boolean | void; disabledReason?: string; unreadFrom?: string; resolved?: Record<string, ForeignObjectData | null | undefined>; resolving?: boolean; nameOf?: (pubkey: string) => string }) {
+export function ConversationThread({ thread, onReply, disabledReason, unreadFrom, resolved, resolving, nameOf, subdued = false }: { thread: ThreadData; onReply: (threadId: string, text: string) => Promise<boolean | void> | boolean | void; disabledReason?: string; unreadFrom?: string; resolved?: Record<string, ForeignObjectData | null | undefined>; resolving?: boolean; nameOf?: (pubkey: string) => string; /** Draw it as secondary — Activity's mentions, which do not carry a comment's trust (CON-9). */ subdued?: boolean }) {
   return (
-    <div className="flex flex-col gap-1 rounded-lg border border-border-default bg-bg-surface px-3 py-2.5">
+    <div
+      className={cn(
+        'flex flex-col gap-1 rounded-lg border px-3 py-2.5',
+        // The card recedes rather than fading: `border-subtle` on the page's own
+        // ground, both tokens, so it stays legible in either theme. An opacity
+        // utility would have dimmed the text with it — UI-RULES §4.
+        subdued ? 'border-border-subtle bg-bg-base' : 'border-border-default bg-bg-surface',
+      )}
+    >
       {unreadFrom === thread.root.id && <NewSinceHere />}
       <MessageCard message={thread.root} resolved={resolved} resolving={resolving} nameOf={nameOf} />
       {thread.replies.map((reply) => (
@@ -193,21 +225,7 @@ export interface ConversationsProps {
 }
 
 export function Conversations({ threads, onStart, onReply, disabledReason, className, unread, anchoredTo, onClearAnchor, nameOf }: ConversationsProps) {
-  /*
-    Every reference in every message on this surface, resolved **once** — RIC-10.
-
-    Per message would be wrong twice over. `startConversation` appends the same
-    pointer to every comment on an issue, so a twelve-message thread would fetch
-    one object twelve times; and `useForeignObjects` re-resolves on the page's
-    own cadence, so two copies could legitimately land in different states and
-    draw the same object two ways on one screen.
-  */
-  const references = useMemo(
-    () => referencesInMessages(threads.flatMap((thread) => [thread.root, ...thread.replies])),
-    [threads],
-  )
-  const objects = useForeignObjects(references)
-  const resolved = byReference(references, objects)
+  const { resolved, resolving } = useThreadReferences(threads)
 
   return (
     <div className={cn('flex flex-col gap-2.5', className)}>
@@ -232,7 +250,7 @@ export function Conversations({ threads, onStart, onReply, disabledReason, class
             disabledReason={disabledReason}
             unreadFrom={unread?.[thread.id]}
             resolved={resolved}
-            resolving={objects === undefined}
+            resolving={resolving}
             nameOf={nameOf}
           />
         ))

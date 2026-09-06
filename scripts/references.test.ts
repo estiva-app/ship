@@ -16,7 +16,7 @@
  */
 import { foldFolder } from '../src/fold'
 import { conversationsAbout } from '../src/fold'
-import { attachmentOf, commentsOn, mentionsOf, taggedIndex } from '../src/references'
+import { attachmentOf, commentsOn, commentsOnAny, mentionsOf, taggedIndex } from '../src/references'
 import { findNaddrs, naddrToAddr } from '@estiva-app/protocol'
 import type { SignedEvent } from '@estiva-app/protocol'
 
@@ -179,6 +179,43 @@ const late = [
   const state = foldFolder(events, refs)
   const tagged = taggedIndex(events)
   check('an unreferenced object attaches to nothing', attachmentOf(state.conversations[0], ISSUE, tagged) === null)
+}
+
+// ── The sub-file roll-up: a project's Activity is its issues' comments ──────
+
+{
+  const OTHER_ISSUE = `30851:${'a'.repeat(64)}:the-other-issue`
+  const UNRELATED = `30851:${'a'.repeat(64)}:not-in-this-project`
+  const events = [
+    shipComment('s1', 'On the first issue.'),
+    event({ id: 's2', kind: 1111, tags: [['A', OTHER_ISSUE], ['a', OTHER_ISSUE]], content: 'On the second.' }),
+    event({ id: 's3', kind: 1111, tags: [['A', UNRELATED], ['a', UNRELATED]], content: 'On somebody else’s issue.' }),
+    // A thread that merely *names* one of the project's issues, mid-conversation.
+    peekMessage('s4', 'Unrelated chatter.'),
+    peekMessage('s5', `Related: ${POINTER}`, 's4'),
+  ]
+  const state = foldFolder(events, refs)
+  const tagged = taggedIndex(events)
+  const mine = new Set([ISSUE, OTHER_ISSUE])
+
+  const rolled = commentsOnAny(state.conversations, mine, tagged)
+  check('a project rolls up the comments on its own issues', rolled.length === 2, `${rolled.length}`)
+  check(
+    '  …each paired with the issue it is about, so the row can name it',
+    rolled.every((r) => mine.has(r.about)) && new Set(rolled.map((r) => r.about)).size === 2,
+  )
+  check("  …and not another project's issue", !rolled.some((r) => r.about === UNRELATED))
+
+  /*
+    The §5.1 merge would come back through this door otherwise. A thread that
+    name-drops an issue is not that issue's comment, so it must not be rolled up
+    into its project's Activity as one either — it is a mention of the issue,
+    which is the issue's own Activity row and not the project's sub-file row.
+  */
+  check(
+    '  …and never a thread that merely mentions one of them',
+    !rolled.some((r) => r.conversation.id === 's4'),
+  )
 }
 
 console.log(

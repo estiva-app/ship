@@ -142,3 +142,44 @@ export function mentionsOf(
 ): Conversation[] {
   return conversations.filter((c) => attachmentOf(c, address, tagged) === 'mention')
 }
+
+/**
+ * Comments on **any** of a set of objects, each paired with the one it is about
+ * — the sub-file roll-up half of Activity (CON-9).
+ *
+ * A project's Activity is the conversations of its issues, and that data exists
+ * today: an issue names its project, and its comments name the issue. No new
+ * protocol, no folder nesting, nothing to publish.
+ *
+ * **One pass over the conversations, not one per object.** The naive shape is
+ * `for (const issue of issues) commentsOn(conversations, issue.addr, …)`, which
+ * on production's 229 issues and 495 conversations is over a hundred thousand
+ * `about.includes` calls to answer a question about one project. This walks the
+ * conversations once and asks the set.
+ *
+ * Ordered by the conversations' own order, which `foldConversations` leaves
+ * most-recently-active first — so a caller taking a horizon off the front takes
+ * the most recent, which is the only cut worth having.
+ */
+export function commentsOnAny(
+  conversations: readonly Conversation[],
+  addresses: ReadonlySet<string>,
+  tagged: TaggedIndex,
+): { conversation: Conversation; about: string }[] {
+  const found: { conversation: Conversation; about: string }[] = []
+  for (const conversation of conversations) {
+    /*
+      The root's tags, and only those — the same rule `attachmentOf` applies.
+      A thread merely *mentioning* one of a project's issues is not that issue's
+      comment, so it must not be rolled up as one either: doing so would let a
+      passing name-drop into the primary reading of a project through a side
+      door, which is the §5.1 merge in a different place.
+    */
+    if (conversation.root.id !== conversation.id) continue
+    const named = tagged[conversation.root.id]
+    if (!named) continue
+    const about = named.find((address) => addresses.has(address))
+    if (about) found.push({ conversation, about })
+  }
+  return found
+}

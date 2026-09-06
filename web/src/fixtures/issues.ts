@@ -1,6 +1,7 @@
 import type { IssueRowData } from '@/components/IssueRow'
 import type { IssuesTableRow } from '@/components/IssuesTable'
 import type { ThreadData } from '@/components/ConversationThread'
+import type { ActivityItem } from '@/components/Activity'
 import anaPortrait from './avatars/ana-duarte.png'
 import raviPortrait from './avatars/ravi-mehta.png'
 import maraPortrait from './avatars/mara-sato.png'
@@ -54,5 +55,41 @@ export const THREADS: ThreadData[] = [
     id: 't2',
     root: { id: 'm4', author: RAVI, at: NOW - 86400, body: 'Moving this to in progress.\nWill pair with Ana on the fix tomorrow.' },
     replies: [],
+  },
+]
+
+/**
+ * Activity — conversations on files *related* to the one being read (CON-9).
+ *
+ * Deliberately mixed. A mention is a thread that named this object in passing,
+ * on a file that has nothing else to do with it; a sub-file's thread is the
+ * project's own subtree. The two are drawn with different weight, so a fixture
+ * showing only one of them would review only half the component.
+ *
+ * The mention here is §5.1's case: four messages of unrelated discussion, the
+ * reference arriving last.
+ */
+export const ACTIVITY_ITEMS: ActivityItem[] = [
+  {
+    relation: 'sub-file',
+    where: 'REL-4 · Fold the change stream once per read',
+    thread: {
+      id: 'a1',
+      root: { id: 'am1', author: RAVI, at: NOW - 1800, body: 'Down to one fold per read. The second pass was the re-linked project.' },
+      replies: [{ id: 'am2', author: ANA, at: NOW - 900, body: 'Nice. Does the widening still terminate on a chain of four?' }],
+    },
+  },
+  {
+    relation: 'mention',
+    where: 'Design System',
+    thread: {
+      id: 'a2',
+      root: { id: 'am3', author: MARA, at: NOW - 86400 * 2, body: 'Standup notes for the week.' },
+      replies: [
+        { id: 'am4', author: ANA, at: NOW - 86400 * 2 + 600, body: 'Nothing from me.' },
+        { id: 'am5', author: RAVI, at: NOW - 86400 * 2 + 1200, body: 'Same.' },
+        { id: 'am6', author: MARA, at: NOW - 86400, body: 'Oh — related to what we said on Tuesday, this one.' },
+      ],
+    },
   },
 ]

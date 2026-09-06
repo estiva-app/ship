@@ -5,7 +5,7 @@ import { AppShell } from '@/components/AppShell'
 import { IdentityMenu } from '@/components/IdentityMenu'
 import { Sidebar } from '@/components/Sidebar'
 import { ACTIVITY, ARCHIVED_CARDS, PEOPLE, PROJECT_CARDS, PROJECT_STATUSES, SIDEBAR_PROJECTS } from '@/fixtures/projects'
-import { ANA, ISSUES, ISSUE_STATUSES, THREADS, hrefFor } from '@/fixtures/issues'
+import { ACTIVITY_ITEMS, ANA, ISSUES, ISSUE_STATUSES, THREADS, hrefFor } from '@/fixtures/issues'
 import { IssueView } from './IssueView'
 import { IssuesView, type IssuesScope } from './IssuesView'
 import { ProjectView } from './ProjectView'
@@ -85,6 +85,8 @@ export const Project: Story = {
           threads={THREADS}
           onStartConversation={fn()}
           onReply={fn()}
+          activity={ACTIVITY_ITEMS}
+          onReplyInActivity={fn()}
           rail={{
             status,
             statuses: PROJECT_STATUSES,
@@ -127,7 +129,9 @@ export const Issue: Story = {
           threads={THREADS}
           onStartConversation={fn()}
           onReply={fn()}
-          activity={ACTIVITY}
+          activity={ACTIVITY_ITEMS}
+          onReplyInActivity={fn()}
+          history={ACTIVITY}
           rail={{
             status,
             statuses: ISSUE_STATUSES,

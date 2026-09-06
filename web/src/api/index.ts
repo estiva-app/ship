@@ -32,7 +32,7 @@ export { conversationsAbout } from '../../../src/fold'
   itself to be about the object with one that named it in passing, and the
   second attaches permanently and by accident.
 */
-export { commentsOn, mentionsOf, attachmentOf, type Attachment, type TaggedIndex } from '../../../src/references'
+export { commentsOn, commentsOnAny, mentionsOf, attachmentOf, type Attachment, type TaggedIndex } from '../../../src/references'
 export { useWorkspace } from './useWorkspace'
 export { useDirectory, type DirectoryView, type Person } from './useDirectory'
 export { peopleIn, short } from './people'

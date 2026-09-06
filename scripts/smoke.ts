@@ -399,9 +399,14 @@ async function main() {
     /"id":"[^"]{8,}"/.test(tagValue(described!, 'value') ?? ''),
   )
 
-  const activity = sectionFor('Activity')
+  /*
+    The change feed is "History" since CON-9, which gave "Activity" to the list
+    of conversations on *related* files. Two sections on one page could not both
+    be Activity, and this one was always the history.
+  */
+  const history = sectionFor('History')
   await pick('Status', 'In Progress')
-  await activity.locator('li').first().waitFor()
+  await history.locator('li').first().waitFor()
   const change = stored.find((e) => e.kind === 1851)
   check('a kind:1851 change was published, not an edit', !!change)
   check(
@@ -469,7 +474,7 @@ async function main() {
   check('  …and renders nested', (await conversations.locator('article').count()) === 2)
 
   /*
-    Waits for one more activity row than there were, not for "more than one".
+    Waits for one more history row than there were, not for "more than one".
 
     The absolute count is already true before the click as soon as anything
     else has written to this issue, so the wait returns immediately and the
@@ -477,14 +482,77 @@ async function main() {
     the app is wrong; the check simply measures a moment too early, and it
     stays green only while this issue has exactly one prior change.
   */
-  const activityRows = await page.locator('section li').count()
+  /*
+    Scoped to History's own rows since CON-9. It used to count every `li` under
+    every `section`, which was unambiguous while History was the only list made
+    of them — Activity is a list of `li` too, so an unscoped count would now
+    move for a reason that has nothing to do with the change being published.
+  */
+  const historyRows = await history.locator('li').count()
   await pick('Assignee', 1)
-  await page.waitForFunction((n) => document.querySelectorAll('section li').length > n, activityRows)
+  await history.locator('li').nth(historyRows).waitFor()
   check(
     'assigning publishes a second change',
     stored.filter((e) => e.kind === 1851 && tagValue(e, 'field') === 'assignee').length === 1,
   )
+
+  /*
+    The two lists, on screen — CON-9.
+
+    A section that renders is not the claim; the claim is that they are two
+    lists holding different things. So: the comment posted above is in
+    Conversations and *not* in Activity, and Activity says what it is for rather
+    than rendering blank. The stub workspace contains no cross-Folder mention,
+    which is why the populated case is asserted in `Activity.test.tsx` — this
+    checks the wiring a unit test cannot see.
+  */
+  check('the page shows Conversations, Activity and History as three lists', (await sectionFor('Activity').count()) === 1 && (await history.count()) === 1 && (await conversations.count()) === 1)
+  check(
+    '  …with the comment in Conversations and not in Activity',
+    !(await sectionFor('Activity').textContent())?.includes('Blocked on the Stripe key.'),
+  )
+  check(
+    '  …and Activity saying what it holds rather than nothing',
+    (await sectionFor('Activity').textContent())?.includes('Nothing related yet') ?? false,
+  )
   await shot(page, '06-issue-detail')
+
+  /*
+    The sub-file roll-up, end to end — CON-9's Activity, the half that needs no
+    new protocol.
+
+    Walk back to the project and the comment just written on its issue must be
+    in the project's Activity, badged as the issue's and naming it. This is the
+    demo beat and it is the one assertion here that cannot be made anywhere
+    else: `references.test.ts` proves the roll-up selects the right threads, and
+    `Activity.test.tsx` proves a selected thread is drawn — only the browser
+    proves the project page actually asks for it.
+
+    Deliberately also checked *negatively*: the comment must not appear under
+    Conversations, which is the project's OWN discussion. A roll-up that leaked
+    into the primary list would be the §5.1 merge one level up.
+  */
+  await page.getByRole('link', { name: 'Payment integration' }).first().click()
+  await page.waitForSelector('[data-surface="project"]', { timeout: 10000 })
+  const projectActivity = sectionFor('Activity')
+  await projectActivity.locator('li').first().waitFor({ timeout: 10000 })
+  check(
+    "a project's Activity carries its issues' conversations",
+    (await projectActivity.textContent())?.includes('Blocked on the Stripe key.') ?? false,
+  )
+  check(
+    '  …badged as a sub-file, not as a mention',
+    (await projectActivity.locator('[data-relation="sub-file"]').count()) === 1,
+  )
+  check(
+    '  …and naming the issue, because replying goes there',
+    (await projectActivity.textContent())?.includes('PAY-1') ?? false,
+  )
+  check(
+    "  …while the project's OWN conversations stay empty",
+    !(await sectionFor('Conversations').textContent())?.includes('Blocked on the Stripe key.'),
+  )
+  await shot(page, '11-project-activity')
 
   // ── The inbound leg: a reference pasted from Peek ─────────────────────────
   // Encoded with the app's own encoder, so this cannot pass against a shape
