@@ -1,5 +1,5 @@
 import type { ProjectCardProps } from '@/components/ProjectCard'
-import type { ActivityEntry } from '@/components/ActivityFeed'
+import type { HistoryEntry } from '@/components/History'
 import type { SidebarProject } from '@/components/Sidebar'
 import { ANA, MARA, RAVI } from './issues'
 
@@ -94,7 +94,7 @@ export const PEOPLE = [
 ]
 
 /** What the fold's change stream says about one issue, already in words. */
-export const ACTIVITY: ActivityEntry[] = [
+export const ACTIVITY: HistoryEntry[] = [
   { id: 'c1', by: ANA, at: NOW - 86400 * 2, text: 'opened the issue' },
   { id: 'c2', by: RAVI, at: NOW - 86400, text: 'set status to In Progress' },
   { id: 'c3', by: RAVI, at: NOW - 86400, text: 'assigned Ana Duarte' },

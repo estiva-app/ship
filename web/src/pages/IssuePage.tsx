@@ -1,13 +1,13 @@
 import { useMarkRead } from '@/lib/useMarkRead'
 import { useMemo, useState } from 'react'
-import { ISSUE_STATUSES, conversationsAbout, deleteIssue, referenceFor, reply, setIssueField, startConversation, type DirectoryView, type FolderState, threadContext, useMergedReadState, firstUnreadByThread, projectContext, me } from '@/api'
-import type { ActivityEntry } from '@/components/ActivityFeed'
+import { ISSUE_STATUSES, commentsOn, deleteIssue, referenceFor, reply, setIssueField, startConversation, type DirectoryView, type FolderState, type WorkspaceState, threadContext, useMergedReadState, firstUnreadByThread, projectContext, me } from '@/api'
+import type { HistoryEntry } from '@/components/History'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { IssueView } from '@/views/IssueView'
 import { go, href } from '../router'
 import { act, type Say } from './act'
-import { copyText, railPeople, threadFor } from './ProjectPage'
+import { activityFor, copyText, railPeople, threadFor } from './ProjectPage'
 
 /**
  * This issue's slice of the change stream, in words, newest first — the old
@@ -15,7 +15,7 @@ import { copyText, railPeople, threadFor } from './ProjectPage'
  * shown as the person's name, an empty value as "(none)". Read off the
  * fold's list in the fold's order, then reversed for reading.
  */
-export function activityFor(issueAddr: string, state: FolderState, directory: DirectoryView): ActivityEntry[] {
+export function historyFor(issueAddr: string, state: FolderState, directory: DirectoryView): HistoryEntry[] {
   return state.activity
     .filter((change) => change.target === issueAddr)
     .map((change) => ({
@@ -36,11 +36,24 @@ export function activityFor(issueAddr: string, state: FolderState, directory: Di
  * field edit is one change event to the issue's own Folder, followed by a
  * re-read; a refused one leaves the field as the relay has it.
  */
-export function IssuePage({ state, directory, d, say, refresh }: { state: FolderState; directory: DirectoryView; /** The object's `d`, which is all a §7.2 URL carries. */ d: string; say: Say; refresh: () => Promise<void> }) {
+export function IssuePage({ state, directory, d, say, refresh }: { state: WorkspaceState; directory: DirectoryView; /** The object's `d`, which is all a §7.2 URL carries. */ d: string; say: Say; refresh: () => Promise<void> }) {
   const issue = state.issues.find((candidate) => candidate.id === d)
   const project = issue?.projectAddr ? state.projects.find((candidate) => candidate.addr === issue.projectAddr) : undefined
 
-  const conversations = useMemo(() => (issue ? conversationsAbout(state.conversations, issue.addr) : []), [issue, state])
+  /*
+    The object's own discussion — CON-7. `conversationsAbout` returned the union
+    of comments and mentions, so a Peek thread that named this issue on its last
+    message sat in here indistinguishably from something written about it. §5.1
+    calls that indefensible; the mentions are in Activity below.
+  */
+  const conversations = useMemo(() => (issue ? commentsOn(state.conversations, issue.addr, state.tagged) : []), [issue, state])
+  /* An issue has no sub-files until files nest (FOL-2), so its Activity is the
+     mentions half alone. The roll-up argument is left empty rather than absent
+     so the day nesting lands, this line is where it goes. */
+  const activity = useMemo(
+    () => (issue ? activityFor(issue.addr, state, directory) : { items: [], truncated: 0 }),
+    [issue, state, directory],
+  )
   /* An issue is an object *inside* a Folder, not a container of its own, so it
      advances one `thread:` context per discussion and never the project's
      container — SPEC §11.2. Doing it the other way would make reading one issue
@@ -58,7 +71,7 @@ export function IssuePage({ state, directory, d, say, refresh }: { state: Folder
     () => firstUnreadByThread(threads, merged, projectContext(issue?.folder), me),
     [threads, merged, issue],
   )
-  const activity = useMemo(() => (issue ? activityFor(issue.addr, state, directory) : []), [issue, state, directory])
+  const history = useMemo(() => (issue ? historyFor(issue.addr, state, directory) : []), [issue, state, directory])
   const people = useMemo(() => railPeople(state, directory), [state, directory])
   const projects = useMemo(
     () => [{ value: '', label: 'No project' }, ...state.projects.map((p) => ({ value: p.addr, label: p.title }))],
@@ -102,7 +115,22 @@ export function IssuePage({ state, directory, d, say, refresh }: { state: Folder
           if (!conversation) return false
           return act('Reply', () => reply(conversation, issue.folder, body), say, refresh)
         }}
-        activity={activity}
+        activity={activity.items}
+        activityTruncated={activity.truncated}
+        /*
+          A reply in Activity goes to the thread's OWN Folder, never this
+          issue's — CON-9. `reply()` already publishes into
+          `conversation.root.folder`, so the fallback here is only reached for a
+          thread whose root carries no `h` at all, and this issue's Folder is
+          the wrong guess for that case: it would file somebody else's reply
+          under this issue. Refusing is the honest answer.
+        */
+        onReplyInActivity={(threadId, body) => {
+          const conversation = state.conversations.find((c) => c.id === threadId)
+          if (!conversation?.root.folder) return false
+          return act('Reply', () => reply(conversation, conversation.root.folder, body), say, refresh)
+        }}
+        history={history}
         rail={{
           status: issue.status,
           statuses: ISSUE_STATUSES.map(({ value, label }) => ({ value, label })),

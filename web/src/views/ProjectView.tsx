@@ -9,6 +9,7 @@ import { Tabs } from '@/components/ui/Tabs'
 import type { StatusEntry } from '@/lib/issues'
 import { Board } from '@/components/Board'
 import { Conversations, type ThreadData } from '@/components/ConversationThread'
+import { Activity, type ActivityItem } from '@/components/Activity'
 import type { IssueRowData } from '@/components/IssueRow'
 import { IssuesTable, type IssuesTableRow } from '@/components/IssuesTable'
 import { ProjectHeader } from '@/components/ProjectHeader'
@@ -17,8 +18,13 @@ import { ProjectRail, type RailPerson } from '@/components/ProjectRail'
 /**
  * One project, as production lays it out (ruling C11): the trail, the
  * editable title and description, "Issues" with the Table / Board toggle,
- * "Conversations" — and the rail on the right. The toggle lives in the URL
- * (`?view=board`), so the caller owns it.
+ * "Conversations", "Activity" — and the rail on the right. The toggle lives in
+ * the URL (`?view=board`), so the caller owns it.
+ *
+ * The two lists are CON-9's, the same pair the issue surface shows:
+ * *Conversations* is what declared itself about this project, *Activity* is
+ * what is related to it. A project has no History section — its change events
+ * are shown in the rail, not as a feed.
  */
 export interface ProjectViewProps {
   crumbs: { projectsHref: string; title: string }
@@ -35,6 +41,12 @@ export interface ProjectViewProps {
   unread?: Record<string, string>
   onStartConversation: (text: string) => Promise<boolean | void> | boolean | void
   onReply: (threadId: string, text: string) => Promise<boolean | void> | boolean | void
+  /** Threads on files related to this project, time-ordered — CON-9. */
+  activity: ActivityItem[]
+  /** How many the horizon left out — `ACTIVITY_HORIZON`. Said on screen, never implied. */
+  activityTruncated?: number
+  /** Reply into a thread belonging to another file: its own Folder, never this project's. */
+  onReplyInActivity: (threadId: string, text: string) => Promise<boolean | void> | boolean | void
   rail: {
     status: string
     statuses: StatusEntry[]
@@ -54,7 +66,7 @@ export interface ProjectViewProps {
   readOnlyReason?: string
 }
 
-export function ProjectView({ crumbs, header, onAddIssue, view, onView, issues, issueStatuses, hrefFor, threads, unread, onStartConversation, onReply, rail, readOnlyReason }: ProjectViewProps) {
+export function ProjectView({ crumbs, header, onAddIssue, view, onView, issues, issueStatuses, hrefFor, threads, unread, onStartConversation, onReply, activity, activityTruncated, onReplyInActivity, rail, readOnlyReason }: ProjectViewProps) {
   const addIssue = readOnlyReason ? (
     <WithTooltip label={readOnlyReason}>
       <Button variant="primary" disabled>
@@ -104,6 +116,10 @@ export function ProjectView({ crumbs, header, onAddIssue, view, onView, issues, 
         <section className="flex flex-col gap-3">
           <h2 className="text-h4 text-text-primary">Conversations</h2>
           <Conversations threads={threads} unread={unread} onStart={onStartConversation} onReply={onReply} disabledReason={readOnlyReason} nameOf={header.nameOf} />
+        </section>
+        <section className="flex flex-col gap-3">
+          <h2 className="text-h4 text-text-primary">Activity</h2>
+          <Activity items={activity} truncated={activityTruncated} onReply={onReplyInActivity} disabledReason={readOnlyReason} nameOf={header.nameOf} />
         </section>
       </div>
       <Divider orientation="vertical" className="col-start-2 row-span-2 row-start-1" />

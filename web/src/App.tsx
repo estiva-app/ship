@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { me, peopleIn, resolveInbound, useDirectory, useWorkspace, type DirectoryView, type FolderState, installReadStateFlush } from '@/api'
+import { me, peopleIn, resolveInbound, useDirectory, useWorkspace, type DirectoryView, type FolderState, type WorkspaceState, installReadStateFlush } from '@/api'
 import { AppShell } from '@/components/AppShell'
 import { Banner } from '@/components/Banner'
 import { IdentityMenu } from '@/components/IdentityMenu'
@@ -81,7 +81,7 @@ export default function App() {
 }
 
 /** Which page the route names; an inbound reference shows nothing until it resolves. */
-function Page({ route, state, directory, say, refresh }: { route: Route; state: FolderState | null; directory: DirectoryView; say: Say; refresh: () => Promise<void> }) {
+function Page({ route, state, directory, say, refresh }: { route: Route; state: WorkspaceState | null; directory: DirectoryView; say: Say; refresh: () => Promise<void> }) {
   if (!state) return null
   switch (route.name) {
     case 'projects':

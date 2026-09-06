@@ -19,10 +19,15 @@ import {
   projectContext,
   useMergedReadState,
   firstUnreadByThread,
+  commentsOn,
+  mentionsOf,
+  commentsOnAny,
   type DirectoryView,
   type FolderState,
+  type WorkspaceState,
 } from '@/api'
 import type { ThreadData } from '@/components/ConversationThread'
+import type { ActivityItem } from '@/components/Activity'
 import type { IssuesTableRow } from '@/components/IssuesTable'
 import { NewIssueDialog } from '@/components/NewIssueDialog'
 import { PairFolderDialog } from '@/components/PairFolderDialog'
@@ -105,6 +110,117 @@ export function threadFor(
   return { id: conversation.id, root: message(conversation.root), replies: conversation.replies.map(message) }
 }
 
+/**
+ * Where a thread lives, in words a reader recognises — CON-9's Activity rows.
+ *
+ * A thread in Activity belongs to a *different* file from the page around it,
+ * and the row has to say which, because replying goes there rather than here.
+ *
+ * Resolved from the Folder, which is the only containment an event carries. A
+ * project names its content Folder; an issue names its own. Both are checked
+ * because a mention may have been written in either.
+ *
+ * **`undefined` is a real answer and is drawn as nothing.** A Peek topic paired
+ * with no project is a Folder and nothing else — Ship has no name for it, and
+ * inventing one ("Folder 4f3a…") would be a worse row than a quiet one. The
+ * same goes for a Folder this reader cannot see into: the thread reached them
+ * some other way and its home did not.
+ */
+export function whereThreadLives(folder: string, state: FolderState): string | undefined {
+  if (!folder) return undefined
+  const project = state.projects.find((candidate) => candidate.contentFolder === folder)
+  if (project) return project.title
+  const issue = state.issues.find((candidate) => candidate.folder === folder)
+  if (issue) return issue.ref ? `${issue.ref} · ${issue.title}` : issue.title
+  return undefined
+}
+
+/**
+ * The Activity list for one object — the mentions half (CON-7, RIC-12).
+ *
+ * Ordered by last activity, which is the order `foldConversations` already
+ * leaves them in: CON-9 asks for one time-ordered list rather than a section
+ * per relation, so the sort is the list's own and the relation rides along as
+ * metadata.
+ *
+ * The sub-file half arrives next and slots in here as a second `relation`.
+ *
+ * **The anchor body is deliberately not passed to `threadFor`.** A block anchor
+ * resolves against *the object the comment is about*, and these comments are
+ * about other objects — resolving them against this page's description would
+ * report a block that has nothing to do with them. Passing nothing reports
+ * every anchor as unaddressable, which is honest rather than wrong.
+ */
+export function activityFor(
+  addr: string,
+  state: WorkspaceState,
+  directory: DirectoryView,
+  /**
+   * The files nested under this one, whose conversations roll up. A project
+   * passes its issues; an issue passes nothing, because nothing nests under one
+   * until FOL-2.
+   */
+  subFiles: readonly { addr: string; label: string }[] = [],
+): { items: ActivityItem[]; truncated: number } {
+  const mentions: ActivityItem[] = mentionsOf(state.conversations, addr, state.tagged).map((conversation) => ({
+    thread: threadFor(conversation, directory, undefined, addr),
+    relation: 'mention' as const,
+    where: whereThreadLives(conversation.root.folder, state),
+  }))
+
+  const labels = new Map(subFiles.map((file) => [file.addr, file.label]))
+  const rolled: ActivityItem[] = commentsOnAny(state.conversations, new Set(labels.keys()), state.tagged).map(
+    ({ conversation, about }) => ({
+      thread: threadFor(conversation, directory, undefined, about),
+      relation: 'sub-file' as const,
+      where: labels.get(about),
+    }),
+  )
+
+  /*
+    One time-ordered list — CON-9 — so the two relations are merged and sorted
+    rather than concatenated. `foldConversations` already orders conversations
+    most-recently-active first, and re-deriving that here from `lastAt` would be
+    a second opinion about ordering; taking the fold's order and merging on the
+    root's time keeps one.
+  */
+  const all = [...mentions, ...rolled].sort((a, b) => lastActivity(b.thread) - lastActivity(a.thread))
+  return { items: all.slice(0, ACTIVITY_HORIZON), truncated: Math.max(0, all.length - ACTIVITY_HORIZON) }
+}
+
+const lastActivity = (thread: ThreadData) => Math.max(thread.root.at, ...thread.replies.map((r) => r.at))
+
+/**
+ * How much of a roll-up Activity shows — the horizon, decided rather than
+ * inherited (CON-9, on CON-1's precedent).
+ *
+ * A project with 200 issues has an unbounded roll-up, and an unbounded list is
+ * not a list a person reads. CON-1 is the precedent for what to do about that:
+ * choose N deliberately, name the constant after the decision, and **say it
+ * where a reader can see it** — because *"an undocumented cap is
+ * indistinguishable from nobody reacted"*, and here it would be
+ * indistinguishable from "nothing else happened".
+ *
+ * 50, cut off the **most recent** end. Not a time window: a quiet project would
+ * show nothing under one, and "nothing in 30 days" is exactly the reading a cap
+ * must not produce. Not a per-issue quota either, which would let one busy issue
+ * be silently rationed while the list had room.
+ *
+ * **Measured before it was chosen, not after.** On production (2026-09-06, 18
+ * projects, 229 issues, 496 conversations) the largest roll-up is 60 threads
+ * over 12 issues, and 50 is the only value in the region that is exercised
+ * without being obtrusive: it cuts exactly one project of eighteen, by ten. A
+ * cap nothing ever reaches is a cap nobody has reviewed, and the line that
+ * reports it would never have been seen before the demo.
+ *
+ * Computing it for all eighteen costs 2 ms once the fold is in hand, so the
+ * horizon is about what a person can read rather than about what it costs.
+ *
+ * The surface says how many it left out; the rest are on the issues themselves,
+ * one click away.
+ */
+export const ACTIVITY_HORIZON = 50
+
 /** Everyone in the workspace as a picker option, ordered by name — by key would be ordered by nothing a person can see. */
 export function railPeople(state: FolderState, directory: DirectoryView): RailPerson[] {
   return peopleIn(state, me)
@@ -125,8 +241,8 @@ export async function copyText(text: string, done: string, prompt: string, say: 
 /**
  * One project from the fold, as the old app's projectView: its issues as a
  * table (Updated = the last change to that issue, or when it was opened)
- * or a board, every conversation in its Folder — deliberately including
- * the ones about an issue — and the rail. Every control writes one change
+ * or a board, the conversation in its Folder, its issues' conversations under
+ * Activity, and the rail. Every control writes one change
  * to one object and then re-reads the relay (`act`). Delete is offered
  * only to the author (NIP-09 honours nobody else) and asks first. A
  * project the fold does not have gets the old app's words, not a blank
@@ -140,7 +256,7 @@ export function ProjectPage({
   say,
   refresh,
 }: {
-  state: FolderState
+  state: WorkspaceState
   directory: DirectoryView
   /** The object's `d`, which is all a §7.2 URL carries. */
   d: string
@@ -161,7 +277,37 @@ export function ProjectPage({
       })
   }, [project, state, directory])
 
-  const conversations = useMemo(() => (project ? state.conversations.filter((c) => c.root.folder === project.contentFolder) : []), [project, state])
+  const activity = useMemo(() => {
+    if (!project) return { items: [], truncated: 0 }
+    /* The sub-files are this project's issues — data that exists today, which is
+       why the roll-up needs no folder nesting. Labelled by ref where there is
+       one, because that is how a person says which issue they mean. */
+    const subFiles = state.issues
+      .filter((issue) => issue.projectAddr === project.addr)
+      .map((issue) => ({ addr: issue.addr, label: issue.ref ? `${issue.ref} · ${issue.title}` : issue.title }))
+    return activityFor(project.addr, state, directory, subFiles)
+  }, [project, state, directory])
+
+  /*
+    The project's OWN conversation — CON-9, and this line changed with it.
+
+    It used to be every thread in the content Folder, *deliberately including the
+    ones about an issue*, because there was nowhere else for those to go. There
+    is now: they are the sub-file half of Activity. Leaving them here as well
+    would put the same thread twice on one page, in two lists that are supposed
+    to mean different things.
+
+    **The filter stays the Folder, not the `a` tag.** A project *is* a Folder, so
+    a message written in the paired Peek topic is the project's conversation even
+    though nobody tagged anything — that is identity, and identity merges. Asking
+    for `commentsOn(project.addr)` instead would have been tidier and would have
+    silently emptied every project paired with a topic people actually talk in.
+  */
+  const rolledUp = useMemo(() => new Set(activity.items.filter((i) => i.relation === 'sub-file').map((i) => i.thread.id)), [activity])
+  const conversations = useMemo(
+    () => (project ? state.conversations.filter((c) => c.root.folder === project.contentFolder && !rolledUp.has(c.id)) : []),
+    [project, state, rolledUp],
+  )
   /* A project *is* a container, so it takes the container context: its Folder's
      bare channel uuid (SPEC §11.1). Looking at the project marks the container
      read; its issues' discussions are separate contexts and are untouched. */
@@ -241,6 +387,16 @@ export function ProjectPage({
           const conversation = conversations.find((c) => c.id === threadId)
           if (!conversation) return false
           return act('Reply', () => reply(conversation, project.contentFolder, body), say, refresh)
+        }}
+        activity={activity.items}
+        activityTruncated={activity.truncated}
+        /* A reply in Activity goes to the thread's own Folder, never this
+           project's — CON-9. Refused when the thread's root carries no `h`,
+           because filing somebody else's reply here is the wrong guess. */
+        onReplyInActivity={(threadId, body) => {
+          const conversation = state.conversations.find((c) => c.id === threadId)
+          if (!conversation?.root.folder) return false
+          return act('Reply', () => reply(conversation, conversation.root.folder, body), say, refresh)
         }}
         rail={{
           status: project.status,
