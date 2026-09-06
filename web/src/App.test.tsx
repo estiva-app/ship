@@ -1,6 +1,6 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { FolderState } from '@/api'
+import type { WorkspaceState } from '@/api'
 
 const { ME, OTHER } = vi.hoisted(() => ({ ME: 'e'.repeat(64), OTHER: 'f'.repeat(64) }))
 
@@ -47,7 +47,7 @@ const issue = (d: string, projectAddr: string | undefined, status: string) => ({
   addr: `30851:x:${d}`, id: d, author: OTHER, createdAt: 1, title: `issue ${d.slice(-2)}`, description: '', descriptionFormat: 'marker' as const, folder: 'f', projectAddr, status, fields: {},
 })
 
-const STATE: FolderState = {
+const STATE: WorkspaceState = {
   projects: [project(LIVE, 'Live'), project(OLD, 'Old', true), { ...project(MINE, 'Mine'), author: ME, lead: OTHER }],
   issues: [
     issue(D('11'), `30850:x:${LIVE}`, 'todo'),
@@ -64,6 +64,9 @@ const STATE: FolderState = {
     { id: 'c1', root: { id: 'c1', author: OTHER, createdAt: 5, body: 'hi nostr:naddr1qqxyz', folder: 'f', about: [`30851:x:${D('14')}`] }, replies: [], about: [`30851:x:${D('14')}`], createdAt: 5, lastAt: 5 },
     { id: 'c2', root: { id: 'c2', author: ME, createdAt: 6, body: 'about the project', folder: 'f', about: [] }, replies: [{ id: 'c3', author: OTHER, createdAt: 7, body: 'reply', folder: 'f', about: [] }], about: [], createdAt: 6, lastAt: 7 },
   ],
+  // `c1` names the issue in its *tags*, so it is that issue's own comment
+  // rather than a passing mention of it — SPEC §6.4, CON-7.
+  tagged: { c1: [`30851:x:${D('14')}`] },
 }
 
 const refresh = vi.fn().mockResolvedValue(undefined)

@@ -1,0 +1,189 @@
+/**
+ * Comments and mentions are two lists — SPEC §6.4, CON-7.
+ *
+ * The case this file exists for is the one §5.1 names as indefensible: a
+ * twenty-message thread that name-drops an issue on message twenty-one used to
+ * land *inside that issue's comments*, indistinguishable from something somebody
+ * wrote about it. `conversationsAbout` returns the union and cannot tell them
+ * apart, because `Conversation.about` is a union of tags and body text, unioned
+ * again across every message in the thread.
+ *
+ *   npx tsx scripts/references.test.ts
+ *
+ * Offline. The events are built the way the two apps actually build them —
+ * Ship's `a` tag, Peek's body-only reference — because the whole claim is that
+ * the split falls out of what production already publishes.
+ */
+import { foldFolder } from '../src/fold'
+import { conversationsAbout } from '../src/fold'
+import { attachmentOf, commentsOn, mentionsOf, taggedIndex } from '../src/references'
+import { findNaddrs, naddrToAddr } from '@estiva-app/protocol'
+import type { SignedEvent } from '@estiva-app/protocol'
+
+let failures = 0
+function check(label: string, condition: boolean, detail = '') {
+  console.log(`${condition ? '✅' : '❌'} ${label}${detail ? ` — ${detail}` : ''}`)
+  if (!condition) failures++
+}
+
+const FOLDER = 'ffffffff-0000-0000-0000-000000000000'
+const ISSUE = `30851:${'a'.repeat(64)}:the-issue`
+/** What Ship appends to a comment body, and what a person types in Peek. */
+const POINTER =
+  'nostr:naddr1qqjxzde5xfjnvdee943kzwrr956rswr995uxgd3s95unsvekvd3nsvtzv3jnyqg4dp68gup69uhkcmmrv9kxsmmnwsarxvpsxqpzpvankwem8vankwem8vankwem8vankwem8vankwem8vankwem8vanqvzqqqrcsvczkget'
+const POINTED_AT = naddrToAddr(POINTER.slice('nostr:'.length))
+
+const refs = (body: string) => findNaddrs(body).map((n) => naddrToAddr(n))
+
+let seq = 0
+function event(partial: Partial<SignedEvent> & { kind: number }): SignedEvent {
+  seq += 1
+  return {
+    id: partial.id ?? `e${seq}`,
+    pubkey: partial.pubkey ?? 'b'.repeat(64),
+    created_at: partial.created_at ?? 1_700_000_000 + seq,
+    kind: partial.kind,
+    tags: [['h', FOLDER], ...(partial.tags ?? [])],
+    content: partial.content ?? '',
+    sig: 'x'.repeat(128),
+  } as SignedEvent
+}
+
+/** Ship's own comment: a NIP-22 `1111` naming the issue as its root, in both cases. */
+const shipComment = (id: string, body: string) =>
+  event({
+    id,
+    kind: 1111,
+    tags: [
+      ['A', ISSUE],
+      ['a', ISSUE],
+      ['K', '30851'],
+    ],
+    // `postMessage` appends the pointer as its own paragraph as well as tagging it.
+    content: `${body}\n\n${POINTER}`,
+  })
+
+/** Peek's message: the reference is in the body and there is no `a` tag at all. */
+const peekMessage = (id: string, body: string, replyTo?: string) =>
+  event({
+    id,
+    kind: 9,
+    tags: replyTo ? [['e', replyTo, '', 'reply']] : [],
+    content: body,
+  })
+
+// ── The thread that names an issue on its last message ──────────────────────
+
+const late = [
+  peekMessage('m1', 'Standup notes.'),
+  ...Array.from({ length: 19 }, (_, i) => peekMessage(`m${i + 2}`, `chatter ${i}`, 'm1')),
+  peekMessage('m21', `Related: ${POINTER}`, 'm1'),
+]
+
+{
+  const state = foldFolder(late, refs)
+  const tagged = taggedIndex(late)
+  const thread = state.conversations.find((c) => c.id === 'm1')!
+
+  check(
+    'the union still holds the thread — §6.4: the WHOLE thread attaches',
+    conversationsAbout(state.conversations, POINTED_AT).length === 1,
+  )
+  check(
+    'but it is a mention, not a comment — §5.1',
+    attachmentOf(thread, POINTED_AT, tagged) === 'mention',
+  )
+  check(
+    '  …so it is absent from the object’s own discussion',
+    commentsOn(state.conversations, POINTED_AT, tagged).length === 0,
+  )
+  check(
+    '  …and present under Mentioned in',
+    mentionsOf(state.conversations, POINTED_AT, tagged).length === 1,
+  )
+}
+
+// ── Ship's own comment, which must not be demoted ───────────────────────────
+
+{
+  const events = [shipComment('c1', 'Blocked on the Stripe key.')]
+  const state = foldFolder(events, refs)
+  const tagged = taggedIndex(events)
+  const thread = state.conversations.find((c) => c.id === 'c1')!
+
+  check('a tagged root is the object’s own comment', attachmentOf(thread, ISSUE, tagged) === 'comment')
+  check('  …and appears in the comments list', commentsOn(state.conversations, ISSUE, tagged).length === 1)
+  check('  …and not also under mentions', mentionsOf(state.conversations, ISSUE, tagged).length === 0)
+
+  /*
+    The reason subtraction cannot do this job. `startConversation` puts the
+    address in the `a` tag AND the pointer in the body, so "tags minus body
+    references" is empty for every comment Ship has ever written — which would
+    demote the primary list wholesale.
+  */
+  check(
+    'the same address is in the body too, which is why the tags must be read separately',
+    thread.root.body.includes('nostr:naddr1') && (tagged.c1 ?? []).includes(ISSUE),
+  )
+}
+
+// ── A reference at the root of a Peek thread is still a mention ─────────────
+
+{
+  const events = [peekMessage('p1', `Kicking off: ${POINTER}`)]
+  const state = foldFolder(events, refs)
+  const tagged = taggedIndex(events)
+  const thread = state.conversations.find((c) => c.id === 'p1')!
+  check(
+    'a body reference at a thread root is a mention — §6.4 says a comment is a TAG',
+    attachmentOf(thread, POINTED_AT, tagged) === 'mention',
+  )
+}
+
+// ── A tag on a reply does not make the thread a comment ─────────────────────
+
+{
+  const events = [
+    peekMessage('r1', 'Unrelated discussion.'),
+    event({ id: 'r2', kind: 1111, tags: [['A', ISSUE], ['e', 'r1', '', 'reply'], ['E', 'r1']], content: 'see also' }),
+  ]
+  const state = foldFolder(events, refs)
+  const tagged = taggedIndex(events)
+  const thread = state.conversations.find((c) => c.about.includes(ISSUE))
+  check(
+    'a tag on a reply attaches the thread, but only as a mention',
+    !!thread && attachmentOf(thread, ISSUE, tagged) === 'mention',
+  )
+}
+
+// ── A thread whose root nobody can see reads as a mention ───────────────────
+
+{
+  // The root `m1` is missing — truncated history. `foldConversations` stands the
+  // earliest visible message in for it, and that stand-in's tags are not the
+  // root's, so calling it a comment would be a guess about an unseen event.
+  const events = [event({ id: 'orphan', kind: 1111, tags: [['A', ISSUE], ['e', 'gone', '', 'reply'], ['E', 'gone']], content: 'a reply with no parent' })]
+  const state = foldFolder(events, refs)
+  const tagged = taggedIndex(events)
+  const thread = state.conversations[0]
+  check(
+    'a thread with no visible root falls to the secondary list, not the primary one',
+    attachmentOf(thread, ISSUE, tagged) === 'mention',
+  )
+}
+
+// ── An object nothing refers to ─────────────────────────────────────────────
+
+{
+  const events = [peekMessage('n1', 'no references here')]
+  const state = foldFolder(events, refs)
+  const tagged = taggedIndex(events)
+  check('an unreferenced object attaches to nothing', attachmentOf(state.conversations[0], ISSUE, tagged) === null)
+}
+
+console.log(
+  failures === 0
+    ? '\nComments and mentions stay apart.'
+    : `\n${failures} failed — the two strengths of §6.4 are being merged.`,
+)
+process.exit(failures === 0 ? 0 : 1)

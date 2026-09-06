@@ -11,17 +11,28 @@
  * Components import from '@/api'. A component importing '../../src/...' is a
  * boundary violation, whatever it does.
  */
-import type { FolderState } from '../../../src/fold'
+import type { WorkspaceState } from '../../../src/store'
 import type { Directory } from '../../../src/profiles'
 import { addrToNaddr, naddrToAddr } from '@estiva-app/protocol'
 import { folderLink, parseFolderLink } from '../../../src/events'
 import { RELAY_URL } from '../config'
 
 export type { Change, Conversation, FolderState, Issue, Message, Project } from '../../../src/fold'
+export type { WorkspaceState } from '../../../src/store'
 export type { Directory, Profile } from '../../../src/profiles'
 export { initials } from '../../../src/profiles'
 export { ISSUE_STATUSES, PROJECT_STATUSES, lookupStatus, type VocabEntry } from '../../../src/kinds'
 export { conversationsAbout } from '../../../src/fold'
+/*
+  The two lists, and the rule that separates them — SPEC §6.4, CON-7.
+
+  `conversationsAbout` is the *union* and stays exported, because "everything
+  attached to this object" is still the right question for a count of activity.
+  It is the wrong question for a comment feed: it merges a thread that declared
+  itself to be about the object with one that named it in passing, and the
+  second attaches permanently and by accident.
+*/
+export { commentsOn, mentionsOf, attachmentOf, type Attachment, type TaggedIndex } from '../../../src/references'
 export { useWorkspace } from './useWorkspace'
 export { useDirectory, type DirectoryView, type Person } from './useDirectory'
 export { peopleIn, short } from './people'
@@ -56,7 +67,7 @@ import { signer, store } from './store'
 
 
 /** Everything the reader can see: projects, issues, their changes and threads. */
-export function loadAll(): Promise<FolderState> {
+export function loadAll(): Promise<WorkspaceState> {
   return store.loadAll()
 }
 
