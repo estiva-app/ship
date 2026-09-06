@@ -1,5 +1,5 @@
 import { useMarkRead } from '@/lib/useMarkRead'
-import { resolveBlockAnchor, type ContentFormat } from '@estiva-app/protocol'
+import { pointerToAddress, referenceToPointer, resolveBlockAnchor, type ContentFormat } from '@estiva-app/protocol'
 import { signedIn } from '@/auth/estivaId'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
@@ -37,12 +37,45 @@ import { hrefForIssue, rowFor } from './IssuesPage'
 export type { Say } from './act'
 
 /**
- * The old app's `stripReferences`: a `nostr:naddr…` in a body is the object
- * the message is about, already shown as the page — not text to read.
+ * Drop the reference that points at the page you are already on — SHI-1.
+ *
+ * This replaces the old app's `stripReferences`, which removed **every**
+ * `nostr:naddr…` from a body before drawing it. That was right about one
+ * reference and wrong about all the others: `startConversation` appends the
+ * issue's own pointer to each comment, and showing bech32 for the object whose
+ * page you are reading is noise — but a thread on a project naming one of its
+ * issues, or a Peek message naming something else entirely, carried a pointer
+ * that Ship then deleted rather than resolving. Katerina saw the result as
+ * "avatar + name + timestamp only".
+ *
+ * So the rule narrows from *"references are not text to read"* to *"the object
+ * this surface already is, is not worth repeating"*. Everything else is drawn
+ * by `Conversations` as the object it names.
+ *
+ * Only a **standalone** reference is removed — a paragraph that is nothing but
+ * the pointer, which is exactly the shape `postMessage` appends (`\n\n${ref}`).
+ * A pointer written inside a sentence is somebody's prose and stays where they
+ * put it, resolved in place (§13.1, RIC-10).
  */
-export function stripReferences(body: string): string {
-  return body.replace(/nostr:naddr1[0-9acdefghjklmnpqrstuvwxyz]+/gi, '').trim()
+export function omitOwnReference(body: string, addr?: string): string {
+  if (!addr) return body
+  const paragraphs = body.split(/\n[ \t]*\n/)
+  const kept = paragraphs.filter((paragraph) => {
+    const text = paragraph.trim()
+    if (!NADDR_ONLY.test(text)) return true
+    try {
+      return pointerToAddress(referenceToPointer(text)) !== addr
+    } catch {
+      // A pointer that will not decode is not this object's; leave it alone
+      // rather than deleting somebody's text on a parse failure.
+      return true
+    }
+  })
+  return kept.join('\n\n').trim()
 }
+
+/** A paragraph that is nothing but one `nostr:` pointer. */
+const NADDR_ONLY = /^nostr:naddr1[0-9acdefghjklmnpqrstuvwxyz]+$/i
 
 /** A conversation from the fold as the thread card draws it: names and faces for keys, the fold's order kept. */
 export function threadFor(
@@ -57,12 +90,14 @@ export function threadFor(
     anchor is then reported unaddressable rather than silently dropped.
   */
   body?: { value: string; format: ContentFormat },
+  /** The object this surface is: its own pointer is dropped, every other one is drawn (SHI-1). */
+  self?: string,
 ): ThreadData {
   const message = (m: FolderState['conversations'][number]['root']) => ({
     id: m.id,
     author: directory.personOf(m.author),
     at: m.createdAt,
-    body: stripReferences(m.body),
+    body: omitOwnReference(m.body, self),
     anchor: resolveBlockAnchor(m.blockId, body?.value ?? '', body?.format ?? 'marker'),
     // Carried for the unread rule only: your own writing is never new to you.
     by: m.author,
@@ -132,7 +167,7 @@ export function ProjectPage({
      read; its issues' discussions are separate contexts and are untouched. */
   useMarkRead([projectContext(project?.contentFolder)])
   const threads = useMemo(
-    () => conversations.map((c) => threadFor(c, directory, project ? { value: project.description, format: project.descriptionFormat } : undefined)),
+    () => conversations.map((c) => threadFor(c, directory, project ? { value: project.description, format: project.descriptionFormat } : undefined, project?.addr)),
     [conversations, directory, project],
   )
   /* The divider in the feed (CRO-13). A project IS the container, so its own

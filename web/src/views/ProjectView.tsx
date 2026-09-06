@@ -103,7 +103,7 @@ export function ProjectView({ crumbs, header, onAddIssue, view, onView, issues, 
         </section>
         <section className="flex flex-col gap-3">
           <h2 className="text-h4 text-text-primary">Conversations</h2>
-          <Conversations threads={threads} unread={unread} onStart={onStartConversation} onReply={onReply} disabledReason={readOnlyReason} />
+          <Conversations threads={threads} unread={unread} onStart={onStartConversation} onReply={onReply} disabledReason={readOnlyReason} nameOf={header.nameOf} />
         </section>
       </div>
       <Divider orientation="vertical" className="col-start-2 row-span-2 row-start-1" />
