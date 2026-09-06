@@ -6,6 +6,36 @@ A minimal issue tracker — projects, issues, comments — built on Nostr.
 This app reads and writes **production**, `estiva.estiva.app`. There is no
 staging workspace.
 
+## UI: the shared package, and the rules every session follows
+
+@UI-RULES.md
+
+Every piece of UI in this app comes from `@estiva-app/ui`, or wraps it with
+what only Ship knows, or draws a product object nothing else has. There is no
+fourth kind. Before you write a component, a class list or a colour:
+
+1. `UI-RULES.md`, imported above, is already in your context. Act on it, all
+   of it.
+2. Read `web/node_modules/@estiva-app/ui/src/<Component>.mdx` for how to use a
+   component, and `Choosing.mdx` to pick one (in the `estiva-ui` checkout
+   beside this repository under `stories/`, or the package Storybook on
+   `:6008`). Do not use a component you have not read the page of.
+3. Look in `web/src/components/ui/` for the shim or wrapper this app already
+   has.
+
+Never hand-write a popup, a menu, a dialog, a tooltip, keyboard navigation,
+outside-click or focus handling, or a form control. Never use a Tailwind
+default size or colour (`text-sm`, `bg-gray-100`), a hex value, an opacity
+modifier on a token (`bg-bg-inset/40`), or a class the preset does not define:
+the token classes are doubled, `bg-bg-surface` and `text-text-primary`, and
+`bg-surface` compiles to nothing. Until the lint that fails the build on these
+lands, prove a class exists by building the CSS (`UI-RULES.md` §4).
+
+If the component you need is missing or nearly fits: extend the package (a
+ticket in `estiva-ui`, a prop added there), never a fork here. A fork without a
+ticket is a defect. Every UI file has a story; a file without one is unreviewed
+and is treated as broken until it has one.
+
 ## The app is `web/`, and nothing at the root tests it
 
 Two package.json files. The root holds the shared wire and fold code — `src/`,
