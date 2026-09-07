@@ -395,14 +395,22 @@ export function buildConversationMessage(
  * Buzz it is accepted and honoured — the addressable event stops coming back —
  * but a copy on another relay, or in another app's cache, is untouched.
  *
- * NIP-09 is **author-scoped**: a relay honours a deletion only from the pubkey
- * that signed the original. That is the same constraint `kind:1851` exists to
- * work around, and here it cannot be worked around, which is why archiving is
- * the operation offered to everyone and this one is offered only to the author.
+ * **It is not author-scoped**, and this comment said it was until CON-3. Buzz
+ * honours a deletion from the target's effective author *or* from the NIP-OA
+ * owner of an authoring agent (`validate_standard_deletion_event`), on the `a`
+ * branch and the `e` branch alike. No client can evaluate the second half, so
+ * nothing here gates on authorship: the control is offered and the refusal is
+ * reported (SPEC §6.5, corrected 2026-09-06; SHI-14).
+ *
+ * Archiving is still the operation offered *first* — it is reversible and
+ * attributable, and a deletion is neither. That half of §6.5 was never wrong.
  *
  * `a` names the addressable event; `k` its kind, which NIP-09 requires so a
- * relay can act without fetching the target first. `h` because the relay
- * channel-scopes ingest and would otherwise reject this outright.
+ * relay can act without fetching the target first. `h` is sent and the relay
+ * ignores it: `kind:5` is not in `requires_h_channel_scope`, and the channel is
+ * derived from the target rather than from the tag. It stays because removing
+ * it would change the event id of every deletion this app has ever published
+ * for no gain — but a reader should not take it for a requirement.
  */
 export function buildDeletion(
   pubkey: string,

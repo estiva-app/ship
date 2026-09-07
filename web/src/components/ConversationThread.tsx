@@ -1,7 +1,11 @@
-import { Fragment, useMemo } from 'react'
+import { Fragment, useMemo, useState } from 'react'
+import { IconDots } from '@tabler/icons-react'
 import type { BlockAnchor } from '@estiva-app/protocol'
 import { referencesIn, standaloneReference, toRenderTree } from '@estiva-app/protocol'
 import { BlockAnchorNote } from './ui/BlockAnchorNote'
+import { ConfirmDialog } from './ui/ConfirmDialog'
+import { IconButton } from './ui/IconButton'
+import { Menu, MenuItem } from './ui/Menu'
 import { cn } from '@/lib/cn'
 import { ago } from '@/lib/time'
 import { Avatar } from '@/components/ui/Avatar'
@@ -146,6 +150,104 @@ export interface ThreadData {
   replies: MessageData[]
 }
 
+/**
+ * The one thing you can do to a message that is not a reaction — CON-3.
+ *
+ * ## Offered to everyone, decided by the relay
+ *
+ * There is no `author === me` here, and that is the whole point of the ticket.
+ * Buzz honours a `kind:5` from the target's effective author **or** from the
+ * NIP-OA owner of an authoring agent, and **no client can evaluate the second
+ * half**: ownership is written from the attestation and read server-side only.
+ * An app that gates on its own author check therefore hides the control from
+ * the one *other* party the relay would accept — and on this workspace that is
+ * where the conversation is: 425 of 583 messages on 2026-09-06 were written by
+ * a single agent identity.
+ *
+ * So the control is offered, the write is attempted, and a refusal is shown in
+ * the relay's own words. SPEC §6.5 said the opposite until 2026-09-06; SHI-14
+ * found it wrong on objects, and this is the comment surface catching up.
+ *
+ * ## Why a menu and not a button
+ *
+ * `Menu`'s page: *"a click-opened list of actions: a `…` more-menu"*, rows
+ * `destructive` in the error colour. One row today; Edit joins it at CON-4,
+ * and a bare trash icon beside every message would have to move then anyway.
+ *
+ * The trigger swallows its own `mousedown` — the shell's outside-click exit
+ * listens on `mousedown`, so a trigger toggling on `click` would see its press
+ * close the menu and the click reopen it. That trap is documented on `Menu`'s
+ * page and it is the caller's to avoid.
+ */
+function MessageActions({ onDelete, disabledReason }: { onDelete: () => void; disabledReason?: string }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="relative ml-auto shrink-0">
+      <IconButton
+        aria-label="Message actions"
+        tooltip={disabledReason ?? 'Message actions'}
+        disabled={!!disabledReason}
+        onMouseDown={(event) => event.stopPropagation()}
+        onClick={() => setOpen((value) => !value)}
+      >
+        <IconDots size={16} stroke={1.5} />
+      </IconButton>
+      {open && (
+        <Menu onClose={() => setOpen(false)}>
+          <MenuItem
+            label="Delete message"
+            destructive
+            onClick={() => {
+              setOpen(false)
+              onDelete()
+            }}
+          />
+        </Menu>
+      )}
+    </div>
+  )
+}
+
+/**
+ * The question asked before a deletion, and the three things it has to say.
+ *
+ * A deletion is a **request**: the relay may decline it, and copies held by
+ * another relay or another app's cache are untouched. That is not hedging — it
+ * is the difference between this and archiving, which is the reversible,
+ * attributable operation §6.5 still puts first.
+ *
+ * Deleting the **root** of a thread does not delete the thread: replies are
+ * separate events with their own authors, and `foldConversations` promotes the
+ * earliest surviving message to stand in for a root it cannot see. So the
+ * conversation carries on without its opening line, which is worth knowing
+ * before rather than after.
+ */
+function ConfirmDeleteMessage({
+  replies,
+  onConfirm,
+  onClose,
+}: {
+  /** How many replies this message would leave behind — 0 unless it is a root. */
+  replies: number
+  onConfirm: () => Promise<boolean | void> | boolean | void
+  onClose: () => void
+}) {
+  return (
+    <ConfirmDialog title="Delete this message?" confirmLabel="Delete message" destructive onConfirm={onConfirm} onClose={onClose}>
+      <p>
+        This publishes a NIP-09 deletion request. The relay decides: it accepts one from the message&rsquo;s author, or from the
+        owner of an agent that wrote it. Copies held by other relays or apps are unaffected.
+      </p>
+      {replies > 0 && (
+        <p>
+          Its {replies} {replies === 1 ? 'reply is a separate event and is' : 'replies are separate events and are'} not deleted.
+          The conversation stays, opening with whichever message comes next.
+        </p>
+      )}
+    </ConfirmDialog>
+  )
+}
+
 export function MessageCard({
   message,
   reply = false,
@@ -154,6 +256,8 @@ export function MessageCard({
   nameOf,
   reactions,
   onToggleReaction,
+  onDelete,
+  repliesLeftBehind = 0,
   disabledReason,
 }: {
   message: MessageData
@@ -168,9 +272,20 @@ export function MessageCard({
   reactions?: readonly Reaction[]
   /** Add or take back a reaction on this message. Omitted where nobody may write. */
   onToggleReaction?: (emoji: string, mine?: string) => void
+  /**
+   * Publish a deletion for this message — CON-3.
+   *
+   * Resolves `false` when the relay refused, which keeps the dialog open so
+   * the page's banner can say why. Omitted where nobody may write, which
+   * removes the control rather than disabling it.
+   */
+  onDelete?: () => Promise<boolean | void> | boolean | void
+  /** Replies that would survive this message — only a thread root has any. */
+  repliesLeftBehind?: number
   /** Why nothing can be written right now. */
   disabledReason?: string
 }) {
+  const [confirming, setConfirming] = useState(false)
   const blocks = toRenderTree(message.body, MESSAGE_FORMAT)
   // A block that is nothing but one pointer is an attachment and is drawn
   // below; one inside a sentence is drawn where it was written (RIC-10).
@@ -184,7 +299,11 @@ export function MessageCard({
         <span className={cn('truncate', message.author.name ? 'text-text-secondary' : 'text-text-muted')}>{message.author.name ?? '—'}</span>
         <span aria-hidden="true">·</span>
         <span className="shrink-0">{ago(message.at)}</span>
+        {onDelete && <MessageActions onDelete={() => setConfirming(true)} disabledReason={disabledReason} />}
       </div>
+      {confirming && onDelete && (
+        <ConfirmDeleteMessage replies={repliesLeftBehind} onConfirm={onDelete} onClose={() => setConfirming(false)} />
+      )}
       <RichText
         value={message.body}
         format={MESSAGE_FORMAT}
@@ -232,7 +351,7 @@ function NewSinceHere() {
   )
 }
 
-export function ConversationThread({ thread, onReply, disabledReason, unreadFrom, resolved, resolving, nameOf, reactionsBy, onReact, subdued = false }: { thread: ThreadData; onReply: (threadId: string, text: string) => Promise<boolean | void> | boolean | void; disabledReason?: string; unreadFrom?: string; resolved?: Record<string, ForeignObjectData | null | undefined>; resolving?: boolean; nameOf?: (pubkey: string) => string; /** Reactions by message id, read once for the surface. */ reactionsBy?: Record<string, readonly Reaction[]>; /** Add or take back a reaction on one message. */ onReact?: (messageId: string, emoji: string, mine?: string) => void; /** Draw it as secondary — Activity's mentions, which do not carry a comment's trust (CON-9). */ subdued?: boolean }) {
+export function ConversationThread({ thread, onReply, disabledReason, unreadFrom, resolved, resolving, nameOf, reactionsBy, onReact, onDeleteMessage, subdued = false }: { thread: ThreadData; onReply: (threadId: string, text: string) => Promise<boolean | void> | boolean | void; disabledReason?: string; unreadFrom?: string; resolved?: Record<string, ForeignObjectData | null | undefined>; resolving?: boolean; nameOf?: (pubkey: string) => string; /** Reactions by message id, read once for the surface. */ reactionsBy?: Record<string, readonly Reaction[]>; /** Add or take back a reaction on one message. */ onReact?: (messageId: string, emoji: string, mine?: string) => void; /** Publish a deletion for one message — CON-3. Omitted where nobody may write. */ onDeleteMessage?: (messageId: string) => Promise<boolean | void> | boolean | void; /** Draw it as secondary — Activity's mentions, which do not carry a comment's trust (CON-9). */ subdued?: boolean }) {
   return (
     <div
       className={cn(
@@ -244,11 +363,11 @@ export function ConversationThread({ thread, onReply, disabledReason, unreadFrom
       )}
     >
       {unreadFrom === thread.root.id && <NewSinceHere />}
-      <MessageCard message={thread.root} resolved={resolved} resolving={resolving} nameOf={nameOf} reactions={reactionsBy?.[thread.root.id]} onToggleReaction={onReact && ((emoji, mine) => onReact(thread.root.id, emoji, mine))} disabledReason={disabledReason} />
+      <MessageCard message={thread.root} resolved={resolved} resolving={resolving} nameOf={nameOf} reactions={reactionsBy?.[thread.root.id]} onToggleReaction={onReact && ((emoji, mine) => onReact(thread.root.id, emoji, mine))} onDelete={onDeleteMessage && (() => onDeleteMessage(thread.root.id))} repliesLeftBehind={thread.replies.length} disabledReason={disabledReason} />
       {thread.replies.map((reply) => (
         <Fragment key={reply.id}>
           {unreadFrom === reply.id && <NewSinceHere />}
-          <MessageCard message={reply} reply resolved={resolved} resolving={resolving} nameOf={nameOf} reactions={reactionsBy?.[reply.id]} onToggleReaction={onReact && ((emoji, mine) => onReact(reply.id, emoji, mine))} disabledReason={disabledReason} />
+          <MessageCard message={reply} reply resolved={resolved} resolving={resolving} nameOf={nameOf} reactions={reactionsBy?.[reply.id]} onToggleReaction={onReact && ((emoji, mine) => onReact(reply.id, emoji, mine))} onDelete={onDeleteMessage && (() => onDeleteMessage(reply.id))} disabledReason={disabledReason} />
         </Fragment>
       ))}
       <Composer kind="reply" onSubmit={(text) => onReply(thread.id, text)} disabledReason={disabledReason} draftKey={draftKeys.thread(thread.id)} className="ml-3.5 mt-1" />
@@ -286,10 +405,18 @@ export interface ConversationsProps {
    * instead of disabling them.
    */
   onReact?: (messageId: string, emoji: string, mine?: string) => Promise<boolean | void> | boolean | void
+  /**
+   * Publish a deletion for one message — CON-3.
+   *
+   * Resolves `false` on a refusal, which is what keeps the confirm dialog open
+   * so the page's banner can carry the relay's own words. Omitted where nobody
+   * may write, and the control is then absent rather than disabled.
+   */
+  onDeleteMessage?: (messageId: string) => Promise<boolean | void> | boolean | void
   className?: string
 }
 
-export function Conversations({ threads, onStart, onReply, disabledReason, className, unread, anchoredTo, onClearAnchor, nameOf, about, onReact }: ConversationsProps) {
+export function Conversations({ threads, onStart, onReply, disabledReason, className, unread, anchoredTo, onClearAnchor, nameOf, about, onReact, onDeleteMessage }: ConversationsProps) {
   const { resolved, resolving } = useThreadReferences(threads)
   const { reactionsBy, omitted, refresh: refreshReactions } = useThreadReactions(threads)
 
@@ -331,6 +458,7 @@ export function Conversations({ threads, onStart, onReply, disabledReason, class
             nameOf={nameOf}
             reactionsBy={reactionsBy}
             onReact={react}
+            onDeleteMessage={onDeleteMessage}
           />
         ))
       ) : (

@@ -81,6 +81,15 @@ export interface ActivityProps {
   /** Add or take back a reaction on a message in one of these threads — CON-2. */
   onReact?: (messageId: string, emoji: string, mine?: string) => Promise<boolean | void> | boolean | void
   /**
+   * Publish a deletion for one message — CON-3.
+   *
+   * Offered here too, and deliberately: an Activity thread belongs to another
+   * file, but a message is a message wherever it is read, and who may delete
+   * it is the relay's question rather than this surface's. Hiding the control
+   * on the roll-up would make it depend on where you happened to be standing.
+   */
+  onDeleteMessage?: (messageId: string) => Promise<boolean | void> | boolean | void
+  /**
    * How many threads the horizon left out — `ACTIVITY_HORIZON`.
    *
    * Reported rather than implied. CON-1's finding is that an undocumented cap
@@ -92,7 +101,7 @@ export interface ActivityProps {
   className?: string
 }
 
-export function Activity({ items, onReply, disabledReason, nameOf, onReact, truncated = 0, className }: ActivityProps) {
+export function Activity({ items, onReply, disabledReason, nameOf, onReact, onDeleteMessage, truncated = 0, className }: ActivityProps) {
   const threads = useMemo(() => items.map((item) => item.thread), [items])
   const { resolved, resolving } = useThreadReferences(threads)
   /* Activity's threads belong to other files, and a reaction is a property of
@@ -137,6 +146,7 @@ export function Activity({ items, onReply, disabledReason, nameOf, onReact, trun
                 nameOf={nameOf}
                 reactionsBy={reactionsBy}
                 onReact={react}
+                onDeleteMessage={onDeleteMessage}
                 subdued={relation.muted}
               />
             </li>

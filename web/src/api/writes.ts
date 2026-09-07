@@ -305,3 +305,29 @@ export function react(targetEventId: string, emoji: string): Promise<WriteResult
 export function unreact(reactionEventId: string): Promise<WriteResult> {
   return publish(() => store.unreact({ reactionEventId }))
 }
+
+// ── Deleting a comment ──────────────────────────────────────────────────────
+
+/**
+ * Take a comment back — CON-3.
+ *
+ * **Offered to everyone, gated by nobody here.** The relay honours a `kind:5`
+ * from the target's effective author or from the NIP-OA owner of an authoring
+ * agent, and no client can evaluate the second half: ownership is written from
+ * the attestation and read server-side only, and the attestation runs
+ * agent→owner, never the reverse. An app that hides the control behind its own
+ * `author === me` therefore hides it from the one *other* party the relay would
+ * accept — and on this workspace that is most of the conversation: 425 of 583
+ * messages on 2026-09-06 were authored by a single agent identity.
+ *
+ * So the answer comes from the relay. `must be event author` is what a refusal
+ * reads as, and the caller shows it rather than pretending the write did not
+ * happen. SHI-14 reached the same conclusion for projects and issues; this is
+ * the comment surface catching up.
+ *
+ * The same shape as `unreact` — a regular event named by `e`, no Folder, no
+ * `h`. What differs is only what is being taken back.
+ */
+export function deleteMessage(messageEventId: string): Promise<WriteResult> {
+  return publish(() => store.deleteMessage({ messageEventId }))
+}

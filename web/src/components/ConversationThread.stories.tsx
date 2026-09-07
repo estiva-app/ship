@@ -37,3 +37,22 @@ export const OneThread: Story = { args: { threads: [THREADS[1]] } }
  * have shown it; there was not one, which is why there is one now.
  */
 export const Unread: Story = { args: { threads: THREADS, unread: { [THREADS[0].id]: THREADS[0].replies[1].id } } }
+
+/**
+ * Every message carries a `…` — CON-3.
+ *
+ * **On every message, not only your own.** SPEC §6.5 said a relay honours a
+ * deletion only from the original signer, and this app was built to hide the
+ * control accordingly; the rule was withdrawn on 2026-09-06. Buzz accepts a
+ * `kind:5` from the target's effective author **or** from the NIP-OA owner of
+ * an authoring agent, and no client can evaluate the second half — ownership is
+ * written from the attestation and read server-side only. So an author gate
+ * would hide the control from the one *other* party the relay would accept,
+ * which here is where the conversation is: 425 of 583 messages on production
+ * were written by a single agent identity.
+ *
+ * Without `onDeleteMessage` — a signed-out reader — the trigger is absent
+ * rather than disabled, which is Button's rule for a control somebody may
+ * never be allowed to use.
+ */
+export const Deletable: Story = { args: { threads: [THREADS[0]], onDeleteMessage: fn() } }
