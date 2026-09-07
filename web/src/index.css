@@ -47,6 +47,16 @@
   #root {
     height: 100%;
   }
+  /*
+    Base UI's one layout requirement, and the reason it is here rather than in
+    a component: its overlays portal to <body>, as siblings of #root. Isolating
+    #root gives them a stacking context to sit above without anyone picking a
+    z-index for them. Safe in Ship, which portals nothing of its own and spells
+    exactly two z-index values, both inside #root.
+  */
+  #root {
+    isolation: isolate;
+  }
   body {
     @apply bg-bg-base text-text-primary font-sans text-body-2 antialiased;
   }
