@@ -1,4 +1,3 @@
-import type { ReactElement } from 'react'
 import { cn } from '@/lib/cn'
 import { Avatar } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
@@ -6,7 +5,6 @@ import { Divider } from '@/components/ui/Divider'
 import { ProgressBar } from '@/components/ui/ProgressBar'
 import { Property } from '@/components/ui/Property'
 import { Select, type SelectOption } from '@/components/ui/Select'
-import { WithTooltip } from '@/components/ui/Tooltip'
 
 /**
  * The project page's right rail, exactly as production lays it out, from
@@ -77,7 +75,6 @@ export function ProjectRail({
   className,
 }: ProjectRailProps) {
   const locked = !!readOnlyReason
-  const held = (button: ReactElement) => (readOnlyReason ? <WithTooltip label={readOnlyReason}>{button}</WithTooltip> : button)
   return (
     <aside className={cn('flex w-[250px] shrink-0 flex-col gap-4', className)}>
       <Property layout="stacked" label="Status">
@@ -100,25 +97,19 @@ export function ProjectRail({
           <Button size="small" variant="outlined" onClick={onCopyFolderLink}>
             Copy Folder link
           </Button>
-          {held(
-            <Button size="small" variant="outlined" onClick={onPairFolder} disabled={locked}>
-              Pair with another Folder…
-            </Button>,
-          )}
+          <Button size="small" variant="outlined" onClick={onPairFolder} disabledReason={readOnlyReason}>
+            Pair with another Folder…
+          </Button>
         </div>
       </Property>
       <Divider className="mx-0" />
       <div className="flex flex-col items-start gap-1">
-        {held(
-          <Button size="small" variant="muted" onClick={onArchive} disabled={locked}>
-            {archived ? 'Unarchive project' : 'Archive project'}
-          </Button>,
-        )}
-        {held(
-          <Button size="small" variant="destructive" onClick={onDelete} disabled={locked}>
-            Delete project
-          </Button>,
-        )}
+        <Button size="small" variant="muted" onClick={onArchive} disabledReason={readOnlyReason}>
+          {archived ? 'Unarchive project' : 'Archive project'}
+        </Button>
+        <Button size="small" variant="destructive" onClick={onDelete} disabledReason={readOnlyReason}>
+          Delete project
+        </Button>
       </div>
     </aside>
   )

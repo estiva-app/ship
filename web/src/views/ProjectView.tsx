@@ -3,7 +3,6 @@ import type { ContentFormat } from '@estiva-app/protocol'
 import { Breadcrumb } from '@/components/ui/Breadcrumb'
 import { Button } from '@/components/ui/Button'
 import { Divider } from '@/components/ui/Divider'
-import { WithTooltip } from '@/components/ui/Tooltip'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Tabs } from '@/components/ui/Tabs'
 import type { StatusEntry } from '@/lib/issues'
@@ -73,14 +72,8 @@ export interface ProjectViewProps {
 }
 
 export function ProjectView({ crumbs, header, onAddIssue, view, onView, issues, issueStatuses, hrefFor, threads, unread, onStartConversation, onReply, activity, activityTruncated, onReplyInActivity, rail, about, onReact, onDeleteMessage, readOnlyReason }: ProjectViewProps) {
-  const addIssue = readOnlyReason ? (
-    <WithTooltip label={readOnlyReason}>
-      <Button variant="primary" disabled>
-        Add issue
-      </Button>
-    </WithTooltip>
-  ) : (
-    <Button variant="primary" onClick={onAddIssue}>
+  const addIssue = (
+    <Button variant="primary" onClick={onAddIssue} disabledReason={readOnlyReason}>
       Add issue
     </Button>
   )
