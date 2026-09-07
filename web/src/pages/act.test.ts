@@ -63,4 +63,16 @@ describe('act', () => {
     await act('Reaction', refusedWith('rate-limited: quota exceeded'), (t) => said.push(t))
     expect(said[0]).toBe('Too busy right now — try again shortly.')
   })
+
+  /*
+    The seam CON-10 and this branch meet at, and neither could assert alone.
+
+    `Composer` clears its draft when the result is not `false`. A quota refusal
+    is still a refusal, so it has to resolve `false` — otherwise the relay
+    saying "try again in 14s" would eat the message it is asking you to send
+    again.
+  */
+  it('resolves false on a quota refusal, so a composer keeps what was typed', async () => {
+    expect(await act('Message', refusedWith('rate-limited: quota exceeded; retry in 14s'), () => {})).toBe(false)
+  })
 })
