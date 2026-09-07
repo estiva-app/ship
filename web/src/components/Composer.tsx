@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { cn } from '@/lib/cn'
 import { browserDrafts, type DraftStore } from '@/lib/drafts'
 import { Button } from '@/components/ui/Button'
-import { WithTooltip } from '@/components/ui/Tooltip'
 import { TextInput } from '@/components/ui/TextInput'
 
 /**
@@ -93,11 +92,6 @@ export function Composer({ kind = 'conversation', onSubmit, autoFocus = false, d
     }
   }
 
-  const button = (
-    <Button type="submit" variant={variant} disabled={!canSubmit}>
-      {label}
-    </Button>
-  )
   return (
     <form onSubmit={submit} className={cn('flex items-center gap-2', className)}>
       <TextInput
@@ -109,7 +103,9 @@ export function Composer({ kind = 'conversation', onSubmit, autoFocus = false, d
         disabled={busy || !!disabledReason}
         className="min-w-0 flex-1"
       />
-      {disabledReason ? <WithTooltip label={disabledReason}>{button}</WithTooltip> : button}
+      <Button type="submit" variant={variant} disabled={!canSubmit} disabledReason={disabledReason}>
+        {label}
+      </Button>
     </form>
   )
 }

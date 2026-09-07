@@ -1,6 +1,5 @@
 import { Button } from '@/components/ui/Button'
 import { Tabs } from '@/components/ui/Tabs'
-import { WithTooltip } from '@/components/ui/Tooltip'
 import type { StatusEntry } from '@/lib/issues'
 import { IssueList } from '@/components/IssueList'
 import type { IssueRowData } from '@/components/IssueRow'
@@ -40,17 +39,9 @@ export function IssuesView({ issues, statuses, mine, scope, onScope, hrefFor, on
     <div data-surface="issues" className="flex flex-col gap-4 px-6 py-5">
       <div className="flex items-center gap-3">
         <h1 className="flex-1 text-h3 text-text-primary">Issues</h1>
-        {addDisabledReason ? (
-          <WithTooltip label={addDisabledReason}>
-            <Button variant="primary" disabled>
-              Add issue
-            </Button>
-          </WithTooltip>
-        ) : (
-          <Button variant="primary" onClick={onAddIssue}>
-            Add issue
-          </Button>
-        )}
+        <Button variant="primary" onClick={onAddIssue} disabledReason={addDisabledReason}>
+          Add issue
+        </Button>
       </div>
       <Tabs<IssuesScope>
         tabs={[

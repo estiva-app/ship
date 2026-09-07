@@ -1,7 +1,6 @@
 import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Tabs } from '@/components/ui/Tabs'
-import { WithTooltip } from '@/components/ui/Tooltip'
 import { ProjectCard, type ProjectCardProps } from '@/components/ProjectCard'
 
 /**
@@ -30,17 +29,9 @@ export function ProjectsView({ active, archived, showArchived, onShowArchived, o
     <div data-surface="projects" className="flex flex-col gap-4 px-6 py-5">
       <div className="flex items-center gap-3">
         <h1 className="flex-1 text-h3 text-text-primary">Projects</h1>
-        {addDisabledReason ? (
-          <WithTooltip label={addDisabledReason}>
-            <Button variant="primary" disabled>
-              Add project
-            </Button>
-          </WithTooltip>
-        ) : (
-          <Button variant="primary" onClick={onAddProject}>
-            Add project
-          </Button>
-        )}
+        <Button variant="primary" onClick={onAddProject} disabledReason={addDisabledReason}>
+          Add project
+        </Button>
       </div>
       {archived.length > 0 && (
         <Tabs

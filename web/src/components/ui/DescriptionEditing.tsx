@@ -118,7 +118,7 @@ export default function DescriptionEditing({
             height, is most of what "1:1" means in practice — the four-row
             textarea this replaces moved everything and hid most of it.
           */
-          className="-mx-2 rounded-md bg-bg-inset/40 px-2 py-1"
+          className="-mx-2 rounded-md bg-bg-wash px-2 py-1"
           onKeyDown={(event) => {
             if (event.key !== 'Escape' || !editor) return
             event.preventDefault()
