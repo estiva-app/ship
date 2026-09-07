@@ -26,3 +26,14 @@ export const Empty: Story = { args: { threads: [] } }
 
 /** A single thread with no replies yet. */
 export const OneThread: Story = { args: { threads: [THREADS[1]] } }
+
+/**
+ * "New since you last read this" — the divider CRO-13 added.
+ *
+ * It had no colour at all until 2026-09-07: `text-accent-default` and
+ * `bg-accent-default/40` are not classes the preset defines (the accent tokens
+ * are `accent-primary`, `accent-muted`, `accent-hover`), so both compiled to
+ * nothing and the marker rendered in the inherited body colour. A story would
+ * have shown it; there was not one, which is why there is one now.
+ */
+export const Unread: Story = { args: { threads: THREADS, unread: { [THREADS[0].id]: THREADS[0].replies[1].id } } }
