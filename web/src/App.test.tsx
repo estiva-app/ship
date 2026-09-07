@@ -67,6 +67,9 @@ const STATE: WorkspaceState = {
   // `c1` names the issue in its *tags*, so it is that issue's own comment
   // rather than a passing mention of it — SPEC §6.4, CON-7.
   tagged: { c1: [`30851:x:${D('14')}`] },
+  // No edits in the fixture: an unedited workspace is the ordinary case, and
+  // `edits.test.ts` covers the fold itself (CON-4).
+  edits: {},
 }
 
 const refresh = vi.fn().mockResolvedValue(undefined)

@@ -3,7 +3,9 @@ import { IconDots } from '@tabler/icons-react'
 import type { BlockAnchor } from '@estiva-app/protocol'
 import { referencesIn, standaloneReference, toRenderTree } from '@estiva-app/protocol'
 import { BlockAnchorNote } from './ui/BlockAnchorNote'
+import { Button } from './ui/Button'
 import { ConfirmDialog } from './ui/ConfirmDialog'
+import { Textarea } from './ui/Textarea'
 import { IconButton } from './ui/IconButton'
 import { Menu, MenuItem } from './ui/Menu'
 import { cn } from '@/lib/cn'
@@ -67,11 +69,24 @@ export interface MessageData {
   /** Seconds. */
   at: number
   /**
-   * The body as it was published, minus the pointer at the object whose page
-   * this is — see `omitOwnReference`. Every other reference is still in here
-   * and is drawn as the object it names, not deleted.
+   * The body as it stands, minus the pointer at the object whose page this is —
+   * see `omitOwnReference`. Every other reference is still in here and is drawn
+   * as the object it names, not deleted.
+   *
+   * **This is the edited text where there is one** (CON-4). An edit replaces
+   * the body and nothing else, and `threadFor` applies it, so nothing below has
+   * to know an edit happened in order to draw the message correctly.
    */
   body: string
+  /**
+   * When it was last edited, in seconds — CON-4.
+   *
+   * Present only for an edited message, because "edited" is a thing a reader
+   * MUST be told (RFC 0.4 §7.2.1): the original event is immutable and still on
+   * the relay, so a body that quietly changed would leave two readers
+   * disagreeing with no way to tell which is current.
+   */
+  editedAt?: number
   /** Author pubkey. Only used to decide unread — your own writing is never new. */
   by?: string
 }
@@ -179,7 +194,15 @@ export interface ThreadData {
  * close the menu and the click reopen it. That trap is documented on `Menu`'s
  * page and it is the caller's to avoid.
  */
-function MessageActions({ onDelete, disabledReason }: { onDelete: () => void; disabledReason?: string }) {
+function MessageActions({
+  onEdit,
+  onDelete,
+  disabledReason,
+}: {
+  onEdit?: () => void
+  onDelete?: () => void
+  disabledReason?: string
+}) {
   const [open, setOpen] = useState(false)
   return (
     <div className="relative ml-auto shrink-0">
@@ -194,14 +217,27 @@ function MessageActions({ onDelete, disabledReason }: { onDelete: () => void; di
       </IconButton>
       {open && (
         <Menu onClose={() => setOpen(false)}>
-          <MenuItem
-            label="Delete message"
-            destructive
-            onClick={() => {
-              setOpen(false)
-              onDelete()
-            }}
-          />
+          {/* Edit above Delete, and not destructive: one changes what was said,
+              the other takes it back, and the reversible one goes first. */}
+          {onEdit && (
+            <MenuItem
+              label="Edit message"
+              onClick={() => {
+                setOpen(false)
+                onEdit()
+              }}
+            />
+          )}
+          {onDelete && (
+            <MenuItem
+              label="Delete message"
+              destructive
+              onClick={() => {
+                setOpen(false)
+                onDelete()
+              }}
+            />
+          )}
         </Menu>
       )}
     </div>
@@ -248,6 +284,79 @@ function ConfirmDeleteMessage({
   )
 }
 
+/**
+ * Editing a message in place — CON-4.
+ *
+ * A `Textarea` and two buttons rather than the rich composer, and that is the
+ * §13.2 line rather than a shortcut: **a message is marker text**, so what is
+ * edited is the text that was published. Handing it a rich editor would make
+ * the round trip lossy in exactly the way `blockDocumentToMarkerText` exists to
+ * avoid, and `RichText` draws the result the same either way.
+ *
+ * Seeded from the body as it currently stands — the *edited* text where there
+ * is one, since editing an edit should start from what is on screen.
+ *
+ * **Kept open on a refusal.** `onSave` resolving `false` means the relay
+ * declined, and closing would throw away what was typed to no purpose. Same
+ * rule the composer and the delete dialog both keep.
+ */
+function EditMessage({
+  body,
+  onSave,
+  onCancel,
+}: {
+  body: string
+  onSave: (body: string) => Promise<boolean | void> | boolean | void
+  onCancel: () => void
+}) {
+  const [text, setText] = useState(body)
+  const [saving, setSaving] = useState(false)
+  const unchanged = text.trim() === body.trim()
+
+  const save = async () => {
+    if (!text.trim() || unchanged) return
+    setSaving(true)
+    try {
+      const ok = await onSave(text.trim())
+      if (ok !== false) onCancel()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5" data-editing={body ? 'message' : 'message'}>
+      <Textarea
+        value={text}
+        autoFocus
+        rows={3}
+        aria-label="Edit message"
+        onChange={(event) => setText(event.target.value)}
+        onKeyDown={(event) => {
+          // Escape abandons, as it does in every other dismissible surface here.
+          if (event.key === 'Escape') onCancel()
+        }}
+      />
+      <div className="flex items-center gap-2">
+        <Button
+          size="small"
+          variant="primary"
+          disabled={saving || !text.trim() || unchanged}
+          onClick={() => void save()}
+        >
+          Save
+        </Button>
+        <Button size="small" variant="muted" disabled={saving} onClick={onCancel}>
+          Cancel
+        </Button>
+        {/* An edit is a new event, and a reader who has not implemented 40003
+            keeps showing the original — worth saying once, where it is done. */}
+        <span className="text-caption text-text-muted">Publishes an edit; the original event stays on the relay.</span>
+      </div>
+    </div>
+  )
+}
+
 export function MessageCard({
   message,
   reply = false,
@@ -257,6 +366,7 @@ export function MessageCard({
   reactions,
   onToggleReaction,
   onDelete,
+  onEdit,
   repliesLeftBehind = 0,
   disabledReason,
 }: {
@@ -280,12 +390,24 @@ export function MessageCard({
    * removes the control rather than disabling it.
    */
   onDelete?: () => Promise<boolean | void> | boolean | void
+  /**
+   * Publish an edit of this message — CON-4.
+   *
+   * Takes the new body and resolves `false` when the relay refused, which keeps
+   * the editor open with the text still in it. Omitted where nobody may write.
+   *
+   * No author gate, same as `onDelete`: the relay takes an edit from the
+   * target's effective author or the NIP-OA owner of an authoring agent, and no
+   * client can evaluate the second half.
+   */
+  onEdit?: (body: string) => Promise<boolean | void> | boolean | void
   /** Replies that would survive this message — only a thread root has any. */
   repliesLeftBehind?: number
   /** Why nothing can be written right now. */
   disabledReason?: string
 }) {
   const [confirming, setConfirming] = useState(false)
+  const [editing, setEditing] = useState(false)
   const blocks = toRenderTree(message.body, MESSAGE_FORMAT)
   // A block that is nothing but one pointer is an attachment and is drawn
   // below; one inside a sentence is drawn where it was written (RIC-10).
@@ -299,11 +421,36 @@ export function MessageCard({
         <span className={cn('truncate', message.author.name ? 'text-text-secondary' : 'text-text-muted')}>{message.author.name ?? '—'}</span>
         <span aria-hidden="true">·</span>
         <span className="shrink-0">{ago(message.at)}</span>
-        {onDelete && <MessageActions onDelete={() => setConfirming(true)} disabledReason={disabledReason} />}
+        {/*
+          "edited", and the time it was edited rather than a bare word.
+
+          RFC 0.4 §7.2.1 makes the marker a MUST: the original event is
+          immutable and still on the relay, so a body that quietly changed
+          leaves two readers disagreeing with nothing to tell them which is
+          current. The `title` carries the detail so the line stays short.
+        */}
+        {message.editedAt !== undefined && (
+          <>
+            <span aria-hidden="true">·</span>
+            <span className="shrink-0 italic" title={`Edited ${ago(message.editedAt)}`}>
+              edited
+            </span>
+          </>
+        )}
+        {(onDelete || onEdit) && (
+          <MessageActions
+            onEdit={onEdit && (() => setEditing(true))}
+            onDelete={onDelete && (() => setConfirming(true))}
+            disabledReason={disabledReason}
+          />
+        )}
       </div>
       {confirming && onDelete && (
         <ConfirmDeleteMessage replies={repliesLeftBehind} onConfirm={onDelete} onClose={() => setConfirming(false)} />
       )}
+      {editing && onEdit ? (
+        <EditMessage body={message.body} onSave={onEdit} onCancel={() => setEditing(false)} />
+      ) : (
       <RichText
         value={message.body}
         format={MESSAGE_FORMAT}
@@ -319,6 +466,7 @@ export function MessageCard({
         resolved={resolved}
         className="break-words text-body-2 text-text-primary"
       />
+      )}
       {attached.length > 0 && resolving && <SkeletonBar className="h-16 w-full rounded-lg" data-foreign-references="loading" />}
       {attachments.length > 0 && (
         <div className="flex flex-col gap-2" data-foreign-references={String(attachments.length)}>
@@ -351,7 +499,7 @@ function NewSinceHere() {
   )
 }
 
-export function ConversationThread({ thread, onReply, disabledReason, unreadFrom, resolved, resolving, nameOf, reactionsBy, onReact, onDeleteMessage, subdued = false }: { thread: ThreadData; onReply: (threadId: string, text: string) => Promise<boolean | void> | boolean | void; disabledReason?: string; unreadFrom?: string; resolved?: Record<string, ForeignObjectData | null | undefined>; resolving?: boolean; nameOf?: (pubkey: string) => string; /** Reactions by message id, read once for the surface. */ reactionsBy?: Record<string, readonly Reaction[]>; /** Add or take back a reaction on one message. */ onReact?: (messageId: string, emoji: string, mine?: string) => void; /** Publish a deletion for one message — CON-3. Omitted where nobody may write. */ onDeleteMessage?: (messageId: string) => Promise<boolean | void> | boolean | void; /** Draw it as secondary — Activity's mentions, which do not carry a comment's trust (CON-9). */ subdued?: boolean }) {
+export function ConversationThread({ thread, onReply, disabledReason, unreadFrom, resolved, resolving, nameOf, reactionsBy, onReact, onDeleteMessage, onEditMessage, subdued = false }: { thread: ThreadData; onReply: (threadId: string, text: string) => Promise<boolean | void> | boolean | void; disabledReason?: string; unreadFrom?: string; resolved?: Record<string, ForeignObjectData | null | undefined>; resolving?: boolean; nameOf?: (pubkey: string) => string; /** Reactions by message id, read once for the surface. */ reactionsBy?: Record<string, readonly Reaction[]>; /** Add or take back a reaction on one message. */ onReact?: (messageId: string, emoji: string, mine?: string) => void; /** Publish a deletion for one message — CON-3. Omitted where nobody may write. */ onDeleteMessage?: (messageId: string) => Promise<boolean | void> | boolean | void; /** Publish an edit of one message — CON-4. Omitted where nobody may write. */ onEditMessage?: (messageId: string, body: string) => Promise<boolean | void> | boolean | void; /** Draw it as secondary — Activity's mentions, which do not carry a comment's trust (CON-9). */ subdued?: boolean }) {
   return (
     <div
       className={cn(
@@ -363,11 +511,11 @@ export function ConversationThread({ thread, onReply, disabledReason, unreadFrom
       )}
     >
       {unreadFrom === thread.root.id && <NewSinceHere />}
-      <MessageCard message={thread.root} resolved={resolved} resolving={resolving} nameOf={nameOf} reactions={reactionsBy?.[thread.root.id]} onToggleReaction={onReact && ((emoji, mine) => onReact(thread.root.id, emoji, mine))} onDelete={onDeleteMessage && (() => onDeleteMessage(thread.root.id))} repliesLeftBehind={thread.replies.length} disabledReason={disabledReason} />
+      <MessageCard message={thread.root} resolved={resolved} resolving={resolving} nameOf={nameOf} reactions={reactionsBy?.[thread.root.id]} onToggleReaction={onReact && ((emoji, mine) => onReact(thread.root.id, emoji, mine))} onDelete={onDeleteMessage && (() => onDeleteMessage(thread.root.id))} onEdit={onEditMessage && ((body) => onEditMessage(thread.root.id, body))} repliesLeftBehind={thread.replies.length} disabledReason={disabledReason} />
       {thread.replies.map((reply) => (
         <Fragment key={reply.id}>
           {unreadFrom === reply.id && <NewSinceHere />}
-          <MessageCard message={reply} reply resolved={resolved} resolving={resolving} nameOf={nameOf} reactions={reactionsBy?.[reply.id]} onToggleReaction={onReact && ((emoji, mine) => onReact(reply.id, emoji, mine))} onDelete={onDeleteMessage && (() => onDeleteMessage(reply.id))} disabledReason={disabledReason} />
+          <MessageCard message={reply} reply resolved={resolved} resolving={resolving} nameOf={nameOf} reactions={reactionsBy?.[reply.id]} onToggleReaction={onReact && ((emoji, mine) => onReact(reply.id, emoji, mine))} onDelete={onDeleteMessage && (() => onDeleteMessage(reply.id))} onEdit={onEditMessage && ((body) => onEditMessage(reply.id, body))} disabledReason={disabledReason} />
         </Fragment>
       ))}
       <Composer kind="reply" onSubmit={(text) => onReply(thread.id, text)} disabledReason={disabledReason} draftKey={draftKeys.thread(thread.id)} className="ml-3.5 mt-1" />
@@ -413,10 +561,18 @@ export interface ConversationsProps {
    * may write, and the control is then absent rather than disabled.
    */
   onDeleteMessage?: (messageId: string) => Promise<boolean | void> | boolean | void
+  /**
+   * Publish an edit of one message — CON-4.
+   *
+   * Resolves `false` on a refusal, which keeps the editor open with the text
+   * still in it. Omitted where nobody may write, and the control is then absent
+   * rather than disabled.
+   */
+  onEditMessage?: (messageId: string, body: string) => Promise<boolean | void> | boolean | void
   className?: string
 }
 
-export function Conversations({ threads, onStart, onReply, disabledReason, className, unread, anchoredTo, onClearAnchor, nameOf, about, onReact, onDeleteMessage }: ConversationsProps) {
+export function Conversations({ threads, onStart, onReply, disabledReason, className, unread, anchoredTo, onClearAnchor, nameOf, about, onReact, onDeleteMessage, onEditMessage }: ConversationsProps) {
   const { resolved, resolving } = useThreadReferences(threads)
   const { reactionsBy, omitted, refresh: refreshReactions } = useThreadReactions(threads)
 
@@ -459,6 +615,7 @@ export function Conversations({ threads, onStart, onReply, disabledReason, class
             reactionsBy={reactionsBy}
             onReact={react}
             onDeleteMessage={onDeleteMessage}
+            onEditMessage={onEditMessage}
           />
         ))
       ) : (

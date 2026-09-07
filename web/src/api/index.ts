@@ -33,6 +33,7 @@ export { conversationsAbout } from '../../../src/fold'
   second attaches permanently and by accident.
 */
 export { commentsOn, commentsOnAny, mentionsOf, attachmentOf, type Attachment, type TaggedIndex } from '../../../src/references'
+export { foldEdits, type Edit, type EditIndex } from '../../../src/edits'
 /* Reactions — SPEC §6.6. The horizon and the fold are in the data layer, where
    they can move into the conversation package; the hook that calls them is the
    app's. */
@@ -57,6 +58,7 @@ export {
   createProject,
   deleteIssue,
   deleteMessage,
+  editMessage,
   deleteProject,
   explainRejection,
   pairProjectFolder,

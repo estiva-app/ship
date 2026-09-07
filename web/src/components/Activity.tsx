@@ -89,6 +89,8 @@ export interface ActivityProps {
    * on the roll-up would make it depend on where you happened to be standing.
    */
   onDeleteMessage?: (messageId: string) => Promise<boolean | void> | boolean | void
+  /** Publish an edit of one message — CON-4. Offered here for the same reason delete is. */
+  onEditMessage?: (messageId: string, body: string) => Promise<boolean | void> | boolean | void
   /**
    * How many threads the horizon left out — `ACTIVITY_HORIZON`.
    *
@@ -101,7 +103,7 @@ export interface ActivityProps {
   className?: string
 }
 
-export function Activity({ items, onReply, disabledReason, nameOf, onReact, onDeleteMessage, truncated = 0, className }: ActivityProps) {
+export function Activity({ items, onReply, disabledReason, nameOf, onReact, onDeleteMessage, onEditMessage, truncated = 0, className }: ActivityProps) {
   const threads = useMemo(() => items.map((item) => item.thread), [items])
   const { resolved, resolving } = useThreadReferences(threads)
   /* Activity's threads belong to other files, and a reaction is a property of
@@ -147,6 +149,7 @@ export function Activity({ items, onReply, disabledReason, nameOf, onReact, onDe
                 reactionsBy={reactionsBy}
                 onReact={react}
                 onDeleteMessage={onDeleteMessage}
+                onEditMessage={onEditMessage}
                 subdued={relation.muted}
               />
             </li>
