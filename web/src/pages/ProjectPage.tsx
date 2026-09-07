@@ -397,6 +397,7 @@ export function ProjectPage({
         /* A reply in Activity goes to the thread's own Folder, never this
            project's — CON-9. Refused when the thread's root carries no `h`,
            because filing somebody else's reply here is the wrong guess. */
+        about={project.addr}
         /*
           A reaction, published then re-read — CON-2.
 

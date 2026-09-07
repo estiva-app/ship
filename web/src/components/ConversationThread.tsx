@@ -12,6 +12,7 @@ import { SkeletonBar } from '@/components/ui/Skeleton'
 import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
 import { byReference, useForeignObjects } from '@/api/useForeignObjects'
 import { Composer } from './Composer'
+import { draftKeys } from '@/lib/drafts'
 import { Reactions } from './Reactions'
 import { useReactions, REACTION_TARGET_LIMIT } from '@/api'
 import type { Reaction } from '@/api'
@@ -250,7 +251,7 @@ export function ConversationThread({ thread, onReply, disabledReason, unreadFrom
           <MessageCard message={reply} reply resolved={resolved} resolving={resolving} nameOf={nameOf} reactions={reactionsBy?.[reply.id]} onToggleReaction={onReact && ((emoji, mine) => onReact(reply.id, emoji, mine))} disabledReason={disabledReason} />
         </Fragment>
       ))}
-      <Composer kind="reply" onSubmit={(text) => onReply(thread.id, text)} disabledReason={disabledReason} className="ml-3.5 mt-1" />
+      <Composer kind="reply" onSubmit={(text) => onReply(thread.id, text)} disabledReason={disabledReason} draftKey={draftKeys.thread(thread.id)} className="ml-3.5 mt-1" />
     </div>
   )
 }
@@ -269,6 +270,15 @@ export interface ConversationsProps {
   /** Resolve a mentioned key to a name — SPEC §13.1. The workspace directory's. */
   nameOf?: (pubkey: string) => string
   /**
+   * The address of the object this surface is about — CON-10.
+   *
+   * Only the "start a conversation" composer needs it: a reply is keyed by its
+   * own thread, which is the same destination wherever the thread is read.
+   * Absent means no draft is kept for starting one, which is correct for a
+   * surface that has no single object.
+   */
+  about?: string
+  /**
    * Add or take back a reaction on one message — CON-2.
    *
    * Resolves when the relay has answered, so this surface can re-read rather
@@ -279,7 +289,7 @@ export interface ConversationsProps {
   className?: string
 }
 
-export function Conversations({ threads, onStart, onReply, disabledReason, className, unread, anchoredTo, onClearAnchor, nameOf, onReact }: ConversationsProps) {
+export function Conversations({ threads, onStart, onReply, disabledReason, className, unread, anchoredTo, onClearAnchor, nameOf, about, onReact }: ConversationsProps) {
   const { resolved, resolving } = useThreadReferences(threads)
   const { reactionsBy, omitted, refresh: refreshReactions } = useThreadReactions(threads)
 
@@ -307,7 +317,7 @@ export function Conversations({ threads, onStart, onReply, disabledReason, class
           </button>
         </div>
       )}
-      <Composer onSubmit={onStart} disabledReason={disabledReason} className="mb-1" />
+      <Composer onSubmit={onStart} disabledReason={disabledReason} draftKey={about && draftKeys.object(about)} className="mb-1" />
       {threads.length ? (
         threads.map((thread) => (
           <ConversationThread

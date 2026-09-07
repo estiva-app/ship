@@ -1,5 +1,6 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { cn } from '@/lib/cn'
+import { browserDrafts, type DraftStore } from '@/lib/drafts'
 import { Button } from '@/components/ui/Button'
 import { WithTooltip } from '@/components/ui/Tooltip'
 import { TextInput } from '@/components/ui/TextInput'
@@ -24,6 +25,16 @@ export interface ComposerProps {
   autoFocus?: boolean
   /** Why nothing can be posted right now; disables the field and the button, shown as a tooltip. */
   disabledReason?: string
+  /**
+   * Where an unsent message belongs — CON-10. Built with `draftKeys`.
+   *
+   * Omitted means no draft is kept, which is the right answer for a composer
+   * with no stable destination: a draft that cannot be keyed correctly is worse
+   * than none, because it reappears somewhere it was not written.
+   */
+  draftKey?: string
+  /** The store. Injected so a test needs no browser; defaults to `localStorage`. */
+  drafts?: DraftStore
   className?: string
 }
 
@@ -32,9 +43,33 @@ const KINDS = {
   reply: { placeholder: 'Reply…', label: 'Reply', variant: 'outlined' as const },
 }
 
-export function Composer({ kind = 'conversation', onSubmit, autoFocus = false, disabledReason, className }: ComposerProps) {
+const DEFAULT_DRAFTS = browserDrafts()
+
+export function Composer({ kind = 'conversation', onSubmit, autoFocus = false, disabledReason, draftKey, drafts = DEFAULT_DRAFTS, className }: ComposerProps) {
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
+
+  /*
+    Seed from the draft, and re-seed when the destination changes — CON-10.
+
+    Keyed on `draftKey` rather than run once on mount: this component is reused
+    across threads as a list re-renders, so mounting is not the moment the
+    destination changes. Doing it on mount alone is half of PEE-7 — the text
+    from one thread staying visible in the next.
+
+    `store` is held in a ref so a caller passing a fresh object each render
+    cannot restart this effect and wipe what is being typed.
+  */
+  const store = useRef(drafts)
+  store.current = drafts
+  useEffect(() => {
+    setText(draftKey ? (store.current.read(draftKey) ?? '') : '')
+  }, [draftKey])
+
+  const change = (next: string) => {
+    setText(next)
+    if (draftKey) store.current.write(draftKey, next)
+  }
   const { placeholder, label, variant } = KINDS[kind]
   const canSubmit = text.trim().length > 0 && !busy && !disabledReason
 
@@ -44,7 +79,15 @@ export function Composer({ kind = 'conversation', onSubmit, autoFocus = false, d
     setBusy(true)
     try {
       const ok = await onSubmit(text.trim())
-      if (ok !== false) setText('')
+      /*
+        Cleared only when the relay took it. A refused publish keeps the text —
+        losing a draft to a rejection is worse than never having had one, and
+        `act` resolves false for exactly that case.
+      */
+      if (ok !== false) {
+        setText('')
+        if (draftKey) store.current.clear(draftKey)
+      }
     } finally {
       setBusy(false)
     }
@@ -59,7 +102,7 @@ export function Composer({ kind = 'conversation', onSubmit, autoFocus = false, d
     <form onSubmit={submit} className={cn('flex items-center gap-2', className)}>
       <TextInput
         value={text}
-        onChange={(event) => setText(event.target.value)}
+        onChange={(event) => change(event.target.value)}
         placeholder={placeholder}
         aria-label={placeholder}
         autoFocus={autoFocus}

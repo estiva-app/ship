@@ -125,6 +125,7 @@ export function IssuePage({ state, directory, d, say, refresh }: { state: Worksp
           the wrong guess for that case: it would file somebody else's reply
           under this issue. Refusing is the honest answer.
         */
+        about={issue.addr}
         /*
           A reaction, published then re-read — CON-2.
 
