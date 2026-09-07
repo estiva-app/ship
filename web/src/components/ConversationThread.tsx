@@ -125,6 +125,7 @@ export function useThreadReferences(threads: readonly ThreadData[]): {
 export function useThreadReactions(threads: readonly ThreadData[]): {
   reactionsBy: Record<string, readonly Reaction[]>
   omitted: number
+  refresh: () => void
 } {
   const ids = useMemo(
     () =>
@@ -134,8 +135,8 @@ export function useThreadReactions(threads: readonly ThreadData[]): {
         .map((message) => message.id),
     [threads],
   )
-  const { reactions, omitted } = useReactions(ids)
-  return { reactionsBy: reactions, omitted }
+  const { reactions, omitted, refresh } = useReactions(ids)
+  return { reactionsBy: reactions, omitted, refresh }
 }
 
 export interface ThreadData {
@@ -151,6 +152,8 @@ export function MessageCard({
   resolving = false,
   nameOf,
   reactions,
+  onToggleReaction,
+  disabledReason,
 }: {
   message: MessageData
   reply?: boolean
@@ -162,6 +165,10 @@ export function MessageCard({
   nameOf?: (pubkey: string) => string
   /** This message's reactions, read by target — SPEC §6.6. */
   reactions?: readonly Reaction[]
+  /** Add or take back a reaction on this message. Omitted where nobody may write. */
+  onToggleReaction?: (emoji: string, mine?: string) => void
+  /** Why nothing can be written right now. */
+  disabledReason?: string
 }) {
   const blocks = toRenderTree(message.body, MESSAGE_FORMAT)
   // A block that is nothing but one pointer is an attachment and is drawn
@@ -202,7 +209,7 @@ export function MessageCard({
       )}
       {/* Under the body, above nothing — a reaction is about the message that
           precedes it, and it sits inside the article so it moves with it. */}
-      <Reactions reactions={reactions} nameOf={nameOf} />
+      <Reactions reactions={reactions} nameOf={nameOf} onToggle={onToggleReaction} disabledReason={disabledReason} />
     </article>
   )
 }
@@ -224,7 +231,7 @@ function NewSinceHere() {
   )
 }
 
-export function ConversationThread({ thread, onReply, disabledReason, unreadFrom, resolved, resolving, nameOf, reactionsBy, subdued = false }: { thread: ThreadData; onReply: (threadId: string, text: string) => Promise<boolean | void> | boolean | void; disabledReason?: string; unreadFrom?: string; resolved?: Record<string, ForeignObjectData | null | undefined>; resolving?: boolean; nameOf?: (pubkey: string) => string; /** Reactions by message id, read once for the surface. */ reactionsBy?: Record<string, readonly Reaction[]>; /** Draw it as secondary — Activity's mentions, which do not carry a comment's trust (CON-9). */ subdued?: boolean }) {
+export function ConversationThread({ thread, onReply, disabledReason, unreadFrom, resolved, resolving, nameOf, reactionsBy, onReact, subdued = false }: { thread: ThreadData; onReply: (threadId: string, text: string) => Promise<boolean | void> | boolean | void; disabledReason?: string; unreadFrom?: string; resolved?: Record<string, ForeignObjectData | null | undefined>; resolving?: boolean; nameOf?: (pubkey: string) => string; /** Reactions by message id, read once for the surface. */ reactionsBy?: Record<string, readonly Reaction[]>; /** Add or take back a reaction on one message. */ onReact?: (messageId: string, emoji: string, mine?: string) => void; /** Draw it as secondary — Activity's mentions, which do not carry a comment's trust (CON-9). */ subdued?: boolean }) {
   return (
     <div
       className={cn(
@@ -236,11 +243,11 @@ export function ConversationThread({ thread, onReply, disabledReason, unreadFrom
       )}
     >
       {unreadFrom === thread.root.id && <NewSinceHere />}
-      <MessageCard message={thread.root} resolved={resolved} resolving={resolving} nameOf={nameOf} reactions={reactionsBy?.[thread.root.id]} />
+      <MessageCard message={thread.root} resolved={resolved} resolving={resolving} nameOf={nameOf} reactions={reactionsBy?.[thread.root.id]} onToggleReaction={onReact && ((emoji, mine) => onReact(thread.root.id, emoji, mine))} disabledReason={disabledReason} />
       {thread.replies.map((reply) => (
         <Fragment key={reply.id}>
           {unreadFrom === reply.id && <NewSinceHere />}
-          <MessageCard message={reply} reply resolved={resolved} resolving={resolving} nameOf={nameOf} reactions={reactionsBy?.[reply.id]} />
+          <MessageCard message={reply} reply resolved={resolved} resolving={resolving} nameOf={nameOf} reactions={reactionsBy?.[reply.id]} onToggleReaction={onReact && ((emoji, mine) => onReact(reply.id, emoji, mine))} disabledReason={disabledReason} />
         </Fragment>
       ))}
       <Composer kind="reply" onSubmit={(text) => onReply(thread.id, text)} disabledReason={disabledReason} className="ml-3.5 mt-1" />
@@ -261,12 +268,31 @@ export interface ConversationsProps {
   onClearAnchor?: () => void
   /** Resolve a mentioned key to a name — SPEC §13.1. The workspace directory's. */
   nameOf?: (pubkey: string) => string
+  /**
+   * Add or take back a reaction on one message — CON-2.
+   *
+   * Resolves when the relay has answered, so this surface can re-read rather
+   * than assume. Omitted where nobody may write, which removes the controls
+   * instead of disabling them.
+   */
+  onReact?: (messageId: string, emoji: string, mine?: string) => Promise<boolean | void> | boolean | void
   className?: string
 }
 
-export function Conversations({ threads, onStart, onReply, disabledReason, className, unread, anchoredTo, onClearAnchor, nameOf }: ConversationsProps) {
+export function Conversations({ threads, onStart, onReply, disabledReason, className, unread, anchoredTo, onClearAnchor, nameOf, onReact }: ConversationsProps) {
   const { resolved, resolving } = useThreadReferences(threads)
-  const { reactionsBy, omitted } = useThreadReactions(threads)
+  const { reactionsBy, omitted, refresh: refreshReactions } = useThreadReactions(threads)
+
+  /* Publish, then ask the relay again — never patch the count locally. The
+     relay is the authority on whether a reaction happened, and `act` already
+     keeps that rule for every other write here; a pill that moved on click and
+     then snapped back would be worse than one that takes a moment. */
+  const react = onReact
+    ? async (messageId: string, emoji: string, mine?: string) => {
+        await onReact(messageId, emoji, mine)
+        refreshReactions()
+      }
+    : undefined
 
   return (
     <div className={cn('flex flex-col gap-2.5', className)}>
@@ -294,6 +320,7 @@ export function Conversations({ threads, onStart, onReply, disabledReason, class
             resolving={resolving}
             nameOf={nameOf}
             reactionsBy={reactionsBy}
+            onReact={react}
           />
         ))
       ) : (

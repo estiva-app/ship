@@ -1,63 +1,158 @@
+import { Button } from '@/components/ui/Button'
 import { Chip } from '@/components/ui/Chip'
+import { IconButton } from '@/components/ui/IconButton'
 import { WithTooltip } from '@/components/ui/Tooltip'
 import { cn } from '@/lib/cn'
-import type { Reaction } from '@/api'
+import { REACTION_EMOJI, type Reaction } from '@/api'
 
 /**
  * The reactions on one message — CON-2.
  *
- * ## Read-only, and that is why these are Chips
+ * ## These were Chips, and the grant is why they are not any more
  *
- * `Chip`'s page is explicit that *"something clickable → Button (small) or
- * MenuItem — a Chip is not a control"*, and it would be the wrong component for
- * a reaction you can add. Ship cannot add one: the `estiva-ship` credential's
- * `allowedKinds` is
- * `[30850, 30851, 1851, 9, 5, 9007, 31989, 27235, 1111, 30078]` — no `7` —
- * while `estiva-peek` has it. So a reaction here is standing information about
- * what happened elsewhere, which is exactly Chip's *When*: a count with no
- * verdict attached.
+ * Ship could not sign a `kind:7` until 2026-09-07 — `estiva-ship`'s
+ * `allowedKinds` had no `7` while `estiva-peek` did — so a reaction here was
+ * standing information about what happened elsewhere, which is Chip's *When*.
+ * estiva-id#59 granted it, the row was re-seeded and verified, and a reaction
+ * is now a control. Chip's page rules itself out for those: *"something
+ * clickable → Button (small) or MenuItem — a Chip is not a control."*
  *
- * **When the grant lands these become controls, and a Chip stops being right.**
- * At that point they want the package's `Reaction` — which does not exist yet,
- * and which Peek currently forks (`Reaction.tsx` re-types Chip's class list
- * with a border, the example UI-RULES §1 names). Building a second hand-rolled
- * pill here to get ahead of that would make it two forks instead of one.
+ * ## Which package components, and why those
  *
- * ## What a reader can tell from this
+ * Both answers are the packages' own *When not* lines rather than a preference:
  *
- * The count, the emoji, and — in the tooltip — who. Not *whether you reacted*:
- * the fold carries that (`mine`), and drawing it would promise a control that
- * is not there. An honest read-only surface says what other people did.
+ * - **The picker is a strip of `IconButton`s.** `Menu`'s page: *"A strip of
+ *   icon actions (reactions, formatting) → a toolbar of IconButtons."* It says
+ *   reactions by name.
+ * - **A reaction with a count is a small `Button`.** `IconButton`'s page: *"The
+ *   action deserves a visible label → Button (words are cheaper than a guessed
+ *   icon)"*, and a count is a visible label an icon-only control has no slot
+ *   for.
+ *
+ * **A pill is still what this wants**, and the package has none. `Reaction` is
+ * proposed to `@estiva-app/ui` — it would also retire Peek's fork of it, the
+ * file UI-RULES §1 names by example. Until it ships, these are the package's
+ * real components rather than a second hand-rolled pill, and this file collapses
+ * onto it when it lands.
+ *
+ * ## Your own reaction is visibly yours
+ *
+ * `outlined` when you are among the reactors, `muted` otherwise — the fold
+ * carries `mine` for exactly this, and it is also the id a retraction targets.
+ * Clicking your own takes it back; clicking anyone else's adds yours.
  */
 export function Reactions({
   reactions,
   nameOf,
+  onToggle,
+  disabledReason,
   className,
 }: {
   reactions: readonly Reaction[] | undefined
   /** Resolve a reactor's key to a name — the workspace directory's. */
   nameOf?: (pubkey: string) => string
+  /**
+   * Add this emoji, or take back the reaction whose id is given.
+   *
+   * One handler for both, because to a reader it is one gesture: clicking a
+   * reaction toggles yours. The caller knows which write that is from whether
+   * `mine` came back.
+   */
+  onToggle?: (emoji: string, mine?: string) => void
+  /** Why nothing can be written right now — every control here is disabled with it. */
+  disabledReason?: string
   className?: string
 }) {
-  if (!reactions?.length) return null
+  const existing = reactions ?? []
+  // Nothing to show and nothing to offer: draw nothing rather than an empty row
+  // under every message in every thread.
+  if (!existing.length && !onToggle) return null
+
   return (
-    <div className={cn('flex flex-wrap items-center gap-1', className)} data-reactions={String(reactions.length)}>
-      {reactions.map((reaction) => (
-        <WithTooltip key={reaction.emoji} label={reactorLabel(reaction, nameOf)}>
-          {/* The emoji rides in `leadingIcon`, whose slot centres it so it does
-              not sit on the label's baseline; the label is the count, which the
-              page says works on its own. */}
-          <span>
-            <Chip
-              type="neutral"
-              leadingIcon={<span aria-hidden="true">{reaction.emoji}</span>}
-              label={String(reaction.count)}
-            />
-          </span>
-        </WithTooltip>
-      ))}
+    <div className={cn('flex flex-wrap items-center gap-1', className)} data-reactions={String(existing.length)}>
+      {existing.map((reaction) => {
+        /*
+          Two shapes, and each page asks for its own.
+
+          Without a handler nobody may ever react here — a signed-out reader —
+          and Button's page is explicit that "a control the person may never be
+          allowed to use is absent, not disabled". So the reaction becomes what
+          it actually is in that state: standing information, which is Chip's
+          own *When*. `disabledReason` is the other case — momentarily
+          unavailable, which is exactly what `disabled` plus a tooltip is for.
+        */
+        if (!onToggle) {
+          return (
+            <WithTooltip key={reaction.emoji} label={reactorLabel(reaction, nameOf)}>
+              <span>
+                <Chip
+                  type="neutral"
+                  leadingIcon={<span aria-hidden="true">{reaction.emoji}</span>}
+                  label={String(reaction.count)}
+                />
+              </span>
+            </WithTooltip>
+          )
+        }
+        const button = (
+          <Button
+            variant={reaction.mine ? 'outlined' : 'muted'}
+            size="small"
+            disabled={!!disabledReason}
+            leadingIcon={<span aria-hidden="true">{reaction.emoji}</span>}
+            onClick={() => onToggle(reaction.emoji, reaction.mine)}
+            aria-pressed={!!reaction.mine}
+            /*
+              The visible label is the count, so without this the control is
+              named "1" — which tells somebody using a screen reader nothing at
+              all. The emoji is `aria-hidden` (a glyph read aloud is noise, and
+              its name differs per screen reader), so the name has to be built.
+              `aria-pressed` carries whether it is yours, which is what a toggle
+              button is for.
+            */
+            aria-label={`${reactionName(reaction.emoji)}, ${reaction.count}`}
+          >
+            {reaction.count}
+          </Button>
+        )
+        return (
+          <WithTooltip key={reaction.emoji} label={disabledReason ?? reactorLabel(reaction, nameOf)}>
+            <span>{button}</span>
+          </WithTooltip>
+        )
+      })}
+      {onToggle && (
+        /* The picker: a toolbar of IconButtons, which is what Menu's page sends
+           reactions to by name. Each one is named by its meaning — a bare glyph
+           is not self-explanatory, and an icon-only control has no other source
+           for an accessible name. */
+        <div className="flex items-center gap-0.5" role="group" aria-label="Add a reaction" data-reaction-picker>
+          {REACTION_EMOJI.map(({ emoji, name }) => (
+            <IconButton
+              key={emoji}
+              aria-label={name}
+              tooltip={disabledReason ?? name}
+              disabled={!!disabledReason}
+              onClick={() => onToggle(emoji, existing.find((r) => r.emoji === emoji)?.mine)}
+            >
+              <span aria-hidden="true">{emoji}</span>
+            </IconButton>
+          ))}
+        </div>
+      )}
     </div>
   )
+}
+
+/**
+ * What an emoji means, for a control that has to be named.
+ *
+ * Falls back to the glyph itself for anything outside the shared palette —
+ * another client can publish any emoji, and a reaction Ship cannot name is
+ * still one it must draw rather than hide.
+ */
+export function reactionName(emoji: string): string {
+  return REACTION_EMOJI.find((e) => e.emoji === emoji)?.name ?? emoji
 }
 
 /**

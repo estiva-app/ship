@@ -78,6 +78,8 @@ export interface ActivityProps {
   disabledReason?: string
   /** Resolve a mentioned key to a name — SPEC §13.1. */
   nameOf?: (pubkey: string) => string
+  /** Add or take back a reaction on a message in one of these threads — CON-2. */
+  onReact?: (messageId: string, emoji: string, mine?: string) => Promise<boolean | void> | boolean | void
   /**
    * How many threads the horizon left out — `ACTIVITY_HORIZON`.
    *
@@ -90,12 +92,18 @@ export interface ActivityProps {
   className?: string
 }
 
-export function Activity({ items, onReply, disabledReason, nameOf, truncated = 0, className }: ActivityProps) {
+export function Activity({ items, onReply, disabledReason, nameOf, onReact, truncated = 0, className }: ActivityProps) {
   const threads = useMemo(() => items.map((item) => item.thread), [items])
   const { resolved, resolving } = useThreadReferences(threads)
   /* Activity's threads belong to other files, and a reaction is a property of
      the message wherever it is read — so they carry theirs too. */
-  const { reactionsBy } = useThreadReactions(threads)
+  const { reactionsBy, refresh: refreshReactions } = useThreadReactions(threads)
+  const react = onReact
+    ? async (messageId: string, emoji: string, mine?: string) => {
+        await onReact(messageId, emoji, mine)
+        refreshReactions()
+      }
+    : undefined
 
   if (!items.length) {
     return (
@@ -128,6 +136,7 @@ export function Activity({ items, onReply, disabledReason, nameOf, truncated = 0
                 resolving={resolving}
                 nameOf={nameOf}
                 reactionsBy={reactionsBy}
+                onReact={react}
                 subdued={relation.muted}
               />
             </li>

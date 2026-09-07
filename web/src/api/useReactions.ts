@@ -34,6 +34,16 @@ export function useReactions(eventIds: readonly string[]): {
   omitted: number
   /** The first read has not landed yet. Distinct from "nobody reacted". */
   loading: boolean
+  /**
+   * Re-read now, rather than waiting for the poll.
+   *
+   * A write goes to the relay and the pill updates from the next read, so
+   * without this a click would sit unchanged for up to five seconds and read as
+   * a control that did nothing. The relay stays the authority — this asks it
+   * again rather than patching local state optimistically, which is the same
+   * rule `act` keeps for every other write in this app.
+   */
+  refresh: () => void
 } {
   const { targets, omitted } = reactionTargets(eventIds)
   const [reactions, setReactions] = useState<ReactionsByTarget | undefined>(undefined)
@@ -69,5 +79,5 @@ export function useReactions(eventIds: readonly string[]): {
   useEffect(() => read(), [key, nonce, read])
   useRefresh(() => setNonce((n) => n + 1))
 
-  return { reactions: reactions ?? {}, omitted, loading: reactions === undefined }
+  return { reactions: reactions ?? {}, omitted, loading: reactions === undefined, refresh: () => setNonce((n) => n + 1) }
 }

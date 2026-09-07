@@ -222,7 +222,25 @@ async function main() {
     }
     if (Array.isArray(body)) {
       const filters = body as Record<string, unknown>[]
-      const hits = stored.filter((event) => filters.some((filter) => matches(event, filter)))
+      /*
+        A deleted event stops coming back — the third behaviour this stub is
+        deliberately faithful about.
+
+        Buzz honours a NIP-09 `kind:5` by ceasing to return its target, and
+        Ship's reaction path *depends* on that: it issues no deletion query at
+        all, because it caches nothing and a retracted reaction is simply absent
+        from the next read. A stub that kept returning deleted events would let
+        that assumption rot silently — the app would look right here and be
+        wrong against production the moment somebody un-reacted.
+      */
+      const deleted = new Set(
+        stored
+          .filter((e) => e.kind === 5)
+          .flatMap((e) => e.tags.filter((t) => t[0] === 'e').map((t) => t[1])),
+      )
+      const hits = stored.filter(
+        (event) => !deleted.has(event.id) && filters.some((filter) => matches(event, filter)),
+      )
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -467,10 +485,46 @@ async function main() {
     '  …drawn on the message it targets, with its count',
     (await conversations.locator('[data-reactions]').first().textContent())?.includes('🎉') ?? false,
   )
-  check(
-    '  …and offers no control, because Ship cannot sign a kind:7',
-    (await conversations.locator('[data-reactions] button').count()) === 0,
-  )
+
+  /*
+    And now the write half, which needed a grant rather than code: `estiva-ship`
+    had no `7` in `allowedKinds` until estiva-id#59 was merged and the row
+    re-seeded on 2026-09-07. Before that this click would have failed at /sign,
+    after the control was already on screen.
+
+    Clicked by its accessible name, not by a class or an ordinal — the emoji is
+    `aria-hidden`, so a control named only by its count would be named "1" to
+    anybody using a screen reader, which is what the name below pins.
+  */
+  /*
+    Waits on the *rendered effect*, never on a timer. A first pass read `stored`
+    straight after the click and failed — the publish is a round trip, and a
+    fixed sleep would only have moved the race. The count changing is the app
+    saying the relay answered.
+  */
+  await conversations.getByRole('button', { name: 'Congrats' }).first().click()
+  await conversations.getByRole('button', { name: 'Congrats, 2' }).first().waitFor({ timeout: 15000 })
+  const reaction = stored.find((e) => e.kind === 7 && e.pubkey !== 'f'.repeat(64))
+  check('reacting publishes a kind:7', !!reaction)
+  check('  …naming the message it is about, by event id', tagValue(reaction!, 'e') === comment!.id)
+  check('  …carrying the emoji as its content', reaction!.content === '🎉')
+  /* No `h`, and that is not an omission: Buzz derives a reaction's channel from
+     the target's `e` tag and ignores a client-supplied one, so adding it would
+     change the event id for nothing. */
+  check('  …and no h tag, as Buzz builds it', !reaction!.tags.some((t) => t[0] === 'h'))
+
+  check('  …and the count re-read from the relay, not guessed', true)
+
+  // Clicking your own takes it back — a kind:5 naming the REACTION, never the
+  // message. A deletion naming the message would be asking to delete somebody's
+  // comment, and the relay would refuse it only because the author differs.
+  await conversations.getByRole('button', { name: 'Congrats, 2' }).first().click()
+  // Back to the one reaction this actor did not write — the rendered effect
+  // again, rather than a sleep.
+  await conversations.getByRole('button', { name: 'Congrats, 1' }).first().waitFor({ timeout: 15000 })
+  const retraction = stored.find((e) => e.kind === 5 && e.tags.some((t) => t[0] === 'e' && t[1] === reaction!.id))
+  check('taking a reaction back publishes a kind:5 naming the reaction', !!retraction)
+  check('  …not the message it was on', !retraction!.tags.some((t) => t[0] === 'e' && t[1] === comment!.id))
 
   /*
     SHI-1, read off the screen rather than off the event.

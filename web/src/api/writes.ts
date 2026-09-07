@@ -270,3 +270,38 @@ export async function assignMissingRefs(project: Project, issues: Issue[]): Prom
   }
   return results
 }
+
+// ── Reactions ───────────────────────────────────────────────────────────────
+
+/**
+ * React to a message — CON-2.
+ *
+ * **This needs a grant Ship did not have until 2026-09-07.** `estiva-ship`'s
+ * `allowedKinds` had no `7`, so every call here would have failed at `/sign`
+ * after the control was already on screen — AGE-2's shape, where the cost is
+ * paid twice. estiva-id#59 added it; the row was re-seeded and verified.
+ *
+ * No `h` tag, and no Folder argument: Buzz derives a reaction's channel from
+ * the target's `e` tag and ignores a client-supplied `h`. That makes this the
+ * one write in this file that does not have to know which Folder it is in — and
+ * the reason `postMessage` and the change events all do.
+ */
+export function react(targetEventId: string, emoji: string): Promise<WriteResult> {
+  return publish(() => store.react({ targetEventId, emoji }))
+}
+
+/**
+ * Take a reaction back.
+ *
+ * Targets **the reaction's own event**, never the message — a `kind:5` naming
+ * the message would ask the relay to delete somebody's comment, and it would
+ * refuse only because the author differs. The id comes off the fold's `mine`,
+ * which exists for exactly this.
+ *
+ * A request, like every deletion here: the relay honours it from the reaction's
+ * author or that author's NIP-OA owner (SPEC §6.5), and a refusal is reported
+ * rather than assumed away.
+ */
+export function unreact(reactionEventId: string): Promise<WriteResult> {
+  return publish(() => store.unreact({ reactionEventId }))
+}
