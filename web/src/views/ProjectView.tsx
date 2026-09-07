@@ -62,13 +62,15 @@ export interface ProjectViewProps {
     onArchive: () => void
     onDelete: () => void
   }
+  /** This object's address, so an unsent message is kept against it — CON-10. */
+  about?: string
   /** Add or take back a reaction on a message — CON-2. */
   onReact?: (messageId: string, emoji: string, mine?: string) => Promise<boolean | void> | boolean | void
   /** Why writes are unavailable — every write control on the page is disabled with it. */
   readOnlyReason?: string
 }
 
-export function ProjectView({ crumbs, header, onAddIssue, view, onView, issues, issueStatuses, hrefFor, threads, unread, onStartConversation, onReply, activity, activityTruncated, onReplyInActivity, rail, onReact, readOnlyReason }: ProjectViewProps) {
+export function ProjectView({ crumbs, header, onAddIssue, view, onView, issues, issueStatuses, hrefFor, threads, unread, onStartConversation, onReply, activity, activityTruncated, onReplyInActivity, rail, about, onReact, readOnlyReason }: ProjectViewProps) {
   const addIssue = readOnlyReason ? (
     <WithTooltip label={readOnlyReason}>
       <Button variant="primary" disabled>
@@ -117,7 +119,7 @@ export function ProjectView({ crumbs, header, onAddIssue, view, onView, issues, 
         </section>
         <section className="flex flex-col gap-3">
           <h2 className="text-h4 text-text-primary">Conversations</h2>
-          <Conversations threads={threads} unread={unread} onStart={onStartConversation} onReply={onReply} disabledReason={readOnlyReason} nameOf={header.nameOf} onReact={onReact} />
+          <Conversations threads={threads} unread={unread} onStart={onStartConversation} onReply={onReply} disabledReason={readOnlyReason} nameOf={header.nameOf} onReact={onReact} about={about} />
         </section>
         <section className="flex flex-col gap-3">
           <h2 className="text-h4 text-text-primary">Activity</h2>

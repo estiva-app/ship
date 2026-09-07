@@ -606,6 +606,47 @@ async function main() {
   await shot(page, '06-issue-detail')
 
   /*
+    Drafts survive a reload — CON-10.
+
+    Asserted in a real browser because the claim is about `localStorage` and a
+    page load, and neither exists in jsdom in the way that matters: the unit
+    tests can prove the store and the composer, and only this can prove the text
+    is still there after the page has actually gone away and come back.
+
+    PEE-7's other half is checked too — the draft belongs to this issue and must
+    not appear in a composer for something else.
+  */
+  const draft = 'a thought I did not finish'
+  await conversations.getByPlaceholder('Start a conversation…').fill(draft)
+  await page.reload()
+  await page.waitForSelector('[data-surface="issue"]', { timeout: 10000 })
+  const afterReload = sectionFor('Conversations')
+  check(
+    'an unsent message survives a reload',
+    (await afterReload.getByPlaceholder('Start a conversation…').inputValue()) === draft,
+  )
+
+  // The reply box on the same page is a different destination and must be empty.
+  check(
+    '  …and does not appear in a different composer',
+    (await afterReload.getByPlaceholder('Reply…').first().inputValue()) === '',
+  )
+
+  // Sending clears it: the next load starts empty rather than re-offering text
+  // that has already been posted.
+  await afterReload.getByRole('button', { name: 'Post', exact: true }).click()
+  await page.waitForFunction(
+    (n) => document.querySelectorAll('section article').length > n,
+    await afterReload.locator('article').count(),
+  )
+  await page.reload()
+  await page.waitForSelector('[data-surface="issue"]', { timeout: 10000 })
+  check(
+    '  …and is forgotten once it has been sent',
+    (await sectionFor('Conversations').getByPlaceholder('Start a conversation…').inputValue()) === '',
+  )
+
+  /*
     The sub-file roll-up, end to end — CON-9's Activity, the half that needs no
     new protocol.
 
@@ -628,9 +669,17 @@ async function main() {
     "a project's Activity carries its issues' conversations",
     (await projectActivity.textContent())?.includes('Blocked on the Stripe key.') ?? false,
   )
+  /*
+    Every row is the project's own issues' work, and none is a mention. Stated
+    as a property rather than as "exactly one row" — that count was true only
+    while this test posted a single comment, and it broke the moment CON-10's
+    checks posted a second one. A count is a fact about the fixture; this is a
+    fact about the split.
+  */
   check(
     '  …badged as a sub-file, not as a mention',
-    (await projectActivity.locator('[data-relation="sub-file"]').count()) === 1,
+    (await projectActivity.locator('[data-relation="sub-file"]').count()) > 0 &&
+      (await projectActivity.locator('[data-relation="mention"]').count()) === 0,
   )
   check(
     '  …and naming the issue, because replying goes there',

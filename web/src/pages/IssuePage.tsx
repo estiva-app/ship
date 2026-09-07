@@ -133,6 +133,7 @@ export function IssuePage({ state, directory, d, say, refresh }: { state: Worksp
           reaction's own event, never the message: a kind:5 naming the message
           would be asking the relay to delete somebody's comment.
         */
+        about={issue.addr}
         onReact={(messageId, emoji, mine) =>
           mine
             ? act('Reaction', () => unreact(mine), say, refresh)
