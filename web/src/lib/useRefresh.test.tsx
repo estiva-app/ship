@@ -103,7 +103,7 @@ describe('useRefresh — holding off when the relay says it is over budget (SHI-
     before `queryAll` was adopted for paging.
   */
   it('polls at twenty seconds, which leaves the relay’s 300-a-minute room for a second app', () => {
-    expect(REFRESH_MS).toBe(20_000)
+    expect(REFRESH_MS).toBe(10_000)
   })
 
   it('skips ticks while the relay has asked this tab to wait', () => {

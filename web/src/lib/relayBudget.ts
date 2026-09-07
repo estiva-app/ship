@@ -4,12 +4,17 @@
  * Buzz meters `POST /query` against `human_api_calls_per_min` — a fixed
  * 60-second window, default **300**, applied to every bridge call whatever tier
  * the caller is (`enforce_http_admission`, `api/bridge.rs`). Ship's readers are
- * well inside that at rest, but the ceiling is a property of the *workspace*:
- * a full read costs one request per Folder, so it rises as the workspace grows
- * and no interval chosen today stays right for ever.
+ * well inside that at rest — 26 requests a minute with an issue page open.
  *
- * So the interval is sized for headroom and this is the part that holds when
- * headroom runs out. The relay says exactly how long to wait —
+ * A full read used to cost one request per Folder, so the ceiling fell as the
+ * workspace grew and no interval chosen on any given day stayed right. Protocol
+ * 0.15.0 batches every filter's first page into one request, so it does not any
+ * more: measured against production, 39 requests to 3.
+ *
+ * This module is still the part that holds when headroom runs out, for the
+ * reason that did not change — **the budget is shared** across every tab and
+ * tool signed in as the same key, so Ship can be well inside its own share and
+ * still be refused. The relay says exactly how long to wait —
  * `rate-limited: quota exceeded; retry in 10s` — and it is the only participant
  * that knows, since the budget is shared across every tab and tool signed in as
  * the same key.
