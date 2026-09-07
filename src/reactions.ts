@@ -39,31 +39,44 @@ import type { SignedEvent } from '@estiva-app/protocol'
 import { KIND } from './kinds'
 
 /**
- * How many targets one read asks about — the horizon, decided rather than
- * inherited (CON-1).
+ * How many targets one read asks about — **SPEC §6.6's horizon, adopted**.
  *
- * §6.6's finding is that the choice is invisible: reactions on messages beyond
- * it simply do not appear, and **an undocumented cap is indistinguishable from
- * "nobody reacted"**. So the number is chosen from a measurement and named
- * after the decision.
+ * ## The direction of this changed, and that is the point
  *
- * **Ship asks about every message on the page**, and this is a ceiling rather
- * than a routine truncation. Measured on production 2026-09-06:
+ * This used to say the number was "chosen from a measurement" here, and that it
+ * "is also the reference client's N (§6.6)" — the spec describing whatever this
+ * constant happened to say. CON-1 asked for the opposite, and estiva-docs#76
+ * settled it: **§6.6 fixes N at 100 as a rule, and this adopts it.** If the two
+ * ever disagree, this one is wrong.
  *
- * | page | messages |
+ * That is not pedantry about where a number lives. A horizon is not a private
+ * tuning constant: two apps showing the same conversation with different N
+ * **disagree about the count, legitimately and unfixably**, and a reader has no
+ * way to tell that from a bug. Its being the same everywhere matters far more
+ * than its value, which is exactly why it belongs in the specification and not
+ * in whichever app was written first.
+ *
+ * ## The measurements behind the rule
+ *
+ * Kept because a reader deciding whether 100 still fits needs them, and §6.6
+ * carries the same table. Production, 2026-09-06/07:
+ *
+ * | surface | messages |
  * | --- | --- |
+ * | busiest container | 77 |
+ * | median container | 9 |
  * | busiest issue | 13 |
- * | median issue | 2 |
- * | busiest project Folder | 77 |
+ * | containers at or over 100 | 0 |
  *
- * So 100 covers every surface this workspace has, with room. It is also the
- * reference client's N (§6.6) and Peek's `REACTION_TARGET_LIMIT`, which matters
- * more than it looks: CON-2 asks that the two apps agree on the count, and two
- * different horizons would make them disagree legitimately and unfixably.
+ * A surface routinely exceeding this wants the question raised in §6.6 rather
+ * than this constant quietly raised.
  *
- * A page that exceeds it is truncated from the **oldest** end — the newest
- * messages are the ones being reacted to — and the caller is told how many it
- * left out, so the boundary is visible rather than silent.
+ * ## What Ship does with it
+ *
+ * **Asks about every message on the page**, so this is a ceiling rather than a
+ * routine truncation. A page that exceeds it is truncated from the **oldest**
+ * end — the newest messages are the ones being reacted to — and the caller is
+ * told how many were left out, which §6.6 now requires rather than suggests.
  */
 export const REACTION_TARGET_LIMIT = 100
 
