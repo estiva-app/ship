@@ -10,6 +10,26 @@ export interface Workspace {
   /** The last read's failure, or `null`. A stale `state` is kept alongside it. */
   error: string | null
   /**
+   * The first read has not landed yet — distinct from an empty workspace.
+   *
+   * `state` is `null` for both, and the page rendered nothing for both, which
+   * is how a slow or refused first read looked like an app that had simply
+   * stopped. A caller must be able to tell "still coming" from "there is
+   * nothing here".
+   */
+  loading: boolean
+  /**
+   * The relay is refusing on quota, and there is nothing on screen yet.
+   *
+   * SHI-12's rule — a quota refusal is not a broken relay and must not be
+   * reported as one — was written for the steady state, where the last good
+   * read stays correct and a banner would describe a working app as failing.
+   * **Before the first read there is no last good read**, so the same silence
+   * leaves a person looking at an empty page with no projects, no issues and
+   * no explanation. That is the one case where saying something is right.
+   */
+  busy: boolean
+  /**
    * Re-read now, starting a new read rather than joining one already running.
    *
    * This is what a write awaits, so it may not be coalesced: a read that began
@@ -29,6 +49,7 @@ export interface Workspace {
 export function useWorkspace(): Workspace {
   const [state, setState] = useState<WorkspaceState | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
   const inFlight = useRef<Promise<void> | null>(null)
   const latest = useRef(0)
   const mounted = useRef(true)
@@ -50,6 +71,7 @@ export function useWorkspace(): Workspace {
         if (!mounted.current || ticket !== latest.current) return
         setState(next)
         setError(null)
+        setBusy(false)
       })
       .catch((reason: unknown) => {
         if (!mounted.current || ticket !== latest.current) return
@@ -67,7 +89,13 @@ export function useWorkspace(): Workspace {
           The stale state is kept either way. This only decides whether a person
           is told about a wait they cannot act on. SHI-12.
         */
-        if (isRateLimited(text)) return
+        if (isRateLimited(text)) {
+          // Recorded rather than swallowed: with a workspace on screen this
+          // stays invisible, and without one it is the only thing that can
+          // explain the empty page.
+          setBusy(true)
+          return
+        }
         setError(text)
       })
       .finally(() => {
@@ -100,5 +128,5 @@ export function useWorkspace(): Workspace {
 
   useRefresh(poll)
 
-  return { state, error, refresh: read }
+  return { state, error, loading: state === null && !busy, busy: busy && state === null, refresh: read }
 }

@@ -80,7 +80,7 @@ beforeEach(() => {
   goTo('/')
   refresh.mockClear()
   for (const write of [createProject, createIssue, setIssueField, deleteProject, deleteIssue, startConversation]) vi.mocked(write).mockReset()
-  vi.mocked(useWorkspace).mockReturnValue({ state: STATE, error: null, refresh })
+  vi.mocked(useWorkspace).mockReturnValue({ state: STATE, error: null, loading: false, busy: false, refresh })
   vi.mocked(useDirectory).mockReturnValue({
     directory: new Map(),
     nameOf: (k: string) => (k === ME ? 'Me Myself' : 'Someone'),
@@ -113,7 +113,7 @@ describe('App — the shell around the route', () => {
   })
 
   it('shows the read error as a banner and keeps the shell', () => {
-    vi.mocked(useWorkspace).mockReturnValue({ state: STATE, error: 'relay refused', refresh: async () => {} })
+    vi.mocked(useWorkspace).mockReturnValue({ state: STATE, error: 'relay refused', loading: false, busy: false, refresh: async () => {} })
     render(<App />)
     expect(screen.getByText(/Could not read from the relay — relay refused/)).toBeInTheDocument()
     expect(within(screen.getByRole('banner')).getByText('Me Myself')).toBeInTheDocument()
@@ -346,5 +346,41 @@ describe('Issue page — one issue from the fold', () => {
     goTo(`/issue/${D('98')}`)
     render(<App />)
     expect(screen.getByText(/not in this workspace/)).toBeInTheDocument()
+  })
+})
+
+/**
+ * The cold start — reported as "Ship sometimes feels very slow and not loading
+ * the projects and issues".
+ *
+ * `state` is null both while the first read is in flight and when it was
+ * refused on quota, and the page rendered nothing for either. A full read takes
+ * ~1.1 s against production, so that blank was reachable on every load; when the
+ * relay was over budget it stayed.
+ */
+describe('before the first read lands', () => {
+  it('shows a skeleton rather than an empty page', () => {
+    vi.mocked(useWorkspace).mockReturnValue({ state: null, error: null, loading: true, busy: false, refresh })
+    const { container } = render(<App />)
+    expect(container.querySelector('[data-loading="workspace"]')).not.toBeNull()
+  })
+
+  /*
+    SHI-12 says a quota refusal must not be reported as a broken relay — true
+    while a workspace is on screen, and the opposite before one is: the silence
+    leaves nothing to distinguish "busy" from "stopped".
+  */
+  it('says the relay is busy when there is nothing on screen yet', () => {
+    vi.mocked(useWorkspace).mockReturnValue({ state: null, error: null, loading: false, busy: true, refresh })
+    render(<App />)
+    expect(screen.getByText(/The relay is busy/)).toBeInTheDocument()
+    // Not the error banner: nothing is broken.
+    expect(screen.queryByText(/Could not read from the relay/)).toBeNull()
+  })
+
+  it('says nothing about quota once the workspace is on screen', () => {
+    vi.mocked(useWorkspace).mockReturnValue({ state: STATE, error: null, loading: false, busy: false, refresh })
+    render(<App />)
+    expect(screen.queryByText(/The relay is busy/)).toBeNull()
   })
 })

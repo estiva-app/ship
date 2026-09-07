@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { me, peopleIn, resolveInbound, useDirectory, useWorkspace, type DirectoryView, type FolderState, type WorkspaceState, installReadStateFlush } from '@/api'
 import { AppShell } from '@/components/AppShell'
 import { Banner } from '@/components/Banner'
+import { SkeletonList } from '@/components/ui/Skeleton'
 import { IdentityMenu } from '@/components/IdentityMenu'
 import { Sidebar, type SidebarProject } from '@/components/Sidebar'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -22,7 +23,7 @@ import { href, replace, useRoute, type Route } from './router'
  * the fold's data.
  */
 export default function App() {
-  const { state, error, refresh } = useWorkspace()
+  const { state, error, loading, busy, refresh } = useWorkspace()
   const route = useRoute()
   const { banner, say } = useBanner()
 
@@ -69,19 +70,45 @@ export default function App() {
       banner={
         error ? (
           <Banner tone="error">{`Could not read from the relay — ${error}`}</Banner>
+        ) : busy ? (
+          /*
+            The one case where a quota refusal is worth saying — SHI-12's rule
+            is right whenever there is a workspace on screen and wrong before
+            there is one. Without this the page is simply empty: no projects,
+            no issues, no explanation, and nothing to distinguish it from an
+            app that has stopped.
+          */
+          <Banner tone="info">The relay is busy — waiting to load the workspace. This clears on its own.</Banner>
         ) : banner ? (
           <Banner tone={banner.tone}>{banner.text}</Banner>
         ) : undefined
       }
       nav={<Sidebar {...sidebarProps(state, route)} />}
     >
-      <Page route={route} state={state} directory={directory} say={say} refresh={refresh} />
+      <Page route={route} state={state} loading={loading} directory={directory} say={say} refresh={refresh} />
     </AppShell>
   )
 }
 
 /** Which page the route names; an inbound reference shows nothing until it resolves. */
-function Page({ route, state, directory, say, refresh }: { route: Route; state: WorkspaceState | null; directory: DirectoryView; say: Say; refresh: () => Promise<void> }) {
+function Page({ route, state, loading, directory, say, refresh }: { route: Route; state: WorkspaceState | null; loading: boolean; directory: DirectoryView; say: Say; refresh: () => Promise<void> }) {
+  /*
+    The first read has not landed. This used to render nothing at all, which is
+    what "Ship sometimes does not load the projects and issues" was: a full read
+    takes ~1.1 s against production and longer when the relay is busy, and for
+    all of it the page was blank with no indication anything was coming.
+
+    A skeleton rather than a spinner, because the shape of what arrives is
+    known — Skeleton's own page: "data is on its way and the shape of what
+    arrives is known, show that shape".
+  */
+  if (!state && loading) {
+    return (
+      <div className="flex flex-col gap-3 p-6" data-loading="workspace">
+        <SkeletonList rows={6} />
+      </div>
+    )
+  }
   if (!state) return null
   switch (route.name) {
     case 'projects':
