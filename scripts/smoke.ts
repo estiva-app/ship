@@ -562,6 +562,40 @@ async function main() {
   check('  …and renders nested', (await conversations.locator('article').count()) === 2)
 
   /*
+    Deleting a comment — CON-3, read off the screen rather than off the event.
+
+    The reply, not the root: the thread survives, so "the message left the page"
+    is a visible difference rather than the whole card disappearing for any
+    reason. Waits on the rendered effect — one article instead of two — because
+    the publish and the re-read are both round trips and a sleep would only move
+    the race.
+
+    **The control is on somebody else's message and is still offered.** That is
+    the ticket, not an oversight: Buzz accepts a kind:5 from the target's author
+    or from the NIP-OA owner of an authoring agent, and no client can evaluate
+    the second half. An author gate would hide the control from the one other
+    party the relay would accept.
+  */
+  const replyMenus = await conversations.getByRole('button', { name: 'Message actions' }).count()
+  check('every message offers a delete, not just your own', replyMenus === 2)
+  await conversations.getByRole('button', { name: 'Message actions' }).nth(1).click()
+  await conversations.getByRole('menuitem', { name: 'Delete message' }).click()
+  await page.getByRole('button', { name: 'Delete message' }).click()
+  await page.waitForFunction(() => document.querySelectorAll('section article').length === 1)
+  const deletion = stored.find((e) => e.kind === 5 && e.tags.some((t) => t[0] === 'e' && t[1] === reply!.id))
+  check('deleting a comment publishes a kind:5 naming it', !!deletion)
+  /* The event form, not the address form: a comment is a regular event, and the
+     relay derives the channel from the target rather than from an `h`. Exactly
+     one target, `e` or `a`, is all Buzz will accept. */
+  check('  …by event id, with no h tag', !deletion!.tags.some((t) => t[0] === 'h'))
+  check('  …and exactly one target', deletion!.tags.filter((t) => t[0] === 'e' || t[0] === 'a').length === 1)
+  check(
+    '  …and the message is gone from the page, re-read rather than hidden',
+    !(await conversations.textContent())?.includes('Key is in 1Password now.'),
+  )
+  check('  …while the thread it was in survives', (await conversations.textContent())?.includes('Blocked on the Stripe key.') ?? false)
+
+  /*
     Waits for one more history row than there were, not for "more than one".
 
     The absolute count is already true before the click as soon as anything

@@ -56,6 +56,7 @@ export {
   createIssue,
   createProject,
   deleteIssue,
+  deleteMessage,
   deleteProject,
   explainRejection,
   pairProjectFolder,

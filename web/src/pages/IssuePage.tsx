@@ -1,6 +1,6 @@
 import { useMarkRead } from '@/lib/useMarkRead'
 import { useMemo, useState } from 'react'
-import { ISSUE_STATUSES, commentsOn, deleteIssue, react, referenceFor, reply, setIssueField, unreact, startConversation, type DirectoryView, type FolderState, type WorkspaceState, threadContext, useMergedReadState, firstUnreadByThread, projectContext, me } from '@/api'
+import { ISSUE_STATUSES, commentsOn, deleteIssue, deleteMessage, react, referenceFor, reply, setIssueField, unreact, startConversation, type DirectoryView, type FolderState, type WorkspaceState, threadContext, useMergedReadState, firstUnreadByThread, projectContext, me } from '@/api'
 import type { HistoryEntry } from '@/components/History'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -139,6 +139,21 @@ export function IssuePage({ state, directory, d, say, refresh }: { state: Worksp
             ? act('Reaction', () => unreact(mine), say, refresh)
             : act('Reaction', () => react(messageId, emoji), say, refresh)
         }
+        /*
+          Deleting a comment — CON-3.
+
+          `refresh` here, unlike `onReact`: a comment IS in the fold, so the
+          workspace has to be re-read for it to leave the page. The relay stops
+          returning a deleted event, so the next read simply does not contain
+          it and nothing folds a tombstone.
+
+          No author check. The relay accepts a kind:5 from the target's author
+          or from the NIP-OA owner of an authoring agent, and no client can
+          evaluate the second half — so the control is offered and the refusal
+          is reported (SPEC §6.5, corrected 2026-09-06). `act` returns false on
+          a refusal, which keeps the confirm dialog open behind the banner.
+        */
+        onDeleteMessage={(messageId) => act('Delete', () => deleteMessage(messageId), say, refresh)}
         onReplyInActivity={(threadId, body) => {
           const conversation = state.conversations.find((c) => c.id === threadId)
           if (!conversation?.root.folder) return false

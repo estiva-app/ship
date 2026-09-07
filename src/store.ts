@@ -247,11 +247,15 @@ export class Store {
   /**
    * Ask the relay to drop a project's record.
    *
-   * Only the project's author can do this — NIP-09 is author-scoped — and it
-   * only removes the *record*. The issues in the Folder are separate events
+   * It only removes the *record*. The issues in the Folder are separate events
    * with their own authors; they survive, and simply stop being reachable from
    * this app once the project they hung off is gone. Callers should say that
    * out loud before publishing.
+   *
+   * Who may do it is the relay's call and not this method's — the author, or
+   * the NIP-OA owner of an authoring agent (SPEC §6.5, corrected 2026-09-06).
+   * This comment used to say "only the project's author can do this", which is
+   * the rule SHI-14 found wrong and CON-3 withdrew.
    */
   deleteProject(args: {
     recordFolder: string
@@ -291,6 +295,42 @@ export class Store {
         reason: args.reason,
       }),
     )
+  }
+
+  /**
+   * Ask the relay to drop a comment — CON-3.
+   *
+   * ## Why this is the event form and not the address form
+   *
+   * A comment is a `kind:1111`: a regular event with an id and no address. So
+   * the `kind:5` names it with an `e` tag, and carries **no `h`** — the relay
+   * looks the target up and takes the channel from it (`ingest.rs`: *"kind:5
+   * events don't carry an h-tag, so we look up the target event and use its
+   * channel_id"*). Exactly one target is allowed, `e` or `a`, never both.
+   *
+   * That is the same shape `unreact` uses, and deliberately: a reaction and a
+   * comment are both regular events, and the relay validates their deletions
+   * through the same branch. The difference is only what is being taken back.
+   *
+   * ## Who may
+   *
+   * The relay's call, never this app's. `validate_standard_deletion_event`
+   * accepts the target's effective author **or** that author's NIP-OA owner,
+   * on both branches — so a human can retract a comment their agent wrote.
+   * **No client can evaluate the second half**: `users.agent_owner_pubkey` is
+   * written from the attestation and read server-side only, and the attestation
+   * runs agent→owner rather than the reverse. So the control is offered and the
+   * refusal is reported in the relay's own words (SPEC §6.5, corrected
+   * 2026-09-06; SHI-14 found the same thing on objects).
+   *
+   * ## Still a request
+   *
+   * The relay stops returning the event, which is why nothing here has to fold
+   * a tombstone: the next read simply does not contain it. A copy on another
+   * relay, or in another app's cache, is untouched.
+   */
+  deleteMessage(args: { messageEventId: string }): Promise<PublishResult> {
+    return this.publish(buildEventDeletion(this.signer.pubkey, Date.now(), { targetEventId: args.messageEventId }))
   }
 
   /**
