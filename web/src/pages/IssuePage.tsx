@@ -133,10 +133,13 @@ export function IssuePage({ state, directory, d, say, refresh }: { state: Worksp
           reaction's own event, never the message: a kind:5 naming the message
           would be asking the relay to delete somebody's comment.
         */
+        /*
+          No `refresh`: a reaction is a kind:7 and is not in the fold, so a
+          workspace re-read would spend 38 bridge requests to learn nothing.
+          The reaction surface re-reads its own query instead — one request.
+        */
         onReact={(messageId, emoji, mine) =>
-          mine
-            ? act('Reaction', () => unreact(mine), say, refresh)
-            : act('Reaction', () => react(messageId, emoji), say, refresh)
+          mine ? act('Reaction', () => unreact(mine), say) : act('Reaction', () => react(messageId, emoji), say)
         }
         onReplyInActivity={(threadId, body) => {
           const conversation = state.conversations.find((c) => c.id === threadId)
