@@ -439,6 +439,40 @@ async function main() {
   check('  …and no kind:9 was written for it', !stored.some((e) => e.kind === 9))
 
   /*
+    Reactions, read across apps — CON-2.
+
+    A `kind:7` is injected rather than clicked, because **Ship cannot publish
+    one**: `estiva-ship`'s `allowedKinds` has no `7` while `estiva-peek` does.
+    That is the real situation this surface is built for — reactions arrive from
+    the other app — so the test reproduces it rather than a capability Ship does
+    not have.
+
+    It also exercises the part that is easy to get wrong: a `kind:7` carries no
+    `h`, so it is found only by a `#e` query addressed at the message. If Ship
+    ever went back to expecting reactions to arrive with the Folder, this is
+    what fails.
+  */
+  stored.push({
+    id: 'r'.repeat(64),
+    pubkey: 'f'.repeat(64),
+    kind: 7,
+    created_at: Math.floor(Date.now() / 1000),
+    tags: [['e', comment!.id]],
+    content: '🎉',
+  })
+  // The page polls every ~5 s; wait for the pill rather than sleeping.
+  await conversations.locator('[data-reactions]').first().waitFor({ timeout: 15000 })
+  check('a reaction written in another app is read here', true)
+  check(
+    '  …drawn on the message it targets, with its count',
+    (await conversations.locator('[data-reactions]').first().textContent())?.includes('🎉') ?? false,
+  )
+  check(
+    '  …and offers no control, because Ship cannot sign a kind:7',
+    (await conversations.locator('[data-reactions] button').count()) === 0,
+  )
+
+  /*
     SHI-1, read off the screen rather than off the event.
 
     The two assertions above prove the pointer was *published*; neither says

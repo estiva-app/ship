@@ -25,9 +25,10 @@ import {
   issueAddr,
   projectAddr,
 } from './events'
-import { findNaddrs, naddrToAddr } from '@estiva-app/protocol'
+import { findNaddrs, naddrToAddr, buildReaction, buildDeletion as buildEventDeletion } from '@estiva-app/protocol'
 import { foldFolder, projectFolders, type FolderState } from './fold'
 import { taggedIndex, type TaggedIndex } from './references'
+import { REACTION_EVENT_LIMIT } from './reactions'
 import { directoryFrom, type Directory } from './profiles'
 import { KIND } from './kinds'
 import { buildRecommendation } from './manifest'
@@ -409,6 +410,67 @@ export class Store {
         blockId: args.blockId,
       }),
     )
+  }
+
+  /**
+   * Reactions on a set of messages — CON-2.
+   *
+   * **One filter with an `#e` array, and that is checked rather than assumed.**
+   * The known relay quirk on `rawFolders` is that `{'#h': [A, B]}` silently
+   * returns only A's events, and over-generalising it to every tag filter would
+   * mean one round trip per message — 588 of them for this workspace. Measured
+   * against production 2026-09-06: `#e` **does** OR. Two targets asked for, two
+   * answered.
+   *
+   * The horizon is applied by the caller through `reactionTargets`, so this
+   * method has no opinion about how much of a page it is being asked about; it
+   * bounds the *events* it will take back, which is a different limit and the
+   * one a single very busy message could otherwise blow past.
+   *
+   * No `kind:5` query. The relay stops returning an event once it holds a
+   * deletion for it, and this app caches nothing — so a retracted reaction is
+   * absent from the next read rather than something to reconcile. Peek asks
+   * because Peek keeps a copy.
+   */
+  async reactionsFor(eventIds: string[]): Promise<SignedEvent[]> {
+    if (!eventIds.length) return []
+    return this.relay.query([
+      { kinds: [KIND.REACTION], '#e': eventIds, limit: REACTION_EVENT_LIMIT },
+    ] as never)
+  }
+
+  /**
+   * React to a message.
+   *
+   * No `h`, deliberately — `buildReaction` mirrors Buzz's own builder, which
+   * emits none, because the relay derives the channel from the target's `e` tag
+   * and ignores a client-supplied one. Adding it would change the event id for
+   * no benefit.
+   */
+  react(args: { targetEventId: string; emoji: string }): Promise<PublishResult> {
+    return this.publish(
+      buildReaction(this.signer.pubkey, Date.now(), {
+        targetEventId: args.targetEventId,
+        emoji: args.emoji,
+      }),
+    )
+  }
+
+  /**
+   * Take a reaction back.
+   *
+   * A `kind:5` naming **the reaction's own event**, not the message — and with
+   * no `h`, matching `build_remove_reaction`. That is a different shape from
+   * this file's other deletions, which target an *address* and must carry the
+   * record's Folder; the two are not interchangeable and the wrong one is
+   * accepted-and-ignored rather than refused.
+   *
+   * Still a request. The relay honours it from the reaction's author or that
+   * author's NIP-OA owner (SPEC §6.5, corrected 2026-09-06), and the caller
+   * reports a refusal rather than assuming it worked.
+   */
+  unreact(args: { reactionEventId: string }): Promise<PublishResult> {
+    return this.publish(buildEventDeletion(this.signer.pubkey, Date.now(), { targetEventId: args.reactionEventId }))
   }
 
   /**

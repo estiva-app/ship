@@ -12,6 +12,9 @@ import { SkeletonBar } from '@/components/ui/Skeleton'
 import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
 import { byReference, useForeignObjects } from '@/api/useForeignObjects'
 import { Composer } from './Composer'
+import { Reactions } from './Reactions'
+import { useReactions, REACTION_TARGET_LIMIT } from '@/api'
+import type { Reaction } from '@/api'
 
 /**
  * Conversations as production shows them: a composer to start one, then
@@ -104,6 +107,37 @@ export function useThreadReferences(threads: readonly ThreadData[]): {
   return { resolved: byReference(references, objects), resolving: objects === undefined }
 }
 
+/**
+ * The reactions on every message of a set of threads — SPEC §6.6, CON-2.
+ *
+ * Once per surface, not once per message: a `kind:7` is fetched addressed by
+ * target, so one query covers a whole page (`#e` ORs — measured against
+ * production, unlike `#h`, which does not). Asking per message would be one
+ * round trip per line of conversation.
+ *
+ * Oldest first, because the horizon keeps the recent end when a page exceeds it
+ * and the caller's order is what decides which end that is.
+ *
+ * Shared by `Conversations` and `Activity` for the same reason
+ * `useThreadReferences` is: two copies of this would be two horizons and two
+ * answers about the same messages on one screen.
+ */
+export function useThreadReactions(threads: readonly ThreadData[]): {
+  reactionsBy: Record<string, readonly Reaction[]>
+  omitted: number
+} {
+  const ids = useMemo(
+    () =>
+      threads
+        .flatMap((thread) => [thread.root, ...thread.replies])
+        .sort((a, b) => a.at - b.at)
+        .map((message) => message.id),
+    [threads],
+  )
+  const { reactions, omitted } = useReactions(ids)
+  return { reactionsBy: reactions, omitted }
+}
+
 export interface ThreadData {
   id: string
   root: MessageData
@@ -116,6 +150,7 @@ export function MessageCard({
   resolved,
   resolving = false,
   nameOf,
+  reactions,
 }: {
   message: MessageData
   reply?: boolean
@@ -125,6 +160,8 @@ export function MessageCard({
   resolving?: boolean
   /** Resolve a mentioned key to a name — SPEC §13.1. */
   nameOf?: (pubkey: string) => string
+  /** This message's reactions, read by target — SPEC §6.6. */
+  reactions?: readonly Reaction[]
 }) {
   const blocks = toRenderTree(message.body, MESSAGE_FORMAT)
   // A block that is nothing but one pointer is an attachment and is drawn
@@ -163,6 +200,9 @@ export function MessageCard({
           ))}
         </div>
       )}
+      {/* Under the body, above nothing — a reaction is about the message that
+          precedes it, and it sits inside the article so it moves with it. */}
+      <Reactions reactions={reactions} nameOf={nameOf} />
     </article>
   )
 }
@@ -184,7 +224,7 @@ function NewSinceHere() {
   )
 }
 
-export function ConversationThread({ thread, onReply, disabledReason, unreadFrom, resolved, resolving, nameOf, subdued = false }: { thread: ThreadData; onReply: (threadId: string, text: string) => Promise<boolean | void> | boolean | void; disabledReason?: string; unreadFrom?: string; resolved?: Record<string, ForeignObjectData | null | undefined>; resolving?: boolean; nameOf?: (pubkey: string) => string; /** Draw it as secondary — Activity's mentions, which do not carry a comment's trust (CON-9). */ subdued?: boolean }) {
+export function ConversationThread({ thread, onReply, disabledReason, unreadFrom, resolved, resolving, nameOf, reactionsBy, subdued = false }: { thread: ThreadData; onReply: (threadId: string, text: string) => Promise<boolean | void> | boolean | void; disabledReason?: string; unreadFrom?: string; resolved?: Record<string, ForeignObjectData | null | undefined>; resolving?: boolean; nameOf?: (pubkey: string) => string; /** Reactions by message id, read once for the surface. */ reactionsBy?: Record<string, readonly Reaction[]>; /** Draw it as secondary — Activity's mentions, which do not carry a comment's trust (CON-9). */ subdued?: boolean }) {
   return (
     <div
       className={cn(
@@ -196,11 +236,11 @@ export function ConversationThread({ thread, onReply, disabledReason, unreadFrom
       )}
     >
       {unreadFrom === thread.root.id && <NewSinceHere />}
-      <MessageCard message={thread.root} resolved={resolved} resolving={resolving} nameOf={nameOf} />
+      <MessageCard message={thread.root} resolved={resolved} resolving={resolving} nameOf={nameOf} reactions={reactionsBy?.[thread.root.id]} />
       {thread.replies.map((reply) => (
         <Fragment key={reply.id}>
           {unreadFrom === reply.id && <NewSinceHere />}
-          <MessageCard message={reply} reply resolved={resolved} resolving={resolving} nameOf={nameOf} />
+          <MessageCard message={reply} reply resolved={resolved} resolving={resolving} nameOf={nameOf} reactions={reactionsBy?.[reply.id]} />
         </Fragment>
       ))}
       <Composer kind="reply" onSubmit={(text) => onReply(thread.id, text)} disabledReason={disabledReason} className="ml-3.5 mt-1" />
@@ -226,6 +266,7 @@ export interface ConversationsProps {
 
 export function Conversations({ threads, onStart, onReply, disabledReason, className, unread, anchoredTo, onClearAnchor, nameOf }: ConversationsProps) {
   const { resolved, resolving } = useThreadReferences(threads)
+  const { reactionsBy, omitted } = useThreadReactions(threads)
 
   return (
     <div className={cn('flex flex-col gap-2.5', className)}>
@@ -252,10 +293,25 @@ export function Conversations({ threads, onStart, onReply, disabledReason, class
             resolved={resolved}
             resolving={resolving}
             nameOf={nameOf}
+            reactionsBy={reactionsBy}
           />
         ))
       ) : (
         <EmptyState className="py-8" message="No conversations yet." />
+      )}
+      {/*
+        The horizon, said out loud — CON-1.
+
+        §6.6's finding is that the cap is invisible: a message past it looks
+        exactly like a message nobody reacted to. On this workspace it has never
+        bitten (the busiest page is 77 messages against a limit of 100), which
+        is precisely why the line has to exist before it does.
+      */}
+      {omitted > 0 && (
+        <p className="text-caption text-text-muted">
+          Reactions are shown for the {REACTION_TARGET_LIMIT} most recent messages. {omitted} older{' '}
+          {omitted === 1 ? 'message was' : 'messages were'} not checked.
+        </p>
       )}
     </div>
   )

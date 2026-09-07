@@ -51,6 +51,21 @@ export const KIND = {
    */
   COMMENT: 1111,
   /**
+   * NIP-25 reaction — an emoji on one message.
+   *
+   * **It carries no `h` tag**, and that is the whole difficulty (SPEC §6.6).
+   * Every other kind here is found by Folder; a reaction cannot be, because
+   * Buzz derives its channel from the target's `e` tag and ignores a
+   * client-supplied `h`. So reactions are fetched *addressed by target* — the
+   * event ids on screen — which is what forces a horizon nobody can see.
+   * `reactions.ts` holds that decision and the number.
+   *
+   * Attaches to a **message**, never to a block (RFC 0.4 §7.2) and not — yet —
+   * to an object. An issue has an address and no event id, so nothing here can
+   * express reacting to one even by accident.
+   */
+  REACTION: 7,
+  /**
    * NIP-09 deletion request.
    *
    * A request rather than a delete, and honoured only for the pubkey that
