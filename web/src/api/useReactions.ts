@@ -23,10 +23,13 @@ import { reactionsOn } from './index'
  *
  * ## Freshness
  *
- * `useRefresh`, like every other view in this app: 5 s while visible, on focus,
- * never in a hidden tab. So a reaction added in Peek shows up here on the same
- * cadence the rest of the page does, rather than needing a reload — which is
- * the whole cross-app claim CON-2 is about.
+ * `useRefresh`, like every other view in this app: `REFRESH_MS` while visible,
+ * on focus, never in a hidden tab. So a reaction added in Peek shows up here on
+ * the same cadence the rest of the page does, rather than needing a reload —
+ * which is the whole cross-app claim CON-2 is about.
+ *
+ * Named rather than quoted: the interval has moved twice (5 s → 10 s → 20 s),
+ * and comments that spelled the old number out stayed behind each time.
  */
 export function useReactions(eventIds: readonly string[]): {
   reactions: ReactionsByTarget

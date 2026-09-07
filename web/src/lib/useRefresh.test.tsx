@@ -85,10 +85,25 @@ describe('useRefresh — the old app\'s 5-second poll and visibility refresh (RE
 })
 
 describe('useRefresh — holding off when the relay says it is over budget (SHI-12)', () => {
-  it('polls at ten seconds, which is what the relay’s 300-a-minute leaves room for', () => {
-    // Three readers share this tick and the workspace read alone is 34
-    // requests; at five seconds that was 420 a minute against a ceiling of 300.
-    expect(REFRESH_MS).toBe(10_000)
+  /*
+    The number is asserted so changing it is deliberate, and the arithmetic is
+    here so a future reader can redo it rather than trust it.
+
+    Measured against production 2026-09-07 by counting the transport's calls
+    through one real `loadAll`: 38 requests. Buzz meters `POST /query` at 300 a
+    minute per pubkey, and a Ship tab and a Peek tab signed in as the same
+    person share that one allowance.
+
+      5 s → 12 reads/min → 456 requests  (152% — over)
+     10 s →  6 reads/min → 228 requests  ( 76% — no room for a second app)
+     20 s →  3 reads/min → 114 requests  ( 38%)
+
+    Revert this to 10_000 once `rawFolders` batches: the same read is 1 request
+    and 362 ms when its 34 filters go in one POST, which is how Ship did it
+    before `queryAll` was adopted for paging.
+  */
+  it('polls at twenty seconds, which leaves the relay’s 300-a-minute room for a second app', () => {
+    expect(REFRESH_MS).toBe(20_000)
   })
 
   it('skips ticks while the relay has asked this tab to wait', () => {

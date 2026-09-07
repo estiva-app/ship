@@ -478,8 +478,13 @@ async function main() {
     tags: [['e', comment!.id]],
     content: '🎉',
   })
-  // The page polls every ~5 s; wait for the pill rather than sleeping.
-  await conversations.locator('[data-reactions]').first().waitFor({ timeout: 15000 })
+  /*
+     Injected straight into the stub's store, so ONLY the poll can bring it back —
+     no click, no write, nothing else to trigger a read. That makes this the one
+     wait in the file whose budget is `REFRESH_MS`, and it has to stay ahead of
+     it: at 20 s the old 15 s timeout failed here, correctly.
+  */
+  await conversations.locator('[data-reactions]').first().waitFor({ timeout: 45000 })
   check('a reaction written in another app is read here', true)
   check(
     '  …drawn on the message it targets, with its count',

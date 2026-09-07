@@ -4,26 +4,56 @@ import { pausedForMs } from './relayBudget'
 /**
  * How often a visible tab re-reads.
  *
- * Was 5000 — the old app's POLL_MS, carried over — until SHI-12 did the
- * arithmetic against what the relay actually allows. Buzz meters `POST /query`
- * at 300 a minute, and three readers share this one tick: the workspace read
- * (34 requests against production, measured), the read-state frontier (1), and
- * the foreign-reference widgets (4 per reference on the open issue).
+ * 5000 → 10000 (SHI-12) → **20000 (2026-09-07)**, each time because the
+ * arithmetic against the relay's meter said so.
  *
- * At five seconds that is 12 ticks a minute and 420 requests before a single
- * reference is on screen — over the ceiling, and `rate-limited: quota exceeded`
- * is what a person then gets instead of their own status change appearing. At
- * ten seconds it is 210, with room for four references.
+ * ## What a tick actually costs
+ *
+ * Buzz meters `POST /query` at **300 a minute, per pubkey** — not per app, so
+ * a Ship tab and a Peek tab signed in as the same person share one allowance
+ * (`enforce_http_admission` runs once per HTTP call, before the filters are
+ * even parsed, so the unit is *requests* and not filters).
+ *
+ * Measured against production on 2026-09-07 by counting the transport's calls
+ * through one real `loadAll`: **38 requests, 1335 ms**. Three other readers
+ * share this same tick — foreign objects, foreign references, and reactions —
+ * but each is a single batched request, so the workspace read is the number
+ * that matters.
+ *
+ * | interval | reads/min | requests/min | of 300 |
+ * | --- | --- | --- | --- |
+ * | 5 s | 12 | 456 | **152%** |
+ * | 10 s | 6 | 228 | **76%** |
+ * | 20 s | 3 | 114 | 38% |
+ *
+ * Ten seconds left 24% for everything else, which reactions alone could spend:
+ * before CON-2's budget fix a click cost a whole workspace re-read. The
+ * symptom was not a slow app but a **blank** one — `rate-limited: quota
+ * exceeded` on a cold start renders no workspace at all (see `useWorkspace`).
+ *
+ * ## This is a stopgap, and the real fix is next door
+ *
+ * 38 is not inherent. `rawFolders` sends one filter per Folder and `queryAll`
+ * pages each filter in its own request; the relay accepts all 34 filters in
+ * **one** POST and clamps per filter — measured the same day: same complete
+ * answer, 1 request, 362 ms. Ship did it that way until `queryAll` was adopted
+ * for correctness (a Folder past the page ceiling would otherwise be silently
+ * short-read — real, and not currently happening: the busiest Folder holds
+ * 130 events).
+ *
+ * So the batching work is what earns this number back. Twenty seconds is what
+ * makes the app usable in the meantime, and it is meant to be reverted rather
+ * than kept.
  *
  * **Freshness of one's own actions does not depend on this number.** A write
  * re-reads immediately through `Workspace.refresh`; this governs only how
  * quickly somebody *else's* change turns up.
  *
- * Not a number that stays right on its own: the workspace read costs one
- * request per Folder, so the ceiling falls as the workspace grows. See
- * `relayBudget` for the part that holds when it does.
+ * Not a number that stays right on its own: the workspace read costs a request
+ * per Folder, so the ceiling falls as the workspace grows. See `relayBudget`
+ * for the part that holds when it does.
  */
-export const REFRESH_MS = 10_000
+export const REFRESH_MS = 20_000
 
 /**
  * Two events often fire for one gesture — switching to a tab raises both
