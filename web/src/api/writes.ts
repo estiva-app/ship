@@ -331,3 +331,25 @@ export function unreact(reactionEventId: string): Promise<WriteResult> {
 export function deleteMessage(messageEventId: string): Promise<WriteResult> {
   return publish(() => store.deleteMessage({ messageEventId }))
 }
+
+// ── Editing a comment ───────────────────────────────────────────────────────
+
+/**
+ * Change what a comment says — CON-4.
+ *
+ * A `kind:40003` naming the target, never a rewrite: the original event is
+ * immutable and stays on the relay, and `foldEdits` picks the latest edit on
+ * the way back.
+ *
+ * **This is the only write here that needs both a Folder and an event id.** A
+ * reaction and a deletion carry no `h` because the relay derives the channel
+ * from the target; an edit is in `requires_h_channel_scope`, so one without an
+ * `h` is refused while the kind is granted and the signature is fine.
+ *
+ * Offered to everyone, gated by nobody here — the relay takes an edit from the
+ * target's effective author or the NIP-OA owner of an authoring agent, and no
+ * client can evaluate the second half. Same reasoning as `deleteMessage`.
+ */
+export function editMessage(folder: string, messageEventId: string, body: string): Promise<WriteResult> {
+  return publish(() => store.editMessage({ folder, messageEventId, body }))
+}

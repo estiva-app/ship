@@ -1,5 +1,6 @@
 import { useMarkRead } from '@/lib/useMarkRead'
 import { pointerToAddress, referenceToPointer, resolveBlockAnchor, type ContentFormat } from '@estiva-app/protocol'
+import type { EditIndex } from '@/api'
 import { signedIn } from '@/auth/estivaId'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
@@ -8,6 +9,7 @@ import {
   archiveProject,
   createIssue,
   deleteMessage,
+  editMessage,
   deleteProject,
   folderLink,
   me,
@@ -102,17 +104,56 @@ export function threadFor(
   body?: { value: string; format: ContentFormat },
   /** The object this surface is: its own pointer is dropped, every other one is drawn (SHI-1). */
   self?: string,
+  /*
+    Edits, applied here rather than in the fold — CON-4.
+
+    `foldFolder` is a two-repo contract whose conformance test walks the union
+    of keys, so the edit cannot be a field on `Message`; `edits.ts` folds it
+    beside the fold and this is where the two meet. A message with no edit is
+    untouched, so the omitted case is exactly today's behaviour.
+  */
+  edits?: EditIndex,
 ): ThreadData {
-  const message = (m: FolderState['conversations'][number]['root']) => ({
-    id: m.id,
-    author: directory.personOf(m.author),
-    at: m.createdAt,
-    body: omitOwnReference(m.body, self),
-    anchor: resolveBlockAnchor(m.blockId, body?.value ?? '', body?.format ?? 'marker'),
-    // Carried for the unread rule only: your own writing is never new to you.
-    by: m.author,
-  })
+  const message = (m: FolderState['conversations'][number]['root']) => {
+    const edit = edits?.[m.id]
+    return {
+      id: m.id,
+      author: directory.personOf(m.author),
+      at: m.createdAt,
+      // The edited text, if there is one — an edit replaces the body and
+      // nothing else (RFC 0.4 §7.2.1). The reference still comes out of it, so
+      // an edit that keeps the pointer keeps the widget.
+      body: omitOwnReference(edit?.body ?? m.body, self),
+      // Milliseconds from the fold, seconds everywhere else on this shape.
+      editedAt: edit ? Math.floor(edit.at / 1000) : undefined,
+      anchor: resolveBlockAnchor(m.blockId, body?.value ?? '', body?.format ?? 'marker'),
+      // Carried for the unread rule only: your own writing is never new to you.
+      by: m.author,
+    }
+  }
   return { id: conversation.id, root: message(conversation.root), replies: conversation.replies.map(message) }
+}
+
+/**
+ * The Folder a message was posted in — CON-4.
+ *
+ * An edit is the one conversation write that is channel-scoped, so it needs
+ * this, and it must be the **message's** Folder rather than the page's: a
+ * message reached through Activity belongs to another file. `Message.folder` is
+ * carried by the fold for exactly this reason ("needed to reply into the same
+ * container"), and this is its second caller.
+ *
+ * `undefined` for a message this reader cannot place — a root that carried no
+ * `h`. Refusing is the honest answer there; guessing would publish an edit into
+ * a channel the message is not in.
+ */
+export function folderOfMessage(state: FolderState, messageId: string): string | undefined {
+  for (const conversation of state.conversations) {
+    for (const message of [conversation.root, ...conversation.replies]) {
+      if (message.id === messageId) return message.folder || undefined
+    }
+  }
+  return undefined
 }
 
 /**
@@ -168,7 +209,7 @@ export function activityFor(
   subFiles: readonly { addr: string; label: string }[] = [],
 ): { items: ActivityItem[]; truncated: number } {
   const mentions: ActivityItem[] = mentionsOf(state.conversations, addr, state.tagged).map((conversation) => ({
-    thread: threadFor(conversation, directory, undefined, addr),
+    thread: threadFor(conversation, directory, undefined, addr, state.edits),
     relation: 'mention' as const,
     where: whereThreadLives(conversation.root.folder, state),
   }))
@@ -176,7 +217,7 @@ export function activityFor(
   const labels = new Map(subFiles.map((file) => [file.addr, file.label]))
   const rolled: ActivityItem[] = commentsOnAny(state.conversations, new Set(labels.keys()), state.tagged).map(
     ({ conversation, about }) => ({
-      thread: threadFor(conversation, directory, undefined, about),
+      thread: threadFor(conversation, directory, undefined, about, state.edits),
       relation: 'sub-file' as const,
       where: labels.get(about),
     }),
@@ -318,7 +359,7 @@ export function ProjectPage({
      read; its issues' discussions are separate contexts and are untouched. */
   useMarkRead([projectContext(project?.contentFolder)])
   const threads = useMemo(
-    () => conversations.map((c) => threadFor(c, directory, project ? { value: project.description, format: project.descriptionFormat } : undefined, project?.addr)),
+    () => conversations.map((c) => threadFor(c, directory, project ? { value: project.description, format: project.descriptionFormat } : undefined, project?.addr, state.edits)),
     [conversations, directory, project],
   )
   /* The divider in the feed (CRO-13). A project IS the container, so its own
@@ -430,6 +471,32 @@ export function ProjectPage({
           a refusal, which keeps the confirm dialog open behind the banner.
         */
         onDeleteMessage={(messageId) => act('Delete', () => deleteMessage(messageId), say, refresh)}
+        /*
+          Editing a comment — CON-4.
+
+          **The message's OWN Folder, never this page's.** An edit is
+          channel-scoped (40003 is in `requires_h_channel_scope`), and a message
+          reached through Activity belongs to a different file — publishing it
+          under this surface's Folder would be refused, or worse, accepted into
+          the wrong channel. So the Folder is looked up from the message, the
+          same rule `onReplyInActivity` keeps for replies.
+
+          `refresh` because an edit IS in the read: `edits.ts` folds it beside
+          the fold, so the new text arrives on the next workspace read rather
+          than being patched in locally.
+
+          No author check. The relay takes an edit from the target's effective
+          author or the NIP-OA owner of an authoring agent, and no client can
+          evaluate the second half — same reasoning as the deletion above.
+        */
+        onEditMessage={(messageId, body) => {
+          const folder = folderOfMessage(state, messageId)
+          if (!folder) {
+            say('That message has no Folder to publish an edit into.', 'error')
+            return false
+          }
+          return act('Edit', () => editMessage(folder, messageId, body), say, refresh)
+        }}
         onReplyInActivity={(threadId, body) => {
           const conversation = state.conversations.find((c) => c.id === threadId)
           if (!conversation?.root.folder) return false

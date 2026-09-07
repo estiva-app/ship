@@ -64,12 +64,14 @@ export interface IssueViewProps {
   onReact?: (messageId: string, emoji: string, mine?: string) => Promise<boolean | void> | boolean | void
   /** Publish a deletion for one message — CON-3. Omitted where nobody may write. */
   onDeleteMessage?: (messageId: string) => Promise<boolean | void> | boolean | void
+  /** Publish an edit of one message — CON-4. Omitted where nobody may write. */
+  onEditMessage?: (messageId: string, body: string) => Promise<boolean | void> | boolean | void
   /** Why writes are unavailable — every write control on the page is disabled with it. */
   readOnlyReason?: string
 }
 
 export function IssueView({ crumbs, title, description, descriptionFormat,
-  nameOf, onRename, onDescribe, threads, unread, onStartConversation, onReply, activity, activityTruncated, onReplyInActivity, history, rail, about, onReact, onDeleteMessage, readOnlyReason }: IssueViewProps) {
+  nameOf, onRename, onDescribe, threads, unread, onStartConversation, onReply, activity, activityTruncated, onReplyInActivity, history, rail, about, onReact, onDeleteMessage, onEditMessage, readOnlyReason }: IssueViewProps) {
   /* Which block the next comment is about — SPEC §13.6. Held here rather than
      in the composer because the choice is made by clicking the description,
      which is a different part of the page. */
@@ -114,12 +116,13 @@ export function IssueView({ crumbs, title, description, descriptionFormat,
             nameOf={nameOf}
             onReact={onReact}
             onDeleteMessage={onDeleteMessage}
+            onEditMessage={onEditMessage}
             about={about}
           />
         </section>
         <section className="flex flex-col gap-3">
           <h2 className="text-h4 text-text-primary">Activity</h2>
-          <Activity items={activity} truncated={activityTruncated} onReply={onReplyInActivity} disabledReason={readOnlyReason} nameOf={nameOf} onReact={onReact} onDeleteMessage={onDeleteMessage} />
+          <Activity items={activity} truncated={activityTruncated} onReply={onReplyInActivity} disabledReason={readOnlyReason} nameOf={nameOf} onReact={onReact} onDeleteMessage={onDeleteMessage} onEditMessage={onEditMessage} />
         </section>
         <section className="flex flex-col gap-3">
           <h2 className="text-h4 text-text-primary">History</h2>

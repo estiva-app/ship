@@ -606,6 +606,72 @@ async function main() {
     the second half. An author gate would hide the control from the one other
     party the relay would accept.
   */
+  /*
+    Editing a comment — CON-4, read off the screen rather than off the event.
+
+    Done BEFORE the delete below, because the delete removes the reply this
+    edits. The reply again rather than the root, so "the text changed" is
+    visible against a card that stays put.
+
+    Waits on the rendered effect — the new words on screen — because the publish
+    and the re-read are both round trips, and the re-read is what proves the
+    edit came back through `foldEdits` rather than being patched in locally.
+  */
+  await conversations.getByRole('button', { name: 'Message actions' }).nth(1).click()
+  await conversations.getByRole('menuitem', { name: 'Edit message' }).click()
+  /*
+    Typed rather than `fill()`ed, and that is not a stylistic choice: `fill` set
+    the textarea's value and the save then did nothing, every time. Typing drives
+    it. The component is a plain controlled `<textarea>` with `value`/`onChange`
+    passed straight through, so this is about how the two APIs reach React
+    rather than about the component — and typing is the more faithful
+    simulation of a person regardless.
+  */
+  const box = conversations.getByRole('textbox', { name: 'Edit message' })
+  await box.click()
+  await box.press('End')
+  await box.pressSequentially(' — second drawer.')
+  await conversations.getByRole('button', { name: 'Save' }).click()
+  /*
+    Waits for the EDITOR TO CLOSE, not for the text.
+
+    A first pass waited on the new words and passed instantly — against the open
+    textarea, whose value Playwright's `getByText` matches. So it proved the
+    typing and nothing else, and the assertions below then read `stored` before
+    the publish had happened. The editor closes only when the write resolved
+    anything but `false`, which is the app saying the relay answered.
+  */
+  await box.waitFor({ state: 'detached', timeout: 15000 })
+  // And only then is the rendered message the edited one — re-read through
+  // `foldEdits`, never patched in locally.
+  await conversations.getByText('Key is in 1Password now. — second drawer.').waitFor({ timeout: 15000 })
+  const edit = stored.find((e) => e.kind === 40003)
+  check('editing a comment publishes a kind:40003', !!edit)
+  check('  …naming the message it edits, by event id', tagValue(edit!, 'e') === reply!.id)
+  check('  …carrying the new body as its content', edit!.content === 'Key is in 1Password now. — second drawer.')
+  /*
+    The one conversation write that IS channel-scoped: 40003 is in the relay's
+    `requires_h_channel_scope`, so an edit with no `h` is refused while the kind
+    is granted and the signature is fine.
+
+    Compared against the TARGET's own `h`, not the page's. A message reached
+    through Activity belongs to another file, and publishing its edit under the
+    surface's Folder would put it in a channel the message is not in.
+  */
+  check(
+    '  …and an h tag matching the message it edits, not the page',
+    !!tagValue(edit!, 'h') && tagValue(edit!, 'h') === tagValue(reply!, 'h'),
+  )
+  /* §6.2's rule, and the reason `buildEdit` adds a tag Buzz's own builder does
+     not: two edits in one second would otherwise have no defined order. */
+  const editTs = Number.parseInt(tagValue(edit!, 'ts') ?? '', 10)
+  check('  …and a ts that agrees with created_at to the second', Math.floor(editTs / 1000) === edit!.created_at)
+  check(
+    '  …with the original event still on the relay, because an edit is not a rewrite',
+    stored.some((e) => e.id === reply!.id),
+  )
+  check('  …and the message marked as edited', (await conversations.textContent())?.includes('edited') ?? false)
+
   const replyMenus = await conversations.getByRole('button', { name: 'Message actions' }).count()
   check('every message offers a delete, not just your own', replyMenus === 2)
   await conversations.getByRole('button', { name: 'Message actions' }).nth(1).click()

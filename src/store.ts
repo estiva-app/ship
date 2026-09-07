@@ -25,9 +25,10 @@ import {
   issueAddr,
   projectAddr,
 } from './events'
-import { findNaddrs, naddrToAddr, buildReaction, buildDeletion as buildEventDeletion } from '@estiva-app/protocol'
+import { findNaddrs, naddrToAddr, buildReaction, buildEdit, buildDeletion as buildEventDeletion } from '@estiva-app/protocol'
 import { foldFolder, projectFolders, type FolderState } from './fold'
 import { taggedIndex, type TaggedIndex } from './references'
+import { foldEdits, type EditIndex } from './edits'
 import { REACTION_EVENT_LIMIT } from './reactions'
 import { directoryFrom, type Directory } from './profiles'
 import { KIND } from './kinds'
@@ -41,7 +42,17 @@ import { MANIFEST_ADDRESS } from './manifest-address'
  * Folder — the topic's conversations *are* the project's, read in one round
  * trip alongside everything else.
  */
-const FOLDER_KINDS = [KIND.PROJECT, KIND.ISSUE, KIND.CHANGE, KIND.MESSAGE, KIND.COMMENT]
+const FOLDER_KINDS = [
+  KIND.PROJECT,
+  KIND.ISSUE,
+  KIND.CHANGE,
+  KIND.MESSAGE,
+  KIND.COMMENT,
+  // An edit rides with the messages it edits: 40003 carries an `h`, unlike a
+  // reaction or a deletion, so it comes back on the Folder read rather than
+  // needing a second query addressed by target (CON-4).
+  KIND.MESSAGE_EDIT,
+]
 
 /**
  * Turn `nostr:naddr…` in a message body into addresses.
@@ -82,11 +93,26 @@ function referencedAddresses(body: string): string[] {
 export interface WorkspaceState extends FolderState {
   /** Message id → the addresses it named in its tags. `references.ts` reads it. */
   tagged: TaggedIndex
+  /**
+   * Message id → its current text, where it was edited (CON-4).
+   *
+   * Beside the fold rather than inside it. `foldFolder` is a contract with
+   * `estiva-agent` and its conformance test walks the union of keys, so an
+   * `edited` field on `Message` would turn both repos red — see `edits.ts`.
+   */
+  edits: EditIndex
 }
 
-/** Fold a set of events, and read attachment strength off the same set. */
+/**
+ * Fold a set of events, and read off the same set the two things `foldFolder`
+ * deliberately does not carry: tag-vs-body provenance, and edits.
+ */
 function read(events: SignedEvent[]): WorkspaceState {
-  return { ...foldFolder(events, referencedAddresses), tagged: taggedIndex(events) }
+  return {
+    ...foldFolder(events, referencedAddresses),
+    tagged: taggedIndex(events),
+    edits: foldEdits(events),
+  }
 }
 
 export class Store {
@@ -331,6 +357,44 @@ export class Store {
    */
   deleteMessage(args: { messageEventId: string }): Promise<PublishResult> {
     return this.publish(buildEventDeletion(this.signer.pubkey, Date.now(), { targetEventId: args.messageEventId }))
+  }
+
+  /**
+   * Edit a comment — CON-4, RFC 0.4 §7.2.1.
+   *
+   * ## An edit is a new event
+   *
+   * `kind:9` and `kind:1111` are both non-replaceable, so nothing here
+   * overwrites anything. This publishes a `kind:40003` naming the target, and
+   * `edits.ts` folds the pair on the way back — latest edit wins.
+   *
+   * ## The one write in this file that needs BOTH a Folder and an event id
+   *
+   * A reaction and a deletion carry no `h`: the relay derives the channel from
+   * the target. An edit is the exception — 40003 is in
+   * `requires_h_channel_scope`, so an edit without an `h` is refused with
+   * `accepted: false` while the kind is granted and the signature is fine. The
+   * two shapes are not interchangeable and the wrong one fails in a way that
+   * looks like a permissions problem.
+   *
+   * ## Who may
+   *
+   * The relay's call. `validate_edit_ownership` takes the target's effective
+   * author **or** the NIP-OA owner of an authoring agent, and on the author
+   * path re-checks channel membership — so somebody removed from a private
+   * channel cannot go back and rewrite what they said while they were in it.
+   * No client can evaluate that, so nothing here gates on authorship; the
+   * control is offered and a refusal is reported, exactly as for deletion.
+   */
+  editMessage(args: { folder: string; messageEventId: string; body: string }): Promise<PublishResult> {
+    assertFolderId(args.folder)
+    return this.publish(
+      buildEdit(this.signer.pubkey, Date.now(), {
+        channelUuid: args.folder,
+        targetEventId: args.messageEventId,
+        body: args.body,
+      }),
+    )
   }
 
   /**

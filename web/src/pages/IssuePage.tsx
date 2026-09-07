@@ -1,13 +1,13 @@
 import { useMarkRead } from '@/lib/useMarkRead'
 import { useMemo, useState } from 'react'
-import { ISSUE_STATUSES, commentsOn, deleteIssue, deleteMessage, react, referenceFor, reply, setIssueField, unreact, startConversation, type DirectoryView, type FolderState, type WorkspaceState, threadContext, useMergedReadState, firstUnreadByThread, projectContext, me } from '@/api'
+import { ISSUE_STATUSES, commentsOn, deleteIssue, deleteMessage, editMessage, react, referenceFor, reply, setIssueField, unreact, startConversation, type DirectoryView, type FolderState, type WorkspaceState, threadContext, useMergedReadState, firstUnreadByThread, projectContext, me } from '@/api'
 import type { HistoryEntry } from '@/components/History'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { IssueView } from '@/views/IssueView'
 import { go, href } from '../router'
 import { act, type Say } from './act'
-import { activityFor, copyText, railPeople, threadFor } from './ProjectPage'
+import { activityFor, copyText, folderOfMessage, railPeople, threadFor } from './ProjectPage'
 
 /**
  * This issue's slice of the change stream, in words, newest first — the old
@@ -60,7 +60,7 @@ export function IssuePage({ state, directory, d, say, refresh }: { state: Worksp
      mark the whole project read. */
   useMarkRead(useMemo(() => conversations.map((c) => threadContext(c.id)), [conversations]))
   const threads = useMemo(
-    () => conversations.map((c) => threadFor(c, directory, issue ? { value: issue.description, format: issue.descriptionFormat } : undefined, issue?.addr)),
+    () => conversations.map((c) => threadFor(c, directory, issue ? { value: issue.description, format: issue.descriptionFormat } : undefined, issue?.addr, state.edits)),
     [conversations, directory, issue],
   )
   /* The divider in the feed (CRO-13). `issue.folder` is the container these
@@ -157,6 +157,32 @@ export function IssuePage({ state, directory, d, say, refresh }: { state: Worksp
           a refusal, which keeps the confirm dialog open behind the banner.
         */
         onDeleteMessage={(messageId) => act('Delete', () => deleteMessage(messageId), say, refresh)}
+        /*
+          Editing a comment — CON-4.
+
+          **The message's OWN Folder, never this page's.** An edit is
+          channel-scoped (40003 is in `requires_h_channel_scope`), and a message
+          reached through Activity belongs to a different file — publishing it
+          under this surface's Folder would be refused, or worse, accepted into
+          the wrong channel. So the Folder is looked up from the message, the
+          same rule `onReplyInActivity` keeps for replies.
+
+          `refresh` because an edit IS in the read: `edits.ts` folds it beside
+          the fold, so the new text arrives on the next workspace read rather
+          than being patched in locally.
+
+          No author check. The relay takes an edit from the target's effective
+          author or the NIP-OA owner of an authoring agent, and no client can
+          evaluate the second half — same reasoning as the deletion above.
+        */
+        onEditMessage={(messageId, body) => {
+          const folder = folderOfMessage(state, messageId)
+          if (!folder) {
+            say('That message has no Folder to publish an edit into.', 'error')
+            return false
+          }
+          return act('Edit', () => editMessage(folder, messageId, body), say, refresh)
+        }}
         onReplyInActivity={(threadId, body) => {
           const conversation = state.conversations.find((c) => c.id === threadId)
           if (!conversation?.root.folder) return false
