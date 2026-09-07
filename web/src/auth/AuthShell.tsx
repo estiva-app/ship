@@ -28,7 +28,7 @@ import {
   isRecoverable,
   type ShellState,
 } from '@estiva-app/identity'
-import { Button } from '@estiva-app/ui'
+import { Button } from '@/components/ui/Button'
 
 export interface AuthShellProps {
   state: ShellState
