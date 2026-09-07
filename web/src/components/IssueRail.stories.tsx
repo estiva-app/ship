@@ -68,3 +68,12 @@ export const Interactive: Story = {
 
 /** Assigned, in progress, opened by someone with no published profile. */
 export const Assigned: Story = { args: { status: 'in_progress', assignee: 'ravi', openedBy: {} } }
+
+/**
+ * Writes unavailable. "Delete issue" is disabled and says why on hover — one
+ * `disabledReason` prop since 0.8.0, where Ship wrapped the button in a
+ * tooltip by hand. The button stays reachable by Tab, so the reason can be
+ * found without a mouse. The selects are plainly disabled: only the action
+ * carries a reason.
+ */
+export const ReadOnly: Story = { args: { readOnlyReason: 'You do not have write access to this Folder.' } }

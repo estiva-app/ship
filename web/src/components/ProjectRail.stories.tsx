@@ -56,3 +56,11 @@ export const Unassigned: Story = { args: { lead: '', done: 0 } }
 
 /** An archived project offers to unarchive. */
 export const Archived: Story = { args: { archived: true, status: 'completed', done: 14 } }
+
+/**
+ * Writes unavailable. All three actions — Pair, Archive, Delete — are disabled
+ * and give the same reason on hover. Before 0.8.0 this rail had a local
+ * `held()` helper wrapping each button in a tooltip; it is now one
+ * `disabledReason` prop per button, and each stays reachable by Tab.
+ */
+export const ReadOnly: Story = { args: { readOnlyReason: 'You do not have write access to this Folder.' } }
