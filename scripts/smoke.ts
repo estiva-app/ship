@@ -184,6 +184,8 @@ async function main() {
   // web/vite.config.ts, which says so for this reason.
   /** Requests this stub does not model, reported rather than guessed at. */
   const unmodelled: string[] = []
+  /** Filters carried by each `POST /query`, so the read's cost is visible. */
+  const queryCalls: number[] = []
   /** How many times the app asked the relay for its clock. */
   let clockProbes = 0
 
@@ -238,9 +240,28 @@ async function main() {
           .filter((e) => e.kind === 5)
           .flatMap((e) => e.tags.filter((t) => t[0] === 'e').map((t) => t[1])),
       )
-      const hits = stored.filter(
-        (event) => !deleted.has(event.id) && filters.some((filter) => matches(event, filter)),
-      )
+      /*
+        Per filter, concatenated in filter order, each clamped to its own
+        `limit` — the fourth behaviour this stub is deliberately faithful
+        about, and it became load-bearing when protocol 0.15.0 started sending
+        every filter's first page in one request.
+
+        Measured against production 2026-09-07: ten filters at `limit: 5`
+        returned 48 events, not 5, and the same filter twice in one POST
+        returned 236, not 118. A stub that unioned the filters and deduped
+        would let a client conclude a filter was complete when the relay had
+        clamped it — the app would look right here and drop events against
+        production, which is the one thing this file exists to prevent.
+      */
+      queryCalls.push(filters.length)
+      const live = stored.filter((event) => !deleted.has(event.id))
+      const hits = filters.flatMap((filter) => {
+        const eligible = live
+          .filter((event) => matches(event, filter))
+          .sort((a, b) => b.created_at - a.created_at)
+        const limit = typeof filter.limit === 'number' ? filter.limit : eligible.length
+        return eligible.slice(0, limit)
+      })
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -907,6 +928,22 @@ async function main() {
     'the app asked the relay nothing this stub cannot model',
     unmodelled.length === 0,
     [...new Set(unmodelled)].join(', '),
+  )
+  /*
+    The read is batched, not one request per Folder.
+
+    Not a performance assertion — it is a correctness one about the shape the
+    app puts on the wire. Buzz meters `POST /query` per call at 300 a minute per
+    pubkey, shared across every app one person has open, so a read that fans out
+    per Folder is one that stops working when a second app is open. Ship's
+    workspace read went from 39 requests to 3 against production; here the check
+    is simply that *some* call carried several filters, which is the thing a
+    regression to the old shape would take away.
+  */
+  check(
+    'the workspace read batches its filters into one request',
+    queryCalls.some((n) => n > 1),
+    `${queryCalls.length} queries, widest carried ${Math.max(0, ...queryCalls)} filters`,
   )
 
   await browser.close()

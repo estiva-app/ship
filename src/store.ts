@@ -520,11 +520,15 @@ export class Store {
    * Reactions on a set of messages — CON-2.
    *
    * **One filter with an `#e` array, and that is checked rather than assumed.**
-   * The known relay quirk on `rawFolders` is that `{'#h': [A, B]}` silently
-   * returns only A's events, and over-generalising it to every tag filter would
-   * mean one round trip per message — 588 of them for this workspace. Measured
-   * against production 2026-09-06: `#e` **does** OR. Two targets asked for, two
-   * answered.
+   * One filter with an `#e` array, not one per message — which would be 588
+   * round trips for this workspace. Measured against production 2026-09-06:
+   * `#e` **does** OR, two targets asked for and two answered. `rawFolders` is
+   * per-Folder for a reason that does not apply here: it is about `limit`
+   * being shared across a filter's values, and this call bounds the events it
+   * takes back explicitly through `REACTION_EVENT_LIMIT`.
+   *
+   * (The note that used to sit here said `#h` does not OR at all. It does —
+   * see `rawFolders`, re-measured 2026-09-07.)
    *
    * The horizon is applied by the caller through `reactionTargets`, so this
    * method has no opinion about how much of a page it is being asked about; it
@@ -811,15 +815,28 @@ export class Store {
   /**
    * Raw events for one or more Folders — for debugging and verification.
    *
-   * **One filter per Folder, not one filter with an `#h` array.** NIP-01 says
-   * the values of a tag filter are OR-ed, and Buzz does not do that: measured
-   * against the live relay, `{'#h': [A, B]}` returns only A's events, silently.
-   * Two filters return both.
+   * **One filter per Folder, not one filter with an `#h` array — but not for
+   * the reason this comment used to give.**
    *
-   * That failure mode is the worst kind — no error, just a short read, which
-   * folds into a project whose issues have all vanished. Costing one filter
-   * object per project is cheap next to that; it is still a single round trip,
-   * because `POST /query` takes a **bare array** of filters (FRICTION.md A5).
+   * It said Buzz does not OR the values of a tag filter, and that
+   * `{'#h': [A, B]}` returns only A's events. Re-measured against production
+   * 2026-09-07: **it returns both.** Two Folders holding 13 and 3 events came
+   * back as 16; at `limit: 5` the answer was 5 drawn from both, which is
+   * NIP-01 behaving exactly as written. Whatever was seen before, that is not
+   * what the relay does now, and the belief had been reasoned from ever since
+   * without being re-checked.
+   *
+   * The shape survives the correction because the real reason is the `limit`.
+   * One filter over thirty-six Folders shares **one** limit, so a busy Folder
+   * crowds the others out; NIP-01 has no truncation signal, so what a reader
+   * gets is a short read with no error — a project whose issues have silently
+   * vanished. One filter per Folder gets the relay's clamp *per Folder*,
+   * measured: ten filters at `limit: 5` returned 48 events, not 5.
+   *
+   * And it is a single round trip again. `queryAll` batches every filter's
+   * first page into one `POST /query` since protocol 0.15.0, so the per-Folder
+   * shape no longer costs a request per Folder — this read went from 39
+   * requests to 3 against production.
    */
   async rawFolders(folders: string[]): Promise<SignedEvent[]> {
     for (const folder of folders) assertFolderId(folder)
