@@ -25,7 +25,7 @@ export interface DirectoryView {
  *
  * - When `navKey` changes — a navigation, an explicit reload — every key in
  *   `pubkeys` is re-read, so a rename made in Peek shows on the next screen.
- * - Otherwise (the 5 s poll handing in a new snapshot) only keys never seen
+ * - Otherwise (the poll handing in a new snapshot) only keys never seen
  *   are asked for, so sitting on an issue does not re-query the whole cast
  *   every tick for names that almost never change.
  *

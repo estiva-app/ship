@@ -31,8 +31,8 @@ beforeEach(() => {
 
 describe('useWorkspace — a read a write is waiting on must have begun after the write', () => {
   /*
-    The bug this pins (Ship #63): `loadAll` against production takes ~8.8 s and
-    the poll runs every 5 s, so a read is in flight roughly 90% of the time. A
+    The bug this pins (Ship #63): `loadAll` against production took ~8.8 s and
+    the poll ran every 5 s, so a read was in flight roughly 90% of the time. A
     click that landed in that window awaited the *poll's* read, which had begun
     before the write — so it resolved with the old status and the select snapped
     back. The user clicked six times in 22 seconds and filed it as broken; every

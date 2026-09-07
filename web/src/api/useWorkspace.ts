@@ -41,8 +41,9 @@ export interface Workspace {
 /**
  * The workspace, kept fresh.
  *
- * Reads once on mount and then on the refresh hook's schedule: every ~5 s
- * while the tab is visible, on the tab becoming visible, on window focus.
+ * Reads once on mount and then on the refresh hook's schedule: every
+ * `REFRESH_MS` while the tab is visible, on the tab becoming visible, on window
+ * focus.
  * Ship polls; it does not subscribe (REW-6). A read that fails keeps the last
  * good state on screen and records the reason, rather than blanking the app.
  */
