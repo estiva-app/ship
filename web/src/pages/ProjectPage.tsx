@@ -398,6 +398,7 @@ export function ProjectPage({
         /* A reply in Activity goes to the thread's own Folder, never this
            project's — CON-9. Refused when the thread's root carries no `h`,
            because filing somebody else's reply here is the wrong guess. */
+        about={project.addr}
         /*
           A reaction, published then re-read — CON-2.
 
@@ -406,11 +407,13 @@ export function ProjectPage({
           reaction's own event, never the message: a kind:5 naming the message
           would be asking the relay to delete somebody's comment.
         */
-        about={project.addr}
+        /*
+          No `refresh`: a reaction is a kind:7 and is not in the fold, so a
+          workspace re-read would spend 38 bridge requests to learn nothing.
+          The reaction surface re-reads its own query instead — one request.
+        */
         onReact={(messageId, emoji, mine) =>
-          mine
-            ? act('Reaction', () => unreact(mine), say, refresh)
-            : act('Reaction', () => react(messageId, emoji), say, refresh)
+          mine ? act('Reaction', () => unreact(mine), say) : act('Reaction', () => react(messageId, emoji), say)
         }
         /*
           Deleting a comment — CON-3.
