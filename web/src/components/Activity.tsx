@@ -1,7 +1,8 @@
+import { useMemo } from 'react'
 import { Chip } from '@/components/ui/Chip'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { cn } from '@/lib/cn'
-import { ConversationThread, useThreadReferences, type ThreadData } from './ConversationThread'
+import { ConversationThread, useThreadReactions, useThreadReferences, type ThreadData } from './ConversationThread'
 
 /**
  * **Activity: the conversations of files *related* to this one** — CON-9.
@@ -90,7 +91,11 @@ export interface ActivityProps {
 }
 
 export function Activity({ items, onReply, disabledReason, nameOf, truncated = 0, className }: ActivityProps) {
-  const { resolved, resolving } = useThreadReferences(items.map((item) => item.thread))
+  const threads = useMemo(() => items.map((item) => item.thread), [items])
+  const { resolved, resolving } = useThreadReferences(threads)
+  /* Activity's threads belong to other files, and a reaction is a property of
+     the message wherever it is read — so they carry theirs too. */
+  const { reactionsBy } = useThreadReactions(threads)
 
   if (!items.length) {
     return (
@@ -122,6 +127,7 @@ export function Activity({ items, onReply, disabledReason, nameOf, truncated = 0
                 resolved={resolved}
                 resolving={resolving}
                 nameOf={nameOf}
+                reactionsBy={reactionsBy}
                 subdued={relation.muted}
               />
             </li>

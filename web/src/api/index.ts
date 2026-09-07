@@ -33,6 +33,11 @@ export { conversationsAbout } from '../../../src/fold'
   second attaches permanently and by accident.
 */
 export { commentsOn, commentsOnAny, mentionsOf, attachmentOf, type Attachment, type TaggedIndex } from '../../../src/references'
+/* Reactions — SPEC §6.6. The horizon and the fold are in the data layer, where
+   they can move into the conversation package; the hook that calls them is the
+   app's. */
+export { REACTION_TARGET_LIMIT, type Reaction, type ReactionsByTarget } from '../../../src/reactions'
+export { useReactions } from './useReactions'
 export { useWorkspace } from './useWorkspace'
 export { useDirectory, type DirectoryView, type Person } from './useDirectory'
 export { peopleIn, short } from './people'
@@ -64,11 +69,24 @@ export {
 } from './writes'
 export { clockProblem } from './clock'
 import { signer, store } from './store'
+import { foldReactions } from '../../../src/reactions'
+import type { ReactionsByTarget } from '../../../src/reactions'
 
 
 /** Everything the reader can see: projects, issues, their changes and threads. */
 export function loadAll(): Promise<WorkspaceState> {
   return store.loadAll()
+}
+
+/**
+ * Reactions on a set of messages, folded into counts — CON-2.
+ *
+ * Addressed by target because a `kind:7` carries no `h` (SPEC §6.6). The
+ * viewer is passed here rather than read inside the fold, so the fold stays
+ * pure and testable with no app around it.
+ */
+export function reactionsOn(eventIds: string[]): Promise<ReactionsByTarget> {
+  return store.reactionsFor(eventIds).then((events) => foldReactions(events, signer.pubkey))
 }
 
 /** kind:0 profiles for a set of pubkeys — names and faces, never keys. */
