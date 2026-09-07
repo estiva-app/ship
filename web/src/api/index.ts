@@ -36,7 +36,7 @@ export { commentsOn, commentsOnAny, mentionsOf, attachmentOf, type Attachment, t
 /* Reactions — SPEC §6.6. The horizon and the fold are in the data layer, where
    they can move into the conversation package; the hook that calls them is the
    app's. */
-export { REACTION_TARGET_LIMIT, type Reaction, type ReactionsByTarget } from '../../../src/reactions'
+export { REACTION_TARGET_LIMIT, REACTION_EMOJI, type Reaction, type ReactionsByTarget } from '../../../src/reactions'
 export { useReactions } from './useReactions'
 export { useWorkspace } from './useWorkspace'
 export { useDirectory, type DirectoryView, type Person } from './useDirectory'
@@ -59,6 +59,8 @@ export {
   deleteProject,
   explainRejection,
   pairProjectFolder,
+  react,
+  unreact,
   reply,
   assignMissingRefs,
   setIssueField,

@@ -77,6 +77,30 @@ export const REACTION_TARGET_LIMIT = 100
  */
 export const REACTION_EVENT_LIMIT = 500
 
+/**
+ * The emoji a person can pick, and what each one means.
+ *
+ * **Deliberately the same five Peek offers**, in the same order — Peek's
+ * `REACTION_NAMES` (`src/components/ui/Reaction.tsx`). Two apps writing to one
+ * relay with different palettes would produce a workspace where a reaction you
+ * can read is one you cannot answer, which is the sort of divergence the
+ * projection layer exists to prevent.
+ *
+ * The names are the tooltips. A bare glyph is not self-explanatory — "🙏" reads
+ * as thanks to one person and as a plea to another — and the label is also the
+ * accessible name, which an icon-only control has no other source for.
+ *
+ * This belongs in the conversation package with the rest of the model. It is
+ * here until that exists, and the duplication is recorded rather than silent.
+ */
+export const REACTION_EMOJI: readonly { emoji: string; name: string }[] = [
+  { emoji: '👍', name: 'Makes sense' },
+  { emoji: '💯', name: 'Agree' },
+  { emoji: '🙏', name: 'Thank you' },
+  { emoji: '🚀', name: "Let's go!" },
+  { emoji: '🎉', name: 'Congrats' },
+]
+
 /** One emoji on one target, and who put it there. */
 export interface Reaction {
   emoji: string

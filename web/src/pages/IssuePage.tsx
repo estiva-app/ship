@@ -1,6 +1,6 @@
 import { useMarkRead } from '@/lib/useMarkRead'
 import { useMemo, useState } from 'react'
-import { ISSUE_STATUSES, commentsOn, deleteIssue, referenceFor, reply, setIssueField, startConversation, type DirectoryView, type FolderState, type WorkspaceState, threadContext, useMergedReadState, firstUnreadByThread, projectContext, me } from '@/api'
+import { ISSUE_STATUSES, commentsOn, deleteIssue, react, referenceFor, reply, setIssueField, unreact, startConversation, type DirectoryView, type FolderState, type WorkspaceState, threadContext, useMergedReadState, firstUnreadByThread, projectContext, me } from '@/api'
 import type { HistoryEntry } from '@/components/History'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -125,6 +125,19 @@ export function IssuePage({ state, directory, d, say, refresh }: { state: Worksp
           the wrong guess for that case: it would file somebody else's reply
           under this issue. Refusing is the honest answer.
         */
+        /*
+          A reaction, published then re-read — CON-2.
+
+          `mine` is the id of the viewer's own reaction when they have one, so
+          the same gesture adds or retracts. The retraction targets the
+          reaction's own event, never the message: a kind:5 naming the message
+          would be asking the relay to delete somebody's comment.
+        */
+        onReact={(messageId, emoji, mine) =>
+          mine
+            ? act('Reaction', () => unreact(mine), say, refresh)
+            : act('Reaction', () => react(messageId, emoji), say, refresh)
+        }
         onReplyInActivity={(threadId, body) => {
           const conversation = state.conversations.find((c) => c.id === threadId)
           if (!conversation?.root.folder) return false
