@@ -1,6 +1,6 @@
-import { Button } from '@/components/ui/Button'
 import { Chip } from '@/components/ui/Chip'
 import { IconButton } from '@/components/ui/IconButton'
+import { Reaction as ReactionPill } from '@/components/ui/Reaction'
 import { WithTooltip } from '@/components/ui/Tooltip'
 import { cn } from '@/lib/cn'
 import { REACTION_EMOJI, type Reaction } from '@/api'
@@ -16,6 +16,13 @@ import { REACTION_EMOJI, type Reaction } from '@/api'
  * estiva-id#59 granted it, the row was re-seeded and verified, and a reaction
  * is now a control. Chip's page rules itself out for those: *"something
  * clickable → Button (small) or MenuItem — a Chip is not a control."*
+ *
+ * ## Adopted `@estiva-app/ui` 0.7.0
+ *
+ * The counted pill is the package's `Reaction` since 0.7.0. Ship drew it as a
+ * small `Button` before that — legible, and measured at a 1px hairline against
+ * no border for "yours", where the package component gives it the accent's
+ * tint and edge. That gap is what the component was added for.
  *
  * ## Which package components, and why those
  *
@@ -95,25 +102,20 @@ export function Reactions({
           )
         }
         const button = (
-          <Button
-            variant={reaction.mine ? 'outlined' : 'muted'}
-            size="small"
+          <ReactionPill
+            emoji={reaction.emoji}
+            count={reaction.count}
+            pressed={!!reaction.mine}
             disabled={!!disabledReason}
-            leadingIcon={<span aria-hidden="true">{reaction.emoji}</span>}
             onClick={() => onToggle(reaction.emoji, reaction.mine)}
-            aria-pressed={!!reaction.mine}
             /*
-              The visible label is the count, so without this the control is
-              named "1" — which tells somebody using a screen reader nothing at
-              all. The emoji is `aria-hidden` (a glyph read aloud is noise, and
-              its name differs per screen reader), so the name has to be built.
-              `aria-pressed` carries whether it is yours, which is what a toggle
-              button is for.
+              The package requires this, and the reason is Ship's own bug: the
+              emoji is `aria-hidden` and the count is the only visible text, so
+              without a name the control is announced as "1". Caught here by a
+              test, then made unskippable by making the prop required.
             */
             aria-label={`${reactionName(reaction.emoji)}, ${reaction.count}`}
-          >
-            {reaction.count}
-          </Button>
+          />
         )
         return (
           <WithTooltip key={reaction.emoji} label={disabledReason ?? reactorLabel(reaction, nameOf)}>
