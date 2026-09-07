@@ -28,7 +28,30 @@
  * asking Estiva ID to hand an app token the staff directory. A caller passes the
  * pubkeys it already saw on events it could already read.
  */
-import type { EstivaIdConfig, EstivaIdSession } from '../auth/estiva-id'
+/**
+ * What a lookup needs, declared here rather than imported.
+ *
+ * These were `EstivaIdConfig` and `EstivaIdSession` from `lib/auth/estiva-id.ts`
+ * — the vanilla app's own Estiva ID client. REW-9 deleted the app; SHA-4 moved
+ * the client into `@estiva-app/identity`. Two type aliases were all that kept
+ * 238 lines of superseded PKCE compiling, which is not a reason to keep them.
+ *
+ * Not imported from the package either, and that is the point rather than an
+ * omission: `/directory/lookup` needs an origin and a bearer token and knows
+ * nothing about how either was obtained. Narrowing to exactly that is what lets
+ * this be called with a session from the package, from a script, or from a test
+ * — and it is the same rule the package follows for browser globals (ADR 0002
+ * §4a), applied one layer up.
+ */
+interface DirectoryConfig {
+  /** Origin of the identity service, e.g. `https://id.estiva.app`. */
+  base: string
+}
+
+interface DirectorySession {
+  /** A bearer token. An anonymous caller has none, and is answered with nothing. */
+  token: string
+}
 
 /** What Estiva ID knows that the relay does not. */
 export interface Member {
@@ -76,8 +99,8 @@ const chunk = <T>(items: T[], size: number): T[][] => {
  * perfectly good issue list would be noise.
  */
 export async function lookupMembers(
-  config: EstivaIdConfig,
-  session: EstivaIdSession,
+  config: DirectoryConfig,
+  session: DirectorySession,
   pubkeys: string[],
 ): Promise<MemberDirectory> {
   const found: MemberDirectory = new Map()
