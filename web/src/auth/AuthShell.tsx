@@ -39,11 +39,11 @@ export function AuthShell({ state, onContinue }: AuthShellProps) {
   const waiting = state.phase === 'checking' || state.phase === 'entering' || state.phase === 'ready'
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-surface px-6 text-center">
-      <h1 className="text-lg font-medium text-content">Estiva Ship</h1>
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-bg-surface px-6 text-center">
+      <h1 className="text-h3 text-text-primary">Estiva Ship</h1>
       {!waiting && (
         <>
-          <p className="max-w-prose text-sm text-content-subtle">{SHELL_COPY[state.reason]}</p>
+          <p className="max-w-prose text-body-2 text-text-secondary">{SHELL_COPY[state.reason]}</p>
           {/*
             An unrecoverable reason gets no button, and that is the honest thing:
             `identity_inactive` and `token_rejected` cannot be cleared by

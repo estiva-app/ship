@@ -217,9 +217,9 @@ export function MessageCard({
 function NewSinceHere() {
   return (
     <div className="flex items-center gap-2 py-1" role="separator" aria-label="New since you last read this">
-      <span className="h-px flex-1 bg-accent-default/40" />
-      <span className="shrink-0 text-caption text-accent-default">New since you last read this</span>
-      <span className="h-px flex-1 bg-accent-default/40" />
+      <span className="h-px flex-1 bg-accent-muted" />
+      <span className="shrink-0 text-caption text-accent-primary">New since you last read this</span>
+      <span className="h-px flex-1 bg-accent-muted" />
     </div>
   )
 }
