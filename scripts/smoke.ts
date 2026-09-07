@@ -520,6 +520,31 @@ async function main() {
 
   check('  …and the count re-read from the relay, not guessed', true)
 
+  /*
+    A second, different emoji from the same person is KEPT — not swapped.
+
+    Reported 2026-09-07 as a Ship/Peek inconsistency: "you can have multiple
+    reactions in Peek, but only one in Ship". The client reads as if it already
+    should — the picker passes each emoji's own `mine`, so a second emoji has
+    none and adds rather than retracts — and reasoning is exactly what this file
+    exists to replace. Buzz agrees at the storage layer: the reaction row's key
+    is (community, target, pubkey, **emoji**), so a different emoji is a
+    different row, and production holds a target carrying 💯 🚀 🙏 from one
+    person.
+
+    So the behaviour is pinned here, and a regression would have to pass this
+    to reach anybody.
+  */
+  await conversations.getByRole('button', { name: 'Makes sense' }).first().click()
+  await conversations.getByRole('button', { name: 'Makes sense, 1' }).first().waitFor({ timeout: 15000 })
+  const mine = stored.filter((e) => e.kind === 7 && e.pubkey !== 'f'.repeat(64))
+  check('a second emoji is a second reaction, not a replacement', mine.map((e) => e.content).sort().join(' ') === '\u{1F389} \u{1F44D}')
+  check('  …and nothing was retracted to make room for it', stored.filter((e) => e.kind === 5).length === 0)
+  check(
+    '  …with both drawn, each carrying its own count',
+    (await conversations.locator('[data-reactions]').first().getAttribute('data-reactions')) === '2',
+  )
+
   // Clicking your own takes it back — a kind:5 naming the REACTION, never the
   // message. A deletion naming the message would be asking to delete somebody's
   // comment, and the relay would refuse it only because the author differs.
