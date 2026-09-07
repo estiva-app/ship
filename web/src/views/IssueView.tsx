@@ -58,6 +58,8 @@ export interface IssueViewProps {
   onReplyInActivity: (threadId: string, text: string) => Promise<boolean | void> | boolean | void
   history: HistoryEntry[]
   rail: Omit<IssueRailProps, 'className'>
+  /** This object's address, so an unsent message is kept against it — CON-10. */
+  about?: string
   /** Add or take back a reaction on a message — CON-2. */
   onReact?: (messageId: string, emoji: string, mine?: string) => Promise<boolean | void> | boolean | void
   /** Why writes are unavailable — every write control on the page is disabled with it. */
@@ -65,7 +67,7 @@ export interface IssueViewProps {
 }
 
 export function IssueView({ crumbs, title, description, descriptionFormat,
-  nameOf, onRename, onDescribe, threads, unread, onStartConversation, onReply, activity, activityTruncated, onReplyInActivity, history, rail, onReact, readOnlyReason }: IssueViewProps) {
+  nameOf, onRename, onDescribe, threads, unread, onStartConversation, onReply, activity, activityTruncated, onReplyInActivity, history, rail, about, onReact, readOnlyReason }: IssueViewProps) {
   /* Which block the next comment is about — SPEC §13.6. Held here rather than
      in the composer because the choice is made by clicking the description,
      which is a different part of the page. */
@@ -109,6 +111,7 @@ export function IssueView({ crumbs, title, description, descriptionFormat,
             onClearAnchor={() => setAnchorTo(undefined)}
             nameOf={nameOf}
             onReact={onReact}
+            about={about}
           />
         </section>
         <section className="flex flex-col gap-3">
