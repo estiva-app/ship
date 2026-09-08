@@ -14,7 +14,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@estiva-app/identity": "^0.1.1",
+    "@estiva-app/identity": "^0.2.1",
     "@estiva-app/interop": "^0.10.0",
     "@estiva-app/protocol": "^0.15.0",
     "@estiva-app/ui": "^0.8.0",
