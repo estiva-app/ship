@@ -70,6 +70,9 @@ const STATE: WorkspaceState = {
   // No edits in the fixture: an unedited workspace is the ordinary case, and
   // `edits.test.ts` covers the fold itself (CON-4).
   edits: {},
+  // Nor attachments: `scripts/attachments.test.ts` covers the fold and
+  // `ui/Attachment.test.tsx` the drawing (CON-12).
+  attachments: {},
 }
 
 const refresh = vi.fn().mockResolvedValue(undefined)
