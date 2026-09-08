@@ -93,15 +93,20 @@ describe('a cold load with nothing', () => {
     expect(url.searchParams.get('client_id')).toBe('estiva-ship')
   })
 
-  it('carries the hash route, because a fragment cannot survive the redirect', async () => {
-    setLocation('', '#/p/abc')
+  it('carries the path route, and never a fragment', async () => {
+    /*
+      This asserted `returnTo === '#/p/abc'` until the redirect-URI fix, which is
+      what REW-2 built and REW-3/4/5 invalidated by moving `web/` to real paths.
+      A fragment is not carried because it cannot be: it is dropped at the first
+      navigation to `/authorize` and nothing brings it back.
+    */
+    window.history.replaceState({}, '', '/p/abc#ignored')
     const { bootAuth } = await freshBootWithNav()
     await bootAuth()
-    // `redirect_uri` must match a registered entry exactly, so it carries no
-    // fragment — the route rides in returnTo instead (PEEK-123).
     const url = new URL(navigated[0])
+    // Exact-string compared upstream, and fixed rather than the current path.
     expect(url.searchParams.get('redirect_uri')).toBe(`${ORIGIN}/`)
-    expect(sessionStorage.getItem('ship.estiva-id.returnTo')).toBe('#/p/abc')
+    expect(sessionStorage.getItem('ship.estiva-id.returnTo')).toBe('/p/abc')
   })
 
   it('marks the guard, so a second cold load does not probe again', async () => {
@@ -143,7 +148,7 @@ describe('coming back with a code', () => {
     const first = await freshBootWithNav()
     await first.bootAuth() // writes the verifier/state and stashes returnTo
     const state = sessionStorage.getItem('ship.estiva-id.state')!
-    sessionStorage.setItem('ship.estiva-id.returnTo', '#/p/abc')
+    sessionStorage.setItem('ship.estiva-id.returnTo', '/project/abc')
 
     reply({ access_token: 'at', pubkey: 'b3'.repeat(32), expires_in: 3600 })
     setLocation(`?code=abc&state=${state}`)
@@ -155,7 +160,10 @@ describe('coming back with a code', () => {
     // static import, the app would come up anonymous immediately after a
     // successful sign-in — and everything would render.
     expect(localStorage.getItem('ship.estiva-id.token')).toBeTruthy()
-    expect(window.location.hash).toBe('#/p/abc')
+    // A path, not a fragment. `web/` routes on `location.pathname`, and this
+    // asserted a hash until the redirect-URI fix — the last place the REW-2-era
+    // premise was still written down as an expectation.
+    expect(window.location.pathname).toBe('/project/abc')
     expect(window.location.search).toBe('')
   })
 
@@ -191,6 +199,82 @@ describe('coming back with a code', () => {
   })
 })
 
+/*
+  The lockout, as tests.
+
+  Reported from production: a token expiring on a project page sent the person
+  to `/authorize` with `redirect_uri=https://ship.estiva.app/project/<slug>`,
+  which Estiva ID refuses with `400 bad_request: That redirect_uri is not
+  registered for this app`. That is a JSON error page on the identity origin,
+  with no route back into the app — so it is a lockout rather than a bad
+  experience.
+
+  Measured against production the same day, with `prompt=none`: only
+  `https://ship.estiva.app/` is registered. Not the origin without its trailing
+  slash, not `/auth/callback`, not `/projects`.
+*/
+describe('the redirect URI is fixed, wherever the person happens to be', () => {
+  const authorizeParam = (url: string, name: string) => new URL(url).searchParams.get(name)
+
+  it('sends the origin root from a deep page, not the current path', async () => {
+    // The exact shape that locked somebody out.
+    setLocation('', '')
+    window.history.replaceState({}, '', '/project/rich-text-and-blocks-254a0dee')
+
+    const boot = await freshBootWithNav()
+    await boot.bootAuth()
+
+    expect(navigated).toHaveLength(1)
+    expect(authorizeParam(navigated[0], 'redirect_uri')).toBe(`${ORIGIN}/`)
+  })
+
+  it('sends the same URI from the root, so one registered entry covers both', async () => {
+    setLocation('')
+    const boot = await freshBootWithNav()
+    await boot.bootAuth()
+    expect(authorizeParam(navigated[0], 'redirect_uri')).toBe(`${ORIGIN}/`)
+  })
+
+  it('carries the deep route in returnTo instead of losing it', async () => {
+    /*
+      The other half of the same stale premise. `returnTo` was
+      `location.hash || '#/'`, which under path routing is the constant `'#/'` —
+      so every sign-in came back to the root however deep a link somebody had
+      opened, which is the thing PEEK-123 exists about.
+    */
+    window.history.replaceState({}, '', '/issue/abc?filter=open')
+    const boot = await freshBootWithNav()
+    await boot.bootAuth()
+
+    expect(sessionStorage.getItem('ship.estiva-id.returnTo')).toBe('/issue/abc?filter=open')
+  })
+
+  it('refuses a returnTo that is not a path on this origin', async () => {
+    // Read back from storage this tab wrote, which is not the same as trusted:
+    // `//evil.example` is protocol-relative and `replaceState` would take it.
+    setLocation('')
+    const id = await import('./estivaId')
+    id.restoreRoute('//evil.example/x')
+    expect(window.location.pathname).toBe('/')
+    id.restoreRoute('https://evil.example/x')
+    expect(window.location.pathname).toBe('/')
+  })
+
+  it('does not overwrite a route something else already applied', async () => {
+    window.history.replaceState({}, '', '/issues')
+    const id = await import('./estivaId')
+    id.restoreRoute('/project/abc')
+    expect(window.location.pathname).toBe('/issues')
+  })
+})
+
+/*
+  MUST STAY LAST. `vi.doMock` below is not undone by `vi.restoreAllMocks()`, so
+  once this block has run every later test sees `ID_CONFIG: null` — which makes
+  `signInAvailable` false, `bootAuth` return `{ kind: 'app' }` without deciding
+  anything, and every navigation assertion in the file silently observe nothing.
+  Cost an hour on the redirect-URI fix, whose new tests were appended after it.
+*/
 describe('a build with no sign-in', () => {
   it('runs anonymous-only without deciding anything', async () => {
     vi.doMock('../config', () => ({

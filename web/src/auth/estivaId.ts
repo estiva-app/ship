@@ -20,12 +20,42 @@
  * from Peek, which uses one. That is the "a library pulled from one app comes out
  * shaped like that app" failure SHA-4 names.
  *
- * ## The route is a fragment, which is why `returnTo` is not the whole story
+ * ## The redirect URI is FIXED, and the route travels in `returnTo`
  *
- * Ship routes on `location.hash`, and `redirectUri()` carries no fragment
- * because it must match a registered URI **exactly**. The fragment is lost at
- * the first navigation to `/authorize` and nothing brings it back, so it is
- * carried in `returnTo` and reapplied before the app boots (PEEK-123).
+ * This file was written in REW-2, when Ship routed on `location.hash`. REW-3/4/5
+ * moved `web/` to real paths — `App.tsx` reads `location.pathname` — and this
+ * file was never told. Three things followed from the stale premise, and the
+ * first one locked people out of production:
+ *
+ * 1. `redirectUri()` returned the **current pathname**. Harmless when every
+ *    route was a fragment and the path was always `/`; once routes became paths
+ *    it produced one URI per page. Estiva ID compares `redirect_uri`
+ *    **exact-string** against a registered list, so a token expiring on
+ *    `/project/<slug>` sent the person to `/authorize` with an unregistered URI
+ *    and got `400 bad_request: That redirect_uri is not registered for this
+ *    app` — a JSON error page on the identity origin, with no way back into the
+ *    app.
+ * 2. `returnTo` was `location.hash || '#/'`, which under path routing is always
+ *    `'#/'`. The route was never carried.
+ * 3. `restoreRoute` began `if (!returnTo.startsWith('#')) return`, so it could
+ *    never restore a path even if one had been carried.
+ *
+ * **One URI is registered, measured rather than assumed** (2026-09-08, against
+ * production `id.estiva.app`, `prompt=none` probes):
+ *
+ * | `redirect_uri` | answer |
+ * | --- | --- |
+ * | `https://ship.estiva.app/` | 302 — registered |
+ * | `https://ship.estiva.app` | 400 |
+ * | `https://ship.estiva.app/auth/callback` | 400 |
+ * | `https://ship.estiva.app/projects` | 400 |
+ *
+ * So the fixed URI is the origin **with its trailing slash** — the slash is not
+ * cosmetic, its absence is a refused sign-in. Peek's equivalent is a dedicated
+ * `/auth/callback`; Ship cannot use one without an Estiva ID seed change and a
+ * re-seed, and does not need to: `bootAuth` redeems the code from
+ * `location.search` on whatever page it lands on, so the root works and this
+ * fix ships without touching the identity service.
  */
 import { createEstivaId, type StoredToken } from '@estiva-app/identity'
 import { ID_CONFIG } from '../config'
@@ -62,7 +92,10 @@ const client = ID_CONFIG
       clientId: ID_CONFIG.clientId,
       // No query and no fragment — compared exact-string upstream, and an
       // identity provider that prefix-matched would be an open redirector.
-      redirectUri: () => `${window.location.origin}${window.location.pathname}`,
+      // Fixed, and the trailing slash is load-bearing — see the table above.
+      // Never the current path: that is one URI per page against an exact-string
+      // registered list, which is the lockout this file's header describes.
+      redirectUri: () => `${window.location.origin}/`,
       storage: () => (typeof localStorage === 'undefined' ? null : localStorage),
       pendingStore: () => (typeof sessionStorage === 'undefined' ? null : sessionStorage),
       keyPrefix: 'ship.estiva-id',
@@ -91,9 +124,16 @@ export async function renew(): Promise<string | null> {
   return next?.accessToken ?? null
 }
 
-/** Send the person to Estiva ID, carrying the hash route in `returnTo`. */
+/**
+ * Send the person to Estiva ID, carrying the current route in `returnTo`.
+ *
+ * The route is a **path** now. It was `location.hash || '#/'` until this fix,
+ * which under path routing meant every sign-in carried the string `'#/'` and
+ * came back to the root, however deep a link somebody had opened (PEEK-123 is
+ * the ticket about not doing that).
+ */
 export async function beginSignIn(options: { silent?: boolean } = {}): Promise<void> {
-  await client?.beginSignIn(window.location.hash || '#/', options)
+  await client?.beginSignIn(`${window.location.pathname}${window.location.search}`, options)
 }
 
 /**
@@ -132,21 +172,29 @@ export async function completeSignIn(): Promise<{ token: StoredToken; returnTo: 
   return client.completeSignIn(window.location.search)
 }
 
-/** Drop `?code=…` without reloading or touching the hash route. */
+/** Drop `?code=…` without reloading or losing the path. */
 export function clearQuery(): void {
-  window.history.replaceState({}, '', `${window.location.pathname}${window.location.hash}`)
+  window.history.replaceState({}, '', window.location.pathname)
 }
 
 /**
  * Put the person back on the route they opened, before the router reads it.
  *
- * Applied with `replaceState` rather than by assigning `location.hash`, so it
+ * Applied with `replaceState` rather than by assigning `location.href`, so it
  * leaves no extra history entry and does not reload.
  */
 export function restoreRoute(returnTo: string): void {
-  if (!returnTo.startsWith('#')) return
-  if (window.location.hash) return
-  window.history.replaceState({}, '', `${window.location.pathname}${returnTo}`)
+  /*
+    A path on this origin and nothing else. `returnTo` is read back from storage
+    this tab wrote, which is not the same as trusting it: a value beginning `//`
+    is a protocol-relative URL and `replaceState` would accept it, turning a
+    stored string into somewhere else entirely.
+  */
+  if (!returnTo.startsWith('/') || returnTo.startsWith('//')) return
+  // Something already put us on a route; do not overwrite it. The callback
+  // always lands on `/`, because that is the only registered redirect URI.
+  if (window.location.pathname !== '/') return
+  window.history.replaceState({}, '', returnTo)
 }
 
 /** The guard, exposed for the boot decision. Per-tab, like the rest of an attempt. */
