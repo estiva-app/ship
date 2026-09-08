@@ -231,7 +231,19 @@ export function manifestContent(): ManifestContent {
           // renders half the workspace blank, and which half depends only on
           // which one you name. The issue below is untouched: REW-11 did not
           // rename anything there.
-          title: { tag: ['name', 'title'] },
+          /*
+            And `fold: 'title'`, which was missing and is not cosmetic.
+            Consumers default the folded field to the *first* tag name, so
+            without this they folded `name` — a field nothing writes — and fell
+            back to the root tag. A project renamed in Ship therefore showed its
+            **original** name in every other app, for ever: 6 of 19 on
+            production, 3 of them with no root `name` at all, which renders as
+            "Untitled".
+            Ship never noticed because its own fold reads the field directly and
+            never consults this manifest. The smoke test could not notice
+            either: nothing is renamed during a run, so the root tag is right.
+          */
+          title: { tag: ['name', 'title'], fold: 'title' },
           /*
            * No `subtitle`, on purpose — PRO-8.
            *
