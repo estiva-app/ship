@@ -118,6 +118,65 @@ export function signedIn(): boolean {
   return currentToken() !== null
 }
 
+/**
+ * The bearer the signer should present, read per signature.
+ *
+ * **Deliberately `storedToken` rather than {@link currentToken}.** That one
+ * subtracts a minute of write-time slack, and a reader is not the place for it:
+ * between `expiresAt - 60s` and the moment the schedule fires there would be no
+ * bearer at all, and `estivaIdSigner` treats an absent one as an expiry without
+ * attempting a renewal. Writes would fail in a window where they used to work.
+ *
+ * Judging a token is `/sign`'s job — it holds the key. This answers the narrower
+ * question the signer actually asks: what is the newest bearer we hold. So
+ * `undefined` means **signed out**, which is the one case worth refusing without
+ * a round trip.
+ *
+ * Passing a reader rather than a string is what makes {@link startRenewal}
+ * worth having: a signer holding a captured string would keep presenting the old
+ * token after a scheduled renewal, pay a 401, and spend a second grant to reach
+ * the token the app already had (identity 0.2.2).
+ */
+export function heldBearer(): string | undefined {
+  return client?.storedToken()?.accessToken
+}
+
+/**
+ * Renew before the token expires, rather than when a write discovers it has.
+ *
+ * Ship has renewed on a 401 from `/sign` since REW-2, which works and is not
+ * the same thing: the person's next action is what pays for the expiry. The
+ * package has offered this since 0.1.2 and no consumer had taken it.
+ *
+ * **No shell on failure, and that is a choice.** Ship has no mid-session entry
+ * surface, and taking the app away from somebody mid-sentence is worse than a
+ * write that reports honestly — which it will, because a refused renewal clears
+ * the session and {@link heldBearer} then answers `undefined`. The next load is
+ * an ordinary cold boot and `decideBoot` says the right thing there.
+ *
+ * A background tab has its timers throttled, so a renewal can be late; the
+ * package documents that and it degrades into the 401 path it replaced.
+ */
+let schedule: { cancel: () => void } | null = null
+
+export function startRenewal(): { cancel: () => void } | null {
+  /*
+    Idempotent, because two schedules would each renew and a refresh token is
+    single-use — the package coalesces concurrent renewals, but two timers
+    firing a minute apart are not concurrent, and the second would spend a grant
+    for a token it had just been given. `bootAuth` is called once in the app and
+    once per test, so this is cheap insurance rather than a hypothetical.
+  */
+  schedule?.cancel()
+  schedule =
+    client?.scheduleRenewal({
+      onEnded: () => {
+        console.warn('[auth] renewal failed; the session is over and the next write will say so')
+      },
+    }) ?? null
+  return schedule
+}
+
 /** For `estivaIdSigner`'s `renew`, so a 401 from `/sign` is an invisible retry. */
 export async function renew(): Promise<string | null> {
   const next = await client?.refreshAccessToken()

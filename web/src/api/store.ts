@@ -3,7 +3,7 @@ import { isRateLimited, noteRateLimited } from '@/lib/relayBudget'
 import { estivaIdSigner, localSigner, type Signer } from '../../../lib/nostr/signer'
 import { Store } from '../../../src/store'
 import { ID_CONFIG, RELAY_URL } from '../config'
-import { currentToken, renew } from '../auth/estivaId'
+import { currentToken, heldBearer, renew } from '../auth/estivaId'
 
 /**
  * Who signs, decided once.
@@ -34,10 +34,14 @@ export const signer: Signer =
     ? estivaIdSigner({
         base: ID_CONFIG.base,
         pubkey: token.pubkey,
-        token: token.accessToken,
-        // A 401 from `/sign` becomes an invisible retry rather than an error the
-        // person sees. Access tokens are short, so any session of real length
-        // crosses an expiry.
+        // A READER, not the token itself. This signer is built once, here, and
+        // lives as long as the page — so a captured string would go stale the
+        // moment `startRenewal` replaced it, and the retry below would spend a
+        // second grant to reach a token already in storage (identity 0.2.2).
+        token: heldBearer,
+        // Still here, and still the safety net: a renewal can be late in a
+        // background tab, where timers are throttled. Then a 401 from `/sign`
+        // becomes an invisible retry rather than an error the person sees.
         renew,
       })
     : localSigner('ship.secretkey')
