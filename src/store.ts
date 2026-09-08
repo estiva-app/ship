@@ -29,6 +29,7 @@ import { findNaddrs, naddrToAddr, buildReaction, buildEdit, buildDeletion as bui
 import { foldFolder, projectFolders, type FolderState } from './fold'
 import { taggedIndex, type TaggedIndex } from './references'
 import { foldEdits, type EditIndex } from './edits'
+import { foldAttachments, type AttachmentIndex } from './attachments'
 import { REACTION_EVENT_LIMIT } from './reactions'
 import { directoryFrom, type Directory } from './profiles'
 import { KIND } from './kinds'
@@ -101,17 +102,26 @@ export interface WorkspaceState extends FolderState {
    * `edited` field on `Message` would turn both repos red — see `edits.ts`.
    */
   edits: EditIndex
+  /**
+   * Message id → the files it carries, from its `imeta` tags (CON-12).
+   *
+   * Beside the fold for the same reason as `edits`: a `files` field on
+   * `Message` would walk into the conformance test's union of keys and turn
+   * both repos red — see `attachments.ts`.
+   */
+  attachments: AttachmentIndex
 }
 
 /**
  * Fold a set of events, and read off the same set the two things `foldFolder`
- * deliberately does not carry: tag-vs-body provenance, and edits.
+ * deliberately does not carry: tag-vs-body provenance, edits, and attachments.
  */
 function read(events: SignedEvent[]): WorkspaceState {
   return {
     ...foldFolder(events, referencedAddresses),
     tagged: taggedIndex(events),
     edits: foldEdits(events),
+    attachments: foldAttachments(events),
   }
 }
 

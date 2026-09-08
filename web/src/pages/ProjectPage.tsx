@@ -1,6 +1,6 @@
 import { useMarkRead } from '@/lib/useMarkRead'
 import { pointerToAddress, referenceToPointer, resolveBlockAnchor, type ContentFormat } from '@estiva-app/protocol'
-import type { EditIndex } from '@/api'
+import type { AttachmentIndex, EditIndex } from '@/api'
 import { signedIn } from '@/auth/estivaId'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
@@ -113,6 +113,13 @@ export function threadFor(
     untouched, so the omitted case is exactly today's behaviour.
   */
   edits?: EditIndex,
+  /*
+    Attachments, beside the fold for the same reason as `edits` — CON-12.
+
+    Passed rather than read here because `threadFor` is pure over one
+    conversation and the index is folded once per workspace read.
+  */
+  attachments?: AttachmentIndex,
 ): ThreadData {
   const message = (m: FolderState['conversations'][number]['root']) => {
     const edit = edits?.[m.id]
@@ -129,6 +136,9 @@ export function threadFor(
       anchor: resolveBlockAnchor(m.blockId, body?.value ?? '', body?.format ?? 'marker'),
       // Carried for the unread rule only: your own writing is never new to you.
       by: m.author,
+      // Files, read off `imeta` beside the fold — CON-12. Undefined for the
+      // messages that carry none, which is nearly all of them.
+      files: attachments?.[m.id],
     }
   }
   return { id: conversation.id, root: message(conversation.root), replies: conversation.replies.map(message) }
@@ -209,7 +219,7 @@ export function activityFor(
   subFiles: readonly { addr: string; label: string }[] = [],
 ): { items: ActivityItem[]; truncated: number } {
   const mentions: ActivityItem[] = mentionsOf(state.conversations, addr, state.tagged).map((conversation) => ({
-    thread: threadFor(conversation, directory, undefined, addr, state.edits),
+    thread: threadFor(conversation, directory, undefined, addr, state.edits, state.attachments),
     relation: 'mention' as const,
     where: whereThreadLives(conversation.root.folder, state),
   }))
@@ -217,7 +227,7 @@ export function activityFor(
   const labels = new Map(subFiles.map((file) => [file.addr, file.label]))
   const rolled: ActivityItem[] = commentsOnAny(state.conversations, new Set(labels.keys()), state.tagged).map(
     ({ conversation, about }) => ({
-      thread: threadFor(conversation, directory, undefined, about, state.edits),
+      thread: threadFor(conversation, directory, undefined, about, state.edits, state.attachments),
       relation: 'sub-file' as const,
       where: labels.get(about),
     }),
@@ -359,7 +369,7 @@ export function ProjectPage({
      read; its issues' discussions are separate contexts and are untouched. */
   useMarkRead([projectContext(project?.contentFolder)])
   const threads = useMemo(
-    () => conversations.map((c) => threadFor(c, directory, project ? { value: project.description, format: project.descriptionFormat } : undefined, project?.addr, state.edits)),
+    () => conversations.map((c) => threadFor(c, directory, project ? { value: project.description, format: project.descriptionFormat } : undefined, project?.addr, state.edits, state.attachments)),
     [conversations, directory, project],
   )
   /* The divider in the feed (CRO-13). A project IS the container, so its own
