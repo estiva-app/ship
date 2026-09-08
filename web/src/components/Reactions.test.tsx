@@ -9,7 +9,6 @@
 import { describe, expect, it } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { Reactions, reactorLabel } from './Reactions'
-import { REACTION_EMOJI } from '@/api'
 
 const ANA = 'a'.repeat(64)
 const RAVI = 'b'.repeat(64)
@@ -56,19 +55,6 @@ describe('Reactions', () => {
     const c = render(<Reactions reactions={[{ emoji: '👍', count: 1, by: [ANA] }]} nameOf={nameOf} />).container
     expect(c.querySelectorAll('button').length).toBe(0)
     expect(c.querySelector('[data-reaction-picker]')).toBeNull()
-  })
-
-  it('offers the picker once a handler is given', () => {
-    const c = render(<Reactions reactions={[]} onToggle={() => {}} />).container
-    expect(c.querySelector('[data-reaction-picker]')).not.toBeNull()
-    // One control per emoji in the shared palette.
-    expect(c.querySelectorAll('[data-reaction-picker] button').length).toBe(REACTION_EMOJI.length)
-  })
-
-  it('names each picker control by meaning, not by glyph', () => {
-    render(<Reactions reactions={[]} onToggle={() => {}} />)
-    // An icon-only control has no other source for an accessible name.
-    expect(screen.getByRole('button', { name: 'Thank you' })).toBeTruthy()
   })
 
   /*

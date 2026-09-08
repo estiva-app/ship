@@ -11,10 +11,10 @@ import { Reactions } from './Reactions'
  * a control is *absent, not disabled* — so it becomes a `Chip`, which is what
  * standing information is.
  *
- * The picker is a strip of `IconButton`s because `Menu`'s page sends reactions
- * there by name. A pill is what this really wants, and the package has none —
- * `Reaction` is proposed to `@estiva-app/ui`, and it would retire Peek's fork
- * of it too.
+ * The pill is the package's `Reaction` (0.7.0). The picker is not in this row
+ * any more (0.10.0, D34): it is the package's `ReactionPicker`, opened from
+ * the "React" button among the message's tools — see the Conversations
+ * stories. With nothing to show, this row draws nothing.
  */
 const NAMES: Record<string, string> = {
   ['a'.repeat(64)]: 'Ana Duarte',
@@ -67,7 +67,7 @@ export const Mine: Story = {
   },
 }
 
-/** Nothing yet, but you may react — the picker alone. */
+/** Nothing yet: the row draws nothing. The way in is "React" among the message's tools (D34). */
 export const NoneYet: Story = { args: { onToggle: fn(), reactions: [] } }
 
 /** Momentarily unavailable, which is what `disabled` plus a reason is for. */

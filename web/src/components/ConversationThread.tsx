@@ -1,13 +1,16 @@
 import { Fragment, useMemo, useState } from 'react'
-import { IconDots } from '@tabler/icons-react'
+import { IconDots, IconMoodPlus } from '@tabler/icons-react'
 import type { BlockAnchor } from '@estiva-app/protocol'
 import { referencesIn, standaloneReference, toRenderTree } from '@estiva-app/protocol'
 import { BlockAnchorNote } from './ui/BlockAnchorNote'
 import { Button } from './ui/Button'
 import { ConfirmDialog } from './ui/ConfirmDialog'
 import { Textarea } from './ui/Textarea'
-import { IconButton } from './ui/IconButton'
 import { Menu, MenuItem } from './ui/Menu'
+import { Popover } from './ui/Popover'
+import { ReactionPicker } from './ui/ReactionPicker'
+import { Toolbar, ToolbarButton } from './ui/Toolbar'
+import { WithTooltip } from './ui/Tooltip'
 import { cn } from '@/lib/cn'
 import { ago } from '@/lib/time'
 import { Avatar } from '@/components/ui/Avatar'
@@ -19,7 +22,7 @@ import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
 import { byReference, useForeignObjects } from '@/api/useForeignObjects'
 import { Composer } from './Composer'
 import { draftKeys } from '@/lib/drafts'
-import { Reactions } from './Reactions'
+import { Reactions, REACTION_OPTIONS } from './Reactions'
 import { useReactions, REACTION_TARGET_LIMIT } from '@/api'
 import type { Reaction } from '@/api'
 
@@ -186,61 +189,72 @@ export interface ThreadData {
  * ## Why a menu and not a button
  *
  * `Menu`'s page: *"a click-opened list of actions: a `…` more-menu"*, rows
- * `destructive` in the error colour. One row today; Edit joins it at CON-4,
- * and a bare trash icon beside every message would have to move then anyway.
+ * `destructive` in the error colour. Edit above Delete, and not destructive:
+ * one changes what was said, the other takes it back, and the reversible one
+ * goes first.
  *
- * The trigger swallows its own `mousedown` — the shell's outside-click exit
- * listens on `mousedown`, so a trigger toggling on `click` would see its press
- * close the menu and the click reopen it. That trap is documented on `Menu`'s
- * page and it is the caller's to avoid.
+ * ## The strip (0.10.0)
+ *
+ * Beside the menu sits "React", where Peek's card puts it (D34): the picker
+ * opens above the button, the message being reacted to underneath (D30). Two
+ * icon buttons side by side are a strip, and a strip is a `Toolbar` (B15):
+ * one Tab stop, the arrow keys between them. `surface={false}` because the
+ * card is the surface. The menu owns its trigger since 0.10.0 (B9), so the
+ * open state, the `mousedown` guard and the `onClose` this used to keep are
+ * gone — Base UI decides when it shows, and closes it when a row is chosen.
  */
-function MessageActions({
+export function MessageActions({
+  onReact,
   onEdit,
   onDelete,
   disabledReason,
 }: {
+  onReact?: (emoji: string) => void
   onEdit?: () => void
   onDelete?: () => void
   disabledReason?: string
 }) {
-  const [open, setOpen] = useState(false)
+  const [picking, setPicking] = useState(false)
   return (
-    <div className="relative ml-auto shrink-0">
-      <IconButton
-        aria-label="Message actions"
-        tooltip={disabledReason ?? 'Message actions'}
-        disabled={!!disabledReason}
-        onMouseDown={(event) => event.stopPropagation()}
-        onClick={() => setOpen((value) => !value)}
-      >
-        <IconDots size={16} stroke={1.5} />
-      </IconButton>
-      {open && (
-        <Menu onClose={() => setOpen(false)}>
-          {/* Edit above Delete, and not destructive: one changes what was said,
-              the other takes it back, and the reversible one goes first. */}
-          {onEdit && (
-            <MenuItem
-              label="Edit message"
-              onClick={() => {
-                setOpen(false)
-                onEdit()
-              }}
-            />
-          )}
-          {onDelete && (
-            <MenuItem
-              label="Delete message"
-              destructive
-              onClick={() => {
-                setOpen(false)
-                onDelete()
-              }}
-            />
-          )}
+    <Toolbar aria-label="Message tools" surface={false} className="ml-auto shrink-0">
+      {onReact && (
+        <Popover
+          side="top"
+          align="right"
+          ariaLabel="Reactions"
+          className="w-auto min-w-0 p-1"
+          open={picking}
+          onOpenChange={setPicking}
+          trigger={
+            <ToolbarButton aria-label="React" tooltip="React" disabledReason={disabledReason}>
+              <IconMoodPlus size={16} stroke={1.5} />
+            </ToolbarButton>
+          }
+        >
+          <ReactionPicker
+            options={REACTION_OPTIONS}
+            surface={false}
+            onSelect={(emoji) => {
+              setPicking(false)
+              onReact(emoji)
+            }}
+          />
+        </Popover>
+      )}
+      {(onEdit || onDelete) && (
+        <Menu
+          align="right"
+          trigger={
+            <ToolbarButton aria-label="Message actions" tooltip="Message actions" disabledReason={disabledReason}>
+              <IconDots size={16} stroke={1.5} />
+            </ToolbarButton>
+          }
+        >
+          {onEdit && <MenuItem label="Edit message" onClick={onEdit} />}
+          {onDelete && <MenuItem label="Delete message" destructive onClick={onDelete} />}
         </Menu>
       )}
-    </div>
+    </Toolbar>
   )
 }
 
@@ -432,13 +446,14 @@ export function MessageCard({
         {message.editedAt !== undefined && (
           <>
             <span aria-hidden="true">·</span>
-            <span className="shrink-0 italic" title={`Edited ${ago(message.editedAt)}`}>
-              edited
-            </span>
+            <WithTooltip label={`Edited ${ago(message.editedAt)}`}>
+              <span className="italic">edited</span>
+            </WithTooltip>
           </>
         )}
-        {(onDelete || onEdit) && (
+        {(onDelete || onEdit || onToggleReaction) && (
           <MessageActions
+            onReact={onToggleReaction && ((emoji) => onToggleReaction(emoji, reactions?.find((r) => r.emoji === emoji)?.mine))}
             onEdit={onEdit && (() => setEditing(true))}
             onDelete={onDelete && (() => setConfirming(true))}
             disabledReason={disabledReason}

@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { fn } from 'storybook/test'
+import { fn, userEvent, within } from 'storybook/test'
 import { THREADS } from '@/fixtures/issues'
 import { Conversations } from './ConversationThread'
 
@@ -56,3 +56,17 @@ export const Unread: Story = { args: { threads: THREADS, unread: { [THREADS[0].i
  * never be allowed to use.
  */
 export const Deletable: Story = { args: { threads: [THREADS[0]], onDeleteMessage: fn() } }
+
+/**
+ * Every message carries "React" beside its `…` — the two are one strip, one
+ * Tab stop (0.10.0, D34). The picker is the package's, and it opens **above**
+ * the button, because the message it is about is underneath (D30). This
+ * canvas opens the first one.
+ */
+export const Reactable: Story = {
+  args: { threads: [THREADS[0]], onReact: fn(), onDeleteMessage: fn() },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await userEvent.click(canvas.getAllByRole('button', { name: 'React' })[0])
+  },
+}
