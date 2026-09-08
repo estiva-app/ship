@@ -63,6 +63,15 @@ export const Deletable: Story = { args: { threads: [THREADS[0]], onDeleteMessage
  * the button, because the message it is about is underneath (D30). This
  * canvas opens the first one.
  */
+/**
+ * Signed out: every control on the message's strip is disabled with the
+ * reason, and stays reachable so the reason can be read (0.10.0). The strip
+ * is drawn, not hidden — the person may sign in.
+ */
+export const ReadOnly: Story = {
+  args: { threads: [THREADS[0]], onReact: fn(), onDeleteMessage: fn(), disabledReason: 'Sign in to react or reply.' },
+}
+
 export const Reactable: Story = {
   args: { threads: [THREADS[0]], onReact: fn(), onDeleteMessage: fn() },
   play: async ({ canvasElement }) => {

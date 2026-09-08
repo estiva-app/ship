@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { fn } from 'storybook/test'
+import { fn, screen, userEvent } from 'storybook/test'
 import { useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
@@ -60,6 +60,29 @@ export const DeleteProject: Story = {
 /** Pair with another Folder — replaces production's prompt(). */
 export const PairFolder: Story = {
   render: () => <PairFolderDialog currentFolder="5c1e2a7b-9d40-4f3a-8e6b-2f0c7d1a9b34" onClose={fn()} onPair={fn()} />,
+}
+
+/**
+ * The error line is `Field`'s own since 0.10.0 (S7): it takes the helper's
+ * place, marks the control invalid, and is announced. This canvas pastes
+ * something that is not a link and presses Pair.
+ */
+export const PairFolderRefused: Story = {
+  render: () => <PairFolderDialog currentFolder="5c1e2a7b-9d40-4f3a-8e6b-2f0c7d1a9b34" onClose={fn()} onPair={fn()} />,
+  play: async () => {
+    await userEvent.type(screen.getByPlaceholderText(/Folder link/), 'nope')
+    await userEvent.click(screen.getByRole('button', { name: 'Pair' }))
+  },
+}
+
+/** The same line under the optional Folder field of a new project: the helper until there is an error. */
+export const NewProjectRefused: Story = {
+  render: () => <NewProjectDialog onClose={fn()} onCreate={fn()} />,
+  play: async () => {
+    await userEvent.type(screen.getByPlaceholderText('New project title'), 'Relay migration')
+    await userEvent.type(screen.getByPlaceholderText(/Paste a Peek topic link/), 'nope')
+    await userEvent.click(screen.getByRole('button', { name: 'Create project' }))
+  },
 }
 
 /** Open each from a button, and close it with Cancel, ✕, the backdrop or Escape. */

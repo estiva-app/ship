@@ -1,5 +1,5 @@
 import { Fragment, useMemo, useState } from 'react'
-import { IconDots, IconMoodPlus } from '@tabler/icons-react'
+import { IconDotsVertical, IconMoodPlus } from '@tabler/icons-react'
 import type { BlockAnchor, Imeta } from '@estiva-app/protocol'
 import { referencesIn, standaloneReference, toRenderTree } from '@estiva-app/protocol'
 import { Attachments as FileAttachments } from './ui/Attachment'
@@ -256,7 +256,8 @@ export function MessageActions({
           align="right"
           trigger={
             <ToolbarButton aria-label="Message actions" tooltip="Message actions" disabledReason={disabledReason}>
-              <IconDots size={16} stroke={1.5} />
+              {/* Vertical, as Peek's card draws its "more" (Katerina, 2026-09-08). */}
+              <IconDotsVertical size={16} stroke={1.5} />
             </ToolbarButton>
           }
         >
