@@ -15,9 +15,9 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "@estiva-app/identity": "^0.2.1",
-    "@estiva-app/interop": "^0.10.0",
-    "@estiva-app/protocol": "^0.15.0",
+    "@estiva-app/identity": "^0.2.2",
+    "@estiva-app/interop": "^0.15.0",
+    "@estiva-app/protocol": "^0.17.0",
     "@estiva-app/ui": "^0.10.0",
     "@tabler/icons-react": "^3.41.1",
     "@tiptap/pm": "^3.31.3",

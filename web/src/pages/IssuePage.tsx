@@ -60,7 +60,7 @@ export function IssuePage({ state, directory, d, say, refresh }: { state: Worksp
      mark the whole project read. */
   useMarkRead(useMemo(() => conversations.map((c) => threadContext(c.id)), [conversations]))
   const threads = useMemo(
-    () => conversations.map((c) => threadFor(c, directory, issue ? { value: issue.description, format: issue.descriptionFormat } : undefined, issue?.addr, state.edits)),
+    () => conversations.map((c) => threadFor(c, directory, issue ? { value: issue.description, format: issue.descriptionFormat } : undefined, issue?.addr, state.edits, state.attachments)),
     [conversations, directory, issue],
   )
   /* The divider in the feed (CRO-13). `issue.folder` is the container these

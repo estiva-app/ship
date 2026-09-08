@@ -1,7 +1,8 @@
 import { Fragment, useMemo, useState } from 'react'
 import { IconDots, IconMoodPlus } from '@tabler/icons-react'
-import type { BlockAnchor } from '@estiva-app/protocol'
+import type { BlockAnchor, Imeta } from '@estiva-app/protocol'
 import { referencesIn, standaloneReference, toRenderTree } from '@estiva-app/protocol'
+import { Attachments as FileAttachments } from './ui/Attachment'
 import { BlockAnchorNote } from './ui/BlockAnchorNote'
 import { Button } from './ui/Button'
 import { ConfirmDialog } from './ui/ConfirmDialog'
@@ -54,11 +55,12 @@ import type { Reaction } from '@/api'
  * draw the object it names below, resolve an in-sentence pointer where it was
  * written. Showing the bech32 *and* the object is worse than either.
  *
- * **The screenshots half of that report is not fixed here and cannot be fixed
- * in Ship.** Peek's outbox publishes `content: m.body` and nothing else
- * (`convex/nostr/outbox.ts`); an attachment lives in Convex storage and never
- * reaches the relay, so there is no image for any other reader to draw. That is
- * Peek's publish path, not Ship's rendering.
+ * **The screenshots half is answered too, now that there is something to
+ * draw.** It could not be, at first: Peek's outbox published `content` and
+ * nothing else, so an attachment stayed in Convex storage and never reached the
+ * relay. peek#177 puts an `imeta` tag on the message (CON-12), `attachments.ts`
+ * reads it back, and `Attachment` fetches the bytes — which it must, because
+ * media GET is authenticated and an `<img src>` answers 401.
  */
 export interface MessageData {
   id: string
@@ -92,6 +94,14 @@ export interface MessageData {
   editedAt?: number
   /** Author pubkey. Only used to decide unread — your own writing is never new. */
   by?: string
+  /**
+   * Files attached to this message, from its `imeta` tags — CON-12, SHI-1.
+   *
+   * Read beside the fold (`attachments.ts`) rather than off `Message`, for the
+   * same reason as `editedAt`: `foldFolder` is a two-repo contract and a new
+   * field on `Message` turns both repos red. `threadFor` supplies it.
+   */
+  files?: Imeta[]
 }
 
 /** Messages are marker text (SPEC §13.2); only a rich text *field* is a block document. */
@@ -482,6 +492,15 @@ export function MessageCard({
         className="break-words text-body-2 text-text-primary"
       />
       )}
+      {/*
+        Files, above the referenced objects — CON-12.
+
+        `attachments` a few lines down is the OTHER kind: objects this message
+        pointed at, which Ship has drawn since RIC-10. These are bytes somebody
+        uploaded, and they go first because a screenshot is usually what the
+        message is about while a pointer is usually what it is filed under.
+      */}
+      <FileAttachments files={message.files} className="mt-0.5" />
       {attached.length > 0 && resolving && <SkeletonBar className="h-16 w-full rounded-lg" data-foreign-references="loading" />}
       {attachments.length > 0 && (
         <div className="flex flex-col gap-2" data-foreign-references={String(attachments.length)}>

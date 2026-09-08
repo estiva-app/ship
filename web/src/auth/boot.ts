@@ -31,6 +31,7 @@ import {
   currentToken,
   guardAttemptedAt,
   restoreRoute,
+  startRenewal,
   signInAvailable,
   stashShellReason,
   takeShellReason,
@@ -66,6 +67,7 @@ export async function bootAuth(): Promise<BootResult> {
 
   switch (action.do) {
     case 'enter':
+      startRenewal()
       return { kind: 'app' }
 
     case 'complete_callback':
@@ -73,6 +75,9 @@ export async function bootAuth(): Promise<BootResult> {
         const { returnTo } = await completeSignIn()
         clearQuery()
         restoreRoute(returnTo)
+        // Started only on the two paths that hold a session, and after the
+        // token is stored — the schedule reads the expiry it is arming against.
+        startRenewal()
         return { kind: 'app' }
       } catch (cause) {
         // Every refusal from `/token` is a uniform `invalid_grant` by design, so

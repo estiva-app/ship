@@ -34,6 +34,7 @@ export { conversationsAbout } from '../../../src/fold'
 */
 export { commentsOn, commentsOnAny, mentionsOf, attachmentOf, type Attachment, type TaggedIndex } from '../../../src/references'
 export { foldEdits, type Edit, type EditIndex } from '../../../src/edits'
+export { foldAttachments, type AttachmentIndex } from '../../../src/attachments'
 /* Reactions — SPEC §6.6. The horizon and the fold are in the data layer, where
    they can move into the conversation package; the hook that calls them is the
    app's. */

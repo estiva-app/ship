@@ -1,4 +1,4 @@
-import { IconBox, IconListDetails } from '@tabler/icons-react'
+import { IconBox, IconFolder, IconListDetails } from '@tabler/icons-react'
 import { Sidebar as SidebarShell } from '@estiva-app/ui'
 import { SectionLabel } from '@/components/ui/SectionLabel'
 import { SkeletonBar } from '@/components/ui/Skeleton'
@@ -30,6 +30,15 @@ export interface SidebarProject {
   openCount: number
 }
 
+/** A Folder, as the sidebar needs it. */
+export interface SidebarFolder {
+  /** The uuid — channel id, `h`, and the `d` of its state, all one (RFC 0.4 §5.2). */
+  id: string
+  /** Absent until something names it; the row falls back to the id. */
+  name?: string
+  href: string
+}
+
 export interface SidebarProps {
   /** Open issues across the workspace, minus archived projects — as today. */
   openIssues: number
@@ -37,8 +46,18 @@ export interface SidebarProps {
   projectsHref: string
   /** Active projects only, in the order the caller wants them shown. */
   projects: SidebarProject[]
+  /**
+   * Folders this identity can see.
+   *
+   * **No count**, unlike every other row here. A Folder's contents are files
+   * from apps Ship does not own, so a number would either be Ship's records
+   * only — which is a lie about a container that holds a topic — or a resolve
+   * per Folder on every render. RFC 0.4 §4.2 also makes the count a disclosure
+   * in its own right, so the honest sidebar states the name and nothing else.
+   */
+  folders?: SidebarFolder[]
   /** Which entry the route is on. A project's `addr` marks its own row. */
-  current: 'issues' | 'projects' | { projectAddr: string }
+  current: 'issues' | 'projects' | { projectAddr: string } | { folderId: string }
   /** The first workspace read has not landed, so the project list is unknown
    *  rather than empty — SHI-20. Shows placeholder rows in its place. */
   loading?: boolean
@@ -70,8 +89,16 @@ function SkeletonProjects() {
   )
 }
 
-export function Sidebar({ openIssues, issuesHref, projectsHref, projects, current, loading = false, className }: SidebarProps) {
-  const isProject = typeof current === 'object'
+export function Sidebar({ openIssues, issuesHref, projectsHref, projects, folders = [], current, loading = false, className }: SidebarProps) {
+  /*
+    Both branches of `current` are objects now, so `typeof current === 'object'`
+    no longer distinguishes them — it was correct while a project route was the
+    only object and became a latent bug the moment a folder route existed: a
+    folder route would have marked a project row active. Keyed on the field
+    instead, which cannot go wrong the same way again.
+  */
+  const isProject = typeof current === 'object' && 'projectAddr' in current
+  const isFolder = typeof current === 'object' && 'folderId' in current
   return (
     <SidebarShell className={className}>
       <NavItem
@@ -109,6 +136,22 @@ export function Sidebar({ openIssues, issuesHref, projectsHref, projects, curren
               />
             ))
           )}
+        </>
+      )}
+      {folders.length > 0 && (
+        <>
+          <div className="mt-2 flex h-8 shrink-0 items-center px-2">
+            <SectionLabel>Folders</SectionLabel>
+          </div>
+          {folders.map((folder) => (
+            <NavItem
+              key={folder.id}
+              label={folder.name ?? folder.id}
+              href={folder.href}
+              icon={<IconFolder size={16} stroke={1.5} />}
+              active={isFolder && current.folderId === folder.id}
+            />
+          ))}
         </>
       )}
     </SidebarShell>

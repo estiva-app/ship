@@ -87,5 +87,44 @@ for (const kind of [KIND.PROJECT, KIND.ISSUE]) {
   check(`kind:${kind} declares a body slot`, !!slot && 'fold' in slot && 'field' in slot, JSON.stringify(slot))
 }
 
+/*
+  Every slot Ship *changes* must name the field it changes.
+
+  A consumer defaults the folded field to the slot's first tag name, so a slot
+  whose tag spelling differs from its change field silently folds a field
+  nothing writes and falls back to the root tag — which means the value at
+  creation, for ever. That is not hypothetical: `title` on a project declared
+  `tag: ['name','title']` and no `fold`, so 6 of 19 production projects showed
+  the name they were created with in every app except Ship, 3 of them blank.
+
+  Ship cannot catch this by using its own objects: its fold reads the field
+  directly and never consults the manifest. Only a consumer sees it, and only
+  after a rename — which is why it is asserted here, against the published
+  declaration, rather than left to a rendering test.
+*/
+/** The field a consumer will fold, given a declaration — interop's rule, restated. */
+function foldedFieldOf(slot: SlotSource | undefined): string | undefined {
+  if (!slot) return undefined
+  if ('fold' in slot && slot.fold) return slot.fold
+  // The default a consumer applies when no `fold` is named: the first tag.
+  // Restating it here rather than importing it is deliberate — this test is
+  // about what a *stranger* would conclude from the published declaration.
+  if ('tag' in slot && slot.tag) return Array.isArray(slot.tag) ? slot.tag[0] : slot.tag
+  return undefined
+}
+
+for (const [kind, field] of [
+  [KIND.PROJECT, 'title'],
+  [KIND.ISSUE, 'title'],
+] as const) {
+  const slot = published.projections[String(kind)]?.slots.title as SlotSource | undefined
+  const declared = foldedFieldOf(slot)
+  check(
+    `kind:${kind} folds the field its rename actually writes (${field})`,
+    declared === field,
+    `declared ${JSON.stringify(declared)}`,
+  )
+}
+
 console.log(failures === 0 ? '\nAll slot-chain checks passed.' : `\n${failures} check(s) FAILED.`)
 process.exit(failures === 0 ? 0 : 1)

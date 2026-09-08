@@ -57,6 +57,13 @@ export type Route =
    */
   | { name: 'project'; d: string; slug?: string; view: ProjectView }
   | { name: 'issue'; d: string; slug?: string }
+  /**
+   * A Folder, addressed by its uuid — the same uuid that is its channel id and
+   * the `d` of its state event (RFC 0.4 §5.2). No slug: a Folder's name lives
+   * in its state, which may be private, and §4.3 keeps names out of addresses
+   * for exactly that reason.
+   */
+  | { name: 'folder'; id: string }
   /** An inbound `nostr:naddr…`, not yet resolved to an object. */
   | { name: 'inbound'; naddr: string }
 
@@ -87,6 +94,8 @@ export function href(route: Route): string {
     }
     case 'issue':
       return `/issue/${objectRef(route.d, route.slug)}`
+    case 'folder':
+      return `/folder/${route.id}`
     case 'inbound':
       return `/o/${route.naddr}`
   }
@@ -122,6 +131,9 @@ export function parse(location: string): Route {
         : DEFAULT_PROJECT_VIEW
       return { name: 'project', d, view }
     }
+  }
+  if (parts[0] === 'folder' && parts[1]) {
+    return { name: 'folder', id: parts[1] }
   }
   if (parts[0] === 'issue' && parts[1]) {
     const d = identifierFromRef(parts[1])

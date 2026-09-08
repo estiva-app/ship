@@ -914,6 +914,117 @@ async function main() {
   await menu.waitFor({ state: 'detached' })
   check('  …and closes on Escape', (await page.getByRole('menu').count()) === 0)
 
+  // ── The Folder view: peers from three apps, one list ──────────────────────
+  /*
+    The claim the whole folders track rests on, driven in a browser rather than
+    asserted in a unit test: given a Folder, Ship draws its contents **without
+    knowing what they are**.
+
+    The Folder below holds three files of three kinds owned by three apps, one
+    of which — the tide reading — is an app nobody wrote and whose widget
+    (`tideboard`) no consumer implements. It has to render anyway, through the
+    chain RFC 0.4 §13.3 closes in `card`. A folder view that quietly drew only
+    the Ship project would pass every other check in this file.
+
+    Seeded straight into the stub rather than published, because a `kind:30890`
+    is relay-signed and a client publishing one is refused (`is_relay_only_kind`)
+    — which is exactly the behaviour being modelled.
+  */
+  const RELAY_KEY = 'f'.repeat(64)
+  const FOLDER_ID = '7b32200c-e4c0-4216-b79a-8490fc05e0bd'
+  const TIDE_KIND = 30911
+  const seed = (event: Partial<Event> & { kind: number; tags: string[][] }) =>
+    ingest({
+      id: Math.random().toString(16).slice(2).padEnd(64, '0'),
+      pubkey: RELAY_KEY,
+      created_at: Math.floor(Date.now() / 1000),
+      content: '',
+      ...event,
+    } as Event)
+
+  // A third app's manifest, declaring a widget chain this consumer only half
+  // understands. Nothing in Ship has heard of a tide table.
+  seed({
+    kind: 31990,
+    tags: [['d', 'tide-table'], ['k', String(TIDE_KIND)]],
+    content: JSON.stringify({
+      name: 'Tide table',
+      projections: {
+        [TIDE_KIND]: { widget: ['tideboard', 'card'], slots: { title: { tag: 'title' } } },
+      },
+    }),
+  })
+  seed({ kind: TIDE_KIND, tags: [['d', 'spring'], ['title', 'Spring tides']] })
+
+  /*
+    Ship's and Peek's manifests, which the stub does not otherwise hold.
+
+    In production both are published `kind:31990`s that this view resolves at
+    runtime; here they have to be seeded or the two files cannot be drawn — and
+    a file that cannot be drawn is *dropped*, not marked, which is RFC 0.4
+    §4.2's disclosure rule and the reason the first run of this step showed one
+    row rather than three. Worth stating: the empty list was the read model
+    behaving correctly about a stub that was lying.
+  */
+  seed({
+    kind: 31990,
+    tags: [['d', 'estiva-ship-smoke'], ['k', '30850']],
+    content: JSON.stringify({
+      name: 'Estiva Ship',
+      records: { changeKind: 1851, targetTag: 'a', fieldTag: 'field', valueTag: 'value' },
+      projections: {
+        // `['name', 'title']`, copied from Ship's real manifest rather than
+        // guessed. REW-11 renamed the tag on the record, and a project
+        // published before that keeps `title` forever — so the slot names both
+        // and the order matters. Written as `title` alone, the row renders
+        // "Untitled" while still resolving, which looks like a missing file
+        // rather than a wrong tag name.
+        30850: { widget: 'card', slots: { title: { tag: ['name', 'title'] } } },
+      },
+    }),
+  })
+  seed({
+    kind: 31990,
+    tags: [['d', 'estiva-peek-smoke'], ['k', '39000']],
+    content: JSON.stringify({
+      name: 'Peek',
+      projections: { 39000: { widget: 'card', slots: { title: { tag: 'name' } } } },
+    }),
+  })
+  seed({ kind: 39000, tags: [['d', FOLDER_ID], ['name', 'Onboarding']] })
+  const tideAddr = `${TIDE_KIND}:${RELAY_KEY}:spring`
+  const topicAddr = `39000:${RELAY_KEY}:${FOLDER_ID}`
+  seed({
+    kind: 30890,
+    tags: [
+      ['d', FOLDER_ID],
+      ['name', 'Onboarding'],
+      ['a', projectAddr],
+      ['a', topicAddr],
+      ['a', tideAddr],
+    ],
+  })
+
+  await page.goto(`http://localhost:${PORT}/folder/${FOLDER_ID}`)
+  await page.waitForSelector(`[data-folder="${FOLDER_ID}"]`)
+  const folderView = page.locator(`[data-folder="${FOLDER_ID}"]`)
+  check('the Folder resolves from its relay-maintained state', (await folderView.getAttribute('data-source')) === 'state')
+  const rows = folderView.locator('[data-foreign-object]')
+  check('it lists every file in the Folder as a peer', (await rows.count()) === 3, `${await rows.count()} rows`)
+  const shown = await folderView.innerText()
+  check('  …a Ship project', shown.includes('Payment integration'))
+  check('  …a Peek topic, which is a channel and still a file', shown.includes('Onboarding'))
+  check(
+    '  …and a kind neither app designed for, via the widget fallback chain',
+    shown.includes('Spring tides'),
+  )
+  check(
+    '  …drawn as a card, because nothing implements "tideboard"',
+    (await folderView.locator('[data-widget="card"]').count()) >= 1,
+  )
+  check('the Folder appears in the sidebar', await sidebar().getByRole('link', { name: 'Onboarding' }).isVisible())
+  await shot(page, '10-folder-view')
+
   check(
     "it measured the relay's clock before signing anything",
     clockProbes > 0,
