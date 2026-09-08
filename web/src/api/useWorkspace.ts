@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { WorkspaceState } from '../../../src/store'
 import { useRefresh } from '../lib/useRefresh'
 import { isRateLimited } from '../lib/relayBudget'
+import { useLiveWorkspace } from './liveWorkspace'
 import { loadAll } from './index'
 
 export interface Workspace {
@@ -36,16 +37,32 @@ export interface Workspace {
    * before the write cannot contain it. See `read` below.
    */
   refresh: () => Promise<void>
+  /**
+   * The socket is delivering, so the poll is standing down (PER-3).
+   *
+   * `false` also covers the build with no sign-in, which has no socket at all
+   * and is polled exclusively — see `useLiveWorkspace`.
+   */
+  live: boolean
 }
 
 /**
  * The workspace, kept fresh.
  *
- * Reads once on mount and then on the refresh hook's schedule: every
- * `REFRESH_MS` while the tab is visible, on the tab becoming visible, on window
- * focus.
- * Ship polls; it does not subscribe (REW-6). A read that fails keeps the last
- * good state on screen and records the reason, rather than blanking the app.
+ * Reads once on mount, then whenever the relay says a Folder changed, and on
+ * the refresh hook's schedule as a fallback: every `REFRESH_MS` while the tab
+ * is visible **and the socket is not live**, on the tab becoming visible, and
+ * on window focus.
+ *
+ * **Ship subscribes now (PER-3).** This module's own comment used to say "Ship
+ * polls; it does not subscribe (REW-6)", and that was the largest of the three
+ * structural differences between Ship and Peek. The poll is still here and
+ * still matters: it is what makes the socket's one silent failure mode
+ * survivable, which is a live subscription the relay never matches — measured,
+ * and possible on a relay built from a different branch. See `liveWorkspace`.
+ *
+ * A read that fails keeps the last good state on screen and records the
+ * reason, rather than blanking the app.
  */
 export function useWorkspace(): Workspace {
   const [state, setState] = useState<WorkspaceState | null>(null)
@@ -127,7 +144,32 @@ export function useWorkspace(): Workspace {
     }
   }, [read])
 
-  useRefresh(poll)
+  /*
+    The socket triggers `read`, not `poll`.
 
-  return { state, error, loading: state === null && !busy, busy: busy && state === null, refresh: read }
+    `poll` joins a read already in flight, and a read that began before the
+    pushed event cannot contain it — the same reasoning that keeps writes off
+    `poll` (Ship #63). Joining one here would drop the change until the next
+    tick, which is precisely the latency this ticket exists to remove.
+
+    The debounce lives in `useLiveWorkspace`, so a burst is one read.
+
+    `state?.folders` is empty until the first read lands, so no subscription
+    opens before there is a Folder set to subscribe to. Discovery derives that
+    set while reading; there is no index to consult.
+  */
+  const { live } = useLiveWorkspace(state?.folders ?? [], read)
+
+  // The interval stands down while the socket delivers; `visibilitychange` and
+  // `focus` still fire, because a tab that was hidden has had no frames either.
+  useRefresh(poll, { interval: !live })
+
+  return {
+    state,
+    error,
+    loading: state === null && !busy,
+    busy: busy && state === null,
+    refresh: read,
+    live,
+  }
 }

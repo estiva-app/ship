@@ -149,3 +149,56 @@ describe('useRefresh — holding off when the relay says it is over budget (SHI-
     expect(refresh).not.toHaveBeenCalled()
   })
 })
+
+describe('useRefresh — standing down while the socket delivers (PER-3)', () => {
+  it('runs no timer at all when the interval is off', () => {
+    // The poll stops being the delivery mechanism. Peek has had this shape
+    // since PEE-8; this is the option that gives Ship it.
+    const refresh = vi.fn()
+    renderHook(() => useRefresh(refresh, { intervalMs: 5000, interval: false }))
+    vi.advanceTimersByTime(600_000)
+    expect(refresh).not.toHaveBeenCalled()
+  })
+
+  it('still reads when the tab is looked at again', () => {
+    // Deliberately not gated with the timer. A backgrounded tab may have had
+    // its socket dropped by the browser, and a reconnect's backfill is not
+    // instant — so a tab being looked at is worth a read whether or not the
+    // socket claims to be live.
+    const refresh = vi.fn()
+    renderHook(() => useRefresh(refresh, { intervalMs: 5000, interval: false }))
+    setVisibility('hidden')
+    setVisibility('visible')
+    expect(refresh).toHaveBeenCalledTimes(1)
+  })
+
+  it('still reads on window focus', () => {
+    const refresh = vi.fn()
+    renderHook(() => useRefresh(refresh, { intervalMs: 5000, interval: false }))
+    window.dispatchEvent(new Event('focus'))
+    expect(refresh).toHaveBeenCalledTimes(1)
+  })
+
+  it('resumes the timer when the socket drops', () => {
+    // The fallback has to come back, or a socket that silently stops delivering
+    // leaves the app frozen with no timer and no frames.
+    const refresh = vi.fn()
+    const { rerender } = renderHook(
+      ({ interval }: { interval: boolean }) => useRefresh(refresh, { intervalMs: 5000, interval }),
+      { initialProps: { interval: false } },
+    )
+    vi.advanceTimersByTime(20_000)
+    expect(refresh).not.toHaveBeenCalled()
+
+    rerender({ interval: true })
+    vi.advanceTimersByTime(5000)
+    expect(refresh).toHaveBeenCalledTimes(1)
+  })
+
+  it('defaults to polling, so a caller that says nothing keeps the old behaviour', () => {
+    const refresh = vi.fn()
+    renderHook(() => useRefresh(refresh, { intervalMs: 5000 }))
+    vi.advanceTimersByTime(5000)
+    expect(refresh).toHaveBeenCalledTimes(1)
+  })
+})
