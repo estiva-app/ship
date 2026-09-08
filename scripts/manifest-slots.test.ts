@@ -102,12 +102,23 @@ for (const kind of [KIND.PROJECT, KIND.ISSUE]) {
   after a rename — which is why it is asserted here, against the published
   declaration, rather than left to a rendering test.
 */
+/** The field a consumer will fold, given a declaration — interop's rule, restated. */
+function foldedFieldOf(slot: SlotSource | undefined): string | undefined {
+  if (!slot) return undefined
+  if ('fold' in slot && slot.fold) return slot.fold
+  // The default a consumer applies when no `fold` is named: the first tag.
+  // Restating it here rather than importing it is deliberate — this test is
+  // about what a *stranger* would conclude from the published declaration.
+  if ('tag' in slot && slot.tag) return Array.isArray(slot.tag) ? slot.tag[0] : slot.tag
+  return undefined
+}
+
 for (const [kind, field] of [
   [KIND.PROJECT, 'title'],
   [KIND.ISSUE, 'title'],
 ] as const) {
   const slot = published.projections[String(kind)]?.slots.title as SlotSource | undefined
-  const declared = slot?.fold ?? (Array.isArray(slot?.tag) ? slot?.tag[0] : slot?.tag)
+  const declared = foldedFieldOf(slot)
   check(
     `kind:${kind} folds the field its rename actually writes (${field})`,
     declared === field,

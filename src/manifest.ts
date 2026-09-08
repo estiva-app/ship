@@ -80,7 +80,15 @@ export type SlotSource =
    */
   | {
       fold: string
-      tag?: string
+      /*
+        `string[]` here for the same reason the tag-only variant above takes
+        one, and it was missing: a slot may need both a fold *and* several tag
+        spellings to seed it from. `title` on a project is exactly that — the
+        field a rename writes, plus the two tag spellings REW-11 left behind.
+        Narrower than the vocabulary it publishes (interop's `SlotSpec` has
+        always allowed both), so this could declare something it could not type.
+      */
+      tag?: string | string[]
       /**
        * Seed the fold from the event's own body when no change has set it and
        * no seed tag resolves — the chain is fold, tag, content.
