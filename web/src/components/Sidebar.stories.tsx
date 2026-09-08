@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { Sidebar, type SidebarProject } from './Sidebar'
+import { Sidebar, type SidebarFolder, type SidebarProject } from './Sidebar'
 
 /** Shaped like the local sandbox — invented projects, nothing real. */
 const PROJECTS: SidebarProject[] = [
@@ -8,6 +8,12 @@ const PROJECTS: SidebarProject[] = [
   { addr: '30850:a:pay', title: 'Payment integration', href: '#/p/pay', openCount: 3 },
   { addr: '30850:a:onb', title: 'Onboarding flow for new workspaces', href: '#/p/onb', openCount: 0 },
   { addr: '30850:a:mob', title: 'Mobile app', href: '#/p/mob', openCount: 0 },
+]
+
+/** Folders as the sidebar sees them: a name and a link, and deliberately no count. */
+const FOLDERS: SidebarFolder[] = [
+  { id: '7b32200c-e4c0-4216-b79a-8490fc05e0bd', name: 'Onboarding', href: '#/folder/7b32200c-e4c0-4216-b79a-8490fc05e0bd' },
+  { id: '0212db6d-bcbf-40d0-890e-f4f056db2f5d', name: 'Feedback on Ship', href: '#/folder/0212db6d-bcbf-40d0-890e-f4f056db2f5d' },
 ]
 
 const meta = {
@@ -43,3 +49,26 @@ export const OnAProject: Story = { args: { current: { projectAddr: '30850:a:rel'
 
 /** A workspace with no active projects: no count on Projects, and no heading either. */
 export const Empty: Story = { args: { openIssues: 0, projects: [] } }
+
+/**
+ * With Folders. They sit below the projects and carry **no count**, unlike
+ * every other row here — a Folder holds files from apps Ship does not own, so
+ * any number would be Ship's records only, which is a lie about a container
+ * that also holds a topic.
+ */
+export const WithFolders: Story = { args: { folders: FOLDERS } }
+
+/** A folder route marks its own row, and leaves the project rows alone. */
+export const OnAFolder: Story = {
+  args: { folders: FOLDERS, current: { folderId: '7b32200c-e4c0-4216-b79a-8490fc05e0bd' } },
+}
+
+/**
+ * A Folder with no name falls back to its id.
+ *
+ * Not hypothetical: a Folder with no state event has only its channel's name,
+ * and a channel created by an app rather than a person may carry none.
+ */
+export const FolderWithNoName: Story = {
+  args: { folders: [{ id: '9c69f247-be6a-4ae7-9703-71cb971f5f93', href: '#/folder/9c69f247' }] },
+}

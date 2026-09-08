@@ -4,8 +4,10 @@ import { AppShell } from '@/components/AppShell'
 import { Banner } from '@/components/Banner'
 import { SkeletonList } from '@/components/ui/Skeleton'
 import { IdentityMenu } from '@/components/IdentityMenu'
-import { Sidebar, type SidebarProject } from '@/components/Sidebar'
+import { Sidebar, type SidebarFolder, type SidebarProject } from '@/components/Sidebar'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { useFolders } from '@/api/useFolders'
+import { FolderPage } from '@/pages/FolderPage'
 import { IssuePage } from '@/pages/IssuePage'
 import { IssuesPage } from '@/pages/IssuesPage'
 import { ProjectPage } from '@/pages/ProjectPage'
@@ -25,6 +27,7 @@ import { href, replace, useRoute, type Route } from './router'
 export default function App() {
   const { state, error, loading, busy, refresh } = useWorkspace()
   const route = useRoute()
+  const folders = useFolders()
   const { banner, say } = useBanner()
 
   // Names and faces for everyone in the snapshot; re-read in full on navigation.
@@ -83,7 +86,7 @@ export default function App() {
           <Banner tone={banner.tone}>{banner.text}</Banner>
         ) : undefined
       }
-      nav={<Sidebar {...sidebarProps(state, route)} />}
+      nav={<Sidebar {...sidebarProps(state, route, folders.map((f) => ({ id: f.id, name: f.name, href: href({ name: 'folder', id: f.id }) })))} />}
     >
       <Page route={route} state={state} loading={loading} directory={directory} say={say} refresh={refresh} />
     </AppShell>
@@ -119,6 +122,10 @@ function Page({ route, state, loading, directory, say, refresh }: { route: Route
       return <ProjectPage state={state} directory={directory} d={route.d} view={route.view} say={say} refresh={refresh} />
     case 'issue':
       return <IssuePage state={state} directory={directory} d={route.d} say={say} refresh={refresh} />
+    case 'folder':
+      // No `state`: a Folder's contents are not Ship's fold. They are resolved
+      // through whichever app owns each file, which is the point.
+      return <FolderPage id={route.id} />
     default:
       return <EmptyState className="py-12" message="Resolving reference…" />
   }
@@ -130,7 +137,11 @@ function Page({ route, state, loading, directory, say, refresh }: { route: Route
  * issues (the old app counted all of them — our tooltip says "open", so open
  * it is; noted for Jan); archived projects are out of the navigation.
  */
-export function sidebarProps(state: FolderState | null, route: Route) {
+export function sidebarProps(
+  state: FolderState | null,
+  route: Route,
+  folders: SidebarFolder[] = [],
+) {
   const projects = state?.projects ?? []
   const issues = state?.issues ?? []
   const isOpen = (status: string) => status !== 'done' && status !== 'cancelled'
@@ -147,12 +158,15 @@ export function sidebarProps(state: FolderState | null, route: Route) {
   const current =
     route.name === 'project'
       ? { projectAddr: projects.find((p) => p.id === route.d)?.addr ?? '' }
-      : route.name === 'projects' ? ('projects' as const) : ('issues' as const)
+      : route.name === 'folder'
+        ? { folderId: route.id }
+        : route.name === 'projects' ? ('projects' as const) : ('issues' as const)
   return {
     openIssues,
     issuesHref: href({ name: 'issues' }),
     projectsHref: href({ name: 'projects', archived: false }),
     projects: active,
+    folders,
     current,
   }
 }

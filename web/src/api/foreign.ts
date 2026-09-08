@@ -15,13 +15,22 @@
  * around here.
  */
 import type { SignedEvent } from '@estiva-app/protocol'
-import { createPeopleCache, createProjectionCache, resolveForeignObject, type ForeignObject } from '@estiva-app/interop'
+import {
+  createPeopleCache,
+  createProjectionCache,
+  listFolders,
+  resolveFolderContents,
+  resolveForeignObject,
+  type FolderContents,
+  type FolderSummary,
+  type ForeignObject,
+} from '@estiva-app/interop'
 
 /** Chain-walking, from the runtime — one implementation, not one per consumer. */
 export { pickWidget } from '@estiva-app/interop'
 import { relay } from './store'
 
-export type { ForeignObject, ResolvedSlot } from '@estiva-app/interop'
+export type { ForeignObject, ResolvedSlot, FolderContents, FolderSummary } from '@estiva-app/interop'
 
 /**
  * The one environment touch the runtime takes: a filter query.
@@ -86,4 +95,27 @@ export function resolveForeign(reference: string): Promise<ForeignObject | null>
   // runtime's signature; naming them here would be inventing an adapter the
   // seam does not need.
   return resolveForeignObject(reference, query, profiles.viaRelay(query), 0, manifests)
+}
+
+/**
+ * Everything in one Folder, whichever app owns it.
+ *
+ * The same seam as `resolveForeign` one line up, pointed at a container rather
+ * than a reference — and deliberately the same two caches, because a Folder is
+ * where the cross-app case actually bites: a project and a topic in one list
+ * are two apps' manifests and two apps' authors, and without the memo that is
+ * the whole discovery cost on every tick.
+ *
+ * Ship draws whatever comes back. It does not filter by kind, does not sort by
+ * app, and has no list of kinds it expects — a Folder holding something neither
+ * app has heard of renders through the widget chain like everything else, which
+ * is the property the folder view exists to demonstrate.
+ */
+export function readFolder(id: string): Promise<FolderContents> {
+  return resolveFolderContents(id, query, profiles.viaRelay(query), manifests)
+}
+
+/** Every Folder this identity can see, for the sidebar. */
+export function readFolders(): Promise<FolderSummary[]> {
+  return listFolders(query)
 }
