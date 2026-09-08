@@ -165,7 +165,7 @@ describe('Projects page — cards from the fold', () => {
     fireEvent.click(dialog.getByRole('button', { name: 'Create project' }))
     await waitFor(() => expect(createProject).toHaveBeenCalledWith({ title: 'Mobile app', description: '', folder: undefined }))
     await waitFor(() => expect(refresh).toHaveBeenCalled())
-    expect(await screen.findByText('Project created, with its own Folder.')).toBeInTheDocument()
+    expect(await screen.findByText('Project created')).toBeInTheDocument()
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   })
 
@@ -247,7 +247,7 @@ describe('Project page — one project from the fold', () => {
     expect(deleteProject).not.toHaveBeenCalled()
     fireEvent.click(dialog.getByRole('button', { name: 'Delete project' }))
     await waitFor(() => expect(deleteProject).toHaveBeenCalledWith(expect.objectContaining({ addr: `30850:x:${MINE}` })))
-    expect(await screen.findByText('Deletion requested.')).toBeInTheDocument()
+    expect(await screen.findByText('Project deleted')).toBeInTheDocument()
     await waitFor(() => expect(location.pathname).toBe('/projects'))
   })
 
@@ -317,7 +317,7 @@ describe('Issue page — one issue from the fold', () => {
     expect(dialog.getByText(/not deleted/)).toBeInTheDocument()
     fireEvent.click(dialog.getByRole('button', { name: 'Delete issue' }))
     await waitFor(() => expect(deleteIssue).toHaveBeenCalledWith(expect.objectContaining({ addr: `30851:x:${D('14')}` })))
-    expect(await screen.findByText('Deletion requested.')).toBeInTheDocument()
+    expect(await screen.findByText('Issue deleted')).toBeInTheDocument()
   })
 
   it('reports a refused deletion and stays on the issue', async () => {

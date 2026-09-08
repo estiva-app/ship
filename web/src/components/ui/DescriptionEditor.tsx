@@ -56,7 +56,6 @@ export function DescriptionEditor({
   onCommit,
   placeholder,
   readOnly = false,
-  onCommentOn,
   nameOf,
   resolved = {},
   className,
@@ -67,7 +66,6 @@ export function DescriptionEditor({
   onCommit: (value: string, contentFormat?: string) => Promise<boolean> | boolean
   placeholder: string
   readOnly?: boolean
-  onCommentOn?: (blockId: string) => void
   nameOf?: (pubkey: string) => string
   resolved?: Record<string, ForeignObject | null | undefined>
   className?: string
@@ -77,9 +75,28 @@ export function DescriptionEditor({
 
   const reading = (
     <div
-      // The editor's own padding, so entering it moves nothing sideways.
-      className={cn('-mx-2 rounded-md px-2 py-1', !readOnly && 'cursor-text')}
+      // The editor's own padding, so entering it moves nothing sideways. The
+      // hover edge and the focus ring are EditableText's (an outline, so no
+      // pixel moves), so a description reads as the same kind of thing
+      // (Katerina, 2026-09-08): Tab reaches it, Enter opens it. The separate
+      // "Edit" button that used to be the keyboard's way in is gone (D37).
+      className={cn(
+        '-mx-2 rounded-md px-2 py-1 transition-colors',
+        !readOnly &&
+          'cursor-text hover:outline hover:outline-1 hover:-outline-offset-1 hover:outline-border-default focus-visible:outline-none focus-visible:shadow-focus-ring',
+      )}
+      tabIndex={readOnly ? undefined : 0}
       onClick={readOnly ? undefined : () => setEditing(true)}
+      onKeyDown={
+        readOnly
+          ? undefined
+          : (event) => {
+              if (event.key === 'Enter' && event.target === event.currentTarget) {
+                event.preventDefault()
+                setEditing(true)
+              }
+            }
+      }
     >
       {empty ? (
         <span className="text-body-2 text-text-muted">{readOnly ? '' : placeholder}</span>
@@ -89,7 +106,6 @@ export function DescriptionEditor({
           format={format}
           nameOf={nameOf}
           resolved={resolved}
-          onCommentOn={onCommentOn}
           hideStandalone
         />
       )}
@@ -98,27 +114,7 @@ export function DescriptionEditor({
 
   return (
     <div className={cn('relative flex flex-col gap-2', className)}>
-      {/*
-        The way in, for a keyboard — and a real button rather than a role on
-        the container.
 
-        `EditableText` wrapped the whole rendered document in a `<button>`,
-        which put RichText's per-block comment buttons *inside* a button:
-        invalid, and a screen reader announces one control over a page of
-        prose. A description is long, structured and contains its own controls,
-        so the affordance sits beside it instead of around it — visible on
-        focus, out of the way for a mouse, which clicks the text.
-      */}
-      {!readOnly && !editing && (
-        <button
-          type="button"
-          onClick={() => setEditing(true)}
-          aria-label="Edit description"
-          className="sr-only focus:not-sr-only focus:absolute focus:right-0 focus:top-0 focus:z-10 focus:rounded-md focus:border focus:border-border-default focus:bg-bg-surface focus:px-2 focus:py-1 focus:text-caption"
-        >
-          Edit
-        </button>
-      )}
       {readOnly || !editing ? (
         reading
       ) : (

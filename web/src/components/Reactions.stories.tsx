@@ -67,30 +67,5 @@ export const Mine: Story = {
   },
 }
 
-/** Nothing yet: the row draws nothing. The way in is "React" among the message's tools (D34). */
-export const NoneYet: Story = { args: { onToggle: fn(), reactions: [] } }
-
 /** Momentarily unavailable, which is what `disabled` plus a reason is for. */
 export const Unavailable: Story = { args: { onToggle: fn(), disabledReason: 'Sign in to react.' } }
-
-/** One reactor — the tooltip reads "Ana Duarte reacted with 👍", not a list of one. */
-export const Single: Story = { args: { reactions: [{ emoji: '👍', count: 1, by: ['a'.repeat(64)] }] } }
-
-/** A reactor with no kind:0. An anonymous participant stays a shortened key rather than "unknown". */
-export const NoProfile: Story = {
-  args: { nameOf: undefined, reactions: [{ emoji: '🚀', count: 1, by: ['f'.repeat(64)] }] },
-}
-
-/** Many emoji on one message — the row wraps rather than pushing the card wide. */
-export const Many: Story = {
-  args: {
-    reactions: ['👍', '🎉', '🚀', '💯', '🙏', '👀', '✅'].map((emoji, i) => ({
-      emoji,
-      count: 7 - i,
-      by: Array.from({ length: 7 - i }, (_, j) => String(j).repeat(64).slice(0, 64)),
-    })),
-  },
-}
-
-/** Nobody reacted and nobody may — draws nothing at all, rather than an empty row under every message. */
-export const None: Story = { args: { reactions: [] } }

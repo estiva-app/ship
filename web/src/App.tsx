@@ -63,7 +63,7 @@ function Shell() {
   const copyKey = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(me)
-      say('Public key copied.')
+      say('Public key copied')
     } catch {
       window.prompt('Copy your public key:', me)
     }
