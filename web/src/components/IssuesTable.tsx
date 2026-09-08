@@ -28,14 +28,14 @@ export interface IssuesTableProps {
   className?: string
 }
 
-// Sizes spelled as arbitrary values, not tokens: these strings go through cn(),
-// and tailwind-merge drops a custom text-size class that is followed by a
-// text-{colour} class (the pitfall Peek's config records). The header is the
-// menu token (9/115%/500); the ref is the caption token (12); everything else
-// in a cell, the date included, is the table's own 14 (Katerina, 2026-08-26).
-const TH = 'h-9 px-3 text-left text-[9px] font-medium uppercase leading-[115%] tracking-[0.08em] text-text-secondary'
+// The type tokens (S6, 0.10.0): the header is the menu token (9/115%/500)
+// with the table's own tracking; the ref is the caption token (12); everything
+// else in a cell, the date included, is body-2, the table's own 14 (Katerina,
+// 2026-08-26). These were arbitrary values while tailwind-merge dropped a
+// token size beside a colour class; the package's cn() names the ramp now.
+const TH = 'h-9 px-3 text-left text-menu font-medium uppercase tracking-[0.08em] text-text-secondary'
 const TD = 'h-10 px-3 text-body-2'
-const SMALL = 'text-[12px] leading-[120%]'
+const SMALL = 'text-caption'
 
 export function IssuesTable({ issues, statuses, hrefFor, className }: IssuesTableProps) {
   return (

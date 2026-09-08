@@ -82,23 +82,20 @@ export function NewProjectDialog({ onClose, onCreate }: NewProjectDialogProps) {
         <Field label="Description">
           <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description (optional)" className="h-[80px]" disabled={busy} />
         </Field>
-        <Field label="Pair with an existing Folder">
-          <div className="flex flex-col gap-1.5">
-            <TextInput
-              value={pair}
-              onChange={(e) => {
-                setPair(e.target.value)
-                setPairError(null)
-              }}
-              placeholder="Paste a Peek topic link (optional)"
-              className="font-mono"
-              aria-invalid={pairError ? true : undefined}
-              disabled={busy}
-            />
-            <span className={pairError ? 'text-caption text-error-default' : 'text-caption text-text-muted'}>
-              {pairError ?? 'Leave empty and the project gets a Folder of its own.'}
-            </span>
-          </div>
+        {/* The line under the field is Field's own since 0.10.0 (S7): the error
+            takes the helper's place, marks the control invalid, and is
+            announced — the hand-built span never was. */}
+        <Field label="Pair with an existing Folder" helper="Leave empty and the project gets a Folder of its own." error={pairError ?? undefined}>
+          <TextInput
+            value={pair}
+            onChange={(e) => {
+              setPair(e.target.value)
+              setPairError(null)
+            }}
+            placeholder="Paste a Peek topic link (optional)"
+            className="font-mono"
+            disabled={busy}
+          />
         </Field>
       </form>
     </DialogShell>

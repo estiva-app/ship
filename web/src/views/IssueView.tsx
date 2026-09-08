@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Breadcrumb, type Crumb } from '@/components/ui/Breadcrumb'
+import { linkTo } from '@/router'
 import type { ContentFormat } from '@estiva-app/protocol'
 import { Divider } from '@/components/ui/Divider'
 import { EditableText } from '@/components/ui/EditableText'
@@ -77,8 +78,10 @@ export function IssueView({ crumbs, title, description, descriptionFormat,
      which is a different part of the page. */
   const [anchorTo, setAnchorTo] = useState<string | undefined>(undefined)
 
-  const items: Crumb[] = [{ label: 'Issues', href: crumbs.issuesHref }]
-  if (crumbs.project) items.push({ label: crumbs.project.title, href: crumbs.project.href })
+  // `linkTo` on each crumb (S15, 0.10.0): the breadcrumbs were the last links
+  // in Ship that reloaded the whole app on a click (SHI-20).
+  const items: Crumb[] = [{ label: 'Issues', ...linkTo(crumbs.issuesHref) }]
+  if (crumbs.project) items.push({ label: crumbs.project.title, ...linkTo(crumbs.project.href) })
   if (crumbs.ref) items.push({ label: crumbs.ref, mono: true })
 
   return (
