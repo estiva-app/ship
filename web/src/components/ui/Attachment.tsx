@@ -56,7 +56,11 @@ export function Attachment({ file, className }: { file: Imeta; className?: strin
         data-attachment="loading"
         aria-busy="true"
         aria-label={`Loading ${label}`}
-        className={cn('h-24 w-40 animate-pulse rounded border border-border-default bg-bg-subtle', className)}
+        /* `bg-bg-inset`, the surface the package's own SkeletonBar uses: the
+           class here was `bg-bg-subtle`, which the preset does not generate,
+           so this placeholder had no background at all. The token lint
+           (S11) caught it on the day it was switched on. */
+        className={cn('h-24 w-40 animate-pulse rounded border border-border-default bg-bg-inset', className)}
       />
     )
   }
