@@ -82,6 +82,8 @@ jobs:
       - run: npm ci
 
       # `tsc -b && vite build` — the same command that builds it for real.
+      - name: Lint — the token contract (ADOPTION S11)
+        run: npm run lint
       - name: Build
         run: npm run build
 
