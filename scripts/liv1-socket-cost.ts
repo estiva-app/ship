@@ -616,14 +616,15 @@ async function phaseBackfill(identity: { secretKeyHex: string; pubkey: string })
   console.log(`  ${'narrow, summed'.padEnd(22)} ${narrow} of ${count} before EOSE`)
 
   console.log('')
+  // Report only what this phase measured. It says nothing about live push —
+  // `shape` owns that — and an earlier version asserted the local answer here
+  // as a conclusion, which then printed as a finding against production.
   if (wide === count) {
-    console.log(`  => a wide filter IS correct for the historical read. It fails only on live push,`)
-    console.log(`     which is why batched /query reads look like proof that it works.`)
-  } else if (wide === 0) {
-    console.log(`  => a wide filter delivers nothing historical either.`)
+    console.log(`  => a wide filter is correct for the historical read over REQ.`)
   } else {
-    console.log(`  => a wide filter delivered ${wide} of ${count} historical.`)
+    console.log(`  => a wide filter delivered ${wide} of ${count} historical over REQ.`)
   }
+  console.log(`     Run \`shape\` for whether it also receives live push; the two paths differ.`)
 
   session.relay.close()
 }
@@ -649,24 +650,27 @@ async function phaseBurst(identity: { secretKeyHex: string; pubkey: string }) {
   const folders = await makeFolders(identity, Number(process.env.FOLDERS ?? 4))
   const session = await connect(identity)
 
-  let opened = 0
-  let refusedAt: number | null = null
+  // Which REQ was accepted and which refused, by its own ordinal. The first
+  // draft recorded "the EOSE count when the first CLOSED arrived", which is a
+  // different and much less useful number — EOSEs and CLOSEDs interleave, so it
+  // read as a ceiling of 16 on a run where 50 were in fact accepted.
+  const accepted: number[] = []
+  const refused: number[] = []
   let reason = ''
   const subs: Subscription[] = []
 
   await new Promise<void>((resolve) => {
     const ceiling = Number(process.env.CEILING ?? 300)
     for (let i = 0; i < ceiling; i++) {
+      const ordinal = i + 1
       subs.push(
         session.relay.subscribe([idleFilter(folders, i)], () => {}, {
           onEose: () => {
-            opened++
+            accepted.push(ordinal)
           },
           onClosed: (why) => {
-            if (refusedAt === null) {
-              refusedAt = opened + 1
-              reason = why
-            }
+            refused.push(ordinal)
+            if (!reason) reason = why
           },
         }),
       )
@@ -675,13 +679,19 @@ async function phaseBurst(identity: { secretKeyHex: string; pubkey: string }) {
     setTimeout(resolve, 8_000)
   })
 
-  console.log(`  ${opened} subscriptions reached EOSE`)
-  if (refusedAt === null) {
-    console.log(`  no refusal up to ${subs.length} — the burst ceiling is above that`)
+  console.log(`  ${subs.length} REQs sent unpaced: ${accepted.length} accepted, ${refused.length} refused`)
+  if (!refused.length) {
+    console.log(`  no refusal at all — the burst ceiling is above ${subs.length}`)
   } else {
-    console.log(`  first refusal after ~${refusedAt}: ${reason}`)
-    console.log(`\n  => Ship's 34 Folders are ${opened >= 34 ? 'inside' : 'OUTSIDE'} the unpaced burst ceiling.`)
-    console.log(`     Subscribing has to be paced, on connect and on every reconnect.`)
+    const firstRefused = Math.min(...refused)
+    const lastAccepted = accepted.length ? Math.max(...accepted) : 0
+    console.log(`  first refused ordinal ${firstRefused}; highest accepted ordinal ${lastAccepted}`)
+    console.log(`  reason: ${reason}`)
+    console.log(
+      `\n  => ${accepted.length} REQs land per burst window. Ship's 34 Folders are ` +
+        `${accepted.length >= 34 ? 'inside' : 'OUTSIDE'} it as one-per-Folder,`,
+    )
+    console.log(`     and cost exactly one REQ as a single wide filter.`)
   }
 
   for (const sub of subs) sub.close()
