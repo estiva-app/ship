@@ -1,6 +1,7 @@
 import { IconBox, IconListDetails } from '@tabler/icons-react'
 import { Sidebar as SidebarShell } from '@estiva-app/ui'
 import { SectionLabel } from '@/components/ui/SectionLabel'
+import { SkeletonBar } from '@/components/ui/Skeleton'
 import { NavItem } from './NavItem'
 
 /**
@@ -38,10 +39,38 @@ export interface SidebarProps {
   projects: SidebarProject[]
   /** Which entry the route is on. A project's `addr` marks its own row. */
   current: 'issues' | 'projects' | { projectAddr: string }
+  /** The first workspace read has not landed, so the project list is unknown
+   *  rather than empty — SHI-20. Shows placeholder rows in its place. */
+  loading?: boolean
   className?: string
 }
 
-export function Sidebar({ openIssues, issuesHref, projectsHref, projects, current, className }: SidebarProps) {
+/**
+ * The project rows before they arrive.
+ *
+ * Built here from `SkeletonBar` rather than taken as `SkeletonList`, because
+ * the shared list draws a 16px square for a row that has a face or an icon and
+ * a project row has neither — the package's own note keeps app-shaped
+ * placeholders in the app. The row is `NavItem`'s: 32px, `px-2`.
+ *
+ * `animate-skeleton-in` holds it back 150ms, so a fast read never flashes a
+ * placeholder on the way past.
+ */
+const PLACEHOLDER_WIDTHS = [104, 78, 122, 90]
+
+function SkeletonProjects() {
+  return (
+    <div className="flex flex-col gap-0.5 animate-skeleton-in" aria-hidden>
+      {PLACEHOLDER_WIDTHS.map((width, i) => (
+        <div key={i} className="flex h-8 shrink-0 items-center px-2">
+          <SkeletonBar className="h-3.5" style={{ width }} />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+export function Sidebar({ openIssues, issuesHref, projectsHref, projects, current, loading = false, className }: SidebarProps) {
   const isProject = typeof current === 'object'
   return (
     <SidebarShell className={className}>
@@ -61,21 +90,25 @@ export function Sidebar({ openIssues, issuesHref, projectsHref, projects, curren
         countLabel={`${projects.length} active`}
         active={current === 'projects'}
       />
-      {projects.length > 0 && (
+      {(projects.length > 0 || loading) && (
         <>
           <div className="mt-2 flex h-8 shrink-0 items-center px-2">
             <SectionLabel>Projects</SectionLabel>
           </div>
-          {projects.map((project) => (
-            <NavItem
-              key={project.addr}
-              label={project.title}
-              href={project.href}
-              count={project.openCount}
-              countLabel={`${project.openCount} open`}
-              active={isProject && current.projectAddr === project.addr}
-            />
-          ))}
+          {projects.length === 0 && loading ? (
+            <SkeletonProjects />
+          ) : (
+            projects.map((project) => (
+              <NavItem
+                key={project.addr}
+                label={project.title}
+                href={project.href}
+                count={project.openCount}
+                countLabel={`${project.openCount} open`}
+                active={isProject && current.projectAddr === project.addr}
+              />
+            ))
+          )}
         </>
       )}
     </SidebarShell>

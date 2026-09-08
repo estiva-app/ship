@@ -4,6 +4,7 @@ import { statusLabel, type StatusEntry } from '@/lib/issues'
 import { Person } from '@/components/ui/Person'
 import { StatusLabel } from '@/components/ui/StatusLabel'
 import type { IssueRowData } from './IssueRow'
+import { linkTo } from '@/router'
 
 /**
  * The project page's table view, as production: ref · Title · Status ·
@@ -68,7 +69,7 @@ export function IssuesTable({ issues, statuses, hrefFor, className }: IssuesTabl
                   app's bookkeeping, not a chore for whoever opened the page. */}
               <td className={cn(TD, 'font-mono', SMALL, issue.ref ? 'text-text-muted' : 'text-text-disabled')}>{issue.ref ?? '—'}</td>
               <td className={TD}>
-                <a href={hrefFor(issue)} className="block truncate text-text-primary hover:underline">
+                <a {...linkTo(hrefFor(issue))} className="block truncate text-text-primary hover:underline">
                   {issue.title}
                 </a>
               </td>
