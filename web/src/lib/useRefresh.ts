@@ -22,38 +22,46 @@ import { pausedForMs } from './relayBudget'
  *
  * | interval | reads/min | requests/min | of 300 |
  * | --- | --- | --- | --- |
- * | 5 s | 12 | 456 | **152%** |
- * | 10 s | 6 | 228 | **76%** |
- * | 20 s | 3 | 114 | 38% |
+ * | 5 s | 12 | 36 | 12% |
+ * | 10 s | 6 | **18** | **6%** |
+ * | 20 s | 3 | 9 | 3% |
  *
- * Ten seconds left 24% for everything else, which reactions alone could spend:
- * before CON-2's budget fix a click cost a whole workspace re-read. The
- * symptom was not a slow app but a **blank** one — `rate-limited: quota
- * exceeded` on a cold start renders no workspace at all (see `useWorkspace`).
+ * ## The stopgap is over
  *
- * ## This is a stopgap, and the real fix is next door
+ * Twenty seconds was never meant to be kept. It bought room while the workspace
+ * read cost one request per Folder, and the note here said so: *the batching
+ * work is what earns this number back.* That work landed — protocol 0.15.0
+ * sends every filter's first page in one request — and the read went from **39
+ * requests to 3** against production, 1001 ms to 577 ms, folding to a
+ * byte-identical state.
  *
- * 38 is not inherent. `rawFolders` sends one filter per Folder and `queryAll`
- * pages each filter in its own request; the relay accepts all 34 filters in
- * **one** POST and clamps per filter — measured the same day: same complete
- * answer, 1 request, 362 ms. Ship did it that way until `queryAll` was adopted
- * for correctness (a Folder past the page ceiling would otherwise be silently
- * short-read — real, and not currently happening: the busiest Folder holds
- * 130 events).
+ * So the table above is the old one recomputed, and ten seconds now costs less
+ * than twenty used to by a factor of twelve.
  *
- * So the batching work is what earns this number back. Twenty seconds is what
- * makes the app usable in the meantime, and it is meant to be reverted rather
- * than kept.
+ * The other two pollers are one request each per tick and stay that way: the
+ * read-state frontier is a single filter every 30 s (2/min), and reactions are
+ * a single filter on this interval (6/min at ten seconds). With an issue page
+ * open the whole tab is **26 requests a minute — under 9%** of the allowance,
+ * against 122 before.
+ *
+ * ## Why not five
+ *
+ * It would fit — 12% with everything open. But the poll is about to stop being
+ * the delivery mechanism: PER-3 adopts the live socket Peek already runs on,
+ * after which this interval governs a fallback rather than how quickly anything
+ * appears. Spending headroom to make a mechanism marginally fresher, weeks
+ * before it is demoted, is the wrong trade.
  *
  * **Freshness of one's own actions does not depend on this number.** A write
  * re-reads immediately through `Workspace.refresh`; this governs only how
  * quickly somebody *else's* change turns up.
  *
- * Not a number that stays right on its own: the workspace read costs a request
- * per Folder, so the ceiling falls as the workspace grows. See `relayBudget`
- * for the part that holds when it does.
+ * The ceiling is no longer a function of how many Folders there are, which is
+ * what made the old number expire on its own. It still is not permanent — the
+ * budget is shared with every other tab and tool signed in as the same key —
+ * so see `relayBudget` for the part that holds when it runs out anyway.
  */
-export const REFRESH_MS = 20_000
+export const REFRESH_MS = 10_000
 
 /**
  * Two events often fire for one gesture — switching to a tab raises both
