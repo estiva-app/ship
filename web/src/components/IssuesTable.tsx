@@ -2,6 +2,7 @@ import { cn } from '@/lib/cn'
 import { ago } from '@/lib/time'
 import { statusLabel, type StatusEntry } from '@/lib/issues'
 import { Person } from '@/components/ui/Person'
+import { ScrollArea } from '@/components/ui/ScrollArea'
 import { StatusLabel } from '@/components/ui/StatusLabel'
 import type { IssueRowData } from './IssueRow'
 import { linkTo } from '@/router'
@@ -39,7 +40,11 @@ const SMALL = 'text-caption'
 
 export function IssuesTable({ issues, statuses, hrefFor, className }: IssuesTableProps) {
   return (
-    <div className={cn('overflow-x-auto rounded-lg border border-border-default', className)}>
+    /* A table wider than its box scrolls sideways in a ScrollArea (D40): the
+       bar takes no height, so the box is exactly as tall with a bar as
+       without. `overflow-hidden` keeps the corners round, as the scrolling
+       box itself used to. */
+    <ScrollArea orientation="horizontal" className={cn('overflow-hidden rounded-lg border border-border-default', className)}>
       <table className="w-full min-w-[840px] table-fixed border-collapse">
         <thead className="bg-bg-surface">
           <tr className="border-b border-border-default">
@@ -87,6 +92,6 @@ export function IssuesTable({ issues, statuses, hrefFor, className }: IssuesTabl
           ))}
         </tbody>
       </table>
-    </div>
+    </ScrollArea>
   )
 }

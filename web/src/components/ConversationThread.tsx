@@ -7,6 +7,7 @@ import { BlockAnchorNote } from './ui/BlockAnchorNote'
 import { Button } from './ui/Button'
 import { ConfirmDialog } from './ui/ConfirmDialog'
 import { Textarea } from './ui/Textarea'
+import { Divider } from './ui/Divider'
 import { Menu, MenuItem } from './ui/Menu'
 import { Popover } from './ui/Popover'
 import { ReactionPicker } from './ui/ReactionPicker'
@@ -525,13 +526,10 @@ export function MessageCard({
  * the signal lives where the reading happens.
  */
 function NewSinceHere() {
-  return (
-    <div className="flex items-center gap-2 py-1" role="separator" aria-label="New since you last read this">
-      <span className="h-px flex-1 bg-accent-muted" />
-      <span className="shrink-0 text-caption text-accent-primary">New since you last read this</span>
-      <span className="h-px flex-1 bg-accent-muted" />
-    </div>
-  )
+  // The package's labelled Divider (0.11.0, D40), in the warning colour: the
+  // accent this drew in measured 3.3:1 on Ship's background and could not
+  // be read (Katerina, 2026-09-08); the warning colour measures 9.6:1.
+  return <Divider label="New since you last read this" tone="warning" className="mx-0 py-1" />
 }
 
 export function ConversationThread({ thread, onReply, disabledReason, unreadFrom, resolved, resolving, nameOf, reactionsBy, onReact, onDeleteMessage, onEditMessage, subdued = false }: { thread: ThreadData; onReply: (threadId: string, text: string) => Promise<boolean | void> | boolean | void; disabledReason?: string; unreadFrom?: string; resolved?: Record<string, ForeignObjectData | null | undefined>; resolving?: boolean; nameOf?: (pubkey: string) => string; /** Reactions by message id, read once for the surface. */ reactionsBy?: Record<string, readonly Reaction[]>; /** Add or take back a reaction on one message. */ onReact?: (messageId: string, emoji: string, mine?: string) => void; /** Publish a deletion for one message — CON-3. Omitted where nobody may write. */ onDeleteMessage?: (messageId: string) => Promise<boolean | void> | boolean | void; /** Publish an edit of one message — CON-4. Omitted where nobody may write. */ onEditMessage?: (messageId: string, body: string) => Promise<boolean | void> | boolean | void; /** Draw it as secondary — Activity's mentions, which do not carry a comment's trust (CON-9). */ subdued?: boolean }) {
@@ -566,9 +564,7 @@ export interface ConversationsProps {
   onReply: (threadId: string, text: string) => Promise<boolean | void> | boolean | void
   /** Why nothing can be posted right now — every composer here is disabled with it. */
   disabledReason?: string
-  /** The block the next comment will be anchored to, if one was chosen — §13.6. */
-  anchoredTo?: string
-  onClearAnchor?: () => void
+
   /** Resolve a mentioned key to a name — SPEC §13.1. The workspace directory's. */
   nameOf?: (pubkey: string) => string
   /**
@@ -607,7 +603,7 @@ export interface ConversationsProps {
   className?: string
 }
 
-export function Conversations({ threads, onStart, onReply, disabledReason, className, unread, anchoredTo, onClearAnchor, nameOf, about, onReact, onDeleteMessage, onEditMessage }: ConversationsProps) {
+export function Conversations({ threads, onStart, onReply, disabledReason, className, unread, nameOf, about, onReact, onDeleteMessage, onEditMessage }: ConversationsProps) {
   const { resolved, resolving } = useThreadReferences(threads)
   const { reactionsBy, omitted, refresh: refreshReactions } = useThreadReactions(threads)
 
@@ -624,17 +620,7 @@ export function Conversations({ threads, onStart, onReply, disabledReason, class
 
   return (
     <div className={cn('flex flex-col gap-2.5', className)}>
-      {/* Say what the next comment will be attached to, and offer to undo it.
-          A choice made by clicking somewhere else on the page is invisible
-          otherwise, and an anchor nobody meant to set is worse than none. */}
-      {anchoredTo && (
-        <div className="flex items-center gap-2 text-caption text-text-muted">
-          <span>Commenting on one part of the description.</span>
-          <button type="button" onClick={onClearAnchor} className="underline hover:text-text-primary">
-            Comment on the whole issue instead
-          </button>
-        </div>
-      )}
+
       <Composer onSubmit={onStart} disabledReason={disabledReason} draftKey={about && draftKeys.object(about)} className="mb-1" />
       {threads.length ? (
         threads.map((thread) => (

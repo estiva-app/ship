@@ -1,6 +1,7 @@
 import { cn } from '@/lib/cn'
 import type { StatusEntry } from '@/lib/issues'
 import { Avatar } from '@/components/ui/Avatar'
+import { ScrollArea } from '@/components/ui/ScrollArea'
 import { StatusLabel } from '@/components/ui/StatusLabel'
 import type { IssueRowData } from './IssueRow'
 import { linkTo } from '@/router'
@@ -72,7 +73,9 @@ export interface BoardProps {
 
 export function Board({ issues, statuses, hrefFor, className }: BoardProps) {
   return (
-    <div className={cn('grid grid-flow-col auto-cols-[minmax(170px,1fr)] gap-2 overflow-x-auto pb-1.5', className)}>
+    /* The columns scroll sideways in a ScrollArea (D40); the grid moves onto
+       the scrolling box, and its bottom padding with it, so nothing moves. */
+    <ScrollArea orientation="horizontal" className={className} viewportClassName="grid grid-flow-col auto-cols-[minmax(170px,1fr)] gap-2 pb-1.5">
       {statuses.map((entry) => (
         <BoardColumn
           key={entry.value}
@@ -82,6 +85,6 @@ export function Board({ issues, statuses, hrefFor, className }: BoardProps) {
           hrefFor={hrefFor}
         />
       ))}
-    </div>
+    </ScrollArea>
   )
 }
