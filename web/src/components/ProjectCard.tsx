@@ -3,6 +3,7 @@ import { ago } from '@/lib/time'
 import { Avatar } from '@/components/ui/Avatar'
 import { Chip } from '@/components/ui/Chip'
 import { StatusLabel } from '@/components/ui/StatusLabel'
+import { linkTo } from '@/router'
 
 /**
  * One project on the projects list — her anatomy (ruling B7): title ·
@@ -52,7 +53,7 @@ export function ProjectCard({
 }: ProjectCardProps) {
   return (
     <a
-      href={href}
+      {...linkTo(href)}
       className={cn(
         'flex flex-col gap-2 rounded-lg border border-border-default bg-bg-surface p-3 transition-colors hover:border-border-strong',
         className,

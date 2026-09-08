@@ -3,6 +3,7 @@ import { ago } from '@/lib/time'
 import { statusLabel, type StatusEntry } from '@/lib/issues'
 import { Avatar } from '@/components/ui/Avatar'
 import { StatusLabel } from '@/components/ui/StatusLabel'
+import { linkTo } from '@/router'
 
 /**
  * One issue, as production's row (Katerina, 2026-08-26): a bordered card of
@@ -48,7 +49,7 @@ export function IssueRow({ issue, statuses, href, className }: IssueRowProps) {
   const threads = issue.conversations ?? 0
   return (
     <a
-      href={href}
+      {...linkTo(href)}
       className={cn(
         'flex flex-col gap-1.5 rounded-lg border border-border-default bg-bg-surface px-3 py-2.5 transition-colors hover:border-border-strong',
         className,
