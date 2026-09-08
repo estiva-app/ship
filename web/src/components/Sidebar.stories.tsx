@@ -43,3 +43,16 @@ export const OnAProject: Story = { args: { current: { projectAddr: '30850:a:rel'
 
 /** A workspace with no active projects: no count on Projects, and no heading either. */
 export const Empty: Story = { args: { openIssues: 0, projects: [] } }
+
+/**
+ * The first workspace read has not landed — SHI-20.
+ *
+ * Issues and Projects are real links and work already, so they are drawn;
+ * their counts are absent rather than zero, because a zero would be a claim.
+ * Where the project list will be, the rows say a list is coming without
+ * pretending to know how long it is.
+ *
+ * The placeholder holds back 150ms, so a fast read never flashes it. That
+ * cannot be seen in a static story — only that the shape is the row's.
+ */
+export const Loading: Story = { args: { openIssues: 0, projects: [], loading: true } }

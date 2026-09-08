@@ -83,7 +83,10 @@ export default function App() {
           <Banner tone={banner.tone}>{banner.text}</Banner>
         ) : undefined
       }
-      nav={<Sidebar {...sidebarProps(state, route)} />}
+      /* The sidebar waits on the same read the page does, so it says so the
+         same way — SHI-20. Before this it drew nothing at all while a full
+         workspace read ran, beside a page already showing its shape. */
+      nav={<Sidebar {...sidebarProps(state, route)} loading={!state && loading} />}
     >
       <Page route={route} state={state} loading={loading} directory={directory} say={say} refresh={refresh} />
     </AppShell>
