@@ -93,7 +93,7 @@ export function IssueView({ crumbs, title, description, descriptionFormat,
           side, and the rail starts level with the title and never moves. */}
       {/* Both columns scroll in a ScrollArea (D40): the bar takes no width, so
           the 24px of padding read the same with a bar as without. */}
-      <ScrollArea className="col-start-1 row-start-2 min-h-0 min-w-0" viewportClassName="flex flex-col gap-6 px-6 pb-5">
+      <ScrollArea className="col-start-1 row-start-2 min-h-0 min-w-0" contentClassName="flex flex-col gap-6 px-6 pb-5">
         <div className="flex flex-col gap-2">
           <EditableText label="Title" value={title} placeholder="Untitled issue" onCommit={onRename} readOnly={!!readOnlyReason} className="-mx-2 text-h2" />
           <Description
@@ -129,7 +129,7 @@ export function IssueView({ crumbs, title, description, descriptionFormat,
         </section>
       </ScrollArea>
       <Divider orientation="vertical" className="col-start-2 row-span-2 row-start-1" />
-      <ScrollArea className="col-start-3 row-start-2 min-h-0" viewportClassName="px-6 pb-5">
+      <ScrollArea className="col-start-3 row-start-2 min-h-0" contentClassName="px-6 pb-5">
         <IssueRail {...rail} readOnlyReason={readOnlyReason} />
       </ScrollArea>
     </div>

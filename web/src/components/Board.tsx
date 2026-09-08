@@ -75,7 +75,7 @@ export function Board({ issues, statuses, hrefFor, className }: BoardProps) {
   return (
     /* The columns scroll sideways in a ScrollArea (D40); the grid moves onto
        the scrolling box, and its bottom padding with it, so nothing moves. */
-    <ScrollArea orientation="horizontal" className={className} viewportClassName="grid grid-flow-col auto-cols-[minmax(170px,1fr)] gap-2 pb-1.5">
+    <ScrollArea orientation="horizontal" className={className} contentClassName="grid grid-flow-col auto-cols-[minmax(170px,1fr)] gap-2 pb-1.5">
       {statuses.map((entry) => (
         <BoardColumn
           key={entry.value}

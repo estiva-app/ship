@@ -96,7 +96,7 @@ export function ProjectView({ crumbs, header, onAddIssue, view, onView, issues, 
           side, and the rail starts level with the title and never moves. */}
       {/* Both columns scroll in a ScrollArea (D40): the bar takes no width, so
           the 24px of padding read the same with a bar as without. */}
-      <ScrollArea className="col-start-1 row-start-2 min-h-0 min-w-0" viewportClassName="flex flex-col gap-6 px-6 pb-5">
+      <ScrollArea className="col-start-1 row-start-2 min-h-0 min-w-0" contentClassName="flex flex-col gap-6 px-6 pb-5">
         <ProjectHeader {...header} readOnly={!!readOnlyReason} action={addIssue} />
         <section className="flex flex-col gap-3">
           <div className="flex items-center gap-3">
@@ -128,7 +128,7 @@ export function ProjectView({ crumbs, header, onAddIssue, view, onView, issues, 
         </section>
       </ScrollArea>
       <Divider orientation="vertical" className="col-start-2 row-span-2 row-start-1" />
-      <ScrollArea className="col-start-3 row-start-2 min-h-0" viewportClassName="px-6 pb-5">
+      <ScrollArea className="col-start-3 row-start-2 min-h-0" contentClassName="px-6 pb-5">
         <ProjectRail {...rail} archived={header.archived} readOnlyReason={readOnlyReason} />
       </ScrollArea>
     </div>
