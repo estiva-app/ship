@@ -3,6 +3,7 @@ import type { StatusEntry } from '@/lib/issues'
 import { Avatar } from '@/components/ui/Avatar'
 import { StatusLabel } from '@/components/ui/StatusLabel'
 import type { IssueRowData } from './IssueRow'
+import { linkTo } from '@/router'
 
 /**
  * The kanban board, as production: one column per status in the vocabulary,
@@ -20,7 +21,7 @@ import type { IssueRowData } from './IssueRow'
 export function BoardCard({ issue, href }: { issue: IssueRowData; href: string }) {
   return (
     <a
-      href={href}
+      {...linkTo(href)}
       className="flex flex-col gap-1.5 rounded-md border border-border-default bg-bg-elevated p-2 transition-colors hover:border-border-strong"
     >
       {issue.ref && <span className="font-mono text-caption text-text-muted">{issue.ref}</span>}

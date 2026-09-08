@@ -29,6 +29,8 @@ function check(label: string, condition: boolean, detail = '') {
 
 const SECRET = '11'.repeat(32)
 const SOMEONE_ELSE = 'f'.repeat(64)
+/** Whoever a misconfigured token actually belongs to. */
+const A_DIFFERENT_IDENTITY = 'a1'.repeat(32)
 
 const unsigned = (pubkey: string): UnsignedEvent => ({
   pubkey,
@@ -117,6 +119,35 @@ async function main() {
     check('  …with the bearer token', seen?.authorization === 'Bearer a-token')
     check('  …and holds no key of its own', !JSON.stringify(seen?.body).includes(SECRET))
 
+    /**
+     * The author guard (SHA-4).
+     *
+     * `/sign` signs as the **token's** subject and ignores any pubkey it is
+     * handed, so handing it a token belonging to somebody else does not fail —
+     * it returns `200` with a perfectly valid event authored by that person. The
+     * symptom arrives much later, as a comment attributed to a colleague, with
+     * nothing in any log connecting it to the call that made it.
+     *
+     * This copy of the signer never checked. Peek's `signViaEstivaId` always did.
+     * That is what three implementations of one call produce, and it landed on
+     * the app that writes every issue, comment and status change.
+     */
+    globalThis.fetch = (async () =>
+      new Response(JSON.stringify({ event: { ...unsigned(A_DIFFERENT_IDENTITY), id: 'x', sig: 'y' } }))) as typeof fetch
+    let refusal: unknown
+    try {
+      await remote.sign(unsigned(SOMEONE_ELSE))
+    } catch (error) {
+      refusal = error
+    }
+    check(
+      'refuses a 200 carrying an event by somebody else',
+      refusal instanceof Error && /wrong author/.test(refusal.message),
+    )
+    // Not an expiry, so it must never spend a renewal: a fresh token cannot fix
+    // a token that belongs to a different person.
+    check('  …and does not report it as an expiry', !(refusal instanceof SignerTokenExpired))
+
     // A token expires every ten minutes. "Sign in again" and "that event was
     // refused" need different handling, so they are different errors.
     globalThis.fetch = (async () => new Response('{}', { status: 401 })) as typeof fetch
@@ -140,7 +171,17 @@ async function main() {
       lastAuth = (init.headers as Record<string, string>).authorization ?? ''
       // First call: the held token is expired. After renewal it is accepted.
       if (lastAuth === 'Bearer stale') return new Response('{}', { status: 401 })
-      return new Response(JSON.stringify({ event: { id: 'ok' } }), { status: 200 })
+      /*
+        The author has to be right, not just present. This used to answer
+        `{ event: { id: 'ok' } }`, which no real `/sign` ever returns — and it
+        passed only because this signer did not check who signed. SHA-4 moved the
+        signer into `@estiva-app/identity` with the guard Peek always had, and
+        this fixture is the first thing it caught.
+      */
+      return new Response(
+        JSON.stringify({ event: { ...unsigned(SOMEONE_ELSE), id: 'ok', sig: 'ok' } }),
+        { status: 200 },
+      )
     }) as typeof fetch
 
     let renewals = 0

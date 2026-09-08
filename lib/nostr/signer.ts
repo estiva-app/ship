@@ -22,9 +22,28 @@
  */
 import type { SignedEvent, UnsignedEvent } from '@estiva-app/protocol'
 import { secretKeySigner, type Signer, type SignerKind } from '@estiva-app/protocol'
+import { estivaIdSigner, SignerTokenExpired, type EstivaIdSignerOptions } from '@estiva-app/identity'
 
 export type { Signer, SignerKind }
 export { secretKeySigner }
+
+/**
+ * The Estiva ID signer, from `@estiva-app/identity` since SHA-4.
+ *
+ * Re-exported rather than re-implemented, and re-exported rather than having
+ * every call site re-pointed: `from './signer'` is what this repo already says
+ * everywhere, and one definition of the bytes is what that was always for.
+ *
+ * **It now checks the author, which this copy never did.** `/sign` signs as the
+ * token's subject whatever it is handed, so a mismatch comes back as HTTP 200
+ * carrying a valid event by somebody else. `expectedPubkey` is supplied from the
+ * pubkey the signer was built with, unconditionally. Here that is
+ * `clientCredentialsToken`'s own answer, so it agrees by construction — and if a
+ * renewal ever returned a different identity it would now fail loudly instead of
+ * publishing under it.
+ */
+export { estivaIdSigner, SignerTokenExpired }
+export type { EstivaIdSignerOptions }
 
 /**
  * A per-browser identity, generated on first use and kept in `localStorage`.
@@ -47,109 +66,8 @@ export function localSigner(storageKey: string): Signer {
   return secretKeySigner(secretKeyHex, 'local')
 }
 
-export interface EstivaIdSignerOptions {
-  /** Origin of the identity service, e.g. `https://id.estiva.app`. */
-  base: string
-  /** The pubkey the token was issued for — `sub` in the JWT. */
-  pubkey: string
-  /** A bearer token from `POST /token`, audience-bound to this app. */
-  token: string
-  /**
-   * Renew the token, once, when `/sign` says it has expired (PEEK-108).
-   *
-   * Optional: without it the signer behaves exactly as before and a `401`
-   * surfaces as `SignerTokenExpired` for the caller to deal with. With it, an
-   * expiry is invisible — which matters much more now that access tokens live
-   * ten minutes rather than an hour, so a session of any length crosses one.
-   *
-   * Returning `null` means renewal failed and the expiry is real.
-   */
-  renew?: () => Promise<string | null>
-}
 
-/**
- * Signing by asking the identity service, holding no key at all.
- *
- * The point of the seam: this app can publish as a person without ever seeing
- * their secret. Obtaining the token is not this module's job — that is the
- * sign-in flow (PEEK-47) — so it arrives as a parameter.
- *
- * **`/sign` refuses `kind:0` for every app, always.** Profiles belong to the
- * identity service, which is the whole of PEEK-31; a refusal here is the policy
- * working, not a bug to route around.
- *
- * Tokens are short-lived. A `401` means the token expired and the caller should
- * obtain a new one rather than treat it as a signing failure — hence the
- * distinct error.
- */
-export function estivaIdSigner({ base, pubkey, token, renew }: EstivaIdSignerOptions): Signer {
-  const origin = base.replace(/\/+$/, '')
-  // The live token. Reassigned by a renewal so later signatures use the new one
-  // rather than retrying the expired one every time.
-  let bearer = token
 
-  return {
-    pubkey,
-    kind: 'estiva-id',
-    async sign(unsigned) {
-      const post = (auth: string) =>
-        fetch(`${origin}/sign`, {
-          method: 'POST',
-          headers: {
-            'content-type': 'application/json',
-            authorization: `Bearer ${auth}`,
-          },
-          body: JSON.stringify({
-            event: {
-              kind: unsigned.kind,
-              created_at: unsigned.created_at,
-              tags: unsigned.tags,
-              content: unsigned.content,
-            },
-          }),
-        })
-
-      let response = await post(bearer)
-
-      /**
-       * Renew once and retry, never twice.
-       *
-       * A second `401` after a successful renewal is not an expiry — it is a
-       * token the service will not accept, and retrying that in a loop is how
-       * one refused signature becomes a hot loop against the identity service.
-       */
-      if (response.status === 401 && renew) {
-        const renewed = await renew()
-        if (renewed) {
-          bearer = renewed
-          response = await post(bearer)
-        }
-      }
-
-      const text = await response.text()
-      if (response.status === 401) throw new SignerTokenExpired()
-      if (!response.ok) {
-        let reason = text.slice(0, 200)
-        try {
-          const body = JSON.parse(text) as { error?: { message?: string } }
-          reason = body.error?.message ?? reason
-        } catch {
-          // keep the raw text
-        }
-        throw new Error(`Estiva ID refused to sign kind:${unsigned.kind} — ${reason}`)
-      }
-      return (JSON.parse(text) as { event: SignedEvent }).event
-    },
-  }
-}
-
-/** Distinguishes "sign in again" from "this event was refused". */
-export class SignerTokenExpired extends Error {
-  constructor() {
-    super('The signing token has expired')
-    this.name = 'SignerTokenExpired'
-  }
-}
 
 /** The subset of NIP-07 this needs. Declared locally — no extension types installed. */
 interface Nip07 {

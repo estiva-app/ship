@@ -72,3 +72,27 @@ export const OnAFolder: Story = {
 export const FolderWithNoName: Story = {
   args: { folders: [{ id: '9c69f247-be6a-4ae7-9703-71cb971f5f93', href: '#/folder/9c69f247' }] },
 }
+
+/**
+ * The first workspace read has not landed — SHI-20.
+ *
+ * Issues and Projects are real links and work already, so they are drawn;
+ * their counts are absent rather than zero, because a zero would be a claim.
+ * Where the project list will be, the rows say a list is coming without
+ * pretending to know how long it is.
+ *
+ * The placeholder holds back 150ms, so a fast read never flashes it. That
+ * cannot be seen in a static story — only that the shape is the row's.
+ */
+export const Loading: Story = { args: { openIssues: 0, projects: [], loading: true } }
+
+/**
+ * Loading, with Folders already in hand.
+ *
+ * Folders are read separately from the workspace, so they can arrive first.
+ * The placeholder stands in for the projects only — a folder list that is
+ * ready has nothing to wait for.
+ */
+export const LoadingWithFolders: Story = {
+  args: { openIssues: 0, projects: [], loading: true, folders: FOLDERS },
+}

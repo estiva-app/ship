@@ -1,6 +1,7 @@
 import { IconBox, IconFolder, IconListDetails } from '@tabler/icons-react'
 import { Sidebar as SidebarShell } from '@estiva-app/ui'
 import { SectionLabel } from '@/components/ui/SectionLabel'
+import { SkeletonBar } from '@/components/ui/Skeleton'
 import { NavItem } from './NavItem'
 
 /**
@@ -57,10 +58,45 @@ export interface SidebarProps {
   folders?: SidebarFolder[]
   /** Which entry the route is on. A project's `addr` marks its own row. */
   current: 'issues' | 'projects' | { projectAddr: string } | { folderId: string }
+  /** The first workspace read has not landed, so the project list is unknown
+   *  rather than empty — SHI-20. Shows placeholder rows in its place. */
+  loading?: boolean
   className?: string
 }
 
-export function Sidebar({ openIssues, issuesHref, projectsHref, projects, folders = [], current, className }: SidebarProps) {
+/**
+ * The project rows before they arrive.
+ *
+ * Built here from `SkeletonBar` rather than taken as `SkeletonList`, because
+ * the shared list draws a 16px square for a row that has a face or an icon and
+ * a project row has neither — the package's own note keeps app-shaped
+ * placeholders in the app. The row is `NavItem`'s: 32px, `px-2`.
+ *
+ * `animate-skeleton-in` holds it back 150ms, so a fast read never flashes a
+ * placeholder on the way past.
+ */
+const PLACEHOLDER_WIDTHS = [104, 78, 122, 90]
+
+function SkeletonProjects() {
+  return (
+    <div className="flex flex-col gap-0.5 animate-skeleton-in" aria-hidden>
+      {PLACEHOLDER_WIDTHS.map((width, i) => (
+        <div key={i} className="flex h-8 shrink-0 items-center px-2">
+          <SkeletonBar className="h-3.5" style={{ width }} />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+export function Sidebar({ openIssues, issuesHref, projectsHref, projects, folders = [], current, loading = false, className }: SidebarProps) {
+  /*
+    Both branches of `current` are objects now, so `typeof current === 'object'`
+    no longer distinguishes them — it was correct while a project route was the
+    only object and became a latent bug the moment a folder route existed: a
+    folder route would have marked a project row active. Keyed on the field
+    instead, which cannot go wrong the same way again.
+  */
   const isProject = typeof current === 'object' && 'projectAddr' in current
   const isFolder = typeof current === 'object' && 'folderId' in current
   return (
@@ -81,21 +117,25 @@ export function Sidebar({ openIssues, issuesHref, projectsHref, projects, folder
         countLabel={`${projects.length} active`}
         active={current === 'projects'}
       />
-      {projects.length > 0 && (
+      {(projects.length > 0 || loading) && (
         <>
           <div className="mt-2 flex h-8 shrink-0 items-center px-2">
             <SectionLabel>Projects</SectionLabel>
           </div>
-          {projects.map((project) => (
-            <NavItem
-              key={project.addr}
-              label={project.title}
-              href={project.href}
-              count={project.openCount}
-              countLabel={`${project.openCount} open`}
-              active={isProject && current.projectAddr === project.addr}
-            />
-          ))}
+          {projects.length === 0 && loading ? (
+            <SkeletonProjects />
+          ) : (
+            projects.map((project) => (
+              <NavItem
+                key={project.addr}
+                label={project.title}
+                href={project.href}
+                count={project.openCount}
+                countLabel={`${project.openCount} open`}
+                active={isProject && current.projectAddr === project.addr}
+              />
+            ))
+          )}
         </>
       )}
       {folders.length > 0 && (

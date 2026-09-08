@@ -166,6 +166,45 @@ export function go(route: Route): void {
 }
 
 /**
+ * The props that make an in-app link an in-app link — SHI-20.
+ *
+ * ## Why every link needs this
+ *
+ * A package component that takes an `href` renders a plain `<a>` and nothing
+ * else; `NavItem.mdx` says so and tells the caller to wrap it. Ship did not,
+ * so **every sidebar click was a full document load**: `main.tsx` re-ran
+ * `bootAuth`, re-imported `App`, and `useWorkspace` started again at `null` —
+ * which is why the project list emptied and stayed empty for the length of a
+ * whole workspace read. Peek wraps its rail item exactly this way and has
+ * never had the bug.
+ *
+ * ## What it deliberately leaves alone
+ *
+ * The `href` stays a real address, so a link can be copied, pasted into Peek
+ * and opened cold — the whole point of SHI-16's real paths.
+ *
+ * A modified click is the browser's business. Ctrl, Cmd, Shift, Alt and any
+ * button but the first all fall through untouched, so open-in-new-tab and
+ * open-in-new-window keep working. So does a click something else has already
+ * handled.
+ */
+export function linkTo(url: string): {
+  href: string
+  onClick: (event: { button: number; metaKey: boolean; ctrlKey: boolean; shiftKey: boolean; altKey: boolean; defaultPrevented: boolean; preventDefault: () => void }) => void
+} {
+  return {
+    href: url,
+    onClick: (event) => {
+      if (event.defaultPrevented) return
+      if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+      event.preventDefault()
+      history.pushState(null, '', url)
+      dispatchEvent(new PopStateEvent('popstate'))
+    },
+  }
+}
+
+/**
  * Navigate **without** adding a history entry.
  *
  * For routes the user did not choose — in practice the redirect off
