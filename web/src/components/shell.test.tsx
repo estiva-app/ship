@@ -76,6 +76,77 @@ describe('Sidebar', () => {
     expect(screen.getByRole('link', { name: /^Projects/ })).not.toHaveAttribute('aria-current')
   })
 
+  it('lists Folders in their own section, under the projects', () => {
+    render(
+      <Sidebar
+        openIssues={5}
+        issuesHref="#/"
+        projectsHref="#/projects"
+        projects={projects}
+        folders={[{ id: 'f1', name: 'Onboarding', href: '#/folder/f1' }]}
+        current="issues"
+      />,
+    )
+    const labels = screen.getAllByRole('link').map((a) => a.textContent)
+    expect(labels).toEqual(['Issues5', 'Projects2', 'One2', 'Two', 'Onboarding'])
+  })
+
+  it('a folder row carries no count', () => {
+    // Deliberate: a Folder holds files from apps Ship does not own, so any
+    // number here would be Ship's records only — a lie about a container that
+    // holds a topic — and RFC 0.4 §4.2 makes the count a disclosure of its own.
+    render(
+      <Sidebar
+        openIssues={0}
+        issuesHref="#/"
+        projectsHref="#/projects"
+        projects={[]}
+        folders={[{ id: 'f1', name: 'Onboarding', href: '#/folder/f1' }]}
+        current="issues"
+      />,
+    )
+    expect(screen.getByRole('link', { name: 'Onboarding' })).toHaveTextContent(/^Onboarding$/)
+  })
+
+  it('falls back to the id when a folder has no name', () => {
+    // A Folder with no state event has only its channel's name, and a channel
+    // created by an app rather than a person may have none at all.
+    render(
+      <Sidebar
+        openIssues={0}
+        issuesHref="#/"
+        projectsHref="#/projects"
+        projects={[]}
+        folders={[{ id: 'f1', href: '#/folder/f1' }]}
+        current="issues"
+      />,
+    )
+    expect(screen.getByRole('link', { name: 'f1' })).toBeInTheDocument()
+  })
+
+  it('marks a folder route on its own row', () => {
+    render(
+      <Sidebar
+        openIssues={0}
+        issuesHref="#/"
+        projectsHref="#/projects"
+        projects={projects}
+        folders={[{ id: 'f1', name: 'Onboarding', href: '#/folder/f1' }]}
+        current={{ folderId: 'f1' }}
+      />,
+    )
+    expect(screen.getByRole('link', { name: 'Onboarding' })).toHaveAttribute('aria-current', 'page')
+    // The project rows must not light up for a folder route — both branches of
+    // `current` are objects, and telling them apart is the whole reason the
+    // discriminant moved from `typeof` to a key check.
+    expect(screen.getByRole('link', { name: /^One/ })).not.toHaveAttribute('aria-current')
+  })
+
+  it('draws no Folders heading when there are none', () => {
+    render(<Sidebar openIssues={0} issuesHref="#/" projectsHref="#/projects" projects={[]} current="issues" />)
+    expect(screen.queryByText('Folders')).not.toBeInTheDocument()
+  })
+
   it('draws no Projects heading when there are none', () => {
     render(<Sidebar openIssues={0} issuesHref="#/" projectsHref="#/projects" projects={[]} current="projects" />)
     expect(screen.getAllByRole('link')).toHaveLength(2)
