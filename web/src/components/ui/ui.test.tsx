@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { Composer } from '../Composer'
 import { DialogShell } from './DialogShell'
@@ -12,23 +13,24 @@ const STATUSES = [
 ]
 
 describe('Select', () => {
-  it('opens from the keyboard, moves with arrows, picks with Enter, and returns focus', () => {
+  it('opens from the keyboard, moves with arrows, picks with Enter, and returns focus', async () => {
+    // Base UI's keyboard (0.10.0), driven the way the package's own test drives it.
+    const user = userEvent.setup()
     const onChange = vi.fn()
     render(<Select value="planned" onChange={onChange} options={STATUSES} ariaLabel="Status" />)
-    const trigger = screen.getByRole('button', { name: 'Status' })
+    const trigger = screen.getByRole('combobox', { name: 'Status' })
     trigger.focus()
-    fireEvent.keyDown(trigger, { key: 'ArrowDown' })
-    expect(screen.getByRole('listbox')).toBeInTheDocument()
-    fireEvent.keyDown(trigger, { key: 'ArrowDown' })
-    fireEvent.keyDown(trigger, { key: 'Enter' })
+    await user.keyboard('{ArrowDown}')
+    expect(await screen.findByRole('listbox')).toBeInTheDocument()
+    await user.keyboard('{ArrowDown}{Enter}')
     expect(onChange).toHaveBeenCalledWith('in_progress')
-    expect(screen.queryByRole('listbox')).toBeNull()
+    await waitFor(() => expect(screen.queryByRole('listbox')).toBeNull())
     expect(document.activeElement).toBe(trigger)
   })
 
   it('closes on Escape and on a click outside', () => {
     render(<Select value="planned" onChange={vi.fn()} options={STATUSES} ariaLabel="Status" />)
-    const trigger = screen.getByRole('button', { name: 'Status' })
+    const trigger = screen.getByRole('combobox', { name: 'Status' })
     fireEvent.click(trigger)
     expect(screen.getByRole('listbox')).toBeInTheDocument()
     fireEvent.keyDown(trigger, { key: 'Escape' })
@@ -40,7 +42,7 @@ describe('Select', () => {
 
   it('shows the placeholder, muted, when nothing matches', () => {
     render(<Select value="" onChange={vi.fn()} options={STATUSES} placeholder="Choose" ariaLabel="Status" />)
-    expect(screen.getByRole('button', { name: 'Status' })).toHaveTextContent('Choose')
+    expect(screen.getByRole('combobox', { name: 'Status' })).toHaveTextContent('Choose')
   })
 })
 
@@ -92,18 +94,22 @@ describe('Composer', () => {
 })
 
 describe('IconButton', () => {
-  it('carries its name, shows its tooltip, and cannot be pressed when disabled', () => {
+  it('carries its name, says why it is disabled, and cannot be pressed', async () => {
+    // `disabledReason` is the shape Ship uses in ten files: the control stays
+    // reachable (`aria-disabled`, not `disabled`), and the reason is its
+    // tooltip — which waits 300ms since 0.10.0 (D23), so the test waits too.
+    const user = userEvent.setup()
     const onClick = vi.fn()
     render(
-      <IconButton aria-label="More" tooltip="More" onClick={onClick} disabled>
+      <IconButton aria-label="More" disabledReason="Sign in to do more">
         <span>…</span>
       </IconButton>,
     )
     const button = screen.getByRole('button', { name: 'More' })
-    expect(button).toBeDisabled()
-    fireEvent.click(button)
+    expect(button).toHaveAttribute('aria-disabled', 'true')
+    await user.click(button)
     expect(onClick).not.toHaveBeenCalled()
-    fireEvent.mouseEnter(button.parentElement!)
-    expect(screen.getByRole('tooltip')).toHaveTextContent('More')
+    await user.hover(button)
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Sign in to do more')
   })
 })

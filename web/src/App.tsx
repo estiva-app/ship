@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { me, peopleIn, resolveInbound, useDirectory, useWorkspace, type DirectoryView, type FolderState, type WorkspaceState, installReadStateFlush } from '@/api'
 import { AppShell } from '@/components/AppShell'
 import { Banner } from '@/components/Banner'
+import { ToastProvider, useToast, type ToastOptions } from '@/components/ui/Toast'
+import { TooltipProvider } from '@/components/ui/Tooltip'
 import { SkeletonList } from '@/components/ui/Skeleton'
 import { IdentityMenu } from '@/components/IdentityMenu'
 import { Sidebar, type SidebarProject } from '@/components/Sidebar'
@@ -23,9 +25,26 @@ import { href, replace, useRoute, type Route } from './router'
  * the fold's data.
  */
 export default function App() {
+  return (
+    /*
+      Two providers the package asks for (0.10.0), outside everything else:
+      tooltips share one delay across a row (B6, D23), and the toast has one
+      place to live (D35). Here rather than in main.tsx so that a test which
+      renders <App /> gets them too.
+    */
+    <TooltipProvider>
+      <ToastProvider>
+        <Shell />
+      </ToastProvider>
+    </TooltipProvider>
+  )
+}
+
+function Shell() {
   const { state, error, loading, busy, refresh } = useWorkspace()
   const route = useRoute()
-  const { banner, say } = useBanner()
+  const { showToast } = useToast()
+  const { banner, say, clear } = useBanner(showToast)
 
   // Names and faces for everyone in the snapshot; re-read in full on navigation.
   const people = useMemo(() => (state ? peopleIn(state, me) : [me]), [state])
@@ -80,7 +99,10 @@ export default function App() {
           */
           <Banner tone="info">The relay is busy — waiting to load the workspace. This clears on its own.</Banner>
         ) : banner ? (
-          <Banner tone={banner.tone}>{banner.text}</Banner>
+          /* An error stays until it is read, and the reader says when (D21's dismiss). */
+          <Banner tone={banner.tone} onDismiss={clear}>
+            {banner.text}
+          </Banner>
         ) : undefined
       }
       /* The sidebar waits on the same read the page does, so it says so the
@@ -160,17 +182,24 @@ export function sidebarProps(state: FolderState | null, route: Route) {
   }
 }
 
-/** The old app's `say`: an "ok" note clears itself after four seconds, an error stays. */
-function useBanner() {
-  const [banner, setBanner] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null)
-  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
-  const say = useCallback<Say>((text, tone = 'ok') => {
-    clearTimeout(timer.current)
-    setBanner({ tone, text })
-    if (tone === 'ok') timer.current = setTimeout(() => setBanner(null), 4000)
-  }, [])
-  useEffect(() => () => clearTimeout(timer.current), [])
-  return { banner, say }
+/**
+ * The old app's `say`, split the way D14 and D35 rule: an "ok" note is a
+ * toast that fades on its own (the package's, bottom-left, five seconds), and
+ * an error is a banner under the top bar that stays until it is dismissed or
+ * the next one replaces it. Before 0.10.0 both were the banner, the "ok" kind
+ * on a four-second timer of this file's own.
+ */
+function useBanner(showToast: (options: ToastOptions) => void) {
+  const [banner, setBanner] = useState<{ tone: 'error'; text: string } | null>(null)
+  const say = useCallback<Say>(
+    (text, tone = 'ok') => {
+      if (tone === 'ok') showToast({ label: text, type: 'success' })
+      else setBanner({ tone, text })
+    },
+    [showToast],
+  )
+  const clear = useCallback(() => setBanner(null), [])
+  return { banner, say, clear }
 }
 
 /**

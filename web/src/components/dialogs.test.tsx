@@ -61,7 +61,7 @@ describe('NewIssueDialog', () => {
     const onCreate = vi.fn().mockResolvedValue(true)
     render(<NewIssueDialog projects={projects} project={{ addr: '30850:a:rel', title: 'Relay Migration' }} onClose={vi.fn()} onCreate={onCreate} />)
     expect(screen.getByRole('dialog', { name: 'New issue in Relay Migration' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Project' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('combobox', { name: /^Project/ })).not.toBeInTheDocument()
     fireEvent.change(screen.getByPlaceholderText('New issue in Relay Migration'), { target: { value: 'Board loses order' } })
     fireEvent.click(screen.getByRole('button', { name: 'Create issue' }))
     await waitFor(() => expect(onCreate).toHaveBeenCalledWith({ title: 'Board loses order', description: '', projectAddr: '30850:a:rel' }))
@@ -70,7 +70,7 @@ describe('NewIssueDialog', () => {
   it('asks for the project when opened from the Issues page, defaulting to the first', async () => {
     const onCreate = vi.fn().mockResolvedValue(true)
     render(<NewIssueDialog projects={projects} onClose={vi.fn()} onCreate={onCreate} />)
-    expect(screen.getByRole('button', { name: 'Project' })).toHaveTextContent('Design System')
+    expect(screen.getByRole('combobox', { name: /^Project/ })).toHaveTextContent('Design System')
     fireEvent.change(screen.getByPlaceholderText('Issue title'), { target: { value: 'X' } })
     fireEvent.click(screen.getByRole('button', { name: 'Create issue' }))
     await waitFor(() => expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({ projectAddr: '30850:a:des' })))
