@@ -201,7 +201,8 @@ describe('Issues page — rows from the fold', () => {
     expect(main.getByRole('tab', { name: /^Open/ })).toHaveTextContent('3')
     expect(main.getByRole('tab', { name: /Assigned to me/ })).toHaveTextContent('1')
     expect(main.getAllByRole('link')).toHaveLength(4)
-    expect(main.getByRole('link', { name: /X-4/ })).toHaveTextContent('1 conversation')
+    // The row says the count as a small icon and a number, named in full for a reader who cannot see it (S26).
+    expect(within(main.getByRole('link', { name: /X-4/ })).getByLabelText('1 conversation')).toBeInTheDocument()
     expect(main.getByRole('button', { name: 'Add issue' })).toBeEnabled()
 
     fireEvent.click(main.getByRole('tab', { name: /Assigned to me/ }))

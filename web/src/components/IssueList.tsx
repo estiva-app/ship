@@ -6,7 +6,8 @@ import { IssueRow, type IssueRowData } from './IssueRow'
 
 /**
  * A status group: a title — the shaped icon, the label and a bare mono
- * count, the sidebar's treatment — then its rows. Not an accordion
+ * count, the sidebar's treatment — then its rows, touching, as list rows
+ * do (2026-09-09; they were cards with 8px between). Not an accordion
  * (Katerina, 2026-08-27: "just the status titles"); everything is visible.
  */
 export interface IssueGroupProps {
@@ -19,7 +20,7 @@ export interface IssueGroupProps {
 
 export function IssueGroup({ status, label, issues, statuses, hrefFor }: IssueGroupProps) {
   return (
-    <section className="flex flex-col gap-2">
+    <section className="flex flex-col gap-px">
       <h3 className="flex h-8 items-center gap-2 px-2">
         <StatusLabel value={status} label={label} strong />
         <span className="font-mono text-caption tabular-nums text-text-muted">{issues.length}</span>

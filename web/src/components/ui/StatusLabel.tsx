@@ -21,8 +21,12 @@ import { cn } from '@/lib/cn'
  * small = caption, default = body-2, as the type tokens (S6, 0.10.0): the
  * package's cn() names the ramp for tailwind-merge, so a token size beside a
  * colour class survives, which is why these were arbitrary values before.
- * There is deliberately no icon-only export: a status
- * without its word is a dot, and dots were what the shapes replaced.
+ *
+ * The shape stands alone in ONE place — `StatusShape`, on the Issues page's
+ * list row (Katerina, 2026-09-09, Linear's row as the picture) — because
+ * that list is grouped by status and the group heading already says the
+ * word; a shape without its word anywhere else is a dot, and dots were what
+ * the shapes replaced. It names itself for a reader who cannot see it.
  */
 export interface StatusLabelProps {
   /** The raw status value — decides the icon. */
@@ -34,7 +38,16 @@ export interface StatusLabelProps {
   className?: string
 }
 
-function StatusShape({ value, size }: { value: string; size: 14 | 16 }) {
+/** The shape alone, named — for the Issues list row only; see above. */
+export function StatusShape({ value, label, size = 16, className }: { value: string; label: string; size?: 14 | 16; className?: string }) {
+  return (
+    <span role="img" aria-label={label} className={cn('flex shrink-0', className)}>
+      <Shape value={value} size={size} />
+    </span>
+  )
+}
+
+function Shape({ value, size }: { value: string; size: 14 | 16 }) {
   const common = { size, stroke: 1.5, className: 'shrink-0' }
   switch (value) {
     case 'todo':
@@ -62,7 +75,7 @@ export function StatusLabel({ value, label, size = 'default', strong = false, cl
         className,
       )}
     >
-      <StatusShape value={value} size={size === 'small' ? 14 : 16} />
+      <Shape value={value} size={size === 'small' ? 14 : 16} />
       {label}
     </span>
   )

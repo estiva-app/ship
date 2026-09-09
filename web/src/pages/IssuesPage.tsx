@@ -13,8 +13,10 @@ export function rowFor(issue: FolderState['issues'][number], state: FolderState,
     id: issue.id,
     ref: issue.ref,
     title: issue.title,
-    description: issue.description || undefined,
     status: issue.status,
+    // The chip names the parent; a parentless issue (B10), or one whose
+    // project is not in this read, shows none.
+    project: issue.projectAddr ? state.projects.find((p) => p.addr === issue.projectAddr) : undefined,
     assignee: issue.assignee ? directory.personOf(issue.assignee) : undefined,
     openedBy: directory.personOf(issue.author),
     at: issue.createdAt,
