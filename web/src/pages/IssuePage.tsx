@@ -84,7 +84,7 @@ export function IssuePage({ state, directory, d, say, refresh }: { state: Worksp
     return (
       <EmptyState
         icon={<IconLinkOff size={16} stroke={1.5} />}
-        className="py-12"
+        className="h-full"
         message="That issue is not in this workspace, or is in a Folder you cannot read."
       />
     )

@@ -167,7 +167,7 @@ function Page({ route, state, loading, directory, say, refresh }: { route: Route
       // through whichever app owns each file, which is the point.
       return <FolderPage id={route.id} />
     default:
-      return <EmptyState icon={<IconLink size={16} stroke={1.5} />} className="py-12" message="Resolving reference…" />
+      return <EmptyState icon={<IconLink size={16} stroke={1.5} />} className="h-full" message="Resolving reference…" />
   }
 }
 

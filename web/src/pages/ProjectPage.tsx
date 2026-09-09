@@ -383,7 +383,7 @@ export function ProjectPage({
   const people = useMemo(() => railPeople(state, directory), [state, directory])
 
   if (!project) {
-    return <EmptyState icon={<IconLinkOff size={16} stroke={1.5} />} className="py-12" message="That project is not in this workspace, or is in a Folder you cannot read." />
+    return <EmptyState icon={<IconLinkOff size={16} stroke={1.5} />} className="h-full" message="That project is not in this workspace, or is in a Folder you cannot read." />
   }
 
   /*
