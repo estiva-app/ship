@@ -55,7 +55,14 @@ export function IssuesTable({ issues, statuses, hrefFor, className }: IssuesTabl
                 whose description pushes this table below the first screen, the
                 WHOLE page (sidebar and top bar included) became scrollable by
                 exactly that distance. */}
-            <th className={cn(TH, 'relative w-16')}>
+            {/* `w-20`, and the cell never wraps (Katerina, 2026-09-09; ADOPTION
+                S25): under `border-box` the 64px of `w-16` left 40px for text
+                once `px-3` was paid, and "PEE-27" at 12px Geist Mono needs 43 —
+                five characters fit, six broke onto a second line. 80px leaves
+                56px, which holds three letters, a dash and three digits
+                (`refPrefix` takes three letters); the Issues page's list row
+                uses the same width, so the two surfaces line up. */}
+            <th className={cn(TH, 'relative w-20')}>
               <span className="sr-only">Ref</span>
             </th>
             <th className={TH}>Title</th>
@@ -72,7 +79,7 @@ export function IssuesTable({ issues, statuses, hrefFor, className }: IssuesTabl
                   through the manifest by another app arrives without a key, and
                   the project page assigns one. Nothing to click: it is the
                   app's bookkeeping, not a chore for whoever opened the page. */}
-              <td className={cn(TD, 'font-mono', SMALL, issue.ref ? 'text-text-muted' : 'text-text-disabled')}>{issue.ref ?? '—'}</td>
+              <td className={cn(TD, 'whitespace-nowrap font-mono', SMALL, issue.ref ? 'text-text-muted' : 'text-text-disabled')}>{issue.ref ?? '—'}</td>
               <td className={TD}>
                 <a {...linkTo(hrefFor(issue))} className="block truncate text-text-primary hover:underline">
                   {issue.title}
