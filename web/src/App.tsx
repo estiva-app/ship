@@ -121,9 +121,10 @@ function Shell() {
           {...sidebarProps(
             state,
             route,
-            folders.map((f) => ({ id: f.id, name: f.name, href: href({ name: 'folder', id: f.id }) })),
+            (folders ?? []).map((f) => ({ id: f.id, name: f.name, href: href({ name: 'folder', id: f.id }) })),
           )}
           loading={!state && loading}
+          foldersLoading={folders === undefined}
         />
       }
     >

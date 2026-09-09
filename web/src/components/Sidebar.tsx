@@ -66,6 +66,8 @@ export interface SidebarProps {
   /** The first workspace read has not landed, so the project list is unknown
    *  rather than empty — SHI-20. Shows placeholder rows in its place. */
   loading?: boolean
+  /** The Folders are read separately and have not landed — the same placeholder rows, under a Folders heading. */
+  foldersLoading?: boolean
   className?: string
 }
 
@@ -94,7 +96,7 @@ function SkeletonProjects() {
   )
 }
 
-export function Sidebar({ openIssues, issuesHref, projectsHref, projects, folders = [], current, loading = false, className }: SidebarProps) {
+export function Sidebar({ openIssues, issuesHref, projectsHref, projects, folders = [], current, loading = false, foldersLoading = false, className }: SidebarProps) {
   /*
     Both branches of `current` are objects now, so `typeof current === 'object'`
     no longer distinguishes them — it was correct while a project route was the
@@ -140,9 +142,12 @@ export function Sidebar({ openIssues, issuesHref, projectsHref, projects, folder
           )}
         </CollapsibleSection>
       )}
-      {folders.length > 0 && (
+      {(folders.length > 0 || foldersLoading) && (
         <CollapsibleSection title="Folders" storageKey={STORAGE.folders} className="mt-2 shrink-0" contentClassName="gap-px">
-          {folders.map((folder) => (
+          {folders.length === 0 && foldersLoading ? (
+            <SkeletonProjects />
+          ) : (
+          folders.map((folder) => (
             <NavItem
               key={folder.id}
               label={folder.name ?? folder.id}
@@ -150,7 +155,8 @@ export function Sidebar({ openIssues, issuesHref, projectsHref, projects, folder
               icon={<IconFolder size={16} stroke={1.5} />}
               active={isFolder && current.folderId === folder.id}
             />
-          ))}
+          ))
+          )}
         </CollapsibleSection>
       )}
     </SidebarShell>

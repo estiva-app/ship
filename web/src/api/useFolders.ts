@@ -16,8 +16,12 @@ import type { FolderSummary } from './foreign'
  * indistinguishable from a relay that did not answer — both mean "no folders to
  * show here", and neither is worth a banner over the projects list.
  */
-export function useFolders(): FolderSummary[] {
-  const [folders, setFolders] = useState<FolderSummary[]>([])
+export function useFolders(): FolderSummary[] | undefined {
+  // `undefined` until the first read lands, so the sidebar can say a list is
+  // coming rather than draw nothing and then a section (Katerina,
+  // 2026-09-09); an empty list after, whether the workspace has no Folders
+  // or the relay did not answer — the two are still one thing here.
+  const [folders, setFolders] = useState<FolderSummary[] | undefined>(undefined)
   useEffect(() => {
     let live = true
     readFolders()
