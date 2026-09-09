@@ -99,3 +99,6 @@ export const LoadingWithFolders: Story = {
 
 /** The Folders have not landed yet, with the projects already in hand: the same placeholder rows, under their own heading. */
 export const FoldersLoading: Story = { args: { folders: [], foldersLoading: true } }
+
+/** The first moment of a session: neither the workspace nor the Folders have landed. Both headings, each over its placeholder rows. */
+export const LoadingEverything: Story = { args: { openIssues: 0, projects: [], loading: true, folders: [], foldersLoading: true } }

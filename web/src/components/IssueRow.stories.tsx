@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite'
 import { ANA, ISSUE_STATUSES, ROWS, hrefFor } from '@/fixtures/issues'
 import { IssueRow } from './IssueRow'
 
-/** One line: ref · status shape · title, then the project chip (its own link), the conversations, the assignee's face and when it was opened. Hover it; click anywhere but the chip to open the issue. */
+/** One line: ref · status shape · title, then the conversations, the project chip (its own link), the assignee's face and when it was opened. Hover it; click anywhere but the chip to open the issue. */
 const meta = {
   title: 'Issues/IssueRow',
   component: IssueRow,

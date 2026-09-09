@@ -11,8 +11,8 @@ import { linkTo } from '@/router'
  * One issue, as a list row (Katerina, 2026-09-09, with Linear's row as the
  * picture): one line, no border, a hover surface, no checkbox. Left to
  * right — the ref in mono at a fixed width so the titles align, the status
- * shape, the title; on the right the project as a chip, how many
- * conversations, the assignee's face, and when it was opened. It was a
+ * shape, the title; on the right how many conversations, the project as
+ * a chip, the assignee's face, and when it was opened. It was a
  * bordered card of two lines with the description clamped under the title
  * (2026-08-26); the description is the issue page's now.
  *
@@ -71,11 +71,8 @@ export function IssueRow({ issue, statuses, href, className }: IssueRowProps) {
           <span className="min-w-0 flex-1 truncate text-body-2 text-text-primary">{issue.title}</span>
         </span>
       </a>
-      {issue.project && (
-        <a {...linkTo(issue.project.href)} className="relative z-10 shrink-0 rounded-full">
-          <Chip label={issue.project.title} leadingIcon={<IconBox size={12} stroke={1.5} />} className="max-w-[200px]" />
-        </a>
-      )}
+      {/* The count before the chip (Katerina, 2026-09-09): what is said
+          about the issue, then where it lives, then who and when. */}
       {threads > 0 && (
         <span
           className="flex shrink-0 items-center gap-1 text-caption tabular-nums text-text-muted"
@@ -84,6 +81,11 @@ export function IssueRow({ issue, statuses, href, className }: IssueRowProps) {
           <IconMessage2 size={14} stroke={1.5} aria-hidden="true" />
           {threads}
         </span>
+      )}
+      {issue.project && (
+        <a {...linkTo(issue.project.href)} className="relative z-10 shrink-0 rounded-full">
+          <Chip label={issue.project.title} leadingIcon={<IconBox size={12} stroke={1.5} />} className="max-w-[200px]" />
+        </a>
       )}
       {issue.assignee && <Avatar name={issue.assignee.name} src={issue.assignee.picture} size={16} label={issue.assignee.name} />}
       {/* A fixed column, right-aligned, so the times stack down the list. */}
