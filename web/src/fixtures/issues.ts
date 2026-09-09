@@ -20,7 +20,7 @@ export const MARA = { name: 'Mara Sato', picture: maraPortrait }
 export const NOBODY = {}
 
 /** The parent, as a row's chip names it. Row 8 has none — a parentless issue (B10). */
-export const REL = { title: 'Relay Migration' }
+export const REL = { title: 'Relay Migration', href: '#/p/rel' }
 
 export const ISSUE_STATUSES = [
   { value: 'todo', label: 'Todo' },

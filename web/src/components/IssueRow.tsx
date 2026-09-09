@@ -16,12 +16,19 @@ import { linkTo } from '@/router'
  * bordered card of two lines with the description clamped under the title
  * (2026-08-26); the description is the issue page's now.
  *
- * The count sits inline rather than on a second line (her first sketch)
- * so every row is one height — 40px, the table's row. The ref is
- * decoration — refs collide across projects — so it is shown and never
- * used to identify anything; an issue without one shows an em dash (audit
- * L2). People are faces and names, never keys. A parentless issue (B10)
- * shows no chip. Ship-only: it knows what an issue is.
+ * Two links, and no link inside a link: the issue link is the ref, the
+ * shape and the title, and it stretches over the whole row (its `after:`
+ * covers the box), so a click anywhere opens the issue — except on the
+ * project chip, which is its own link to the project and sits above the
+ * stretch (her ask, 2026-09-09). Her second pass the same day: 12px at the
+ * sides, 6px between the shape and the title, the title at 400 as the
+ * table's is, and 36px tall. The count sits inline rather than on a second
+ * line so every row is one height.
+ *
+ * The ref is decoration — refs collide across projects — so it is shown and
+ * never used to identify anything; an issue without one shows an em dash
+ * (audit L2). People are faces and names, never keys. A parentless issue
+ * (B10) shows no chip. Ship-only: it knows what an issue is.
  */
 export interface IssueRowData {
   /** The identity. */
@@ -34,8 +41,8 @@ export interface IssueRowData {
   ref?: string
   title: string
   status: string
-  /** The parent project, as the chip names it. Absent for a parentless issue. */
-  project?: { title: string }
+  /** The parent project, as the chip names it and links to it. Absent for a parentless issue. */
+  project?: { title: string; href: string }
   assignee?: { name?: string; picture?: string }
   openedBy?: { name?: string; picture?: string }
   /** Seconds — when it was opened. */
@@ -54,16 +61,21 @@ export interface IssueRowProps {
 export function IssueRow({ issue, statuses, href, className }: IssueRowProps) {
   const threads = issue.conversations ?? 0
   return (
-    <a
-      {...linkTo(href)}
-      className={cn('flex h-10 min-w-0 items-center gap-3 rounded-md px-2 transition-colors hover:bg-bg-hover', className)}
-    >
-      {/* `w-14`: 56px, the room the project table's ref cell has (S25), so
-          the two surfaces line up. */}
-      <span className={cn('w-14 shrink-0 truncate font-mono text-caption', issue.ref ? 'text-text-muted' : 'text-text-disabled')}>{issue.ref ?? '—'}</span>
-      <StatusShape value={issue.status} label={statusLabel(issue.status, statuses)} />
-      <span className="min-w-0 flex-1 truncate text-body-2-strong text-text-primary">{issue.title}</span>
-      {issue.project && <Chip label={issue.project.title} leadingIcon={<IconBox size={12} stroke={1.5} />} className="max-w-[200px] shrink-0" />}
+    <div className={cn('relative flex h-9 min-w-0 items-center gap-3 rounded-md px-3 transition-colors hover:bg-bg-hover', className)}>
+      <a {...linkTo(href)} className="flex min-w-0 flex-1 items-center gap-3 after:absolute after:inset-0">
+        {/* `w-14`: 56px, the room the project table's ref cell has (S25), so
+            the two surfaces line up. */}
+        <span className={cn('w-14 shrink-0 truncate font-mono text-caption', issue.ref ? 'text-text-muted' : 'text-text-disabled')}>{issue.ref ?? '—'}</span>
+        <span className="flex min-w-0 flex-1 items-center gap-1.5">
+          <StatusShape value={issue.status} label={statusLabel(issue.status, statuses)} />
+          <span className="min-w-0 flex-1 truncate text-body-2 text-text-primary">{issue.title}</span>
+        </span>
+      </a>
+      {issue.project && (
+        <a {...linkTo(issue.project.href)} className="relative z-10 shrink-0 rounded-full">
+          <Chip label={issue.project.title} leadingIcon={<IconBox size={12} stroke={1.5} />} className="max-w-[200px]" />
+        </a>
+      )}
       {threads > 0 && (
         <span
           className="flex shrink-0 items-center gap-1 text-caption tabular-nums text-text-muted"
@@ -76,6 +88,6 @@ export function IssueRow({ issue, statuses, href, className }: IssueRowProps) {
       {issue.assignee && <Avatar name={issue.assignee.name} src={issue.assignee.picture} size={16} label={issue.assignee.name} />}
       {/* A fixed column, right-aligned, so the times stack down the list. */}
       <span className="w-16 shrink-0 text-right text-caption tabular-nums text-text-muted">{ago(issue.at)}</span>
-    </a>
+    </div>
   )
 }

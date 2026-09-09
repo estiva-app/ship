@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite'
 import { ANA, ISSUE_STATUSES, ROWS, hrefFor } from '@/fixtures/issues'
 import { IssueRow } from './IssueRow'
 
-/** One line: ref · status shape · title, then the project chip, the conversations, the assignee's face and when it was opened. Hover it. */
+/** One line: ref · status shape · title, then the project chip (its own link), the conversations, the assignee's face and when it was opened. Hover it; click anywhere but the chip to open the issue. */
 const meta = {
   title: 'Issues/IssueRow',
   component: IssueRow,
@@ -43,7 +43,7 @@ export const LongTitle: Story = {
     issue: {
       ...ROWS[0],
       title: 'A very long issue title that goes on and on about the columns and the archived project and the order they come back in after a reload',
-      project: { title: 'Onboarding flow for new workspaces, the whole first ten minutes' },
+      project: { title: 'Onboarding flow for new workspaces, the whole first ten minutes', href: '#/p/onb' },
       assignee: ANA,
     },
   },

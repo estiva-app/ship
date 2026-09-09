@@ -37,9 +37,15 @@ describe('groupByStatus — production’s rule', () => {
 })
 
 describe('IssueRow', () => {
-  it('shows an em dash for a missing ref, links the whole row, and never a key', () => {
+  it('shows an em dash for a missing ref, stretches the issue link over the row, links the project on its own, and never a key', () => {
     const { container } = render(<IssueRow issue={ROWS[4]} statuses={ISSUE_STATUSES} href="#/issue/x" />)
-    expect(screen.getByRole('link')).toHaveAttribute('href', '#/issue/x')
+    // Two links, no link inside a link (S26): the issue — ref, shape, title —
+    // stretched over the row, and the project chip above the stretch.
+    const [issue, project] = screen.getAllByRole('link')
+    expect(issue).toHaveAttribute('href', '#/issue/x')
+    expect(issue.className).toContain('after:absolute')
+    expect(project).toHaveAttribute('href', '#/p/rel')
+    expect(screen.getAllByRole('link')).toHaveLength(2)
     expect(container.textContent).toContain('—')
     expect(container.textContent).not.toMatch(/[0-9a-f]{8}/)
   })

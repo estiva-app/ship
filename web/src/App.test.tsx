@@ -200,13 +200,15 @@ describe('Issues page — rows from the fold', () => {
     expect(main.getByRole('tab', { name: /^All/ })).toHaveTextContent('4')
     expect(main.getByRole('tab', { name: /^Open/ })).toHaveTextContent('3')
     expect(main.getByRole('tab', { name: /Assigned to me/ })).toHaveTextContent('1')
-    expect(main.getAllByRole('link')).toHaveLength(4)
+    // Issue links only: a row's project chip is a link of its own (S26).
+    const issueLinks = () => main.getAllByRole('link').filter((a) => a.getAttribute('href')?.startsWith('/issue/'))
+    expect(issueLinks()).toHaveLength(4)
     // The row says the count as a small icon and a number, named in full for a reader who cannot see it (S26).
-    expect(within(main.getByRole('link', { name: /X-4/ })).getByLabelText('1 conversation')).toBeInTheDocument()
+    expect(main.getByLabelText('1 conversation')).toBeInTheDocument()
     expect(main.getByRole('button', { name: 'Add issue' })).toBeEnabled()
 
     fireEvent.click(main.getByRole('tab', { name: /Assigned to me/ }))
-    expect(main.getAllByRole('link')).toHaveLength(1)
+    expect(issueLinks()).toHaveLength(1)
     expect(main.getByRole('link', { name: /X-4/ })).toHaveAttribute('href', `/issue/issue-14-${D('14')}`)
   })
 })

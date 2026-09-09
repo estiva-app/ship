@@ -22,7 +22,8 @@ export interface IssueGroupProps {
 export function IssueGroup({ status, label, issues, statuses, hrefFor }: IssueGroupProps) {
   return (
     <section className="flex flex-col gap-px">
-      <h3 className="flex h-8 items-center gap-2 px-2">
+      {/* `px-3`, as the rows: the heading and its rows share a left edge. */}
+      <h3 className="flex h-8 items-center gap-2 px-3">
         <StatusLabel value={status} label={label} strong />
         <span className="font-mono text-caption tabular-nums text-text-muted">{issues.length}</span>
       </h3>
