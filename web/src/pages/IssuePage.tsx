@@ -1,3 +1,4 @@
+import { IconLinkOff } from '@tabler/icons-react'
 import { useMarkRead } from '@/lib/useMarkRead'
 import { useMemo, useState } from 'react'
 import { ISSUE_STATUSES, commentsOn, deleteIssue, deleteMessage, editMessage, react, referenceFor, reply, setIssueField, unreact, startConversation, type DirectoryView, type FolderState, type WorkspaceState, threadContext, useMergedReadState, firstUnreadByThread, projectContext, me } from '@/api'
@@ -82,8 +83,9 @@ export function IssuePage({ state, directory, d, say, refresh }: { state: Worksp
   if (!issue) {
     return (
       <EmptyState
-        className="py-12"
-        message="That issue is not in this workspace. It may live in a Folder you cannot read, or the link may point at a different workspace."
+        icon={<IconLinkOff size={16} stroke={1.5} />}
+        className="h-full"
+        message="That issue is not in this workspace, or is in a Folder you cannot read."
       />
     )
   }

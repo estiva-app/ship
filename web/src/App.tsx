@@ -1,3 +1,4 @@
+import { IconLink } from '@tabler/icons-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { me, peopleIn, resolveInbound, useDirectory, useWorkspace, type DirectoryView, type FolderState, type WorkspaceState, installReadStateFlush } from '@/api'
 import { AppShell } from '@/components/AppShell'
@@ -120,9 +121,10 @@ function Shell() {
           {...sidebarProps(
             state,
             route,
-            folders.map((f) => ({ id: f.id, name: f.name, href: href({ name: 'folder', id: f.id }) })),
+            (folders ?? []).map((f) => ({ id: f.id, name: f.name, href: href({ name: 'folder', id: f.id }) })),
           )}
           loading={!state && loading}
+          foldersLoading={folders === undefined}
         />
       }
     >
@@ -165,7 +167,7 @@ function Page({ route, state, loading, directory, say, refresh }: { route: Route
       // through whichever app owns each file, which is the point.
       return <FolderPage id={route.id} />
     default:
-      return <EmptyState className="py-12" message="Resolving reference…" />
+      return <EmptyState icon={<IconLink size={16} stroke={1.5} />} className="h-full" message="Resolving reference…" />
   }
 }
 

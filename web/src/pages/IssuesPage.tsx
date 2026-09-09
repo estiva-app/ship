@@ -8,13 +8,16 @@ import { type Say } from './act'
 
 /** One issue as the list draws it — status and assignee read off the fold, never recomputed. */
 export function rowFor(issue: FolderState['issues'][number], state: FolderState, directory: DirectoryView): IssueRowData {
+  const parent = issue.projectAddr ? state.projects.find((p) => p.addr === issue.projectAddr) : undefined
   return {
     addr: issue.addr,
     id: issue.id,
     ref: issue.ref,
     title: issue.title,
-    description: issue.description || undefined,
     status: issue.status,
+    // The chip names the parent and links to it; a parentless issue (B10),
+    // or one whose project is not in this read, shows none.
+    project: parent ? { title: parent.title, href: href({ name: 'project', d: parent.id, slug: parent.title, view: 'table' }) } : undefined,
     assignee: issue.assignee ? directory.personOf(issue.assignee) : undefined,
     openedBy: directory.personOf(issue.author),
     at: issue.createdAt,

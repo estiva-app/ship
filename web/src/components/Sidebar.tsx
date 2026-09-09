@@ -1,6 +1,5 @@
 import { IconBox, IconFolder, IconListDetails } from '@tabler/icons-react'
-import { Sidebar as SidebarShell } from '@estiva-app/ui'
-import { SectionLabel } from '@/components/ui/SectionLabel'
+import { CollapsibleSection, Sidebar as SidebarShell } from '@estiva-app/ui'
 import { SkeletonBar } from '@/components/ui/Skeleton'
 import { NavItem } from './NavItem'
 
@@ -19,8 +18,14 @@ import { NavItem } from './NavItem'
  * one click inside Projects, which is where you go when looking for something
  * rather than working on it.
  *
+ * The two groups fold (Katerina, 2026-09-09): each is a `CollapsibleSection`,
+ * and this browser remembers how you left it under the keys below. A closed
+ * group stays closed even on one of its own routes — the reader closed it.
+ *
  * Desktop only: the narrow-screen drawer is parked (ruling A5).
  */
+const STORAGE = { projects: 'ship.sidebar.projects', folders: 'ship.sidebar.folders' }
+
 export interface SidebarProject {
   /** The identity — refs and titles collide, addresses do not. */
   addr: string
@@ -61,6 +66,8 @@ export interface SidebarProps {
   /** The first workspace read has not landed, so the project list is unknown
    *  rather than empty — SHI-20. Shows placeholder rows in its place. */
   loading?: boolean
+  /** The Folders are read separately and have not landed — the same placeholder rows, under a Folders heading. */
+  foldersLoading?: boolean
   className?: string
 }
 
@@ -89,7 +96,7 @@ function SkeletonProjects() {
   )
 }
 
-export function Sidebar({ openIssues, issuesHref, projectsHref, projects, folders = [], current, loading = false, className }: SidebarProps) {
+export function Sidebar({ openIssues, issuesHref, projectsHref, projects, folders = [], current, loading = false, foldersLoading = false, className }: SidebarProps) {
   /*
     Both branches of `current` are objects now, so `typeof current === 'object'`
     no longer distinguishes them — it was correct while a project route was the
@@ -118,10 +125,7 @@ export function Sidebar({ openIssues, issuesHref, projectsHref, projects, folder
         active={current === 'projects'}
       />
       {(projects.length > 0 || loading) && (
-        <>
-          <div className="mt-2 flex h-8 shrink-0 items-center px-2">
-            <SectionLabel>Projects</SectionLabel>
-          </div>
+        <CollapsibleSection title="Projects" storageKey={STORAGE.projects} className="mt-2 shrink-0" contentClassName="gap-px">
           {projects.length === 0 && loading ? (
             <SkeletonProjects />
           ) : (
@@ -136,14 +140,14 @@ export function Sidebar({ openIssues, issuesHref, projectsHref, projects, folder
               />
             ))
           )}
-        </>
+        </CollapsibleSection>
       )}
-      {folders.length > 0 && (
-        <>
-          <div className="mt-2 flex h-8 shrink-0 items-center px-2">
-            <SectionLabel>Folders</SectionLabel>
-          </div>
-          {folders.map((folder) => (
+      {(folders.length > 0 || foldersLoading) && (
+        <CollapsibleSection title="Folders" storageKey={STORAGE.folders} className="mt-2 shrink-0" contentClassName="gap-px">
+          {folders.length === 0 && foldersLoading ? (
+            <SkeletonProjects />
+          ) : (
+          folders.map((folder) => (
             <NavItem
               key={folder.id}
               label={folder.name ?? folder.id}
@@ -151,8 +155,9 @@ export function Sidebar({ openIssues, issuesHref, projectsHref, projects, folder
               icon={<IconFolder size={16} stroke={1.5} />}
               active={isFolder && current.folderId === folder.id}
             />
-          ))}
-        </>
+          ))
+          )}
+        </CollapsibleSection>
       )}
     </SidebarShell>
   )

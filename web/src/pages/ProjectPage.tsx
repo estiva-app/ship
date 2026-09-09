@@ -1,3 +1,4 @@
+import { IconLinkOff } from '@tabler/icons-react'
 import { useMarkRead } from '@/lib/useMarkRead'
 import { pointerToAddress, referenceToPointer, resolveBlockAnchor, type ContentFormat } from '@estiva-app/protocol'
 import type { AttachmentIndex, EditIndex } from '@/api'
@@ -382,7 +383,7 @@ export function ProjectPage({
   const people = useMemo(() => railPeople(state, directory), [state, directory])
 
   if (!project) {
-    return <EmptyState className="py-12" message="That project is not in this workspace, or lives in a Folder you cannot read." />
+    return <EmptyState icon={<IconLinkOff size={16} stroke={1.5} />} className="h-full" message="That project is not in this workspace, or is in a Folder you cannot read." />
   }
 
   /*

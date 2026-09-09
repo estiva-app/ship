@@ -2,14 +2,14 @@ import type { Meta, StoryObj } from '@storybook/react-vite'
 import { ISSUE_STATUSES, ROWS, hrefFor } from '@/fixtures/issues'
 import { IssueList } from './IssueList'
 
-/** Grouped by status in the vocabulary's order, every group open; an unknown status gets its own group, shown raw. */
+/** Grouped by status in the vocabulary's order, the rows touching under each heading; an unknown status gets its own group, shown raw. */
 const meta = {
   title: 'Issues/IssueList',
   component: IssueList,
   args: { issues: ROWS, statuses: ISSUE_STATUSES, hrefFor },
   decorators: [
     (Story) => (
-      <div className="w-[720px]">
+      <div className="w-[900px]">
         <Story />
       </div>
     ),

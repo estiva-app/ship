@@ -106,6 +106,6 @@ describe('Activity', () => {
 
   it('says what would appear when there is nothing yet', () => {
     show({ items: [] })
-    expect(screen.getByText(/Conversations that mention this/i)).toBeTruthy()
+    expect(screen.getByText(/No related conversations yet/i)).toBeTruthy()
   })
 })

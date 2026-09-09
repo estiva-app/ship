@@ -143,6 +143,13 @@ describe('Sidebar', () => {
     expect(screen.getByRole('link', { name: /^One/ })).not.toHaveAttribute('aria-current')
   })
 
+  it('shows placeholder rows under both headings while both are still loading', () => {
+    const { container } = render(<Sidebar openIssues={0} issuesHref="#/" projectsHref="#/projects" projects={[]} current="issues" loading folders={[]} foldersLoading />)
+    expect(screen.getByRole('button', { name: 'Projects' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Folders' })).toBeInTheDocument()
+    expect(container.querySelectorAll('[aria-hidden="true"].animate-skeleton-in')).toHaveLength(2)
+  })
+
   it('draws no Folders heading when there are none', () => {
     render(<Sidebar openIssues={0} issuesHref="#/" projectsHref="#/projects" projects={[]} current="issues" />)
     expect(screen.queryByText('Folders')).not.toBeInTheDocument()

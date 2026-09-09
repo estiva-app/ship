@@ -118,10 +118,7 @@ export function Activity({ items, onReply, disabledReason, nameOf, onReact, onDe
 
   if (!items.length) {
     return (
-      <EmptyState
-        className={cn('py-8', className)}
-        message="Nothing related yet. Conversations that mention this, and conversations on its issues, appear here."
-      />
+      <EmptyState scope="section" className={cn('py-8', className)} message="No related conversations yet." />
     )
   }
 
