@@ -38,7 +38,7 @@ const folder = (over: Partial<FolderContents> = {}): FolderContents =>
   ({ id: '7b32200c-e4c0-4216-b79a-8490fc05e0bd', name: 'Onboarding', hasState: true, source: 'state', files: FILES, ...over }) as FolderContents
 
 const meta = {
-  title: 'Pages/FolderView',
+  title: 'Views/FolderView',
   component: FolderView,
   args: { folder: folder() },
   parameters: { layout: 'fullscreen' },

@@ -31,7 +31,9 @@ function Shell({ current, children }: { current: 'issues' | 'projects' | { proje
 }
 
 const meta = {
-  title: 'Views/Pages',
+  // A page is a view placed in the shell (Katerina, 2026-09-09: a view alone
+  // is under Views, a page in the shell under Pages).
+  title: 'Pages/In the shell',
   parameters: { layout: 'fullscreen' },
 } satisfies Meta
 
@@ -45,6 +47,18 @@ export const Projects: Story = {
     return (
       <Shell current="projects">
         <ProjectsView active={PROJECT_CARDS} archived={ARCHIVED_CARDS} showArchived={showArchived} onShowArchived={setShowArchived} onAddProject={fn()} />
+      </Shell>
+    )
+  },
+}
+
+/** No projects at all: the whole page is empty, so the empty state keeps its icon and its centre — the `page` manner (B18). */
+export const ProjectsEmpty: Story = {
+  render: () => {
+    const [showArchived, setShowArchived] = useState(false)
+    return (
+      <Shell current="projects">
+        <ProjectsView active={[]} archived={[]} showArchived={showArchived} onShowArchived={setShowArchived} onAddProject={fn()} />
       </Shell>
     )
   },
