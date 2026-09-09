@@ -7,7 +7,7 @@
  * of the state, "two apps agree on the data" would be measuring Ship's
  * cache rather than the shared record.
  */
-import type { PublishResult, Relay } from '@estiva-app/protocol'
+import type { Imeta, PublishResult, Relay } from '@estiva-app/protocol'
 import type { Signer } from '../lib/nostr/signer'
 import {
   buildCreateChannel,
@@ -533,6 +533,8 @@ export class Store {
     blockId?: string
     /** Reference to append so other apps can see what this is about. */
     aboutRef?: string
+    /** Files already uploaded to the relay — SHI-2. See `buildConversationMessage`. */
+    files?: readonly Imeta[]
   }): Promise<PublishResult> {
     const body = args.aboutRef ? `${args.body}\n\n${args.aboutRef}` : args.body
     return this.publish(
@@ -542,6 +544,7 @@ export class Store {
         replyTo: args.replyTo,
         about: args.about,
         blockId: args.blockId,
+        files: args.files,
       }),
     )
   }

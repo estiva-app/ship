@@ -532,7 +532,7 @@ function NewSinceHere() {
   return <Divider label="New since you last read this" tone="warning" className="mx-0 py-1" />
 }
 
-export function ConversationThread({ thread, onReply, disabledReason, unreadFrom, resolved, resolving, nameOf, reactionsBy, onReact, onDeleteMessage, onEditMessage, subdued = false }: { thread: ThreadData; onReply: (threadId: string, text: string) => Promise<boolean | void> | boolean | void; disabledReason?: string; unreadFrom?: string; resolved?: Record<string, ForeignObjectData | null | undefined>; resolving?: boolean; nameOf?: (pubkey: string) => string; /** Reactions by message id, read once for the surface. */ reactionsBy?: Record<string, readonly Reaction[]>; /** Add or take back a reaction on one message. */ onReact?: (messageId: string, emoji: string, mine?: string) => void; /** Publish a deletion for one message — CON-3. Omitted where nobody may write. */ onDeleteMessage?: (messageId: string) => Promise<boolean | void> | boolean | void; /** Publish an edit of one message — CON-4. Omitted where nobody may write. */ onEditMessage?: (messageId: string, body: string) => Promise<boolean | void> | boolean | void; /** Draw it as secondary — Activity's mentions, which do not carry a comment's trust (CON-9). */ subdued?: boolean }) {
+export function ConversationThread({ thread, onReply, disabledReason, unreadFrom, resolved, resolving, nameOf, reactionsBy, onReact, onDeleteMessage, onEditMessage, subdued = false }: { thread: ThreadData; onReply: (threadId: string, text: string, files: readonly Imeta[]) => Promise<boolean | void> | boolean | void; disabledReason?: string; unreadFrom?: string; resolved?: Record<string, ForeignObjectData | null | undefined>; resolving?: boolean; nameOf?: (pubkey: string) => string; /** Reactions by message id, read once for the surface. */ reactionsBy?: Record<string, readonly Reaction[]>; /** Add or take back a reaction on one message. */ onReact?: (messageId: string, emoji: string, mine?: string) => void; /** Publish a deletion for one message — CON-3. Omitted where nobody may write. */ onDeleteMessage?: (messageId: string) => Promise<boolean | void> | boolean | void; /** Publish an edit of one message — CON-4. Omitted where nobody may write. */ onEditMessage?: (messageId: string, body: string) => Promise<boolean | void> | boolean | void; /** Draw it as secondary — Activity's mentions, which do not carry a comment's trust (CON-9). */ subdued?: boolean }) {
   return (
     <div
       className={cn(
@@ -551,7 +551,7 @@ export function ConversationThread({ thread, onReply, disabledReason, unreadFrom
           <MessageCard message={reply} reply resolved={resolved} resolving={resolving} nameOf={nameOf} reactions={reactionsBy?.[reply.id]} onToggleReaction={onReact && ((emoji, mine) => onReact(reply.id, emoji, mine))} onDelete={onDeleteMessage && (() => onDeleteMessage(reply.id))} onEdit={onEditMessage && ((body) => onEditMessage(reply.id, body))} disabledReason={disabledReason} />
         </Fragment>
       ))}
-      <Composer kind="reply" onSubmit={(text) => onReply(thread.id, text)} disabledReason={disabledReason} draftKey={draftKeys.thread(thread.id)} className="ml-3.5 mt-1" />
+      <Composer kind="reply" onSubmit={(text, files) => onReply(thread.id, text, files)} disabledReason={disabledReason} draftKey={draftKeys.thread(thread.id)} className="ml-3.5 mt-1" />
     </div>
   )
 }
@@ -560,8 +560,9 @@ export interface ConversationsProps {
   threads: ThreadData[]
   /** Thread id → the id of its first unread message. Omitted threads have nothing new. */
   unread?: Record<string, string>
-  onStart: (text: string) => Promise<boolean | void> | boolean | void
-  onReply: (threadId: string, text: string) => Promise<boolean | void> | boolean | void
+  /** The text and the files already on the relay — SHI-2. See `Composer`. */
+  onStart: (text: string, files: readonly Imeta[]) => Promise<boolean | void> | boolean | void
+  onReply: (threadId: string, text: string, files: readonly Imeta[]) => Promise<boolean | void> | boolean | void
   /** Why nothing can be posted right now — every composer here is disabled with it. */
   disabledReason?: string
 

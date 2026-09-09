@@ -3,7 +3,7 @@ import { IconBox } from '@tabler/icons-react'
 import { Breadcrumb, type Crumb } from '@/components/ui/Breadcrumb'
 import { ScrollArea } from '@/components/ui/ScrollArea'
 import { linkTo } from '@/router'
-import type { ContentFormat } from '@estiva-app/protocol'
+import type { ContentFormat, Imeta } from '@estiva-app/protocol'
 import { Divider } from '@/components/ui/Divider'
 import { EditableText } from '@/components/ui/EditableText'
 import { Description } from '@/components/Description'
@@ -49,16 +49,23 @@ export interface IssueViewProps {
   activityTruncated?: number
   /** Thread id → first unread message id. Drives the feed divider (CRO-13). */
   unread?: Record<string, string>
-  /** `blockId` is set when the reader clicked a specific block — SPEC §13.6. */
-  onStartConversation: (text: string, blockId?: string) => Promise<boolean | void> | boolean | void
-  onReply: (threadId: string, text: string) => Promise<boolean | void> | boolean | void
+  /**
+   * `files` are attachments already on the relay — SHI-2. `blockId` is set when
+   * the reader clicked a specific block — SPEC §13.6.
+   *
+   * `files` comes second because that is the shape `Conversations` calls with;
+   * the block a comment is about is chosen by a different affordance and is
+   * supplied by whoever built it.
+   */
+  onStartConversation: (text: string, files: readonly Imeta[], blockId?: string) => Promise<boolean | void> | boolean | void
+  onReply: (threadId: string, text: string, files: readonly Imeta[]) => Promise<boolean | void> | boolean | void
   /**
    * Reply into a thread that belongs to another file — CON-9.
    *
    * A separate handler from `onReply` because the destination is different:
    * this one publishes into the thread's own Folder, never into this issue's.
    */
-  onReplyInActivity: (threadId: string, text: string) => Promise<boolean | void> | boolean | void
+  onReplyInActivity: (threadId: string, text: string, files: readonly Imeta[]) => Promise<boolean | void> | boolean | void
   history: HistoryEntry[]
   rail: Omit<IssueRailProps, 'className'>
   /** This object's address, so an unsent message is kept against it — CON-10. */

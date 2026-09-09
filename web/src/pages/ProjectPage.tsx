@@ -439,11 +439,11 @@ export function ProjectPage({
         unread={unread}
         // A project conversation is already in the topic it belongs to, so a
         // reference would be noise (withReference: false), as the old app has it.
-        onStartConversation={(body) => act('Message', () => startConversation({ folder: project.contentFolder, about: project.addr, withReference: false, body }), say, refresh)}
-        onReply={(threadId, body) => {
+        onStartConversation={(body, files) => act('Message', () => startConversation({ folder: project.contentFolder, about: project.addr, withReference: false, body, files }), say, refresh)}
+        onReply={(threadId, body, files) => {
           const conversation = conversations.find((c) => c.id === threadId)
           if (!conversation) return false
-          return act('Reply', () => reply(conversation, project.contentFolder, body), say, refresh)
+          return act('Reply', () => reply(conversation, project.contentFolder, body, files), say, refresh)
         }}
         activity={activity.items}
         activityTruncated={activity.truncated}
@@ -508,10 +508,10 @@ export function ProjectPage({
           }
           return act('Edit', () => editMessage(folder, messageId, body), say, refresh)
         }}
-        onReplyInActivity={(threadId, body) => {
+        onReplyInActivity={(threadId, body, files) => {
           const conversation = state.conversations.find((c) => c.id === threadId)
           if (!conversation?.root.folder) return false
-          return act('Reply', () => reply(conversation, conversation.root.folder, body), say, refresh)
+          return act('Reply', () => reply(conversation, conversation.root.folder, body, files), say, refresh)
         }}
         rail={{
           status: project.status,
