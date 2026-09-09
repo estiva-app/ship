@@ -27,7 +27,7 @@ export function ProjectsView({ active, archived, showArchived, onShowArchived, o
   const shown = showArchived ? archived : active
   return (
     // `data-surface` is the smoke test's waypoint — see IssuesView.
-    <div data-surface="projects" className="flex h-full flex-col gap-4 px-6 py-5">
+    <div data-surface="projects" className="flex flex-1 flex-col gap-4 px-6 py-5">
       <div className="flex items-center gap-3">
         <h1 className="flex-1 text-h3 text-text-primary">Projects</h1>
         <Button variant="primary" onClick={onAddProject} disabledReason={addDisabledReason}>

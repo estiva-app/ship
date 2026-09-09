@@ -87,7 +87,10 @@ export function IssueView({ crumbs, title, description, descriptionFormat,
 
   return (
     // `data-surface` is the smoke test's waypoint — see IssuesView.
-    <div data-surface="issue" className="grid h-full min-h-0 grid-cols-[minmax(0,1fr)_1px_auto] grid-rows-[auto_minmax(0,1fr)] gap-y-4">
+    // A page that scrolls inside itself: `flex-1 min-h-0 [contain:size]` — it
+    // takes exactly the frame's height and adds none of its own, so its columns
+    // scroll and the frame does not (the frame owns the bar, 2026-09-09).
+    <div data-surface="issue" className="grid min-h-0 flex-1 [contain:size] grid-cols-[minmax(0,1fr)_1px_auto] grid-rows-[auto_minmax(0,1fr)] gap-y-4">
       <div className="col-start-1 row-start-1 pl-6 pt-5">
         <Breadcrumb items={items} />
       </div>

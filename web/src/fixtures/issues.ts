@@ -96,3 +96,26 @@ export const ACTIVITY_ITEMS: ActivityItem[] = [
     },
   },
 ]
+
+/**
+ * As many rows as a canvas needs — forty to scroll a page, none to empty it
+ * (PREVENTION §5.8: a page story shows tall, empty and loading, not the
+ * happy nine). Cycles through the invented people and statuses; every row
+ * carries a ref and the project, every third a conversation or two.
+ */
+export function makeIssues(count: number): IssuesTableRow[] {
+  const people = [ANA, RAVI, MARA]
+  const statuses = ['todo', 'in_progress', 'done', 'cancelled']
+  return Array.from({ length: count }, (_, i) => ({
+    addr: `30851:a:g${i + 1}`,
+    id: `g${i + 1}`,
+    ref: `REL-${i + 10}`,
+    title: `Generated issue ${i + 1}: ${['a column', 'a draft', 'an accent', 'a keyboard path', 'a clock', 'a re-seed'][i % 6]} that needs looking at`,
+    status: statuses[i % statuses.length]!,
+    project: REL,
+    assignee: i % 4 === 3 ? undefined : people[i % 3],
+    openedBy: people[(i + 1) % 3]!,
+    at: NOW - 3600 * (i + 1) * 3,
+    conversations: i % 3 === 0 ? (i % 2) + 1 : undefined,
+  }))
+}
