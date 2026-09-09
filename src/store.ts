@@ -110,18 +110,38 @@ export interface WorkspaceState extends FolderState {
    * both repos red — see `attachments.ts`.
    */
   attachments: AttachmentIndex
+  /**
+   * Every Folder this read actually fetched (PER-3).
+   *
+   * Beside the fold, like the three above, and for the same reason: `foldFolder`
+   * is a contract with `estiva-agent` whose conformance test walks the union of
+   * its keys, so a `folders` field on `FolderState` would turn both repos red.
+   *
+   * It exists because the live socket needs the set and `loadAll` was the only
+   * thing that knew it — discovery *derives* the Folder list while reading, so
+   * there is no index to consult and nothing else can compute it. Which also
+   * means the subscription cannot be opened until a read has landed; see
+   * `useLiveWorkspace`.
+   */
+  folders: string[]
 }
 
 /**
  * Fold a set of events, and read off the same set the two things `foldFolder`
  * deliberately does not carry: tag-vs-body provenance, edits, and attachments.
  */
-function read(events: SignedEvent[]): WorkspaceState {
+function read(events: SignedEvent[], folders: string[]): WorkspaceState {
   return {
     ...foldFolder(events, referencedAddresses),
     tagged: taggedIndex(events),
     edits: foldEdits(events),
     attachments: foldAttachments(events),
+    // A parameter rather than derived from the events: the set that was
+    // *asked for* is not the set that came back. A Folder holding nothing this
+    // reader may see yields no events and would vanish from a derived list,
+    // and then nothing would ever subscribe to it — so it would stay empty and
+    // silent, which is indistinguishable from working.
+    folders: [...new Set(folders)],
   }
 }
 
@@ -706,7 +726,7 @@ export class Store {
    * reading one container in isolation.
    */
   async loadFolder(folder: string): Promise<WorkspaceState> {
-    return read(await this.rawFolders([folder]))
+    return read(await this.rawFolders([folder]), [folder])
   }
 
   /**
@@ -717,7 +737,7 @@ export class Store {
    * doing that serially would make the issue list N round trips deep.
    */
   async loadFolders(folders: string[]): Promise<WorkspaceState> {
-    return read(await this.rawFolders(folders))
+    return read(await this.rawFolders(folders), folders)
   }
 
   /**
@@ -819,7 +839,7 @@ export class Store {
       events = [...events, ...(await this.rawFolders([...wanted]))]
     }
 
-    return read(events)
+    return read(events, [...fetched])
   }
 
   /**

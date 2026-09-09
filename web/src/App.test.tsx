@@ -74,6 +74,7 @@ const STATE: WorkspaceState = {
   // Nor attachments: `scripts/attachments.test.ts` covers the fold and
   // `ui/Attachment.test.tsx` the drawing (CON-12).
   attachments: {},
+  folders: [],
 }
 
 const refresh = vi.fn().mockResolvedValue(undefined)
@@ -87,7 +88,7 @@ beforeEach(() => {
   goTo('/')
   refresh.mockClear()
   for (const write of [createProject, createIssue, setIssueField, deleteProject, deleteIssue, startConversation]) vi.mocked(write).mockReset()
-  vi.mocked(useWorkspace).mockReturnValue({ state: STATE, error: null, loading: false, busy: false, refresh })
+  vi.mocked(useWorkspace).mockReturnValue({ state: STATE, error: null, loading: false, busy: false, refresh , live: false })
   vi.mocked(useDirectory).mockReturnValue({
     directory: new Map(),
     nameOf: (k: string) => (k === ME ? 'Me Myself' : 'Someone'),
@@ -120,7 +121,7 @@ describe('App — the shell around the route', () => {
   })
 
   it('shows the read error as a banner and keeps the shell', () => {
-    vi.mocked(useWorkspace).mockReturnValue({ state: STATE, error: 'relay refused', loading: false, busy: false, refresh: async () => {} })
+    vi.mocked(useWorkspace).mockReturnValue({ state: STATE, error: 'relay refused', loading: false, busy: false, refresh: async () => {} , live: false })
     render(<App />)
     expect(screen.getByText(/Could not read from the relay — relay refused/)).toBeInTheDocument()
     expect(within(screen.getByRole('banner')).getByText('Me Myself')).toBeInTheDocument()
@@ -367,7 +368,7 @@ describe('Issue page — one issue from the fold', () => {
  */
 describe('before the first read lands', () => {
   it('shows a skeleton rather than an empty page', () => {
-    vi.mocked(useWorkspace).mockReturnValue({ state: null, error: null, loading: true, busy: false, refresh })
+    vi.mocked(useWorkspace).mockReturnValue({ state: null, error: null, loading: true, busy: false, refresh , live: false })
     const { container } = render(<App />)
     expect(container.querySelector('[data-loading="workspace"]')).not.toBeNull()
   })
@@ -378,7 +379,7 @@ describe('before the first read lands', () => {
     leaves nothing to distinguish "busy" from "stopped".
   */
   it('says the relay is busy when there is nothing on screen yet', () => {
-    vi.mocked(useWorkspace).mockReturnValue({ state: null, error: null, loading: false, busy: true, refresh })
+    vi.mocked(useWorkspace).mockReturnValue({ state: null, error: null, loading: false, busy: true, refresh , live: false })
     render(<App />)
     expect(screen.getByText(/The relay is busy/)).toBeInTheDocument()
     // Not the error banner: nothing is broken.
@@ -386,7 +387,7 @@ describe('before the first read lands', () => {
   })
 
   it('says nothing about quota once the workspace is on screen', () => {
-    vi.mocked(useWorkspace).mockReturnValue({ state: STATE, error: null, loading: false, busy: false, refresh })
+    vi.mocked(useWorkspace).mockReturnValue({ state: STATE, error: null, loading: false, busy: false, refresh , live: false })
     render(<App />)
     expect(screen.queryByText(/The relay is busy/)).toBeNull()
   })

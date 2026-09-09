@@ -71,6 +71,21 @@ const COALESCE_MS = 1000
 
 export interface RefreshOptions {
   intervalMs?: number
+  /**
+   * Whether the timer runs at all. Default `true`.
+   *
+   * PER-3 turns this off while the live socket is connected, which is what
+   * demotes the poll from the delivery mechanism to a fallback — the same shape
+   * Peek has had since PEE-8: `useRefreshTriggers(…, { interval: relayState !==
+   * 'live' })`.
+   *
+   * **Only the timer.** `visibilitychange` and `focus` still fire, on purpose: a
+   * tab that was hidden for ten minutes has had no socket frames delivered to
+   * it either — a backgrounded tab's socket may have been dropped by the
+   * browser, and a reconnect's backfill is not instant — so re-reading when
+   * somebody looks at it is right whether or not the socket says `live`.
+   */
+  interval?: boolean
 }
 
 /**
@@ -87,7 +102,10 @@ export interface RefreshOptions {
  * the caller owns its first read. Cleans up its timer and listeners on
  * unmount, and never stacks one interval per render.
  */
-export function useRefresh(refresh: () => void | Promise<void>, { intervalMs = REFRESH_MS }: RefreshOptions = {}): void {
+export function useRefresh(
+  refresh: () => void | Promise<void>,
+  { intervalMs = REFRESH_MS, interval = true }: RefreshOptions = {},
+): void {
   const latest = useRef(refresh)
   useEffect(() => {
     latest.current = refresh
@@ -109,6 +127,7 @@ export function useRefresh(refresh: () => void | Promise<void>, { intervalMs = R
       void latest.current()
     }
     const start = () => {
+      if (!interval) return
       if (timer === undefined) timer = setInterval(tick, intervalMs)
     }
     const stop = () => {
@@ -136,5 +155,5 @@ export function useRefresh(refresh: () => void | Promise<void>, { intervalMs = R
       document.removeEventListener('visibilitychange', onVisibility)
       window.removeEventListener('focus', onFocus)
     }
-  }, [intervalMs])
+  }, [intervalMs, interval])
 }
