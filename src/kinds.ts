@@ -39,12 +39,26 @@ export const KIND = {
   /**
    * NIP-22 comment — a threaded comment scoped to any event or **address**.
    *
-   * Read but not yet written (REW-10). Ship publishes comments as `kind:9` so
-   * that a comment and the Peek topic conversation are one event rather than
-   * two records nobody reconciles; `1111` keeps that property while dropping
-   * the one non-standard part, since scoping to an addressable event is
-   * precisely what lets two apps comment on the same object without either
-   * owning the comment kind.
+   * **Written as well as read**, and this said otherwise until 2026-09-09 — it
+   * still carried REW-10's "read but not yet written. Ship publishes comments
+   * as `kind:9`", which REW-10 itself then made false and nobody came back to.
+   *
+   * What actually decides the kind is one line in `events.ts`
+   * (`buildConversationMessage`): a comment that names what it is **about**
+   * becomes a `kind:1111`, and every other message stays a `kind:9`. So the two
+   * files two apart from each other said opposite things about production.
+   *
+   * Not a cosmetic disagreement. A `kind:9` filter looks like the way to read
+   * "the comments", returns most of them, and silently omits exactly the ones
+   * attached to an object — the shape that is hardest to notice, because the
+   * answer is populated. Found when a probe went looking for a comment it had
+   * just published, asked for `kind:9`, and reported the event **gone**.
+   *
+   * The reason for the kind is unchanged: a comment and the Peek topic
+   * conversation stay one event rather than two records nobody reconciles, and
+   * `1111` keeps that property while dropping the one non-standard part, since
+   * scoping to an addressable event is precisely what lets two apps comment on
+   * the same object without either owning the comment kind.
    *
    * Uppercase `A`/`E`/`K`/`P` name the thread root, lowercase the immediate
    * parent. See `parseNip22Comment` in `fold.ts` — the case is the whole spec.
