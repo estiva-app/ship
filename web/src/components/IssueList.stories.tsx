@@ -9,7 +9,7 @@ const meta = {
   args: { issues: ROWS, statuses: ISSUE_STATUSES, hrefFor },
   decorators: [
     (Story) => (
-      <div className="w-[720px]">
+      <div className="w-[900px]">
         <Story />
       </div>
     ),
