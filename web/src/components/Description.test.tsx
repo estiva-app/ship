@@ -72,7 +72,8 @@ describe('Description', () => {
       moment a person clicks. That difference was the whole report.
     */
     show(`See ${NADDR} for the detail.`)
-    fireEvent.click(screen.getByRole('button', { name: /edit description/i }))
+    // The reading surface is the way in (D37): a click on the prose opens it.
+    fireEvent.click(screen.getByText(/for the detail/))
 
     // `findBy`, because the editor is a lazy chunk: a reader never downloads
     // ProseMirror, so the first click is what fetches it.
@@ -96,7 +97,8 @@ describe('Description', () => {
 
   it('offers no edit affordance to a reader who cannot write', () => {
     const c = render(<Description value="text" format="marker" onCommit={() => true} readOnly />).container
-    expect(screen.queryByRole('button', { name: /edit description/i })).toBeNull()
+    // No focusable surface either: a reader who cannot write gets no way in (D37).
+    expect(c.querySelector('[tabindex="0"]')).toBeNull()
     // And clicking the prose does nothing: the affordance is the only way in,
     // so removing it has to remove the capability rather than only the button.
     fireEvent.click(c.querySelector('p')!)
