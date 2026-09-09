@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { IconBox } from '@tabler/icons-react'
 import { Breadcrumb, type Crumb } from '@/components/ui/Breadcrumb'
 import { ScrollArea } from '@/components/ui/ScrollArea'
 import { linkTo } from '@/router'
@@ -78,7 +79,10 @@ export function IssueView({ crumbs, title, description, descriptionFormat,
   // `linkTo` on each crumb (S15, 0.10.0): the breadcrumbs were the last links
   // in Ship that reloaded the whole app on a click (SHI-20).
   const items: Crumb[] = [{ label: 'Issues', ...linkTo(crumbs.issuesHref) }]
-  if (crumbs.project) items.push({ label: crumbs.project.title, ...linkTo(crumbs.project.href) })
+  // The box before the project's name says it is a project, as the sidebar's
+  // entry does (Katerina, 2026-09-09) — a crumb that is only a title reads
+  // as any place at all.
+  if (crumbs.project) items.push({ label: crumbs.project.title, icon: <IconBox size={16} stroke={1.5} />, ...linkTo(crumbs.project.href) })
   if (crumbs.ref) items.push({ label: crumbs.ref, mono: true })
 
   return (

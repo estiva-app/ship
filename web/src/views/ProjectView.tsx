@@ -1,4 +1,4 @@
-import { IconLayoutKanban, IconTable } from '@tabler/icons-react'
+import { IconBox, IconLayoutKanban, IconTable } from '@tabler/icons-react'
 import type { ContentFormat } from '@estiva-app/protocol'
 import { Breadcrumb } from '@/components/ui/Breadcrumb'
 import { ScrollArea } from '@/components/ui/ScrollArea'
@@ -88,7 +88,9 @@ export function ProjectView({ crumbs, header, onAddIssue, view, onView, issues, 
     // tell "the board rendered" from "the toggle did nothing".
     <div data-surface="project" data-view={view} className="grid h-full min-h-0 grid-cols-[minmax(0,1fr)_1px_auto] grid-rows-[auto_minmax(0,1fr)] gap-y-4">
       <div className="col-start-1 row-start-1 pl-6 pt-5">
-        <Breadcrumb items={[{ label: 'Projects', ...linkTo(crumbs.projectsHref) }, { label: crumbs.title }]} />
+        {/* The box before the name says it is a project — the sidebar's icon
+            for one (Katerina, 2026-09-09). */}
+        <Breadcrumb items={[{ label: 'Projects', ...linkTo(crumbs.projectsHref) }, { label: crumbs.title, icon: <IconBox size={16} stroke={1.5} /> }]} />
       </div>
       {/* Only the content column scrolls — with Peek's thin scrollbar right
           beside the hairline, which runs from the top bar to the bottom. The
