@@ -524,11 +524,11 @@ export function ProjectPage({
           total: issues.length,
           folder: project.contentFolder,
           onCopyFolderLink: () =>
-            void copyText(folderLink(project.contentFolder), 'Folder link copied — paste it into Peek to pair a topic.', 'Copy this Folder link:', say),
+            void copyText(folderLink(project.contentFolder), 'Folder link copied', 'Copy this Folder link:', say),
           onPairFolder: () => setDialog('pair'),
           onArchive: () =>
             void act(project.archived ? 'Unarchive' : 'Archive', () => archiveProject(project, !project.archived), say, refresh).then((ok) => {
-              if (ok) say(project.archived ? 'Project restored.' : 'Project archived.')
+              if (ok) say(project.archived ? 'Project restored' : 'Project archived')
             }),
           onDelete: () => setDialog('delete'),
         }}
@@ -546,6 +546,7 @@ export function ProjectPage({
               return false
             }
             await refresh()
+            say('Issue created')
             return true
           }}
         />
@@ -568,7 +569,7 @@ export function ProjectPage({
                 'error',
               )
             } else {
-              say('Paired. New issues will land in that Folder.')
+              say('Folder paired')
             }
             return true
           }}
@@ -587,7 +588,7 @@ export function ProjectPage({
               say(`Delete rejected — ${result.reason}`, 'error')
               return false
             }
-            say('Deletion requested.')
+            say('Project deleted')
             // Nothing left to render here.
             go({ name: 'projects', archived: false })
             await refresh()

@@ -204,7 +204,7 @@ export function IssuePage({ state, directory, d, say, refresh }: { state: Worksp
           },
           openedBy: directory.personOf(issue.author),
           openedAt: issue.createdAt,
-          onCopyReference: () => void copyText(referenceFor(issue.addr), 'Reference copied — paste it into a Peek message.', 'Copy this reference:', say),
+          onCopyReference: () => void copyText(referenceFor(issue.addr), 'Reference copied', 'Copy this reference:', say),
           onDelete: () => setConfirmingDelete(true),
         }}
       />
@@ -220,7 +220,7 @@ export function IssuePage({ state, directory, d, say, refresh }: { state: Worksp
               say(`Delete rejected — ${result.reason}`, 'error')
               return false
             }
-            say('Deletion requested.')
+            say('Issue deleted')
             // Nothing left to render here.
             go(project ? { name: 'project', d: project.id, slug: project.title, view: 'table' } : { name: 'issues' })
             await refresh()

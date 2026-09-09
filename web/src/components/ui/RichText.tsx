@@ -35,7 +35,6 @@ export function RichText({
   nameOf,
   resolved,
   hideStandalone,
-  onCommentOn,
 }: {
   value: string
   format: ContentFormat
@@ -65,16 +64,6 @@ export function RichText({
    * chip for whatever it cannot draw below.
    */
   hideStandalone?: boolean | ((reference: string) => boolean)
-  /**
-   * Offer to comment on one block — SPEC §13.6.
-   *
-   * Only a block that *has* an id can be commented on, which is exactly the
-   * difference between the two content models: marker text has no addressable
-   * sub-unit (§13.1), so `toRenderTree` gives its blocks no id and no
-   * affordance appears. That is the honest behaviour rather than a limitation
-   * to work around — there is nothing there to point at.
-   */
-  onCommentOn?: (blockId: string) => void
 }) {
   const all = toRenderTree(value, format)
   // A block that is nothing but one reference is an attachment; the caller
@@ -90,31 +79,11 @@ export function RichText({
     // The type styles are `PROSE_BLOCKS`, shared with the editor rather than
     // written twice — see that file for why (RIC-14).
     <div className={cn(PROSE_BLOCKS, className)}>
-      {blocks.map((block, i) =>
-        onCommentOn && block.id ? (
-          <div key={block.id} className="group/block relative">
-            {renderBlock(block, i, nameOf, resolved)}
-            <button
-              type="button"
-              onClick={() => onCommentOn(block.id as string)}
-              aria-label="Comment on this block"
-              // Which block it offers to comment on. The button only exists
-              // while its block is hovered, so ordinal selectors cannot address
-              // it — a checker has to say which one it means.
-              data-comment-on={block.id}
-              className="absolute -left-6 top-0 hidden rounded-sm px-1 text-caption text-text-muted hover:text-text-primary group-hover/block:block"
-            >
-              {/* The glyph is decoration; `aria-label` is the name. Without
-                  `aria-hidden` it joins the description's own text — a reader
-                  gets "Rewritten✎A bold claim", and so does anything reading
-                  the body out loud. */}
-              <span aria-hidden="true">&#9998;</span>
-            </button>
-          </div>
-        ) : (
-          renderBlock(block, i, nameOf, resolved)
-        ),
-      )}
+      {/* The per-block "comment on this" control that used to sit here is
+          gone (Katerina, 2026-09-08, D37): a hover-only pencil nobody found.
+          Reading a comment that carries an anchor still works — that is
+          BlockAnchorNote's job. */}
+      {blocks.map((block, i) => renderBlock(block, i, nameOf, resolved))}
     </div>
   )
 }

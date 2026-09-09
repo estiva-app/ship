@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { Breadcrumb, type Crumb } from '@/components/ui/Breadcrumb'
+import { ScrollArea } from '@/components/ui/ScrollArea'
+import { linkTo } from '@/router'
 import type { ContentFormat } from '@estiva-app/protocol'
 import { Divider } from '@/components/ui/Divider'
 import { EditableText } from '@/components/ui/EditableText'
@@ -72,13 +74,11 @@ export interface IssueViewProps {
 
 export function IssueView({ crumbs, title, description, descriptionFormat,
   nameOf, onRename, onDescribe, threads, unread, onStartConversation, onReply, activity, activityTruncated, onReplyInActivity, history, rail, about, onReact, onDeleteMessage, onEditMessage, readOnlyReason }: IssueViewProps) {
-  /* Which block the next comment is about — SPEC §13.6. Held here rather than
-     in the composer because the choice is made by clicking the description,
-     which is a different part of the page. */
-  const [anchorTo, setAnchorTo] = useState<string | undefined>(undefined)
 
-  const items: Crumb[] = [{ label: 'Issues', href: crumbs.issuesHref }]
-  if (crumbs.project) items.push({ label: crumbs.project.title, href: crumbs.project.href })
+  // `linkTo` on each crumb (S15, 0.10.0): the breadcrumbs were the last links
+  // in Ship that reloaded the whole app on a click (SHI-20).
+  const items: Crumb[] = [{ label: 'Issues', ...linkTo(crumbs.issuesHref) }]
+  if (crumbs.project) items.push({ label: crumbs.project.title, ...linkTo(crumbs.project.href) })
   if (crumbs.ref) items.push({ label: crumbs.ref, mono: true })
 
   return (
@@ -91,7 +91,9 @@ export function IssueView({ crumbs, title, description, descriptionFormat,
           beside the hairline, which runs from the top bar to the bottom. The
           content keeps 24px inside the column (pl/pr-6), the rail 24px either
           side, and the rail starts level with the title and never moves. */}
-      <div className="col-start-1 row-start-2 flex min-h-0 min-w-0 flex-col gap-6 overflow-y-auto px-6 pb-5">
+      {/* Both columns scroll in a ScrollArea (D40): the bar takes no width, so
+          the 24px of padding read the same with a bar as without. */}
+      <ScrollArea className="col-start-1 row-start-2 min-h-0 min-w-0" contentClassName="flex flex-col gap-6 px-6 pb-5">
         <div className="flex flex-col gap-2">
           <EditableText label="Title" value={title} placeholder="Untitled issue" onCommit={onRename} readOnly={!!readOnlyReason} className="-mx-2 text-h2" />
           <Description
@@ -99,7 +101,6 @@ export function IssueView({ crumbs, title, description, descriptionFormat,
             format={descriptionFormat}
             onCommit={onDescribe}
             readOnly={!!readOnlyReason}
-            onCommentOn={readOnlyReason ? undefined : setAnchorTo}
             nameOf={nameOf}
           />
         </div>
@@ -108,11 +109,9 @@ export function IssueView({ crumbs, title, description, descriptionFormat,
           <Conversations
             threads={threads}
             unread={unread}
-            onStart={(text) => onStartConversation(text, anchorTo)}
+            onStart={onStartConversation}
             onReply={onReply}
             disabledReason={readOnlyReason}
-            anchoredTo={anchorTo}
-            onClearAnchor={() => setAnchorTo(undefined)}
             nameOf={nameOf}
             onReact={onReact}
             onDeleteMessage={onDeleteMessage}
@@ -128,11 +127,11 @@ export function IssueView({ crumbs, title, description, descriptionFormat,
           <h2 className="text-h4 text-text-primary">History</h2>
           <History entries={history} />
         </section>
-      </div>
+      </ScrollArea>
       <Divider orientation="vertical" className="col-start-2 row-span-2 row-start-1" />
-      <div className="col-start-3 row-start-2 min-h-0 overflow-y-auto px-6 pb-5">
+      <ScrollArea className="col-start-3 row-start-2 min-h-0" contentClassName="px-6 pb-5">
         <IssueRail {...rail} readOnlyReason={readOnlyReason} />
-      </div>
+      </ScrollArea>
     </div>
   )
 }

@@ -35,7 +35,7 @@ describe('ProjectRail', () => {
     expect(screen.getByText('10 of 14 done')).toBeInTheDocument()
     expect(screen.getByText('5c1e2a7b-9d40-4f3a-8e6b-2f0c7d1a9b34')).toBeInTheDocument()
     // The assignee select shows the chosen person's face before the name.
-    expect(screen.getByRole('button', { name: 'Assignee' }).querySelector('svg')).not.toBeNull()
+    expect(screen.getByRole('combobox', { name: 'Assignee' }).querySelector('svg')).not.toBeNull()
     for (const name of ['Copy Folder link', 'Pair with another Folder…', 'Archive project', 'Delete project']) {
       expect(screen.getByRole('button', { name })).toHaveClass('h-6')
     }

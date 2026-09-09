@@ -58,7 +58,7 @@ export function ProjectsPage({ state, directory, archived, say, refresh }: { sta
               return false
             }
             await refresh()
-            say(draft.folder ? 'Project created in the Folder you pasted — it and that topic are now one container.' : 'Project created, with its own Folder.')
+            say('Project created')
             return true
           }}
         />

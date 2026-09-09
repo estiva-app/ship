@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { initialsFor } from '@estiva-app/ui'
 import { Avatar } from './ui/Avatar'
@@ -30,11 +31,11 @@ describe("Avatar (the shared one, on Peek's rules)", () => {
 })
 
 describe('NavItem', () => {
-  it('counts open issues and says so', () => {
+  it('counts open issues and says so', async () => {
     render(<NavItem label="Issues" href="#/" count={18} />)
     expect(screen.getByText('18')).toBeInTheDocument()
-    fireEvent.mouseEnter(screen.getByText('18').parentElement!)
-    expect(screen.getByRole('tooltip')).toHaveTextContent('18 open')
+    await userEvent.hover(screen.getByText('18'))
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('18 open')
   })
 
   it('draws no counter for zero', () => {

@@ -63,22 +63,20 @@ export function PairFolderDialog({ currentFolder, onClose, onPair }: PairFolderD
         New issues will go to the Folder you paste. Issues already filed stay readable in the old Folder — events cannot move.
       </p>
       <form id="pair-folder" onSubmit={submit}>
-        <Field label="Folder link">
-          <div className="flex flex-col gap-1.5">
-            <TextInput
-              value={link}
-              onChange={(e) => {
-                setLink(e.target.value)
-                setError(null)
-              }}
-              placeholder="Paste a Peek topic's Folder link"
-              className="font-mono"
-              aria-invalid={error ? true : undefined}
-              autoFocus
-              disabled={busy}
-            />
-            {error && <span className="text-caption text-error-default">{error}</span>}
-          </div>
+        {/* The error line is Field's own since 0.10.0 (S7): it marks the
+            control invalid and is announced, which the hand-built span was not. */}
+        <Field label="Folder link" error={error ?? undefined}>
+          <TextInput
+            value={link}
+            onChange={(e) => {
+              setLink(e.target.value)
+              setError(null)
+            }}
+            placeholder="Paste a Peek topic's Folder link"
+            className="font-mono"
+            autoFocus
+            disabled={busy}
+          />
         </Field>
       </form>
     </DialogShell>

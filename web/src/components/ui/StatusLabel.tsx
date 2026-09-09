@@ -18,9 +18,10 @@ import { cn } from '@/lib/cn'
  * `strong` for a group or column heading, where the label names a group
  * rather than describing a thing — the weight changes, the colour does not.
  *
- * Sizes are arbitrary values because this string goes through cn(): a token
- * size before a colour class is dropped by tailwind-merge. small = caption,
- * default = body-2. There is deliberately no icon-only export: a status
+ * small = caption, default = body-2, as the type tokens (S6, 0.10.0): the
+ * package's cn() names the ramp for tailwind-merge, so a token size beside a
+ * colour class survives, which is why these were arbitrary values before.
+ * There is deliberately no icon-only export: a status
  * without its word is a dot, and dots were what the shapes replaced.
  */
 export interface StatusLabelProps {
@@ -56,7 +57,7 @@ export function StatusLabel({ value, label, size = 'default', strong = false, cl
     <span
       className={cn(
         'inline-flex items-center gap-1.5 whitespace-nowrap text-text-secondary',
-        size === 'small' ? 'text-[12px] leading-[120%]' : 'text-[14px] leading-[140%]',
+        size === 'small' ? 'text-caption' : 'text-body-2',
         strong && 'font-medium',
         className,
       )}

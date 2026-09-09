@@ -66,11 +66,14 @@ export function IssueRail({
         <Select value={project} onChange={onProjectChange} options={projects} ariaLabel="Project" disabled={locked} />
       </Property>
       <Divider className="mx-0" />
-      <span className="flex items-center gap-1.5 text-caption text-text-muted">
-        Opened by
-        <Person name={openedBy.name} picture={openedBy.picture} size={16} className="text-text-secondary" />
-        · {ago(openedAt)}
-      </span>
+      {/* The same shape as the three above (Katerina, 2026-09-08): the label
+          over the value, not beside it. */}
+      <Property layout="stacked" label="Opened by">
+        <span className="flex items-center gap-1.5 text-caption text-text-muted">
+          <Person name={openedBy.name} picture={openedBy.picture} size={16} className="text-text-secondary" />
+          · {ago(openedAt)}
+        </span>
+      </Property>
       <Button size="small" variant="outlined" className="self-start" onClick={onCopyReference}>
         Copy reference for Peek
       </Button>

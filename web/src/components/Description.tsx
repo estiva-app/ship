@@ -33,7 +33,6 @@ export function Description({
   format,
   onCommit,
   readOnly = false,
-  onCommentOn,
   nameOf,
   className,
 }: {
@@ -48,8 +47,6 @@ export function Description({
    */
   onCommit: (next: string, contentFormat?: string) => Promise<boolean> | boolean
   readOnly?: boolean
-  /** Offer to comment on one block — SPEC §13.6. Omitted where nobody may write. */
-  onCommentOn?: (blockId: string) => void
   /** Resolve a mentioned key to a name — SPEC §13.1. The workspace directory's. */
   nameOf?: (pubkey: string) => string
   className?: string
@@ -82,7 +79,6 @@ export function Description({
         onCommit={onCommit}
         placeholder="Add a description…"
         readOnly={readOnly}
-        onCommentOn={onCommentOn}
         nameOf={nameOf}
         resolved={resolved}
       />

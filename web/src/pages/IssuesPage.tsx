@@ -58,6 +58,7 @@ export function IssuesPage({ state, directory, say, refresh }: { state: FolderSt
               return false
             }
             await refresh()
+            say('Issue created')
             return true
           }}
         />

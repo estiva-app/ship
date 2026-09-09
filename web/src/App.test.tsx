@@ -1,4 +1,5 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorkspaceState } from '@/api'
 
@@ -165,7 +166,7 @@ describe('Projects page — cards from the fold', () => {
     fireEvent.click(dialog.getByRole('button', { name: 'Create project' }))
     await waitFor(() => expect(createProject).toHaveBeenCalledWith({ title: 'Mobile app', description: '', folder: undefined }))
     await waitFor(() => expect(refresh).toHaveBeenCalled())
-    expect(await screen.findByText('Project created, with its own Folder.')).toBeInTheDocument()
+    expect(await screen.findByText('Project created')).toBeInTheDocument()
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   })
 
@@ -219,7 +220,7 @@ describe('Project page — one project from the fold', () => {
     expect(main.getAllByRole('row')).toHaveLength(3) // header + 2 issues
     expect(main.getByText('about the project')).toBeInTheDocument()
     expect(main.getByText('reply')).toBeInTheDocument()
-    expect(main.getByRole('button', { name: 'Status' })).toBeEnabled()
+    expect(main.getByRole('combobox', { name: 'Status' })).toBeEnabled()
     expect(main.getByRole('button', { name: 'Copy Folder link' })).toBeEnabled()
     expect(main.getByRole('button', { name: /Archive project/ })).toBeEnabled()
     /*
@@ -243,11 +244,11 @@ describe('Project page — one project from the fold', () => {
     const main = within(screen.getByRole('main'))
     expect(main.queryByRole('table')).not.toBeInTheDocument()
     fireEvent.click(main.getByRole('button', { name: 'Delete project' }))
-    const dialog = within(screen.getByRole('dialog', { name: /Delete .Mine./ }))
+    const dialog = within(screen.getByRole('alertdialog', { name: /Delete .Mine./ }))
     expect(deleteProject).not.toHaveBeenCalled()
     fireEvent.click(dialog.getByRole('button', { name: 'Delete project' }))
     await waitFor(() => expect(deleteProject).toHaveBeenCalledWith(expect.objectContaining({ addr: `30850:x:${MINE}` })))
-    expect(await screen.findByText('Deletion requested.')).toBeInTheDocument()
+    expect(await screen.findByText('Project deleted')).toBeInTheDocument()
     await waitFor(() => expect(location.pathname).toBe('/projects'))
   })
 
@@ -280,7 +281,7 @@ describe('Issue page — one issue from the fold', () => {
     expect(main.getByText('hi')).toBeInTheDocument()
     const feed = main.getAllByText(/set (status|assignee) to/)
     expect(feed.map((node) => node.textContent)).toEqual(['Me Myself set status to in_progress', 'Someone set assignee to Me Myself'])
-    expect(main.getByRole('button', { name: 'Assignee' })).toBeEnabled()
+    expect(main.getByRole('combobox', { name: 'Assignee' })).toBeEnabled()
     expect(main.getByRole('button', { name: 'Copy reference for Peek' })).toBeEnabled()
     expect(main.getByText(/Opened by/)).toBeInTheDocument()
   })
@@ -290,19 +291,19 @@ describe('Issue page — one issue from the fold', () => {
     goTo(`/issue/${D('14')}`)
     render(<App />)
     const main = within(screen.getByRole('main'))
-    fireEvent.click(main.getByRole('button', { name: 'Status' }))
-    fireEvent.mouseDown(screen.getByRole('option', { name: 'Done' }))
+    fireEvent.click(main.getByRole('combobox', { name: 'Status' }))
+    await userEvent.click(screen.getByRole('option', { name: 'Done' }))
     // The trailing `undefined` is the content format, which only a description
     // carries (RIC-14) — a status is a scalar and says so by passing none.
     await waitFor(() => expect(setIssueField).toHaveBeenCalledWith(expect.objectContaining({ addr: `30851:x:${D('14')}` }), 'status', 'done', 'Status → done', undefined))
     await waitFor(() => expect(refresh).toHaveBeenCalledTimes(1))
 
     vi.mocked(setIssueField).mockResolvedValue({ ok: false, reason: 'relay said no' })
-    fireEvent.click(main.getByRole('button', { name: 'Status' }))
-    fireEvent.mouseDown(screen.getByRole('option', { name: 'Cancelled' }))
+    fireEvent.click(main.getByRole('combobox', { name: 'Status' }))
+    await userEvent.click(screen.getByRole('option', { name: 'Cancelled' }))
     expect(await screen.findByText(/Status → cancelled rejected — relay said no/)).toBeInTheDocument()
     expect(refresh).toHaveBeenCalledTimes(1)
-    expect(main.getByRole('button', { name: 'Status' })).toHaveTextContent('In Progress')
+    expect(main.getByRole('combobox', { name: 'Status' })).toHaveTextContent('In Progress')
   })
 
   it('asks before deleting an issue, says the conversations survive, and requests the deletion', async () => {
@@ -311,13 +312,13 @@ describe('Issue page — one issue from the fold', () => {
     render(<App />)
     const main = within(screen.getByRole('main'))
     fireEvent.click(main.getByRole('button', { name: 'Delete issue' }))
-    const dialog = within(screen.getByRole('dialog', { name: /Delete/ }))
+    const dialog = within(screen.getByRole('alertdialog', { name: /Delete/ }))
     expect(deleteIssue).not.toHaveBeenCalled()
     // SHI-3 is explicit that this must not read as deleting the discussion.
     expect(dialog.getByText(/not deleted/)).toBeInTheDocument()
     fireEvent.click(dialog.getByRole('button', { name: 'Delete issue' }))
     await waitFor(() => expect(deleteIssue).toHaveBeenCalledWith(expect.objectContaining({ addr: `30851:x:${D('14')}` })))
-    expect(await screen.findByText('Deletion requested.')).toBeInTheDocument()
+    expect(await screen.findByText('Issue deleted')).toBeInTheDocument()
   })
 
   it('reports a refused deletion and stays on the issue', async () => {
@@ -326,7 +327,7 @@ describe('Issue page — one issue from the fold', () => {
     render(<App />)
     const main = within(screen.getByRole('main'))
     fireEvent.click(main.getByRole('button', { name: 'Delete issue' }))
-    const dialog = within(screen.getByRole('dialog', { name: /Delete/ }))
+    const dialog = within(screen.getByRole('alertdialog', { name: /Delete/ }))
     fireEvent.click(dialog.getByRole('button', { name: 'Delete issue' }))
     expect(await screen.findByText(/Delete rejected — must be event author/)).toBeInTheDocument()
     expect(location.pathname).toBe(`/issue/${D('14')}`)

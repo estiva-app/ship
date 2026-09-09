@@ -1,6 +1,8 @@
 import { IconLayoutKanban, IconTable } from '@tabler/icons-react'
 import type { ContentFormat } from '@estiva-app/protocol'
 import { Breadcrumb } from '@/components/ui/Breadcrumb'
+import { ScrollArea } from '@/components/ui/ScrollArea'
+import { linkTo } from '@/router'
 import { Button } from '@/components/ui/Button'
 import { Divider } from '@/components/ui/Divider'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -86,13 +88,15 @@ export function ProjectView({ crumbs, header, onAddIssue, view, onView, issues, 
     // tell "the board rendered" from "the toggle did nothing".
     <div data-surface="project" data-view={view} className="grid h-full min-h-0 grid-cols-[minmax(0,1fr)_1px_auto] grid-rows-[auto_minmax(0,1fr)] gap-y-4">
       <div className="col-start-1 row-start-1 pl-6 pt-5">
-        <Breadcrumb items={[{ label: 'Projects', href: crumbs.projectsHref }, { label: crumbs.title }]} />
+        <Breadcrumb items={[{ label: 'Projects', ...linkTo(crumbs.projectsHref) }, { label: crumbs.title }]} />
       </div>
       {/* Only the content column scrolls — with Peek's thin scrollbar right
           beside the hairline, which runs from the top bar to the bottom. The
           content keeps 24px inside the column (pl/pr-6), the rail 24px either
           side, and the rail starts level with the title and never moves. */}
-      <div className="col-start-1 row-start-2 flex min-h-0 min-w-0 flex-col gap-6 overflow-y-auto px-6 pb-5">
+      {/* Both columns scroll in a ScrollArea (D40): the bar takes no width, so
+          the 24px of padding read the same with a bar as without. */}
+      <ScrollArea className="col-start-1 row-start-2 min-h-0 min-w-0" contentClassName="flex flex-col gap-6 px-6 pb-5">
         <ProjectHeader {...header} readOnly={!!readOnlyReason} action={addIssue} />
         <section className="flex flex-col gap-3">
           <div className="flex items-center gap-3">
@@ -122,11 +126,11 @@ export function ProjectView({ crumbs, header, onAddIssue, view, onView, issues, 
           <h2 className="text-h4 text-text-primary">Activity</h2>
           <Activity items={activity} truncated={activityTruncated} onReply={onReplyInActivity} disabledReason={readOnlyReason} nameOf={header.nameOf} onReact={onReact} onDeleteMessage={onDeleteMessage} onEditMessage={onEditMessage} />
         </section>
-      </div>
+      </ScrollArea>
       <Divider orientation="vertical" className="col-start-2 row-span-2 row-start-1" />
-      <div className="col-start-3 row-start-2 min-h-0 overflow-y-auto px-6 pb-5">
+      <ScrollArea className="col-start-3 row-start-2 min-h-0" contentClassName="px-6 pb-5">
         <ProjectRail {...rail} archived={header.archived} readOnlyReason={readOnlyReason} />
-      </div>
+      </ScrollArea>
     </div>
   )
 }

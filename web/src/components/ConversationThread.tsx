@@ -1,5 +1,5 @@
 import { Fragment, useMemo, useState } from 'react'
-import { IconDots } from '@tabler/icons-react'
+import { IconDotsVertical, IconMoodPlus } from '@tabler/icons-react'
 import type { BlockAnchor, Imeta } from '@estiva-app/protocol'
 import { referencesIn, standaloneReference, toRenderTree } from '@estiva-app/protocol'
 import { Attachments as FileAttachments } from './ui/Attachment'
@@ -7,8 +7,12 @@ import { BlockAnchorNote } from './ui/BlockAnchorNote'
 import { Button } from './ui/Button'
 import { ConfirmDialog } from './ui/ConfirmDialog'
 import { Textarea } from './ui/Textarea'
-import { IconButton } from './ui/IconButton'
+import { Divider } from './ui/Divider'
 import { Menu, MenuItem } from './ui/Menu'
+import { Popover } from './ui/Popover'
+import { ReactionPicker } from './ui/ReactionPicker'
+import { Toolbar, ToolbarButton } from './ui/Toolbar'
+import { WithTooltip } from './ui/Tooltip'
 import { cn } from '@/lib/cn'
 import { ago } from '@/lib/time'
 import { Avatar } from '@/components/ui/Avatar'
@@ -20,7 +24,7 @@ import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
 import { byReference, useForeignObjects } from '@/api/useForeignObjects'
 import { Composer } from './Composer'
 import { draftKeys } from '@/lib/drafts'
-import { Reactions } from './Reactions'
+import { Reactions, REACTION_OPTIONS } from './Reactions'
 import { useReactions, REACTION_TARGET_LIMIT } from '@/api'
 import type { Reaction } from '@/api'
 
@@ -196,61 +200,73 @@ export interface ThreadData {
  * ## Why a menu and not a button
  *
  * `Menu`'s page: *"a click-opened list of actions: a `…` more-menu"*, rows
- * `destructive` in the error colour. One row today; Edit joins it at CON-4,
- * and a bare trash icon beside every message would have to move then anyway.
+ * `destructive` in the error colour. Edit above Delete, and not destructive:
+ * one changes what was said, the other takes it back, and the reversible one
+ * goes first.
  *
- * The trigger swallows its own `mousedown` — the shell's outside-click exit
- * listens on `mousedown`, so a trigger toggling on `click` would see its press
- * close the menu and the click reopen it. That trap is documented on `Menu`'s
- * page and it is the caller's to avoid.
+ * ## The strip (0.10.0)
+ *
+ * Beside the menu sits "React", where Peek's card puts it (D34): the picker
+ * opens above the button, the message being reacted to underneath (D30). Two
+ * icon buttons side by side are a strip, and a strip is a `Toolbar` (B15):
+ * one Tab stop, the arrow keys between them. `surface={false}` because the
+ * card is the surface. The menu owns its trigger since 0.10.0 (B9), so the
+ * open state, the `mousedown` guard and the `onClose` this used to keep are
+ * gone — Base UI decides when it shows, and closes it when a row is chosen.
  */
-function MessageActions({
+export function MessageActions({
+  onReact,
   onEdit,
   onDelete,
   disabledReason,
 }: {
+  onReact?: (emoji: string) => void
   onEdit?: () => void
   onDelete?: () => void
   disabledReason?: string
 }) {
-  const [open, setOpen] = useState(false)
+  const [picking, setPicking] = useState(false)
   return (
-    <div className="relative ml-auto shrink-0">
-      <IconButton
-        aria-label="Message actions"
-        tooltip={disabledReason ?? 'Message actions'}
-        disabled={!!disabledReason}
-        onMouseDown={(event) => event.stopPropagation()}
-        onClick={() => setOpen((value) => !value)}
-      >
-        <IconDots size={16} stroke={1.5} />
-      </IconButton>
-      {open && (
-        <Menu onClose={() => setOpen(false)}>
-          {/* Edit above Delete, and not destructive: one changes what was said,
-              the other takes it back, and the reversible one goes first. */}
-          {onEdit && (
-            <MenuItem
-              label="Edit message"
-              onClick={() => {
-                setOpen(false)
-                onEdit()
-              }}
-            />
-          )}
-          {onDelete && (
-            <MenuItem
-              label="Delete message"
-              destructive
-              onClick={() => {
-                setOpen(false)
-                onDelete()
-              }}
-            />
-          )}
+    <Toolbar aria-label="Message tools" surface={false} className="ml-auto shrink-0">
+      {onReact && (
+        <Popover
+          side="top"
+          align="right"
+          ariaLabel="Reactions"
+          className="w-auto min-w-0 p-1"
+          open={picking}
+          onOpenChange={setPicking}
+          trigger={
+            <ToolbarButton aria-label="React" tooltip="React" disabledReason={disabledReason}>
+              <IconMoodPlus size={16} stroke={1.5} />
+            </ToolbarButton>
+          }
+        >
+          <ReactionPicker
+            options={REACTION_OPTIONS}
+            surface={false}
+            onSelect={(emoji) => {
+              setPicking(false)
+              onReact(emoji)
+            }}
+          />
+        </Popover>
+      )}
+      {(onEdit || onDelete) && (
+        <Menu
+          align="right"
+          trigger={
+            <ToolbarButton aria-label="Message actions" tooltip="Message actions" disabledReason={disabledReason}>
+              {/* Vertical, as Peek's card draws its "more" (Katerina, 2026-09-08). */}
+              <IconDotsVertical size={16} stroke={1.5} />
+            </ToolbarButton>
+          }
+        >
+          {onEdit && <MenuItem label="Edit message" onClick={onEdit} />}
+          {onDelete && <MenuItem label="Delete message" destructive onClick={onDelete} />}
         </Menu>
       )}
-    </div>
+    </Toolbar>
   )
 }
 
@@ -442,13 +458,14 @@ export function MessageCard({
         {message.editedAt !== undefined && (
           <>
             <span aria-hidden="true">·</span>
-            <span className="shrink-0 italic" title={`Edited ${ago(message.editedAt)}`}>
-              edited
-            </span>
+            <WithTooltip label={`Edited ${ago(message.editedAt)}`}>
+              <span className="italic">edited</span>
+            </WithTooltip>
           </>
         )}
-        {(onDelete || onEdit) && (
+        {(onDelete || onEdit || onToggleReaction) && (
           <MessageActions
+            onReact={onToggleReaction && ((emoji) => onToggleReaction(emoji, reactions?.find((r) => r.emoji === emoji)?.mine))}
             onEdit={onEdit && (() => setEditing(true))}
             onDelete={onDelete && (() => setConfirming(true))}
             disabledReason={disabledReason}
@@ -509,13 +526,10 @@ export function MessageCard({
  * the signal lives where the reading happens.
  */
 function NewSinceHere() {
-  return (
-    <div className="flex items-center gap-2 py-1" role="separator" aria-label="New since you last read this">
-      <span className="h-px flex-1 bg-accent-muted" />
-      <span className="shrink-0 text-caption text-accent-primary">New since you last read this</span>
-      <span className="h-px flex-1 bg-accent-muted" />
-    </div>
-  )
+  // The package's labelled Divider (0.11.0, D40), in the warning colour: the
+  // accent this drew in measured 3.3:1 on Ship's background and could not
+  // be read (Katerina, 2026-09-08); the warning colour measures 9.6:1.
+  return <Divider label="New since you last read this" tone="warning" className="mx-0 py-1" />
 }
 
 export function ConversationThread({ thread, onReply, disabledReason, unreadFrom, resolved, resolving, nameOf, reactionsBy, onReact, onDeleteMessage, onEditMessage, subdued = false }: { thread: ThreadData; onReply: (threadId: string, text: string) => Promise<boolean | void> | boolean | void; disabledReason?: string; unreadFrom?: string; resolved?: Record<string, ForeignObjectData | null | undefined>; resolving?: boolean; nameOf?: (pubkey: string) => string; /** Reactions by message id, read once for the surface. */ reactionsBy?: Record<string, readonly Reaction[]>; /** Add or take back a reaction on one message. */ onReact?: (messageId: string, emoji: string, mine?: string) => void; /** Publish a deletion for one message — CON-3. Omitted where nobody may write. */ onDeleteMessage?: (messageId: string) => Promise<boolean | void> | boolean | void; /** Publish an edit of one message — CON-4. Omitted where nobody may write. */ onEditMessage?: (messageId: string, body: string) => Promise<boolean | void> | boolean | void; /** Draw it as secondary — Activity's mentions, which do not carry a comment's trust (CON-9). */ subdued?: boolean }) {
@@ -550,9 +564,7 @@ export interface ConversationsProps {
   onReply: (threadId: string, text: string) => Promise<boolean | void> | boolean | void
   /** Why nothing can be posted right now — every composer here is disabled with it. */
   disabledReason?: string
-  /** The block the next comment will be anchored to, if one was chosen — §13.6. */
-  anchoredTo?: string
-  onClearAnchor?: () => void
+
   /** Resolve a mentioned key to a name — SPEC §13.1. The workspace directory's. */
   nameOf?: (pubkey: string) => string
   /**
@@ -591,7 +603,7 @@ export interface ConversationsProps {
   className?: string
 }
 
-export function Conversations({ threads, onStart, onReply, disabledReason, className, unread, anchoredTo, onClearAnchor, nameOf, about, onReact, onDeleteMessage, onEditMessage }: ConversationsProps) {
+export function Conversations({ threads, onStart, onReply, disabledReason, className, unread, nameOf, about, onReact, onDeleteMessage, onEditMessage }: ConversationsProps) {
   const { resolved, resolving } = useThreadReferences(threads)
   const { reactionsBy, omitted, refresh: refreshReactions } = useThreadReactions(threads)
 
@@ -608,17 +620,7 @@ export function Conversations({ threads, onStart, onReply, disabledReason, class
 
   return (
     <div className={cn('flex flex-col gap-2.5', className)}>
-      {/* Say what the next comment will be attached to, and offer to undo it.
-          A choice made by clicking somewhere else on the page is invisible
-          otherwise, and an anchor nobody meant to set is worse than none. */}
-      {anchoredTo && (
-        <div className="flex items-center gap-2 text-caption text-text-muted">
-          <span>Commenting on one part of the description.</span>
-          <button type="button" onClick={onClearAnchor} className="underline hover:text-text-primary">
-            Comment on the whole issue instead
-          </button>
-        </div>
-      )}
+
       <Composer onSubmit={onStart} disabledReason={disabledReason} draftKey={about && draftKeys.object(about)} className="mb-1" />
       {threads.length ? (
         threads.map((thread) => (

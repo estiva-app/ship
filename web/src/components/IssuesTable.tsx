@@ -2,6 +2,7 @@ import { cn } from '@/lib/cn'
 import { ago } from '@/lib/time'
 import { statusLabel, type StatusEntry } from '@/lib/issues'
 import { Person } from '@/components/ui/Person'
+import { ScrollArea } from '@/components/ui/ScrollArea'
 import { StatusLabel } from '@/components/ui/StatusLabel'
 import type { IssueRowData } from './IssueRow'
 import { linkTo } from '@/router'
@@ -28,18 +29,22 @@ export interface IssuesTableProps {
   className?: string
 }
 
-// Sizes spelled as arbitrary values, not tokens: these strings go through cn(),
-// and tailwind-merge drops a custom text-size class that is followed by a
-// text-{colour} class (the pitfall Peek's config records). The header is the
-// menu token (9/115%/500); the ref is the caption token (12); everything else
-// in a cell, the date included, is the table's own 14 (Katerina, 2026-08-26).
-const TH = 'h-9 px-3 text-left text-[9px] font-medium uppercase leading-[115%] tracking-[0.08em] text-text-secondary'
+// The type tokens (S6, 0.10.0): the header is the menu token (9/115%/500)
+// with the table's own tracking; the ref is the caption token (12); everything
+// else in a cell, the date included, is body-2, the table's own 14 (Katerina,
+// 2026-08-26). These were arbitrary values while tailwind-merge dropped a
+// token size beside a colour class; the package's cn() names the ramp now.
+const TH = 'h-9 px-3 text-left text-menu font-medium uppercase tracking-[0.08em] text-text-secondary'
 const TD = 'h-10 px-3 text-body-2'
-const SMALL = 'text-[12px] leading-[120%]'
+const SMALL = 'text-caption'
 
 export function IssuesTable({ issues, statuses, hrefFor, className }: IssuesTableProps) {
   return (
-    <div className={cn('overflow-x-auto rounded-lg border border-border-default', className)}>
+    /* A table wider than its box scrolls sideways in a ScrollArea (D40): the
+       bar takes no height, so the box is exactly as tall with a bar as
+       without. `overflow-hidden` keeps the corners round, as the scrolling
+       box itself used to. */
+    <ScrollArea orientation="horizontal" className={cn('overflow-hidden rounded-lg border border-border-default', className)}>
       <table className="w-full min-w-[840px] table-fixed border-collapse">
         <thead className="bg-bg-surface">
           <tr className="border-b border-border-default">
@@ -87,6 +92,6 @@ export function IssuesTable({ issues, statuses, hrefFor, className }: IssuesTabl
           ))}
         </tbody>
       </table>
-    </div>
+    </ScrollArea>
   )
 }

@@ -1,9 +1,15 @@
 import { Chip } from '@/components/ui/Chip'
-import { IconButton } from '@/components/ui/IconButton'
 import { Reaction as ReactionPill } from '@/components/ui/Reaction'
 import { WithTooltip } from '@/components/ui/Tooltip'
 import { cn } from '@/lib/cn'
 import { REACTION_EMOJI, type Reaction } from '@/api'
+
+/**
+ * The palette as the package's `ReactionPicker` takes it: each emoji with the
+ * word for it. The vocabulary is Ship's (D31, 2026-09-08); the picker that
+ * shows it is the package's, opened from the message's tools.
+ */
+export const REACTION_OPTIONS = REACTION_EMOJI.map(({ emoji, name }) => ({ emoji, label: name }))
 
 /**
  * The reactions on one message — CON-2.
@@ -28,9 +34,10 @@ import { REACTION_EMOJI, type Reaction } from '@/api'
  *
  * Both answers are the packages' own *When not* lines rather than a preference:
  *
- * - **The picker is a strip of `IconButton`s.** `Menu`'s page: *"A strip of
- *   icon actions (reactions, formatting) → a toolbar of IconButtons."* It says
- *   reactions by name.
+ * - **The picker is not here any more** (0.10.0, D34). It is the package's
+ *   `ReactionPicker`, opened from the "React" button among the message's
+ *   tools and drawn above it, the way Peek's card does it. This row is the
+ *   answer — the pills — and it draws nothing when there is none to show.
  * - **A reaction with a count is a small `Button`.** `IconButton`'s page: *"The
  *   action deserves a visible label → Button (words are cheaper than a guessed
  *   icon)"*, and a count is a visible label an icon-only control has no slot
@@ -71,9 +78,9 @@ export function Reactions({
   className?: string
 }) {
   const existing = reactions ?? []
-  // Nothing to show and nothing to offer: draw nothing rather than an empty row
-  // under every message in every thread.
-  if (!existing.length && !onToggle) return null
+  // Nothing to show: draw nothing rather than an empty row under every message
+  // in every thread. Offering a reaction is the message's tools' job (D34).
+  if (!existing.length) return null
 
   return (
     <div className={cn('flex flex-wrap items-center gap-1', className)} data-reactions={String(existing.length)}>
@@ -123,25 +130,7 @@ export function Reactions({
           </WithTooltip>
         )
       })}
-      {onToggle && (
-        /* The picker: a toolbar of IconButtons, which is what Menu's page sends
-           reactions to by name. Each one is named by its meaning — a bare glyph
-           is not self-explanatory, and an icon-only control has no other source
-           for an accessible name. */
-        <div className="flex items-center gap-0.5" role="group" aria-label="Add a reaction" data-reaction-picker>
-          {REACTION_EMOJI.map(({ emoji, name }) => (
-            <IconButton
-              key={emoji}
-              aria-label={name}
-              tooltip={disabledReason ?? name}
-              disabled={!!disabledReason}
-              onClick={() => onToggle(emoji, existing.find((r) => r.emoji === emoji)?.mine)}
-            >
-              <span aria-hidden="true">{emoji}</span>
-            </IconButton>
-          ))}
-        </div>
-      )}
+
     </div>
   )
 }
