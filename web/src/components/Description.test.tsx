@@ -76,8 +76,10 @@ describe('Description', () => {
     fireEvent.click(screen.getByText(/for the detail/))
 
     // `findBy`, because the editor is a lazy chunk: a reader never downloads
-    // ProseMirror, so the first click is what fetches it.
-    const editor = await screen.findByRole('textbox', { name: 'Description' })
+    // ProseMirror, so the first click is what fetches it. The wait is for
+    // that chunk, not for the UI, and in a full run it has taken 1.1–1.7s
+    // against findBy's 1s default — the flake of 2026-09-09, three times.
+    const editor = await screen.findByRole('textbox', { name: 'Description' }, { timeout: 5000 })
     expect(editor.textContent).toContain('See')
     expect(editor.textContent).toContain('for the detail.')
     // A node view is a React portal, so it lands a tick after the editor does.
