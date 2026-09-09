@@ -110,11 +110,11 @@ export function IssuePage({ state, directory, d, say, refresh }: { state: Worksp
         unread={unread}
         // Threads about an issue carry a reference in the body so Peek renders
         // the issue's widget above them (withReference: true), as the old app has it.
-        onStartConversation={(body, blockId) => act('Message', () => startConversation({ folder: issue.folder, about: issue.addr, withReference: true, body, blockId }), say, refresh)}
-        onReply={(threadId, body) => {
+        onStartConversation={(body, files, blockId) => act('Message', () => startConversation({ folder: issue.folder, about: issue.addr, withReference: true, body, blockId, files }), say, refresh)}
+        onReply={(threadId, body, files) => {
           const conversation = conversations.find((c) => c.id === threadId)
           if (!conversation) return false
-          return act('Reply', () => reply(conversation, issue.folder, body), say, refresh)
+          return act('Reply', () => reply(conversation, issue.folder, body, files), say, refresh)
         }}
         activity={activity.items}
         activityTruncated={activity.truncated}
@@ -184,10 +184,10 @@ export function IssuePage({ state, directory, d, say, refresh }: { state: Worksp
           }
           return act('Edit', () => editMessage(folder, messageId, body), say, refresh)
         }}
-        onReplyInActivity={(threadId, body) => {
+        onReplyInActivity={(threadId, body, files) => {
           const conversation = state.conversations.find((c) => c.id === threadId)
           if (!conversation?.root.folder) return false
-          return act('Reply', () => reply(conversation, conversation.root.folder, body), say, refresh)
+          return act('Reply', () => reply(conversation, conversation.root.folder, body, files), say, refresh)
         }}
         history={history}
         rail={{

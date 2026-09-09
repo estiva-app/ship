@@ -22,6 +22,7 @@
 import { buildChange, buildConversationMessage, buildIssue, buildProject } from '../src/events'
 import { buildManifest } from '../src/manifest'
 import { foldFolder, projectFolders, type Change, type Project } from '../src/fold'
+import { foldAttachments } from '../src/attachments'
 import { directoryFrom, initials, parseProfile } from '../src/profiles'
 import type { SignedEvent } from '@estiva-app/protocol'
 import { actionProblems } from '@estiva-app/interop'
@@ -363,6 +364,39 @@ const reply = buildConversationMessage(PK, Date.now(), {
 })
 check('a reply stays a kind:9 until a caller can supply the anchor', reply.kind === 9)
 check('  …and threads by e, as it always did', tag(reply, 'e') === 'r1')
+
+/*
+  Attaching a file — SHI-2, the other end of `attachments.ts`.
+
+  Checked as a round trip rather than by reading the tag back by hand: the
+  producer and the reader are two halves of the same feature and this is the
+  only place both are in scope. A tag that serialises fine and folds to nothing
+  is exactly the failure this pins — Ship would draw a message with no
+  attachment on it and say nothing about why.
+*/
+const FILE_SHA = 'f'.repeat(64)
+const SECOND_SHA = 'e'.repeat(64)
+const file = { url: `/media/${FILE_SHA}.png`, m: 'image/png', x: FILE_SHA, size: 4096 }
+const second = { url: `/media/${SECOND_SHA}.png`, m: 'image/png', x: SECOND_SHA, size: 8192 }
+/* The fold takes signed events. Nothing here verifies a signature, so an id is
+   all these need to be indexable. */
+const asSigned = (event: { tags: string[][]; kind: number; content: string; pubkey: string; created_at: number }, id: string): SignedEvent =>
+  ({ ...event, id, sig: '0'.repeat(128) }) as SignedEvent
+
+const withFile = buildConversationMessage(PK, Date.now(), { folder: CONTENT, body: 'Here it is', files: [file] })
+check('a message can carry a file', foldAttachments([asSigned(withFile, 'm1')]).m1?.[0]?.x === FILE_SHA)
+
+const commentWithFile = buildConversationMessage(PK, Date.now(), { folder: CONTENT, body: 'Look', about: ISSUE_ADDR2, files: [file] })
+check('a comment carries one too, on the 1111 branch', commentWithFile.kind === 1111 && foldAttachments([asSigned(commentWithFile, 'm2')]).m2?.[0]?.x === FILE_SHA)
+check('  …and the comment keeps its NIP-22 root', tag(commentWithFile, 'A') === ISSUE_ADDR2)
+
+const two = buildConversationMessage(PK, Date.now(), { folder: CONTENT, body: 'Both', files: [file, second] })
+check('several files keep the order they were attached in', foldAttachments([asSigned(two, 'm3')]).m3?.map((f) => f.x).join() === `${FILE_SHA},${SECOND_SHA}`)
+
+// A message that attached nothing must carry no `imeta` at all. An empty tag
+// would be a claim about a blob the relay does not hold, and ingest refuses the
+// whole message for it.
+check('a message with no files carries no imeta', plain.tags.every((t) => t[0] !== 'imeta'))
 
 // The manifest is not a description of Ship, it is an instruction to Peek.
 const shipManifest = buildManifest(PK, Date.now())
