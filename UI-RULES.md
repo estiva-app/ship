@@ -107,6 +107,14 @@ If a rule here blocks the work, say so and stop; do not route around it. The per
 
 ---
 
+## 8. Rules for particular components
+
+Rulings that say which manner of a shared component this app uses where. Each is also on the component's own page; this list is the index.
+
+- **An empty state has two manners, and the page decides** (Katerina, 2026-09-09). When the *whole page* is empty — no projects yet, a link that leads nowhere — `EmptyState` in its `page` manner: the icon over a centred line. When one *section* of a page is empty — no conversations under an issue, a search with no results — the `section` manner: the line alone, left-aligned, no icon. A section's emptiness is one line in a page that has other things on it; it does not get a stage of its own. A hand-written "Nothing here" paragraph or span is the `section` manner, and becomes it.
+
+---
+
 ## The short version
 
 1. Check the package (read the page). Check `web/src/components/ui/`. Check for a near-match.
