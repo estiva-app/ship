@@ -29,7 +29,7 @@ export interface HistoryEntry {
 }
 
 export function History({ entries, className }: { entries: HistoryEntry[]; className?: string }) {
-  if (!entries.length) return <EmptyState className={cn('py-6', className)} message="Nothing has changed yet." />
+  if (!entries.length) return <EmptyState scope="section" className={cn('py-6', className)} message="Nothing has changed yet." />
   return (
     <ol className={cn('flex flex-col gap-3', className)}>
       {entries.map((entry) => (

@@ -70,7 +70,7 @@ export function NewIssueDialog({ projects, project, onClose, onCreate }: NewIssu
       }
     >
       {none ? (
-        <EmptyState className="py-6" message="Create a project first — an issue lives in a project's Folder." />
+        <EmptyState scope="section" className="py-6" message="Create a project first." />
       ) : (
         <form id="new-issue" onSubmit={submit} className="flex flex-col gap-6">
           <Field label="Title" required>

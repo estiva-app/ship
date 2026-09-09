@@ -1,3 +1,4 @@
+import { IconListDetails } from '@tabler/icons-react'
 import { cn } from '@/lib/cn'
 import { groupByStatus, type StatusEntry } from '@/lib/issues'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -45,7 +46,7 @@ export interface IssueListProps {
 }
 
 export function IssueList({ issues, statuses, hrefFor, emptyMessage = 'No issues yet.', className }: IssueListProps) {
-  if (!issues.length) return <EmptyState className={cn('py-12', className)} message={emptyMessage} />
+  if (!issues.length) return <EmptyState icon={<IconListDetails size={16} stroke={1.5} />} className={cn('py-12', className)} message={emptyMessage} />
   return (
     <div className={cn('flex flex-col gap-4', className)}>
       {groupByStatus(issues, statuses).map((group) => (

@@ -113,7 +113,7 @@ export function ProjectView({ crumbs, header, onAddIssue, view, onView, issues, 
             />
           </div>
           {!issues.length ? (
-            <EmptyState className="py-10" message="No issues yet." />
+            <EmptyState scope="section" className="py-10" message="No issues yet." />
           ) : view === 'board' ? (
             <Board issues={issues} statuses={issueStatuses} hrefFor={hrefFor} />
           ) : (

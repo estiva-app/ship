@@ -1,3 +1,4 @@
+import { IconArchive, IconBox } from '@tabler/icons-react'
 import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Tabs } from '@/components/ui/Tabs'
@@ -51,8 +52,9 @@ export function ProjectsView({ active, archived, showArchived, onShowArchived, o
         </div>
       ) : (
         <EmptyState
+          icon={showArchived ? <IconArchive size={16} stroke={1.5} /> : <IconBox size={16} stroke={1.5} />}
           className="py-12"
-          message={showArchived ? 'Nothing archived.' : 'No projects yet. Create one to get a Folder you can share with Peek.'}
+          message={showArchived ? 'Nothing archived.' : 'No projects yet.'}
         />
       )}
     </div>
