@@ -5,7 +5,7 @@ import { AppShell } from '@/components/AppShell'
 import { IdentityMenu } from '@/components/IdentityMenu'
 import { Sidebar } from '@/components/Sidebar'
 import { ACTIVITY, ARCHIVED_CARDS, PEOPLE, PROJECT_CARDS, PROJECT_STATUSES, SIDEBAR_PROJECTS } from '@/fixtures/projects'
-import { ACTIVITY_ITEMS, ANA, ISSUES, ISSUE_STATUSES, THREADS, hrefFor } from '@/fixtures/issues'
+import { ACTIVITY_ITEMS, ANA, ISSUES, ISSUE_STATUSES, THREADS, hrefFor, makeIssues } from '@/fixtures/issues'
 import { IssueView } from './IssueView'
 import { IssuesView, type IssuesScope } from './IssuesView'
 import { ProjectView } from './ProjectView'
@@ -64,13 +64,25 @@ export const ProjectsEmpty: Story = {
   },
 }
 
-/** Every issue in the workspace: All / Open / Assigned to me, grouped by status. */
+/** Every issue in the workspace: All / Open / Assigned to me, grouped by status. Forty rows, so the page scrolls — in the frame's bar, not a native one. */
 export const Issues: Story = {
   render: () => {
     const [scope, setScope] = useState<IssuesScope>('all')
     return (
       <Shell current="issues">
-        <IssuesView issues={ISSUES} statuses={ISSUE_STATUSES} mine={new Set(['30851:a:1', '30851:a:4', '30851:a:7'])} scope={scope} onScope={setScope} hrefFor={hrefFor} onAddIssue={fn()} />
+        <IssuesView issues={[...ISSUES, ...makeIssues(40)]} statuses={ISSUE_STATUSES} mine={new Set(['30851:a:1', '30851:a:4', '30851:a:7'])} scope={scope} onScope={setScope} hrefFor={hrefFor} onAddIssue={fn()} />
+      </Shell>
+    )
+  },
+}
+
+/** No issues at all: the whole page is empty, so the state keeps its icon and its centre (B18). */
+export const IssuesEmpty: Story = {
+  render: () => {
+    const [scope, setScope] = useState<IssuesScope>('all')
+    return (
+      <Shell current="issues">
+        <IssuesView issues={[]} statuses={ISSUE_STATUSES} mine={new Set()} scope={scope} onScope={setScope} hrefFor={hrefFor} onAddIssue={fn()} />
       </Shell>
     )
   },

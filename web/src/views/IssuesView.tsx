@@ -36,7 +36,7 @@ export function IssuesView({ issues, statuses, mine, scope, onScope, hrefFor, on
     // surface, on the element that *is* the surface, so a browser test can wait
     // for "the issue list is on screen" without coupling to a Tailwind class —
     // which is a styling decision and free to change.
-    <div data-surface="issues" className="flex h-full flex-col gap-4 px-6 py-5">
+    <div data-surface="issues" className="flex flex-1 flex-col gap-4 px-6 py-5">
       <div className="flex items-center gap-3">
         <h1 className="flex-1 text-h3 text-text-primary">Issues</h1>
         <Button variant="primary" onClick={onAddIssue} disabledReason={addDisabledReason}>
