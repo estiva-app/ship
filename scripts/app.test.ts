@@ -398,6 +398,67 @@ check('several files keep the order they were attached in', foldAttachments([asS
 // whole message for it.
 check('a message with no files carries no imeta', plain.tags.every((t) => t[0] !== 'imeta'))
 
+/*
+  A description's files reach the change event as tags — SPEC §13.3, SHI-2.
+
+  The point of the requirement, and so of these checks: ingest verifies `imeta`
+  **tags** and never parses `content`. Without the tag a description could name
+  a blob the relay does not hold and nothing would refuse it — where a message
+  physically cannot. `buildChange` derives them from the document so that no
+  caller can leave them off.
+*/
+const BLOCKS_FORMAT = 'estiva-blocks-1'
+const descriptionWith = (...attachments: Record<string, unknown>[]) =>
+  JSON.stringify({
+    type: 'doc',
+    content: [
+      { type: 'paragraph', id: 'b1', content: [{ type: 'text', text: 'here it is' }] },
+      ...attachments.map((attrs, i) => ({ type: 'attachment', id: `b${i + 2}`, attrs })),
+    ],
+  })
+const descFile = { url: `/media/${FILE_SHA}.png`, m: 'image/png', x: FILE_SHA, size: 4096 }
+
+const described = buildChange(PK, Date.now(), {
+  target: ISSUE_ADDR2,
+  field: 'description',
+  value: descriptionWith(descFile),
+  folder: CONTENT,
+  contentFormat: BLOCKS_FORMAT,
+})
+const imetaTags = described.tags.filter((t) => t[0] === 'imeta')
+check('a description with a file names it in an imeta tag', imetaTags.length === 1)
+check('  …carrying the blob hash ingest will look for', imetaTags[0]?.some((part) => part === `x ${FILE_SHA}`) === true)
+check('  …and the value tag still holds the document', tag(described, 'value') === descriptionWith(descFile))
+check('  …with the content-format the reader needs', tag(described, 'content-format') === BLOCKS_FORMAT)
+
+const twoFiles = buildChange(PK, Date.now(), {
+  target: ISSUE_ADDR2,
+  field: 'description',
+  value: descriptionWith(descFile, { ...descFile, x: SECOND_SHA, url: `/media/${SECOND_SHA}.png` }),
+  folder: CONTENT,
+  contentFormat: BLOCKS_FORMAT,
+})
+check('two files become two tags', twoFiles.tags.filter((t) => t[0] === 'imeta').length === 2)
+
+// Every other field goes through the same builder, and a scalar has no
+// document to read. A `status` change growing an imeta tag would be nonsense
+// the relay would then try to verify.
+const scalarChange = buildChange(PK, Date.now(), {
+  target: ISSUE_ADDR2,
+  field: 'status',
+  value: 'in_progress',
+  folder: CONTENT,
+})
+check('a scalar change carries no imeta', scalarChange.tags.every((t) => t[0] !== 'imeta'))
+
+const plainDescription = buildChange(PK, Date.now(), {
+  target: ISSUE_ADDR2,
+  field: 'description',
+  value: 'just words, no blocks',
+  folder: CONTENT,
+})
+check('  …and neither does a marker-text description', plainDescription.tags.every((t) => t[0] !== 'imeta'))
+
 // The manifest is not a description of Ship, it is an instruction to Peek.
 const shipManifest = buildManifest(PK, Date.now())
 const commentAction = (JSON.parse(shipManifest.content) as {

@@ -60,7 +60,13 @@ const ROOT = new URL('..', import.meta.url).pathname
  */
 const DIST = join(ROOT, 'dist', 'ship')
 const SHOTS = join(ROOT, '.smoke')
-const PORT = 5191
+/*
+  5191 is also `npm run dev`'s port, and these repos are shared — so a colleague
+  with Ship open makes this unrunnable with an `EADDRINUSE` that says nothing
+  about the test. Overridable rather than hardcoded: `SMOKE_PORT=5199 npm run
+  smoke`. The default is unchanged, so nothing that already works has to.
+*/
+const PORT = Number(process.env.SMOKE_PORT ?? 5191)
 const HEADED = process.argv.includes('--headed')
 
 const TYPES: Record<string, string> = {

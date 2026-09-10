@@ -68,8 +68,12 @@ export interface EditorDocument {
  *
  * Everything else is preserved as an atom rather than edited. Deliberately not
  * `KNOWN_BLOCK_TYPES` — that is what the *protocol* names, and Ship's editor
- * knows a subset of it. `table`, `attachment` and `widget` are in the protocol
- * and have no editing design here yet, so they travel through untouched.
+ * knows a subset of it. `table` and `widget` are in the protocol and have no
+ * editing design here yet, so they travel through untouched.
+ *
+ * `attachment` joined the list in SHI-2. It is "editable" only in the sense
+ * that the schema has a node for it — the block is an atom with nothing inside
+ * to type into, and what the editor offers is inserting and deleting one.
  */
 const EDITABLE_BLOCKS = new Set([
   'paragraph',
@@ -80,6 +84,7 @@ const EDITABLE_BLOCKS = new Set([
   'blockquote',
   'codeBlock',
   'horizontalRule',
+  'attachment',
 ])
 
 /** The node type an unknown block is parked in. Defined in `UnknownBlock.ts`. */
@@ -253,7 +258,15 @@ function blockFromEditor(node: EditorNode, seen: Set<string>): Block | null {
     return source
   }
 
-  const { blockId: _drop, ...attrs } = node.attrs ?? {}
+  const { blockId: _drop, ...rest } = node.attrs ?? {}
+  /*
+    A ProseMirror attribute that was never set is `null`, and §13.3's optional
+    fields are *absent* rather than null — a reader checking `attrs.thumb` copes
+    either way, but `imetaTag` would serialise `thumb null` and the relay would
+    refuse the event. Dropped here, where every block passes through, rather
+    than in the one place that noticed.
+  */
+  const attrs = Object.fromEntries(Object.entries(rest).filter(([, v]) => v !== null && v !== undefined))
   const id = idFor(node, seen)
   const base = { type: node.type, id, ...(Object.keys(attrs).length ? { attrs } : {}) }
 

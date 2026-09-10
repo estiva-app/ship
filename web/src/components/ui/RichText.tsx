@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react'
 import type { ForeignObject } from '@/api/foreign'
+import { Attachment } from './Attachment'
 import { Reference } from './Reference'
+import { imetaFromAttrs } from '../../../../src/attachments'
 import { standaloneReference, toRenderTree, type RenderBlock, type ContentFormat, type RenderInline } from '@estiva-app/protocol'
 import { cn } from '@/lib/cn'
 import { PROSE_BLOCKS } from './prose'
@@ -195,19 +197,52 @@ function renderBlock(
       return <hr key={key} data-block-id={block.id} />
     case 'listItem':
       return <div key={key} data-block-id={block.id}>{inline}</div>
-    default:
+    case 'attachment': {
       /*
-        `table`, `attachment`, `widget` and anything a later version publishes.
-        §13.3: a reader MUST render an unknown block's inline text and MUST NOT
-        drop it silently — a block that vanishes is indistinguishable from one
-        the reader is not allowed to see. Drawing it as a paragraph is the
-        honest fallback until Ship has a design for it.
+        SPEC §13.3, SHI-2. `attrs` are the `imeta` fields, so this is the same
+        component a message's attachment uses — including the authenticated
+        fetch, because media GET answers 401 to an `<img src>`.
+
+        A block missing a REQUIRED field falls through to the default: §13.3
+        calls it malformed and asks for the inline text rather than a broken
+        file, which is the same thing a reader does with a type it has never
+        heard of.
       */
-      return (
-        <div key={key} data-block-id={block.id} data-block-type={block.typeName ?? block.type}>
-          {inline}
-          {block.children?.map((child, j) => renderBlock(child, j, nameOf, resolved))}
-        </div>
-      )
+      const file = imetaFromAttrs(block.attrs)
+      if (file) {
+        return (
+          <div key={key} data-block-id={block.id}>
+            <Attachment file={file} />
+          </div>
+        )
+      }
+      return fallbackBlock(block, key, nameOf, resolved, inline)
+    }
+    default:
+      return fallbackBlock(block, key, nameOf, resolved, inline)
   }
+}
+
+/**
+ * `table`, `widget`, a malformed `attachment`, and anything a later version
+ * publishes.
+ *
+ * §13.3: a reader MUST render an unknown block's inline text and MUST NOT drop
+ * it silently — a block that vanishes is indistinguishable from one the reader
+ * is not allowed to see. Drawing it as a paragraph is the honest fallback until
+ * Ship has a design for it.
+ */
+function fallbackBlock(
+  block: RenderBlock,
+  key: string,
+  nameOf: ((pubkey: string) => string) | undefined,
+  resolved: Record<string, ForeignObject | null | undefined> | undefined,
+  inline: ReactNode,
+): ReactNode {
+  return (
+    <div key={key} data-block-id={block.id} data-block-type={block.typeName ?? block.type}>
+      {inline}
+      {block.children?.map((child, j) => renderBlock(child, j, nameOf, resolved))}
+    </div>
+  )
 }

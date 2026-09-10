@@ -8,7 +8,7 @@
  */
 import type { SignedEvent } from '@estiva-app/protocol'
 import { imetaTag } from '@estiva-app/protocol'
-import { foldAttachments } from '../src/attachments'
+import { attachmentsInDocument, foldAttachments } from '../src/attachments'
 import { KIND } from '../src/kinds'
 
 let passed = 0
@@ -98,4 +98,64 @@ check('no events means no entries', Object.keys(foldAttachments([])).length === 
   check('only the message that carried one is indexed', Object.keys(out).length === 1 && out[withFile.id] !== undefined)
 }
 
+
+/*
+  The other model — a description's files, SPEC §13.3 and SHI-2.
+
+  A message carries `imeta` tags because its body is text. A description carries
+  `attachment` blocks, because a block document has somewhere to put them. Same
+  fields, so a reader draws either with the same code — and these check that the
+  block reader is as unforgiving about a malformed one as `imetaOf` is about a
+  malformed tag.
+*/
+console.log('\nAttachments in a description.\n')
+
+const BLOCKS = 'estiva-blocks-1'
+const attachmentBlock = (attrs: Record<string, unknown>, id = 'b2') => ({ type: 'attachment', id, attrs })
+const doc = (...blocks: unknown[]) => JSON.stringify({ type: 'doc', content: blocks })
+const paragraph = { type: 'paragraph', id: 'b1', content: [{ type: 'text', text: 'see this' }] }
+const FULL = { url: `/media/${SHA}.png`, m: 'image/png', x: SHA, size: 4096 }
+
+{
+  const files = attachmentsInDocument(doc(paragraph, attachmentBlock(FULL)), BLOCKS)
+  check('a description names the file it places inline', files.length === 1 && files[0].x === SHA)
+}
+
+{
+  const rich = { ...FULL, dim: '800x600', thumb: `/media/${SHA}.thumb.jpg`, filename: 'shot.png', alt: 'a screenshot' }
+  const [file] = attachmentsInDocument(doc(attachmentBlock(rich)), BLOCKS)
+  check('  …with the optional fields it had', file.dim === '800x600' && file.filename === 'shot.png' && file.alt === 'a screenshot')
+}
+
+{
+  // Depth-first: an attachment inside a list or a quote is still an attachment,
+  // and a reader that only looked at the top level would publish a document
+  // naming a blob with no tag to verify it.
+  const nested = { type: 'blockquote', id: 'q1', content: [attachmentBlock(FULL, 'b9')] }
+  check('an attachment nested in another block is found', attachmentsInDocument(doc(nested), BLOCKS).length === 1)
+}
+
+{
+  const two = doc(attachmentBlock(FULL, 'b2'), attachmentBlock({ ...FULL, x: OTHER, url: `/media/${OTHER}.png` }, 'b3'))
+  check('several come back in document order', attachmentsInDocument(two, BLOCKS).map((f) => f.x).join() === `${SHA},${OTHER}`)
+}
+
+{
+  // Each REQUIRED field, missing in turn. A block this cannot vouch for must
+  // not become a tag: naming a blob the relay does not hold takes the whole
+  // event down, so a half-read block is worse than a dropped one.
+  for (const field of ['url', 'm', 'x', 'size']) {
+    const broken = { ...FULL } as Record<string, unknown>
+    delete broken[field]
+    check(`  …a block with no ${field} is skipped, not half-read`, attachmentsInDocument(doc(attachmentBlock(broken)), BLOCKS).length === 0)
+  }
+  check('  …and a size that is not a number is skipped too', attachmentsInDocument(doc(attachmentBlock({ ...FULL, size: '4096' })), BLOCKS).length === 0)
+}
+
+{
+  check('marker text carries no attachment blocks', attachmentsInDocument('just words', undefined) .length === 0)
+  check('  …nor does a scalar field, which is what every other change carries', attachmentsInDocument('in_progress', undefined).length === 0)
+  check('  …nor an empty value', attachmentsInDocument('', BLOCKS).length === 0)
+  check('unparseable JSON is answered with nothing, not a throw', attachmentsInDocument('{oops', BLOCKS).length === 0)
+}
 console.log(`\n${passed} checks passed.\n`)
