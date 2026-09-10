@@ -20,6 +20,7 @@ import {
   type UnsignedEvent,
 } from '@estiva-app/protocol'
 import { KIND } from './kinds'
+import { attachmentsInDocument } from './attachments'
 
 /**
  * The Folder id.
@@ -243,6 +244,22 @@ export function buildChange(
       // order. An app that does not know `ts` ignores it and still folds — just
       // at one-second resolution.
       ['ts', String(Math.floor(createdAtMs))],
+      /*
+        Every file the document places inline, named again as an `imeta` —
+        SPEC §13.3, SHI-2.
+
+        **Derived here rather than passed in**, so no caller can omit it. Ingest
+        verifies `imeta` *tags* and never parses `content`, and the check is not
+        gated on kind — so this tag is what makes a `kind:1851` carrying a
+        description obey the same rule a message does: a document naming a blob
+        the relay does not hold is refused outright, instead of published and
+        rendering as a broken file for every reader.
+
+        Nothing to do for a scalar field. `attachmentsInDocument` answers with
+        an empty list for anything that is not a block document, which `status`
+        and `assignee` are not.
+      */
+      ...attachmentsInDocument(args.value, args.contentFormat).map(imetaTag),
     ],
     content: args.note ?? '',
   }
