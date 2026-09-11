@@ -262,7 +262,7 @@ describe('Project page — one project from the fold', () => {
     const main = within(screen.getByRole('main'))
     fireEvent.change(main.getByPlaceholderText('Start a conversation…'), { target: { value: 'hello' } })
     fireEvent.click(main.getByRole('button', { name: 'Post' }))
-    await waitFor(() => expect(startConversation).toHaveBeenCalledWith({ folder: 'f', about: `30850:x:${LIVE}`, withReference: false, body: 'hello' }))
+    await waitFor(() => expect(startConversation).toHaveBeenCalledWith({ folder: 'f', about: `30850:x:${LIVE}`, withReference: false, body: 'hello', files: [] }))
     await waitFor(() => expect(refresh).toHaveBeenCalled())
   })
 
@@ -343,7 +343,7 @@ describe('Issue page — one issue from the fold', () => {
     const main = within(screen.getByRole('main'))
     fireEvent.change(main.getByPlaceholderText('Start a conversation…'), { target: { value: 'seen this?' } })
     fireEvent.click(main.getByRole('button', { name: 'Post' }))
-    await waitFor(() => expect(startConversation).toHaveBeenCalledWith({ folder: 'f', about: `30851:x:${D('14')}`, withReference: true, body: 'seen this?' }))
+    await waitFor(() => expect(startConversation).toHaveBeenCalledWith({ folder: 'f', about: `30851:x:${D('14')}`, withReference: true, body: 'seen this?', files: [] }))
   })
 
   it('links the project in the trail when the issue has one', () => {

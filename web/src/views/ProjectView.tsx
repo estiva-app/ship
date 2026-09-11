@@ -1,5 +1,5 @@
 import { IconBox, IconLayoutKanban, IconTable } from '@tabler/icons-react'
-import type { ContentFormat } from '@estiva-app/protocol'
+import type { ContentFormat, Imeta } from '@estiva-app/protocol'
 import { Breadcrumb } from '@/components/ui/Breadcrumb'
 import { ScrollArea } from '@/components/ui/ScrollArea'
 import { linkTo } from '@/router'
@@ -40,14 +40,15 @@ export interface ProjectViewProps {
   threads: ThreadData[]
   /** Thread id → first unread message id. Drives the feed divider (CRO-13). */
   unread?: Record<string, string>
-  onStartConversation: (text: string) => Promise<boolean | void> | boolean | void
-  onReply: (threadId: string, text: string) => Promise<boolean | void> | boolean | void
+  /** `files` are attachments already on the relay — SHI-2. */
+  onStartConversation: (text: string, files: readonly Imeta[]) => Promise<boolean | void> | boolean | void
+  onReply: (threadId: string, text: string, files: readonly Imeta[]) => Promise<boolean | void> | boolean | void
   /** Threads on files related to this project, time-ordered — CON-9. */
   activity: ActivityItem[]
   /** How many the horizon left out — `ACTIVITY_HORIZON`. Said on screen, never implied. */
   activityTruncated?: number
   /** Reply into a thread belonging to another file: its own Folder, never this project's. */
-  onReplyInActivity: (threadId: string, text: string) => Promise<boolean | void> | boolean | void
+  onReplyInActivity: (threadId: string, text: string, files: readonly Imeta[]) => Promise<boolean | void> | boolean | void
   rail: {
     status: string
     statuses: StatusEntry[]

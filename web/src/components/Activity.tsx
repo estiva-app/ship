@@ -1,3 +1,4 @@
+import type { Imeta } from '@estiva-app/protocol'
 import { useMemo } from 'react'
 import { Chip } from '@/components/ui/Chip'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -73,7 +74,7 @@ export interface ActivityItem {
 
 export interface ActivityProps {
   items: ActivityItem[]
-  onReply: (threadId: string, text: string) => Promise<boolean | void> | boolean | void
+  onReply: (threadId: string, text: string, files: readonly Imeta[]) => Promise<boolean | void> | boolean | void
   /** Why nothing can be posted right now — every composer here is disabled with it. */
   disabledReason?: string
   /** Resolve a mentioned key to a name — SPEC §13.1. */

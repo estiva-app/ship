@@ -223,3 +223,70 @@ describe('what a person sees is what is stored', () => {
     expect(editing.content.map((n) => n.attrs?.blockId)).toEqual(idsOf(stored))
   })
 })
+
+/*
+  A file in a description — SPEC §13.3's `attachment` block, SHI-2.
+
+  Until SHI-2 this block was parked as an `unknownBlock`: preserved, never
+  produced. Now the editor has a node for it, which moves it out of the
+  "carried whole" path and into the converted one — so the questions are the
+  converted path's questions. An attribute the schema forgets to declare is
+  dropped by ProseMirror and vanishes on save, and that is silent.
+*/
+const SHA = 'f'.repeat(64)
+const attachment = (attrs: Record<string, unknown>, id = 'b2') => ({ type: 'attachment', id, attrs })
+const FILE = { url: `/media/${SHA}.png`, m: 'image/png', x: SHA, size: 4096 }
+
+describe('a file in a description', () => {
+  it('opens as an editable node rather than an opaque block', () => {
+    const doc: BlockDocument = { type: 'doc', content: [attachment(FILE)] }
+    const [node] = toEditorDocument(doc).content
+    expect(node.type).toBe('attachment')
+    expect(node.attrs).toMatchObject({ ...FILE, blockId: 'b2' })
+  })
+
+  it('round-trips every imeta field, which is the one that fails silently', () => {
+    const rich = { ...FILE, dim: '800x600', thumb: `/media/${SHA}.thumb.jpg`, filename: 'shot.png', alt: 'a screenshot' }
+    const doc: BlockDocument = { type: 'doc', content: [attachment(rich)] }
+    const back = fromEditorDocument(toEditorDocument(doc))
+    expect(back.content[0].attrs).toEqual(rich)
+  })
+
+  it('keeps the block id, so a comment anchored to the file still resolves', () => {
+    const doc: BlockDocument = { type: 'doc', content: [attachment(FILE, 'anchored')] }
+    expect(fromEditorDocument(toEditorDocument(doc)).content[0].id).toBe('anchored')
+  })
+
+  /*
+    A ProseMirror attribute that was never set is `null`. §13.3's optional
+    fields are *absent*, and `imetaTag` would serialise `thumb null` into a tag
+    the relay then refuses — taking down a description that looked fine in the
+    editor.
+  */
+  it('writes no null for an optional field the file does not have', () => {
+    const doc: BlockDocument = { type: 'doc', content: [attachment(FILE)] }
+    const attrs = fromEditorDocument(toEditorDocument(doc)).content[0].attrs ?? {}
+    expect(Object.keys(attrs).sort()).toEqual(['m', 'size', 'url', 'x'])
+    expect(JSON.stringify(attrs)).not.toContain('null')
+  })
+
+  it('publishes as a block document, so the format tag is on the event', () => {
+    const doc: BlockDocument = { type: 'doc', content: [attachment(FILE)] }
+    const { value, contentFormat } = publishableFrom(toEditorDocument(doc))
+    expect(contentFormat).toBe('estiva-blocks-1')
+    expect(parseBlockDocument(value)?.content[0].type).toBe('attachment')
+  })
+
+  it('survives beside the text it was dropped into', () => {
+    const doc: BlockDocument = {
+      type: 'doc',
+      content: [
+        { type: 'paragraph', id: 'b1', content: [{ type: 'text', text: 'look at this' }] },
+        attachment(FILE),
+        { type: 'paragraph', id: 'b3', content: [{ type: 'text', text: 'and that' }] },
+      ],
+    }
+    const back = fromEditorDocument(toEditorDocument(doc))
+    expect(back.content.map((b) => b.type)).toEqual(['paragraph', 'attachment', 'paragraph'])
+  })
+})

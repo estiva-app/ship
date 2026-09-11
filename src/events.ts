@@ -11,13 +11,16 @@
 import {
   addr,
   buildMessage,
+  imetaTag,
   threadTags,
   toNostrSeconds,
+  type Imeta,
   type NostrTag,
   type ThreadRef,
   type UnsignedEvent,
 } from '@estiva-app/protocol'
 import { KIND } from './kinds'
+import { attachmentsInDocument } from './attachments'
 
 /**
  * The Folder id.
@@ -241,6 +244,22 @@ export function buildChange(
       // order. An app that does not know `ts` ignores it and still folds — just
       // at one-second resolution.
       ['ts', String(Math.floor(createdAtMs))],
+      /*
+        Every file the document places inline, named again as an `imeta` —
+        SPEC §13.3, SHI-2.
+
+        **Derived here rather than passed in**, so no caller can omit it. Ingest
+        verifies `imeta` *tags* and never parses `content`, and the check is not
+        gated on kind — so this tag is what makes a `kind:1851` carrying a
+        description obey the same rule a message does: a document naming a blob
+        the relay does not hold is refused outright, instead of published and
+        rendering as a broken file for every reader.
+
+        Nothing to do for a scalar field. `attachmentsInDocument` answers with
+        an empty list for anything that is not a block document, which `status`
+        and `assignee` are not.
+      */
+      ...attachmentsInDocument(args.value, args.contentFormat).map(imetaTag),
     ],
     content: args.note ?? '',
   }
@@ -312,7 +331,7 @@ export function buildChange(
 function buildNip22Comment(
   pubkey: string,
   createdAtMs: number,
-  args: { folder: string; body: string; about: string; blockId?: string },
+  args: { folder: string; body: string; about: string; blockId?: string; files?: readonly Imeta[] },
 ): UnsignedEvent {
   const [kind, author] = args.about.split(':')
   return {
@@ -337,6 +356,8 @@ function buildNip22Comment(
       // Same `ts` as everything else Ship writes, for the same reason: see
       // `buildConversationMessage` below.
       ['ts', String(Math.floor(createdAtMs))],
+      // Attachments last, as on the `kind:9` branch — see there for why.
+      ...(args.files ?? []).map(imetaTag),
     ],
     content: args.body,
   }
@@ -354,6 +375,16 @@ export function buildConversationMessage(
     about?: string
     /** A block of that object, when the comment is about one part — §13.6. */
     blockId?: string
+    /**
+     * Files already on the relay — SHI-2, CON-12.
+     *
+     * `Imeta`, not a `File`: the tag's `m` and `x` must be the **relay's** own
+     * answers about the stored blob, so the upload has to have happened before
+     * this is called. `verify_imeta_blobs` refuses a message naming a blob the
+     * relay does not already hold, which makes the order a requirement rather
+     * than a preference — see `uploadAttachment` in `web/src/api/blobs.ts`.
+     */
+    files?: readonly Imeta[]
   },
 ): UnsignedEvent {
   assertFolderId(args.folder)
@@ -367,6 +398,7 @@ export function buildConversationMessage(
       body: args.body,
       about: args.about,
       blockId: args.blockId,
+      files: args.files,
     })
   }
 
@@ -384,6 +416,18 @@ export function buildConversationMessage(
   // (FRICTION.md A6). An app that does not know `ts` ignores it and still
   // threads, just at one-second resolution.
   tags.push(['ts', String(Math.floor(createdAtMs))])
+  /*
+    Attachments last.
+
+    `buildMessage` takes a `mediaTags` argument and puts `imeta` at the end of
+    *its* tags, which here would be before the thread tags this builder appends
+    afterwards — so passing it through would place `imeta` differently on a
+    reply than on a root, for no reason a reader could see. Position carries no
+    meaning to `imetaOf` or to the relay's `validate_imeta_tags`; the only thing
+    that matters is that Ship's own order is one rule rather than two. It is
+    part of the id preimage, so it is settled once this ships.
+  */
+  tags.push(...(args.files ?? []).map(imetaTag))
   return { ...event, tags }
 }
 

@@ -1,13 +1,14 @@
 import { createContext, useContext } from 'react'
 import { Extension, Node } from '@tiptap/core'
 import { NodeViewWrapper, ReactNodeViewRenderer } from '@tiptap/react'
-import { inlineTextOf, type Block } from '@estiva-app/protocol'
+import { inlineTextOf, type Block, type Imeta } from '@estiva-app/protocol'
 import type { ForeignObject } from '@/api/foreign'
+import { Attachment } from './Attachment'
 import { Reference } from './Reference'
 
 /**
- * The three things Ship's editor needs that a stock schema does not have —
- * RIC-14.
+ * The four things Ship's editor needs that a stock schema does not have —
+ * RIC-14, and the attachment since SHI-2.
  *
  * Everything else a description can contain is already a ProseMirror node of
  * the same name, which is why `StarterKit` covers it and this file is short.
@@ -48,6 +49,10 @@ export const BlockId = Extension.create({
           'blockquote',
           'codeBlock',
           'horizontalRule',
+          // Without this an attachment's id is re-minted on every save, and
+          // every comment anchored to it stops resolving — §13.3's whole
+          // reason for a block having an address.
+          'attachment',
         ],
         attributes: {
           blockId: {
@@ -165,6 +170,64 @@ function UnknownBlockView({ node }: { node: { attrs: Record<string, unknown> } }
       className="rounded-md border border-border-default bg-bg-inset px-2 py-1 text-text-secondary"
     >
       {text || `A ${source?.type ?? 'block'} this app cannot edit yet.`}
+    </NodeViewWrapper>
+  )
+}
+
+/**
+ * A file placed in a description — SPEC §13.3's `attachment` block, SHI-2.
+ *
+ * An atom: the file is the block, there is nothing inside it to edit, and a
+ * caret that could sit "inside" an image is a way to produce documents no
+ * reader has a rule for. Selectable and deletable, so removing one is Backspace
+ * like anything else.
+ *
+ * `attrs` are the `imeta` fields exactly, because that is what §13.3 specifies
+ * and it is what lets {@link Attachment} — written for a message's files —
+ * draw this one with no second implementation. Each is declared here, and that
+ * is not boilerplate: ProseMirror **drops an attribute its schema does not
+ * name**, so an undeclared `thumb` would survive the editor and vanish on save,
+ * which is the same silent-deletion failure `UnknownBlock` exists to prevent.
+ */
+export const AttachmentNode = Node.create({
+  name: 'attachment',
+  group: 'block',
+  atom: true,
+  selectable: true,
+  draggable: false,
+
+  addAttributes() {
+    return {
+      url: { default: '' },
+      m: { default: '' },
+      x: { default: '' },
+      size: { default: 0 },
+      dim: { default: null },
+      thumb: { default: null },
+      alt: { default: null },
+      filename: { default: null },
+    }
+  },
+
+  parseHTML() {
+    return [{ tag: 'div[data-attachment-block]' }]
+  },
+
+  renderHTML({ node }) {
+    // Only reached by a copy to the clipboard; the editor draws the node view.
+    return ['div', { 'data-attachment-block': String(node.attrs.x ?? '') }, String(node.attrs.filename ?? 'attachment')]
+  },
+
+  addNodeView() {
+    return ReactNodeViewRenderer(AttachmentBlockView)
+  },
+})
+
+function AttachmentBlockView({ node }: { node: { attrs: Record<string, unknown> } }) {
+  const file = node.attrs as unknown as Imeta
+  return (
+    <NodeViewWrapper className="my-2">
+      <Attachment file={file} />
     </NodeViewWrapper>
   )
 }

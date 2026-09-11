@@ -60,7 +60,13 @@ const ROOT = new URL('..', import.meta.url).pathname
  */
 const DIST = join(ROOT, 'dist', 'ship')
 const SHOTS = join(ROOT, '.smoke')
-const PORT = 5191
+/*
+  5191 is also `npm run dev`'s port, and these repos are shared — so a colleague
+  with Ship open makes this unrunnable with an `EADDRINUSE` that says nothing
+  about the test. Overridable rather than hardcoded: `SMOKE_PORT=5199 npm run
+  smoke`. The default is unchanged, so nothing that already works has to.
+*/
+const PORT = Number(process.env.SMOKE_PORT ?? 5191)
 const HEADED = process.argv.includes('--headed')
 
 const TYPES: Record<string, string> = {
@@ -280,9 +286,11 @@ async function main() {
   const sectionFor = (name: string) =>
     page.locator('section').filter({ has: page.getByRole('heading', { name, exact: true }) })
 
-  /** `Select` is not a native `<select>`: a labelled trigger, then a listbox. */
+  /** `Select` is not a native `<select>`: a labelled trigger, then a listbox.
+   *  The trigger is a `combobox` rather than a `button` since the Base UI
+   *  migration — which is what the component's own unit tests already say. */
   const pick = async (label: string, option: string | number) => {
-    await page.getByRole('button', { name: label, exact: true }).click()
+    await page.getByRole('combobox', { name: label, exact: true }).click()
     await page.getByRole('listbox').waitFor()
     await (typeof option === 'string'
       ? page.getByRole('option', { name: option })
@@ -397,9 +405,11 @@ async function main() {
 
     The four-row textarea this replaced would fail every line below.
   */
-  const description = page.getByRole('button', { name: 'Edit description' })
+  // The reading surface itself: Tab reaches it and Enter opens it, since D37
+  // deleted the screen-reader-only "Edit description" button this used to use.
+  const description = page.locator('[data-description="reading"]')
   await description.focus()
-  await description.click()
+  await description.press('Enter')
   const editor = page.getByRole('textbox', { name: 'Description' })
   await editor.waitFor()
   check('the description opens an editor, not a textarea', (await page.locator('textarea').count()) === 0)
@@ -419,7 +429,7 @@ async function main() {
   // Blur commits, the way `EditableText` always did.
   await page.getByRole('heading', { name: 'Activity' }).click()
   await page.locator('[data-block-id] h1, h1[data-block-id]').first().waitFor()
-  const readingBox = await page.locator('[aria-label="Edit description"]').locator('..').boundingBox()
+  const readingBox = await page.locator('[data-description="reading"]').boundingBox()
   check(
     'the field is the same size reading and writing — the report itself',
     !!editingBox && !!readingBox && Math.abs(editingBox.height - readingBox.height) < 24,
@@ -556,7 +566,14 @@ async function main() {
     So the behaviour is pinned here, and a regression would have to pass this
     to reach anybody.
   */
-  await conversations.getByRole('button', { name: 'Makes sense' }).first().click()
+  /* An emoji nobody has used yet comes from the picker, which lives behind the
+     card's React button — it was an inline row when this was written. The
+     picker's buttons are named by meaning, not by glyph, the same rule the
+     pills follow. */
+  await conversations.getByRole('button', { name: 'React' }).first().click()
+  // `page`, not `conversations`: the popover portals to the body, so it is not
+  // inside the section its trigger sits in.
+  await page.getByRole('button', { name: 'Makes sense', exact: true }).first().click()
   await conversations.getByRole('button', { name: 'Makes sense, 1' }).first().waitFor({ timeout: 15000 })
   const mine = stored.filter((e) => e.kind === 7 && e.pubkey !== 'f'.repeat(64))
   check('a second emoji is a second reaction, not a replacement', mine.map((e) => e.content).sort().join(' ') === '\u{1F389} \u{1F44D}')
@@ -639,7 +656,7 @@ async function main() {
     edit came back through `foldEdits` rather than being patched in locally.
   */
   await conversations.getByRole('button', { name: 'Message actions' }).nth(1).click()
-  await conversations.getByRole('menuitem', { name: 'Edit message' }).click()
+  await page.getByRole('menuitem', { name: 'Edit message' }).click()
   /*
     Typed rather than `fill()`ed, and that is not a stylistic choice: `fill` set
     the textarea's value and the save then did nothing, every time. Typing drives
@@ -696,7 +713,7 @@ async function main() {
   const replyMenus = await conversations.getByRole('button', { name: 'Message actions' }).count()
   check('every message offers a delete, not just your own', replyMenus === 2)
   await conversations.getByRole('button', { name: 'Message actions' }).nth(1).click()
-  await conversations.getByRole('menuitem', { name: 'Delete message' }).click()
+  await page.getByRole('menuitem', { name: 'Delete message' }).click()
   await page.getByRole('button', { name: 'Delete message' }).click()
   await page.waitForFunction(() => document.querySelectorAll('section article').length === 1)
   const deletion = stored.find((e) => e.kind === 5 && e.tags.some((t) => t[0] === 'e' && t[1] === reply!.id))
@@ -752,7 +769,7 @@ async function main() {
   )
   check(
     '  …and Activity saying what it holds rather than nothing',
-    (await sectionFor('Activity').textContent())?.includes('Nothing related yet') ?? false,
+    (await sectionFor('Activity').textContent())?.includes('No related conversations yet.') ?? false,
   )
   await shot(page, '06-issue-detail')
 

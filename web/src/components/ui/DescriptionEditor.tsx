@@ -75,6 +75,13 @@ export function DescriptionEditor({
 
   const reading = (
     <div
+      /* Named for the browser test. `smoke.ts` used to find this surface by the
+         screen-reader-only "Edit description" button, and D37 deleted that
+         button — leaving the test looking for something no longer rendered.
+         There is no accessible name to select instead (the surface is a
+         focusable div), so this is one of the `data-` exceptions smoke.ts
+         already documents: which surface is on screen is not a role. */
+      data-description="reading"
       // The editor's own padding, so entering it moves nothing sideways. The
       // hover edge and the focus ring are EditableText's (an outline, so no
       // pixel moves), so a description reads as the same kind of thing

@@ -1,5 +1,10 @@
 /**
- * Reading an attachment's bytes — CON-12.
+ * An attachment's bytes, both ways — CON-12.
+ *
+ * {@link blobObjectUrl} reads one for the page to draw (SHI-1);
+ * {@link uploadAttachment} puts one there so a message can name it (SHI-2).
+ * Both are here because both need the relay origin and the viewer's signer,
+ * and neither can live in `src/`, which builds without `lib.dom`.
  *
  * ## Why an `<img src>` does not work
  *
@@ -27,7 +32,7 @@
  * repeat; a conversation shows a handful of images, and a page that has drawn
  * 64 distinct files is one somebody scrolled a long way through.
  */
-import { fetchBlob } from '@estiva-app/protocol'
+import { fetchBlob, imetaFor, uploadBlob, type Imeta } from '@estiva-app/protocol'
 import { RELAY_URL } from '../config'
 import { signer } from './store'
 
@@ -64,4 +69,35 @@ export function blobObjectUrl(mediaUrl: string): Promise<string> {
 /** Test seam — the cache is module state and a suite must not inherit it. */
 export function clearBlobCache(): void {
   cache.clear()
+}
+
+/**
+ * Put a file on the relay and describe it as an `imeta` — SHI-2's write half.
+ *
+ * The mirror of {@link blobObjectUrl}, and here for the same reason: this layer
+ * is the one that holds `RELAY_URL` and the viewer's signer, and `src/` builds
+ * without `lib.dom` so a `File` cannot reach it.
+ *
+ * **Two orderings that are not preferences.** The bytes must land before the
+ * message that names them — ingest runs `verify_imeta_blobs` and refuses a
+ * message whose blob it does not hold — so this resolves before anything is
+ * posted, and a failure here means no message goes out rather than one going
+ * out broken. And the `m` and `x` in the tag are the relay's answers about what
+ * it stored, not the browser's guess from a file extension; `imetaFor` maps the
+ * upload descriptor for exactly that reason.
+ *
+ * Rejects with the relay's own words. The composer draws them: a refusal here
+ * is usually about the file (too large, a type the relay will not take), which
+ * is something the person can act on.
+ */
+export async function uploadAttachment(file: File): Promise<Imeta> {
+  const blob = await uploadBlob({
+    relayUrl: RELAY_URL,
+    bytes: await file.arrayBuffer(),
+    contentType: file.type || undefined,
+    filename: file.name,
+    sign: (unsigned) => signer.sign(unsigned),
+    pubkey: signer.pubkey,
+  })
+  return imetaFor(blob, { filename: file.name })
 }

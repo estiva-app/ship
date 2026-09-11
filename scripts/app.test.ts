@@ -22,6 +22,7 @@
 import { buildChange, buildConversationMessage, buildIssue, buildProject } from '../src/events'
 import { buildManifest } from '../src/manifest'
 import { foldFolder, projectFolders, type Change, type Project } from '../src/fold'
+import { foldAttachments } from '../src/attachments'
 import { directoryFrom, initials, parseProfile } from '../src/profiles'
 import type { SignedEvent } from '@estiva-app/protocol'
 import { actionProblems } from '@estiva-app/interop'
@@ -363,6 +364,100 @@ const reply = buildConversationMessage(PK, Date.now(), {
 })
 check('a reply stays a kind:9 until a caller can supply the anchor', reply.kind === 9)
 check('  …and threads by e, as it always did', tag(reply, 'e') === 'r1')
+
+/*
+  Attaching a file — SHI-2, the other end of `attachments.ts`.
+
+  Checked as a round trip rather than by reading the tag back by hand: the
+  producer and the reader are two halves of the same feature and this is the
+  only place both are in scope. A tag that serialises fine and folds to nothing
+  is exactly the failure this pins — Ship would draw a message with no
+  attachment on it and say nothing about why.
+*/
+const FILE_SHA = 'f'.repeat(64)
+const SECOND_SHA = 'e'.repeat(64)
+const file = { url: `/media/${FILE_SHA}.png`, m: 'image/png', x: FILE_SHA, size: 4096 }
+const second = { url: `/media/${SECOND_SHA}.png`, m: 'image/png', x: SECOND_SHA, size: 8192 }
+/* The fold takes signed events. Nothing here verifies a signature, so an id is
+   all these need to be indexable. */
+const asSigned = (event: { tags: string[][]; kind: number; content: string; pubkey: string; created_at: number }, id: string): SignedEvent =>
+  ({ ...event, id, sig: '0'.repeat(128) }) as SignedEvent
+
+const withFile = buildConversationMessage(PK, Date.now(), { folder: CONTENT, body: 'Here it is', files: [file] })
+check('a message can carry a file', foldAttachments([asSigned(withFile, 'm1')]).m1?.[0]?.x === FILE_SHA)
+
+const commentWithFile = buildConversationMessage(PK, Date.now(), { folder: CONTENT, body: 'Look', about: ISSUE_ADDR2, files: [file] })
+check('a comment carries one too, on the 1111 branch', commentWithFile.kind === 1111 && foldAttachments([asSigned(commentWithFile, 'm2')]).m2?.[0]?.x === FILE_SHA)
+check('  …and the comment keeps its NIP-22 root', tag(commentWithFile, 'A') === ISSUE_ADDR2)
+
+const two = buildConversationMessage(PK, Date.now(), { folder: CONTENT, body: 'Both', files: [file, second] })
+check('several files keep the order they were attached in', foldAttachments([asSigned(two, 'm3')]).m3?.map((f) => f.x).join() === `${FILE_SHA},${SECOND_SHA}`)
+
+// A message that attached nothing must carry no `imeta` at all. An empty tag
+// would be a claim about a blob the relay does not hold, and ingest refuses the
+// whole message for it.
+check('a message with no files carries no imeta', plain.tags.every((t) => t[0] !== 'imeta'))
+
+/*
+  A description's files reach the change event as tags — SPEC §13.3, SHI-2.
+
+  The point of the requirement, and so of these checks: ingest verifies `imeta`
+  **tags** and never parses `content`. Without the tag a description could name
+  a blob the relay does not hold and nothing would refuse it — where a message
+  physically cannot. `buildChange` derives them from the document so that no
+  caller can leave them off.
+*/
+const BLOCKS_FORMAT = 'estiva-blocks-1'
+const descriptionWith = (...attachments: Record<string, unknown>[]) =>
+  JSON.stringify({
+    type: 'doc',
+    content: [
+      { type: 'paragraph', id: 'b1', content: [{ type: 'text', text: 'here it is' }] },
+      ...attachments.map((attrs, i) => ({ type: 'attachment', id: `b${i + 2}`, attrs })),
+    ],
+  })
+const descFile = { url: `/media/${FILE_SHA}.png`, m: 'image/png', x: FILE_SHA, size: 4096 }
+
+const described = buildChange(PK, Date.now(), {
+  target: ISSUE_ADDR2,
+  field: 'description',
+  value: descriptionWith(descFile),
+  folder: CONTENT,
+  contentFormat: BLOCKS_FORMAT,
+})
+const imetaTags = described.tags.filter((t) => t[0] === 'imeta')
+check('a description with a file names it in an imeta tag', imetaTags.length === 1)
+check('  …carrying the blob hash ingest will look for', imetaTags[0]?.some((part) => part === `x ${FILE_SHA}`) === true)
+check('  …and the value tag still holds the document', tag(described, 'value') === descriptionWith(descFile))
+check('  …with the content-format the reader needs', tag(described, 'content-format') === BLOCKS_FORMAT)
+
+const twoFiles = buildChange(PK, Date.now(), {
+  target: ISSUE_ADDR2,
+  field: 'description',
+  value: descriptionWith(descFile, { ...descFile, x: SECOND_SHA, url: `/media/${SECOND_SHA}.png` }),
+  folder: CONTENT,
+  contentFormat: BLOCKS_FORMAT,
+})
+check('two files become two tags', twoFiles.tags.filter((t) => t[0] === 'imeta').length === 2)
+
+// Every other field goes through the same builder, and a scalar has no
+// document to read. A `status` change growing an imeta tag would be nonsense
+// the relay would then try to verify.
+const scalarChange = buildChange(PK, Date.now(), {
+  target: ISSUE_ADDR2,
+  field: 'status',
+  value: 'in_progress',
+  folder: CONTENT,
+})
+check('a scalar change carries no imeta', scalarChange.tags.every((t) => t[0] !== 'imeta'))
+
+const plainDescription = buildChange(PK, Date.now(), {
+  target: ISSUE_ADDR2,
+  field: 'description',
+  value: 'just words, no blocks',
+  folder: CONTENT,
+})
+check('  …and neither does a marker-text description', plainDescription.tags.every((t) => t[0] !== 'imeta'))
 
 // The manifest is not a description of Ship, it is an instruction to Peek.
 const shipManifest = buildManifest(PK, Date.now())
