@@ -34,6 +34,7 @@ import {
   type FolderState,
   type WorkspaceState,
 } from '@/api'
+import { useRelated } from '@/api/useRelated'
 import type { ThreadData } from '@/components/ConversationThread'
 import type { ActivityItem } from '@/components/Activity'
 import type { IssuesTableRow } from '@/components/IssuesTable'
@@ -381,6 +382,15 @@ export function ProjectPage({
     [threads, merged, project],
   )
   const people = useMemo(() => railPeople(state, directory), [state, directory])
+  /*
+    What somebody placed under this project from another app — RFC 0.5 §10.7.
+
+    Read from the project's content Folder, which is where a file placed
+    "under" it lives: Peek starts a topic under a project inside the Folder the
+    person is looking at, and that Folder lists the project. Not the fold — the
+    fold is Ship's kinds, and these are by definition not.
+  */
+  const related = useRelated(project?.contentFolder, project?.addr)
 
   if (!project) {
     return <EmptyState icon={<IconLinkOff size={16} stroke={1.5} />} message="That project is not in this workspace, or is in a Folder you cannot read." />
@@ -435,6 +445,7 @@ export function ProjectPage({
         issues={issues}
         issueStatuses={ISSUE_STATUSES}
         hrefFor={hrefForIssue}
+        related={related}
         threads={threads}
         unread={unread}
         // A project conversation is already in the topic it belongs to, so a

@@ -1,9 +1,10 @@
-import { IconBox, IconMessage2 } from '@tabler/icons-react'
+import { IconBox } from '@tabler/icons-react'
 import { cn } from '@/lib/cn'
 import { ago } from '@/lib/time'
 import { statusLabel, type StatusEntry } from '@/lib/issues'
 import { Avatar } from '@/components/ui/Avatar'
 import { Chip } from '@/components/ui/Chip'
+import { ConversationCount } from '@/components/ui/ConversationCount'
 import { StatusShape } from '@/components/ui/StatusLabel'
 import { linkTo } from '@/router'
 
@@ -73,15 +74,7 @@ export function IssueRow({ issue, statuses, href, className }: IssueRowProps) {
       </a>
       {/* The count before the chip (Katerina, 2026-09-09): what is said
           about the issue, then where it lives, then who and when. */}
-      {threads > 0 && (
-        <span
-          className="flex shrink-0 items-center gap-1 text-caption tabular-nums text-text-muted"
-          aria-label={`${threads} ${threads === 1 ? 'conversation' : 'conversations'}`}
-        >
-          <IconMessage2 size={14} stroke={1.5} aria-hidden="true" />
-          {threads}
-        </span>
-      )}
+      <ConversationCount count={threads} unit="conversation" />
       {issue.project && (
         <a {...linkTo(issue.project.href)} className="relative z-10 shrink-0 rounded-full">
           <Chip label={issue.project.title} leadingIcon={<IconBox size={12} stroke={1.5} />} className="max-w-[200px]" />

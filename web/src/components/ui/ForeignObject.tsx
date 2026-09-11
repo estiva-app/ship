@@ -2,6 +2,7 @@ import { stripNaddrs } from '@estiva-app/protocol'
 import { cn } from '@/lib/cn'
 import { Avatar } from './Avatar'
 import { Chip } from './Chip'
+import { ConversationCount } from './ConversationCount'
 import { Person } from './Person'
 import { StatusLabel } from './StatusLabel'
 import { pickWidget } from '@/api/foreign'
@@ -61,6 +62,14 @@ function SlotValue({ slot, people }: { slot: ResolvedSlot; people?: ForeignObjec
 
 export interface ForeignObjectProps {
   object: ForeignObjectData
+  /**
+   * Comments addressed to this object, from `conversationCountsOf` — drawn on
+   * a card or a row when the caller has asked for it. Not on the object
+   * itself, because a folder listing deliberately does not fetch it (one more
+   * query per listing) and a Related section does: the count is the section's
+   * to ask for, the widget's to draw.
+   */
+  conversations?: number
   className?: string
 }
 
@@ -72,7 +81,7 @@ export interface ForeignObjectProps {
  * from the relay and must never look identical on screen. `unreachable` is the
  * resolver telling us which one it was.
  */
-export function ForeignObject({ object, className }: ForeignObjectProps) {
+export function ForeignObject({ object, conversations, className }: ForeignObjectProps) {
   if (object.unreachable) {
     return (
       <div
@@ -101,7 +110,7 @@ export function ForeignObject({ object, className }: ForeignObjectProps) {
   return widget === 'message' ? (
     <ForeignMessage object={object} className={className} />
   ) : (
-    <ForeignCard object={object} row={widget === 'row'} className={className} />
+    <ForeignCard object={object} row={widget === 'row'} conversations={conversations} className={className} />
   )
 }
 
@@ -143,7 +152,7 @@ function ForeignMessage({ object, className }: ForeignObjectProps) {
   )
 }
 
-function ForeignCard({ object, row, className }: ForeignObjectProps & { row?: boolean }) {
+function ForeignCard({ object, row, conversations, className }: ForeignObjectProps & { row?: boolean }) {
   const { slots, meta, children } = object
   const body = (
     <>
@@ -154,6 +163,9 @@ function ForeignCard({ object, row, className }: ForeignObjectProps & { row?: bo
               slot safe rather than merely tolerable (§13.3). */}
           {slots.title?.value ?? 'Untitled'}
         </span>
+        {/* The count before the chip — what is said about the file, then
+            whose it is — the same order an issue row keeps. */}
+        {conversations !== undefined && <ConversationCount count={conversations} unit="comment" />}
         {object.appName && <Chip label={object.appName} />}
       </div>
       {slots.subtitle && (

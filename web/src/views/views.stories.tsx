@@ -6,10 +6,35 @@ import { IdentityMenu } from '@/components/IdentityMenu'
 import { Sidebar } from '@/components/Sidebar'
 import { ACTIVITY, ARCHIVED_CARDS, PEOPLE, PROJECT_CARDS, PROJECT_STATUSES, SIDEBAR_PROJECTS } from '@/fixtures/projects'
 import { ACTIVITY_ITEMS, ANA, ISSUES, ISSUE_STATUSES, THREADS, hrefFor, makeIssues } from '@/fixtures/issues'
+import type { ForeignObject } from '@/api/foreign'
+import type { RelatedState } from '@/api/useRelated'
 import { IssueView } from './IssueView'
 import { IssuesView, type IssuesScope } from './IssuesView'
 import { ProjectView } from './ProjectView'
 import { ProjectsView } from './ProjectsView'
+
+/**
+ * A bare-file topic somebody started under the project in Peek — RFC 0.5
+ * §10.7's Related section, with its comment count. The shape `readRelated`
+ * hands the page; see `Related.stories` for the section's own states.
+ */
+const RELATED: RelatedState = {
+  files: [
+    {
+      ref: '30840:a:cutover',
+      address: '30840:a:cutover',
+      eventId: 'e',
+      kind: 30840,
+      widget: 'card',
+      appName: 'File',
+      slots: { title: { value: 'Cut-over checklist' }, body: { value: 'What has to be true before the old read path is turned off.' } },
+      meta: [],
+      comments: [],
+      parentRef: '30850:a:rel',
+    } as unknown as ForeignObject,
+  ],
+  counts: { '30840:a:cutover': 7 },
+}
 
 /**
  * The four pages, composed from the reviewed parts and placed in the shell,
@@ -108,6 +133,7 @@ export const Project: Story = {
           issues={ISSUES}
           issueStatuses={ISSUE_STATUSES}
           hrefFor={hrefFor}
+          related={RELATED}
           threads={THREADS}
           onStartConversation={fn()}
           onReply={fn()}

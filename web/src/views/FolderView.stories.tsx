@@ -5,12 +5,11 @@ import { FolderView } from './FolderView'
 /**
  * Invented files from three apps, one of which nobody wrote.
  *
- * The tide reading is the point of the fixture rather than decoration: its
- * widget chain is `["tideboard", "card"]`, and no consumer implements
- * `tideboard`. RFC 0.4 §13.3 closes every chain in card/row/table/stat, so it
- * still draws — as a card, in Ship's design language, with its own app's name
- * beside it. A folder view that could only render Ship's kinds would look
- * identical until the day a third app existed.
+ * Since RFC 0.5 §10.7 the tree lists Ship's own kinds and *counts* the rest,
+ * so the tide reading and the topic are the point of the fixture for a new
+ * reason: neither is listed, both are counted, and no kind is named in the
+ * rule that decides. The line under the title is what a person gets instead
+ * of a blank list.
  */
 const file = (over: Partial<ForeignObject>): ForeignObject =>
   ({
@@ -30,8 +29,9 @@ const file = (over: Partial<ForeignObject>): ForeignObject =>
 
 const FILES: ForeignObject[] = [
   file({ ref: 'p', kind: 30850, appName: 'Estiva Ship', slots: { title: { value: 'Payment integration' } } }),
-  file({ ref: 't', kind: 39000, appName: 'Peek', slots: { title: { value: 'Onboarding' } } }),
+  file({ ref: 't', kind: 30840, appName: 'File', slots: { title: { value: 'Onboarding' } } }),
   file({ ref: 'x', kind: 30911, appName: 'Tide table', widget: ['tideboard', 'card'], slots: { title: { value: 'Spring tides' } } }),
+  file({ ref: 'i', kind: 30851, appName: 'Estiva Ship', widget: 'row', slots: { title: { value: 'Refund webhook retries' }, status: { value: 'in_progress' } } }),
 ]
 
 const folder = (over: Partial<FolderContents> = {}): FolderContents =>
@@ -47,8 +47,24 @@ const meta = {
 export default meta
 type Story = StoryObj<typeof meta>
 
-/** Three apps' files as peers in one list, each drawn through its own manifest. */
+/** Ship's project and issue listed; the topic and the tide reading counted — "2 files · 2 other files, listed in Peek". */
 export const ThreeApps: Story = {}
+
+/**
+ * Four topics and no projects — the case §10.7's ticket names.
+ *
+ * Nothing is listed and the folder is not empty, and the line has to say both:
+ * "No projects or issues here · 4 other files, listed in Peek". A blank list
+ * under "Nothing in this folder yet" would be the lie this story guards
+ * against.
+ */
+export const OnlyOtherApps: Story = {
+  args: {
+    folder: folder({
+      files: [1, 2, 3, 4].map((n) => file({ ref: `t${n}`, kind: 30840, appName: 'File', slots: { title: { value: `Topic ${n}` } } })),
+    }),
+  },
+}
 
 /**
  * The approximation, and it says so.
@@ -64,7 +80,7 @@ export const NoFolderStateYet: Story = {
 }
 
 /** One file: "1 file", not "1 files". */
-export const OneFile: Story = { args: { folder: folder({ files: [FILES[1]!] }) } }
+export const OneFile: Story = { args: { folder: folder({ files: [FILES[0]!] }) } }
 
 /**
  * Empty, and deliberately not silent.

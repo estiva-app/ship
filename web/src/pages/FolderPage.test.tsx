@@ -1,13 +1,15 @@
 /**
- * The folder view — RFC 0.4 §4 and §5.
+ * The folder view — RFC 0.4 §4 and §5, narrowed by RFC 0.5 §10.7.
  *
- * The claim worth pinning is not that Ship can draw a project. It is that Ship
- * draws a Folder's contents **without knowing what they are**: a Ship project,
- * a Peek topic and a record from an app nobody here has heard of come out as
- * peers, each through its owner's declared widget.
+ * Two claims. The read is generic: a Ship project arrives through its owner's
+ * declared widget the same way a stranger's record would, and drawing it
+ * proves nothing about 30850 in particular. And the *tree* is Ship's own —
+ * navigation is by kind — so a topic, or a kind nobody here has heard of, is
+ * counted rather than listed, and a folder of only such files never reads as
+ * empty.
  *
- * So the fixtures below include a kind neither app designed for. If this file
- * only ever tested 30850 and 39000 it would be testing an integration.
+ * The fixtures still include a kind neither app designed for, and now it is
+ * there to pin the *other* side: "not mine" has no list of kinds in it.
  */
 import { render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
@@ -67,37 +69,55 @@ describe('FolderPage', () => {
     await waitFor(() => expect(screen.getByText('This folder could not be read.')).toBeInTheDocument())
   })
 
-  it('lists a Ship project and a Peek topic as peers, each named by its own app', async () => {
+  it('lists a project and an issue as peers, and counts a topic beside them rather than listing it', async () => {
     readFolder.mockResolvedValue(
       folder({
         files: [
           file({ ref: 'p', kind: 30850, appName: 'Estiva Ship', slots: { title: { value: 'Onboarding work' } } }),
-          file({ ref: 't', kind: 39000, appName: 'Peek', slots: { title: { value: 'Design review' } } }),
+          file({ ref: 't', kind: 30840, appName: 'File', slots: { title: { value: 'Design review' } } }),
+          file({ ref: 'i', kind: 30851, appName: 'Estiva Ship', slots: { title: { value: 'Broken link' } } }),
         ],
       }),
     )
     render(<FolderPage id="f1" />)
     await waitFor(() => expect(screen.getByText('Onboarding work')).toBeInTheDocument())
-    expect(screen.getByText('Design review')).toBeInTheDocument()
-    // Peers: two rows at the same level, neither reached by expanding the other.
+    expect(screen.getByText('Broken link')).toBeInTheDocument()
+    // Navigation is by kind (§10.7): the topic is not a peer in Ship's tree —
+    // it is counted, and the count says where it is listed.
+    expect(screen.queryByText('Design review')).not.toBeInTheDocument()
     expect(document.querySelectorAll('[data-foreign-object]')).toHaveLength(2)
-    expect(screen.getByText('2 files')).toBeInTheDocument()
+    expect(screen.getByText('2 files · 1 other file, listed in Peek')).toBeInTheDocument()
   })
 
-  it('draws a kind neither app designed for, through the fallback chain', async () => {
-    // `tideboard` is a widget this consumer has never heard of. RFC 0.4 §13.3
-    // closes every chain in card/row/table/stat, so there is always something
-    // left to draw — and drawing nothing is the failure PEE-10 named.
+  it('a folder holding only other apps’ files says how many, and never reads as empty', async () => {
+    // The case the ticket names: four topics and no projects. A blank list
+    // here would be a lie, and "Nothing in this folder yet" a worse one.
+    readFolder.mockResolvedValue(
+      folder({
+        files: [1, 2, 3, 4].map((n) => file({ ref: `t${n}`, kind: 30840, appName: 'File', slots: { title: { value: `Topic ${n}` } } })),
+      }),
+    )
+    render(<FolderPage id="f1" />)
+    await waitFor(() => expect(screen.getByText('No projects or issues here · 4 other files, listed in Peek')).toBeInTheDocument())
+    expect(screen.queryByText('Nothing in this folder yet.')).not.toBeInTheDocument()
+    expect(document.querySelectorAll('[data-foreign-object]')).toHaveLength(0)
+  })
+
+  it('a kind neither app designed for is "not mine" too — counted, not special-cased', async () => {
+    // There is no list of kinds to hide. `tideboard` belongs to an app nobody
+    // here has heard of, and it is treated exactly as a topic is.
     readFolder.mockResolvedValue(
       folder({
         files: [
+          file({ ref: 'p', kind: 30850, appName: 'Estiva Ship', slots: { title: { value: 'Onboarding work' } } }),
           file({ ref: 'x', kind: 30911, appName: 'Tide table', widget: ['tideboard', 'card'], slots: { title: { value: 'Spring tides' } } }),
         ],
       }),
     )
     render(<FolderPage id="f1" />)
-    await waitFor(() => expect(screen.getByText('Spring tides')).toBeInTheDocument())
-    expect(document.querySelector('[data-widget="card"]')).toBeTruthy()
+    await waitFor(() => expect(screen.getByText('Onboarding work')).toBeInTheDocument())
+    expect(screen.queryByText('Spring tides')).not.toBeInTheDocument()
+    expect(screen.getByText('1 file · 1 other file, listed in Peek')).toBeInTheDocument()
   })
 
   it('says so when the list came from channel containment rather than folder state', async () => {

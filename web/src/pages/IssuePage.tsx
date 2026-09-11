@@ -2,6 +2,7 @@ import { IconLinkOff } from '@tabler/icons-react'
 import { useMarkRead } from '@/lib/useMarkRead'
 import { useMemo, useState } from 'react'
 import { ISSUE_STATUSES, commentsOn, deleteIssue, deleteMessage, editMessage, react, referenceFor, reply, setIssueField, unreact, startConversation, type DirectoryView, type FolderState, type WorkspaceState, threadContext, useMergedReadState, firstUnreadByThread, projectContext, me } from '@/api'
+import { useRelated } from '@/api/useRelated'
 import type { HistoryEntry } from '@/components/History'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -79,6 +80,10 @@ export function IssuePage({ state, directory, d, say, refresh }: { state: Worksp
     [state],
   )
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+  /* What somebody placed under this issue from another app — RFC 0.5 §10.7.
+     Read from the issue's own Folder, the one a file placed under it is
+     written into; see the same line on ProjectPage. */
+  const related = useRelated(issue?.folder, issue?.addr)
 
   if (!issue) {
     return (
@@ -106,6 +111,7 @@ export function IssuePage({ state, directory, d, say, refresh }: { state: Worksp
         nameOf={directory.nameOf}
         onRename={(value) => set('title', value, 'Rename')}
         onDescribe={(value, contentFormat) => set('description', value, 'Description', contentFormat)}
+        related={related}
         threads={threads}
         unread={unread}
         // Threads about an issue carry a reference in the body so Peek renders
