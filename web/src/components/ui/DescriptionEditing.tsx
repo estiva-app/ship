@@ -48,6 +48,11 @@ export default function DescriptionEditing({
   */
   const committing = useRef(false)
   const picker = useRef<HTMLInputElement>(null)
+  /*
+    True from the moment the file dialog is asked for until the window comes
+    back — see `openPicker`. While it is set, a blur does **not** commit.
+  */
+  const picking = useRef(false)
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const failed = useRef(false)
@@ -112,7 +117,26 @@ export default function DescriptionEditing({
           class: cn(PROSE_BLOCKS, 'outline-none'),
         },
       },
-      onBlur: ({ editor: e }) => void finish(e, true),
+      /*
+        Blur commits — except while the file dialog is open.
+
+        **This is SHI-2's bug.** Opening a native file dialog takes focus off
+        the page, and the browser fires `blur` on the editor. The description
+        then saved and closed *while the person was still choosing a file*, the
+        upload resolved into an unmounted editor, and the guard in `attach`
+        dropped the insert without a word. Production showed it plainly: three
+        description changes in twenty-five seconds, none carrying an
+        attachment.
+
+        `preventDefault` on the button's mousedown was not enough — it stops
+        the *button* taking focus, and the dialog is what actually takes it. A
+        Playwright repro cannot see this either, because it intercepts the file
+        chooser and no native dialog ever opens.
+      */
+      onBlur: ({ editor: e }) => {
+        if (picking.current) return
+        void finish(e, true)
+      },
     },
     [value, format],
   )
@@ -130,6 +154,23 @@ export default function DescriptionEditing({
     in the composer: §13.3's `attrs` are the relay's own answers about the blob,
     and there is nothing to write until it has them.
   */
+  /**
+   * Ask for a file, without letting the dialog close the description.
+   *
+   * The flag is cleared when the window comes back rather than on `change`: a
+   * cancelled dialog fires no event at all, so `change` alone would leave the
+   * editor unable to commit on blur for the rest of its life.
+   */
+  const openPicker = () => {
+    picking.current = true
+    const released = () => {
+      picking.current = false
+      window.removeEventListener('focus', released)
+    }
+    window.addEventListener('focus', released)
+    picker.current?.click()
+  }
+
   const attach = async (chosen: FileList | null) => {
     if (!chosen || chosen.length === 0) return
     setUploading(true)
@@ -183,12 +224,12 @@ export default function DescriptionEditing({
           />
           <IconButton
             variant="muted"
-            aria-label="Attach a file"
+            aria-label="Attach a file to the description"
             tooltip="Attach a file"
             disabledReason={uploading ? 'Uploading…' : undefined}
             // See `attach`: taking focus here would commit and close the editor.
             onMouseDown={(event) => event.preventDefault()}
-            onClick={() => picker.current?.click()}
+            onClick={openPicker}
           >
             <IconPaperclip size={16} stroke={1.5} />
           </IconButton>
