@@ -15,6 +15,8 @@ import type { IssueRowData } from '@/components/IssueRow'
 import { IssuesTable, type IssuesTableRow } from '@/components/IssuesTable'
 import { ProjectHeader } from '@/components/ProjectHeader'
 import { ProjectRail, type RailPerson } from '@/components/ProjectRail'
+import { Related, hasRelated } from '@/components/Related'
+import type { RelatedState } from '@/api/useRelated'
 
 /**
  * One project, as production lays it out (ruling C11): the trail, the
@@ -37,6 +39,12 @@ export interface ProjectViewProps {
   issues: IssuesTableRow[]
   issueStatuses: StatusEntry[]
   hrefFor: (issue: IssueRowData) => string
+  /**
+   * Foreign files placed under this project — RFC 0.5 §10.7. Drawn as a
+   * section after Issues (its own sub-files first, then what others put here)
+   * only when there is something to say; see `hasRelated`.
+   */
+  related?: RelatedState
   threads: ThreadData[]
   /** Thread id → first unread message id. Drives the feed divider (CRO-13). */
   unread?: Record<string, string>
@@ -76,7 +84,7 @@ export interface ProjectViewProps {
   readOnlyReason?: string
 }
 
-export function ProjectView({ crumbs, header, onAddIssue, view, onView, issues, issueStatuses, hrefFor, threads, unread, onStartConversation, onReply, activity, activityTruncated, onReplyInActivity, rail, about, onReact, onDeleteMessage, onEditMessage, readOnlyReason }: ProjectViewProps) {
+export function ProjectView({ crumbs, header, onAddIssue, view, onView, issues, issueStatuses, hrefFor, related, threads, unread, onStartConversation, onReply, activity, activityTruncated, onReplyInActivity, rail, about, onReact, onDeleteMessage, onEditMessage, readOnlyReason }: ProjectViewProps) {
   const addIssue = (
     <Button variant="primary" onClick={onAddIssue} disabledReason={readOnlyReason}>
       Add issue
@@ -122,6 +130,15 @@ export function ProjectView({ crumbs, header, onAddIssue, view, onView, issues, 
             <IssuesTable issues={issues} statuses={issueStatuses} hrefFor={hrefFor} />
           )}
         </section>
+        {/* Nesting is by intent (RFC 0.5 §10.7): what somebody placed under
+            this project, whatever app it belongs to. After Issues, because
+            those are the project's own sub-files and these are the others'. */}
+        {hasRelated(related) && (
+          <section className="flex flex-col gap-3">
+            <h2 className="text-h4 text-text-primary">Related</h2>
+            <Related related={related} />
+          </section>
+        )}
         <section className="flex flex-col gap-3">
           <h2 className="text-h4 text-text-primary">Conversations</h2>
           <Conversations threads={threads} unread={unread} onStart={onStartConversation} onReply={onReply} disabledReason={readOnlyReason} nameOf={header.nameOf} onReact={onReact} onDeleteMessage={onDeleteMessage} onEditMessage={onEditMessage} about={about} />

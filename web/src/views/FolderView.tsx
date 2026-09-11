@@ -1,36 +1,46 @@
 import type { FolderContents } from '@/api/foreign'
 import { ForeignObject } from '@/components/ui/ForeignObject'
+import { splitByKind } from '@/lib/ownKinds'
 
 /**
- * One Folder, and everything in it — RFC 0.4 §4 and §5.
+ * One Folder, as Ship's navigation — RFC 0.4 §4 and §5, narrowed by RFC 0.5
+ * §10.7: **navigation is by kind; nesting is by intent.**
  *
- * **The view that is supposed to look boring.** Every row is a
- * `<ForeignObject>`, the same component that draws a reference pasted into an
- * issue, and nothing here knows what any of the rows are. A Ship project, a
- * Peek topic and a record from an app nobody here has heard of are the same
- * case: an address, resolved through its owner's manifest, drawn through the
- * widget chain in Ship's design language.
+ * Ship is a specialized app, and a specialized app's tree lists its own kinds:
+ * folders and, inside them, projects and issues. The generic apps are where
+ * every file in a Folder is listed — in Peek you can talk about any file, so
+ * Peek lists them all. Until 2026-09-11 this view listed everything too, and
+ * the comment above it said a `kind === 30850` branch would be the day the
+ * Folder stopped being a container. §10.7 settled that the other way: the
+ * *read* is still generic (`readFolder` filters nothing), and what the tree
+ * chooses to list is this app's business.
  *
- * That is the whole claim. If this file ever grows a `kind === 30850` branch,
- * a sort by app, or a list of kinds it expects, the Folder has stopped being a
- * container and become an integration — and the demo stops proving anything.
+ * **What it does not list, it counts.** A Folder holding four topics and no
+ * projects is not empty, and a blank list would say it was — so the line under
+ * the title says how many other files there are and where they are listed.
+ * The split is `splitByKind`, defined once beside the Related filter, and
+ * there is no list of the kinds it expects to hide: a Leaf document is "other"
+ * the day Leaf exists.
+ *
+ * Every row is still a `<ForeignObject>`, resolved through its owner's
+ * manifest and drawn through the widget chain: Ship's own kinds arrive here
+ * the same way a stranger's would, which is what keeps the folder read one
+ * mechanism rather than an integration.
  *
  * **Peers, not nesting.** The rows are the Folder's contents, flat, in the
  * order the Folder lists them. A project's own issues are *its* children and
- * belong on the project's page; showing them here would make one row the
- * parent of another and put the two apps at different levels, which is exactly
- * what §5's "a file is anything with an address that a folder can list" rules
- * out.
+ * belong on the project's page; showing them here would put one row inside
+ * another, which is exactly what §5's "a file is anything with an address that
+ * a folder can list" rules out.
  */
 export function FolderView({ folder }: { folder: FolderContents }) {
+  const { own, foreign } = splitByKind(folder.files)
   return (
     <div className="flex flex-col gap-4 p-6" data-surface="folder" data-folder={folder.id} data-source={folder.source}>
       <div className="flex flex-col gap-1">
         <h1 className="text-h3 text-text-primary">{folder.name ?? 'Folder'}</h1>
-        <p className="text-caption text-text-muted">
-          {folder.files.length === 0
-            ? 'Nothing in this folder yet.'
-            : `${folder.files.length} ${folder.files.length === 1 ? 'file' : 'files'}`}
+        <p className="text-caption text-text-muted" data-own={own.length} data-foreign={foreign.length}>
+          {countLine(own.length, foreign.length)}
           {/*
             Said out loud, because the two are not equivalent and a short list
             is the only visible symptom. Containment by `h` can list Ship's
@@ -42,11 +52,30 @@ export function FolderView({ folder }: { folder: FolderContents }) {
           {folder.source === 'channel' && ' · from channel contents; this folder has no folder state yet'}
         </p>
       </div>
-      <div className="flex flex-col gap-2">
-        {folder.files.map((file) => (
-          <ForeignObject key={file.ref} object={file} />
-        ))}
-      </div>
+      {own.length > 0 && (
+        <div className="flex flex-col gap-2">
+          {own.map((file) => (
+            <ForeignObject key={file.ref} object={file} />
+          ))}
+        </div>
+      )}
     </div>
   )
+}
+
+/**
+ * The count, in four sentences that must stay four.
+ *
+ * "Nothing in this folder yet" is true only when both halves are zero. A
+ * folder of only other apps' files says so and says how many, because the
+ * honest answer to "why is this list blank" is "it is not; Ship does not list
+ * these" — and Peek, which lists everything, is where they are.
+ */
+export function countLine(own: number, foreign: number): string {
+  const files = (n: number) => `${n} ${n === 1 ? 'file' : 'files'}`
+  const others = `${foreign} other ${foreign === 1 ? 'file' : 'files'}, listed in Peek`
+  if (own === 0 && foreign === 0) return 'Nothing in this folder yet.'
+  if (foreign === 0) return files(own)
+  if (own === 0) return `No projects or issues here · ${others}`
+  return `${files(own)} · ${others}`
 }

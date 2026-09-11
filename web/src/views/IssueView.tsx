@@ -11,6 +11,8 @@ import { History, type HistoryEntry } from '@/components/History'
 import { Activity, type ActivityItem } from '@/components/Activity'
 import { Conversations, type ThreadData } from '@/components/ConversationThread'
 import { IssueRail, type IssueRailProps } from '@/components/IssueRail'
+import { Related, hasRelated } from '@/components/Related'
+import type { RelatedState } from '@/api/useRelated'
 
 /**
  * One issue, as production: the trail (Issues / project / ref — no project
@@ -41,6 +43,12 @@ export interface IssueViewProps {
   onRename: (v: string) => Promise<boolean> | boolean
   /** The body, and the format tag the editor built it in — RIC-14. */
   onDescribe: (v: string, contentFormat?: string) => Promise<boolean> | boolean
+  /**
+   * Foreign files placed under this issue — RFC 0.5 §10.7. An issue has no
+   * sub-files of Ship's own, so this is the whole of what nests under it;
+   * drawn before Conversations, only when there is something to say.
+   */
+  related?: RelatedState
   /** Threads that are *about* this issue — a tag at the root, never a passing mention (§6.4). */
   threads: ThreadData[]
   /** Threads on files related to it, time-ordered, each carrying how it is related. */
@@ -81,7 +89,7 @@ export interface IssueViewProps {
 }
 
 export function IssueView({ crumbs, title, description, descriptionFormat,
-  nameOf, onRename, onDescribe, threads, unread, onStartConversation, onReply, activity, activityTruncated, onReplyInActivity, history, rail, about, onReact, onDeleteMessage, onEditMessage, readOnlyReason }: IssueViewProps) {
+  nameOf, onRename, onDescribe, related, threads, unread, onStartConversation, onReply, activity, activityTruncated, onReplyInActivity, history, rail, about, onReact, onDeleteMessage, onEditMessage, readOnlyReason }: IssueViewProps) {
 
   // `linkTo` on each crumb (S15, 0.10.0): the breadcrumbs were the last links
   // in Ship that reloaded the whole app on a click (SHI-20).
@@ -118,6 +126,15 @@ export function IssueView({ crumbs, title, description, descriptionFormat,
             nameOf={nameOf}
           />
         </div>
+        {/* Nesting is by intent (RFC 0.5 §10.7): what somebody placed under
+            this issue — a sub-discussion started in Peek, a document — from
+            whichever app owns it. */}
+        {hasRelated(related) && (
+          <section className="flex flex-col gap-3">
+            <h2 className="text-h4 text-text-primary">Related</h2>
+            <Related related={related} />
+          </section>
+        )}
         <section className="flex flex-col gap-3">
           <h2 className="text-h4 text-text-primary">Conversations</h2>
           <Conversations

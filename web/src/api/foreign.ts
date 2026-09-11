@@ -16,6 +16,7 @@
  */
 import type { SignedEvent } from '@estiva-app/protocol'
 import {
+  conversationCountsOf,
   createPeopleCache,
   createProjectionCache,
   listFolders,
@@ -28,6 +29,7 @@ import {
 
 /** Chain-walking, from the runtime — one implementation, not one per consumer. */
 export { pickWidget } from '@estiva-app/interop'
+import { relatedTo } from '@/lib/ownKinds'
 import { relay } from './store'
 
 export type { ForeignObject, ResolvedSlot, FolderContents, FolderSummary } from '@estiva-app/interop'
@@ -106,13 +108,46 @@ export function resolveForeign(reference: string): Promise<ForeignObject | null>
  * are two apps' manifests and two apps' authors, and without the memo that is
  * the whole discovery cost on every tick.
  *
- * Ship draws whatever comes back. It does not filter by kind, does not sort by
- * app, and has no list of kinds it expects — a Folder holding something neither
- * app has heard of renders through the widget chain like everything else, which
- * is the property the folder view exists to demonstrate.
+ * The *read* takes whatever comes back: it does not filter by kind, does not
+ * sort by app, and has no list of kinds it expects. What the tree then lists is
+ * a different question — navigation is by kind (RFC 0.5 §10.7), so the folder
+ * view lists Ship's own files and counts the rest, and a project or issue page
+ * shows the foreign files placed under it as Related. Both are filters over
+ * this one read (`lib/ownKinds.ts`), and a Folder holding something neither app
+ * has heard of still arrives through the widget chain like everything else.
  */
 export function readFolder(id: string): Promise<FolderContents> {
   return resolveFolderContents(id, query, profiles.viaRelay(query), manifests)
+}
+
+/** The foreign files placed under one of Ship's objects, with their conversation counts. */
+export interface RelatedFiles {
+  /** One level, in the Folder's order — see `relatedTo`. */
+  files: ForeignObject[]
+  /** Comments addressed to each file, keyed by `ref`. Absent where the file has no address to ask about. */
+  counts: Record<string, number>
+}
+
+/**
+ * What is placed under a project or an issue — its Related section.
+ *
+ * **The same fetch as the folder view, with a different filter.** A file
+ * somebody put under a project lives in that project's Folder, so the Folder
+ * read already holds it, `parentRef` on it already says which file it is
+ * under (interop 0.19.0: a bare file's own `a` tag; any other kind's declared
+ * relation), and there is nothing to resolve twice.
+ *
+ * The count is one more query, from `conversationCountsOf`, and it is real for
+ * the file this was built for: a bare file's `kind:1111`s carry `#a`, so the
+ * badge is the discussion. Zero is a real zero — nothing addressed to it — and
+ * not "nobody has discussed it", which the runtime's own note on the function
+ * is careful about. Skipped entirely when there is nothing to count.
+ */
+export async function readRelated(folder: string, address: string): Promise<RelatedFiles> {
+  const contents = await readFolder(folder)
+  const files = relatedTo(contents.files, address)
+  const counts = files.length > 0 ? await conversationCountsOf(files, query, manifests) : {}
+  return { files, counts }
 }
 
 /** Every Folder this identity can see, for the sidebar. */
