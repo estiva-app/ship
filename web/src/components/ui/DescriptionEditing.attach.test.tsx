@@ -75,10 +75,39 @@ describe('the paperclip in a description', () => {
   */
   it('does not commit the description when pressed', () => {
     const { onCommit } = editing()
-    const paperclip = screen.getByRole('button', { name: 'Attach a file' })
+    const paperclip = screen.getByRole('button', { name: 'Attach a file to the description' })
     const prevented = !fireEvent.mouseDown(paperclip)
     expect(prevented, 'mousedown must be prevented or the editor commits').toBe(true)
     expect(onCommit).not.toHaveBeenCalled()
+  })
+
+  /*
+    The bug SHI-2 shipped with, and the reason the first version of these tests
+    proved the wrong half.
+
+    A native file dialog takes focus off the page and the browser fires `blur`
+    on the editor. This surface commits on blur — so the description saved and
+    closed while the person was still choosing a file, and the upload resolved
+    into an unmounted editor. Production showed three description changes in
+    twenty-five seconds, none carrying an attachment.
+
+    `preventDefault` on mousedown does not help: it stops the *button* taking
+    focus, and it is the *dialog* that takes it. A Playwright repro cannot see
+    it either — it intercepts the file chooser, so no native dialog opens.
+    Which leaves this: press the paperclip, then blur the way a dialog would.
+  */
+  it('does not commit when the file dialog takes focus away', async () => {
+    const { onCommit } = editing()
+    fireEvent.click(screen.getByRole('button', { name: 'Attach a file to the description' }))
+    fireEvent.blur(screen.getByRole('textbox', { name: 'Description' }))
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Description' })).toBeInTheDocument())
+    expect(onCommit).not.toHaveBeenCalled()
+  })
+
+  it('commits on an ordinary blur, once the dialog is done with', async () => {
+    const { onCommit } = editing()
+    fireEvent.blur(screen.getByRole('textbox', { name: 'Description' }))
+    await waitFor(() => expect(onCommit).toHaveBeenCalled())
   })
 
   it('says why an upload was refused, and attaches nothing', async () => {
