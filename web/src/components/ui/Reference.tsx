@@ -98,13 +98,26 @@ export function Reference({
 
   // An object: whatever its owner's projection says it is.
   if (object) {
+    const label = objectLabel(object, nameOf) ?? short
     return (
       <span
         data-reference="object"
         data-object={object.ref}
+        // The whole label on hover, because the visible one is cut.
+        title={label}
         className={cn(base, 'bg-bg-inset text-body-2 text-text-primary', className)}
+        /*
+          Cut, not wrapped, and `ch` rather than pixels so it scales with the
+          type. `truncate` alone did nothing here: an inline-flex chip takes
+          its content's width, so an 84-character issue title — or a message,
+          whose caption is a sentence (RIC-11) — became a chip as wide as the
+          column. A mention is a word in a sentence; the whole title is a
+          sentence of its own, and it is one hover away. Peek's chip keeps the
+          same 24ch for the same reason.
+        */
+        style={{ maxWidth: '24ch' }}
       >
-        <span className="truncate">{objectLabel(object, nameOf) ?? short}</span>
+        <span className="truncate">{label}</span>
         {object.slots.status && (
           // Same call `ForeignObject` makes for the attachment variant, so the
           // two agree about what a status looks like.
