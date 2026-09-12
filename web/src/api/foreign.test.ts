@@ -9,7 +9,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const query = vi.fn()
 vi.mock('./store', () => ({ relay: { query: (filters: unknown[]) => query(filters) } }))
 
-import { resolveForeign } from './foreign'
+import { encodeNevent } from '@estiva-app/protocol'
+import { isEventReference, resolveForeign } from './foreign'
 
 const AUTHOR = 'a'.repeat(64)
 const KIND = 30850
@@ -140,5 +141,62 @@ describe('resolveForeign — who the people are is remembered too (SHA-16)', () 
       (call[0] as { kinds?: number[] }[]).some((f) => f.kinds?.includes(0)),
     ).length
     expect(profileAsks).toBe(0)
+  })
+})
+
+/**
+ * A message is an event, not an address — RIC-11.
+ *
+ * Peek mentions a message as `nostr:nevent…`. Everything here went to
+ * `resolveForeignObject`, which throws on that form, and `useForeignObjects`
+ * catches the throw into `null` — so the mention drew as twelve characters of
+ * bech32 and nothing said why. `resolveForeignEvent` is the runtime's other
+ * half (PRO-11), and the fixture above is reused: the same manifest, the same
+ * kind, one event of it that is not addressable.
+ */
+describe('resolveForeign — a message, pointed at by id', () => {
+  const MESSAGE_ID = 'c'.repeat(64)
+  const message = event({ id: MESSAGE_ID, kind: KIND, tags: [['title', 'Said in passing'], ['lead', AUTHOR]] })
+
+  it('tells an event pointer from an address', () => {
+    expect(isEventReference(`nostr:${encodeNevent({ id: MESSAGE_ID, relays: [] })}`)).toBe(true)
+    expect(isEventReference('nostr:note1abc')).toBe(true)
+    expect(isEventReference(MESSAGE_ID)).toBe(true)
+    expect(isEventReference(ADDRESS)).toBe(false)
+    expect(isEventReference('nostr:naddr1abc')).toBe(false)
+    expect(isEventReference('nostr:npub1abc')).toBe(false)
+  })
+
+  it('resolves an nevent through the same manifest an address uses', async () => {
+    world.push(message)
+    query.mockImplementation(async (filters: Record<string, unknown>[]) =>
+      world.filter((e) =>
+        filters.some((f) => {
+          if (f.ids && !(f.ids as string[]).includes(e.id)) return false
+          if (f.kinds && !(f.kinds as number[]).includes(e.kind)) return false
+          if (f.authors && !(f.authors as string[]).includes(e.pubkey)) return false
+          for (const [key, want] of Object.entries(f)) {
+            if (!key.startsWith('#')) continue
+            const held = e.tags.filter((t) => t[0] === key.slice(1)).map((t) => t[1])
+            if (!(want as string[]).some((v) => held.includes(v))) return false
+          }
+          return true
+        }),
+      ),
+    )
+    try {
+      const found = await resolveForeign(`nostr:${encodeNevent({ id: MESSAGE_ID, relays: [], kind: KIND })}`)
+      expect(found).not.toBeNull()
+      expect(found?.eventId).toBe(MESSAGE_ID)
+      expect(found?.slots.title?.value).toBe('Said in passing')
+      // The people lookup is the cached one, the same as for an address.
+      expect(found?.people?.[AUTHOR]?.displayName).toBe('Ada')
+    } finally {
+      world.pop()
+    }
+  })
+
+  it('answers null, not a throw, for an event the relay does not hold', async () => {
+    await expect(resolveForeign(`nostr:${encodeNevent({ id: 'd'.repeat(64), relays: [], kind: KIND })}`)).resolves.toBeNull()
   })
 })

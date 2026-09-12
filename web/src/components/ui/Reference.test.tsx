@@ -11,7 +11,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import { render } from '@testing-library/react'
-import { addrToNaddr, encodeNpub } from '@estiva-app/protocol'
+import { addrToNaddr, encodeNevent, encodeNpub } from '@estiva-app/protocol'
 import type { ForeignObject } from '@/api/foreign'
 import { Reference } from './Reference'
 
@@ -70,5 +70,45 @@ describe('Reference', () => {
     const empty = render(<Reference uri={NADDR} object={null} />).container
     expect(pending.querySelector('[data-reference="pending"]')).not.toBeNull()
     expect(empty.querySelector('[data-reference="unresolved"]')).not.toBeNull()
+  })
+})
+
+/**
+ * A message, through Peek's manifest — RIC-11. It has no title of its own, so
+ * the manifest titles it by its author (`field: "pubkey", as: "pubkey"`) and
+ * carries the text as `body`. The done-when is that a mention made in Peek
+ * resolves *here*, with no shared fixture: the runtime's `people` name the
+ * author, and the chip quotes the opening words so a reader knows which
+ * message.
+ */
+describe('Reference, for a message', () => {
+  const NEVENT = `nostr:${encodeNevent({ id: 'c'.repeat(64), relays: [], kind: 9 })}`
+  const aMessage = (people?: ForeignObject['people'], widget: ForeignObject['widget'] = ['message', 'card']): ForeignObject =>
+    ({
+      ref: 'nevent1msg',
+      kind: 9,
+      widget,
+      slots: { title: { value: ADA, isPubkey: true }, body: { value: 'The build is green again.' } },
+      people,
+    }) as unknown as ForeignObject
+
+  it('names the author and quotes the opening words', () => {
+    const c = render(<Reference uri={NEVENT} object={aMessage({ [ADA]: { displayName: 'Ada Lovelace' } })} />).container
+    expect(c.textContent).toBe('Ada Lovelace: The build is green again.')
+  })
+
+  it('never prints the key when the runtime found no profile', () => {
+    const c = render(<Reference uri={NEVENT} object={aMessage()} nameOf={nameOf} />).container
+    expect(c.textContent).toBe('Ada Lovelace: The build is green again.')
+    const stranger = render(<Reference uri={NEVENT} object={aMessage(undefined)} />).container
+    expect(stranger.textContent).not.toContain(ADA)
+    expect(stranger.textContent).toContain(`${ADA.slice(0, 8)}…`)
+  })
+
+  it('draws a person-titled object that is not a message by the name alone', () => {
+    // The `message` widget is what makes something a message, not the
+    // person-shaped title: a project led by somebody is still a project.
+    const c = render(<Reference uri={NADDR} object={aMessage({ [ADA]: { displayName: 'Ada' } }, 'card')} />).container
+    expect(c.textContent).toBe('Ada')
   })
 })

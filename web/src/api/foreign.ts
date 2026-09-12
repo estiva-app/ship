@@ -21,6 +21,7 @@ import {
   createProjectionCache,
   listFolders,
   resolveFolderContents,
+  resolveForeignEvent,
   resolveForeignObject,
   type FolderContents,
   type FolderSummary,
@@ -92,7 +93,30 @@ const manifests = createProjectionCache()
  */
 const profiles = createPeopleCache()
 
+/**
+ * Whether a reference names an event rather than an address.
+ *
+ * A message is an event: it has no `d` tag and is pointed at by id — an
+ * `nevent`, a `note`, or the bare 64 hex characters an `e` tag gives you. The
+ * two resolvers in the runtime are split the same way, and each throws on the
+ * other's form.
+ */
+export function isEventReference(reference: string): boolean {
+  const bare = reference.replace(/^nostr:/i, '')
+  return /^(?:nevent|note)1/i.test(bare) || /^[0-9a-f]{64}$/i.test(bare)
+}
+
 export function resolveForeign(reference: string): Promise<ForeignObject | null> {
+  /*
+    A message mentioned from Peek arrives as `nostr:nevent…` (RIC-11), and
+    everything went to `resolveForeignObject`, which decodes an `naddr` or an
+    address and throws on anything else — so the mention resolved to null and
+    drew as twelve characters of bech32. `resolveForeignEvent` is the other
+    half of the runtime (PRO-11) and had no caller in either app.
+  */
+  if (isEventReference(reference)) {
+    return resolveForeignEvent(reference, query, profiles.viaRelay(query), manifests)
+  }
   // `0` is the list-depth budget, at the top. Positional because that is the
   // runtime's signature; naming them here would be inventing an adapter the
   // seam does not need.
