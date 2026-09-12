@@ -1,5 +1,6 @@
 import { IconLinkOff } from '@tabler/icons-react'
 import { useMarkRead } from '@/lib/useMarkRead'
+import { ownConversations } from '@/lib/ownConversation'
 import { pointerToAddress, referenceToPointer, resolveBlockAnchor, type ContentFormat } from '@estiva-app/protocol'
 import type { AttachmentIndex, EditIndex } from '@/api'
 import { signedIn } from '@/auth/estivaId'
@@ -360,10 +361,16 @@ export function ProjectPage({
     though nobody tagged anything — that is identity, and identity merges. Asking
     for `commentsOn(project.addr)` instead would have been tidier and would have
     silently emptied every project paired with a topic people actually talk in.
+
+    **And since RFC 0.5 §10.7, a thread rooted at another file is not here.** A
+    bare-file topic started under the project lives in this same Folder, and its
+    messages are rooted at the topic — a different file, so a different
+    conversation. `ownConversations` keeps the Folder rule and drops those; the
+    topic reaches this page as a Related card with its count instead.
   */
   const rolledUp = useMemo(() => new Set(activity.items.filter((i) => i.relation === 'sub-file').map((i) => i.thread.id)), [activity])
   const conversations = useMemo(
-    () => (project ? state.conversations.filter((c) => c.root.folder === project.contentFolder && !rolledUp.has(c.id)) : []),
+    () => (project ? ownConversations(state.conversations, project.contentFolder, project.addr, state.tagged).filter((c) => !rolledUp.has(c.id)) : []),
     [project, state, rolledUp],
   )
   /* A project *is* a container, so it takes the container context: its Folder's
