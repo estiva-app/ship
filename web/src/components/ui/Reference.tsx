@@ -1,7 +1,29 @@
-import { decodeNpub } from '@estiva-app/protocol'
+import { decodeNpub, stripNaddrs } from '@estiva-app/protocol'
 import type { ForeignObject } from '@/api/foreign'
 import { StatusLabel } from './StatusLabel'
 import { cn } from '@/lib/cn'
+
+/**
+ * What an object is called, for a chip one line high.
+ *
+ * Usually the title. The exception is a title that is a *person* — `as:
+ * "pubkey"` on the title slot, which is how Peek's manifest titles a message,
+ * by its author (RIC-11). Drawing that slot's value would draw 64 hex
+ * characters, and a key is never on screen; the runtime's `people` answer it,
+ * else the workspace directory, else a short key. A message then quotes its
+ * opening words after the name, because "Ada" alone says nothing about which
+ * of Ada's messages this is — the `message` widget is what makes it one, not
+ * the person-shaped title, so a project led by somebody stays a name.
+ */
+function objectLabel(object: ForeignObject, nameOf?: (pubkey: string) => string): string | undefined {
+  const title = object.slots.title
+  if (!title) return undefined
+  if (!title.isPubkey) return title.value
+  const name = object.people?.[title.value]?.displayName ?? nameOf?.(title.value) ?? `${title.value.slice(0, 8)}…`
+  const body = object.slots.body?.value
+  const widgets = Array.isArray(object.widget) ? object.widget : [object.widget]
+  return body && widgets.includes('message') ? `${name}: ${stripNaddrs(body).trim()}` : name
+}
 
 /**
  * A `nostr:` reference drawn in place — SPEC §13.1, RIC-10.
@@ -76,13 +98,26 @@ export function Reference({
 
   // An object: whatever its owner's projection says it is.
   if (object) {
+    const label = objectLabel(object, nameOf) ?? short
     return (
       <span
         data-reference="object"
         data-object={object.ref}
+        // The whole label on hover, because the visible one is cut.
+        title={label}
         className={cn(base, 'bg-bg-inset text-body-2 text-text-primary', className)}
+        /*
+          Cut, not wrapped, and `ch` rather than pixels so it scales with the
+          type. `truncate` alone did nothing here: an inline-flex chip takes
+          its content's width, so an 84-character issue title — or a message,
+          whose caption is a sentence (RIC-11) — became a chip as wide as the
+          column. A mention is a word in a sentence; the whole title is a
+          sentence of its own, and it is one hover away. Peek's chip keeps the
+          same 24ch for the same reason.
+        */
+        style={{ maxWidth: '24ch' }}
       >
-        <span className="truncate">{object.slots.title?.value ?? short}</span>
+        <span className="truncate">{label}</span>
         {object.slots.status && (
           // Same call `ForeignObject` makes for the attachment variant, so the
           // two agree about what a status looks like.
