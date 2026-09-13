@@ -6,6 +6,9 @@ A minimal issue tracker — projects, issues, comments — built on Nostr.
 This app reads and writes **production**, `estiva.estiva.app`. There is no
 staging workspace.
 
+**The UI Guardrails project:** where it stands is `docs/GATES.md` §0 in the `estiva-ui` checkout beside this repository.
+`npm run gates:status` here shows Ship's part of it, read from the code.
+
 ## UI: the shared package, and the rules every session follows
 
 @UI-RULES.md
