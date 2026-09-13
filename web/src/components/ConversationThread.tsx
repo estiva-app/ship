@@ -233,7 +233,11 @@ export function MessageActions({
           side="top"
           align="right"
           ariaLabel="Reactions"
-          className="w-auto min-w-0 p-1"
+          className="w-auto min-w-0"
+          // The 4px is the content's; on `className` it added to the package's
+          // 8px from 0.12.6 on, and the picker grew 8px a side (migration docs
+          // D68, Finding 60).
+          contentClassName="p-1"
           open={picking}
           onOpenChange={setPicking}
           trigger={
