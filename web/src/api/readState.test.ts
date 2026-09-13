@@ -6,6 +6,7 @@ import {
   allSlotsFilter,
   buildReadStateEvent,
   fetchMergedReadState,
+  fileContext,
   isPublishableContextId,
   loadSlotIdentity,
   mergeBlobs,
@@ -25,6 +26,8 @@ const FOLDER = 'b7c1e0a4-2f3d-4a86-9c15-8d0e6f2a4b91'
 const OTHER_FOLDER = 'c8d2f1b5-3a4e-4b97-8d26-9e1f7a3b5c02'
 const ROOT = 'a'.repeat(64)
 const OTHER_ROOT = 'b'.repeat(64)
+const PUBKEY = 'e'.repeat(64)
+const ISSUE = `30851:${PUBKEY}:9f1b4a2c-7e3d-4c8a-9b2e-1d5f6a7b8c9d`
 const SLOT = '0123456789abcdef0123456789abcdef'
 
 /**
@@ -69,12 +72,40 @@ describe('context identifiers (SPEC §11.1)', () => {
     expect(threadContext('a'.repeat(63))).toBeUndefined()
   })
 
-  it('accepts the three well-known grains and nothing else', () => {
+  it('accepts the four grains and nothing else', () => {
     expect(isPublishableContextId(FOLDER)).toBe(true)
+    expect(isPublishableContextId(ISSUE)).toBe(true)
     expect(isPublishableContextId(`thread:${ROOT}`)).toBe(true)
     expect(isPublishableContextId(`msg:${ROOT}`)).toBe(true)
     expect(isPublishableContextId(`h:${FOLDER}`)).toBe(false)
+    expect(isPublishableContextId(`file:${ISSUE}`)).toBe(false)
     expect(isPublishableContextId('x'.repeat(257))).toBe(false)
+  })
+
+  /*
+    The file grain — SPEC §11.1, FOL-16. A file's context is its address, bare,
+    and the same function serves an issue, a project and a bare file: the key
+    is the value of the `a` tag every comment on it carries.
+  */
+  it("makes a file's context its BARE address, whichever kind of file it is", () => {
+    expect(fileContext(ISSUE)).toBe(ISSUE)
+    expect(fileContext(`30850:${PUBKEY}:${FOLDER}`)).toBe(`30850:${PUBKEY}:${FOLDER}`)
+    expect(fileContext(`30840:${PUBKEY}:${FOLDER}`)).toBe(`30840:${PUBKEY}:${FOLDER}`)
+  })
+
+  it('keeps the `d` verbatim — it is case-sensitive on the wire', () => {
+    const mixed = `30851:${PUBKEY}:Sprint-Q4`
+    expect(fileContext(mixed)).toBe(mixed)
+  })
+
+  it('refuses anything that is not an addressable address rather than coercing it', () => {
+    expect(fileContext(`1111:${PUBKEY}:x`)).toBeUndefined() // not an addressable kind
+    expect(fileContext(`30851:abc:x`)).toBeUndefined() // not a pubkey
+    expect(fileContext(`30851:${PUBKEY}:with space`)).toBeUndefined()
+    expect(fileContext(FOLDER)).toBeUndefined() // a channel, not a file
+    expect(fileContext(`thread:${ROOT}`)).toBeUndefined()
+    expect(fileContext(`30851:${PUBKEY}:${'x'.repeat(200)}`)).toBeUndefined() // over the 256-byte limit
+    expect(fileContext(undefined)).toBeUndefined()
   })
 })
 
@@ -94,6 +125,16 @@ describe('the write discipline (SPEC §11.2, §11.4)', () => {
   it('reading one discussion does not touch another on the same issue', () => {
     const after = advanceContexts({ [`thread:${OTHER_ROOT}`]: 1000 }, { [`thread:${ROOT}`]: 2000 })
     expect(after[`thread:${OTHER_ROOT}`]).toBe(1000)
+  })
+
+  /* FOL-16: reading one file advances its address and nothing beside it —
+     not the channel it sits in, not a sibling file in the same channel. */
+  it("reading an issue advances its address and leaves the channel and its siblings alone", () => {
+    const sibling = `30851:${PUBKEY}:${OTHER_FOLDER}`
+    const after = advanceContexts({ [FOLDER]: 1000, [sibling]: 1000 }, { [ISSUE]: 2000 })
+    expect(after[ISSUE]).toBe(2000)
+    expect(after[FOLDER]).toBe(1000)
+    expect(after[sibling]).toBe(1000)
   })
 
   it('never lowers a timestamp, because there is no mark-as-unread', () => {

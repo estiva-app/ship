@@ -26,6 +26,7 @@ import {
   setProjectField,
   startConversation,
   projectContext,
+  fileContext,
   useMergedReadState,
   firstUnreadByThread,
   commentsOn,
@@ -373,21 +374,29 @@ export function ProjectPage({
     () => (project ? ownConversations(state.conversations, project.contentFolder, project.addr, state.tagged).filter((c) => !rolledUp.has(c.id)) : []),
     [project, state, rolledUp],
   )
-  /* A project *is* a container, so it takes the container context: its Folder's
-     bare channel uuid (SPEC §11.1). Looking at the project marks the container
-     read; its issues' discussions are separate contexts and are untouched. */
-  useMarkRead([projectContext(project?.contentFolder)])
+  /* This feed is two streams drawn as one — SPEC §11.1 (FOL-16): the Folder's
+     chat, which answers to its bare channel uuid, and the project's own
+     comments, which answer to the project's address. Looking at the page
+     advances both, because both are on it — §11.2, "exactly the streams you are
+     showing". Its issues' comments are other files' streams and are untouched;
+     before FOL-16 their roots answered to the channel marker, so this line
+     silently read every issue in the project. */
+  useMarkRead([projectContext(project?.contentFolder), fileContext(project?.addr)])
   const threads = useMemo(
     () => conversations.map((c) => threadFor(c, directory, project ? { value: project.description, format: project.descriptionFormat } : undefined, project?.addr, state.edits, state.attachments)),
     [conversations, directory, project],
   )
-  /* The divider in the feed (CRO-13). A project IS the container, so its own
-     marker governs the roots and propagates down to their replies. */
+  /* The divider in the feed (CRO-13). A root about the project — its own `a`
+     tag names it — answers to the project's marker; a root with no `a` is the
+     Folder's chat and answers to the channel's. `ownConversations` already
+     dropped roots about any other file, so those are the only two cases. */
   const merged = useMergedReadState()
-  const unread = useMemo(
-    () => firstUnreadByThread(threads, merged, projectContext(project?.contentFolder), me),
-    [threads, merged, project],
-  )
+  const unread = useMemo(() => {
+    const channel = projectContext(project?.contentFolder)
+    const file = fileContext(project?.addr)
+    const aboutProject = new Set(conversations.filter((c) => project && (state.tagged[c.root.id] ?? []).includes(project.addr)).map((c) => c.id))
+    return firstUnreadByThread(threads, merged, (thread) => (aboutProject.has(thread.id) ? file : channel), me)
+  }, [threads, merged, project, conversations, state.tagged])
   const people = useMemo(() => railPeople(state, directory), [state, directory])
   /*
     What somebody placed under this project from another app — RFC 0.5 §10.7.

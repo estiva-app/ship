@@ -14,10 +14,14 @@
  *
  * ## The two grains, and why replies are not governed by their own marker alone
  *
- * SPEC §11.3: a container's frontier propagates down, so the effective marker
- * for a reply is the **later** of its thread's own marker and its container's.
- * Marking a project read therefore clears replies that predate that moment,
- * while a reply newer than it stays new until the thread's own marker advances.
+ * SPEC §11.3: a stream's frontier propagates down, so the effective marker for
+ * a reply is the **later** of its thread's own marker and its stream's — the
+ * channel uuid for the Folder's chat, the file's address for comments on a
+ * project or an issue (FOL-16). Marking a stream read therefore clears replies
+ * that predate that moment, while a reply newer than it stays new until the
+ * thread's own marker advances. What does *not* propagate is the channel's
+ * marker into a file's stream: reading the project page says nothing about
+ * which of its issues you have read.
  *
  * Applied here, at read time, and never written down. Writing the container's
  * value onto each thread would give the same answer today and be permanent —
@@ -57,6 +61,17 @@ export interface FeedThread {
   replies: FeedMessage[]
 }
 
+/**
+ * The stream a thread's root answers to — SPEC §11.1 (FOL-16).
+ *
+ * A bare channel uuid for a root with no `a` tag (the Folder's chat), a bare
+ * file address for a root about that file; `undefined` when the caller has
+ * neither in scope. A string applies to every thread in the feed, which is what
+ * an issue page has — every root there is about the issue. The project page has
+ * both kinds in one feed and passes a function.
+ */
+export type StreamOf = string | undefined | ((thread: FeedThread) => string | undefined)
+
 /** The later of two markers, either of which may be absent. */
 function later(a: number | undefined, b: number | undefined): number | undefined {
   if (a === undefined) return b
@@ -68,26 +83,29 @@ function later(a: number | undefined, b: number | undefined): number | undefined
  * The id of the first message in this thread the reader has not seen, or
  * `undefined` when there is nothing new.
  *
- * `containerContext` is the bare Folder uuid for a project, or `undefined` when
- * the caller has no container in scope. `me` is the viewer's pubkey.
+ * `streamOf` names the marker the root answers to (see {@link StreamOf}); `me`
+ * is the viewer's pubkey.
  */
 export function firstUnreadIn(
   thread: FeedThread,
   merged: Readonly<Record<string, number>>,
-  containerContext: string | undefined,
+  streamOf: StreamOf,
   me: string,
 ): string | undefined {
-  const container = containerContext === undefined ? undefined : merged[containerContext]
+  const streamContext = typeof streamOf === 'function' ? streamOf(thread) : streamOf
+  const stream = streamContext === undefined ? undefined : merged[streamContext]
   const ownThread = merged[`thread:${thread.root.id}`]
-  // §11.3 — the container's frontier propagates down to its threads.
-  const forReplies = later(ownThread, container)
+  // §11.3 — the stream's frontier propagates down to its threads. Only the
+  // stream's: a file's roots never answer to the channel's marker, which is the
+  // one place the hierarchy stops and the reason a file has a marker at all.
+  const forReplies = later(ownThread, stream)
 
   const isNew = (m: FeedMessage, mark: number | undefined) =>
     mark !== undefined && m.at > mark && m.by !== me
 
-  // A root is a top-level message in the Folder, so it answers to the container
+  // A root is a top-level message in its stream, so it answers to the stream's
   // marker — not to its own thread marker, which governs the replies beneath it.
-  if (isNew(thread.root, container)) return thread.root.id
+  if (isNew(thread.root, stream)) return thread.root.id
   for (const reply of thread.replies) {
     if (isNew(reply, forReplies)) return reply.id
   }
@@ -104,12 +122,12 @@ export function firstUnreadIn(
 export function firstUnreadByThread(
   threads: readonly FeedThread[],
   merged: Readonly<Record<string, number>>,
-  containerContext: string | undefined,
+  streamOf: StreamOf,
   me: string,
 ): Record<string, string> {
   const out: Record<string, string> = {}
   for (const thread of threads) {
-    const id = firstUnreadIn(thread, merged, containerContext, me)
+    const id = firstUnreadIn(thread, merged, streamOf, me)
     if (id) out[thread.id] = id
   }
   return out
