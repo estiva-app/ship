@@ -1,7 +1,7 @@
 import { IconLinkOff } from '@tabler/icons-react'
 import { useMarkRead } from '@/lib/useMarkRead'
 import { useMemo, useState } from 'react'
-import { ISSUE_STATUSES, commentsOn, deleteIssue, deleteMessage, editMessage, react, referenceFor, reply, setIssueField, unreact, startConversation, type DirectoryView, type FolderState, type WorkspaceState, threadContext, useMergedReadState, firstUnreadByThread, projectContext, me } from '@/api'
+import { ISSUE_STATUSES, commentsOn, deleteIssue, deleteMessage, editMessage, react, referenceFor, reply, setIssueField, unreact, startConversation, type DirectoryView, type FolderState, type WorkspaceState, threadContext, fileContext, useMergedReadState, firstUnreadByThread, me } from '@/api'
 import { useRelated } from '@/api/useRelated'
 import type { HistoryEntry } from '@/components/History'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
@@ -56,21 +56,24 @@ export function IssuePage({ state, directory, d, say, refresh }: { state: Worksp
     () => (issue ? activityFor(issue.addr, state, directory) : { items: [], truncated: 0 }),
     [issue, state, directory],
   )
-  /* An issue is an object *inside* a Folder, not a container of its own, so it
-     advances one `thread:` context per discussion and never the project's
-     container — SPEC §11.2. Doing it the other way would make reading one issue
-     mark the whole project read. */
-  useMarkRead(useMemo(() => conversations.map((c) => threadContext(c.id)), [conversations]))
+  /* An issue's comments are its own stream, keyed on its address — SPEC §11.1
+     (FOL-16) — so reading it advances that address and one `thread:` context
+     per discussion, and never the project's channel: §11.2, and doing it the
+     other way would make reading one issue mark the whole project read. Before
+     FOL-16 only the threads moved, and the roots answered to the project's
+     marker, so a new top-level comment stayed new until the project page was
+     opened and opening the project page read every issue's roots. */
+  useMarkRead(useMemo(() => [fileContext(issue?.addr), ...conversations.map((c) => threadContext(c.id))], [issue, conversations]))
   const threads = useMemo(
     () => conversations.map((c) => threadFor(c, directory, issue ? { value: issue.description, format: issue.descriptionFormat } : undefined, issue?.addr, state.edits, state.attachments)),
     [conversations, directory, issue],
   )
-  /* The divider in the feed (CRO-13). `issue.folder` is the container these
-     conversations live in, so §11.3's hierarchy can apply — marking the project
-     read clears replies that predate it. */
+  /* The divider in the feed (CRO-13). Every root here is about the issue, so
+     they all answer to the issue's marker, which §11.3 propagates down to their
+     replies — and the project's marker is deliberately not in the picture. */
   const merged = useMergedReadState()
   const unread = useMemo(
-    () => firstUnreadByThread(threads, merged, projectContext(issue?.folder), me),
+    () => firstUnreadByThread(threads, merged, fileContext(issue?.addr), me),
     [threads, merged, issue],
   )
   const history = useMemo(() => (issue ? historyFor(issue.addr, state, directory) : []), [issue, state, directory])

@@ -96,6 +96,39 @@ describe('absence means no divider — the first-run decision', () => {
   })
 })
 
+/*
+  The file grain — SPEC §11.1 and §11.3, FOL-16. A root about a file answers
+  to the file's marker; the channel's marker stops at the file's stream.
+*/
+describe('firstUnreadIn — a file is its own stream', () => {
+  const PUBKEY = 'e'.repeat(64)
+  const ISSUE = `30851:${PUBKEY}:9f1b4a2c-7e3d-4c8a-9b2e-1d5f6a7b8c9d`
+
+  it("judges a root about a file against the file's marker", () => {
+    expect(firstUnreadIn(thread(ROOT, 2000), { [ISSUE]: 1000 }, ISSUE, ME)).toBe(ROOT)
+    expect(firstUnreadIn(thread(ROOT, 500), { [ISSUE]: 1000 }, ISSUE, ME)).toBeUndefined()
+  })
+
+  it("does not let the channel's marker reach a file's stream — reading the project page is not reading its issues", () => {
+    // The channel was read after the root; the issue itself never was.
+    expect(firstUnreadIn(thread(ROOT, 2000), { [FOLDER]: 3000 }, ISSUE, ME)).toBeUndefined() // absent means quiet (CRO-13) …
+    expect(firstUnreadIn(thread(ROOT, 2000), { [FOLDER]: 3000, [ISSUE]: 1000 }, ISSUE, ME)).toBe(ROOT) // … and the file's own marker, not the channel's, decides
+  })
+
+  it("propagates the file's marker down to its threads, as the channel's did", () => {
+    const t = thread(ROOT, 500, [['r1', 1500], ['r2', 2500]])
+    expect(firstUnreadIn(t, { [ISSUE]: 2000, [`thread:${ROOT}`]: 1000 }, ISSUE, ME)).toBe('r2')
+  })
+
+  it('routes each thread to its own stream when a feed draws two', () => {
+    const chat = thread(ROOT, 2000)
+    const aboutProject = thread(OTHER_ROOT, 2000)
+    const merged = { [FOLDER]: 3000, [ISSUE]: 1000 }
+    const streamOf = (t: FeedThread) => (t.id === OTHER_ROOT ? ISSUE : FOLDER)
+    expect(firstUnreadByThread([chat, aboutProject], merged, streamOf, ME)).toEqual({ [OTHER_ROOT]: OTHER_ROOT })
+  })
+})
+
 describe('firstUnreadByThread', () => {
   it('maps only the threads that have something new', () => {
     const merged = { [FOLDER]: 1000 }

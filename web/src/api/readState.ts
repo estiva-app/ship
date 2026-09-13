@@ -41,10 +41,19 @@
  *
  * | Ship object | context | why |
  * | --- | --- | --- |
- * | project | its Folder's channel uuid, **bare** | a project *is* a container |
- * | an issue's discussion | `thread:<root event id>` | an issue is an object *inside* a Folder, not a container of its own |
+ * | the Folder's chat — `kind:9`, no `a` | its channel uuid, **bare** | the general stream: what the `h` tag scopes |
+ * | a project's own comments | the project's address, **bare** | a file's stream: what the `a` tag scopes (§11.1, FOL-16) |
+ * | an issue's comments | the issue's address, **bare** | the same rule — an issue is a file like any other |
+ * | one conversation's replies | `thread:<root event id>` | NIP-RS's own grain, under whichever stream the root is in |
  *
- * Using a container context for an issue would make reading one issue mark the
+ * Until FOL-16 an issue had no context of its own: its replies answered to
+ * `thread:` markers and its **roots** to the project's channel marker, so
+ * opening the project page quietly read every issue's top-level comments, and a
+ * new top-level comment on an issue you had read stayed new until you did. A
+ * file's address is the container its comments were always scoped to on the
+ * wire, and §11.3 stops the channel's marker at it.
+ *
+ * Using the channel context for an issue would make reading one issue mark the
  * **whole project** read — SPEC §11.2, and the failure the write discipline
  * exists to prevent.
  *
@@ -92,6 +101,15 @@ export const HORIZON_DAYS = 90
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
 const EVENT_ID_RE = /^[0-9a-f]{64}$/
 const SLOT_ID_RE = /^[0-9a-f]{32}$/
+/*
+  A file's address, `<kind>:<pubkey>:<d>` — SPEC §11.1's file grain (FOL-16).
+
+  The kind is 30000–39999 because only an addressable event has an address. The
+  `d` is anything without whitespace and is **not** lowercased with the rest:
+  it is case-sensitive on the wire, and a normalised key would name a file that
+  does not exist.
+*/
+const ADDRESS_RE = /^3[0-9]{4}:[0-9a-f]{64}:[^\s]*$/
 
 // ---------------------------------------------------------------------------
 // Context identifiers — SPEC §11.1
@@ -131,13 +149,28 @@ export function messageContext(eventId: string | null | undefined): string | und
   return EVENT_ID_RE.test(value) ? `msg:${value}` : undefined
 }
 
+/**
+ * A file's stream: its address, **bare** — SPEC §11.1 (FOL-16).
+ *
+ * An issue, a project, a bare file: one function, because the context is the
+ * value of the `a` tag every comment on the file already carries, and nothing
+ * about it depends on which app owns the file. Returns `undefined` rather than
+ * coercing, for the same reason `projectContext` does — a key that is not an
+ * address, published once, is permanent.
+ */
+export function fileContext(address: string | null | undefined): string | undefined {
+  if (!address) return undefined
+  if (new TextEncoder().encode(address).length > MAX_CONTEXT_ID_BYTES) return undefined
+  return ADDRESS_RE.test(address) ? address : undefined
+}
+
 /** Is this a context id worth putting in a grow-only blob? */
 export function isPublishableContextId(id: string): boolean {
   if (id.length === 0) return false
   if (new TextEncoder().encode(id).length > MAX_CONTEXT_ID_BYTES) return false
   if (id.startsWith('thread:')) return EVENT_ID_RE.test(id.slice('thread:'.length))
   if (id.startsWith('msg:')) return EVENT_ID_RE.test(id.slice('msg:'.length))
-  return UUID_RE.test(id)
+  return UUID_RE.test(id) || ADDRESS_RE.test(id)
 }
 
 /** Epoch ms → the unix seconds NIP-RS stores, clamped to its integer range. */
