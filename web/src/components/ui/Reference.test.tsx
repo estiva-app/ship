@@ -9,7 +9,7 @@
  * Two mechanisms side by side is how the display-name mention drifted away from
  * the projection layer; this replaces `MentionChip`, which knew only people.
  */
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { render } from '@testing-library/react'
 import { addrToNaddr, encodeNevent, encodeNpub } from '@estiva-app/protocol'
 import type { ForeignObject } from '@/api/foreign'
@@ -110,5 +110,69 @@ describe('Reference, for a message', () => {
     // person-shaped title: a project led by somebody is still a project.
     const c = render(<Reference uri={NADDR} object={aMessage({ [ADA]: { displayName: 'Ada' } }, 'card')} />).container
     expect(c.textContent).toBe('Ada')
+  })
+})
+
+describe('Reference, as a link (RIC-16)', () => {
+  const D = '0212db6d-bcbf-40d0-890e-f4f056db2f5d'
+  const anOwnIssue = (): ForeignObject =>
+    ({ ref: `30851:${ADA}:${D}`, kind: 30851, address: `30851:${ADA}:${D}`, slots: { title: { value: 'Ship it' } } }) as unknown as ForeignObject
+  const aPeekTopic = (): ForeignObject =>
+    ({ ref: 'naddr1topic', kind: 39000, openUrl: 'https://peek.estiva.app/o/naddr1topic', slots: { title: { value: 'Feedback on Ship' } } }) as unknown as ForeignObject
+  const click = (init: MouseEventInit = {}) => new MouseEvent('click', { bubbles: true, cancelable: true, button: 0, ...init })
+
+  afterEach(() => {
+    history.replaceState(null, '', '/')
+  })
+
+  it("a label leads nowhere: nothing resolved, or an app with no web template, is not an anchor", () => {
+    expect(render(<Reference uri={NADDR} object={undefined} />).container.querySelector('a')).toBeNull()
+    expect(render(<Reference uri={NADDR} object={anIssue()} />).container.querySelector('a')).toBeNull()
+  })
+
+  it("one of Ship's own objects is a link to its page here, followed through the router", () => {
+    const c = render(<Reference uri={NADDR} object={anOwnIssue()} />).container
+    const a = c.querySelector('a')!
+    expect(a.getAttribute('href')).toBe(`/issue/ship-it-${D}`)
+    expect(a.getAttribute('target')).toBeNull()
+    const event = click()
+    a.dispatchEvent(event)
+    // Routed in place, not a document load.
+    expect(event.defaultPrevented).toBe(true)
+    expect(location.pathname).toBe(`/issue/ship-it-${D}`)
+  })
+
+  it('a modified click is left to the browser, so open-in-new-tab keeps working', () => {
+    const c = render(<Reference uri={NADDR} object={anOwnIssue()} />).container
+    const event = click({ ctrlKey: true })
+    c.querySelector('a')!.dispatchEvent(event)
+    expect(event.defaultPrevented).toBe(false)
+    expect(location.pathname).toBe('/')
+  })
+
+  it('a Peek topic opens in Peek, at the URL its manifest gave, in a new tab', () => {
+    const c = render(<Reference uri={NADDR} object={aPeekTopic()} />).container
+    const a = c.querySelector('a')!
+    expect(a.getAttribute('href')).toBe('https://peek.estiva.app/o/naddr1topic')
+    expect(a.getAttribute('target')).toBe('_blank')
+    expect(a.getAttribute('rel')).toContain('noopener')
+    expect(a.textContent).toBe('Feedback on Ship')
+    // Not intercepted: the browser follows it.
+    const event = click()
+    a.dispatchEvent(event)
+    expect(event.defaultPrevented).toBe(false)
+  })
+
+  it('following a chip does not reach the surface under it', () => {
+    // The description's reading view enters editing on a click; a mention
+    // followed is not a description edited.
+    const onSurface = vi.fn()
+    const c = render(
+      <div onClick={onSurface}>
+        <Reference uri={NADDR} object={aPeekTopic()} />
+      </div>,
+    ).container
+    c.querySelector('a')!.dispatchEvent(click())
+    expect(onSurface).not.toHaveBeenCalled()
   })
 })
