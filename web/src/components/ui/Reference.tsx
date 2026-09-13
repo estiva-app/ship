@@ -1,7 +1,10 @@
+import type { MouseEvent } from 'react'
 import { decodeNpub, stripNaddrs } from '@estiva-app/protocol'
 import type { ForeignObject } from '@/api/foreign'
 import { StatusLabel } from './StatusLabel'
 import { cn } from '@/lib/cn'
+import { referenceLink } from '@/lib/referenceLink'
+import { linkTo } from '@/router'
 
 /**
  * What an object is called, for a chip one line high.
@@ -48,6 +51,17 @@ function objectLabel(object: ForeignObject, nameOf?: (pubkey: string) => string)
  * sense: "never blank". A reference to something outside this workspace still
  * says that a reference is there, which is the honest answer and more than the
  * old form could manage.
+ *
+ * **A chip that names something leads to it (RIC-16).** Miky, after the first
+ * pointer mention on production: "It only creates a label, but not really a
+ * link to the mentioned thing." An object chip is an anchor when
+ * `referenceLink` has somewhere to send it: one of Ship's own objects opens
+ * here through the router, another app's object opens at the `openUrl` its
+ * manifest gave — Peek's topics and messages included — in a new tab. A
+ * modified click is left to the browser either way, and the click stops at the
+ * chip, because the surface under it may open on a click of its own (the
+ * description's reading view enters editing) and a mention followed is not a
+ * description edited. A person stays a label: Ship has no page for one.
  */
 export function Reference({
   uri,
@@ -99,24 +113,26 @@ export function Reference({
   // An object: whatever its owner's projection says it is.
   if (object) {
     const label = objectLabel(object, nameOf) ?? short
-    return (
-      <span
-        data-reference="object"
-        data-object={object.ref}
-        // The whole label on hover, because the visible one is cut.
-        title={label}
-        className={cn(base, 'bg-bg-inset text-body-2 text-text-primary', className)}
-        /*
-          Cut, not wrapped, and `ch` rather than pixels so it scales with the
-          type. `truncate` alone did nothing here: an inline-flex chip takes
-          its content's width, so an 84-character issue title — or a message,
-          whose caption is a sentence (RIC-11) — became a chip as wide as the
-          column. A mention is a word in a sentence; the whole title is a
-          sentence of its own, and it is one hover away. Peek's chip keeps the
-          same 24ch for the same reason.
-        */
-        style={{ maxWidth: '24ch' }}
-      >
+    const link = referenceLink(object)
+    const chip = {
+      'data-reference': 'object',
+      'data-object': object.ref,
+      // The whole label on hover, because the visible one is cut.
+      title: label,
+      className: cn(base, 'bg-bg-inset text-body-2 text-text-primary', link && 'hover:bg-bg-hover', className),
+      /*
+        Cut, not wrapped, and `ch` rather than pixels so it scales with the
+        type. `truncate` alone did nothing here: an inline-flex chip takes
+        its content's width, so an 84-character issue title — or a message,
+        whose caption is a sentence (RIC-11) — became a chip as wide as the
+        column. A mention is a word in a sentence; the whole title is a
+        sentence of its own, and it is one hover away. Peek's chip keeps the
+        same 24ch for the same reason.
+      */
+      style: { maxWidth: '24ch' },
+    }
+    const body = (
+      <>
         <span className="truncate">{label}</span>
         {object.slots.status && (
           // Same call `ForeignObject` makes for the attachment variant, so the
@@ -128,7 +144,22 @@ export function Reference({
             className="shrink-0"
           />
         )}
-      </span>
+      </>
+    )
+    if (!link) return <span {...chip}>{body}</span>
+    const here = link.place === 'here' ? linkTo(link.href) : null
+    const follow = (event: MouseEvent<HTMLAnchorElement>) => {
+      event.stopPropagation()
+      here?.onClick(event)
+    }
+    return here ? (
+      <a {...chip} href={here.href} onClick={follow}>
+        {body}
+      </a>
+    ) : (
+      <a {...chip} href={link.href} target="_blank" rel="noopener noreferrer" onClick={follow}>
+        {body}
+      </a>
     )
   }
 
