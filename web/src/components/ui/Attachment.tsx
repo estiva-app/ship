@@ -37,7 +37,20 @@ import { blobObjectUrl } from '@/api/blobs'
  * fetch: the package draws, the app reads the bytes with the reader's own
  * permission.
  */
-export function Attachment({ file, className }: { file: Imeta; className?: string }) {
+export function Attachment({
+  file,
+  opens = true,
+  className,
+}: {
+  file: Imeta
+  /**
+   * Whether a file opens and downloads. `false` in a description being edited: that editor saves and closes
+   * when it loses focus, and the card's link and Download button take focus (measured 2026-09-15: pressing
+   * Download committed and left the editor). There a file is content being edited, drawn and never opened.
+   */
+  opens?: boolean
+  className?: string
+}) {
   const isImage = file.m.startsWith('image/')
   // The relay generates a thumbnail for images and it is the right thing to put
   // in a conversation card. `thumb` comes back absolute, like `url`.
@@ -45,7 +58,7 @@ export function Attachment({ file, className }: { file: Imeta; className?: strin
   const { url, failed } = useBlobUrl(source)
   const label = file.filename ?? file.alt ?? 'attachment'
 
-  if (!isImage) return <FileCard file={file} className={className} />
+  if (!isImage) return <FileCard file={file} opens={opens} className={className} />
 
   if (failed) {
     // The package's card that cannot be read (UIG-27): its name, "Could not be loaded", a dashed hairline.
@@ -86,8 +99,44 @@ export function Attachment({ file, className }: { file: Imeta; className?: strin
  * A non-image file: the package's file card (UIG-27; Katerina, 2026-09-14: Ship's files are Peek's card) —
  * a type tile, the name, and its type and size.
  */
-function FileCard({ file, className }: { file: Imeta; className?: string }) {
-  return <AttachmentCard data-attachment="file" name={file.filename ?? file.alt ?? 'file'} size={file.size} contentType={file.m} className={className} />
+function FileCard({ file, opens, className }: { file: Imeta; opens: boolean; className?: string }) {
+  const name = file.filename ?? file.alt ?? 'file'
+  /*
+    Its bytes are read so the card can open them, as an image's are. Media GET
+    is authenticated, so the relay's own URL answers 401 in a new tab; only an
+    object URL made from a signed fetch opens. Read once per file and cached
+    (`blobObjectUrl`), as Peek reads a file from the relay (Katerina,
+    2026-09-15: files open and download, like Peek's). Until the bytes arrive,
+    or when they cannot be read, the card has no address: dimmed, opening
+    nothing.
+  */
+  const { url } = useBlobUrl(opens ? file.url : undefined)
+  return (
+    <AttachmentCard
+      data-attachment="file"
+      name={name}
+      size={file.size}
+      contentType={file.m}
+      href={opens ? url : undefined}
+      onDownload={opens ? () => void saveFile(file.url, name) : undefined}
+      className={className}
+    />
+  )
+}
+
+/** Save a file under its own name: its bytes' object URL, handed to a temporary `<a download>`. */
+async function saveFile(source: string, name: string): Promise<void> {
+  try {
+    const url = await blobObjectUrl(source)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = name
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+  } catch {
+    // A refused read saves nothing, and the card already opens nothing: there is no second thing to say.
+  }
 }
 
 /** Every file on one message, in the order the sender attached them. */

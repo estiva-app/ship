@@ -227,7 +227,8 @@ function AttachmentBlockView({ node }: { node: { attrs: Record<string, unknown> 
   const file = node.attrs as unknown as Imeta
   return (
     <NodeViewWrapper className="my-2">
-      <Attachment file={file} />
+      {/* Drawn, never opened: this editor saves on blur, and a link or a Download button would take focus. */}
+      <Attachment file={file} opens={false} />
     </NodeViewWrapper>
   )
 }
