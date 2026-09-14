@@ -1,3 +1,4 @@
+import { Card } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
 import type { StatusEntry } from '@/lib/issues'
 import { Avatar } from '@/components/ui/Avatar'
@@ -21,10 +22,8 @@ import { linkTo } from '@/router'
  */
 export function BoardCard({ issue, href }: { issue: IssueRowData; href: string }) {
   return (
-    <a
-      {...linkTo(href)}
-      className="flex flex-col gap-1.5 rounded-md border border-border-default bg-bg-elevated p-2 transition-colors hover:border-border-strong"
-    >
+    // The package's Card: the elevated fill on its column, 8px corners (Katerina, 2026-09-14; it was 6px).
+    <Card {...linkTo(href)} fill="elevated" className="flex flex-col gap-1.5 p-2">
       {issue.ref && <span className="font-mono text-caption text-text-muted">{issue.ref}</span>}
       <span className="text-body-2 text-text-primary">{issue.title}</span>
       {issue.assignee && (
@@ -33,7 +32,7 @@ export function BoardCard({ issue, href }: { issue: IssueRowData; href: string }
           <span className="truncate">{issue.assignee.name ?? '—'}</span>
         </span>
       )}
-    </a>
+    </Card>
   )
 }
 

@@ -2,6 +2,7 @@ import { Fragment, useMemo, useState } from 'react'
 import { IconDotsVertical, IconMoodPlus } from '@tabler/icons-react'
 import type { BlockAnchor, Imeta } from '@estiva-app/protocol'
 import { referencesIn, standaloneReference, toRenderTree } from '@estiva-app/protocol'
+import { Card } from '@estiva-app/ui'
 import { Attachments as FileAttachments } from './ui/Attachment'
 import { BlockAnchorNote } from './ui/BlockAnchorNote'
 import { Button } from './ui/Button'
@@ -538,15 +539,10 @@ function NewSinceHere() {
 
 export function ConversationThread({ thread, onReply, disabledReason, unreadFrom, resolved, resolving, nameOf, reactionsBy, onReact, onDeleteMessage, onEditMessage, subdued = false }: { thread: ThreadData; onReply: (threadId: string, text: string, files: readonly Imeta[]) => Promise<boolean | void> | boolean | void; disabledReason?: string; unreadFrom?: string; resolved?: Record<string, ForeignObjectData | null | undefined>; resolving?: boolean; nameOf?: (pubkey: string) => string; /** Reactions by message id, read once for the surface. */ reactionsBy?: Record<string, readonly Reaction[]>; /** Add or take back a reaction on one message. */ onReact?: (messageId: string, emoji: string, mine?: string) => void; /** Publish a deletion for one message — CON-3. Omitted where nobody may write. */ onDeleteMessage?: (messageId: string) => Promise<boolean | void> | boolean | void; /** Publish an edit of one message — CON-4. Omitted where nobody may write. */ onEditMessage?: (messageId: string, body: string) => Promise<boolean | void> | boolean | void; /** Draw it as secondary — Activity's mentions, which do not carry a comment's trust (CON-9). */ subdued?: boolean }) {
   return (
-    <div
-      className={cn(
-        'flex flex-col gap-1 rounded-lg border px-3 py-2.5',
-        // The card recedes rather than fading: `border-subtle` on the page's own
-        // ground, both tokens, so it stays legible in either theme. An opacity
-        // utility would have dimmed the text with it — UI-RULES §4.
-        subdued ? 'border-border-subtle bg-bg-base' : 'border-border-default bg-bg-surface',
-      )}
-    >
+    // The card recedes rather than fading: no fill, so the subtle hairline sits
+    // on the page's own ground, and it stays legible in either theme. An opacity
+    // utility would have dimmed the text with it — UI-RULES §4.
+    <Card fill={subdued ? 'none' : 'surface'} className="flex flex-col gap-1 px-3 py-2.5">
       {unreadFrom === thread.root.id && <NewSinceHere />}
       <MessageCard message={thread.root} resolved={resolved} resolving={resolving} nameOf={nameOf} reactions={reactionsBy?.[thread.root.id]} onToggleReaction={onReact && ((emoji, mine) => onReact(thread.root.id, emoji, mine))} onDelete={onDeleteMessage && (() => onDeleteMessage(thread.root.id))} onEdit={onEditMessage && ((body) => onEditMessage(thread.root.id, body))} repliesLeftBehind={thread.replies.length} disabledReason={disabledReason} />
       {thread.replies.map((reply) => (
@@ -556,7 +552,7 @@ export function ConversationThread({ thread, onReply, disabledReason, unreadFrom
         </Fragment>
       ))}
       <Composer kind="reply" onSubmit={(text, files) => onReply(thread.id, text, files)} disabledReason={disabledReason} draftKey={draftKeys.thread(thread.id)} className="ml-3.5 mt-1" />
-    </div>
+    </Card>
   )
 }
 
