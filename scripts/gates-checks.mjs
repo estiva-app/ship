@@ -6,7 +6,7 @@
  * live at the repo root.
  *
  * `owner: true` is a ticket ship owns. `owner: false` is ship's part of a
- * ticket another repo owns. The list of all 29 tickets, and who owns each, is
+ * ticket another repo owns. The list of all 30 tickets, and who owns each, is
  * in estiva-ui's scripts/gates-checks.mjs. Run gates:status there to see them
  * all together.
  *
@@ -96,12 +96,18 @@ export default function define(h) {
       { ref: "UIG-27", title: "The components the apps had to build themselves — Link, ProgressBar, EmptyState padding", owner: false, checks: [
         { what: "the installed package has Link", run: () => h.contains(installed, /\bLink\b/, "the installed @estiva-app/ui exports Link") },
         { what: "the installed package has ProgressBar", run: () => h.contains(installed, /\bProgressBar\b/, "the installed @estiva-app/ui exports ProgressBar") },
-        { what: "Ship's hand-made progress bar is gone", run: () => h.exists("web/src/components/ui/ProgressBar.tsx") ? h.lacks("web/src/components/ui/ProgressBar.tsx", 'role="progressbar"') : h.PASS("web/src/components/ui/ProgressBar.tsx is gone") },
+        // The adoption deleted these; the checks keep them deleted.
+        { what: "Ship's hand-made progress bar is gone", run: () => h.exists("web/src/components/ui/ProgressBar.tsx") ? h.FAIL("web/src/components/ui/ProgressBar.tsx is back: use the package's ProgressBar") : h.PASS("web/src/components/ui/ProgressBar.tsx is gone") },
+        { what: "Ship's mentions are the package's InlineChip", run: () => h.contains("web/src/components/ui/Reference.tsx", /\bInlineChip\b/, "Reference.tsx draws InlineChip") },
+        { what: "Ship's files are the package's AttachmentCard", run: () => h.contains("web/src/components/ui/Attachment.tsx", /\bAttachmentCard\b/, "Attachment.tsx draws AttachmentCard") },
       ] },
       { ref: "UIG-28", title: "Close the two holes in the token contract — arbitrary values, and inline style", owner: false, checks: [
         { what: "text-[14px] is an error", run: probe(component('<div className="text-[14px]">x</div>'), "error", undefined, PROBE, "eslint.config.js") },
         { what: "a colour in an inline style is an error", run: probe(component("<div style={{ backgroundColor: '#ff0000' }}>x</div>"), "error", undefined, PROBE, "eslint.config.js") },
         { what: "h-[240px] is a warning", run: probe(component('<div className="h-[240px]">x</div>'), "warning", undefined, PROBE, "eslint.config.js") },
+      ] },
+      { ref: "UIG-30", title: "RichText — one component that draws a message's text, for both apps", owner: false, checks: [
+        { what: "the installed package has RichText", run: () => h.contains(installed, /\bRichText\b/, "the installed @estiva-app/ui exports RichText") },
       ] },
     ],
   };
