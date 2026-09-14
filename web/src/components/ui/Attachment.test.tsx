@@ -95,15 +95,52 @@ describe('Attachment', () => {
     expect(c.querySelector('img')?.getAttribute('alt')).toBe('the failing dialog')
   })
 
-  /* A PDF has no thumbnail and nothing to draw. Fetching it to render a chip
-     would download the file to display its own name. */
-  it('draws a non-image as a named chip without fetching it', () => {
-    const pdf: Imeta = { url: `https://buzz.estiva.app/media/${SHA}.pdf`, m: 'application/pdf', x: SHA, size: 2_097_152, filename: 'spec.pdf' }
+  /* A file opens, like Peek's (Katerina, 2026-09-15). The relay's URL would
+     answer 401 in a new tab, so the card opens the bytes it fetched — which
+     means a file is read when it is drawn, once, and cached. */
+  const pdf: Imeta = { url: `https://buzz.estiva.app/media/${SHA}.pdf`, m: 'application/pdf', x: SHA, size: 2_097_152, filename: 'spec.pdf' }
+
+  it('draws a non-image as a file card that opens the bytes it fetched, in a new tab', async () => {
+    blobObjectUrl.mockResolvedValue('blob:pdf')
     const c = render(<Attachment file={pdf} />).container
     expect(c.querySelector('[data-attachment="file"]')).toBeTruthy()
     expect(screen.getByText('spec.pdf')).toBeTruthy()
-    expect(screen.getByText('2.0 MB')).toBeTruthy()
+    // The package's card: the type, then the size.
+    expect(screen.getByText('PDF · 2.0 MB')).toBeTruthy()
+    const link = await screen.findByRole('link')
+    expect(link.getAttribute('href')).toBe('blob:pdf')
+    expect(link.getAttribute('target')).toBe('_blank')
+    expect(blobObjectUrl).toHaveBeenCalledWith(pdf.url)
+  })
+
+  it('opens nothing when the file cannot be read', async () => {
+    blobObjectUrl.mockRejectedValue(new Error('blob read failed: 401'))
+    render(<Attachment file={pdf} />)
+    await waitFor(() => expect(blobObjectUrl).toHaveBeenCalled())
+    expect(screen.queryByRole('link')).toBeNull()
+    expect(screen.getByText('spec.pdf')).toBeTruthy()
+  })
+
+  /* In a description being edited, a file is content: the editor saves and closes on blur, and a link or a
+     Download button takes focus. Measured 2026-09-15: pressing Download there committed and left the editor. */
+  it('in an editor, a file neither opens nor downloads, and is not fetched', () => {
+    render(<Attachment file={pdf} opens={false} />)
+    expect(screen.getByText('spec.pdf')).toBeTruthy()
+    expect(screen.queryByRole('link')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Download spec.pdf' })).toBeNull()
     expect(blobObjectUrl).not.toHaveBeenCalled()
+  })
+
+  it('saves a file under its own name', async () => {
+    blobObjectUrl.mockResolvedValue('blob:pdf')
+    const clicked: { href: string; download: string }[] = []
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      clicked.push({ href: this.getAttribute('href') ?? '', download: this.download })
+    })
+    render(<Attachment file={pdf} />)
+    screen.getByRole('button', { name: 'Download spec.pdf' }).click()
+    await waitFor(() => expect(clicked).toEqual([{ href: 'blob:pdf', download: 'spec.pdf' }]))
+    click.mockRestore()
   })
 })
 

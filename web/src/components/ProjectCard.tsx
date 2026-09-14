@@ -1,3 +1,4 @@
+import { Card } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
 import { ago } from '@/lib/time'
 import { Avatar } from '@/components/ui/Avatar'
@@ -52,13 +53,7 @@ export function ProjectCard({
   className,
 }: ProjectCardProps) {
   return (
-    <a
-      {...linkTo(href)}
-      className={cn(
-        'flex flex-col gap-2 rounded-lg border border-border-default bg-bg-surface p-3 transition-colors hover:border-border-strong',
-        className,
-      )}
-    >
+    <Card {...linkTo(href)} fill="surface" className={cn('flex flex-col gap-2 p-3', className)}>
       <div className="flex items-start gap-2">
         <span className="min-w-0 flex-1 truncate text-body-2-strong text-text-primary">{title}</span>
         {archived && <Chip label="Archived" />}
@@ -93,7 +88,7 @@ export function ProjectCard({
         <Dot />
         <span className="shrink-0">{ago(createdAt)}</span>
       </div>
-    </a>
+    </Card>
   )
 }
 

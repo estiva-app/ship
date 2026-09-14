@@ -1,4 +1,5 @@
 import { stripNaddrs } from '@estiva-app/protocol'
+import { Card, Link } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
 import { Avatar } from './Avatar'
 import { Chip } from './Chip'
@@ -84,11 +85,10 @@ export interface ForeignObjectProps {
 export function ForeignObject({ object, conversations, className }: ForeignObjectProps) {
   if (object.unreachable) {
     return (
-      <div
-        className={cn(
-          'rounded-lg border border-dashed border-border-default bg-bg-surface p-3 text-body-2 text-text-muted',
-          className,
-        )}
+      <Card
+        fill="surface"
+        unreadable
+        className={cn('p-3 text-body-2 text-text-muted', className)}
         data-foreign-object={object.ref}
         data-state="unreachable"
       >
@@ -96,13 +96,13 @@ export function ForeignObject({ object, conversations, className }: ForeignObjec
         {object.openUrl && (
           <>
             {' '}
-            <a href={object.openUrl} className="text-text-secondary underline">
+            <Link href={object.openUrl} variant="underlined" className="text-text-secondary">
               Open it there
-            </a>
+            </Link>
             .
           </>
         )}
-      </div>
+      </Card>
     )
   }
 
@@ -208,24 +208,11 @@ function ForeignCard({ object, row, conversations, className }: ForeignObjectPro
     </>
   )
 
-  const shell = cn(
-    'flex flex-col gap-2 rounded-lg border border-border-default bg-bg-surface p-3',
-    row && 'py-2',
-    className,
-  )
+  const layout = cn('flex flex-col gap-2 p-3', row && 'py-2', className)
 
-  return object.openUrl ? (
-    <a
-      href={object.openUrl}
-      className={cn(shell, 'transition-colors hover:border-border-strong')}
-      data-foreign-object={object.ref}
-      data-widget={row ? 'row' : 'card'}
-    >
+  return (
+    <Card href={object.openUrl || undefined} fill="surface" className={layout} data-foreign-object={object.ref} data-widget={row ? 'row' : 'card'}>
       {body}
-    </a>
-  ) : (
-    <div className={shell} data-foreign-object={object.ref} data-widget={row ? 'row' : 'card'}>
-      {body}
-    </div>
+    </Card>
   )
 }

@@ -1,4 +1,5 @@
 import { IconBox } from '@tabler/icons-react'
+import { Link } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
 import { ago } from '@/lib/time'
 import { statusLabel, type StatusEntry } from '@/lib/issues'
@@ -63,7 +64,7 @@ export function IssueRow({ issue, statuses, href, className }: IssueRowProps) {
   const threads = issue.conversations ?? 0
   return (
     <div className={cn('relative flex h-9 min-w-0 items-center gap-3 rounded-md px-3 transition-colors hover:bg-bg-hover', className)}>
-      <a {...linkTo(href)} className="flex min-w-0 flex-1 items-center gap-3 after:absolute after:inset-0">
+      <Link {...linkTo(href)} variant="plain" className="flex min-w-0 flex-1 items-center gap-3 after:absolute after:inset-0">
         {/* `w-14`: 56px, the room the project table's ref cell has (S25), so
             the two surfaces line up. */}
         <span className={cn('w-14 shrink-0 truncate font-mono text-caption', issue.ref ? 'text-text-muted' : 'text-text-disabled')}>{issue.ref ?? '—'}</span>
@@ -71,14 +72,14 @@ export function IssueRow({ issue, statuses, href, className }: IssueRowProps) {
           <StatusShape value={issue.status} label={statusLabel(issue.status, statuses)} />
           <span className="min-w-0 flex-1 truncate text-body-2 text-text-primary">{issue.title}</span>
         </span>
-      </a>
+      </Link>
       {/* The count before the chip (Katerina, 2026-09-09): what is said
           about the issue, then where it lives, then who and when. */}
       <ConversationCount count={threads} unit="conversation" />
       {issue.project && (
-        <a {...linkTo(issue.project.href)} className="relative z-10 shrink-0 rounded-full">
+        <Link {...linkTo(issue.project.href)} variant="plain" className="relative z-10 shrink-0 rounded-full">
           <Chip label={issue.project.title} leadingIcon={<IconBox size={12} stroke={1.5} />} className="max-w-[200px]" />
-        </a>
+        </Link>
       )}
       {issue.assignee && <Avatar name={issue.assignee.name} src={issue.assignee.picture} size={16} label={issue.assignee.name} />}
       {/* A fixed column, right-aligned, so the times stack down the list. */}

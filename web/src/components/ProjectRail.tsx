@@ -1,8 +1,8 @@
+import { ProgressBar } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
 import { Avatar } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
 import { Divider } from '@/components/ui/Divider'
-import { ProgressBar } from '@/components/ui/ProgressBar'
 import { Property } from '@/components/ui/Property'
 import { Select, type SelectOption } from '@/components/ui/Select'
 

@@ -118,9 +118,8 @@ export function Activity({ items, onReply, disabledReason, nameOf, onReact, onDe
     : undefined
 
   if (!items.length) {
-    return (
-      <EmptyState scope="section" className={cn('py-8', className)} message="No related conversations yet." />
-    )
+    // Where the list starts, with no room of its own (Katerina, 2026-09-14): the list's box has no padding either.
+    return <EmptyState scope="section" className={className} message="No related conversations yet." />
   }
 
   return (

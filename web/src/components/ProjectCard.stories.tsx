@@ -105,7 +105,7 @@ export const NothingArchived: Story = {
   parameters: { layout: 'fullscreen' },
   render: () => (
     <div className="flex w-full flex-col gap-4 p-6">
-      <EmptyState className="py-12" message="Nothing archived." />
+      <EmptyState message="Nothing archived." />
     </div>
   ),
 }

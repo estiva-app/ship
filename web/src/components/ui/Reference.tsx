@@ -1,8 +1,8 @@
 import type { MouseEvent } from 'react'
 import { decodeNpub, stripNaddrs } from '@estiva-app/protocol'
+import { InlineChip } from '@estiva-app/ui'
 import type { ForeignObject } from '@/api/foreign'
 import { StatusLabel } from './StatusLabel'
-import { cn } from '@/lib/cn'
 import { referenceLink } from '@/lib/referenceLink'
 import { linkTo } from '@/router'
 
@@ -85,7 +85,8 @@ export function Reference({
   className?: string
 }) {
   const short = `${uri.replace(/^nostr:/, '').slice(0, 12)}…`
-  const base = 'mx-0.5 inline-flex items-center gap-1 rounded-sm px-1 align-baseline'
+  // Every chip below is the package's InlineChip (UIG-27): Peek's chip, one line
+  // high and level with the words around it, so a mention looks the same in both apps.
 
   // A person: the directory answers, or gives back a short key of its own.
   if (/^nostr:npub1/i.test(uri)) {
@@ -98,15 +99,16 @@ export function Reference({
     const name = pubkey ? nameOf?.(pubkey) : undefined
     const named = !!name && !pubkey?.startsWith(name.replace('…', ''))
     return (
-      <span
+      <InlineChip
+        tone={named ? 'person' : 'quiet'}
         data-reference="person"
         data-mention={pubkey ?? undefined}
         data-resolved={named ? 'true' : 'false'}
         title={named ? undefined : uri}
-        className={cn(base, named ? 'bg-accent-muted text-accent-primary text-body-2' : 'bg-bg-inset font-mono text-caption text-text-muted', className)}
+        className={className}
       >
         {named ? `@${name}` : (name ?? short)}
-      </span>
+      </InlineChip>
     )
   }
 
@@ -115,11 +117,12 @@ export function Reference({
     const label = objectLabel(object, nameOf) ?? short
     const link = referenceLink(object)
     const chip = {
+      tone: 'neutral' as const,
       'data-reference': 'object',
       'data-object': object.ref,
       // The whole label on hover, because the visible one is cut.
       title: label,
-      className: cn(base, 'bg-bg-inset text-body-2 text-text-primary', link && 'hover:bg-bg-hover', className),
+      className,
       /*
         Cut, not wrapped, and `ch` rather than pixels so it scales with the
         type. `truncate` alone did nothing here: an inline-flex chip takes
@@ -146,31 +149,27 @@ export function Reference({
         )}
       </>
     )
-    if (!link) return <span {...chip}>{body}</span>
+    if (!link) return <InlineChip {...chip}>{body}</InlineChip>
     const here = link.place === 'here' ? linkTo(link.href) : null
     const follow = (event: MouseEvent<HTMLAnchorElement>) => {
       event.stopPropagation()
       here?.onClick(event)
     }
     return here ? (
-      <a {...chip} href={here.href} onClick={follow}>
+      <InlineChip {...chip} href={here.href} onClick={follow}>
         {body}
-      </a>
+      </InlineChip>
     ) : (
-      <a {...chip} href={link.href} target="_blank" rel="noopener noreferrer" onClick={follow}>
+      <InlineChip {...chip} href={link.href} target="_blank" rel="noopener noreferrer" onClick={follow}>
         {body}
-      </a>
+      </InlineChip>
     )
   }
 
   // Still resolving, or resolved to nothing. §13.1: never blank.
   return (
-    <span
-      data-reference={object === null ? 'unresolved' : 'pending'}
-      title={uri}
-      className={cn(base, 'bg-bg-inset font-mono text-caption text-text-muted', className)}
-    >
+    <InlineChip tone="quiet" data-reference={object === null ? 'unresolved' : 'pending'} title={uri} className={className}>
       {short}
-    </span>
+    </InlineChip>
   )
 }
