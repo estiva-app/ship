@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { IconFile, IconPhotoOff } from '@tabler/icons-react'
 import type { Imeta } from '@estiva-app/protocol'
+import { AttachmentCard } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
 import { blobObjectUrl } from '@/api/blobs'
 
@@ -27,6 +27,15 @@ import { blobObjectUrl } from '@/api/blobs'
  * one leaves the reader thinking the sender forgot it. The relay's most likely
  * refusal here is `relay_membership_required` — a real answer about a channel
  * this reader is not in, not a bug — and it deserves words rather than a gap.
+ *
+ * ## What is the package's, and what stays here
+ *
+ * A file, and an image that cannot be read, are the package's `AttachmentCard`
+ * (UIG-27): Ship's files are the same card as Peek's (Katerina, 2026-09-14).
+ * An image stays drawn here, whole, in its 4px frame, until the package has a
+ * full-screen viewer to open it in — her ruling the same day. So does the
+ * fetch: the package draws, the app reads the bytes with the reader's own
+ * permission.
  */
 export function Attachment({ file, className }: { file: Imeta; className?: string }) {
   const isImage = file.m.startsWith('image/')
@@ -36,18 +45,11 @@ export function Attachment({ file, className }: { file: Imeta; className?: strin
   const { url, failed } = useBlobUrl(source)
   const label = file.filename ?? file.alt ?? 'attachment'
 
-  if (!isImage) return <FileChip file={file} className={className} />
+  if (!isImage) return <FileCard file={file} className={className} />
 
   if (failed) {
-    return (
-      <div
-        data-attachment="unreadable"
-        className={cn('flex items-center gap-1.5 rounded border border-border-default px-2 py-1.5 text-caption text-text-muted', className)}
-      >
-        <IconPhotoOff size={14} aria-hidden="true" />
-        <span className="truncate">{label} — could not be loaded</span>
-      </div>
-    )
+    // The package's card that cannot be read (UIG-27): its name, "Could not be loaded", a dashed hairline.
+    return <AttachmentCard data-attachment="unreadable" name={label} contentType={file.m} state="unreadable" className={className} />
   }
 
   if (!url) {
@@ -80,18 +82,12 @@ export function Attachment({ file, className }: { file: Imeta; className?: strin
   )
 }
 
-/** A non-image file: named and sized, because that is all a reader can use. */
-function FileChip({ file, className }: { file: Imeta; className?: string }) {
-  return (
-    <div
-      data-attachment="file"
-      className={cn('flex items-center gap-1.5 rounded border border-border-default px-2 py-1.5 text-caption text-text-secondary', className)}
-    >
-      <IconFile size={14} aria-hidden="true" />
-      <span className="truncate">{file.filename ?? file.alt ?? 'file'}</span>
-      <span className="shrink-0 text-text-muted">{formatBytes(file.size)}</span>
-    </div>
-  )
+/**
+ * A non-image file: the package's file card (UIG-27; Katerina, 2026-09-14: Ship's files are Peek's card) —
+ * a type tile, the name, and its type and size.
+ */
+function FileCard({ file, className }: { file: Imeta; className?: string }) {
+  return <AttachmentCard data-attachment="file" name={file.filename ?? file.alt ?? 'file'} size={file.size} contentType={file.m} className={className} />
 }
 
 /** Every file on one message, in the order the sender attached them. */
@@ -138,12 +134,4 @@ function useBlobUrl(source?: string): { url?: string; failed: boolean } {
   }, [source])
 
   return state
-}
-
-/** Bytes as a person reads them. Binary units, one decimal past KB. */
-function formatBytes(size: number): string {
-  if (size < 1024) return `${size} B`
-  const kb = size / 1024
-  if (kb < 1024) return `${Math.round(kb)} KB`
-  return `${(kb / 1024).toFixed(1)} MB`
 }

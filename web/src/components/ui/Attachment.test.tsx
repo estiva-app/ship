@@ -97,12 +97,13 @@ describe('Attachment', () => {
 
   /* A PDF has no thumbnail and nothing to draw. Fetching it to render a chip
      would download the file to display its own name. */
-  it('draws a non-image as a named chip without fetching it', () => {
+  it('draws a non-image as a named file card without fetching it', () => {
     const pdf: Imeta = { url: `https://buzz.estiva.app/media/${SHA}.pdf`, m: 'application/pdf', x: SHA, size: 2_097_152, filename: 'spec.pdf' }
     const c = render(<Attachment file={pdf} />).container
     expect(c.querySelector('[data-attachment="file"]')).toBeTruthy()
     expect(screen.getByText('spec.pdf')).toBeTruthy()
-    expect(screen.getByText('2.0 MB')).toBeTruthy()
+    // The package's card: the type, then the size.
+    expect(screen.getByText('PDF · 2.0 MB')).toBeTruthy()
     expect(blobObjectUrl).not.toHaveBeenCalled()
   })
 })
