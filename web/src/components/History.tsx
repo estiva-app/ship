@@ -29,7 +29,8 @@ export interface HistoryEntry {
 }
 
 export function History({ entries, className }: { entries: HistoryEntry[]; className?: string }) {
-  if (!entries.length) return <EmptyState scope="section" className={cn('py-6', className)} message="Nothing has changed yet." />
+  // Where the list starts, with no room of its own (Katerina, 2026-09-14): the list's box has no padding either.
+  if (!entries.length) return <EmptyState scope="section" className={className} message="Nothing has changed yet." />
   return (
     <ol className={cn('flex flex-col gap-3', className)}>
       {entries.map((entry) => (

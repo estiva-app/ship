@@ -641,7 +641,7 @@ export function Conversations({ threads, onStart, onReply, disabledReason, class
           />
         ))
       ) : (
-        <EmptyState scope="section" className="py-8" message="No conversations yet." />
+        <EmptyState scope="section" message="No conversations yet." />
       )}
       {/*
         The horizon, said out loud — CON-1.
