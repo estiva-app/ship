@@ -1,3 +1,4 @@
+import { Link } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
 import { ago } from '@/lib/time'
 import { statusLabel, type StatusEntry } from '@/lib/issues'
@@ -81,9 +82,9 @@ export function IssuesTable({ issues, statuses, hrefFor, className }: IssuesTabl
                   app's bookkeeping, not a chore for whoever opened the page. */}
               <td className={cn(TD, 'whitespace-nowrap font-mono', SMALL, issue.ref ? 'text-text-muted' : 'text-text-disabled')}>{issue.ref ?? '—'}</td>
               <td className={TD}>
-                <a {...linkTo(hrefFor(issue))} className="block truncate text-text-primary hover:underline">
+                <Link {...linkTo(hrefFor(issue))} variant="quiet" className="block truncate text-text-primary">
                   {issue.title}
-                </a>
+                </Link>
               </td>
               <td className={TD}>
                 <StatusLabel value={issue.status} label={statusLabel(issue.status, statuses)} />
