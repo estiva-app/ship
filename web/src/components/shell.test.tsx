@@ -77,82 +77,87 @@ describe('Sidebar', () => {
     expect(screen.getByRole('link', { name: /^Projects/ })).not.toHaveAttribute('aria-current')
   })
 
-  it('lists Folders in their own section, under the projects', () => {
+  const teams = [
+    { id: 'peek', name: 'Peek' },
+    { id: 'hq', name: 'Estiva HQ' },
+  ]
+  const filed = [
+    { ...projects[0]!, folder: 'peek' },
+    { ...projects[1]!, folder: 'hq' },
+  ]
+
+  it('folds the projects under their teams, alphabetically, and draws no Projects fold (SHI-25)', () => {
+    render(
+      <Sidebar openIssues={5} issuesHref="#/" projectsHref="#/projects" projects={filed} folders={teams} current="issues" />,
+    )
+    const folds = screen.getAllByRole('button').map((b) => b.textContent)
+    expect(folds).toEqual(['Estiva HQ', 'Peek'])
+    const labels = screen.getAllByRole('link').map((a) => a.textContent)
+    expect(labels).toEqual(['Issues5', 'Projects2', 'Two', 'One2'])
+    // The team is a fold, not a link: a team's row carries no count and no href.
+    expect(screen.queryByRole('link', { name: 'Peek' })).not.toBeInTheDocument()
+  })
+
+  it('a project under no team keeps a row under a plain Projects fold', () => {
     render(
       <Sidebar
         openIssues={5}
         issuesHref="#/"
         projectsHref="#/projects"
-        projects={projects}
-        folders={[{ id: 'f1', name: 'Onboarding', href: '#/folder/f1' }]}
+        projects={[filed[0]!, projects[1]!, { addr: '30850:x:three', title: 'Three', href: '#/p/three', openCount: 1, folder: 'not-a-team' }]}
+        folders={teams}
         current="issues"
       />,
     )
+    const folds = screen.getAllByRole('button').map((b) => b.textContent)
+    expect(folds).toEqual(['Estiva HQ', 'Peek', 'Projects'])
     const labels = screen.getAllByRole('link').map((a) => a.textContent)
-    expect(labels).toEqual(['Issues5', 'Projects2', 'One2', 'Two', 'Onboarding'])
+    expect(labels).toEqual(['Issues5', 'Projects3', 'One2', 'Two', 'Three1'])
   })
 
-  it('a folder row carries no count', () => {
-    // Deliberate: a Folder holds files from apps Ship does not own, so any
-    // number here would be Ship's records only — a lie about a container that
-    // holds a topic — and RFC 0.4 §4.2 makes the count a disclosure of its own.
+  it("the arrow on a team's fold opens the Folder", async () => {
+    const onOpenFolder = vi.fn()
     render(
-      <Sidebar
-        openIssues={0}
-        issuesHref="#/"
-        projectsHref="#/projects"
-        projects={[]}
-        folders={[{ id: 'f1', name: 'Onboarding', href: '#/folder/f1' }]}
-        current="issues"
-      />,
+      <Sidebar openIssues={0} issuesHref="#/" projectsHref="#/projects" projects={filed} folders={teams} current="issues" onOpenFolder={onOpenFolder} />,
     )
-    expect(screen.getByRole('link', { name: 'Onboarding' })).toHaveTextContent(/^Onboarding$/)
+    await userEvent.click(screen.getAllByRole('button', { name: 'Open folder' })[1]!)
+    expect(onOpenFolder).toHaveBeenCalledWith(teams[0])
   })
 
-  it('falls back to the id when a folder has no name', () => {
-    // A Folder with no state event has only its channel's name, and a channel
-    // created by an app rather than a person may have none at all.
+  it('falls back to the id when a team has no name', () => {
+    // A state written by a placement carries no name, and `listFolders` reads
+    // the state's name and stops (the Peek team, 2026-09-15).
     render(
-      <Sidebar
-        openIssues={0}
-        issuesHref="#/"
-        projectsHref="#/projects"
-        projects={[]}
-        folders={[{ id: 'f1', href: '#/folder/f1' }]}
-        current="issues"
-      />,
+      <Sidebar openIssues={0} issuesHref="#/" projectsHref="#/projects" projects={[]} folders={[{ id: 'f1' }]} current="issues" />,
     )
-    expect(screen.getByRole('link', { name: 'f1' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'f1' })).toBeInTheDocument()
   })
 
-  it('marks a folder route on its own row', () => {
+  it('marks a project route on its row and nothing on a folder route', () => {
     render(
-      <Sidebar
-        openIssues={0}
-        issuesHref="#/"
-        projectsHref="#/projects"
-        projects={projects}
-        folders={[{ id: 'f1', name: 'Onboarding', href: '#/folder/f1' }]}
-        current={{ folderId: 'f1' }}
-      />,
+      <Sidebar openIssues={0} issuesHref="#/" projectsHref="#/projects" projects={filed} folders={teams} current={{ folderId: 'peek' }} />,
     )
-    expect(screen.getByRole('link', { name: 'Onboarding' })).toHaveAttribute('aria-current', 'page')
-    // The project rows must not light up for a folder route — both branches of
-    // `current` are objects, and telling them apart is the whole reason the
-    // discriminant moved from `typeof` to a key check.
-    expect(screen.getByRole('link', { name: /^One/ })).not.toHaveAttribute('aria-current')
+    // Both branches of `current` are objects; a folder route must not light a
+    // project row, which is why the discriminant is a key check, not `typeof`.
+    for (const link of screen.getAllByRole('link')) expect(link).not.toHaveAttribute('aria-current')
   })
 
-  it('shows placeholder rows under both headings while both are still loading', () => {
+  it('shows placeholder rows while either read is still coming, and no team yet', () => {
     const { container } = render(<Sidebar openIssues={0} issuesHref="#/" projectsHref="#/projects" projects={[]} current="issues" loading folders={[]} foldersLoading />)
     expect(screen.getByRole('button', { name: 'Projects' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Folders' })).toBeInTheDocument()
-    expect(container.querySelectorAll('[aria-hidden="true"].animate-skeleton-in')).toHaveLength(2)
+    expect(container.querySelectorAll('[aria-hidden="true"].animate-skeleton-in')).toHaveLength(1)
+    const { container: withProjects } = render(
+      <Sidebar openIssues={0} issuesHref="#/" projectsHref="#/projects" projects={filed} current="issues" folders={[]} foldersLoading />,
+    )
+    // The projects are known and the teams are not: still the placeholder,
+    // rather than a flat list that regroups itself a moment later.
+    expect(withProjects.querySelectorAll('[aria-hidden="true"].animate-skeleton-in')).toHaveLength(1)
+    expect(withProjects.querySelector('[data-sidebar-team]')).toBeNull()
   })
 
-  it('draws no Folders heading when there are none', () => {
+  it('draws no team fold when there are none', () => {
     render(<Sidebar openIssues={0} issuesHref="#/" projectsHref="#/projects" projects={[]} current="issues" />)
-    expect(screen.queryByText('Folders')).not.toBeInTheDocument()
+    expect(document.querySelector('[data-sidebar-team]')).toBeNull()
   })
 
   it('draws no Projects heading when there are none', () => {
