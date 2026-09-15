@@ -12,7 +12,9 @@
     "build-storybook": "storybook build",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "lint:rules": "eslint --config eslint.gates.config.js .",
+    "postlint:rules": "node scripts/gates-count.mjs"
   },
   "dependencies": {
     "@estiva-app/identity": "^0.2.2",
