@@ -10,10 +10,18 @@ const PROJECTS: SidebarProject[] = [
   { addr: '30850:a:mob', title: 'Mobile app', href: '#/p/mob', openCount: 0 },
 ]
 
-/** Folders as the sidebar sees them: a name and a link, and deliberately no count. */
+/** The teams as the sidebar sees them: a name, and deliberately no count. */
 const FOLDERS: SidebarFolder[] = [
-  { id: '7b32200c-e4c0-4216-b79a-8490fc05e0bd', name: 'Onboarding', href: '#/folder/7b32200c-e4c0-4216-b79a-8490fc05e0bd' },
-  { id: '0212db6d-bcbf-40d0-890e-f4f056db2f5d', name: 'Feedback on Ship', href: '#/folder/0212db6d-bcbf-40d0-890e-f4f056db2f5d' },
+  { id: '7b32200c-e4c0-4216-b79a-8490fc05e0bd', name: 'Ship' },
+  { id: '0212db6d-bcbf-40d0-890e-f4f056db2f5d', name: 'Estiva HQ' },
+]
+/** The same projects, each under a team (SHI-25); the last one under none. */
+const FILED: SidebarProject[] = [
+  { ...PROJECTS[0]!, folder: '0212db6d-bcbf-40d0-890e-f4f056db2f5d' },
+  { ...PROJECTS[1]!, folder: '7b32200c-e4c0-4216-b79a-8490fc05e0bd' },
+  { ...PROJECTS[2]!, folder: '7b32200c-e4c0-4216-b79a-8490fc05e0bd' },
+  { ...PROJECTS[3]!, folder: '0212db6d-bcbf-40d0-890e-f4f056db2f5d' },
+  PROJECTS[4]!,
 ]
 
 const meta = {
@@ -51,12 +59,13 @@ export const OnAProject: Story = { args: { current: { projectAddr: '30850:a:rel'
 export const Empty: Story = { args: { openIssues: 0, projects: [] } }
 
 /**
- * With Folders. They sit below the projects and carry **no count**, unlike
- * every other row here — a Folder holds files from apps Ship does not own, so
- * any number would be Ship's records only, which is a lie about a container
- * that also holds a topic.
+ * With teams (SHI-25): one fold per top-level Folder, its projects as the
+ * rows, and a project under no team in a plain "Projects" fold after them. A
+ * team carries **no count**, unlike every other row here — a Folder holds
+ * files from apps Ship does not own, so any number would be Ship's records
+ * only, which is a lie about a container that also holds a topic.
  */
-export const WithFolders: Story = { args: { folders: FOLDERS } }
+export const WithFolders: Story = { args: { folders: FOLDERS, projects: FILED, onOpenFolder: () => {} } }
 
 /** A folder route marks its own row, and leaves the project rows alone. */
 export const OnAFolder: Story = {
@@ -66,11 +75,12 @@ export const OnAFolder: Story = {
 /**
  * A Folder with no name falls back to its id.
  *
- * Not hypothetical: a Folder with no state event has only its channel's name,
- * and a channel created by an app rather than a person may carry none.
+ * Not hypothetical: a state written by a placement carries no name, and
+ * `listFolders` reads the state's name and stops — the Peek team rendered as
+ * its uuid on 2026-09-15.
  */
 export const FolderWithNoName: Story = {
-  args: { folders: [{ id: '9c69f247-be6a-4ae7-9703-71cb971f5f93', href: '#/folder/9c69f247' }] },
+  args: { folders: [{ id: '9c69f247-be6a-4ae7-9703-71cb971f5f93' }] },
 }
 
 /**

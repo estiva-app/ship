@@ -9,7 +9,7 @@ import { SkeletonList } from '@/components/ui/Skeleton'
 import { IdentityMenu } from '@/components/IdentityMenu'
 import { Sidebar, type SidebarFolder, type SidebarProject } from '@/components/Sidebar'
 import { EmptyState } from '@/components/ui/EmptyState'
-import { useFolders } from '@/api/useFolders'
+import { topLevelFolders, useFolders } from '@/api/useFolders'
 import { FolderPage } from '@/pages/FolderPage'
 import { IssuePage } from '@/pages/IssuePage'
 import { IssuesPage } from '@/pages/IssuesPage'
@@ -19,7 +19,7 @@ import { ProjectsPage } from '@/pages/ProjectsPage'
 import { ID_CONFIG, RELAY_URL } from './config'
 import { beginSignIn, beginSignOut, signInAvailable, signedIn } from './auth/estivaId'
 import { identifierFromRef } from '@estiva-app/interop'
-import { href, replace, useRoute, type Route } from './router'
+import { go, href, replace, useRoute, type Route } from './router'
 
 /**
  * The app: the shell around whichever page the hash names, fed from the
@@ -121,8 +121,9 @@ function Shell() {
           {...sidebarProps(
             state,
             route,
-            (folders ?? []).map((f) => ({ id: f.id, name: f.name, href: href({ name: 'folder', id: f.id }) })),
+            folders ? topLevelFolders(folders).map((f) => ({ id: f.id, name: f.name })) : [],
           )}
+          onOpenFolder={(folder) => go({ name: 'folder', id: folder.id })}
           loading={!state && loading}
           foldersLoading={folders === undefined}
         />
@@ -194,6 +195,9 @@ export function sidebarProps(
       title: p.title,
       href: href({ name: 'project', d: p.id, slug: p.title, view: 'table' }),
       openCount: issues.filter((i) => i.projectAddr === p.addr && isOpen(i.status)).length,
+      // The team it is under: the Folder its record names, or the one
+      // `ship link-project` re-pointed it at (SHI-25).
+      ...(p.contentFolder ? { folder: p.contentFolder } : {}),
     }))
   const current =
     route.name === 'project'

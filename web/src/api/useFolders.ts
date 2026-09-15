@@ -3,6 +3,26 @@ import { readFolders } from './foreign'
 import type { FolderSummary } from './foreign'
 
 /**
+ * The Folders a person navigates by — the teams (SHI-25).
+ *
+ * `listFolders` answers with every channel this identity can see, and most
+ * of production's are nobody's Folder: Ship's own record channels (one
+ * `project-…` per project, `Store.ensureFolder`), the channel a project's
+ * issues live in by `h`, Peek's test topics. Each is reached through the
+ * object it belongs to. What marks a Folder out is the relay's own mark:
+ * a `kind:30890` exists once somebody has sent a Folder command at the
+ * channel — placed something in it, named it — and a record channel never
+ * gets one. A Folder another Folder lists (`listedIn`) is a row in that one.
+ *
+ * The same predicate Peek draws its Folders column from (`topLevelFolders`
+ * in peek#221), so the two apps show the same five. Not the five by id: a
+ * sixth team is a Folder somebody creates, not a code change.
+ */
+export function topLevelFolders(folders: FolderSummary[]): FolderSummary[] {
+  return folders.filter((folder) => folder.hasState && !folder.listedIn?.length)
+}
+
+/**
  * The Folders this identity can see, for the sidebar.
  *
  * **Read once on mount, not on the workspace poll.** A Folder's name changes

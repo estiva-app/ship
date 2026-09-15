@@ -1,13 +1,29 @@
-import { IconBox, IconFolder, IconListDetails } from '@tabler/icons-react'
+import { IconArrowUpRight, IconBox, IconListDetails } from '@tabler/icons-react'
 import { CollapsibleSection, Sidebar as SidebarShell } from '@estiva-app/ui'
 import { SkeletonBar } from '@/components/ui/Skeleton'
 import { NavItem } from './NavItem'
 
 /**
- * The sidebar: today's contents (ruling A1) — Issues, Projects, then the
- * active projects under a "Projects" heading. No inbox, no "my issues", no
- * teams; a personal filter belongs to the list it filters. The column
- * itself is the shared shell (2026-09-02); what fills it stays here.
+ * The sidebar: Issues, Projects, then the active projects **under their
+ * team** — one fold per top-level Folder, its projects as the rows (SHI-25).
+ * No inbox, no "my issues"; a personal filter belongs to the list it filters.
+ * The column itself is the shared shell (2026-09-02); what fills it stays
+ * here.
+ *
+ * Until 2026-09-15 the projects were one flat list and every Folder the
+ * relay answered with was a row under a "Folders" heading — on production
+ * fifty-odd, most of them Ship's own record channels. Miky's ruling: "in both
+ * Peek and Ship have 5 folders — Estiva HQ, Ship, Peek, Steer, Leaf. Under
+ * those there should be all the topics and projects. The issues should be
+ * under the dedicated project." Which Folders are the teams is the caller's
+ * to say (`topLevelFolders` — the ones with state that nothing lists); which
+ * project is under which team is Ship's own fold (`Project.contentFolder`,
+ * the Folder `ship link-project` re-points it at). A project whose Folder is
+ * no team keeps a row under a plain "Projects" fold rather than vanishing.
+ *
+ * A team's title toggles its fold; the arrow on hover opens the Folder page,
+ * which lists everything in it — the topics Peek filed there beside the
+ * projects. The issues are one more click: a project's row opens the project.
  *
  * Two kinds of number, each saying what it counts in its tooltip (ruling
  * A2): the Issues entry and every project row count OPEN issues ("18 open");
@@ -24,7 +40,7 @@ import { NavItem } from './NavItem'
  *
  * Desktop only: the narrow-screen drawer is parked (ruling A5).
  */
-const STORAGE = { projects: 'ship.sidebar.projects', folders: 'ship.sidebar.folders' }
+const STORAGE = { projects: 'ship.sidebar.projects', team: (id: string) => `ship.sidebar.team.${id}` }
 
 export interface SidebarProject {
   /** The identity — refs and titles collide, addresses do not. */
@@ -33,15 +49,16 @@ export interface SidebarProject {
   href: string
   /** Open issues in this project. */
   openCount: number
+  /** The Folder the project is under — its `contentFolder`. Absent when it names none. */
+  folder?: string
 }
 
-/** A Folder, as the sidebar needs it. */
+/** A top-level Folder — a team — as the sidebar needs it. */
 export interface SidebarFolder {
   /** The uuid — channel id, `h`, and the `d` of its state, all one (RFC 0.4 §5.2). */
   id: string
-  /** Absent until something names it; the row falls back to the id. */
+  /** Absent until something names it; the fold falls back to the id. */
   name?: string
-  href: string
 }
 
 export interface SidebarProps {
@@ -52,21 +69,28 @@ export interface SidebarProps {
   /** Active projects only, in the order the caller wants them shown. */
   projects: SidebarProject[]
   /**
-   * Folders this identity can see.
+   * The teams: the top-level Folders, each a fold over its projects. Which
+   * Folders those are is the caller's reading (`topLevelFolders`).
    *
-   * **No count**, unlike every other row here. A Folder's contents are files
-   * from apps Ship does not own, so a number would either be Ship's records
-   * only — which is a lie about a container that holds a topic — or a resolve
-   * per Folder on every render. RFC 0.4 §4.2 also makes the count a disclosure
-   * in its own right, so the honest sidebar states the name and nothing else.
+   * **No count on a team**, unlike every other row here. A Folder's contents
+   * are files from apps Ship does not own, so a number would either be Ship's
+   * records only — which is a lie about a container that holds a topic — or a
+   * resolve per Folder on every render. RFC 0.4 §4.2 also makes the count a
+   * disclosure in its own right, so the fold states the name and nothing else.
    */
   folders?: SidebarFolder[]
+  /** The arrow on a team's fold: open the Folder page. */
+  onOpenFolder?: (folder: SidebarFolder) => void
   /** Which entry the route is on. A project's `addr` marks its own row. */
   current: 'issues' | 'projects' | { projectAddr: string } | { folderId: string }
   /** The first workspace read has not landed, so the project list is unknown
    *  rather than empty — SHI-20. Shows placeholder rows in its place. */
   loading?: boolean
-  /** The Folders are read separately and have not landed — the same placeholder rows, under a Folders heading. */
+  /**
+   * The Folders are read separately and have not landed, so which team a
+   * project is under is unknown — the same placeholder rows, rather than a
+   * flat list that regroups itself a moment later.
+   */
   foldersLoading?: boolean
   className?: string
 }
@@ -96,7 +120,7 @@ function SkeletonProjects() {
   )
 }
 
-export function Sidebar({ openIssues, issuesHref, projectsHref, projects, folders = [], current, loading = false, foldersLoading = false, className }: SidebarProps) {
+export function Sidebar({ openIssues, issuesHref, projectsHref, projects, folders = [], onOpenFolder, current, loading = false, foldersLoading = false, className }: SidebarProps) {
   /*
     Both branches of `current` are objects now, so `typeof current === 'object'`
     no longer distinguishes them — it was correct while a project route was the
@@ -105,7 +129,29 @@ export function Sidebar({ openIssues, issuesHref, projectsHref, projects, folder
     instead, which cannot go wrong the same way again.
   */
   const isProject = typeof current === 'object' && 'projectAddr' in current
-  const isFolder = typeof current === 'object' && 'folderId' in current
+  /*
+    Grouped here rather than by the caller, so a story can hand in the two
+    lists production hands in. Alphabetical teams, as Peek's column draws
+    them; a project keeps the caller's order inside its team. The relay's
+    order tells the person nothing.
+  */
+  const teams = [...folders].sort((a, b) =>
+    (a.name ?? a.id).localeCompare(b.name ?? b.id, undefined, { sensitivity: 'base' }),
+  )
+  const teamIds = new Set(teams.map((team) => team.id))
+  const under = (team: SidebarFolder) => projects.filter((project) => project.folder === team.id)
+  const elsewhere = projects.filter((project) => !project.folder || !teamIds.has(project.folder))
+  const row = (project: SidebarProject) => (
+    <NavItem
+      key={project.addr}
+      label={project.title}
+      href={project.href}
+      count={project.openCount}
+      countLabel={`${project.openCount} open`}
+      active={isProject && current.projectAddr === project.addr}
+    />
+  )
+  const pending = (projects.length === 0 && loading) || (folders.length === 0 && foldersLoading)
   return (
     <SidebarShell className={className}>
       <NavItem
@@ -124,40 +170,40 @@ export function Sidebar({ openIssues, issuesHref, projectsHref, projects, folder
         countLabel={`${projects.length} active`}
         active={current === 'projects'}
       />
-      {(projects.length > 0 || loading) && (
+      {pending ? (
         <CollapsibleSection title="Projects" storageKey={STORAGE.projects} className="mt-2 shrink-0" contentClassName="gap-px">
-          {projects.length === 0 && loading ? (
-            <SkeletonProjects />
-          ) : (
-            projects.map((project) => (
-              <NavItem
-                key={project.addr}
-                label={project.title}
-                href={project.href}
-                count={project.openCount}
-                countLabel={`${project.openCount} open`}
-                active={isProject && current.projectAddr === project.addr}
-              />
-            ))
-          )}
+          <SkeletonProjects />
         </CollapsibleSection>
-      )}
-      {(folders.length > 0 || foldersLoading) && (
-        <CollapsibleSection title="Folders" storageKey={STORAGE.folders} className="mt-2 shrink-0" contentClassName="gap-px">
-          {folders.length === 0 && foldersLoading ? (
-            <SkeletonProjects />
-          ) : (
-          folders.map((folder) => (
-            <NavItem
-              key={folder.id}
-              label={folder.name ?? folder.id}
-              href={folder.href}
-              icon={<IconFolder size={16} stroke={1.5} />}
-              active={isFolder && current.folderId === folder.id}
-            />
-          ))
+      ) : (
+        <>
+          {teams.map((team) => (
+            <div key={team.id} data-sidebar-team={team.id} className="mt-2 shrink-0">
+              <CollapsibleSection
+                title={team.name ?? team.id}
+                storageKey={STORAGE.team(team.id)}
+                contentClassName="gap-px"
+                actions={
+                  onOpenFolder
+                    ? [{ icon: <IconArrowUpRight size={16} stroke={1.5} />, tooltip: 'Open folder', onClick: () => onOpenFolder(team) }]
+                    : []
+                }
+              >
+                {under(team).map(row)}
+              </CollapsibleSection>
+            </div>
+          ))}
+          {/*
+            A project under no team, or under a Folder that is not one. Nothing
+            is dropped from the navigation for being unfiled; on production
+            every project is under a team since 2026-09-15, so this fold is
+            usually absent.
+          */}
+          {elsewhere.length > 0 && (
+            <CollapsibleSection title="Projects" storageKey={STORAGE.projects} className="mt-2 shrink-0" contentClassName="gap-px">
+              {elsewhere.map(row)}
+            </CollapsibleSection>
           )}
-        </CollapsibleSection>
+        </>
       )}
     </SidebarShell>
   )
