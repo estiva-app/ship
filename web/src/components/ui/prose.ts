@@ -25,17 +25,25 @@
  * **`:not(pre) > code`.** An inline `code` run and a fence are different
  * things wearing the same tag: the fence styles the `<pre>`, and giving its
  * inner `<code>` a background as well draws a box inside a box.
+ *
+ * **The list has a `_CLASSES` name, and is joined below.** The token lint reads
+ * class lists in a variable of that name, and cannot read through `.join()`
+ * (UIG-28 R5).
  */
-export const PROSE_BLOCKS = [
+const PROSE_BLOCK_CLASSES = [
   'flex flex-col gap-2 text-body-2',
   '[&_h1]:text-h3 [&_h2]:text-h4 [&_h3]:text-body-1 [&_h3]:font-semibold',
   '[&_ul]:list-disc [&_ul]:pl-5',
   '[&_ol]:list-decimal [&_ol]:pl-5',
   '[&_blockquote]:border-l-2 [&_blockquote]:border-border-default [&_blockquote]:pl-3',
+  // eslint-disable-next-line token-values/no-restricted-classes -- @estiva-escape: code is 0.9 of the text around it, so it scales with a heading; a named size is fixed
   '[&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:bg-bg-inset [&_pre]:p-2 [&_pre]:font-mono [&_pre]:text-[0.9em]',
+  // eslint-disable-next-line token-values/no-restricted-classes -- @estiva-escape: code is 0.9 of the text around it, so it scales with a heading; a named size is fixed
   '[&_:not(pre)>code]:rounded-sm [&_:not(pre)>code]:bg-bg-inset [&_:not(pre)>code]:px-1 [&_:not(pre)>code]:py-0.5 [&_:not(pre)>code]:font-mono [&_:not(pre)>code]:text-[0.9em]',
   '[&_hr]:border-border-default',
   '[&_strong]:font-semibold',
   '[&_em]:italic',
   '[&_u]:underline [&_u]:underline-offset-2',
-].join(' ')
+]
+
+export const PROSE_BLOCKS = PROSE_BLOCK_CLASSES.join(' ')
