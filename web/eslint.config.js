@@ -4,6 +4,7 @@ import reactHooks from 'eslint-plugin-react-hooks'
 import { defineConfig, globalIgnores } from 'eslint/config'
 import { createRequire } from 'node:module'
 import { parser as typescriptParser } from 'typescript-eslint'
+import { gateLint } from './eslint.gates.js'
 
 // Tailwind's own loader: the preset imports `tailwindcss/plugin`, which a plain
 // `import` cannot resolve.
@@ -206,4 +207,7 @@ export default defineConfig([
     },
   },
   tokenValues,
+  // The UI Guardrails' rules (UIG-4), so an editor shows them where the element
+  // is typed. `npm run lint:rules` runs these alone, and that is the CI gate.
+  gateLint,
 ])
