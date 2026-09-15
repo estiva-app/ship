@@ -9,6 +9,18 @@ staging workspace.
 **The UI Guardrails project:** where it stands is `docs/GATES.md` §0 in the `estiva-ui` checkout beside this repository.
 `npm run gates:status` here shows Ship's part of it, read from the code.
 
+**The gate lint, and a session opened in another folder.** A raw element the
+package already has (today a `<button>`; the message names what to use) is
+refused by `npm --prefix web run lint:rules`, by CI's "Gate lint", and before
+the write by `.claude/hooks/gates.mjs` — but that hook runs only in a Claude
+session started in this folder, the repository's top folder. A session started
+anywhere else (a workspace holding several repositories, or `web/`) does not
+get the hook, so: after changing any `.tsx` under `web/src/`, run
+`npm --prefix web run lint:rules` and fix everything it reports before you
+finish. Keep an element only with its reason on the line above,
+`// @estiva-escape: <reason>` or `{/* @estiva-escape: <reason> */}`, never with
+`eslint-disable`.
+
 ## UI: the shared package, and the rules every session follows
 
 @UI-RULES.md
