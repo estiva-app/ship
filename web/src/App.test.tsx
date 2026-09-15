@@ -167,7 +167,7 @@ describe('Projects page — cards from the fold', () => {
     await waitFor(() => expect(createProject).toHaveBeenCalledWith({ title: 'Mobile app', description: '', folder: undefined }))
     await waitFor(() => expect(refresh).toHaveBeenCalled())
     expect(await screen.findByText('Project created')).toBeInTheDocument()
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'New project' })).not.toBeInTheDocument())
   })
 
   it('keeps the dialog open and says why when the relay refuses', async () => {
@@ -179,7 +179,7 @@ describe('Projects page — cards from the fold', () => {
     fireEvent.change(dialog.getByPlaceholderText('New project title'), { target: { value: 'X' } })
     fireEvent.click(dialog.getByRole('button', { name: 'Create project' }))
     expect(await screen.findByText(/Project rejected — not a channel member/)).toBeInTheDocument()
-    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'New project' })).toBeInTheDocument()
     expect(refresh).not.toHaveBeenCalled()
   })
 

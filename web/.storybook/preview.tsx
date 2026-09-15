@@ -26,7 +26,7 @@ const applyTheme = (theme?: string) => {
 }
 
 // Apply the theme once, for EVERY page — including standalone MDX docs
-// (Introduction, Design Tokens), which don't run story decorators. The
+// (Introduction), which don't run story decorators. The
 // toolbar listener that used to sit here went with the picker: nothing
 // changes the theme global any more, so there is nothing to follow.
 applyTheme(DEFAULT_THEME)
@@ -52,7 +52,7 @@ const preview: Preview = {
       // Docs first; the rest follows Peek's taxonomy where the concepts match
       // (one component, not two that drift), Ship's own sections after.
       storySort: {
-        order: ['Docs', ['Introduction', 'Design Tokens'], 'Primitives', 'Feedback', 'Inputs', 'Overlays', 'Issues', 'Projects', 'Conversations', 'Navigation', 'Views'],
+        order: ['Docs', ['Introduction'], 'Primitives', 'Feedback', 'Inputs', 'Overlays', 'Issues', 'Projects', 'Conversations', 'Navigation', 'Views'],
       },
     },
   },

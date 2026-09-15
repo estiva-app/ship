@@ -35,7 +35,7 @@ export interface IssuesTableProps {
 // else in a cell, the date included, is body-2, the table's own 14 (Katerina,
 // 2026-08-26). These were arbitrary values while tailwind-merge dropped a
 // token size beside a colour class; the package's cn() names the ramp now.
-const TH = 'h-9 px-3 text-left text-menu font-medium uppercase tracking-[0.08em] text-text-secondary'
+const TH_CLASSES = 'h-9 px-3 text-left text-menu font-medium uppercase tracking-widest text-text-secondary'
 const TD = 'h-10 px-3 text-body-2'
 const SMALL = 'text-caption'
 
@@ -63,14 +63,14 @@ export function IssuesTable({ issues, statuses, hrefFor, className }: IssuesTabl
                 56px, which holds three letters, a dash and three digits
                 (`refPrefix` takes three letters); the Issues page's list row
                 uses the same width, so the two surfaces line up. */}
-            <th className={cn(TH, 'relative w-20')}>
+            <th className={cn(TH_CLASSES, 'relative w-20')}>
               <span className="sr-only">Ref</span>
             </th>
-            <th className={TH}>Title</th>
-            <th className={cn(TH, 'w-32')}>Status</th>
-            <th className={cn(TH, 'w-40')}>Assignee</th>
-            <th className={cn(TH, 'w-40')}>Opened by</th>
-            <th className={cn(TH, 'w-24')}>Updated</th>
+            <th className={TH_CLASSES}>Title</th>
+            <th className={cn(TH_CLASSES, 'w-32')}>Status</th>
+            <th className={cn(TH_CLASSES, 'w-40')}>Assignee</th>
+            <th className={cn(TH_CLASSES, 'w-40')}>Opened by</th>
+            <th className={cn(TH_CLASSES, 'w-24')}>Updated</th>
           </tr>
         </thead>
         <tbody>
