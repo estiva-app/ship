@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { IconPaperclip } from '@tabler/icons-react'
 import type { Imeta } from '@estiva-app/protocol'
-import { FilePicker, Form } from '@estiva-app/ui'
+import { FieldLine, FilePicker, Form } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
 import { browserDrafts, type DraftStore } from '@/lib/drafts'
 import { uploadAttachment } from '@/api/blobs'
@@ -214,12 +214,9 @@ export function Composer({ kind = 'conversation', onSubmit, autoFocus = false, d
       )}
 
       {/* The relay's own words. A refusal here is usually about the file — too
-          large, a type it will not take — which is something to act on. */}
-      {uploadError && (
-        <p data-composer="upload-error" role="alert" className="text-caption text-error-default">
-          {uploadError}
-        </p>
-      )}
+          large, a type it will not take — which is something to act on. The
+          package's FieldLine: the same line, and it says "error" itself (UIG-8). */}
+      {uploadError && <FieldLine tone="error">{uploadError}</FieldLine>}
     </Form>
   )
 }

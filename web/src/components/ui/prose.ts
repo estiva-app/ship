@@ -26,6 +26,12 @@
  * things wearing the same tag: the fence styles the `<pre>`, and giving its
  * inner `<code>` a background as well draws a box inside a box.
  *
+ * **A code block wraps.** A long line folds onto the next, keeping every space,
+ * as Peek's does (Katerina's ruling of 11 September there, taken here on 16
+ * September, UIG-8). It used to scroll sideways while read and wrap while
+ * written, so the two surfaces did not match; now both wrap, and nothing
+ * scrolls with the browser's scrollbar.
+ *
  * **The list has a `_CLASSES` name, and is joined below.** The token lint reads
  * class lists in a variable of that name, and cannot read through `.join()`
  * (UIG-28 R5).
@@ -37,7 +43,7 @@ const PROSE_BLOCK_CLASSES = [
   '[&_ol]:list-decimal [&_ol]:pl-5',
   '[&_blockquote]:border-l-2 [&_blockquote]:border-border-default [&_blockquote]:pl-3',
   // eslint-disable-next-line token-values/no-restricted-classes -- @estiva-escape: code is 0.9 of the text around it, so it scales with a heading; a named size is fixed
-  '[&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:bg-bg-inset [&_pre]:p-2 [&_pre]:font-mono [&_pre]:text-[0.9em]',
+  '[&_pre]:whitespace-pre-wrap [&_pre]:break-words [&_pre]:rounded-md [&_pre]:bg-bg-inset [&_pre]:p-2 [&_pre]:font-mono [&_pre]:text-[0.9em]',
   // eslint-disable-next-line token-values/no-restricted-classes -- @estiva-escape: code is 0.9 of the text around it, so it scales with a heading; a named size is fixed
   '[&_:not(pre)>code]:rounded-sm [&_:not(pre)>code]:bg-bg-inset [&_:not(pre)>code]:px-1 [&_:not(pre)>code]:py-0.5 [&_:not(pre)>code]:font-mono [&_:not(pre)>code]:text-[0.9em]',
   '[&_hr]:border-border-default',

@@ -3,7 +3,7 @@ import { EditorContent, useEditor, type Editor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import { IconPaperclip } from '@tabler/icons-react'
 import type { ContentFormat, Imeta } from '@estiva-app/protocol'
-import { FilePicker } from '@estiva-app/ui'
+import { FieldLine, FilePicker } from '@estiva-app/ui'
 import type { ForeignObject } from '@/api/foreign'
 import { cn } from '@/lib/cn'
 import { documentFor, publishableFrom, toEditorDocument, type EditorDocument } from '@/lib/blockEditor'
@@ -226,11 +226,8 @@ export default function DescriptionEditing({
             <IconPaperclip size={16} stroke={1.5} />
           </IconButton>
         </div>
-        {uploadError && (
-          <p data-description="upload-error" role="alert" className="text-caption text-error-default">
-            {uploadError}
-          </p>
-        )}
+        {/* The package's FieldLine: the same line, and it says "error" itself (UIG-8). */}
+        {uploadError && <FieldLine tone="error">{uploadError}</FieldLine>}
         {failed.current && (
           <p className="text-caption text-error-default">Could not save. Your text is still here.</p>
         )}
