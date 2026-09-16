@@ -9,6 +9,12 @@ without a line here is a silent ignore, and that is a lie.
 | file | gate | reason | since |
 |---|---|---|---|
 
-**Nothing is owed.** 16 September 2026, UIG-4: the gate lint
-(`estiva/no-raw-button`, `npm --prefix web run lint:rules`) finds 0 raw
-`<button>` in `web/src`, stories included, tests out, and no file is excused.
+**Nothing is owed.** 16 September 2026, UIG-7: the gate lint
+(`estiva/no-raw-element`, `npm --prefix web run lint:rules`) finds 0 raw
+interactive elements in `web/src`, stories included, tests out, and no file
+is excused. It found 6 on main `15d3c04` — four `<form>` and two file
+`<input>` — and all 6 now use the package's `Form` and `FilePicker`; none is
+escaped.
+
+Earlier, 16 September 2026, UIG-4: the rule was `estiva/no-raw-button`, and it
+found 0 raw `<button>`.
