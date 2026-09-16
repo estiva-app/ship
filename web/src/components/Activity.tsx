@@ -124,6 +124,7 @@ export function Activity({ items, onReply, disabledReason, nameOf, onReact, onDe
 
   return (
     <div className={cn('flex flex-col gap-2.5', className)}>
+      <button type="button">UIG-6 proof</button>
       <ol className="flex flex-col gap-2.5">
         {items.map((item) => {
           const relation = RELATION[item.relation]
