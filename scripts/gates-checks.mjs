@@ -47,7 +47,8 @@ export default function define(h) {
         { what: "the debt list exists", run: () => h.file("docs/GATES-DEBT.md") },
       ] },
       { ref: "UIG-6", title: "Branch protection — the backstop, all three repos", owner: false, checks: [
-        { what: "GitHub requires the gate lint to merge", run: () => h.protectedBranch(/gate|lint:rules/i) },
+        { what: "GitHub requires the check gate to merge into main", run: () => h.protectedBranch(/^gate$/) },
+        { what: "CI's job gate runs lint:rules", run: () => h.ciJob("gate", "lint:rules") },
       ] },
       { ref: "UIG-7", title: "Lint rule — every remaining raw element", owner: false, checks: [
         { what: "a raw <input> is an error naming TextInput", run: probe(component("<input />"), "error", "TextInput") },
