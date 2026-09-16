@@ -2,7 +2,7 @@ import { Fragment, useMemo, useState } from 'react'
 import { IconDotsVertical, IconMoodPlus } from '@tabler/icons-react'
 import type { BlockAnchor, Imeta } from '@estiva-app/protocol'
 import { referencesIn, standaloneReference, toRenderTree } from '@estiva-app/protocol'
-import { Card } from '@estiva-app/ui'
+import { Card, Form } from '@estiva-app/ui'
 import { Attachments as FileAttachments } from './ui/Attachment'
 import { BlockAnchorNote } from './ui/BlockAnchorNote'
 import { Button } from './ui/Button'
@@ -356,7 +356,8 @@ function EditMessage({
   }
 
   return (
-    <div className="flex flex-col gap-1.5" data-editing={body ? 'message' : 'message'}>
+    // The package Form (UIG-7): Ctrl+Enter or Save saves; Enter in the text is a new line; it locks while saving.
+    <Form busy={saving} onSubmit={save} className="flex flex-col gap-1.5" data-editing={body ? 'message' : 'message'}>
       <Textarea
         value={text}
         autoFocus
@@ -369,22 +370,17 @@ function EditMessage({
         }}
       />
       <div className="flex items-center gap-2">
-        <Button
-          size="small"
-          variant="primary"
-          disabled={saving || !text.trim() || unchanged}
-          onClick={() => void save()}
-        >
+        <Button size="small" variant="primary" type="submit" disabled={saving || !text.trim() || unchanged}>
           Save
         </Button>
-        <Button size="small" variant="muted" disabled={saving} onClick={onCancel}>
+        <Button size="small" variant="muted" onClick={onCancel}>
           Cancel
         </Button>
         {/* An edit is a new event, and a reader who has not implemented 40003
             keeps showing the original — worth saying once, where it is done. */}
         <span className="text-caption text-text-muted">Publishes an edit; the original event stays on the relay.</span>
       </div>
-    </div>
+    </Form>
   )
 }
 

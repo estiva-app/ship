@@ -1,4 +1,5 @@
-import { useState, type FormEvent } from 'react'
+import { useState } from 'react'
+import { Form } from '@estiva-app/ui'
 import { Button } from '@/components/ui/Button'
 import { DialogShell } from '@/components/ui/DialogShell'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -39,8 +40,7 @@ export function NewIssueDialog({ projects, project, onClose, onCreate }: NewIssu
   const none = !project && projects.length === 0
   const canSubmit = title.trim().length > 0 && projectAddr !== '' && !busy
 
-  const submit = async (event: FormEvent) => {
-    event.preventDefault()
+  const submit = async () => {
     if (!canSubmit) return
     setBusy(true)
     try {
@@ -72,19 +72,19 @@ export function NewIssueDialog({ projects, project, onClose, onCreate }: NewIssu
       {none ? (
         <EmptyState scope="section" message="Create a project first." />
       ) : (
-        <form id="new-issue" onSubmit={submit} className="flex flex-col gap-6">
+        <Form id="new-issue" onSubmit={submit} busy={busy} className="flex flex-col gap-6">
           <Field label="Title" required>
-            <TextInput value={title} onChange={(e) => setTitle(e.target.value)} placeholder={project ? `New issue in ${project.title}` : 'Issue title'} autoFocus disabled={busy} />
+            <TextInput value={title} onChange={(e) => setTitle(e.target.value)} placeholder={project ? `New issue in ${project.title}` : 'Issue title'} autoFocus />
           </Field>
           <Field label="Description">
-            <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description (optional)" className="h-[80px]" disabled={busy} />
+            <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description (optional)" className="h-[80px]" />
           </Field>
           {!project && (
             <Field label="Project" required>
-              <Select value={projectAddr} onChange={setProjectAddr} options={projects} ariaLabel="Project" disabled={busy} />
+              <Select value={projectAddr} onChange={setProjectAddr} options={projects} ariaLabel="Project" />
             </Field>
           )}
-        </form>
+        </Form>
       )}
     </DialogShell>
   )

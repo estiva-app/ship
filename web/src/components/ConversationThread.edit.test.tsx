@@ -64,6 +64,21 @@ describe('the edit control', () => {
     await waitFor(() => expect(onEditMessage).toHaveBeenCalledWith('root-1', 'Key is in 1Password.'))
   })
 
+  /* The package Form (UIG-7): the keys every form has. Enter in the text is a
+     new line; Ctrl+Enter saves, as Save does. */
+  it('saves on Ctrl+Enter, and Enter in the text is a new line', async () => {
+    const onEditMessage = vi.fn(async () => true)
+    open({ onEditMessage })
+    openEditor()
+    const box = screen.getByRole('textbox', { name: 'Edit message' })
+    fireEvent.change(box, { target: { value: 'Key is in 1Password.' } })
+    // Enter's default action in a text area is the new line, so it is not prevented, and nothing saves.
+    expect(fireEvent.keyDown(box, { key: 'Enter' })).toBe(true)
+    expect(onEditMessage).not.toHaveBeenCalled()
+    fireEvent.keyDown(box, { key: 'Enter', ctrlKey: true })
+    await waitFor(() => expect(onEditMessage).toHaveBeenCalledWith('root-1', 'Key is in 1Password.'))
+  })
+
   /* Nothing to publish, and a no-op edit would still cost an event that every
      reader has to fold. */
   it('will not save an unchanged body', () => {

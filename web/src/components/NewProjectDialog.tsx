@@ -1,4 +1,5 @@
-import { useState, type FormEvent } from 'react'
+import { useState } from 'react'
+import { Form } from '@estiva-app/ui'
 import { parseFolderLink } from '@/api'
 import { Button } from '@/components/ui/Button'
 import { DialogShell } from '@/components/ui/DialogShell'
@@ -37,8 +38,7 @@ export function NewProjectDialog({ onClose, onCreate }: NewProjectDialogProps) {
   const [busy, setBusy] = useState(false)
   const canSubmit = title.trim().length > 0 && !busy
 
-  const submit = async (event: FormEvent) => {
-    event.preventDefault()
+  const submit = async () => {
     if (!canSubmit) return
     let folder: string | undefined
     if (pair.trim()) {
@@ -75,12 +75,12 @@ export function NewProjectDialog({ onClose, onCreate }: NewProjectDialogProps) {
         </>
       }
     >
-      <form id="new-project" onSubmit={submit} className="flex flex-col gap-6">
+      <Form id="new-project" onSubmit={submit} busy={busy} className="flex flex-col gap-6">
         <Field label="Title" required>
-          <TextInput value={title} onChange={(e) => setTitle(e.target.value)} placeholder="New project title" autoFocus disabled={busy} />
+          <TextInput value={title} onChange={(e) => setTitle(e.target.value)} placeholder="New project title" autoFocus />
         </Field>
         <Field label="Description">
-          <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description (optional)" className="h-[80px]" disabled={busy} />
+          <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description (optional)" className="h-[80px]" />
         </Field>
         {/* The line under the field is Field's own since 0.10.0 (S7): the error
             takes the helper's place, marks the control invalid, and is
@@ -94,10 +94,9 @@ export function NewProjectDialog({ onClose, onCreate }: NewProjectDialogProps) {
             }}
             placeholder="Paste a Peek topic link (optional)"
             className="font-mono"
-            disabled={busy}
           />
         </Field>
-      </form>
+      </Form>
     </DialogShell>
   )
 }

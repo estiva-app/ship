@@ -3,6 +3,7 @@ import { EditorContent, useEditor, type Editor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import { IconPaperclip } from '@tabler/icons-react'
 import type { ContentFormat, Imeta } from '@estiva-app/protocol'
+import { FilePicker } from '@estiva-app/ui'
 import type { ForeignObject } from '@/api/foreign'
 import { cn } from '@/lib/cn'
 import { documentFor, publishableFrom, toEditorDocument, type EditorDocument } from '@/lib/blockEditor'
@@ -171,12 +172,12 @@ export default function DescriptionEditing({
     picker.current?.click()
   }
 
-  const attach = async (chosen: FileList | null) => {
-    if (!chosen || chosen.length === 0) return
+  const attach = async (chosen: File[]) => {
+    if (chosen.length === 0) return
     setUploading(true)
     setUploadError(null)
     try {
-      for (const file of Array.from(chosen)) {
+      for (const file of chosen) {
         const meta = await upload(file)
         // The editor can be gone by now — a slow upload outlives a description
         // the person closed. Inserting into a destroyed editor throws, and the
@@ -187,8 +188,8 @@ export default function DescriptionEditing({
     } catch (error) {
       setUploadError(error instanceof Error ? error.message : String(error))
     } finally {
+      // FilePicker has already cleared itself, so the same file can be chosen again.
       setUploading(false)
-      if (picker.current) picker.current.value = ''
     }
   }
 
@@ -212,16 +213,7 @@ export default function DescriptionEditing({
           }}
         />
         <div className="flex items-center gap-2">
-          <input
-            ref={picker}
-            type="file"
-            multiple
-            data-description="picker"
-            className="hidden"
-            aria-hidden="true"
-            tabIndex={-1}
-            onChange={(event) => void attach(event.target.files)}
-          />
+          <FilePicker ref={picker} multiple data-description="picker" onPick={(files) => void attach(files)} />
           <IconButton
             variant="muted"
             aria-label="Attach a file to the description"

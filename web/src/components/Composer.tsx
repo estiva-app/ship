@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { IconPaperclip } from '@tabler/icons-react'
 import type { Imeta } from '@estiva-app/protocol'
+import { FilePicker, Form } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
 import { browserDrafts, type DraftStore } from '@/lib/drafts'
 import { uploadAttachment } from '@/api/blobs'
@@ -116,8 +117,8 @@ export function Composer({ kind = 'conversation', onSubmit, autoFocus = false, d
   // that is nothing at all.
   const canSubmit = (text.trim().length > 0 || files.length > 0) && !busy && !uploading && !disabledReason
 
-  const choose = async (chosen: FileList | null) => {
-    if (!chosen || chosen.length === 0) return
+  const choose = async (chosen: File[]) => {
+    if (chosen.length === 0) return
     setUploading(true)
     setUploadError(null)
     try {
@@ -128,19 +129,18 @@ export function Composer({ kind = 'conversation', onSubmit, autoFocus = false, d
         the same message, and the relay's words are about one file.
       */
       const added: Imeta[] = []
-      for (const file of Array.from(chosen)) added.push(await upload(file))
+      for (const file of chosen) added.push(await upload(file))
       setFiles((held) => [...held, ...added])
     } catch (error) {
       setUploadError(error instanceof Error ? error.message : String(error))
     } finally {
+      // The same file can be chosen again after a failure, or after removing
+      // it: FilePicker clears itself.
       setUploading(false)
-      // Let the same file be chosen again after a failure, or after removing it.
-      if (picker.current) picker.current.value = ''
     }
   }
 
-  const submit = async (event: FormEvent) => {
-    event.preventDefault()
+  const submit = async () => {
     if (!canSubmit) return
     setBusy(true)
     try {
@@ -165,7 +165,8 @@ export function Composer({ kind = 'conversation', onSubmit, autoFocus = false, d
   const blocked = disabledReason || (uploading ? 'Uploading…' : undefined)
 
   return (
-    <form onSubmit={submit} className={cn('flex flex-col gap-1', className)}>
+    // `busy` locks the field, both buttons and the chips' ✕ while a post is in flight (UIG-7).
+    <Form onSubmit={submit} busy={busy} className={cn('flex flex-col gap-1', className)}>
       <div className="flex items-center gap-2">
         <TextInput
           value={text}
@@ -173,23 +174,12 @@ export function Composer({ kind = 'conversation', onSubmit, autoFocus = false, d
           placeholder={placeholder}
           aria-label={placeholder}
           autoFocus={autoFocus}
-          disabled={busy || !!disabledReason}
+          disabled={!!disabledReason}
           className="min-w-0 flex-1"
         />
-        {/* The button is the control; this is the mechanism behind it. Hidden
-            from the accessibility tree on purpose — two things both named
-            "Attach a file" is one more than a screen reader should find, and
-            a `display:none` input still opens its picker on a scripted click. */}
-        <input
-          ref={picker}
-          type="file"
-          multiple
-          data-composer="picker"
-          className="hidden"
-          aria-hidden="true"
-          tabIndex={-1}
-          onChange={(event) => void choose(event.target.files)}
-        />
+        {/* The button is the control; the picker is the mechanism behind it,
+            hidden from Tab and the accessibility tree (the package's FilePicker). */}
+        <FilePicker ref={picker} multiple data-composer="picker" onPick={(files) => void choose(files)} />
         <IconButton
           variant="muted"
           aria-label="Attach a file"
@@ -230,6 +220,6 @@ export function Composer({ kind = 'conversation', onSubmit, autoFocus = false, d
           {uploadError}
         </p>
       )}
-    </form>
+    </Form>
   )
 }
