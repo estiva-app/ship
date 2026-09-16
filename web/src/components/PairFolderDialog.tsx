@@ -1,4 +1,5 @@
-import { useState, type FormEvent } from 'react'
+import { useState } from 'react'
+import { Form } from '@estiva-app/ui'
 import { parseFolderLink } from '@/api'
 import { Button } from '@/components/ui/Button'
 import { DialogShell } from '@/components/ui/DialogShell'
@@ -27,8 +28,7 @@ export function PairFolderDialog({ currentFolder, onClose, onPair }: PairFolderD
   const [busy, setBusy] = useState(false)
   const canSubmit = link.trim().length > 0 && !busy
 
-  const submit = async (event: FormEvent) => {
-    event.preventDefault()
+  const submit = async () => {
     if (!canSubmit) return
     const parsed = parseFolderLink(link)
     if (!parsed) return setError('That does not look like a Folder link or a UUID.')
@@ -62,7 +62,7 @@ export function PairFolderDialog({ currentFolder, onClose, onPair }: PairFolderD
       <p className="text-body-2 text-text-secondary">
         New issues will go to the Folder you paste. Issues already filed stay readable in the old Folder — events cannot move.
       </p>
-      <form id="pair-folder" onSubmit={submit}>
+      <Form id="pair-folder" onSubmit={submit} busy={busy}>
         {/* The error line is Field's own since 0.10.0 (S7): it marks the
             control invalid and is announced, which the hand-built span was not. */}
         <Field label="Folder link" error={error ?? undefined}>
@@ -75,10 +75,9 @@ export function PairFolderDialog({ currentFolder, onClose, onPair }: PairFolderD
             placeholder="Paste a Peek topic's Folder link"
             className="font-mono"
             autoFocus
-            disabled={busy}
           />
         </Field>
-      </form>
+      </Form>
     </DialogShell>
   )
 }
