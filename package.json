@@ -5,7 +5,7 @@
   "description": "A minimal issue tracker on Nostr — projects, issues, comments",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "gates:status": "node scripts/gates-status.mjs",
+    "gates:status": "node web/node_modules/@estiva-app/ui/dist/gates/cli.js status --app web",
     "probe": "tsx scripts/probe-kinds.ts",
     "verify": "tsx scripts/verify.ts",
     "manifest": "tsx scripts/publish-manifest.ts",
