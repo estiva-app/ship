@@ -73,7 +73,6 @@ export function PairFolderDialog({ currentFolder, onClose, onPair }: PairFolderD
               setError(null)
             }}
             placeholder="Paste a Peek topic's Folder link"
-            className="font-mono"
             autoFocus
           />
         </Field>

@@ -117,7 +117,10 @@ export function IssueView({ crumbs, title, description, descriptionFormat,
           the 24px of padding read the same with a bar as without. */}
       <ScrollArea className="col-start-1 row-start-2 min-h-0 min-w-0" contentClassName="flex flex-col gap-6 px-6 pb-5">
         <div className="flex flex-col gap-2">
-          <EditableText label="Title" value={title} placeholder="Untitled issue" onCommit={onRename} readOnly={!!readOnlyReason} className="-mx-2 text-h2" />
+          {/* EditableText takes its size from where it sits (UIG-9). */}
+          <div className="contents text-h2">
+            <EditableText label="Title" value={title} placeholder="Untitled issue" onCommit={onRename} readOnly={!!readOnlyReason} className="-mx-2" />
+          </div>
           <Description
             value={description}
             format={descriptionFormat}

@@ -93,7 +93,6 @@ export function NewProjectDialog({ onClose, onCreate }: NewProjectDialogProps) {
               setPairError(null)
             }}
             placeholder="Paste a Peek topic link (optional)"
-            className="font-mono"
           />
         </Field>
       </Form>

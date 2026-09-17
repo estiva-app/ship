@@ -83,7 +83,7 @@ export function Description({
         resolved={resolved}
       />
       {attached.length > 0 && objects === undefined && (
-        <SkeletonBar className="h-16 w-full rounded-lg" data-foreign-references="loading" />
+        <SkeletonBar className="h-16 w-full" data-foreign-references="loading" />
       )}
       {attachments.length > 0 && (
         <div className="flex flex-col gap-2" data-foreign-references={String(attachments.length)}>

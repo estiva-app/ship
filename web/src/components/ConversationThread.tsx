@@ -504,7 +504,7 @@ export function MessageCard({
         message is about while a pointer is usually what it is filed under.
       */}
       <FileAttachments files={message.files} className="mt-0.5" />
-      {attached.length > 0 && resolving && <SkeletonBar className="h-16 w-full rounded-lg" data-foreign-references="loading" />}
+      {attached.length > 0 && resolving && <SkeletonBar className="h-16 w-full" data-foreign-references="loading" />}
       {attachments.length > 0 && (
         <div className="flex flex-col gap-2" data-foreign-references={String(attachments.length)}>
           {attachments.map((object) => (
