@@ -9,7 +9,18 @@ without a line here is a silent ignore, and that is a lie.
 | file | gate | reason | since |
 |---|---|---|---|
 
-**Nothing is owed.** 16 September 2026, UIG-8: the second rule
+**Nothing is owed.** 17 September 2026, UIG-9: the third rule
+(`estiva/no-restyled-part`) found 13 looks passed into package parts on main
+`25a38cc`. 11 are fixed: the words' look moved onto a box of Ship's own
+(`IssueRail`, `IssuesTable`'s title and frame, `ui/ForeignObject`'s card that
+could not be read), `EditableText` takes its title size from where it sits
+(`ProjectHeader`, `views/IssueView`), and, from Katerina's photos, the link
+fields are plain like Peek's (`NewProjectDialog`, `PairFolderDialog`) and the
+loading block has a bar's corners (`ConversationThread`, `Description`). 2 are
+escaped with their reason: `IssueRow`'s whole-row link and the project chip
+lifted over it — no part makes a row that is a link yet.
+
+Earlier, 16 September 2026, UIG-8: the second rule
 (`estiva/no-rebuilt-behaviour`), now over `.ts` as well as `.tsx`, found 4 on
 main `27113cd`: two error lines written by hand (`Composer`,
 `ui/DescriptionEditing`), now the package's `FieldLine`; a code block that

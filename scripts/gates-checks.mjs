@@ -97,7 +97,16 @@ export default function define(h) {
         { what: "a real page gets no error", run: () => h.lint({ cwd: WEB, config: GATES, file: "src/pages/ProjectPage.tsx", code: h.read("web/src/pages/ProjectPage.tsx"), expect: "none" }) },
       ] },
       { ref: "UIG-9", title: "Lint rule — the className allow-list", owner: false, checks: [
-        { what: "a border passed into Button is an error naming Button", run: probe(`import { Button } from '@estiva-app/ui'\n${component('<Button className="border">x</Button>')}`, "error", "Button") },
+        { what: "a border passed into Button is an error naming Button", run: probe(`import { Button } from '@estiva-app/ui'\n${component('<Button className="border">x</Button>')}`, "error", "on `Button` changes how it looks") },
+        { what: "placement passed into Button is not", run: probe(`import { Button } from '@estiva-app/ui'\n${component('<Button className="mt-2 w-full flex-1 relative">x</Button>')}`, "none") },
+        { what: "a part re-exported from Ship's own file is followed: padding on EmptyState is an error", run: probe(`import { EmptyState } from '@/components/ui/EmptyState'\n${component('<EmptyState className="py-6" message="Nothing yet" />')}`, "error", "EmptyState takes no padding") },
+        { what: "a component that hands its className on is followed", run: probe(`import { ProjectCard } from '@/components/ProjectCard'\n${component('<ProjectCard className="bg-bg-hover" />')}`, "error", "hands its `className` to `Card`") },
+        { what: "an escaped look is not an error, while the same look is", run: async () => {
+          const raw = await probe(`import { Link } from '@estiva-app/ui'\n${component('<Link href="/x" className="after:absolute after:inset-0">x</Link>')}`, "error", "`Link`")();
+          if (raw.result !== "pass") return h.FAIL(`a restyled part is not caught yet, so this proves nothing: ${raw.detail}`);
+          return probe(`import { Link } from '@estiva-app/ui'\nexport function Probe() {\n  return (\n    // @estiva-escape: a probe that keeps its row link on purpose\n    <Link href="/x" className="after:absolute after:inset-0">x</Link>\n  )\n}\n`, "none")();
+        } },
+        { what: "a real page gets no error", run: () => h.lint({ cwd: WEB, config: GATES, file: "src/pages/ProjectPage.tsx", code: h.read("web/src/pages/ProjectPage.tsx"), expect: "none" }) },
       ] },
       { ref: "UIG-13", title: "The registry widens to Peek's 115 and Ship's 74, with classification", owner: false, checks: [
         { what: "registry.json is committed and has entries", run: () => h.json(registry(), (d) => (d.entries ?? d.components ?? []).length > 0, "registry.json has entries") },
