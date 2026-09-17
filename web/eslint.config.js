@@ -1,149 +1,26 @@
-import betterTailwindcss from 'eslint-plugin-better-tailwindcss'
-import { getDefaultSelectors } from 'eslint-plugin-better-tailwindcss/defaults'
+import { gateLint, TOKEN_LINT_IGNORES, tokenLint, tokenValues } from '@estiva-app/ui/gates'
 import reactHooks from 'eslint-plugin-react-hooks'
 import { defineConfig, globalIgnores } from 'eslint/config'
-import { createRequire } from 'node:module'
-import { parser as typescriptParser } from 'typescript-eslint'
-import { gateLint } from './eslint.gates.js'
-
-// Tailwind's own loader: the preset imports `tailwindcss/plugin`, which a plain
-// `import` cannot resolve.
-const require = createRequire(import.meta.url)
-const preset = require('tailwindcss/loadConfig')(require.resolve('@estiva-app/ui/tailwind-preset'))
 
 /**
- * UIG-28: the values the tokens already name, written by hand (Katerina's
- * rulings B11, B12, C3 of 13 September and R2 of 15 September). The same block
- * as the package's `eslint.config.js`.
+ * Ship's lint: the token contract, one hooks rule, and the UI Guardrails'
+ * rules, so an editor shows each of them where the class or the element is
+ * typed.
  *
- * The rules below stop `text-sm` and `bg-[#fff]`. Until these, `text-[14px]`
- * and `style={{ color }}` walked straight past them.
+ * The token settings and the gate are the package's own pieces, imported
+ * (UIG-32, estiva-ui docs/GATES.md §23). Until then this file carried them
+ * itself — 145 lines that were, character for character, the block Peek
+ * carried too, measured before the swap. What they do is unchanged:
  *
- * - Errors: type (`text-[14px]`, `leading-[1.4]`, `tracking-[0.08em]`),
- *   corners (`rounded-[3px]`) and shadows (`shadow-[…]`), and an inline
- *   `style` that sets a colour, a font size, a border or a shadow.
- * - Warnings, reported and never blocking: heights and spacing (`h-[240px]`,
- *   `gap-[3px]`) and border or ring widths (`ring-[1.5px]`). The preset has no
- *   spacing token; those steps are Tailwind's own scale.
- *
- * They sit under their own rule names, `token-values` and `token-spacing`
- * (the same plugin registered twice, so one runs as errors and one as
- * warnings), for two reasons: the rules below stay as they were, and an escape
- * for a hand-written size cannot also silence a raw colour on the same line.
- *
- * The variant part of every pattern reads arbitrary variants too
- * (`[&_pre]:`, `data-[state]:`, `group-hover/row:`). A colour inside
- * `text-[…]` is left to the raw-colour rule below.
- *
- * Tests are out (ruling of 13 September): a test mounts markup to test it.
- *
- * A place that keeps a hand-written value says why (Katerina, 15 September):
- * `// eslint-disable-next-line <rule> -- @estiva-escape: <reason>`.
- */
-const V = '^(?:(?:[^:\\[\\]\\s]|\\[[^\\]]*\\])+:)*!?'
-const NOT_COLOUR = '(?!color:|#|rgba?\\(|hsla?\\(|oklch\\(|var\\()'
-const HAND_WRITTEN = {
-  type: `${V}(?:text-\\[${NOT_COLOUR}|text-\\[length:|leading-\\[|tracking-\\[)[^\\]]+\\](?:/\\S*)?$`,
-  corner: `${V}rounded(?:-(?:t|r|b|l|s|e|tl|tr|br|bl|ss|se|es|ee))?-\\[[^\\]]+\\]$`,
-  shadow: `${V}(?:shadow|drop-shadow)-\\[(?!color:)[^\\]]+\\]$`,
-  spacing: `${V}-?(?:w|h|size|min-w|min-h|max-w|max-h|p[xytrblse]?|m[xytrblse]?|gap(?:-[xy])?|space-[xy]|inset(?:-[xy])?|top|right|bottom|left|translate-[xy]|basis|indent|scroll-[mp][xytrblse]?|border-spacing(?:-[xy])?)-\\[[^\\]]+\\]$`,
-  width: `${V}(?:border(?:-[xytrblse])?|divide-[xy]|outline|ring|ring-offset)-\\[(?:length:)?-?[0-9.]+(?:px|rem|em)?\\]$`,
-}
-
-// `text-[14px]` names the token of that size, read from the preset, so the
-// message stays true when the ramp changes.
-const tokensBySize = {}
-for (const [name, value] of Object.entries(preset.theme.extend.fontSize)) {
-  const size = Array.isArray(value) ? value[0] : value
-  ;(tokensBySize[size] ??= []).push(`text-${name}`)
-}
-const cornersBySize = {}
-for (const [name, size] of Object.entries(preset.theme.extend.borderRadius)) (cornersBySize[size] ??= []).push(name === 'DEFAULT' ? 'rounded' : `rounded-${name}`)
-
-const INLINE_STYLE_TOKEN_PROPERTIES =
-  '/^(color|background|backgroundColor|backgroundImage|fill|stroke|fontSize|border|borderTop|borderRight|borderBottom|borderLeft|borderBlock|borderInline|borderStyle|boxShadow|textShadow)$|Color$/'
-
-const tokenValues = {
-  files: ['**/*.{ts,tsx}'],
-  ignores: ['**/*.test.ts', '**/*.test.tsx'],
-  plugins: { 'token-values': betterTailwindcss, 'token-spacing': betterTailwindcss },
-  rules: {
-    'token-values/no-restricted-classes': [
-      'error',
-      {
-        restrict: [
-          ...Object.entries(tokensBySize).map(([size, names]) => ({
-            pattern: `${V}text-\\[${size.replace('.', '\\.')}\\](?:/\\S*)?$`,
-            message: `$0 is the type ramp written by hand. Use ${names.join(' or ')}.`,
-          })),
-          {
-            pattern: HAND_WRITTEN.type,
-            message: '$0 is type written by hand. A token from the package sets the size, line height, letter spacing and weight together (text-body-2, text-caption, text-h5...); if none fits, add one to the package, or say why not in an eslint-disable comment.',
-          },
-          ...Object.entries(cornersBySize).map(([size, names]) => ({
-            pattern: `${V}rounded(?:-(?:t|r|b|l|s|e|tl|tr|br|bl|ss|se|es|ee))?-\\[${size.replace('.', '\\.')}\\]$`,
-            message: `$0 is a corner written by hand. Use ${names.join(' or ')} (with the same side, if it has one).`,
-          })),
-          {
-            pattern: HAND_WRITTEN.corner,
-            message: '$0 is a corner written by hand, and no token has it. Use a corner from the package (rounded-sm 4px, rounded-md 6px, rounded-lg 8px...), or say why not in an eslint-disable comment.',
-          },
-          {
-            pattern: HAND_WRITTEN.shadow,
-            message: '$0 is a shadow written by hand. Use a shadow from the package (shadow-sm, shadow-md, shadow-focus-ring, drop-shadow-glow-success...); a shadow with no token is a missing token.',
-          },
-        ],
-      },
-    ],
-    'token-spacing/no-restricted-classes': [
-      'warn',
-      {
-        restrict: [
-          {
-            pattern: HAND_WRITTEN.spacing,
-            message: '$0 is a size or a space written by hand. Use a step of the spacing scale (p-3, h-9, gap-2...) if one fits. Reported, not blocked.',
-          },
-          {
-            pattern: HAND_WRITTEN.width,
-            message: '$0 is a border or ring width written by hand. Use border, border-2, ring-1... if one fits. Reported, not blocked.',
-          },
-        ],
-      },
-    ],
-    'no-restricted-syntax': [
-      'error',
-      {
-        selector: `JSXAttribute[name.name="style"] > JSXExpressionContainer > ObjectExpression > Property[key.name=${INLINE_STYLE_TOKEN_PROPERTIES}]`,
-        message: 'An inline style that sets a colour, a font size, a border or a shadow is outside the token contract: use a token class. If the value is computed (a palette, a size from a prop), say why in an eslint-disable comment. Width, height and transforms are fine.',
-      },
-    ],
-  },
-}
-
-/**
- * The token contract as a machine rule — the package's `eslint.config.js`
- * (estiva-ui, stage 0) brought into Ship (ADOPTION S11, D36, 2026-09-08).
- * Ship had no ESLint at all before this; only the class rules run, so the
- * commit that adds the lint changes no component.
- *
- * Three things a class list may not do, each of which has shipped a silent
- * defect here:
- *
- * 1. Name a class Tailwind does not generate. The token names are doubled in
- *    the class (`bg-bg-surface`, not `bg-surface`); the shorter spelling
- *    compiles to nothing and is dropped without a word. The sign-in screen
- *    rendered transparent that way (COMPONENTS-SHIP F1). `no-unknown-classes`
- *    reads tailwind.config.js, so it knows exactly what the preset generates.
- * 2. Reach for Tailwind's own type ramp or palette (`text-sm`, `bg-gray-100`).
- *    Those are not tokens, so they do not follow the theme.
- * 3. Write a raw colour into an arbitrary value, or an opacity modifier on a
- *    token colour (`bg-bg-inset/40` compiled to nothing — F17, D16). A colour
- *    with no token is a missing token; it goes into the package's tokens.css.
- *
- * Where the plugin looks: every `className`, every `cn()` / `clsx()` argument,
- * and the values of a class map whose name ends in `Styles` / `_STYLES` or
- * `Classes` / `_CLASSES`. A class map named any other way is invisible to the
- * lint, so name it that way.
+ * - `tokenLint` — a class Tailwind does not generate (`bg-bg-surface` doubled),
+ *   Tailwind's own type ramp or palette, a raw colour, and an opacity modifier
+ *   on a token colour (`bg-bg-inset/40` compiled to nothing — F17, D16).
+ * - `tokenValues` — UIG-28: type, corners and shadows written by hand, and an
+ *   inline `style` that sets a colour (errors); heights, spacing and border
+ *   widths written by hand (warnings, never blocking). Tests are out.
+ * - `gateLint` — a raw interactive element, behaviour a package part owns
+ *   written by hand, a look passed into a part. `npm run lint:rules` runs these
+ *   alone, and that is CI's job `gate`.
  *
  * Plus one hooks rule, `react-hooks/exhaustive-deps`, as a warning: three
  * hooks in `api/` already carried `eslint-disable-next-line` comments for it,
@@ -151,63 +28,13 @@ const tokenValues = {
  * for an unknown rule. The rest of the set Peek runs waits for S17.
  */
 export default defineConfig([
-  globalIgnores(['dist/', 'storybook-static/', 'node_modules/']),
+  globalIgnores(TOKEN_LINT_IGNORES),
+  tokenLint(),
   {
     files: ['**/*.{ts,tsx}'],
-    languageOptions: {
-      parser: typescriptParser,
-      parserOptions: { ecmaFeatures: { jsx: true } },
-    },
-    plugins: { 'better-tailwindcss': betterTailwindcss, 'react-hooks': reactHooks },
-    settings: {
-      'better-tailwindcss': {
-        tailwindConfig: 'tailwind.config.js',
-        selectors: [
-          ...getDefaultSelectors(),
-          {
-            kind: 'variable',
-            name: '^(?:[A-Z][A-Z0-9_]*_(?:STYLES|CLASSES)|[a-z][a-zA-Z0-9]*(?:Styles|Classes))$',
-            match: [{ type: 'strings' }, { type: 'objectValues' }],
-          },
-        ],
-      },
-    },
-    rules: {
-      // The one hooks rule three hooks in `api/` already carry directives for,
-      // as a warning. Peek runs the whole recommended set; here it found 30
-      // things in Ship's own code (ADOPTION S17), which is a PR of its own.
-      'react-hooks/exhaustive-deps': 'warn',
-      'better-tailwindcss/no-unknown-classes': 'error',
-      'better-tailwindcss/no-restricted-classes': [
-        'error',
-        {
-          restrict: [
-            {
-              pattern: '^(?:[a-z0-9-]+:)*text-(?:xs|sm|base|lg|xl|[2-9]xl)$',
-              message: "Tailwind's type ramp is not a token. Use the ramp from the package: text-body-2, text-caption, text-h3, text-btn-default...",
-            },
-            {
-              pattern:
-                '^(?:[a-z0-9-]+:)*(?:text|bg|border|ring|outline|fill|stroke|decoration|divide|placeholder|from|via|to|accent|caret|shadow)-(?:black|white|slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)(?:-[0-9]{2,3})?(?:/[0-9]{1,3})?$',
-              message: "Tailwind's palette is not a token. Use a colour from the package (bg-bg-surface, text-text-primary, border-border-subtle...); a colour with no token is a missing token.",
-            },
-            {
-              // `[^]]*` read as "any one character, then `]`", so this matched
-              // nothing (UIG-28 R1); the package's pattern, which works.
-              pattern: '^(?:[a-z0-9-]+:)*[a-z-]+-\\[[^\\]]*(?:#[0-9a-fA-F]{3}|rgba?\\(|hsla?\\(|oklch\\()',
-              message: 'A raw colour is a missing token: add it to the package (tokens.css in every theme block, and the preset), or say why not in an eslint-disable comment.',
-            },
-            {
-              pattern: '^(?:[a-z0-9-]+:)*(?:text|bg|border|ring|outline|fill|stroke|decoration|divide|placeholder|from|via|to|accent|caret|shadow)-(?:bg|text|border|accent|info|warning|success|error)-[a-z-]+/[0-9]{1,3}$',
-              message: 'An opacity modifier on a token colour compiles to nothing. A transparent colour is a token of its own (D16): add it to the package.',
-            },
-          ],
-        },
-      ],
-    },
+    plugins: { 'react-hooks': reactHooks },
+    rules: { 'react-hooks/exhaustive-deps': 'warn' },
   },
-  tokenValues,
-  // The UI Guardrails' rules (UIG-4), so an editor shows them where the element
-  // is typed. `npm run lint:rules` runs these alone, and that is the CI gate.
-  gateLint,
+  tokenValues(),
+  gateLint(),
 ])

@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/gates.mjs\""
+            "command": "node \"$CLAUDE_PROJECT_DIR/web/node_modules/@estiva-app/ui/dist/gates/cli.js\" hook --app web"
           }
         ]
       }
