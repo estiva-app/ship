@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "ship",
-  "generatedAt": "2026-09-16T17:16:54.306Z",
+  "generatedAt": "2026-09-17T12:07:53.967Z",
   "rules": {
     "estiva/no-raw-element": {
       "errors": 0,
@@ -12,6 +12,11 @@
       "errors": 0,
       "warnings": 0,
       "escapes": 1
+    },
+    "estiva/no-restyled-part": {
+      "errors": 0,
+      "warnings": 0,
+      "escapes": 2
     }
   }
 }

@@ -44,8 +44,10 @@ export function IssuesTable({ issues, statuses, hrefFor, className }: IssuesTabl
     /* A table wider than its box scrolls sideways in a ScrollArea (D40): the
        bar takes no height, so the box is exactly as tall with a bar as
        without. `overflow-hidden` keeps the corners round, as the scrolling
-       box itself used to. */
-    <ScrollArea orientation="horizontal" className={cn('overflow-hidden rounded-lg border border-border-default', className)}>
+       box itself used to. The frame is a box of our own around the region,
+       not pushed into it (UIG-9). */
+    <div className={cn('overflow-hidden rounded-lg border border-border-default', className)}>
+    <ScrollArea orientation="horizontal">
       <table className="w-full min-w-[840px] table-fixed border-collapse">
         <thead className="bg-bg-surface">
           <tr className="border-b border-border-default">
@@ -82,9 +84,11 @@ export function IssuesTable({ issues, statuses, hrefFor, className }: IssuesTabl
                   app's bookkeeping, not a chore for whoever opened the page. */}
               <td className={cn(TD, 'whitespace-nowrap font-mono', SMALL, issue.ref ? 'text-text-muted' : 'text-text-disabled')}>{issue.ref ?? '—'}</td>
               <td className={TD}>
-                <Link {...linkTo(hrefFor(issue))} variant="quiet" className="block truncate text-text-primary">
-                  {issue.title}
-                </Link>
+                <div className="text-text-primary">
+                  <Link {...linkTo(hrefFor(issue))} variant="quiet" truncate className="block">
+                    {issue.title}
+                  </Link>
+                </div>
               </td>
               <td className={TD}>
                 <StatusLabel value={issue.status} label={statusLabel(issue.status, statuses)} />
@@ -101,5 +105,6 @@ export function IssuesTable({ issues, statuses, hrefFor, className }: IssuesTabl
         </tbody>
       </table>
     </ScrollArea>
+    </div>
   )
 }

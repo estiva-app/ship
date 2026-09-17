@@ -88,20 +88,25 @@ export function ForeignObject({ object, conversations, className }: ForeignObjec
       <Card
         fill="surface"
         unreadable
-        className={cn('p-3 text-body-2 text-text-muted', className)}
+        className={cn('p-3', className)}
         data-foreign-object={object.ref}
         data-state="unreachable"
       >
-        You may not have access to this{object.appName ? ` ${object.appName}` : ''} object.
-        {object.openUrl && (
-          <>
-            {' '}
-            <Link href={object.openUrl} variant="underlined" className="text-text-secondary">
-              Open it there
-            </Link>
-            .
-          </>
-        )}
+        {/* The words' look on a box inside the card: Card draws the frame only (UIG-9). */}
+        <div className="text-body-2 text-text-muted">
+          You may not have access to this{object.appName ? ` ${object.appName}` : ''} object.
+          {object.openUrl && (
+            <>
+              {' '}
+              <span className="text-text-secondary">
+                <Link href={object.openUrl} variant="underlined">
+                  Open it there
+                </Link>
+              </span>
+              .
+            </>
+          )}
+        </div>
       </Card>
     )
   }

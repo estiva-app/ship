@@ -70,7 +70,10 @@ export function IssueRail({
           over the value, not beside it. */}
       <Property layout="stacked" label="Opened by">
         <span className="flex items-center gap-1.5 text-caption text-text-muted">
-          <Person name={openedBy.name} picture={openedBy.picture} size={16} className="text-text-secondary" />
+          {/* A name takes the tone of where it sits (UIG-9). */}
+          <span className="contents text-text-secondary">
+            <Person name={openedBy.name} picture={openedBy.picture} size={16} />
+          </span>
           · {ago(openedAt)}
         </span>
       </Property>

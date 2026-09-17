@@ -35,13 +35,16 @@ export function ProjectHeader({ title, description, descriptionFormat,
     <div className={cn('flex flex-col gap-2', className)}>
       <div className="flex items-start gap-2">
         <div className="flex min-w-0 flex-1 items-start gap-2">
-          <EditableText readOnly={readOnly}
-            label="Title"
-            value={title}
-            placeholder="Untitled project"
-            onCommit={onRename}
-            className="-mx-2 text-h2"
-          />
+          {/* EditableText takes its size from where it sits (UIG-9); `contents` so the field is still the row's own item. */}
+          <div className="contents text-h2">
+            <EditableText readOnly={readOnly}
+              label="Title"
+              value={title}
+              placeholder="Untitled project"
+              onCommit={onRename}
+              className="-mx-2"
+            />
+          </div>
           {archived && <Chip label="Archived" className="mt-2 shrink-0" />}
         </div>
         {action && <div className="flex shrink-0 items-center pt-0.5">{action}</div>}

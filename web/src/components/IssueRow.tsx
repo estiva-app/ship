@@ -64,6 +64,7 @@ export function IssueRow({ issue, statuses, href, className }: IssueRowProps) {
   const threads = issue.conversations ?? 0
   return (
     <div className={cn('relative flex h-9 min-w-0 items-center gap-3 rounded-md px-3 transition-colors hover:bg-bg-hover', className)}>
+      {/* @estiva-escape: the whole row is one link, drawn by a layer over it; no part makes a row that is a link yet (UIG-9, Katerina 17 September) */}
       <Link {...linkTo(href)} variant="plain" className="flex min-w-0 flex-1 items-center gap-3 after:absolute after:inset-0">
         {/* `w-14`: 56px, the room the project table's ref cell has (S25), so
             the two surfaces line up. */}
@@ -77,6 +78,7 @@ export function IssueRow({ issue, statuses, href, className }: IssueRowProps) {
           about the issue, then where it lives, then who and when. */}
       <ConversationCount count={threads} unit="conversation" />
       {issue.project && (
+        // @estiva-escape: a second link lifted over the row's own, with the chip's round focus ring; kept with the row link (UIG-9, Katerina 17 September)
         <Link {...linkTo(issue.project.href)} variant="plain" className="relative z-10 shrink-0 rounded-full">
           <Chip label={issue.project.title} leadingIcon={<IconBox size={12} stroke={1.5} />} className="max-w-[200px]" />
         </Link>
