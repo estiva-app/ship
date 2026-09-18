@@ -2,6 +2,7 @@ import { Card } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
 import type { StatusEntry } from '@/lib/issues'
 import { Avatar } from '@/components/ui/Avatar'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { ScrollArea } from '@/components/ui/ScrollArea'
 import { StatusLabel } from '@/components/ui/StatusLabel'
 import type { IssueRowData } from './IssueRow'
@@ -65,7 +66,12 @@ export function BoardColumn({
         {issues.map((issue) => (
           <BoardCard key={issue.addr} issue={issue} href={hrefFor(issue)} />
         ))}
-        {!issues.length && <span className="px-1 py-2 text-caption text-text-muted">Nothing here</span>}
+        {/* The package's quiet line; its room is this box's, since EmptyState takes no padding. */}
+        {!issues.length && (
+          <div className="px-1 py-2">
+            <EmptyState scope="section" message="Nothing here" />
+          </div>
+        )}
       </div>
     </section>
   )

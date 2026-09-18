@@ -4,6 +4,7 @@ import { cn } from '@/lib/cn'
 import { Avatar } from './Avatar'
 import { Chip } from './Chip'
 import { ConversationCount } from './ConversationCount'
+import { EmptyState } from './EmptyState'
 import { Person } from './Person'
 import { StatusLabel } from './StatusLabel'
 import { pickWidget } from '@/api/foreign'
@@ -210,9 +211,7 @@ function ForeignCard({ object, row, conversations, className }: ForeignObjectPro
           ))}
         </div>
       )}
-      {children?.length === 0 && (
-        <p className="mt-1 text-caption text-text-muted">Nothing in it yet.</p>
-      )}
+      {children?.length === 0 && <EmptyState scope="section" message="Nothing in it yet." className="mt-1" />}
     </>
   )
 
