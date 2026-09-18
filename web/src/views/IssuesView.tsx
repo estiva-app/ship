@@ -27,6 +27,13 @@ export interface IssuesViewProps {
 
 const isOpen = (issue: IssueRowData) => issue.status !== 'done' && issue.status !== 'cancelled'
 
+/** What an empty tab says: each tab's own emptiness, not the workspace's (UIG-14). */
+const EMPTY: Record<IssuesScope, string> = {
+  all: 'No issues yet.',
+  open: 'No open issues.',
+  mine: 'Nothing assigned to you.',
+}
+
 export function IssuesView({ issues, statuses, mine, scope, onScope, hrefFor, onAddIssue, addDisabledReason }: IssuesViewProps) {
   const open = issues.filter(isOpen)
   const assigned = issues.filter((issue) => mine.has(issue.addr))
@@ -52,7 +59,7 @@ export function IssuesView({ issues, statuses, mine, scope, onScope, hrefFor, on
         active={scope}
         onChange={onScope}
       />
-      <IssueList issues={shown} statuses={statuses} hrefFor={hrefFor} />
+      <IssueList issues={shown} statuses={statuses} hrefFor={hrefFor} emptyMessage={EMPTY[scope]} />
     </div>
   )
 }
