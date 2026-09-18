@@ -5,7 +5,7 @@ import { AppShell } from '@/components/AppShell'
 import { Banner } from '@/components/Banner'
 import { ToastProvider, useToast, type ToastOptions } from '@/components/ui/Toast'
 import { TooltipProvider } from '@/components/ui/Tooltip'
-import { SkeletonList } from '@/components/ui/Skeleton'
+import { PageSkeleton, type PageSkeletonShape } from '@/components/PageSkeleton'
 import { IdentityMenu } from '@/components/IdentityMenu'
 import { Sidebar, type SidebarFolder, type SidebarProject } from '@/components/Sidebar'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -134,6 +134,14 @@ function Shell() {
   )
 }
 
+/** The shape each route arrives in. A Folder draws rows while its files load, and so does anything else. */
+const SKELETON: Partial<Record<Route['name'], PageSkeletonShape>> = {
+  projects: 'cards',
+  issues: 'list',
+  project: 'page',
+  issue: 'page',
+}
+
 /** Which page the route names; an inbound reference shows nothing until it resolves. */
 function Page({ route, state, loading, directory, say, refresh }: { route: Route; state: WorkspaceState | null; loading: boolean; directory: DirectoryView; say: Say; refresh: () => Promise<void> }) {
   /*
@@ -144,15 +152,10 @@ function Page({ route, state, loading, directory, say, refresh }: { route: Route
 
     A skeleton rather than a spinner, because the shape of what arrives is
     known — Skeleton's own page: "data is on its way and the shape of what
-    arrives is known, show that shape".
+    arrives is known, show that shape". Each route's own shape (UIG-14): it
+    was six rows everywhere, and the projects route arrives as a grid.
   */
-  if (!state && loading) {
-    return (
-      <div className="flex flex-col gap-3 p-6" data-loading="workspace">
-        <SkeletonList rows={6} />
-      </div>
-    )
-  }
+  if (!state && loading) return <PageSkeleton shape={SKELETON[route.name] ?? 'rows'} />
   if (!state) return null
   switch (route.name) {
     case 'projects':
