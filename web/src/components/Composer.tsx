@@ -1,13 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { IconPaperclip } from '@tabler/icons-react'
 import type { Imeta } from '@estiva-app/protocol'
-import { FieldLine, FilePicker, Form } from '@estiva-app/ui'
+import { AttachmentCard, FieldLine, FilePicker, Form } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
 import { browserDrafts, type DraftStore } from '@/lib/drafts'
 import { uploadAttachment } from '@/api/blobs'
 import { Button } from '@/components/ui/Button'
 import { IconButton } from '@/components/ui/IconButton'
-import { InputChip } from '@/components/ui/InputChip'
 import { TextInput } from '@/components/ui/TextInput'
 
 /**
@@ -37,11 +36,11 @@ import { TextInput } from '@/components/ui/TextInput'
  *
  * The cost is that abandoning a half-written message leaves an unreferenced
  * blob on the relay. It is content-addressed and nothing points at it; the
- * alternative was showing a chip for a file that might still turn out to be
+ * alternative was showing a card for a file that might still turn out to be
  * unpostable, which is worse to read.
  *
  * Attachments are **not** kept in the draft (CON-10). The store holds a string
- * per key, and a chip restored beside text that no longer mentions it is a
+ * per key, and a card restored beside text that no longer mentions it is a
  * claim about a message nobody wrote.
  */
 export interface ComposerProps {
@@ -76,7 +75,7 @@ const KINDS = {
 
 const DEFAULT_DRAFTS = browserDrafts()
 
-/** What to call a file on its chip. `filename` is what the sender attached. */
+/** What to call a file on its card. `filename` is what the sender attached. */
 const nameOf = (file: Imeta) => file.filename ?? file.alt ?? 'attachment'
 
 export function Composer({ kind = 'conversation', onSubmit, autoFocus = false, disabledReason, draftKey, drafts = DEFAULT_DRAFTS, upload = uploadAttachment, className }: ComposerProps) {
@@ -165,7 +164,7 @@ export function Composer({ kind = 'conversation', onSubmit, autoFocus = false, d
   const blocked = disabledReason || (uploading ? 'Uploading…' : undefined)
 
   return (
-    // `busy` locks the field, both buttons and the chips' ✕ while a post is in flight (UIG-7).
+    // `busy` locks the field, both buttons and the cards' ✕ while a post is in flight (UIG-7).
     <Form onSubmit={submit} busy={busy} className={cn('flex flex-col gap-1', className)}>
       <div className="flex items-center gap-2">
         <TextInput
@@ -194,18 +193,22 @@ export function Composer({ kind = 'conversation', onSubmit, autoFocus = false, d
         </Button>
       </div>
 
-      {/* `InputChip`, the package's own removable chip — exported on its own
-          (Katerina, 2026-09-01) "under a name that promises nothing about
-          people: a chip like this may one day hold a label, a file, a filter".
-          It draws the ✕ and names it `Remove <label>`, which is what several
-          attachments need: one control per file, each saying which. */}
+      {/* Each file waiting to go is the package's `AttachmentCard`, `pending`,
+          as in Peek's composer (UIG-14): its type and size, and a ✕ on its
+          corner named `Remove <name>` — one control per file, each saying
+          which. Already on the relay by now (see above), so it is never
+          uploading or failed here. `pt-1`: 8px under the field with the
+          form's gap, the 8px the cards keep between each other, so the ✕
+          (6px above its card) never reaches the field. */}
       {files.length > 0 && (
-        <ul data-composer="files" className="flex flex-wrap gap-1.5">
+        <ul data-composer="files" className="flex flex-wrap gap-2 pt-1">
           {files.map((file) => (
             <li key={file.x}>
-              <InputChip
-                label={nameOf(file)}
-                leading={<IconPaperclip size={16} stroke={1.5} />}
+              <AttachmentCard
+                pending
+                name={nameOf(file)}
+                size={file.size}
+                contentType={file.m}
                 onRemove={() => setFiles((held) => held.filter((f) => f.x !== file.x))}
               />
             </li>
