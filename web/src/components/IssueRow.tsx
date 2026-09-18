@@ -64,7 +64,7 @@ export function IssueRow({ issue, statuses, href, className }: IssueRowProps) {
   const threads = issue.conversations ?? 0
   return (
     <div className={cn('relative flex h-9 min-w-0 items-center gap-3 rounded-md px-3 transition-colors hover:bg-bg-hover', className)}>
-      {/* @estiva-escape: the whole row is one link, drawn by a layer over it; no part makes a row that is a link yet (UIG-9, Katerina 17 September) */}
+      {/* @estiva-escape: the link covers the whole row with an after: layer, so the project chip can be a second link above it and never inside it; Link has no covering layer of its own (UIG-9, Katerina 17 September; UIG-14) */}
       <Link {...linkTo(href)} variant="plain" className="flex min-w-0 flex-1 items-center gap-3 after:absolute after:inset-0">
         {/* `w-14`: 56px, the room the project table's ref cell has (S25), so
             the two surfaces line up. */}
