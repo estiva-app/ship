@@ -38,7 +38,10 @@ export interface StatusLabelProps {
   className?: string
 }
 
-/** The shape alone, named — for the Issues list row only; see above. */
+/**
+ * An issue's status as its shape alone, named for screen readers — for the
+ * Issues list row only; `StatusLabel` writes the name out.
+ */
 export function StatusShape({ value, label, size = 16, className }: { value: string; label: string; size?: 14 | 16; className?: string }) {
   return (
     <span role="img" aria-label={label} className={cn('flex shrink-0', className)}>
@@ -65,6 +68,10 @@ function Shape({ value, size }: { value: string; size: 14 | 16 }) {
   }
 }
 
+/**
+ * An issue's or project's status written out: its icon, such as a dashed circle
+ * for Todo or a tick for Done, and its name.
+ */
 export function StatusLabel({ value, label, size = 'default', strong = false, className }: StatusLabelProps) {
   return (
     <span

@@ -15,6 +15,7 @@ import { Textarea } from '@/components/ui/Textarea'
  * select when opened from the Issues page — and when there is no project
  * at all, the form says to create one first rather than offer a field that
  * cannot succeed.
+ * @registry reusable: Ship's own issue form
  */
 export interface NewIssueDraft {
   title: string

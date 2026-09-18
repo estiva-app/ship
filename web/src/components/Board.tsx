@@ -20,6 +20,10 @@ import { linkTo } from '@/router'
  * as the status dropdown does; that write, and the drag states around it,
  * arrive with REW-5.
  */
+/**
+ * One issue on the board as a card: its reference, title and the assignee's
+ * photo and name, opening the issue when clicked.
+ */
 export function BoardCard({ issue, href }: { issue: IssueRowData; href: string }) {
   return (
     // The package's Card: the elevated fill on its column, 8px corners (Katerina, 2026-09-14; it was 6px).
@@ -36,6 +40,10 @@ export function BoardCard({ issue, href }: { issue: IssueRowData; href: string }
   )
 }
 
+/**
+ * One status column on the board: the status name and count, then a card for
+ * each issue in it, or a "Nothing here" line.
+ */
 export function BoardColumn({
   status,
   label,
@@ -70,6 +78,10 @@ export interface BoardProps {
   className?: string
 }
 
+/**
+ * The kanban board of issues: one column per status, side by side, scrolling
+ * sideways when the columns no longer fit.
+ */
 export function Board({ issues, statuses, hrefFor, className }: BoardProps) {
   return (
     /* The columns scroll sideways in a ScrollArea (D40); the grid moves onto
