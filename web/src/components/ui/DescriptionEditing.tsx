@@ -228,9 +228,7 @@ export default function DescriptionEditing({
         </div>
         {/* The package's FieldLine: the same line, and it says "error" itself (UIG-8). */}
         {uploadError && <FieldLine tone="error">{uploadError}</FieldLine>}
-        {failed.current && (
-          <p className="text-caption text-error-default">Could not save. Your text is still here.</p>
-        )}
+        {failed.current && <FieldLine tone="error">Could not save. Your text is still here.</FieldLine>}
       </div>
     </ReferenceProvider>
   )
