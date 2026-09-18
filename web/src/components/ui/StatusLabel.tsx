@@ -71,6 +71,7 @@ function Shape({ value, size }: { value: string; size: 14 | 16 }) {
 /**
  * An issue's or project's status written out: its icon, such as a dashed circle
  * for Todo or a tick for Done, and its name.
+ * @registry reusable: stays in Ship (Katerina, 18 September)
  */
 export function StatusLabel({ value, label, size = 'default', strong = false, className }: StatusLabelProps) {
   return (
