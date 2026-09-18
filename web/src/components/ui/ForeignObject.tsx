@@ -136,7 +136,7 @@ function ForeignMessage({ object, className }: ForeignObjectProps) {
       data-foreign-object={object.ref}
       data-widget="message"
     >
-      <Avatar name={profile?.displayName} src={profile?.picture} size={20} />
+      <Avatar name={profile?.displayName} src={profile?.picture} size={24} />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 text-caption text-text-muted">
           <span className={cn('truncate', profile?.displayName ? 'text-text-secondary' : 'text-text-muted')}>

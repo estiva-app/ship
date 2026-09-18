@@ -448,7 +448,7 @@ export function MessageCard({
     <article className={cn('flex flex-col gap-1 py-1.5', reply && 'ml-3.5 border-l-2 border-border-default pl-2.5')}>
       <BlockAnchorNote anchor={message.anchor} />
       <div className="flex items-center gap-1.5 text-caption text-text-muted">
-        <Avatar name={message.author.name} src={message.author.picture} size={18} />
+        <Avatar name={message.author.name} src={message.author.picture} size={16} />
         <span className={cn('truncate', message.author.name ? 'text-text-secondary' : 'text-text-muted')}>{message.author.name ?? '—'}</span>
         <span aria-hidden="true">·</span>
         <span className="shrink-0">{ago(message.at)}</span>
