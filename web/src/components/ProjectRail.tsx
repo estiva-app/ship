@@ -1,4 +1,3 @@
-import type { ReactElement } from 'react'
 import { ProgressBar } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
 import { Avatar } from '@/components/ui/Avatar'
@@ -6,7 +5,6 @@ import { Button } from '@/components/ui/Button'
 import { Divider } from '@/components/ui/Divider'
 import { Property } from '@/components/ui/Property'
 import { Select, type SelectOption } from '@/components/ui/Select'
-import { WithTooltip } from '@/components/ui/Tooltip'
 
 /**
  * The project page's right rail, exactly as production lays it out, from
@@ -58,17 +56,6 @@ export function peopleOptions(people: RailPerson[]): SelectOption[] {
   ]
 }
 
-/**
- * A select that is switched off, saying why on hover, as the buttons beside it
- * do with `disabledReason`. `Select` has no reason of its own, so the package's
- * tooltip goes around it — the Select page's own advice. An enabled one is
- * left as it is.
- */
-export function WhyLocked({ reason, children }: { reason?: string; children: ReactElement }) {
-  return reason ? <WithTooltip label={reason}>{children}</WithTooltip> : children
-}
-
-/** The project page's right rail: status, assignee, progress, the Folder, then archive and delete. */
 export function ProjectRail({
   status,
   statuses,
@@ -87,18 +74,14 @@ export function ProjectRail({
   readOnlyReason,
   className,
 }: ProjectRailProps) {
-  const locked = !!readOnlyReason
   return (
     <aside className={cn('flex w-[250px] shrink-0 flex-col gap-4', className)}>
+      {/* A locked select says why, as the buttons below do (UIG-14): held shut, reachable by Tab, the reason as its tooltip. */}
       <Property layout="stacked" label="Status">
-        <WhyLocked reason={readOnlyReason}>
-          <Select value={status} onChange={onStatusChange} options={statuses} ariaLabel="Status" disabled={locked} />
-        </WhyLocked>
+        <Select value={status} onChange={onStatusChange} options={statuses} ariaLabel="Status" disabledReason={readOnlyReason} />
       </Property>
       <Property layout="stacked" label="Assignee">
-        <WhyLocked reason={readOnlyReason}>
-          <Select value={lead} onChange={onLeadChange} options={peopleOptions(people)} ariaLabel="Assignee" disabled={locked} />
-        </WhyLocked>
+        <Select value={lead} onChange={onLeadChange} options={peopleOptions(people)} ariaLabel="Assignee" disabledReason={readOnlyReason} />
       </Property>
       <Property layout="stacked" label="Progress">
         <div className="flex flex-col gap-2">
