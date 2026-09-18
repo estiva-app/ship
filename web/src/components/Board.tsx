@@ -1,8 +1,8 @@
 import { Card } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
 import type { StatusEntry } from '@/lib/issues'
-import { Avatar } from '@/components/ui/Avatar'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { Person } from '@/components/ui/Person'
 import { ScrollArea } from '@/components/ui/ScrollArea'
 import { StatusLabel } from '@/components/ui/StatusLabel'
 import type { IssueRowData } from './IssueRow'
@@ -32,9 +32,9 @@ export function BoardCard({ issue, href }: { issue: IssueRowData; href: string }
       {issue.ref && <span className="font-mono text-caption text-text-muted">{issue.ref}</span>}
       <span className="text-body-2 text-text-primary">{issue.title}</span>
       {issue.assignee && (
-        <span className="flex items-center gap-1.5 text-caption text-text-secondary">
-          <Avatar name={issue.assignee.name} src={issue.assignee.picture} size={16} />
-          <span className="truncate">{issue.assignee.name ?? '—'}</span>
+        // The package's Person: a face beside a name, the em dash for a missing one. A name takes the tone of where it sits (UIG-9).
+        <span className="contents text-caption text-text-secondary">
+          <Person name={issue.assignee.name} picture={issue.assignee.picture} size={16} />
         </span>
       )}
     </Card>
