@@ -75,6 +75,9 @@ export interface ForeignObjectProps {
 }
 
 /**
+ * Another app's item, mentioned here, drawn as a card in each of its six
+ * states, so "you cannot see this" never looks like "this is empty".
+ *
  * The six states a foreign object has, and why they are not two.
  *
  * A gated read returns *nothing* — the same nothing as an object with no

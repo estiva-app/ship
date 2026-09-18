@@ -35,6 +35,10 @@ export interface AuthShellProps {
   onContinue: () => void
 }
 
+/**
+ * What shows while nobody is signed in: Ship's name, one line saying why, and
+ * at most one button to continue.
+ */
 export function AuthShell({ state, onContinue }: AuthShellProps) {
   const waiting = state.phase === 'checking' || state.phase === 'entering' || state.phase === 'ready'
 

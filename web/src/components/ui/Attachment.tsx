@@ -37,6 +37,10 @@ import { blobObjectUrl } from '@/api/blobs'
  * fetch: the package draws, the app reads the bytes with the reader's own
  * permission.
  */
+/**
+ * A file attached to a message: an image shown whole, any other file as a card
+ * to open or download, and a plain note when it cannot be loaded.
+ */
 export function Attachment({
   file,
   opens = true,

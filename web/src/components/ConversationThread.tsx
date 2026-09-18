@@ -384,6 +384,10 @@ function EditMessage({
   )
 }
 
+/**
+ * One message or reply in a conversation: author, time, text, files, linked
+ * items and reactions, with a menu to react, edit or delete it.
+ */
 export function MessageCard({
   message,
   reply = false,
@@ -533,6 +537,10 @@ function NewSinceHere() {
   return <Divider label="New since you last read this" tone="warning" className="mx-0 py-1" />
 }
 
+/**
+ * One conversation as a card: its first message, the replies below it, a line
+ * where unread messages start, and a box to reply.
+ */
 export function ConversationThread({ thread, onReply, disabledReason, unreadFrom, resolved, resolving, nameOf, reactionsBy, onReact, onDeleteMessage, onEditMessage, subdued = false }: { thread: ThreadData; onReply: (threadId: string, text: string, files: readonly Imeta[]) => Promise<boolean | void> | boolean | void; disabledReason?: string; unreadFrom?: string; resolved?: Record<string, ForeignObjectData | null | undefined>; resolving?: boolean; nameOf?: (pubkey: string) => string; /** Reactions by message id, read once for the surface. */ reactionsBy?: Record<string, readonly Reaction[]>; /** Add or take back a reaction on one message. */ onReact?: (messageId: string, emoji: string, mine?: string) => void; /** Publish a deletion for one message — CON-3. Omitted where nobody may write. */ onDeleteMessage?: (messageId: string) => Promise<boolean | void> | boolean | void; /** Publish an edit of one message — CON-4. Omitted where nobody may write. */ onEditMessage?: (messageId: string, body: string) => Promise<boolean | void> | boolean | void; /** Draw it as secondary — Activity's mentions, which do not carry a comment's trust (CON-9). */ subdued?: boolean }) {
   return (
     // The card recedes rather than fading: no fill, so the subtle hairline sits
@@ -600,6 +608,10 @@ export interface ConversationsProps {
   className?: string
 }
 
+/**
+ * The conversations on an issue or project: a box to start one, then each
+ * conversation as a card, or a line saying there are none yet.
+ */
 export function Conversations({ threads, onStart, onReply, disabledReason, className, unread, nameOf, about, onReact, onDeleteMessage, onEditMessage }: ConversationsProps) {
   const { resolved, resolving } = useThreadReferences(threads)
   const { reactionsBy, omitted, refresh: refreshReactions } = useThreadReactions(threads)

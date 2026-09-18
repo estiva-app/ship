@@ -17,6 +17,7 @@ import { cn } from '@/lib/cn'
  *
  * Draws nothing at zero. A zero is a real answer on the wire — "nothing is
  * addressed to this file" — but a row of `0`s says less than their absence.
+ * @registry reusable: stays in Ship (Katerina, 18 September)
  */
 export function ConversationCount({ count, unit, className }: { count: number; unit: 'conversation' | 'comment'; className?: string }) {
   if (count <= 0) return null

@@ -1,2 +1,6 @@
 node_modules
 dist
+
+# The catalogue of Ship's parts (UIG-13): built from the code every time it is read,
+# written to a file only by `npm run registry`, and never committed.
+/registry.json

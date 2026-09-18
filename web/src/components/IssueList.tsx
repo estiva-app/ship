@@ -19,6 +19,10 @@ export interface IssueGroupProps {
   hrefFor: (issue: IssueRowData) => string
 }
 
+/**
+ * One status group in the issue list: the status name and count as a heading,
+ * then a row for each issue with that status.
+ */
 export function IssueGroup({ status, label, issues, statuses, hrefFor }: IssueGroupProps) {
   return (
     <section className="flex flex-col gap-px">
@@ -46,6 +50,10 @@ export interface IssueListProps {
   className?: string
 }
 
+/**
+ * The issue list, grouped by status in the statuses' own order, with a message
+ * when there are no issues.
+ */
 export function IssueList({ issues, statuses, hrefFor, emptyMessage = 'No issues yet.', className }: IssueListProps) {
   if (!issues.length) return <EmptyState icon={<IconListDetails size={16} stroke={1.5} />} className={className} message={emptyMessage} />
   return (
