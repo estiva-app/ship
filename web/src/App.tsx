@@ -134,7 +134,7 @@ function Shell() {
   )
 }
 
-/** The shape each route arrives in. A Folder draws rows while its files load, and so does anything else. */
+/** The shape each route arrives in; rows for anything else. A Folder has none here: it does not wait for the workspace. */
 const SKELETON: Partial<Record<Route['name'], PageSkeletonShape>> = {
   projects: 'cards',
   issues: 'list',
@@ -154,7 +154,13 @@ function Page({ route, state, loading, directory, say, refresh }: { route: Route
     known — Skeleton's own page: "data is on its way and the shape of what
     arrives is known, show that shape". Each route's own shape (UIG-14): it
     was six rows everywhere, and the projects route arrives as a grid.
+
+    A Folder first, before either: it is not handed `state` — its contents are
+    not Ship's fold, they are resolved through whichever app owns each file —
+    so it never waits for the workspace, and draws its own rows while its
+    files load (UIG-14 C8). The workspace's skeleton used to sit there first.
   */
+  if (route.name === 'folder') return <FolderPage id={route.id} />
   if (!state && loading) return <PageSkeleton shape={SKELETON[route.name] ?? 'rows'} />
   if (!state) return null
   switch (route.name) {
@@ -166,10 +172,6 @@ function Page({ route, state, loading, directory, say, refresh }: { route: Route
       return <ProjectPage state={state} directory={directory} d={route.d} view={route.view} say={say} refresh={refresh} />
     case 'issue':
       return <IssuePage state={state} directory={directory} d={route.d} say={say} refresh={refresh} />
-    case 'folder':
-      // No `state`: a Folder's contents are not Ship's fold. They are resolved
-      // through whichever app owns each file, which is the point.
-      return <FolderPage id={route.id} />
     default:
       return <EmptyState icon={<IconLink size={16} stroke={1.5} />} message="Resolving reference…" />
   }

@@ -44,5 +44,5 @@ export const Issues: Story = { render: () => <Loading shape="list" current="issu
 /** One project or one issue: the trail, the title and rows, and the rail. */
 export const ProjectOrIssue: Story = { render: () => <Loading shape="page" current="issues" /> }
 
-/** A Folder, and anything else: rows, the list a Folder draws while its files load. */
+/** Any other route (an inbound reference): rows. A Folder is not one — it draws its own. */
 export const Rows: Story = { render: () => <Loading shape="rows" current="issues" /> }

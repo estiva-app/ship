@@ -18,8 +18,9 @@ import { SkeletonBar, SkeletonList } from '@/components/ui/Skeleton'
  * - `list` — the issues page: its heading, the tabs, then rows.
  * - `page` — one project or issue: the trail, the title and rows, and the
  *   rail beyond the hairline.
- * - `rows` — rows alone, where the page's shape is its own to say (a Folder
- *   draws this same list while its files load).
+ * - `rows` — rows alone, for any other route (an inbound reference while
+ *   the workspace loads). A Folder is not here: it does not wait for the
+ *   workspace, and draws its own rows while its files load.
  *
  * Revealed after 150ms, as the list is, so a fast read never flashes it.
  */
