@@ -141,6 +141,11 @@ jobs:
       - name: Gate lint
         run: npm run lint:rules
 
+      # Every part says in one line what it is for, so `npm run ui:find` can offer
+      # it before someone builds it again (UIG-13). Built from the code; nothing kept.
+      - name: Every part is described
+        run: npm run registry:check
+
   publish:
     # Both, since the cutover (REW-8). `web` used to be advisory — it could fail
     # while the image published, because the image was built from apps/ and the
