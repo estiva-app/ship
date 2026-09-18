@@ -1,3 +1,4 @@
+import type { ReactElement } from 'react'
 import { ProgressBar } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
 import { Avatar } from '@/components/ui/Avatar'
@@ -5,6 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { Divider } from '@/components/ui/Divider'
 import { Property } from '@/components/ui/Property'
 import { Select, type SelectOption } from '@/components/ui/Select'
+import { WithTooltip } from '@/components/ui/Tooltip'
 
 /**
  * The project page's right rail, exactly as production lays it out, from
@@ -56,6 +58,17 @@ export function peopleOptions(people: RailPerson[]): SelectOption[] {
   ]
 }
 
+/**
+ * A select that is switched off, saying why on hover, as the buttons beside it
+ * do with `disabledReason`. `Select` has no reason of its own, so the package's
+ * tooltip goes around it — the Select page's own advice. An enabled one is
+ * left as it is.
+ */
+export function WhyLocked({ reason, children }: { reason?: string; children: ReactElement }) {
+  return reason ? <WithTooltip label={reason}>{children}</WithTooltip> : children
+}
+
+/** The project page's right rail: status, assignee, progress, the Folder, then archive and delete. */
 export function ProjectRail({
   status,
   statuses,
@@ -78,10 +91,14 @@ export function ProjectRail({
   return (
     <aside className={cn('flex w-[250px] shrink-0 flex-col gap-4', className)}>
       <Property layout="stacked" label="Status">
-        <Select value={status} onChange={onStatusChange} options={statuses} ariaLabel="Status" disabled={locked} />
+        <WhyLocked reason={readOnlyReason}>
+          <Select value={status} onChange={onStatusChange} options={statuses} ariaLabel="Status" disabled={locked} />
+        </WhyLocked>
       </Property>
       <Property layout="stacked" label="Assignee">
-        <Select value={lead} onChange={onLeadChange} options={peopleOptions(people)} ariaLabel="Assignee" disabled={locked} />
+        <WhyLocked reason={readOnlyReason}>
+          <Select value={lead} onChange={onLeadChange} options={peopleOptions(people)} ariaLabel="Assignee" disabled={locked} />
+        </WhyLocked>
       </Property>
       <Property layout="stacked" label="Progress">
         <div className="flex flex-col gap-2">

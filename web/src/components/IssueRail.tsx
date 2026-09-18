@@ -5,7 +5,7 @@ import { Divider } from '@/components/ui/Divider'
 import { Person } from '@/components/ui/Person'
 import { Property } from '@/components/ui/Property'
 import { Select, type SelectOption } from '@/components/ui/Select'
-import { peopleOptions, type RailPerson } from './ProjectRail'
+import { WhyLocked, peopleOptions, type RailPerson } from './ProjectRail'
 
 /**
  * The issue page's right rail, as production: Status, Assignee (with a
@@ -31,7 +31,7 @@ export interface IssueRailProps {
   openedAt: number
   onCopyReference: () => void
   onDelete: () => void
-  /** Why writes are unavailable: disables the three selects. Copy stays. */
+  /** Why writes are unavailable: disables the three selects and says why on hover. Copy stays. */
   readOnlyReason?: string
   className?: string
 }
@@ -56,14 +56,21 @@ export function IssueRail({
   const locked = !!readOnlyReason
   return (
     <aside className={cn('flex w-[250px] shrink-0 flex-col gap-4', className)}>
+      {/* A locked select says why on hover, as Delete does (WhyLocked). */}
       <Property layout="stacked" label="Status">
-        <Select value={status} onChange={onStatusChange} options={statuses} ariaLabel="Status" disabled={locked} />
+        <WhyLocked reason={readOnlyReason}>
+          <Select value={status} onChange={onStatusChange} options={statuses} ariaLabel="Status" disabled={locked} />
+        </WhyLocked>
       </Property>
       <Property layout="stacked" label="Assignee">
-        <Select value={assignee} onChange={onAssigneeChange} options={peopleOptions(people)} ariaLabel="Assignee" disabled={locked} />
+        <WhyLocked reason={readOnlyReason}>
+          <Select value={assignee} onChange={onAssigneeChange} options={peopleOptions(people)} ariaLabel="Assignee" disabled={locked} />
+        </WhyLocked>
       </Property>
       <Property layout="stacked" label="Project">
-        <Select value={project} onChange={onProjectChange} options={projects} ariaLabel="Project" disabled={locked} />
+        <WhyLocked reason={readOnlyReason}>
+          <Select value={project} onChange={onProjectChange} options={projects} ariaLabel="Project" disabled={locked} />
+        </WhyLocked>
       </Property>
       <Divider className="mx-0" />
       {/* The same shape as the three above (Katerina, 2026-09-08): the label
