@@ -1,6 +1,6 @@
-import type { MouseEvent } from 'react'
+import type { MouseEvent, ReactNode } from 'react'
 import { decodeNpub, stripNaddrs } from '@estiva-app/protocol'
-import { InlineChip } from '@estiva-app/ui'
+import { InlineChip, WithTooltip } from '@estiva-app/ui'
 import type { ForeignObject } from '@/api/foreign'
 import { StatusLabel } from './StatusLabel'
 import { referenceLink } from '@/lib/referenceLink'
@@ -98,18 +98,19 @@ export function Reference({
     }
     const name = pubkey ? nameOf?.(pubkey) : undefined
     const named = !!name && !pubkey?.startsWith(name.replace('…', ''))
-    return (
+    const chip = (
       <InlineChip
         tone={named ? 'person' : 'quiet'}
         data-reference="person"
         data-mention={pubkey ?? undefined}
         data-resolved={named ? 'true' : 'false'}
-        title={named ? undefined : uri}
         className={className}
       >
         {named ? `@${name}` : (name ?? short)}
       </InlineChip>
     )
+    // Nobody to name: the whole address, on hover.
+    return named ? chip : <Hint label={uri}>{chip}</Hint>
   }
 
   // An object: whatever its owner's projection says it is.
@@ -120,8 +121,6 @@ export function Reference({
       tone: 'neutral' as const,
       'data-reference': 'object',
       'data-object': object.ref,
-      // The whole label on hover, because the visible one is cut.
-      title: label,
       className,
       /*
         Cut, not wrapped, and `ch` rather than pixels so it scales with the
@@ -149,27 +148,57 @@ export function Reference({
         )}
       </>
     )
-    if (!link) return <InlineChip {...chip}>{body}</InlineChip>
+    // The whole label on hover (and on focus, as a link), because the visible one is cut.
+    if (!link) return <Hint label={label}><InlineChip {...chip}>{body}</InlineChip></Hint>
     const here = link.place === 'here' ? linkTo(link.href) : null
     const follow = (event: MouseEvent<HTMLAnchorElement>) => {
       event.stopPropagation()
       here?.onClick(event)
     }
-    return here ? (
-      <InlineChip {...chip} href={here.href} onClick={follow}>
-        {body}
-      </InlineChip>
-    ) : (
-      <InlineChip {...chip} href={link.href} target="_blank" rel="noopener noreferrer" onClick={follow}>
-        {body}
-      </InlineChip>
+    return (
+      <Hint label={label}>
+        {here ? (
+          <InlineChip {...chip} href={here.href} onClick={follow}>
+            {body}
+          </InlineChip>
+        ) : (
+          <InlineChip {...chip} href={link.href} target="_blank" rel="noopener noreferrer" onClick={follow}>
+            {body}
+          </InlineChip>
+        )}
+      </Hint>
     )
   }
 
-  // Still resolving, or resolved to nothing. §13.1: never blank.
+  // Still resolving, or resolved to nothing. §13.1: never blank. The whole address, on hover.
   return (
-    <InlineChip tone="quiet" data-reference={object === null ? 'unresolved' : 'pending'} title={uri} className={className}>
-      {short}
-    </InlineChip>
+    <Hint label={uri}>
+      <InlineChip tone="quiet" data-reference={object === null ? 'unresolved' : 'pending'} className={className}>
+        {short}
+      </InlineChip>
+    </Hint>
+  )
+}
+
+/**
+ * The package's tooltip around a chip (UIG-14): the full words on hover, and
+ * on keyboard focus for a chip that is a link, where they were a `title` only
+ * a mouse could read. `inline`, because a chip is a word in a sentence and a
+ * paragraph cannot hold the `<div>` wrapper; the tooltip wraps at 320px, so a
+ * whole message or address stays on screen.
+ *
+ * The span around it is pinned to the top of the line, as the chip is
+ * (`align-top`, InlineChip's own alignment). Without it the tooltip's wrapper
+ * sits on the baseline: the quiet chip drops 0.2px and its line grows from
+ * 19.6px to 20px (measured). On a span of Ship's own, because the package's
+ * wrapper takes placement only.
+ */
+function Hint({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <span className="inline-flex align-top">
+      <WithTooltip inline label={label}>
+        {children}
+      </WithTooltip>
+    </span>
   )
 }
