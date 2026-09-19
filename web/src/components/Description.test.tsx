@@ -10,7 +10,7 @@
  * So the assertions here are about the pairing, and `ProjectHeader.test.tsx`
  * checks that the project surface actually mounts it.
  */
-import { describe, expect, it, vi } from 'vitest'
+import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 
 // The reference resolver reaches the relay. What is under test is which text
@@ -24,6 +24,22 @@ vi.mock(import('@/api/foreign'), async (importOriginal) => ({
 }))
 
 import { Description } from './Description'
+
+/* jsdom implements neither `getClientRects` nor `getBoundingClientRect` on text
+   nodes, and ProseMirror calls them when it scrolls the caret into view — the
+   editor this opens focuses itself at the end. Without these the call can land
+   after a test has finished, as an unhandled error that fails the whole run
+   while every test passes (seen under load, UIG-14). The same stand-in as
+   `ui/DescriptionEditing.attach.test.tsx`. */
+beforeAll(() => {
+  const rects = () => ({ length: 0, item: () => null, [Symbol.iterator]: function* () {} }) as unknown as DOMRectList
+  const empty = () =>
+    ({ top: 0, left: 0, bottom: 0, right: 0, width: 0, height: 0, x: 0, y: 0, toJSON: () => ({}) }) as DOMRect
+  for (const proto of [Element.prototype, Range.prototype] as { getClientRects?: unknown; getBoundingClientRect?: unknown }[]) {
+    proto.getClientRects = rects
+    proto.getBoundingClientRect = empty
+  }
+})
 
 const NADDR =
   'nostr:naddr1qqjxzde5xfjnvdee943kzwrr956rswr995uxgd3s95unsvekvd3nsvtzv3jnyqg4dp68gup69uhkcmmrv9kxsmmnwsarxvpsxqpzpvankwem8vankwem8vankwem8vankwem8vankwem8vankwem8vanqvzqqqrcsvczkget'
