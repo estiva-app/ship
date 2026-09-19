@@ -74,14 +74,14 @@ export function ProjectRail({
   readOnlyReason,
   className,
 }: ProjectRailProps) {
-  const locked = !!readOnlyReason
   return (
     <aside className={cn('flex w-[250px] shrink-0 flex-col gap-4', className)}>
+      {/* A locked select says why, as the buttons below do (UIG-14): held shut, reachable by Tab, the reason as its tooltip. */}
       <Property layout="stacked" label="Status">
-        <Select value={status} onChange={onStatusChange} options={statuses} ariaLabel="Status" disabled={locked} />
+        <Select value={status} onChange={onStatusChange} options={statuses} ariaLabel="Status" disabledReason={readOnlyReason} />
       </Property>
       <Property layout="stacked" label="Assignee">
-        <Select value={lead} onChange={onLeadChange} options={peopleOptions(people)} ariaLabel="Assignee" disabled={locked} />
+        <Select value={lead} onChange={onLeadChange} options={peopleOptions(people)} ariaLabel="Assignee" disabledReason={readOnlyReason} />
       </Property>
       <Property layout="stacked" label="Progress">
         <div className="flex flex-col gap-2">

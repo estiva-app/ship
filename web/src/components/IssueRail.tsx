@@ -31,7 +31,7 @@ export interface IssueRailProps {
   openedAt: number
   onCopyReference: () => void
   onDelete: () => void
-  /** Why writes are unavailable: disables the three selects. Copy stays. */
+  /** Why writes are unavailable: holds the three selects shut and says why on hover and on keyboard focus. Copy stays. */
   readOnlyReason?: string
   className?: string
 }
@@ -53,17 +53,17 @@ export function IssueRail({
   readOnlyReason,
   className,
 }: IssueRailProps) {
-  const locked = !!readOnlyReason
   return (
     <aside className={cn('flex w-[250px] shrink-0 flex-col gap-4', className)}>
+      {/* A locked select says why, as Delete does (UIG-14): held shut, reachable by Tab, the reason as its tooltip. */}
       <Property layout="stacked" label="Status">
-        <Select value={status} onChange={onStatusChange} options={statuses} ariaLabel="Status" disabled={locked} />
+        <Select value={status} onChange={onStatusChange} options={statuses} ariaLabel="Status" disabledReason={readOnlyReason} />
       </Property>
       <Property layout="stacked" label="Assignee">
-        <Select value={assignee} onChange={onAssigneeChange} options={peopleOptions(people)} ariaLabel="Assignee" disabled={locked} />
+        <Select value={assignee} onChange={onAssigneeChange} options={peopleOptions(people)} ariaLabel="Assignee" disabledReason={readOnlyReason} />
       </Property>
       <Property layout="stacked" label="Project">
-        <Select value={project} onChange={onProjectChange} options={projects} ariaLabel="Project" disabled={locked} />
+        <Select value={project} onChange={onProjectChange} options={projects} ariaLabel="Project" disabledReason={readOnlyReason} />
       </Property>
       <Divider className="mx-0" />
       {/* The same shape as the three above (Katerina, 2026-09-08): the label

@@ -1,7 +1,7 @@
 import { Card } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
 import { ago } from '@/lib/time'
-import { Avatar } from '@/components/ui/Avatar'
+import { Person } from '@/components/ui/Person'
 import { Chip } from '@/components/ui/Chip'
 import { StatusLabel } from '@/components/ui/StatusLabel'
 import { linkTo } from '@/router'
@@ -80,9 +80,9 @@ export function ProjectCard({
       <div className="flex items-center gap-2.5 text-caption text-text-muted">
         <span className="flex min-w-0 items-center gap-1.5">
           <span>by</span>
-          <Avatar name={author.name} src={author.picture} size={16} />
-          <span className={cn('truncate', author.name ? 'text-text-secondary' : 'text-text-muted')}>
-            {author.name ?? '—'}
+          {/* The package's Person: a face beside a name, the em dash for a missing one. A name takes the tone of where it sits (UIG-9). */}
+          <span className="contents text-text-secondary">
+            <Person name={author.name} picture={author.picture} size={16} />
           </span>
         </span>
         <Dot />

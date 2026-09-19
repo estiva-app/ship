@@ -30,8 +30,9 @@ import { blobObjectUrl } from '@/api/blobs'
  *
  * ## What is the package's, and what stays here
  *
- * A file, and an image that cannot be read, are the package's `AttachmentCard`
- * (UIG-27): Ship's files are the same card as Peek's (Katerina, 2026-09-14).
+ * A file, an image on its way and an image that cannot be read are the
+ * package's `AttachmentCard` (UIG-27, UIG-14): Ship's files are the same card
+ * as Peek's (Katerina, 2026-09-14).
  * An image stays drawn here, whole, in its 4px frame, until the package has a
  * full-screen viewer to open it in — her ruling the same day. So does the
  * fetch: the package draws, the app reads the bytes with the reader's own
@@ -70,18 +71,8 @@ export function Attachment({
   }
 
   if (!url) {
-    return (
-      <div
-        data-attachment="loading"
-        aria-busy="true"
-        aria-label={`Loading ${label}`}
-        /* `bg-bg-inset`, the surface the package's own SkeletonBar uses: the
-           class here was `bg-bg-subtle`, which the preset does not generate,
-           so this placeholder had no background at all. The token lint
-           (S11) caught it on the day it was switched on. */
-        className={cn('h-24 w-40 animate-pulse rounded border border-border-default bg-bg-inset', className)}
-      />
-    )
+    // The package's picture on its way (UIG-14): the card's pulse, with "Loading <name>" for a reader that cannot see it.
+    return <AttachmentCard data-attachment="loading" name={label} contentType={file.m} state="loading" className={className} />
   }
 
   return (

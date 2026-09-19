@@ -56,7 +56,12 @@ export default function DescriptionEditing({
   const picking = useRef(false)
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
-  const failed = useRef(false)
+  /*
+    The last save was refused. State, not a ref (UIG-14 C6): it was a ref, and
+    setting a ref re-renders nothing, so the line under the editor never
+    appeared. It goes when a save succeeds or the edit is left.
+  */
+  const [failed, setFailed] = useState(false)
 
   const finish = useCallback(
     async (editor: Editor, save: boolean) => {
@@ -64,19 +69,21 @@ export default function DescriptionEditing({
       committing.current = true
       try {
         if (!save) {
+          setFailed(false)
           onLeave()
           return
         }
         const next = publishableFrom(editor.getJSON() as EditorDocument)
         // Nothing changed: leaving is not a write. `EditableText`'s rule, kept.
         if (next.value === value) {
+          setFailed(false)
           onLeave()
           return
         }
         const ok = await onCommit(next.value, next.contentFormat)
         // A commit that fails keeps the surface open with the text in it, so an
         // edit is never silently lost — the caller has already said why.
-        failed.current = !ok
+        setFailed(!ok)
         if (ok) onLeave()
       } finally {
         committing.current = false
@@ -228,9 +235,7 @@ export default function DescriptionEditing({
         </div>
         {/* The package's FieldLine: the same line, and it says "error" itself (UIG-8). */}
         {uploadError && <FieldLine tone="error">{uploadError}</FieldLine>}
-        {failed.current && (
-          <p className="text-caption text-error-default">Could not save. Your text is still here.</p>
-        )}
+        {failed && <FieldLine tone="error">Could not save. Your text is still here.</FieldLine>}
       </div>
     </ReferenceProvider>
   )

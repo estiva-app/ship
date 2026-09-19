@@ -35,7 +35,8 @@ export function History({ entries, className }: { entries: HistoryEntry[]; class
     <ol className={cn('flex flex-col gap-3', className)}>
       {entries.map((entry) => (
         <li key={entry.id} className="flex gap-2">
-          <Avatar name={entry.by.name} src={entry.by.picture} size={18} className="mt-px" />
+          {/* 16px (Katerina, UIG-14); `mt-0.5` puts its middle on the first line's, as `mt-px` did for 18px. */}
+          <Avatar name={entry.by.name} src={entry.by.picture} size={16} className="mt-0.5" />
           <div className="flex min-w-0 flex-col gap-0.5">
             <span className="text-body-2 text-text-secondary">
               <span className={cn('font-medium', entry.by.name ? 'text-text-primary' : 'text-text-muted')}>{entry.by.name ?? '—'}</span> {entry.text}

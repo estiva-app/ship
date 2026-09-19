@@ -26,6 +26,13 @@ vi.mock('@/api', async (importOriginal) => {
   }
 })
 
+/* A Folder is read through the projection layer, not the workspace: held
+   pending here, so the folder page stays in its own loading state. */
+vi.mock('@/api/foreign', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/api/foreign')>()),
+  readFolder: vi.fn(() => new Promise(() => {})),
+}))
+
 import { createIssue, createProject, deleteIssue, deleteProject, resolveInbound, setIssueField, startConversation, useDirectory, useWorkspace } from '@/api'
 import { fireEvent } from '@testing-library/react'
 import App, { sidebarProps } from './App'
@@ -393,5 +400,25 @@ describe('before the first read lands', () => {
     vi.mocked(useWorkspace).mockReturnValue({ state: STATE, error: null, loading: false, busy: false, refresh , live: false })
     render(<App />)
     expect(screen.queryByText(/The relay is busy/)).toBeNull()
+  })
+
+  /*
+    A Folder page does not wait for the workspace (UIG-14 C8): its files are
+    read through the projection layer, on their own. So on its route the
+    workspace's skeleton is not drawn, and the page is — with its own loading
+    rows while its files come — whether the workspace is still loading or the
+    relay is busy.
+  */
+  it('draws a Folder page without waiting for the workspace', () => {
+    goTo(`/folder/${D('90')}`)
+    vi.mocked(useWorkspace).mockReturnValue({ state: null, error: null, loading: true, busy: false, refresh, live: false })
+    const { container, unmount } = render(<App />)
+    expect(container.querySelector('[data-loading="workspace"]')).toBeNull()
+    expect(container.querySelector('[data-loading="folder"]')).not.toBeNull()
+    unmount()
+
+    vi.mocked(useWorkspace).mockReturnValue({ state: null, error: null, loading: false, busy: true, refresh, live: false })
+    const busy = render(<App />).container
+    expect(busy.querySelector('[data-loading="folder"]')).not.toBeNull()
   })
 })

@@ -1,4 +1,3 @@
-import { IconListDetails } from '@tabler/icons-react'
 import { cn } from '@/lib/cn'
 import { groupByStatus, type StatusEntry } from '@/lib/issues'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -52,10 +51,11 @@ export interface IssueListProps {
 
 /**
  * The issue list, grouped by status in the statuses' own order, with a message
- * when there are no issues.
+ * when there are no issues — the quiet line of a section, not the whole page's
+ * empty state: the list sits under a heading and tabs (UIG-14).
  */
 export function IssueList({ issues, statuses, hrefFor, emptyMessage = 'No issues yet.', className }: IssueListProps) {
-  if (!issues.length) return <EmptyState icon={<IconListDetails size={16} stroke={1.5} />} className={className} message={emptyMessage} />
+  if (!issues.length) return <EmptyState scope="section" className={className} message={emptyMessage} />
   return (
     <div className={cn('flex flex-col gap-4', className)}>
       {groupByStatus(issues, statuses).map((group) => (
