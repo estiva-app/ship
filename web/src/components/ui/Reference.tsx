@@ -187,18 +187,16 @@ export function Reference({
  * paragraph cannot hold the `<div>` wrapper; the tooltip wraps at 320px, so a
  * whole message or address stays on screen.
  *
- * The span around it is pinned to the top of the line, as the chip is
- * (`align-top`, InlineChip's own alignment). Without it the tooltip's wrapper
- * sits on the baseline: the quiet chip drops 0.2px and its line grows from
- * 19.6px to 20px (measured). On a span of Ship's own, because the package's
- * wrapper takes placement only.
+ * The inline wrapper is pinned to the top of the line, as the chip is
+ * (`align-top`, InlineChip's own alignment); the package does that itself
+ * since 0.24.1. Ship used to add a span of its own for it: without it the
+ * wrapper sat on the baseline, the quiet chip dropped 0.2px and its line grew
+ * from 19.6px to 20px (measured).
  */
 function Hint({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <span className="inline-flex align-top">
-      <WithTooltip inline label={label}>
-        {children}
-      </WithTooltip>
-    </span>
+    <WithTooltip inline label={label}>
+      {children}
+    </WithTooltip>
   )
 }
