@@ -79,6 +79,16 @@ const projectChange = buildChange(PK, Date.now(), {
   folder: CONTENT,
 })
 check('a change to a project carries that same Folder', tag(projectChange, 'h') === CONTENT)
+check('  …and a status change names nobody', tag(statusChange, 'p') === undefined && tag(projectChange, 'p') === undefined)
+
+const WHO = 'c'.repeat(64)
+const assign = buildChange(PK, Date.now(), { target: `30851:${PK}:i1`, field: 'assignee', value: WHO, folder: CONTENT })
+const lead = buildChange(PK, Date.now(), { target: `30850:${PK}:p1`, field: 'lead', value: WHO, folder: CONTENT })
+const unassign = buildChange(PK, Date.now(), { target: `30851:${PK}:i1`, field: 'assignee', value: '', folder: CONTENT })
+check('assigning an issue names the assignee as a p tag (FOL-30)', tag(assign, 'p') === WHO)
+check('  …and so does making someone a project lead', tag(lead, 'p') === WHO)
+check('  …while clearing an assignment names nobody', tag(unassign, 'p') === undefined)
+check('  …and the fixed four keep their order ahead of it', assign.tags.slice(0, 4).map((t) => t[0]).join(',') === 'a,field,value,h')
 
 // Still one container — but the record now *names* it instead of sitting in it.
 // Access to the Peek topic is access to the issues, the history and the

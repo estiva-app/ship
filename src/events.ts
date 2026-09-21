@@ -260,10 +260,29 @@ export function buildChange(
         and `assignee` are not.
       */
       ...attachmentsInDocument(args.value, args.contentFormat).map(imetaTag),
+      /*
+        A change that places a person on the object names them — `assignee`
+        on an issue, `lead` on a project — as a `p` tag, the way a comment
+        names the people it mentions (FOL-30). Being placed on something is
+        being told about it, and `p` is how the relay tells: the mention index
+        and the inbox are `p`-based, and so is the one read Peek makes for
+        "what am I named in" to fill a person's followed set. Without it the
+        assignment is findable only by folding every `kind:1851` in reach —
+        measured at the relay's 1,000 cap over 90 days on production, with
+        64 assignee changes among them. Appended after `ts`, so the fixed
+        four keep their order; an app that does not know `p` here ignores it.
+
+        Only a value that is a key: clearing an assignment carries an empty
+        value and names nobody.
+      */
+      ...(PLACEMENT_FIELDS.has(args.field) && /^[0-9a-f]{64}$/.test(args.value) ? [['p', args.value]] : []),
     ],
     content: args.note ?? '',
   }
 }
+
+/** The fields whose value is a person being placed on the object — see `buildChange`. */
+const PLACEMENT_FIELDS = new Set(['assignee', 'lead'])
 
 /**
  * kind:9 conversation message — the same kind Peek writes for a topic message.
