@@ -222,14 +222,14 @@ export function activityFor(
    */
   subFiles: readonly { addr: string; label: string }[] = [],
 ): { items: ActivityItem[]; truncated: number } {
-  const mentions: ActivityItem[] = mentionsOf(state.conversations, addr, state.tagged).map((conversation) => ({
+  const mentions: ActivityItem[] = mentionsOf(state.conversations, addr, state.anchors).map((conversation) => ({
     thread: threadFor(conversation, directory, undefined, addr, state.edits, state.attachments),
     relation: 'mention' as const,
     where: whereThreadLives(conversation.root.folder, state),
   }))
 
   const labels = new Map(subFiles.map((file) => [file.addr, file.label]))
-  const rolled: ActivityItem[] = commentsOnAny(state.conversations, new Set(labels.keys()), state.tagged).map(
+  const rolled: ActivityItem[] = commentsOnAny(state.conversations, new Set(labels.keys()), state.anchors).map(
     ({ conversation, about }) => ({
       thread: threadFor(conversation, directory, undefined, about, state.edits, state.attachments),
       relation: 'sub-file' as const,
@@ -371,7 +371,7 @@ export function ProjectPage({
   */
   const rolledUp = useMemo(() => new Set(activity.items.filter((i) => i.relation === 'sub-file').map((i) => i.thread.id)), [activity])
   const conversations = useMemo(
-    () => (project ? ownConversations(state.conversations, project.contentFolder, project.addr, state.tagged).filter((c) => !rolledUp.has(c.id)) : []),
+    () => (project ? ownConversations(state.conversations, project.contentFolder, project.addr, state.anchors).filter((c) => !rolledUp.has(c.id)) : []),
     [project, state, rolledUp],
   )
   /* This feed is two streams drawn as one — SPEC §11.1 (FOL-16): the Folder's
@@ -394,9 +394,9 @@ export function ProjectPage({
   const unread = useMemo(() => {
     const channel = projectContext(project?.contentFolder)
     const file = fileContext(project?.addr)
-    const aboutProject = new Set(conversations.filter((c) => project && (state.tagged[c.root.id] ?? []).includes(project.addr)).map((c) => c.id))
+    const aboutProject = new Set(conversations.filter((c) => project && (state.anchors[c.root.id] ?? []).includes(project.addr)).map((c) => c.id))
     return firstUnreadByThread(threads, merged, (thread) => (aboutProject.has(thread.id) ? file : channel), me)
-  }, [threads, merged, project, conversations, state.tagged])
+  }, [threads, merged, project, conversations, state.anchors])
   const people = useMemo(() => railPeople(state, directory), [state, directory])
   /*
     What somebody placed under this project from another app — RFC 0.5 §10.7.

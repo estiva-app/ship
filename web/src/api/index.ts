@@ -32,7 +32,7 @@ export { conversationsAbout } from '../../../src/fold'
   itself to be about the object with one that named it in passing, and the
   second attaches permanently and by accident.
 */
-export { commentsOn, commentsOnAny, mentionsOf, attachmentOf, type Attachment, type TaggedIndex } from '../../../src/references'
+export { commentsOn, commentsOnAny, mentionsOf, attachmentOf, type Attachment, type AnchorIndex } from '../../../src/references'
 export { foldEdits, type Edit, type EditIndex } from '../../../src/edits'
 export { foldAttachments, type AttachmentIndex } from '../../../src/attachments'
 /* Reactions — SPEC §6.6. The horizon and the fold are in the data layer, where

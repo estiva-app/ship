@@ -27,7 +27,7 @@ import {
 } from './events'
 import { findNaddrs, naddrToAddr, buildReaction, buildEdit, buildDeletion as buildEventDeletion } from '@estiva-app/protocol'
 import { foldFolder, projectFolders, type FolderState } from './fold'
-import { taggedIndex, type TaggedIndex } from './references'
+import { anchorIndex, type AnchorIndex } from './references'
 import { foldEdits, type EditIndex } from './edits'
 import { foldAttachments, type AttachmentIndex } from './attachments'
 import { REACTION_EVENT_LIMIT } from './reactions'
@@ -82,7 +82,7 @@ function referencedAddresses(body: string): string[] {
  * contract between this repository and `estiva-agent`, held to a recorded state
  * by `scripts/conformance.test.ts`, and adding a field to it is a change to
  * what the workspace *means* that has to land in both repos at once. Attachment
- * strength is not that: the same events fold to the same state, and `tagged` is
+ * strength is not that: the same events fold to the same state, and `anchors` is
  * a second reading of the same input, taken here because this is the only place
  * that still has the events in hand.
  *
@@ -92,8 +92,8 @@ function referencedAddresses(body: string): string[] {
  * into both — so no amount of subtracting one from the other separates them.
  */
 export interface WorkspaceState extends FolderState {
-  /** Message id → the addresses it named in its tags. `references.ts` reads it. */
-  tagged: TaggedIndex
+  /** Message id → the addresses it is a comment on, by §6.4's per-tag rule. `references.ts` reads it. */
+  anchors: AnchorIndex
   /**
    * Message id → its current text, where it was edited (CON-4).
    *
@@ -133,7 +133,7 @@ export interface WorkspaceState extends FolderState {
 function read(events: SignedEvent[], folders: string[]): WorkspaceState {
   return {
     ...foldFolder(events, referencedAddresses),
-    tagged: taggedIndex(events),
+    anchors: anchorIndex(events),
     edits: foldEdits(events),
     attachments: foldAttachments(events),
     // A parameter rather than derived from the events: the set that was

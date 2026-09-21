@@ -10,7 +10,7 @@
  * | | in the data | presented as |
  * | --- | --- | --- |
  * | **a comment** | uppercase `A` at the thread root — the thread *is* about this object | the object's own discussion |
- * | **a mention** | the address referenced inside a message | *Mentioned in*, secondary and collapsed |
+ * | **a mention** | an `a` tag on the root that is not its `A`, or an address in a body | *Mentioned in*, secondary and collapsed |
  *
  * `conversationsAbout` in `fold.ts` returns the union of both, because
  * `Conversation.about` is itself a union: `parseMessage` merges an event's `a`
@@ -31,48 +31,75 @@
  * So `foldFolder` is untouched and this is additive. `estiva-agent` gets the
  * file by copy like the rest of `src/`, and nothing it already does changes.
  *
- * ## What counts as tagged
+ * ## What counts as an anchor — §6.4's per-tag rule (CON-13)
  *
- * A `kind:9`'s `a` tag, and a `kind:1111`'s `A` and `a`. Case is the whole of
- * NIP-22 — uppercase names the thread root, lowercase the immediate parent — and
- * for a *top-level* comment the two are the same, which is why both are read.
- * On a reply the lowercase pair names the comment being answered rather than an
- * object, and a reply's tags are never consulted below anyway.
+ * Not every `a` tag is the object a thread is about. Since RIC-11 and peek#272
+ * a message carries every `nostr:naddr…` its body names as an `a` tag as well —
+ * the body is what the person wrote, the tag is the index that lets one `#a`
+ * filter answer *who named this file* — so a Peek comment written on a file
+ * that names a Ship issue carries the issue as `a`, and reading that as a
+ * comment put another file's discussion inside the issue's own. §6.4 says which
+ * tag carries which strength, and this is that table:
  *
- * A `nostr:naddr…` typed into a body is deliberately **not** tagged. That is the
- * mention half, and keeping the two apart is the entire point: Peek publishes
- * `about: referencedAddresses(m.body)` and no `a` tag at all, so every reference
- * a person types in Peek is a mention — which is exactly what §6.4 says it is.
+ * - A `kind:1111`'s `A` is the comment. NIP-22's uppercase names the thread
+ *   root, and a comment is about one object. Its `a` tags are read only when it
+ *   has no `A` at all — malformed, and absent from production — and any `a`
+ *   that is not the `A` is a mention, because NIP-22 makes a root's own
+ *   lowercase pair equal its uppercase one and so any other `a` is a reference.
+ * - A `kind:9`'s `a` is the comment when the body does **not** name it — the
+ *   anchor of a comment written before REW-10 moved comments to `1111`, which
+ *   nothing writes any more and which is not replaceable, so it is read for
+ *   good (112 threads on production, 2026-09-21). One the body *does* name is
+ *   the index of that reference: a mention, on a kind that has no `A`.
+ *
+ * A reply's tags are never consulted below: its lowercase pair names the
+ * comment being answered, or repeats what the root already said.
  */
-import type { SignedEvent } from '@estiva-app/protocol'
+import { findNaddrs, naddrToAddr, type SignedEvent } from '@estiva-app/protocol'
 import { KIND } from './kinds'
 import type { Conversation } from './fold'
 
-/** Message id → the addresses that message named in its **tags**, never in its body. */
-export type TaggedIndex = Record<string, string[]>
+/** Message id → the addresses that message is a **comment on**, by the rule above. */
+export type AnchorIndex = Record<string, string[]>
 
 /** Which of the two strengths §6.4 allows. */
 export type Attachment = 'comment' | 'mention'
 
+/** The addresses a body names, as `store.ts` reads them; a pointer that will not decode is prose. */
+function namedInBody(body: string): Set<string> {
+  const out = new Set<string>()
+  for (const naddr of findNaddrs(body)) {
+    try {
+      out.add(naddrToAddr(naddr))
+    } catch {
+      // Not a pointer we can read, so not a reference either.
+    }
+  }
+  return out
+}
+
 /**
- * Read the tag half of `about` back off the events.
+ * Read the comment half of `about` back off the events.
  *
  * Keyed by message id rather than by address because the question asked of it is
  * always *"how did this thread attach"*, which is a property of the thread's
  * root message. An address-keyed index would answer the same question at the
  * cost of a scan per lookup.
  */
-export function taggedIndex(events: readonly SignedEvent[]): TaggedIndex {
-  const index: TaggedIndex = {}
+export function anchorIndex(events: readonly SignedEvent[]): AnchorIndex {
+  const index: AnchorIndex = {}
   for (const event of events) {
     if (event.kind !== KIND.MESSAGE && event.kind !== KIND.COMMENT) continue
-    const named = new Set<string>()
-    for (const tag of event.tags) {
-      if (tag[0] === 'a' || (event.kind === KIND.COMMENT && tag[0] === 'A')) {
-        if (tag[1]) named.add(tag[1])
-      }
+    const values = (name: string) => event.tags.filter((t) => t[0] === name && t[1]).map((t) => t[1])
+    let anchors: string[]
+    if (event.kind === KIND.COMMENT) {
+      const roots = values('A')
+      anchors = roots.length ? roots : values('a')
+    } else {
+      const named = namedInBody(event.content)
+      anchors = values('a').filter((address) => !named.has(address))
     }
-    if (named.size) index[event.id] = [...named]
+    if (anchors.length) index[event.id] = [...new Set(anchors)]
   }
   return index
 }
@@ -96,11 +123,11 @@ export function taggedIndex(events: readonly SignedEvent[]): TaggedIndex {
 export function attachmentOf(
   conversation: Conversation,
   address: string,
-  tagged: TaggedIndex,
+  anchors: AnchorIndex,
 ): Attachment | null {
   if (!conversation.about.includes(address)) return null
   const rootIsPresent = conversation.root.id === conversation.id
-  const namedByRoot = rootIsPresent && (tagged[conversation.root.id] ?? []).includes(address)
+  const namedByRoot = rootIsPresent && (anchors[conversation.root.id] ?? []).includes(address)
   return namedByRoot ? 'comment' : 'mention'
 }
 
@@ -115,9 +142,9 @@ export function attachmentOf(
 export function commentsOn(
   conversations: readonly Conversation[],
   address: string,
-  tagged: TaggedIndex,
+  anchors: AnchorIndex,
 ): Conversation[] {
-  return conversations.filter((c) => attachmentOf(c, address, tagged) === 'comment')
+  return conversations.filter((c) => attachmentOf(c, address, anchors) === 'comment')
 }
 
 /**
@@ -138,9 +165,9 @@ export function commentsOn(
 export function mentionsOf(
   conversations: readonly Conversation[],
   address: string,
-  tagged: TaggedIndex,
+  anchors: AnchorIndex,
 ): Conversation[] {
-  return conversations.filter((c) => attachmentOf(c, address, tagged) === 'mention')
+  return conversations.filter((c) => attachmentOf(c, address, anchors) === 'mention')
 }
 
 /**
@@ -164,7 +191,7 @@ export function mentionsOf(
 export function commentsOnAny(
   conversations: readonly Conversation[],
   addresses: ReadonlySet<string>,
-  tagged: TaggedIndex,
+  anchors: AnchorIndex,
 ): { conversation: Conversation; about: string }[] {
   const found: { conversation: Conversation; about: string }[] = []
   for (const conversation of conversations) {
@@ -176,7 +203,7 @@ export function commentsOnAny(
       door, which is the §5.1 merge in a different place.
     */
     if (conversation.root.id !== conversation.id) continue
-    const named = tagged[conversation.root.id]
+    const named = anchors[conversation.root.id]
     if (!named) continue
     const about = named.find((address) => addresses.has(address))
     if (about) found.push({ conversation, about })

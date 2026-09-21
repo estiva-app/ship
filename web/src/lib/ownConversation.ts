@@ -1,5 +1,5 @@
 import type { Conversation } from '../../../src/fold'
-import type { TaggedIndex } from '../../../src/references'
+import type { AnchorIndex } from '../../../src/references'
 
 /**
  * A project's own conversation, now that other files live in its Folder —
@@ -28,10 +28,10 @@ import type { TaggedIndex } from '../../../src/references'
  * threads and nineteen comments on issues moved out of the project — each of
  * which the issue's own page still shows.
  */
-export function ownConversations(conversations: readonly Conversation[], folder: string, address: string, tagged: TaggedIndex): Conversation[] {
-  return conversations.filter((c) => c.root.folder === folder && !aboutAnotherFile(c, address, tagged))
+export function ownConversations(conversations: readonly Conversation[], folder: string, address: string, anchors: AnchorIndex): Conversation[] {
+  return conversations.filter((c) => c.root.folder === folder && !aboutAnotherFile(c, address, anchors))
 }
 
-function aboutAnotherFile(c: Conversation, address: string, tagged: TaggedIndex): boolean {
-  return (tagged[c.root.id] ?? []).some((named) => named !== address)
+function aboutAnotherFile(c: Conversation, address: string, anchors: AnchorIndex): boolean {
+  return (anchors[c.root.id] ?? []).some((named) => named !== address)
 }
