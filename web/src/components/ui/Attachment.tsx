@@ -27,14 +27,17 @@ import { blobObjectUrl } from '@/api/blobs'
  * looked at. The 181 lines that were here did what Peek's 174 did, differently.
  *
  * What stays is the one thing only this app knows: how to fetch with this
- * reader's authorization. It is a prop so a story can hand over a stub;
- * everything in Ship takes the default.
+ * reader's authorization, and which URL is the thumbnail and which the
+ * original.
+ *
+ * No story here, by ruling (Katerina, 21 September): the card has a page in the
+ * package, and a second page drawing the same card with Ship's words would be
+ * the same picture twice. What is left in this file is a mapping, not a shape.
  */
 export function Attachment({
   file,
   opens = true,
   className,
-  fetchImage = blobObjectUrl,
 }: {
   file: Imeta
   /**
@@ -44,8 +47,6 @@ export function Attachment({
    */
   opens?: boolean
   className?: string
-  /** How this app reads a file it is allowed to read. The default signs as the viewer. */
-  fetchImage?: (url: string) => Promise<string>
 }) {
   const isImage = file.m.startsWith('image/')
   const name = file.filename ?? file.alt ?? (isImage ? 'attachment' : 'file')
@@ -68,7 +69,7 @@ export function Attachment({
       contentType={file.m}
       remoteSrc={opens || isImage ? (isImage ? (file.thumb ?? file.url) : file.url) : undefined}
       remoteFullSrc={isImage ? file.url : undefined}
-      fetchImage={fetchImage}
+      fetchImage={blobObjectUrl}
       download={opens}
       className={className}
     />
@@ -76,23 +77,14 @@ export function Attachment({
 }
 
 /** Every file on one message, in the order the sender attached them. */
-export function Attachments({
-  files,
-  className,
-  fetchImage,
-}: {
-  files?: readonly Imeta[]
-  className?: string
-  /** Passed to each card; a story hands over a stub, the app takes the default. */
-  fetchImage?: (url: string) => Promise<string>
-}) {
+export function Attachments({ files, className }: { files?: readonly Imeta[]; className?: string }) {
   if (!files || files.length === 0) return null
   return (
     <div className={cn('flex flex-wrap items-start gap-1.5', className)}>
       {files.map((file) => (
         // Content-addressed, so the hash is a stable key — and two copies of
         // one file on a message are the same blob, hence the index beside it.
-        <Attachment key={`${file.x}_${file.url}`} file={file} fetchImage={fetchImage} />
+        <Attachment key={`${file.x}_${file.url}`} file={file} />
       ))}
     </div>
   )
