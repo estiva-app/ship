@@ -61,8 +61,9 @@ describe('Attachment', () => {
 
   it('shows a placeholder while the bytes are in flight', () => {
     blobObjectUrl.mockReturnValue(new Promise(() => {}))
-    const c = render(<Attachment file={image} />).container
-    expect(c.querySelector('[data-attachment="loading"]')).toBeTruthy()
+    render(<Attachment file={image} />)
+    // The package's busy card since UIG-35: named as a status, for a reader who cannot see the pulse.
+    expect(screen.getByRole('status', { name: 'Loading screenshot.jpg' })).toBeTruthy()
   })
 
   /*
@@ -74,8 +75,8 @@ describe('Attachment', () => {
   */
   it('says so when the bytes cannot be read, rather than drawing nothing', async () => {
     blobObjectUrl.mockRejectedValue(new Error('blob read failed: 401'))
-    const c = render(<Attachment file={image} />).container
-    await waitFor(() => expect(c.querySelector('[data-attachment="unreadable"]')).toBeTruthy())
+    render(<Attachment file={image} />)
+    await waitFor(() => expect(screen.getByText('Could not be loaded')).toBeTruthy())
     expect(screen.getByText(/screenshot\.jpg/)).toBeTruthy()
   })
 
