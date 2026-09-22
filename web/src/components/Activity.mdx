@@ -1,0 +1,58 @@
+import { Meta, Canvas, Controls } from '@storybook/addon-docs/blocks'
+import * as ActivityStories from './Activity.stories'
+
+<Meta of={ActivityStories} />
+
+# Activity
+
+The conversations of files *related* to this one, in one time-ordered list with
+a relation on every row. One rule decides which list a thread lands in:
+**identity merges, relation aggregates.**
+
+<Canvas of={ActivityStories.Default} />
+
+## When
+
+- On an object's page, under an Activity heading, beside **Conversations**.
+- For a thread about something merely related — a mention, or a conversation on
+  a sub-file.
+
+## When not
+
+- For this object's own threads, including one on a file declared to be the
+  same thing as it → **Conversations**.
+- For this object's change events → **History**. Two sections on one page
+  cannot both be Activity.
+- Never one section per relation. A third-party app can render this surface
+  without knowing which relation types exist yet: an unfamiliar one is still a
+  row with a label.
+
+## How
+
+```tsx
+import { Activity } from '@/components/Activity'
+
+<Activity items={items} onReply={reply} nameOf={nameOf} truncated={left} />
+```
+
+- An item is a thread, its relation, and where it lives in words. `where` is
+  absent when Ship cannot name the file, which is ordinary rather than an
+  error.
+- A reply goes to the file the thread belongs to, never to the file you are
+  looking at. That falls out of the data, but the row names the destination,
+  because a composer pointing somewhere else is otherwise a trap.
+
+## What it owns
+
+- **The two relations and their exact words.** "Mentioned in" is the
+  specification's own phrase, kept verbatim so the screen and the spec cannot
+  drift into two names for one thing.
+- **The lighter weight a mention gets.** A stranger typing your address arrives
+  retroactively and can never be withdrawn, so it must not sit indistinguishably
+  beside your project's own work.
+- **The closing line**, which declines to present the length as authoritative:
+  conversations in folders you cannot read are absent, without being counted.
+
+## Props
+
+<Controls of={ActivityStories.Default} />

@@ -1,0 +1,56 @@
+import { Meta, Canvas, Controls } from '@storybook/addon-docs/blocks'
+import * as RichTextStories from './RichText.stories'
+
+<Meta of={RichTextStories} />
+
+# RichText
+
+A body, drawn — every block and mark SPEC §13 defines, in both content models.
+Every string reaches the DOM as a React child, so a body written by somebody
+else on a shared relay is safe by construction rather than by care.
+
+<Canvas of={RichTextStories.MarkerBody} />
+
+## When
+
+- Any body that came off the relay: a message, a description, another app's.
+- Whenever you have the format from the event's own tag. The caller reads it
+  off the fold and passes it on.
+
+## When not
+
+- Never `dangerouslySetInnerHTML`, and never interpolate a title into a
+  template string. On a shared relay the words were written by other people.
+- Never guess the format from the body. A description that happens to begin
+  with `{` is marker text, because it carries no tag.
+- For the editor as well as the rendering → **DescriptionEditor**, which wears
+  the same block styles.
+
+## How
+
+```tsx
+import { RichText } from '@/components/ui/RichText'
+
+<RichText value={body} format={format} resolved={resolved} nameOf={nameOf} hideStandalone />
+```
+
+- `resolved` is keyed by URI and resolved once for the whole body, so an object
+  named twice cannot be drawn in two states on one screen.
+- `hideStandalone` takes a predicate as well as a boolean. Pass one where you
+  cannot afford to hide a pointer you will not draw below: a message that is
+  *only* a pointer would otherwise render as a name and a time above nothing.
+
+## What it owns
+
+- **One element per block**, unstyled, with the look coming from `PROSE_BLOCKS`
+  — the same styles the editor wears, so neither surface can be restyled
+  without the other.
+- **The fallback for a block it has never heard of**: its inline text is drawn,
+  never dropped, because a block that vanishes is indistinguishable from one the
+  reader is not allowed to see.
+- **`strong` / `em` / `u`, not `b` / `i`.** The mark is meaning, and a literal
+  `<b>` typed by an author never reaches the DOM as one.
+
+## Props
+
+<Controls of={RichTextStories.MarkerBody} />

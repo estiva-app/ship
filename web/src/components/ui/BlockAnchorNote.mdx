@@ -1,0 +1,52 @@
+import { Meta, Canvas, Controls } from '@storybook/addon-docs/blocks'
+import * as BlockAnchorNoteStories from './BlockAnchorNote.stories'
+
+<Meta of={BlockAnchorNoteStories} />
+
+# BlockAnchorNote
+
+What a comment is anchored to — the part of the description it is about, quoted
+above it. It exists for the states it draws *differently*, not the one it draws
+well: a comment on a paragraph somebody has deleted and a comment about the
+whole object mean opposite things, and would otherwise look identical.
+
+<Canvas of={BlockAnchorNoteStories.Resolved} />
+
+## When
+
+- Above a message, wherever a comment carries a `block` tag — today that is
+  every message in a thread.
+- Always. The component decides for itself whether there is anything to say,
+  and draws nothing when there is not.
+
+## When not
+
+- Never hide a broken anchor. A comment whose subject has gone still has to say
+  so, or it silently becomes a comment about the whole object.
+- Never write the two failures with the same words. Telling somebody a
+  paragraph was removed when none ever existed is wrong twice.
+
+## How
+
+```tsx
+import { BlockAnchorNote } from '@/components/ui/BlockAnchorNote'
+
+<BlockAnchorNote anchor={message.anchor} />
+```
+
+- The anchor comes from `resolveBlockAnchor`, resolved against the description
+  the comment is about. Where a surface has no single object, every anchor is
+  reported `unaddressable` rather than quietly dropped.
+
+## What it owns
+
+- **The four states and their words.** `unanchored` draws nothing;
+  `resolved` quotes the block, clamped to two lines; `detached` and
+  `unaddressable` each get their own sentence.
+- **Both failures muted, and worded apart.** Muted because a broken anchor is
+  not an error the reader caused and cannot act on; worded apart because
+  telling them apart is the whole point.
+
+## Props
+
+<Controls of={BlockAnchorNoteStories.Resolved} />

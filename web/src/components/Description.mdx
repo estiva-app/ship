@@ -1,0 +1,48 @@
+import { Meta } from '@storybook/addon-docs/blocks'
+
+<Meta title="Projects/Description" />
+
+# Description
+
+An object's description, whole — the editor, the rendering, and the objects it
+refers to. The three used to be assembled by hand at each call site, and one
+copy was assembled wrong.
+
+**Seen in** — every story under *Projects/ProjectHeader*, and the project and
+issue pages under *Pages/In the shell*.
+
+## When
+
+- Wherever an object has a description somebody can read and edit.
+- Always as the whole thing. A caller cannot take one half without the other:
+  showing the bech32 *and* the object is worse than either, and showing neither
+  is what a project description did.
+
+## When not
+
+- For a message body → **RichText**, which is the rendering alone.
+- Never assemble the editor, the rendering and the references yourself. An
+  issue's description stripped its pointers out of the prose and drew the
+  objects below it; a project's did neither — and every test was green, because
+  nothing was broken. One surface simply had a feature the other did not.
+
+## How
+
+```tsx
+import { Description } from '@/components/Description'
+
+<Description value={body} format={format} onCommit={save} readOnly={!canWrite} nameOf={nameOf} />
+```
+
+- `onCommit` receives the body *and* the format tag, because this component is
+  what built the document, and a body's format lives on the event rather than
+  being guessed from the body.
+
+## What it owns
+
+- **Which pointer is an attachment and which is a mention.** A pointer alone on
+  its line is drawn as a card below; a pointer inside a sentence is drawn where
+  it was written. The rule itself is the package's, so Peek reaches the same
+  answer for the same body.
+- **The bar drawn while those objects resolve**, so an attachment that is on
+  its way does not look like one that is not there.

@@ -1,0 +1,53 @@
+import { Meta } from '@storybook/addon-docs/blocks'
+
+<Meta title="Primitives/Attachment" />
+
+# Attachment
+
+A file on a message, drawn as the package's `AttachmentCard`. What is left in
+this file is a mapping, not a shape: how to fetch with this reader's
+authorization, and which URL is the thumbnail and which the original.
+
+**Seen in** — the card itself has its own page in `@estiva-app/ui`
+(*Media/AttachmentCard*), with every state. There is no story here, by ruling
+(Katerina, 21 September): a second page drawing the same card in Ship's words
+would be the same picture twice.
+
+## When
+
+- Anywhere Ship holds an `imeta` — the files on a message, an `attachment`
+  block inside a body.
+- Use `Attachments` for all the files on one message, in the order the sender
+  attached them.
+
+## When not
+
+- Never a plain `<img src>`. Media reads are authenticated, so one answers 401
+  for everyone — which is also why a picture here has a loading state and a
+  refusal.
+- For a file still being chosen in a composer, use the package card's `pending`
+  form rather than this.
+
+## How
+
+```tsx
+import { Attachment, Attachments } from '@/components/ui/Attachment'
+
+<Attachments files={message.files} />
+<Attachment file={file} opens={false} />
+```
+
+- `opens={false}` only inside a description being edited. That editor saves and
+  closes when it loses focus, and the card's link and Download button take
+  focus — measured 15 September: pressing Download committed and left the
+  editor.
+
+## What it owns
+
+- **The signed fetch.** `blobObjectUrl` signs a `kind:24242` and hands back an
+  object URL, which is the one thing only this app knows.
+- **Which URL is which**: the relay's thumbnail in a conversation, the original
+  only when somebody opens it.
+- **The alt text rule.** The sender's words where they wrote some, the filename
+  otherwise, and never empty — an empty alt tells a screen reader the image is
+  decorative, and an attachment somebody deliberately posted is the opposite.

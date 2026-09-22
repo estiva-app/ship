@@ -1,0 +1,47 @@
+import { Meta } from '@storybook/addon-docs/blocks'
+
+<Meta title="Overlays/NewIssueDialog" />
+
+# NewIssueDialog
+
+Production's New issue form, in the shared **DialogShell**. An issue lives in a
+project's Folder, so it always has a project.
+
+**Seen in** — *Overlays/Dialogs*: **New Issue**, **New Issue In A Project** and
+**New Issue Without Projects**. That page groups all four of Ship's dialogs
+under one heading, so the catalogue cannot link these stories to this component
+— the stories are there.
+
+## When
+
+- From a project page, where the project is preselected and fixed.
+- From the Issues page, where it is chosen from a select.
+
+## When not
+
+- When there is no project at all. The form says to create one first rather
+  than offering a field that cannot succeed.
+- Never build the frame by hand: the title bar, the body and the footer are
+  **DialogShell**'s, the fields are **Field** with **TextInput**, **Textarea**
+  and **Select**, and the submit is the package's **Form**.
+
+## How
+
+```tsx
+import { NewIssueDialog } from '@/components/NewIssueDialog'
+
+<NewIssueDialog projects={options} project={{ addr, title }} onClose={close} onCreate={create} />
+```
+
+- `onCreate` resolves `false` to keep the dialog open — the caller has already
+  said why, in the page's banner.
+- `project` fixes the project and names it in the title and the placeholder;
+  leave it out and the select appears.
+
+## What it owns
+
+- **The three fields and which are required**: a title, an optional
+  description, and the project.
+- **The "create a project first" state**, which also removes the submit button
+  rather than leaving one that cannot work.
+- **The busy state** while the relay answers, and closing only once it has.

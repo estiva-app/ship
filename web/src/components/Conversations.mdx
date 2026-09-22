@@ -1,0 +1,51 @@
+import { Meta, Canvas, Controls } from '@storybook/addon-docs/blocks'
+import * as ConversationStories from './Conversations.stories'
+
+<Meta of={ConversationStories} />
+
+# Conversations
+
+The conversations on an issue or project: a box to start one, then each thread
+as its own card, or a line saying there are none yet.
+
+<Canvas of={ConversationStories.Default} />
+
+## When
+
+- On the page of the object the threads are about.
+- Wherever somebody may write. Leave a callback out where nobody may, which
+  removes the control instead of disabling it.
+
+## When not
+
+- For threads that belong to other files → **Activity**. The distinction is the
+  whole model, not a layout choice.
+- For one thread on its own → **ConversationThread**.
+
+## How
+
+```tsx
+import { Conversations } from '@/components/ConversationThread'
+
+<Conversations threads={threads} onStart={start} onReply={reply} about={issue.addr} unread={unread} />
+```
+
+- `about` is only for the "start a conversation" composer's draft: a reply is
+  keyed by its own thread, which is the same destination wherever it is read.
+- A write callback resolves `false` on a refusal, which is what keeps the
+  confirm dialog or the editor open so the page's banner can carry the relay's
+  own words.
+
+## What it owns
+
+- **Resolving every body's references once for the whole surface**, so one
+  object cannot be drawn in two states on one screen.
+- **Reading the reactions once**, and re-reading after a write rather than
+  patching the count locally — the relay is the authority on whether a reaction
+  happened.
+- **The drafts**, keyed by the object for a new conversation and by the thread
+  for a reply.
+
+## Props
+
+<Controls of={ConversationStories.Default} />

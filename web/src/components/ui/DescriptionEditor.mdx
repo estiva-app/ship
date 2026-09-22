@@ -1,0 +1,53 @@
+import { Meta } from '@storybook/addon-docs/blocks'
+
+<Meta title="Projects/DescriptionEditor" />
+
+# DescriptionEditor
+
+A description, written where it is read. Reading and writing are the same
+document at the same size in the same place, rather than a rendering and a
+smaller box holding its source.
+
+**Seen in** — every story under *Projects/ProjectHeader* draws the reading
+surface; clicking it opens the editor. There is no story of its own, by ruling
+(Katerina, 22 September): the two states are one click apart, and what was
+missing was the rule below, not a picture.
+
+## When
+
+- For a description: a body with headings, lists and live references, which a
+  field cannot hold.
+- Through **Description**, which is what pairs it with the rendering of the
+  objects the body refers to.
+
+## When not
+
+- For a title, or any one line of prose → **EditableText**, where a field that
+  looks like a field is the honest affordance.
+- Never swap the rendered document for a `textarea`. That is what this
+  replaced, and it made every heading, list and live reference disappear at the
+  moment somebody started writing.
+
+## How
+
+```tsx
+import { DescriptionEditor } from '@/components/ui/DescriptionEditor'
+
+<DescriptionEditor value={value} format={format} onCommit={save} placeholder="Add a description…" readOnly={readOnly} />
+```
+
+- `onCommit` resolves `false` to keep the editor open with the text still in
+  it.
+- Tab reaches the reading surface and Enter opens it. There is no Edit button;
+  it was a hover-only affordance nobody found.
+
+## What it owns
+
+- **Blur commits. Escape reverts. Enter does not commit** — it makes a
+  paragraph, because that is what Enter does in a document.
+- **Reading and writing kept 1:1 by sharing the styles**, not by care:
+  `PROSE_BLOCKS` is applied to both wrappers and addresses elements both
+  surfaces emit.
+- **A reader never downloads an editor.** The writing surface loads on the
+  first click, and the fallback while it loads is the reading surface itself —
+  the same pixels, so the fetch shows as nothing rather than as a spinner.
