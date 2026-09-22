@@ -138,10 +138,13 @@ export function Reference({
         <span className="truncate">{label}</span>
         {object.slots.status && (
           // Same call `ForeignObject` makes for the attachment variant, so the
-          // two agree about what a status looks like.
+          // two agree about what a status looks like — including the colour it
+          // reads the shape from, which is the only signal of meaning that
+          // crosses an app boundary (UIG-18).
           <StatusLabel
             value={object.slots.status.value}
             label={object.slots.status.value}
+            colour={object.slots.status.colour}
             size="small"
             className="shrink-0"
           />

@@ -29,7 +29,7 @@ const issue = {
   kind: 30851,
   widget: 'row',
   appName: 'Estiva Ship',
-  slots: { title: { value: 'Ship the block model' }, status: { value: 'In Progress' } },
+  slots: { title: { value: 'Ship the block model' }, status: { value: 'In Progress', colour: 'blue' } },
 } as unknown as ForeignObject
 
 const message = {

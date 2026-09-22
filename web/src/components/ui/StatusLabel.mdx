@@ -25,11 +25,11 @@ everywhere. Ship-only, because it knows Ship's vocabulary.
   `StatusShape`. That list is grouped by status and the heading already says
   the word; a shape without its word anywhere else is a dot, and dots are what
   the shapes replaced.
-- **For another app's status, read the colour the manifest sent.** What reaches
-  a consumer through the projection is the *label*, not the raw value, with a
-  `colour` beside it — so the shape lookup here cannot match and falls to a
-  plain circle. **ForeignObject** and **Reference** do exactly that today; it
-  is a known defect, not the intended use.
+- **For another app's status, pass `colour`, not `value`.** What reaches a
+  consumer through the projection is the *label*, never the raw key, so the
+  shape lookup on `value` cannot match and falls to a plain circle — which is
+  what **ForeignObject** and **Reference** drew for every app, Ship's own
+  objects included, until 22 September.
 
 ## How
 
@@ -37,11 +37,16 @@ everywhere. Ship-only, because it knows Ship's vocabulary.
 import { StatusLabel, StatusShape } from '@/components/ui/StatusLabel'
 
 <StatusLabel value="in_progress" label="In Progress" size="small" />
+<StatusLabel value={slot.value} label={slot.value} colour={slot.colour} size="small" />
 <StatusShape value={issue.status} label={statusLabel} size={14} />
 ```
 
 - `value` is the raw status and decides the icon; `label` is the words. A value
   outside the vocabulary keeps its words and gets a plain circle.
+- `colour` is for an object Ship does not own. The four the manifests declare —
+  `neutral`, `blue`, `green`, `muted` — are the same four Ship's own vocabulary
+  uses, so a Ship object read back through the projection gets the shape it has
+  natively.
 
 ## What it owns
 
@@ -52,6 +57,9 @@ import { StatusLabel, StatusShape } from '@/components/ui/StatusLabel'
   icon, `default` is body-2 with 16px.
 - **Showing a status it has never heard of** rather than hiding it. Another app
   wrote it and it is still true.
+- **The crossing from a declared colour to a shape.** `stage` never reaches a
+  consumer, so the colour is the only signal of meaning that survives the
+  projection, and this is the one place it is read.
 
 ## Props
 
