@@ -43,7 +43,7 @@ type Story = StoryObj<typeof meta>
 export const Card: Story = {
   args: {
     object: obj({
-      slots: { title: { value: 'Cut-over checklist' }, subtitle: { value: 'What has to be true before the old read path is turned off.' }, status: { value: 'In Progress' } },
+      slots: { title: { value: 'Cut-over checklist' }, subtitle: { value: 'What has to be true before the old read path is turned off.' }, status: { value: 'In Progress', colour: 'blue' } },
       meta: [{ label: 'Led by', value: ADA, isPubkey: true }],
       people: { [ADA]: { displayName: 'Ada Lovelace' } },
     }),
