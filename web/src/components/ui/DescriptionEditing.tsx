@@ -1,7 +1,8 @@
 import { useCallback, useRef, useState } from 'react'
 import { EditorContent, useEditor, type Editor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
-import { IconPaperclip } from '@tabler/icons-react'
+import { TableKit } from '@tiptap/extension-table'
+import { IconPaperclip, IconTable } from '@tabler/icons-react'
 import type { ContentFormat, Imeta } from '@estiva-app/protocol'
 import { FieldLine, FilePicker } from '@estiva-app/ui'
 import type { ForeignObject } from '@/api/foreign'
@@ -107,6 +108,18 @@ export default function DescriptionEditing({
           // §13.3 validates a heading at 1–3 and rejects anything else.
           heading: { levels: [1, 2, 3] },
         }),
+        /*
+          Tables — §13.3's `table` block, UIG-18.
+
+          They travelled through untouched until now, parked in `UnknownBlock`:
+          the protocol has named `table` since the block model landed, and 24
+          published descriptions carry one, but there was no editing design.
+          `TableKit` is the four nodes ProseMirror needs — the table, its rows,
+          and the two kinds of cell — and it is what decides the shape Ship
+          publishes, which is why it is registered before the reader learns to
+          draw one and not after.
+        */
+        TableKit.configure({ table: { resizable: false } }),
         BlockId,
         ReferenceNode,
         UnknownBlock,
@@ -231,6 +244,23 @@ export default function DescriptionEditing({
             onClick={openPicker}
           >
             <IconPaperclip size={16} stroke={1.5} />
+          </IconButton>
+          <IconButton
+            variant="muted"
+            aria-label="Insert a table into the description"
+            tooltip="Insert a table"
+            // Same rule the paperclip keeps: this editor commits on blur, so a
+            // control that took focus would save and close before it acted.
+            onMouseDown={(event) => event.preventDefault()}
+            /*
+              Three columns and three rows with a header — the shape somebody
+              asked for when they asked for a table, and the one the published
+              descriptions carry. Rows and columns are added from the keyboard
+              afterwards: Tab at the last cell makes a row.
+            */
+            onClick={() => editor?.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
+          >
+            <IconTable size={16} stroke={1.5} />
           </IconButton>
         </div>
         {/* The package's FieldLine: the same line, and it says "error" itself (UIG-8). */}

@@ -1,0 +1,66 @@
+import { Meta, Canvas, Controls } from '@storybook/addon-docs/blocks'
+import * as StatusLabelStories from './StatusLabel.stories'
+
+<Meta of={StatusLabelStories} />
+
+# StatusLabel
+
+A status written out: its shaped icon and the vocabulary's label, in one colour
+everywhere. Ship-only, because it knows Ship's vocabulary.
+
+<Canvas of={StatusLabelStories.AllStatuses} />
+
+## When
+
+- Wherever a Ship status is shown — a card, a list row, a table cell, a group
+  heading. The card, the list and the table had each picked their own colour
+  before this existed.
+- `small` on a card's or a row's meta line; `default` in a table cell or a
+  heading; `strong` where the label names a group rather than describing a
+  thing.
+
+## When not
+
+- **The shape alone** belongs on the Issues list row and nowhere else, through
+  `StatusShape`. That list is grouped by status and the heading already says
+  the word; a shape without its word anywhere else is a dot, and dots are what
+  the shapes replaced.
+- **For another app's status, pass `colour`, not `value`.** What reaches a
+  consumer through the projection is the *label*, never the raw key, so the
+  shape lookup on `value` cannot match and falls to a plain circle — which is
+  what **ForeignObject** and **Reference** drew for every app, Ship's own
+  objects included, until 22 September.
+
+## How
+
+```tsx
+import { StatusLabel, StatusShape } from '@/components/ui/StatusLabel'
+
+<StatusLabel value="in_progress" label="In Progress" size="small" />
+<StatusLabel value={slot.value} label={slot.value} colour={slot.colour} size="small" />
+<StatusShape value={issue.status} label={statusLabel} size={14} />
+```
+
+- `value` is the raw status and decides the icon; `label` is the words. A value
+  outside the vocabulary keeps its words and gets a plain circle.
+- `colour` is for an object Ship does not own. The four the manifests declare —
+  `neutral`, `blue`, `green`, `muted` — are the same four Ship's own vocabulary
+  uses, so a Ship object read back through the projection gets the shape it has
+  natively.
+
+## What it owns
+
+- **The five shapes**, from ruling C14: dashed circle open, half circle in
+  progress, tick done, cross cancelled, plain circle for anything else. Issues
+  and projects share them — todo is planned, done is completed.
+- **The two sizes**, tied to the type tokens: `small` is caption with a 14px
+  icon, `default` is body-2 with 16px.
+- **Showing a status it has never heard of** rather than hiding it. Another app
+  wrote it and it is still true.
+- **The crossing from a declared colour to a shape.** `stage` never reaches a
+  consumer, so the colour is the only signal of meaning that survives the
+  projection, and this is the one place it is read.
+
+## Props
+
+<Controls of={StatusLabelStories.Default} />

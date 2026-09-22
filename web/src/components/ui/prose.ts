@@ -46,6 +46,15 @@ const PROSE_BLOCK_CLASSES = [
   '[&_pre]:whitespace-pre-wrap [&_pre]:break-words [&_pre]:rounded-md [&_pre]:bg-bg-inset [&_pre]:p-2 [&_pre]:font-mono [&_pre]:text-[0.9em]',
   // eslint-disable-next-line token-values/no-restricted-classes -- @estiva-escape: code is 0.9 of the text around it, so it scales with a heading; a named size is fixed
   '[&_:not(pre)>code]:rounded-sm [&_:not(pre)>code]:bg-bg-inset [&_:not(pre)>code]:px-1 [&_:not(pre)>code]:py-0.5 [&_:not(pre)>code]:font-mono [&_:not(pre)>code]:text-[0.9em]',
+  /*
+    A table — §13.3, UIG-18. Hairlines on the cells rather than a box around
+    the whole, so a table reads as a grid at any width; the header row takes
+    the inset fill the way a code fence does, which is the only other place
+    this file tints a background.
+  */
+  '[&_table]:w-full [&_table]:border-collapse',
+  '[&_th]:border [&_th]:border-border-default [&_th]:bg-bg-inset [&_th]:px-2 [&_th]:py-1 [&_th]:text-left [&_th]:align-top [&_th]:font-medium',
+  '[&_td]:border [&_td]:border-border-default [&_td]:px-2 [&_td]:py-1 [&_td]:align-top',
   '[&_hr]:border-border-default',
   '[&_strong]:font-semibold',
   '[&_em]:italic',

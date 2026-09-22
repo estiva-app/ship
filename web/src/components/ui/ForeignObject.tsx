@@ -172,10 +172,20 @@ function ForeignCard({ object, row, conversations, className }: ForeignObjectPro
               slot safe rather than merely tolerable (§13.3). */}
           {slots.title?.value ?? 'Untitled'}
         </span>
-        {/* The count before the chip — what is said about the file, then
-            whose it is — the same order an issue row keeps. */}
-        {conversations !== undefined && <ConversationCount count={conversations} unit="comment" />}
-        {object.appName && <Chip label={object.appName} />}
+        {/*
+          The count before the chip — what is said about the file, then whose
+          it is — the same order an issue row keeps.
+
+          Centred on each other in a group of their own (Katerina, 22
+          September). The row is `items-start`, so the count, which is 14.4px
+          against the chip's 20, floated 2.6px above it; aligning the whole row
+          instead would move the title, which is meant to sit at the top of a
+          card whose subtitle may wrap.
+        */}
+        <span className="flex shrink-0 items-center gap-2">
+          {conversations !== undefined && <ConversationCount count={conversations} unit="comment" />}
+          {object.appName && <Chip label={object.appName} />}
+        </span>
       </div>
       {slots.subtitle && (
         <p className="line-clamp-2 text-body-2 text-text-secondary">{slots.subtitle.value}</p>
@@ -183,7 +193,13 @@ function ForeignCard({ object, row, conversations, className }: ForeignObjectPro
       {(slots.status || meta.length > 0) && (
         <div className="flex flex-wrap items-center gap-2.5 text-caption text-text-muted">
           {slots.status && (
-            <StatusLabel value={slots.status.value} label={slots.status.value} size="small" />
+            /*
+              By the colour, not the value — UIG-18. The projection replaced
+              the raw status with its label before it reached here, so passing
+              the value drew a plain circle for every app, Ship's own objects
+              included. See `StatusLabel`'s `colour`.
+            */
+            <StatusLabel value={slots.status.value} label={slots.status.value} colour={slots.status.colour} size="small" />
           )}
           {meta.map((entry, i) => (
             <span key={i} className="flex min-w-0 items-center gap-1.5">
@@ -203,9 +219,12 @@ function ForeignCard({ object, row, conversations, className }: ForeignObjectPro
         `children === undefined` means no list was declared; `[]` means one was
         and nothing matched. Those are different sentences and this draws
         neither the same way as the other.
+
+        A line between the children, and none above the first (Katerina, 22
+        September): the card's own edge already says where its contents begin.
       */}
       {children && children.length > 0 && (
-        <div className="mt-1 flex flex-col divide-y divide-border-default border-t border-border-default">
+        <div className="mt-1 flex flex-col divide-y divide-border-default">
           {children.map((child) => (
             <ForeignObject key={child.ref} object={child} />
           ))}

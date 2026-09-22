@@ -1,0 +1,59 @@
+import { Meta, Canvas, Controls } from '@storybook/addon-docs/blocks'
+import * as ReferenceStories from './Reference.stories'
+
+<Meta of={ReferenceStories} />
+
+# Reference
+
+A `nostr:` pointer drawn where it was written, as a chip one line high. One
+component for every kind of reference, on purpose: a person and a project are
+the same idea pointed at two things, and drawing them with two unrelated
+mechanisms is how the display-name mention drifted away from the projection
+layer in the first place.
+
+<Canvas of={ReferenceStories.Object} />
+
+## When
+
+- Inside a body, wherever the parser says a run is a reference. What it draws
+  depends on what the URI turns out to name, not on the caller knowing in
+  advance.
+- For anything it cannot resolve. A reference to something outside this
+  workspace still says a reference is there — never blank.
+
+## When not
+
+- Never pattern-match a name back out of text. Nothing here has to recognise a
+  name, which is why it works for a body Ship did not write.
+- For an object that should be a card with its own states → **ForeignObject**.
+
+## How
+
+```tsx
+import { Reference } from '@/components/ui/Reference'
+
+<Reference uri={run.reference} object={resolved[run.reference]} nameOf={nameOf} />
+```
+
+- `object` is passed in, not resolved here: a body's references are resolved
+  once for the whole body, so the same object cannot appear in two states on
+  one screen.
+- `undefined` means still resolving and `null` means resolved to nothing. They
+  are different facts, drawn the same way, because neither is something a
+  reader can act on.
+
+## What it owns
+
+- **Person, object, unresolved** — and which of the three a URI turns out to be.
+- **A chip that names something leads to it.** One of Ship's own objects opens
+  here through the router; another app's opens at the `openUrl` its manifest
+  gave, in a new tab. A person stays a label, because Ship has no page for one.
+- **The 24-character cut and the tooltip that carries the whole label**, on
+  hover and on keyboard focus. A mention is a word in a sentence; the whole
+  title is a sentence of its own.
+- **The click stops at the chip**, because the surface under it may open on a
+  click of its own, and a mention followed is not a description edited.
+
+## Props
+
+<Controls of={ReferenceStories.Object} />

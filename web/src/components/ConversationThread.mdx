@@ -1,0 +1,52 @@
+import { Meta, Canvas, Controls } from '@storybook/addon-docs/blocks'
+import * as ConversationThreadStories from './ConversationThread.stories'
+
+<Meta of={ConversationThreadStories} />
+
+# ConversationThread
+
+One conversation as a card: its first message, the replies one level in behind
+a left rule, a line where unread messages begin, and a box to reply. Flat
+within a thread, as Peek shows them; never deeper.
+
+<Canvas of={ConversationThreadStories.OneCard} />
+
+## When
+
+- Inside a list of threads: **Conversations** on an object's own page,
+  **Activity** for threads that belong elsewhere.
+- With `subdued` for a thread that arrived by mention rather than by being
+  yours.
+
+## When not
+
+- Never alone on a page. The card is a row in a list, and the list is what
+  decides which list a thread belongs in.
+- Never deeper than one level of replies.
+
+## How
+
+```tsx
+import { ConversationThread } from '@/components/ConversationThread'
+
+<ConversationThread thread={thread} onReply={reply} unreadFrom={first} subdued />
+```
+
+- `unreadFrom` is the id of the first message this reader has not seen; the
+  divider sits above it and everything below it is new.
+- Omit `onDeleteMessage` and `onEditMessage` where nobody may write. The
+  control is then absent rather than disabled.
+
+## What it owns
+
+- **The card**: a hairline, the surface background, 10×12 padding, 10px between
+  cards. With `subdued` it recedes rather than fading — no fill, so the text
+  stays legible.
+- **Where the unread rule sits**, and that it is a rule rather than a badge:
+  the signal lives where the reading happens.
+- **The reply destination.** A reply is published into the thread's own folder,
+  not the page around it.
+
+## Props
+
+<Controls of={ConversationThreadStories.OneCard} />

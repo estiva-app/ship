@@ -33,6 +33,22 @@ export interface StatusLabelProps {
   value: string
   /** The vocabulary's label — or the raw value, when it has none. */
   label: string
+  /**
+   * Another app's status, by the colour its manifest declared — UIG-18.
+   *
+   * **Use this for every object Ship does not own.** What the projection hands
+   * a consumer is the vocabulary's *label*, never the raw value (interop
+   * `projection.js`: `value = entry?.label ?? raw`), so `value` above cannot
+   * match and every foreign status fell to the plain circle — Ship's own
+   * issues included, the moment one was mentioned in a comment. The colour is
+   * the one signal of *meaning* that does cross an app boundary, and it is
+   * declared for exactly that: "set when the value came from a vocabulary —
+   * the consumer picks the colour".
+   *
+   * Ship's own vocabulary uses the same four (`kinds.ts`), so a Ship object
+   * read back through the projection gets the shape it has natively.
+   */
+  colour?: string
   size?: 'small' | 'default'
   strong?: boolean
   className?: string
@@ -50,9 +66,17 @@ export function StatusShape({ value, label, size = 16, className }: { value: str
   )
 }
 
-function Shape({ value, size }: { value: string; size: 14 | 16 }) {
+/** A declared colour, as the shape that means the same thing. `stage` never reaches a consumer, so this is the crossing. */
+const BY_COLOUR: Record<string, string> = {
+  neutral: 'todo',
+  blue: 'in_progress',
+  green: 'done',
+  muted: 'cancelled',
+}
+
+function Shape({ value, colour, size }: { value: string; colour?: string; size: 14 | 16 }) {
   const common = { size, stroke: 1.5, className: 'shrink-0' }
-  switch (value) {
+  switch (colour ? (BY_COLOUR[colour] ?? '') : value) {
     case 'todo':
     case 'planned':
       return <IconCircleDashed {...common} className={cn(common.className, 'text-text-secondary')} />
@@ -73,7 +97,7 @@ function Shape({ value, size }: { value: string; size: 14 | 16 }) {
  * for Todo or a tick for Done, and its name.
  * @registry reusable: stays in Ship (Katerina, 18 September)
  */
-export function StatusLabel({ value, label, size = 'default', strong = false, className }: StatusLabelProps) {
+export function StatusLabel({ value, label, colour, size = 'default', strong = false, className }: StatusLabelProps) {
   return (
     <span
       className={cn(
@@ -83,7 +107,7 @@ export function StatusLabel({ value, label, size = 'default', strong = false, cl
         className,
       )}
     >
-      <Shape value={value} size={size === 'small' ? 14 : 16} />
+      <Shape value={value} colour={colour} size={size === 'small' ? 14 : 16} />
       {label}
     </span>
   )

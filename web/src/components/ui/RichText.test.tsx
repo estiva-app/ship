@@ -98,3 +98,55 @@ describe('the formats a reader must not guess at', () => {
     expect(show('').textContent).toBe('')
   })
 })
+
+describe('tables — §13.3, the one block the protocol names without naming its parts', () => {
+  const cell = (type: string, id: string, text: string) => ({ type, id, content: [{ type: 'paragraph', id: `${id}p`, content: [{ type: 'text', text }] }] })
+  const doc = JSON.stringify({
+    type: 'doc',
+    content: [
+      {
+        type: 'table',
+        id: 't1',
+        content: [
+          { type: 'tableRow', id: 'r1', content: [cell('tableHeader', 'h1', 'Stage'), cell('tableHeader', 'h2', 'Who')] },
+          { type: 'tableRow', id: 'r2', content: [cell('tableCell', 'c1', 'Cut-over'), cell('tableCell', 'c2', 'Ada')] },
+        ],
+      },
+    ],
+  })
+
+  it('draws a real table, with the first row of header cells as its head', () => {
+    const c = show(doc, 'blocks')
+    expect(c.querySelectorAll('thead th')).toHaveLength(2)
+    expect(c.querySelectorAll('tbody tr')).toHaveLength(1)
+    expect(c.querySelector('tbody td')?.textContent).toBe('Cut-over')
+  })
+
+  it('keeps every id, because a comment can be anchored to a cell', () => {
+    const c = show(doc, 'blocks')
+    expect(c.querySelector('table')?.getAttribute('data-block-id')).toBe('t1')
+    expect(c.querySelector('tbody tr')?.getAttribute('data-block-id')).toBe('r2')
+    expect(c.querySelector('tbody td')?.getAttribute('data-block-id')).toBe('c1')
+  })
+
+  it('has no head when the first row is ordinary cells', () => {
+    const rows = JSON.stringify({
+      type: 'doc',
+      content: [{ type: 'table', id: 't1', content: [{ type: 'tableRow', id: 'r1', content: [cell('tableCell', 'c1', 'only')] }] }],
+    })
+    const c = show(rows, 'blocks')
+    expect(c.querySelector('thead')).toBeNull()
+    expect(c.querySelectorAll('tbody tr')).toHaveLength(1)
+  })
+
+  it('falls back to the text when the nesting is not one it knows', () => {
+    // §13.3's rule for anything unrecognised: render it, never drop it.
+    const odd = JSON.stringify({
+      type: 'doc',
+      content: [{ type: 'table', id: 't1', content: [{ type: 'text', text: 'a table written some other way' }] }],
+    })
+    const c = show(odd, 'blocks')
+    expect(c.querySelector('table')).toBeNull()
+    expect(c.textContent).toContain('a table written some other way')
+  })
+})

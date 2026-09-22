@@ -1,0 +1,54 @@
+import { Meta, Canvas, Controls } from '@storybook/addon-docs/blocks'
+import * as RelatedStories from './Related.stories'
+
+<Meta of={RelatedStories} />
+
+# Related
+
+The foreign files somebody placed under this project or issue — RFC 0.5 §10.7,
+*nesting is by intent*. Every row is a **ForeignObject**, and nothing here knows
+what any of them are.
+
+<Canvas of={RelatedStories.Topics} />
+
+## When
+
+- On an object's page, under a "Related" heading, with `hasRelated` deciding
+  whether the heading is drawn at all.
+- One level, in the Folder's order. A sub-topic under a related topic is that
+  topic's to show.
+
+## When not
+
+- For an empty, successful read. It draws nothing — heading included — because
+  a heading over nothing on every page is noise rather than honesty.
+- For a file this reader may not see. It never arrives: the folder read drops
+  it by design, and the count is the disclosure. There is no "unavailable" row
+  here and there should not be one.
+
+## How
+
+```tsx
+import { Related, hasRelated } from '@/components/Related'
+
+{hasRelated(related) && (
+  <section>
+    <h2 className="text-h4 text-text-primary">Related</h2>
+    <Related related={related} />
+  </section>
+)}
+```
+
+- `related` is `undefined` while the read is in flight, a list when it came
+  back, and `'failed'` when it did not.
+
+## What it owns
+
+- **The failed-read line.** A read that did not come back must never look like
+  "nothing is placed under this".
+- **The rule that empty and failed are different sentences**, which is why the
+  hook keeps the two apart and this component draws neither the same way.
+
+## Props
+
+<Controls of={RelatedStories.Topics} />

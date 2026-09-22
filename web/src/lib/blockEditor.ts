@@ -68,12 +68,19 @@ export interface EditorDocument {
  *
  * Everything else is preserved as an atom rather than edited. Deliberately not
  * `KNOWN_BLOCK_TYPES` — that is what the *protocol* names, and Ship's editor
- * knows a subset of it. `table` and `widget` are in the protocol and have no
- * editing design here yet, so they travel through untouched.
+ * knows a subset of it. `widget` is in the protocol and has no editing design
+ * here yet, so it travels through untouched.
  *
  * `attachment` joined the list in SHI-2. It is "editable" only in the sense
  * that the schema has a node for it — the block is an atom with nothing inside
  * to type into, and what the editor offers is inserting and deleting one.
+ *
+ * **`table` joined in UIG-18**, with the three types inside it. The protocol
+ * names only `table`, not its parts, so what a row and a cell are called is
+ * decided by the editor that writes them — ProseMirror's names, which is what
+ * both apps' editors already are. A reader walks the nesting by name, and an
+ * unrecognised shape still renders its text, so a table written by anything
+ * else is not lost.
  */
 const EDITABLE_BLOCKS = new Set([
   'paragraph',
@@ -85,7 +92,21 @@ const EDITABLE_BLOCKS = new Set([
   'codeBlock',
   'horizontalRule',
   'attachment',
+  'table',
+  'tableRow',
+  'tableHeader',
+  'tableCell',
 ])
+
+/**
+ * The nodes whose content is other blocks rather than inline runs.
+ *
+ * A list was the only one until UIG-18, which is why the check was written as
+ * two names. A table is four more — itself, its rows, and the two kinds of
+ * cell — and reading a cell's paragraphs as inline runs is exactly how the
+ * whole table came back empty the first time.
+ */
+const BLOCK_CONTAINERS = new Set(['bulletList', 'orderedList', 'table', 'tableRow', 'tableHeader', 'tableCell'])
 
 /** The node type an unknown block is parked in. Defined in `UnknownBlock.ts`. */
 export const UNKNOWN_BLOCK = 'unknownBlock'
@@ -282,7 +303,7 @@ function blockFromEditor(node: EditorNode, seen: Set<string>): Block | null {
     return { ...base, content: inline }
   }
 
-  if (node.type === 'bulletList' || node.type === 'orderedList') {
+  if (BLOCK_CONTAINERS.has(node.type)) {
     const children = (node.content ?? [])
       .map((child) => blockFromEditor(child, seen))
       .filter((b): b is Block => b !== null)

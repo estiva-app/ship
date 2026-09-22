@@ -130,17 +130,68 @@ describe('the three things it must not lose', () => {
       §13.3: a reader MUST render an unknown block's inline text and MUST NOT
       drop it silently. An editor is the dangerous case — ProseMirror discards
       a node its schema does not know, and the save after it would delete
-      somebody else's table with no error anywhere on the way.
+      somebody else's block with no error anywhere on the way.
+
+      `widget` is the example now that `table` is editable (UIG-18). It is the
+      one type §13.3 names that Ship still has no design for.
     */
     const stored: BlockDocument = {
       type: 'doc',
       content: [
         { type: 'paragraph', id: 'p1', content: [{ type: 'text', text: 'before' }] },
-        { type: 'table', id: 't1', content: [{ type: 'text', text: 'a table Ship cannot draw' }] },
+        { type: 'widget', id: 'w1', content: [{ type: 'text', text: 'a widget Ship cannot draw' }] },
       ],
     }
     const saved = fromEditorDocument(toEditorDocument(stored))
     expect(saved.content[1]).toEqual(stored.content[1])
+  })
+
+  /*
+    A table, which the editor learnt in UIG-18.
+
+    The protocol names `table` and not its parts, so the nesting is the
+    editor's — ProseMirror's names — and what matters here is that the whole
+    shape survives a round trip with every id on it. A row or a cell that was
+    re-minted on save would detach any comment anchored to it, which is the
+    same failure the attachment block had before SHI-2.
+  */
+  const table: BlockDocument = {
+    type: 'doc',
+    content: [
+      {
+        type: 'table',
+        id: 't1',
+        content: [
+          {
+            type: 'tableRow',
+            id: 'r1',
+            content: [
+              { type: 'tableHeader', id: 'h1', content: [{ type: 'paragraph', id: 'hp1', content: [{ type: 'text', text: 'Stage' }] }] },
+              { type: 'tableHeader', id: 'h2', content: [{ type: 'paragraph', id: 'hp2', content: [{ type: 'text', text: 'Who' }] }] },
+            ],
+          },
+          {
+            type: 'tableRow',
+            id: 'r2',
+            content: [
+              { type: 'tableCell', id: 'c1', content: [{ type: 'paragraph', id: 'cp1', content: [{ type: 'text', text: 'Cut-over' }] }] },
+              { type: 'tableCell', id: 'c2', content: [{ type: 'paragraph', id: 'cp2', content: [{ type: 'text', text: 'Ada' }] }] },
+            ],
+          },
+        ],
+      },
+    ],
+  }
+
+  it('round-trips a table, every row, cell and id', () => {
+    expect(fromEditorDocument(toEditorDocument(table))).toEqual(table)
+  })
+
+  it('opens a table as editable nodes rather than one opaque block', () => {
+    const node = toEditorDocument(table).content[0]
+    expect(node.type).toBe('table')
+    expect(node.content?.[0].type).toBe('tableRow')
+    expect(node.content?.[0].content?.[0].type).toBe('tableHeader')
   })
 })
 

@@ -193,6 +193,13 @@ function renderBlock(
           <code>{(block.inline ?? []).map((r) => r.text).join('')}</code>
         </pre>
       )
+    case 'table': {
+      const drawn = renderTable(block, key, nameOf, resolved)
+      // A table whose nesting this does not recognise is not a table to this
+      // reader: §13.3's rule then applies as it does to any unknown shape, and
+      // the text is drawn rather than dropped.
+      return drawn ?? fallbackBlock(block, key, nameOf, resolved, inline)
+    }
     case 'horizontalRule':
       return <hr key={key} data-block-id={block.id} />
     case 'listItem':
@@ -221,6 +228,69 @@ function renderBlock(
     default:
       return fallbackBlock(block, key, nameOf, resolved, inline)
   }
+}
+
+/**
+ * A table — SPEC §13.3.
+ *
+ * **The protocol names `table` and not its parts**, so what a row and a cell
+ * are called is decided by whatever wrote the document. ProseMirror's names
+ * are what both apps' editors emit, so those are what this walks, and they
+ * arrive as unknown blocks carrying their own `typeName`.
+ *
+ * A first row of header cells becomes a `thead`, which is the shape the editor
+ * creates and the one a reader expects; a table without one is all body.
+ * Returns `null` when the nesting is not recognisable, so the caller can fall
+ * back to §13.3's rule rather than draw an empty frame.
+ */
+function renderTable(
+  block: RenderBlock,
+  key: string,
+  nameOf: ((pubkey: string) => string) | undefined,
+  resolved: Record<string, ForeignObject | null | undefined> | undefined,
+): ReactNode {
+  const named = (b: RenderBlock) => b.typeName ?? b.type
+  const rows = (block.children ?? []).filter((r) => named(r) === 'tableRow')
+  if (!rows.length) return null
+
+  const cellsOf = (row: RenderBlock, at: number) =>
+    (row.children ?? []).map((cell, i) => {
+      const Cell = named(cell) === 'tableHeader' ? 'th' : 'td'
+      const attrs = (cell.attrs ?? {}) as { colspan?: number; rowspan?: number }
+      return (
+        <Cell
+          key={cell.id ?? i}
+          data-block-id={cell.id}
+          colSpan={attrs.colspan && attrs.colspan > 1 ? attrs.colspan : undefined}
+          rowSpan={attrs.rowspan && attrs.rowspan > 1 ? attrs.rowspan : undefined}
+        >
+          {(cell.children ?? []).map((child, j) => renderBlock(child, j, nameOf, resolved))}
+          {cell.inline && renderInline(cell.inline, `${key}-${at}-${i}`, nameOf, resolved)}
+        </Cell>
+      )
+    })
+
+  const header = rows[0]
+  const heads = header.children ?? []
+  const headerRow = heads.length > 0 && heads.every((c) => named(c) === 'tableHeader')
+  const body = headerRow ? rows.slice(1) : rows
+
+  return (
+    <table key={key} data-block-id={block.id}>
+      {headerRow && (
+        <thead>
+          <tr data-block-id={header.id}>{cellsOf(header, 0)}</tr>
+        </thead>
+      )}
+      <tbody>
+        {body.map((row, i) => (
+          <tr key={row.id ?? i} data-block-id={row.id}>
+            {cellsOf(row, i + 1)}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
 }
 
 /**

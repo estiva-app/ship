@@ -31,7 +31,7 @@ const FILES: ForeignObject[] = [
   file({ ref: 'p', kind: 30850, appName: 'Estiva Ship', slots: { title: { value: 'Payment integration' } } }),
   file({ ref: 't', kind: 30840, appName: 'File', slots: { title: { value: 'Onboarding' } } }),
   file({ ref: 'x', kind: 30911, appName: 'Tide table', widget: ['tideboard', 'card'], slots: { title: { value: 'Spring tides' } } }),
-  file({ ref: 'i', kind: 30851, appName: 'Estiva Ship', widget: 'row', slots: { title: { value: 'Refund webhook retries' }, status: { value: 'in_progress' } } }),
+  file({ ref: 'i', kind: 30851, appName: 'Estiva Ship', widget: 'row', slots: { title: { value: 'Refund webhook retries' }, status: { value: 'In Progress', colour: 'blue' } } }),
 ]
 
 const folder = (over: Partial<FolderContents> = {}): FolderContents =>

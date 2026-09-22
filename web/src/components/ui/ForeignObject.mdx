@@ -1,0 +1,57 @@
+import { Meta, Canvas, Controls } from '@storybook/addon-docs/blocks'
+import * as ForeignObjectStories from './ForeignObject.stories'
+
+<Meta of={ForeignObjectStories} />
+
+# ForeignObject
+
+Another app's object, drawn in Ship's design language. What arrives is a title,
+some secondary values, maybe a status, maybe a list of children, and a widget
+hint; what does not arrive is layout, because an owner who could specify that
+would be designing Ship's product.
+
+<Canvas of={ForeignObjectStories.Card} />
+
+## When
+
+- Any time Ship shows an object it does not own — a file placed under a project
+  (**Related**), a pointer written into a comment or a description, a row on the
+  Folder page.
+- Whatever the kind. An app nobody here has heard of still resolves to one of
+  the closes this consumer implements, through the fallback chain.
+
+## When not
+
+- Never branch on which app it came from. Not one line here knows what Peek is,
+  and if it ever needs to, the projection layer has failed rather than this
+  component being incomplete.
+- For a reference inside a sentence, one line high → **Reference**.
+- For the section that lists them under a heading → **Related**.
+
+## How
+
+```tsx
+import { ForeignObject } from '@/components/ui/ForeignObject'
+
+<ForeignObject object={resolved} conversations={counts[resolved.ref]} />
+```
+
+- `conversations` is the section's to ask for and this component's to draw: a
+  folder listing deliberately does not fetch it, a Related section does.
+- Children resolve through their own projection, so they are drawn with this
+  same component rather than a reduced copy of it.
+
+## What it owns
+
+- **The six states**, and that they never collapse into one another. A gated
+  read returns the same nothing an empty object does, so `unreachable` is drawn
+  as a dashed card that says so, and a declared-but-empty list says "Nothing in
+  it yet" rather than looking like no list at all.
+- **The widget chain**, terminated in `message`, `card` or `row` — the walking
+  itself is the runtime's, not a copy kept here.
+- **A body as text, never as markup.** Ship's rule, and the reason it may draw
+  another app's body at all.
+
+## Props
+
+<Controls of={ForeignObjectStories.Card} />
