@@ -1,6 +1,7 @@
-import { Meta } from '@storybook/addon-docs/blocks'
+import { Meta, Canvas, Controls } from '@storybook/addon-docs/blocks'
+import * as ConversationThreadStories from './ConversationThread.stories'
 
-<Meta title="Conversations/ConversationThread" />
+<Meta of={ConversationThreadStories} />
 
 # ConversationThread
 
@@ -8,9 +9,7 @@ One conversation as a card: its first message, the replies one level in behind
 a left rule, a line where unread messages begin, and a box to reply. Flat
 within a thread, as Peek shows them; never deeper.
 
-**Seen in** — every story under *Conversations/Conversations* draws it, and
-*Conversations/Activity* draws it in its `subdued` form. A story of its own
-would repeat one you already have.
+<Canvas of={ConversationThreadStories.OneCard} />
 
 ## When
 
@@ -47,3 +46,7 @@ import { ConversationThread } from '@/components/ConversationThread'
   the signal lives where the reading happens.
 - **The reply destination.** A reply is published into the thread's own folder,
   not the page around it.
+
+## Props
+
+<Controls of={ConversationThreadStories.OneCard} />

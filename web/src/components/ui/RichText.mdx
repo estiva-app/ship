@@ -23,6 +23,8 @@ else on a shared relay is safe by construction rather than by care.
   template string. On a shared relay the words were written by other people.
 - Never guess the format from the body. A description that happens to begin
   with `{` is marker text, because it carries no tag.
+- Do not expect a table in marker text. §13.2 has no table, so `| a | b |`
+  stays the line somebody typed — that is the protocol's ruling, not Ship's.
 - For the editor as well as the rendering → **DescriptionEditor**, which wears
   the same block styles.
 
@@ -42,6 +44,10 @@ import { RichText } from '@/components/ui/RichText'
 
 ## What it owns
 
+- **Tables**, since 22 September. The protocol names `table` and not its
+  parts, so the nesting is the editor's — ProseMirror's names — and a first row
+  of header cells becomes a `thead`. A table written some other way still
+  renders its text.
 - **One element per block**, unstyled, with the look coming from `PROSE_BLOCKS`
   — the same styles the editor wears, so neither surface can be restyled
   without the other.

@@ -31,7 +31,9 @@ import { ConversationCount } from '@/components/ui/ConversationCount'
 
 - `unit` is the caller's, because the number is not always the same thing: an
   issue row counts *conversations*, threads at the root; a foreign file counts
-  *comments* addressed to it, replies included.
+  *comments* addressed to it, replies included. **It changes nothing on screen**
+  — it is the sentence a screen reader is given (`7 conversations`, `23
+  comments`), which is why there is no second story for it.
 
 ## What it owns
 
