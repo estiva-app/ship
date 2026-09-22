@@ -49,6 +49,13 @@ export const BlockId = Extension.create({
           'blockquote',
           'codeBlock',
           'horizontalRule',
+          // A table and everything inside it (UIG-18). §13.3 puts an id on
+          // every block, and a row or a cell whose id was re-minted on each
+          // save would detach any comment anchored to it.
+          'table',
+          'tableRow',
+          'tableHeader',
+          'tableCell',
           // Without this an attachment's id is re-minted on every save, and
           // every comment anchored to it stops resolving — §13.3's whole
           // reason for a block having an address.
