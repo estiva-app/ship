@@ -20,7 +20,12 @@ const repoRoot = fileURLToPath(new URL('../..', import.meta.url))
  */
 const config: StorybookConfig = {
   framework: '@storybook/react-vite',
-  stories: ['../src/stories/**/*.mdx', '../src/**/*.stories.@(ts|tsx)'],
+  /*
+    A usage page sits beside its component (UIG-18), not in a folder of its own:
+    the rule travels with the file if the component is ever promoted. The
+    standalone pages under src/stories stay where they are.
+  */
+  stories: ['../src/stories/**/*.mdx', '../src/components/**/*.mdx', '../src/**/*.stories.@(ts|tsx)'],
   addons: ['@storybook/addon-docs'],
   viteFinal: (viteConfig) => {
     // Stories must be deterministic and must never touch production: the
