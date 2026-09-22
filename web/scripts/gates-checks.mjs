@@ -30,7 +30,29 @@ export default function define(h) {
   const WEB = "web";
   const PROBE = "src/components/__gates_probe__.tsx";
   const GATES = "eslint.gates.config.js";
-  const fiveSections = (mdx) => h.exists(mdx) && ["What it is", "When", "When not", "How", "What it owns"].every((s) => new RegExp(`^#+\\s*${s}\\s*$`, "m").test(h.read(mdx)));
+  /*
+    The contract every usage page keeps — the package's own (estiva-ui
+    src/pages.test.ts): a line saying what the part is under the title, then
+    When, When not, How with code, and What it owns, in that order. "What it
+    is" is that opening line rather than a heading of its own, which is what
+    the first guess here got wrong. Returns why it fails, or null.
+
+    Read on normalised text: Ship is checked out with CRLF on Windows.
+  */
+  const usagePage = (mdx) => {
+    if (!h.exists(mdx)) return "no page";
+    const text = h.read(mdx).split("\r\n").join("\n");
+    const heads = [...text.matchAll(/^##+\s+(.+?)\s*$/gm)].map((m) => m[1]);
+    const want = ["When", "When not", "How", "What it owns"];
+    const at = want.map((w) => heads.indexOf(w));
+    if (at.some((i) => i < 0)) return `missing ${want.filter((_, i) => at[i] < 0).join(", ")}`;
+    if (at.some((i, n) => n > 0 && i < at[n - 1])) return "sections out of order";
+    if (!/^#\s+\S.*\n\n\S/m.test(text)) return "no opening line under the title";
+    if (!/##\s+How\s*\n[\s\S]*?```tsx?\n/.test(text)) return "no code under How";
+    return null;
+  };
+  const catalogue = () => { try { return JSON.parse(h.read(registry())); } catch { return null; } };
+  const reusable = () => { const d = catalogue(); return d ? d.entries.filter((e) => e.app && e.app.class === "reusable") : null; };
   const probe = (code, expect, mentions, file = PROBE, config = GATES) => () => h.lint({ cwd: WEB, config, file, code, expect, mentions });
   const component = (body) => `export function Probe() {\n  return ${body}\n}\n`;
   const registry = () => (h.exists("registry.json") ? "registry.json" : "web/registry.json");
@@ -42,8 +64,36 @@ export default function define(h) {
       { what: "a component that hands its className on is followed", run: probe(`import { ProjectCard } from '@/components/ProjectCard'\n${component('<ProjectCard className="bg-bg-hover" />')}`, "error", "hands its `className` to `Card`") },
     ] },
     { ref: "UIG-18", title: "Usage rules — Ship's own components", owner: true, checks: [
-      { what: "ForeignObject has a usage page with the five sections", run: () => fiveSections("web/src/components/ui/ForeignObject.mdx") ? h.PASS("ForeignObject.mdx has all five") : h.FAIL("web/src/components/ui/ForeignObject.mdx does not have all five yet") },
-      { what: "every Ship component in the registry has a class", run: () => h.json(registry(), (d) => (d.entries ?? d.components ?? []).every((e) => e.repo !== "ship" || e.class || e.classification), "every ship entry has a class") },
+      { what: "every reusable component has a usage page that keeps the contract", run: () => {
+        const parts = reusable();
+        if (!parts) return h.UNKNOWN("no catalogue yet: run npm --prefix web run registry");
+        const bad = parts.map((e) => [e.name, usagePage(`${WEB}/${e.sourceFile.replace(/[^/]+\.tsx$/, `${e.name}.mdx`)}`)]).filter(([, why]) => why);
+        return bad.length ? h.FAIL(bad.map(([n, why]) => `${n}: ${why}`).join("; ")) : h.PASS(`${parts.length} reusable, ${parts.length} pages, all four sections in order with code under How`);
+      } },
+      { what: "the two one-offs Katerina kept in scope have one too", run: () => {
+        const bad = [["DescriptionEditor", "web/src/components/ui/DescriptionEditor.mdx"], ["BlockAnchorNote", "web/src/components/ui/BlockAnchorNote.mdx"]].map(([n, f]) => [n, usagePage(f)]).filter(([, why]) => why);
+        return bad.length ? h.FAIL(bad.map(([n, why]) => `${n}: ${why}`).join("; ")) : h.PASS("DescriptionEditor and BlockAnchorNote have pages");
+      } },
+      // A page is findable either because it carries its own stories, or because
+      // it names the stories that already draw the part — Katerina, 21 September:
+      // a story that repeats another is not worth writing.
+      { what: "every usage page either has its own stories or says where it is seen", run: () => {
+        const pages = h.listFiles(`${WEB}/src/components`, (n) => n.endsWith(".mdx"));
+        if (!pages.length) return h.FAIL("no usage pages beside components");
+        const bad = pages.filter((f) => { const t = h.read(f); return !/<Meta of=\{/.test(t) && !/\*\*Seen in\*\*/.test(t); });
+        return bad.length ? h.FAIL(`no stories and no "Seen in": ${bad.join(", ")}`) : h.PASS(`${pages.length} pages, each with stories or a "Seen in"`);
+      } },
+      { what: "Storybook reads a page that sits beside its component", run: () => h.contains(`${WEB}/.storybook/main.ts`, /['"]\.\.\/src\/components\/\*\*\/\*\.mdx['"]/, "main.ts globs src/components/**/*.mdx") },
+      { what: "the four parts that had no picture anywhere now have stories", run: () => {
+        const missing = ["ui/ForeignObject", "ui/RichText", "ui/ConversationCount", "ui/BlockAnchorNote"].filter((p) => !h.exists(`${WEB}/src/components/${p}.stories.tsx`));
+        return missing.length ? h.FAIL(`no story file: ${missing.join(", ")}`) : h.PASS("ForeignObject, RichText, ConversationCount and BlockAnchorNote each have a story");
+      } },
+      { what: "every Ship component in the catalogue has a class", run: () => {
+        const d = catalogue();
+        if (!d) return h.UNKNOWN("no catalogue yet: run npm --prefix web run registry");
+        const bad = d.entries.filter((e) => !e.app || !e.app.class);
+        return bad.length ? h.FAIL(`${bad.length} with no class: ${bad.slice(0, 3).map((e) => e.name).join(", ")}`) : h.PASS(`${d.entries.length} parts, every one classified`);
+      } },
     ] },
     { ref: "UIG-27", checks: [
       // The adoption deleted these; the checks keep them deleted.
