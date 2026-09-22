@@ -122,6 +122,3 @@ export const Table: Story = {
     }),
   },
 }
-
-/** A table is not in the message dialect, so its line stays literal rather than becoming a table nobody published. */
-export const NoTableInMarker: Story = { args: { value: '| a | b |\n| - | - |', format: 'marker' } }
