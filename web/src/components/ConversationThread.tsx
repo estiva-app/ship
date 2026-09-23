@@ -547,7 +547,7 @@ export function ConversationThread({ thread, onReply, disabledReason, unreadFrom
   return (
     // The card recedes rather than fading: no fill, so the subtle hairline sits
     // on the page's own ground, and it stays legible in either theme. An opacity
-    // utility would have dimmed the text with it — UI-RULES §4.
+    // utility would have dimmed the text with it — D16, the token lint.
     <Card fill={subdued ? 'none' : 'surface'} className="flex flex-col gap-1 px-3 py-2.5">
       {unreadFrom === thread.root.id && <NewSinceHere />}
       <MessageCard message={thread.root} resolved={resolved} resolving={resolving} nameOf={nameOf} reactions={reactionsBy?.[thread.root.id]} onToggleReaction={onReact && ((emoji, mine) => onReact(thread.root.id, emoji, mine))} onDelete={onDeleteMessage && (() => onDeleteMessage(thread.root.id))} onEdit={onEditMessage && ((body) => onEditMessage(thread.root.id, body))} repliesLeftBehind={thread.replies.length} disabledReason={disabledReason} />

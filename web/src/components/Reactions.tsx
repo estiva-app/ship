@@ -44,8 +44,8 @@ export const REACTION_OPTIONS = REACTION_EMOJI.map(({ emoji, name }) => ({ emoji
  *   for.
  *
  * **A pill is still what this wants**, and the package has none. `Reaction` is
- * proposed to `@estiva-app/ui` — it would also retire Peek's fork of it, the
- * file UI-RULES §1 names by example. Until it ships, these are the package's
+ * proposed to `@estiva-app/ui` — it would also retire Peek's fork of it (a
+ * fork as .claude/rules/ship-ui.md defines one). Until it ships, these are the package's
  * real components rather than a second hand-rolled pill, and this file collapses
  * onto it when it lands.
  *
