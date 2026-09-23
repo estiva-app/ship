@@ -113,4 +113,35 @@ check('no edits means no entries', Object.keys(foldEdits([])).length === 0)
   check('an edit naming nothing is skipped rather than thrown on', Object.keys(foldEdits([noTarget as SignedEvent])).length === 0)
 }
 
+/*
+  The "edited" mark stays about the body (§7.2.1, amended 2026-09-23, CON-5).
+  An edit byte-identical to the body it replaces changes attachments only.
+*/
+function original(body: string, id = TARGET): SignedEvent {
+  return { ...edit({ body, at: 900, id }), kind: KIND.MESSAGE, tags: [['h', '11111111-1111-4111-8111-111111111111']] } as SignedEvent
+}
+
+{
+  const out = foldEdits([original('same words'), edit({ body: 'same words', at: 1000 })])
+  check('an identical-body edit is not marked edited', out[TARGET]?.edited === false)
+  check('  …and the body is unchanged', out[TARGET]?.body === 'same words')
+}
+
+{
+  const out = foldEdits([original('before'), edit({ body: 'after', at: 1000 })])
+  check('a body-changing edit is marked edited', out[TARGET]?.edited === true)
+}
+
+{
+  // Changed, then re-sent identical (to attach a file): still edited, at the change.
+  const out = foldEdits([original('before'), edit({ body: 'after', at: 1000 }), edit({ body: 'after', at: 2000 })])
+  check('an identical edit after a change keeps the mark', out[TARGET]?.edited === true)
+  check('  …and the mark dates the change, not the re-attach', out[TARGET]?.at === 1_000_000)
+}
+
+{
+  const out = foldEdits([edit({ body: 'orphan', at: 1000, target: 'd'.repeat(64) })])
+  check('with the target unseen, an edit counts as a change', out['d'.repeat(64)]?.edited === true)
+}
+
 console.log(`\n${passed} checks passed.\n`)

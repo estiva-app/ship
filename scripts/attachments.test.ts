@@ -68,14 +68,65 @@ check('no events means no entries', Object.keys(foldAttachments([])).length === 
   check('in the order they were written', out[e.id]?.[1].x === OTHER)
 }
 
+/*
+  An edit MAY carry `imeta` (RFC 0.4 §7.2.1, amended 2026-09-23, CON-5). The
+  set is the latest edit's that carries at least one, in the body fold's order;
+  an edit with none leaves it alone; a set replaces, never appends.
+*/
+const THIRD = 'e'.repeat(64)
+const metaOf = (x: string) => ({ ...meta, url: `/media/${x}.jpg`, x })
+function editOf(target: string, at: number, files: string[], id?: string): SignedEvent {
+  return {
+    ...message({ kind: KIND.MESSAGE_EDIT, tags: [['e', target], ...files.map((x) => imetaTag(metaOf(x)))], id }),
+    created_at: at,
+  } as SignedEvent
+}
+
 {
-  /*
-    An edit replaces the body and nothing else (RFC 0.4 §7.2.1). There is no
-    rule for what an `imeta` on one would mean, and inventing one here would
-    let an edit silently add or drop a file — so a 40003 contributes nothing.
-  */
-  const e = message({ kind: KIND.MESSAGE_EDIT, tags: [['e', SHA], imetaTag(meta)] })
-  check('an edit event never contributes an attachment', Object.keys(foldAttachments([e])).length === 0)
+  const root = message({ tags: [imetaTag(meta)] })
+  const out = foldAttachments([root, editOf(root.id, 1_700_000_100, [OTHER, THIRD])])
+  check('a later edit with imeta replaces the set', out[root.id]?.map((f) => f.x).join() === `${OTHER},${THIRD}`)
+  check('  …and does not append to it', out[root.id]?.length === 2)
+}
+
+{
+  const root = message({ tags: [imetaTag(meta)] })
+  const out = foldAttachments([root, editOf(root.id, 1_700_000_100, [])])
+  check('an edit without imeta leaves the set as it was', out[root.id]?.length === 1 && out[root.id]?.[0].x === SHA)
+}
+
+{
+  const root = message({ tags: [imetaTag(meta)] })
+  // Out of order on purpose, and the latest carries none: it must not clear.
+  const out = foldAttachments([
+    editOf(root.id, 1_700_000_300, []),
+    editOf(root.id, 1_700_000_200, [THIRD]),
+    root,
+    editOf(root.id, 1_700_000_100, [OTHER]),
+  ])
+  check('the latest edit carrying imeta wins over an earlier one', out[root.id]?.length === 1 && out[root.id]?.[0].x === THIRD)
+}
+
+{
+  const root = message({})
+  const out = foldAttachments([root, editOf(root.id, 1_700_000_100, [OTHER])])
+  check('an edit can give a message with no files its first one', out[root.id]?.[0].x === OTHER)
+}
+
+{
+  // Same second, so id decides — the body fold's tiebreak, not a second rule.
+  const root = message({})
+  const out = foldAttachments([
+    editOf(root.id, 1_700_000_100, [THIRD], 'f'.repeat(64)),
+    editOf(root.id, 1_700_000_100, [OTHER], '1'.repeat(64)),
+  ])
+  check('a same-second tie breaks on event id, as the body fold does', out[root.id]?.[0].x === THIRD)
+}
+
+{
+  const e = editOf('d'.repeat(64), 1_700_000_100, [OTHER])
+  check('an edit for an unseen target is kept under the target id', foldAttachments([e])['d'.repeat(64)]?.[0].x === OTHER)
+  check('  …and never under its own id', foldAttachments([e])[e.id] === undefined)
 }
 
 {
