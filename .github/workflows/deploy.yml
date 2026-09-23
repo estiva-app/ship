@@ -82,9 +82,7 @@ jobs:
       - run: npm ci
 
       # `tsc -b && vite build` — the same command that builds it for real.
-      - name: Lint — the token contract (ADOPTION S11)
-        run: npm run lint
-
+      # (The token lint that stood before it moved to `gate`, UIG-21.)
       - name: Build
         run: npm run build
 
@@ -140,6 +138,14 @@ jobs:
 
       - name: Gate lint
         run: npm run lint:rules
+
+      # The token contract (ADOPTION S11): `npm run lint` is the whole lint —
+      # tokens, hand-written values, the gate rules again. It moved here from
+      # `web` (UIG-21) because `gate` is the one check GitHub requires, so a
+      # wrong class now stops a merge, not only a deploy. Like the gate lint, it
+      # reads files and compiles nothing: web/ installed alone is enough.
+      - name: Lint — the token contract (ADOPTION S11)
+        run: npm run lint
 
       # Every part says in one line what it is for, so `npm run ui:find` can offer
       # it before someone builds it again (UIG-13). Built from the code; nothing kept.
