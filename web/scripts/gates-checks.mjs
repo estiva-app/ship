@@ -1,4 +1,5 @@
 import { appChecks } from '@estiva-app/ui/gates'
+import { pageProblem } from '@estiva-app/ui/registry'
 
 /**
  * What gates:status checks in ship.
@@ -31,28 +32,13 @@ export default function define(h) {
   const PROBE = "src/components/__gates_probe__.tsx";
   const GATES = "eslint.gates.config.js";
   /*
-    The contract every usage page keeps — the package's own (estiva-ui
-    src/pages.test.ts): a line saying what the part is under the title, then
-    When, When not, How with code, and What it owns, in that order. "What it
-    is" is that opening line rather than a heading of its own, which is what
-    the first guess here got wrong. Returns why it fails, or null.
-
-    Read on normalised text: Ship is checked out with CRLF on Windows.
+    The page contract is the package's one copy (UIG-19): `estiva-ui check`
+    holds every reusable part to it in CI's gate job, and `pageProblem` is the
+    same rule for the two one-offs Katerina kept in scope. Ship pasted its own
+    until then. Returns why a page fails, or null.
   */
-  const usagePage = (mdx) => {
-    if (!h.exists(mdx)) return "no page";
-    const text = h.read(mdx).split("\r\n").join("\n");
-    const heads = [...text.matchAll(/^##+\s+(.+?)\s*$/gm)].map((m) => m[1]);
-    const want = ["When", "When not", "How", "What it owns"];
-    const at = want.map((w) => heads.indexOf(w));
-    if (at.some((i) => i < 0)) return `missing ${want.filter((_, i) => at[i] < 0).join(", ")}`;
-    if (at.some((i, n) => n > 0 && i < at[n - 1])) return "sections out of order";
-    if (!/^#\s+\S.*\n\n\S/m.test(text)) return "no opening line under the title";
-    if (!/##\s+How\s*\n[\s\S]*?```tsx?\n/.test(text)) return "no code under How";
-    return null;
-  };
+  const usagePage = (mdx) => (h.exists(mdx) ? pageProblem(h.read(mdx)) : "no page");
   const catalogue = () => { try { return JSON.parse(h.read(registry())); } catch { return null; } };
-  const reusable = () => { const d = catalogue(); return d ? d.entries.filter((e) => e.app && e.app.class === "reusable") : null; };
   const probe = (code, expect, mentions, file = PROBE, config = GATES) => () => h.lint({ cwd: WEB, config, file, code, expect, mentions });
   const component = (body) => `export function Probe() {\n  return ${body}\n}\n`;
   const registry = () => (h.exists("registry.json") ? "registry.json" : "web/registry.json");
@@ -64,12 +50,7 @@ export default function define(h) {
       { what: "a component that hands its className on is followed", run: probe(`import { ProjectCard } from '@/components/ProjectCard'\n${component('<ProjectCard className="bg-bg-hover" />')}`, "error", "hands its `className` to `Card`") },
     ] },
     { ref: "UIG-18", title: "Usage rules — Ship's own components", owner: true, checks: [
-      { what: "every reusable component has a usage page that keeps the contract", run: () => {
-        const parts = reusable();
-        if (!parts) return h.UNKNOWN("no catalogue yet: run npm --prefix web run registry");
-        const bad = parts.map((e) => [e.name, usagePage(`${WEB}/${e.sourceFile.replace(/[^/]+\.tsx$/, `${e.name}.mdx`)}`)]).filter(([, why]) => why);
-        return bad.length ? h.FAIL(bad.map(([n, why]) => `${n}: ${why}`).join("; ")) : h.PASS(`${parts.length} reusable, ${parts.length} pages, all four sections in order with code under How`);
-      } },
+      { what: "every reusable component has a usage page that keeps the contract", run: () => h.contract(WEB) },
       { what: "the two one-offs Katerina kept in scope have one too", run: () => {
         const bad = [["DescriptionEditor", "web/src/components/ui/DescriptionEditor.mdx"], ["BlockAnchorNote", "web/src/components/ui/BlockAnchorNote.mdx"]].map(([n, f]) => [n, usagePage(f)]).filter(([, why]) => why);
         return bad.length ? h.FAIL(bad.map(([n, why]) => `${n}: ${why}`).join("; ")) : h.PASS("DescriptionEditor and BlockAnchorNote have pages");
