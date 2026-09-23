@@ -46,6 +46,10 @@ import { ConversationThread, useThreadReactions, useThreadReferences, type Threa
  * Activity; REW-4 keeps history and conversation apart and this does not
  * disturb that.
  */
+/**
+ * Since PEE-26 Ship's pages produce only `mention`: a sub-file's threads are read
+ * on the sub-file. `sub-file` stays drawable here for another app's relation.
+ */
 export type Relation = 'mention' | 'sub-file'
 
 /**
