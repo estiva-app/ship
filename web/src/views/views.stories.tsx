@@ -19,6 +19,7 @@ import { ProjectsView } from './ProjectsView'
  * hands the page; see `Related.stories` for the section's own states.
  */
 const RELATED: RelatedState = {
+  inside: {},
   files: [
     {
       ref: '30840:a:cutover',

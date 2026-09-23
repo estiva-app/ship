@@ -45,9 +45,9 @@ export function splitByKind(files: readonly ForeignObject[]): { own: ForeignObje
  * `parentRef` is the runtime's answer to "what does this file name as its
  * parent": for a bare file its own `a` tag, for any other kind the tag its
  * owner's manifest declares. Ship compares it to the object's address and asks
- * nothing else — the filter is "not mine, and under this", one level, with no
- * recursion. Depth is the consumer's budget and interop's `MAX_LIST_DEPTH` is
- * 1 on purpose; a sub-topic under a related topic is that topic's business.
+ * nothing else — the filter is "not mine, and under this", one level. What is
+ * under each of these is drawn beneath it (FOL-4), walked in the same listing
+ * by `readRelated` with interop's `nestingOf` rather than by recursing here.
  *
  * Ship's own children are not here: an issue whose `parentRef` is the project
  * is the Issues table's, and listing it twice would put the same file on one

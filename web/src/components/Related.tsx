@@ -1,3 +1,5 @@
+import type { ForeignObject as ForeignObjectType } from '@estiva-app/interop'
+import type { RelatedFiles } from '@/api/foreign'
 import type { RelatedState } from '@/api/useRelated'
 import { ForeignObject } from '@/components/ui/ForeignObject'
 
@@ -10,8 +12,9 @@ import { ForeignObject } from '@/components/ui/ForeignObject'
  * what any of them are: a bare-file topic is a card with its title and its
  * comment count, a Leaf document will be whatever Leaf's manifest says, and a
  * kind nobody has heard of falls through the widget chain like everything
- * else. One level, in the Folder's order, no recursion — a sub-topic under a
- * related topic is that topic's to show.
+ * else. In the Folder's order, and what is under each file indented beneath it
+ * at whatever depth the listing holds (FOL-4) — each card still opens in its
+ * own app, where the nesting continues.
  *
  * ## What the section says, and when it is there at all
  *
@@ -38,8 +41,32 @@ export function Related({ related }: { related: RelatedState }) {
   return (
     <div className="flex flex-col gap-2" data-related="files">
       {related.files.map((file) => (
-        <ForeignObject key={file.ref} object={file} conversations={related.counts[file.ref]} />
+        <RelatedFile key={file.ref} file={file} related={related} />
       ))}
+    </div>
+  )
+}
+
+/**
+ * One related file, and what is under it, indented (FOL-4).
+ *
+ * Ship renders the nesting and does not own it: every card opens in the app
+ * that does (its `openUrl`), where the breadcrumb and the tree continue. The
+ * depth is whatever the listing holds — `readRelated` walked it once, and a
+ * cycle is cut there, so this recursion ends.
+ */
+function RelatedFile({ file, related }: { file: ForeignObjectType; related: RelatedFiles }) {
+  const inside = related.inside[file.ref] ?? []
+  return (
+    <div className="flex flex-col gap-2" data-related-file={file.ref}>
+      <ForeignObject object={file} conversations={related.counts[file.ref]} />
+      {inside.length > 0 && (
+        <div className="flex flex-col gap-2 pl-6" data-inside={file.ref}>
+          {inside.map((child) => (
+            <RelatedFile key={child.ref} file={child} related={related} />
+          ))}
+        </div>
+      )}
     </div>
   )
 }

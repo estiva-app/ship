@@ -20,6 +20,7 @@ import {
   createPeopleCache,
   createProjectionCache,
   listFolders,
+  nestingOf,
   resolveFolderContents,
   resolveForeignEvent,
   resolveForeignObject,
@@ -148,6 +149,12 @@ export function readFolder(id: string): Promise<FolderContents> {
 export interface RelatedFiles {
   /** One level, in the Folder's order — see `relatedTo`. */
   files: ForeignObject[]
+  /**
+   * What is under each of those files, and under those, keyed by the parent's
+   * `ref` (FOL-4). From the same listing — every sub-file is in its parent's
+   * team (SPEC §6.7) — so no request per level. A leaf has no entry.
+   */
+  inside: Record<string, ForeignObject[]>
   /** Comments addressed to each file, keyed by `ref`. Absent where the file has no address to ask about. */
   counts: Record<string, number>
 }
@@ -170,8 +177,26 @@ export interface RelatedFiles {
 export async function readRelated(folder: string, address: string): Promise<RelatedFiles> {
   const contents = await readFolder(folder)
   const files = relatedTo(contents.files, address)
-  const counts = files.length > 0 ? await conversationCountsOf(files, query, manifests) : {}
-  return { files, counts }
+  /*
+    The nesting below each related file (FOL-4), walked in the listing with
+    `nestingOf` — the one read that has a moved file under its new parent, and
+    cycle-safe, so the walk ends. Counted with the rest in one query.
+  */
+  const nesting = nestingOf(contents.files)
+  const inside: Record<string, ForeignObject[]> = {}
+  const below: ForeignObject[] = []
+  const stack = [...files]
+  while (stack.length) {
+    const parent = stack.pop() as ForeignObject
+    const children = nesting.childrenOf(parent)
+    if (children.length === 0 || inside[parent.ref]) continue
+    inside[parent.ref] = children
+    below.push(...children)
+    stack.push(...children)
+  }
+  const counted = [...files, ...below]
+  const counts = counted.length > 0 ? await conversationCountsOf(counted, query, manifests) : {}
+  return { files, inside, counts }
 }
 
 /** Every Folder this identity can see, for the sidebar. */
