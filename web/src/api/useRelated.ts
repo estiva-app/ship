@@ -46,7 +46,7 @@ export function useRelated(folder: string | undefined, address: string | undefin
 
   useEffect(() => {
     if (!folder || !address) {
-      setRelated({ files: [], counts: {} })
+      setRelated({ files: [], inside: {}, counts: {} })
       return
     }
     let live = true

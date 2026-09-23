@@ -37,7 +37,7 @@ const TIDE = file({ ref: 'x', address: '30911:a:x', kind: 30911, appName: 'Tide 
 const meta = {
   title: 'Projects/Related',
   component: Related,
-  args: { related: { files: [TOPIC, SECOND], counts: { t1: 7, t2: 0 } } },
+  args: { related: { files: [TOPIC, SECOND], inside: {}, counts: { t1: 7, t2: 0 } } },
   // The width a project page's content column gives the section, as Activity's story does.
   decorators: [
     (Story) => (
@@ -55,7 +55,21 @@ type Story = StoryObj<typeof meta>
 export const Topics: Story = {}
 
 /** Any kind, not only the bare file — a record from an app nobody here has heard of, through the fallback chain. */
-export const AnyKind: Story = { args: { related: { files: [TOPIC, TIDE], counts: { t1: 7, x: 1 } } } }
+export const AnyKind: Story = { args: { related: { files: [TOPIC, TIDE], inside: {}, counts: { t1: 7, x: 1 } } } }
+
+/**
+ * A sub-topic under the related topic, and one under that (FOL-4): indented
+ * beneath, each still a card that opens in its own app.
+ */
+export const Nested: Story = {
+  args: {
+    related: {
+      files: [TOPIC],
+      inside: { [TOPIC.ref]: [SECOND], [SECOND.ref]: [TIDE] },
+      counts: { t1: 7, t2: 0, x: 1 },
+    },
+  },
+}
 
 /** The read did not come back. Says so, and is never mistaken for "nothing placed here". */
 export const Failed: Story = { args: { related: 'failed' } }

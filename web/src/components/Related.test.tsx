@@ -6,7 +6,7 @@
  * unread, empty, failed — never collapse into one another on screen (peek#189's
  * invariant); and the filter is "not mine", with no kind named in it.
  */
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import type { ForeignObject as Data } from '@/api/foreign'
 
@@ -16,7 +16,11 @@ import type { ForeignObject as Data } from '@/api/foreign'
 const readRelated = vi.fn()
 vi.mock(import('@/api/foreign'), async (importOriginal) => ({
   ...(await importOriginal()),
-  readRelated: (folder: string, address: string) => readRelated(folder, address),
+  // Nothing nested unless a test says so (FOL-4).
+  readRelated: async (folder: string, address: string) => {
+    const read = await readRelated(folder, address)
+    return read && { inside: {}, ...read }
+  },
 }))
 
 import { useRelated } from '@/api/useRelated'
@@ -92,6 +96,21 @@ describe('Related', () => {
     expect(screen.queryByRole('heading', { name: 'Related' })).not.toBeInTheDocument()
   })
 
+  it('draws what is under a related file beneath it, at depth, each card its own (FOL-4)', async () => {
+    const brief = file({ ref: '30840:pk:b', address: '30840:pk:b', parentRef: '30840:pk:t1', slots: { title: { value: 'Brief' } } })
+    const notes = file({ ref: '30840:pk:n', address: '30840:pk:n', parentRef: '30840:pk:b', slots: { title: { value: 'Notes' } } })
+    readRelated.mockResolvedValue({
+      files: [file()],
+      inside: { '30840:pk:t1': [brief], '30840:pk:b': [notes] },
+      counts: { '30840:pk:t1': 3 },
+    })
+    render(<Page folder="f1" address={PROJECT} />)
+    await waitFor(() => expect(screen.getByText('Notes')).toBeInTheDocument())
+    const underTopic = document.querySelector('[data-inside="30840:pk:t1"]') as HTMLElement
+    expect(within(underTopic).getByText('Brief')).toBeInTheDocument()
+    expect(within(document.querySelector('[data-inside="30840:pk:b"]') as HTMLElement).getByText('Notes')).toBeInTheDocument()
+  })
+
   it('a read that failed says so, and is never mistaken for nothing placed here', async () => {
     // Rejects on a later tick — see FolderPage.test for why an already-rejected
     // promise trips the runner rather than the component.
@@ -133,8 +152,8 @@ describe('Related', () => {
 describe('hasRelated', () => {
   it('draws the heading for files and for a failure, and for nothing else', () => {
     expect(hasRelated(undefined)).toBe(false)
-    expect(hasRelated({ files: [], counts: {} })).toBe(false)
-    expect(hasRelated({ files: [file()], counts: {} })).toBe(true)
+    expect(hasRelated({ files: [], inside: {}, counts: {} })).toBe(false)
+    expect(hasRelated({ files: [file()], inside: {}, counts: {} })).toBe(true)
     expect(hasRelated('failed')).toBe(true)
   })
 })
