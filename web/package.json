@@ -14,7 +14,7 @@
     "test:watch": "vitest",
     "lint": "eslint .",
     "lint:rules": "eslint --config eslint.gates.config.js .",
-    "ui:find": "estiva-ui find --repo ship --also peek=../../peek",
+    "ui:find": "estiva-ui find --repo ship",
     "registry": "estiva-ui build --repo ship",
     "registry:check": "estiva-ui check --repo ship",
     "postlint:rules": "estiva-gates count --repo ship"

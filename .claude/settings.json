@@ -11,5 +11,13 @@
         ]
       }
     ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(npm run ui:find *)",
+      "Bash(npm --prefix * run ui:find *)",
+      "PowerShell(npm run ui:find *)",
+      "PowerShell(npm --prefix * run ui:find *)"
+    ]
   }
 }
