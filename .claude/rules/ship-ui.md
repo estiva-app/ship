@@ -45,7 +45,7 @@ Ship's own `NavItem` (`web/src/components/NavItem.tsx`) already does it; use tha
 
 - A hand-written "Nothing here" paragraph or span is the `section` manner of `EmptyState`, and becomes it.
 - **A `page` sits in the middle of its box both ways.** A page is a flex child of `main` (below), so the state takes the room left under its heading and centres there. Nothing to add; never `h-full` on its box.
-- **A page keeps the frame's contract** (D46): it is a flex child of `main` and says `flex-1` — it fills the frame and, when taller, scrolls in the frame's bar — or `flex-1 min-h-0 [contain:size]` — it takes exactly the frame's height and scrolls inside itself, in regions of its own. Never `h-full`, and never a scroll class of its own: the frame owns the bar.
+- **A page keeps the frame's contract**: it is a flex child of `main` and says `flex-1` — it fills the frame and, when taller, scrolls in the frame's bar — or `flex-1 min-h-0 [contain:size]` — it takes exactly the frame's height and scrolls inside itself, in regions of its own. Never `h-full`, and never a scroll class of its own: the frame owns the bar.
 
 ## Two things the rewrite settled, both easy to undo by accident
 

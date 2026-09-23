@@ -53,7 +53,7 @@ finish.
   read the part's page, the mistakes this codebase keeps making.
 - **`.claude/rules/ship-ui.md`** — loads when you open a file under
   `web/src/` or `scripts/smoke.ts`: Ship's three kinds of UI file, forks,
-  links through `linkTo`, tables, empty states, the page contract (D46), the
+  links through `linkTo`, tables, empty states, the page contract, the
   smoke test's selectors.
 - **`.claude/rules/wire-and-fold.md`** — loads when you open a file under
   `src/`, `lib/nostr/`, `conformance/` or `scripts/conformance.test.ts`: the
