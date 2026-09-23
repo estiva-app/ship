@@ -139,7 +139,7 @@ export function Activity({ items, onReply, disabledReason, nameOf, onReact, onDe
               </div>
               {/* The same card `Conversations` draws, deliberately — a thread
                   looks like a thread wherever it is read, and re-typing the card
-                  here would be the second copy UI-RULES §1 calls a component. */}
+                  here would be the second copy .claude/rules/ship-ui.md calls a component. */}
               <ConversationThread
                 thread={item.thread}
                 onReply={onReply}

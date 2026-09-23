@@ -8,7 +8,7 @@ import { cn } from '@/lib/cn'
  * 2026-09-09: the count before the chip — what is said about the file, then
  * where it lives). `ForeignObject` needed the same mark for a Related file's
  * conversation count, and the same class string twice is a component
- * (UI-RULES §1).
+ * (.claude/rules/ship-ui.md).
  *
  * The `unit` is the caller's, because the number is not always the same
  * thing: an issue row counts *conversations* (threads at the root), a foreign
