@@ -1,6 +1,7 @@
 import { gateLint, TOKEN_LINT_IGNORES, tokenLint, tokenValues } from '@estiva-app/ui/gates'
 import reactHooks from 'eslint-plugin-react-hooks'
 import { defineConfig, globalIgnores } from 'eslint/config'
+import tseslint from 'typescript-eslint'
 
 /**
  * Ship's lint: the token contract, one hooks rule, and the UI Guardrails'
@@ -26,13 +27,19 @@ import { defineConfig, globalIgnores } from 'eslint/config'
  * hooks in `api/` already carried `eslint-disable-next-line` comments for it,
  * written for a lint that did not exist here, and ESLint refuses a directive
  * for an unknown rule. The rest of the set Peek runs waits for S17.
+ *
+ * And TypeScript's plugin, with none of its rules on, for the same reason
+ * (UIG-37): an `eslint-disable-next-line @typescript-eslint/...` comment,
+ * which TypeScript's own lint writes, would otherwise fail this lint with
+ * "Definition for rule ... was not found". Peek PR #324 failed its token lint
+ * on one.
  */
 export default defineConfig([
   globalIgnores(TOKEN_LINT_IGNORES),
   tokenLint(),
   {
     files: ['**/*.{ts,tsx}'],
-    plugins: { 'react-hooks': reactHooks },
+    plugins: { 'react-hooks': reactHooks, '@typescript-eslint': tseslint.plugin },
     rules: { 'react-hooks/exhaustive-deps': 'warn' },
   },
   tokenValues(),
