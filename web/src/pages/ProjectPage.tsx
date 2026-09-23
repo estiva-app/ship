@@ -196,14 +196,17 @@ export function whereThreadLives(folder: string, state: FolderState): string | u
 }
 
 /**
- * The Activity list for one object — the mentions half (CON-7, RIC-12).
+ * The Activity list for one object: where else it was mentioned (CON-7,
+ * RIC-12), and nothing else.
+ *
+ * **Sub-file conversations are not Activity (PEE-26).** CON-9 rolled a
+ * project's issue threads up into this list as a second relation. It was an
+ * experiment and was undone: a comment on an issue is that issue's
+ * conversation, read on the issue. It shows on neither the project's
+ * Activity nor its stream (`subFileThreads` keeps it out of the stream).
  *
  * Ordered by last activity, which is the order `foldConversations` already
- * leaves them in: CON-9 asks for one time-ordered list rather than a section
- * per relation, so the sort is the list's own and the relation rides along as
- * metadata.
- *
- * The sub-file half arrives next and slots in here as a second `relation`.
+ * leaves them in.
  *
  * **The anchor body is deliberately not passed to `threadFor`.** A block anchor
  * resolves against *the object the comment is about*, and these comments are
@@ -215,46 +218,32 @@ export function activityFor(
   addr: string,
   state: WorkspaceState,
   directory: DirectoryView,
-  /**
-   * The files nested under this one, whose conversations roll up. A project
-   * passes its issues; an issue passes nothing, because nothing nests under one
-   * until FOL-2.
-   */
-  subFiles: readonly { addr: string; label: string }[] = [],
 ): { items: ActivityItem[]; truncated: number } {
   const mentions: ActivityItem[] = mentionsOf(state.conversations, addr, state.anchors).map((conversation) => ({
     thread: threadFor(conversation, directory, undefined, addr, state.edits, state.attachments),
     relation: 'mention' as const,
     where: whereThreadLives(conversation.root.folder, state),
   }))
-
-  const labels = new Map(subFiles.map((file) => [file.addr, file.label]))
-  const rolled: ActivityItem[] = commentsOnAny(state.conversations, new Set(labels.keys()), state.anchors).map(
-    ({ conversation, about }) => ({
-      thread: threadFor(conversation, directory, undefined, about, state.edits, state.attachments),
-      relation: 'sub-file' as const,
-      where: labels.get(about),
-    }),
-  )
-
-  /*
-    One time-ordered list — CON-9 — so the two relations are merged and sorted
-    rather than concatenated. `foldConversations` already orders conversations
-    most-recently-active first, and re-deriving that here from `lastAt` would be
-    a second opinion about ordering; taking the fold's order and merging on the
-    root's time keeps one.
-  */
-  const all = [...mentions, ...rolled].sort((a, b) => lastActivity(b.thread) - lastActivity(a.thread))
-  return { items: all.slice(0, ACTIVITY_HORIZON), truncated: Math.max(0, all.length - ACTIVITY_HORIZON) }
+  return { items: mentions.slice(0, ACTIVITY_HORIZON), truncated: Math.max(0, mentions.length - ACTIVITY_HORIZON) }
 }
 
-const lastActivity = (thread: ThreadData) => Math.max(thread.root.at, ...thread.replies.map((r) => r.at))
+/**
+ * The ids of the threads rooted at one of these files: a project's issue
+ * comments, which sit in the project's Folder but are not its conversation
+ * (CON-9). Every one of them, not only the most recent `ACTIVITY_HORIZON`:
+ * when this set came from the capped Activity list, threads past the cap
+ * leaked back into the project's stream.
+ */
+export function subFileThreads(state: WorkspaceState, subFiles: ReadonlySet<string>): Set<string> {
+  return new Set(commentsOnAny(state.conversations, subFiles, state.anchors).map(({ conversation }) => conversation.id))
+}
 
 /**
- * How much of a roll-up Activity shows — the horizon, decided rather than
- * inherited (CON-9, on CON-1's precedent).
+ * How much Activity shows — the horizon, decided rather than inherited (CON-9,
+ * on CON-1's precedent). It was chosen when Activity still held a project's
+ * issue threads (the measurement below); since PEE-26 it caps mentions only.
  *
- * A project with 200 issues has an unbounded roll-up, and an unbounded list is
+ * A project with 200 issues had an unbounded roll-up, and an unbounded list is
  * not a list a person reads. CON-1 is the precedent for what to do about that:
  * choose N deliberately, name the constant after the decision, and **say it
  * where a reader can see it** — because *"an undocumented cap is
@@ -337,25 +326,17 @@ export function ProjectPage({
       })
   }, [project, state, directory])
 
-  const activity = useMemo(() => {
-    if (!project) return { items: [], truncated: 0 }
-    /* The sub-files are this project's issues — data that exists today, which is
-       why the roll-up needs no folder nesting. Labelled by ref where there is
-       one, because that is how a person says which issue they mean. */
-    const subFiles = state.issues
-      .filter((issue) => issue.projectAddr === project.addr)
-      .map((issue) => ({ addr: issue.addr, label: issue.ref ? `${issue.ref} · ${issue.title}` : issue.title }))
-    return activityFor(project.addr, state, directory, subFiles)
-  }, [project, state, directory])
+  const activity = useMemo(
+    () => (project ? activityFor(project.addr, state, directory) : { items: [], truncated: 0 }),
+    [project, state, directory],
+  )
 
   /*
     The project's OWN conversation — CON-9, and this line changed with it.
 
     It used to be every thread in the content Folder, *deliberately including the
-    ones about an issue*, because there was nowhere else for those to go. There
-    is now: they are the sub-file half of Activity. Leaving them here as well
-    would put the same thread twice on one page, in two lists that are supposed
-    to mean different things.
+    ones about an issue*. Those are the issues' own conversations, read on each
+    issue's page, so they are not here and, since PEE-26, not in Activity either.
 
     **The filter stays the Folder, not the `a` tag.** A project *is* a Folder, so
     a message written in the paired Peek topic is the project's conversation even
@@ -369,7 +350,10 @@ export function ProjectPage({
     conversation. `ownConversations` keeps the Folder rule and drops those; the
     topic reaches this page as a Related card with its count instead.
   */
-  const rolledUp = useMemo(() => new Set(activity.items.filter((i) => i.relation === 'sub-file').map((i) => i.thread.id)), [activity])
+  const rolledUp = useMemo(
+    () => (project ? subFileThreads(state, new Set(state.issues.filter((issue) => issue.projectAddr === project.addr).map((issue) => issue.addr))) : new Set<string>()),
+    [project, state],
+  )
   const conversations = useMemo(
     () => (project ? ownConversations(state.conversations, project.contentFolder, project.addr, state.anchors).filter((c) => !rolledUp.has(c.id)) : []),
     [project, state, rolledUp],

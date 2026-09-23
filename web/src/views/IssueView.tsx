@@ -24,7 +24,7 @@ import type { RelatedState } from '@/api/useRelated'
  * | | what it holds |
  * | --- | --- |
  * | **Conversations** | threads that declared themselves to be about this issue |
- * | **Activity** | threads on files *related* to it — places it was mentioned, and (next) its sub-files |
+ * | **Activity** | threads elsewhere that mention it — never its sub-files' (PEE-26) |
  * | **History** | this issue's own change events |
  *
  * History was called "Activity" until CON-9 gave that word the middle row.

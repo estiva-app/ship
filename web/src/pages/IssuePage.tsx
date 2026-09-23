@@ -49,9 +49,7 @@ export function IssuePage({ state, directory, d, say, refresh }: { state: Worksp
     calls that indefensible; the mentions are in Activity below.
   */
   const conversations = useMemo(() => (issue ? commentsOn(state.conversations, issue.addr, state.anchors) : []), [issue, state])
-  /* An issue has no sub-files until files nest (FOL-2), so its Activity is the
-     mentions half alone. The roll-up argument is left empty rather than absent
-     so the day nesting lands, this line is where it goes. */
+  /* Activity is where else this issue was mentioned (PEE-26). */
   const activity = useMemo(
     () => (issue ? activityFor(issue.addr, state, directory) : { items: [], truncated: 0 }),
     [issue, state, directory],
