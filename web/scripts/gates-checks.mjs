@@ -91,7 +91,6 @@ export default function define(h) {
     chain: { ref: "UIG-4", owner: true },
     // Ship runs the token contract inside its one lint config; it has no config of its own for it.
     tokenConfigs: ["eslint.config.js"],
-    headers: ["SectionHeader"],
   });
   for (const { ref, title, owner = false, checks } of own) {
     const row = tickets.find((t) => t.ref === ref);
