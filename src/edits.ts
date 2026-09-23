@@ -36,8 +36,18 @@ import { KIND } from './kinds'
 /** The current text of an edited message, and when it was last changed. */
 export interface Edit {
   body: string
-  /** Milliseconds, so a reader can say when — `ts` where trusted, else seconds×1000. */
+  /**
+   * Milliseconds, so a reader can say when — `ts` where trusted, else seconds×1000.
+   * When the body last *changed*; if no edit changed it, the latest edit's time.
+   */
   at: number
+  /**
+   * Whether any edit changed the body, which is what a reader marks. An edit
+   * byte-identical to the body it replaces changes attachments only, and a
+   * reader SHOULD NOT mark the message edited for it (§7.2.1, amended
+   * 2026-09-23, CON-5).
+   */
+  edited: boolean
 }
 
 /** Target event id → the edit that won. */
@@ -66,6 +76,27 @@ function laterThan(a: SignedEvent, b: SignedEvent): boolean {
 }
 
 /**
+ * Every `kind:40003` in `events`, grouped by target, earliest first.
+ *
+ * The one edit ordering. `foldEdits` walks it for the body and
+ * `foldAttachments` walks it for `imeta` — §7.2.1 orders attachments "exactly
+ * as the body fold is" — so the two cannot disagree about which edit is later.
+ */
+export function editsByTarget(events: readonly SignedEvent[]): Map<string, SignedEvent[]> {
+  const out = new Map<string, SignedEvent[]>()
+  for (const event of events) {
+    if (event.kind !== KIND.MESSAGE_EDIT) continue
+    const target = event.tags.find((t) => t[0] === 'e')?.[1]
+    if (!target) continue
+    const list = out.get(target)
+    if (list) list.push(event)
+    else out.set(target, [event])
+  }
+  for (const list of out.values()) list.sort((a, b) => (laterThan(a, b) ? 1 : laterThan(b, a) ? -1 : 0))
+  return out
+}
+
+/**
  * Fold `kind:40003` events into the current text of each target.
  *
  * Pure and event-shaped, so it runs in a test with no app around it — the same
@@ -74,20 +105,32 @@ function laterThan(a: SignedEvent, b: SignedEvent): boolean {
  *
  * An edit whose target this reader cannot see is **kept**, not dropped: the
  * target may arrive in a later read, and the caller looks edits up by id.
+ *
+ * `edited` needs the body each edit replaces, so targets are read out of the
+ * same `events`. With the target unseen there is nothing to compare the first
+ * edit against and it counts as a change: the mark errs towards showing, and
+ * settles on the next read that holds the target.
  */
 export function foldEdits(events: readonly SignedEvent[]): EditIndex {
-  const winners: Record<string, SignedEvent> = {}
+  const originals = new Map<string, string>()
   for (const event of events) {
-    if (event.kind !== KIND.MESSAGE_EDIT) continue
-    const target = event.tags.find((t) => t[0] === 'e')?.[1]
-    if (!target) continue
-    const held = winners[target]
-    if (!held || laterThan(event, held)) winners[target] = event
+    if (event.kind === KIND.MESSAGE || event.kind === KIND.COMMENT) originals.set(event.id, event.content)
   }
 
   const out: EditIndex = {}
-  for (const [target, event] of Object.entries(winners)) {
-    out[target] = { body: event.content, at: orderingTime(event) }
+  for (const [target, list] of editsByTarget(events)) {
+    const latest = list[list.length - 1]
+    let current = originals.get(target)
+    let edited = false
+    let at = orderingTime(latest)
+    for (const event of list) {
+      if (current === undefined || event.content !== current) {
+        edited = true
+        at = orderingTime(event)
+      }
+      current = event.content
+    }
+    out[target] = { body: latest.content, at, edited }
   }
   return out
 }

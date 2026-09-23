@@ -80,9 +80,10 @@ export interface MessageData {
    * see `omitOwnReference`. Every other reference is still in here and is drawn
    * as the object it names, not deleted.
    *
-   * **This is the edited text where there is one** (CON-4). An edit replaces
-   * the body and nothing else, and `threadFor` applies it, so nothing below has
-   * to know an edit happened in order to draw the message correctly.
+   * **This is the edited text where there is one** (CON-4). An edit changes
+   * the body and its attachments (§7.2.1, amended 2026-09-23), and `threadFor`
+   * applies both, so nothing below has to know an edit happened in order to
+   * draw the message correctly.
    */
   body: string
   /**
@@ -91,7 +92,8 @@ export interface MessageData {
    * Present only for an edited message, because "edited" is a thing a reader
    * MUST be told (RFC 0.4 §7.2.1): the original event is immutable and still on
    * the relay, so a body that quietly changed would leave two readers
-   * disagreeing with no way to tell which is current.
+   * disagreeing with no way to tell which is current. An edit that changes only
+   * the attachments, under byte-identical text, does not set it (CON-5).
    */
   editedAt?: number
   /** Author pubkey. Only used to decide unread — your own writing is never new. */

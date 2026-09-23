@@ -131,12 +131,14 @@ export function threadFor(
       id: m.id,
       author: directory.personOf(m.author),
       at: m.createdAt,
-      // The edited text, if there is one — an edit replaces the body and
-      // nothing else (RFC 0.4 §7.2.1). The reference still comes out of it, so
-      // an edit that keeps the pointer keeps the widget.
+      // The edited text, if there is one — an edit changes the body and its
+      // attachments (RFC 0.4 §7.2.1, amended 2026-09-23). The reference still
+      // comes out of it, so an edit that keeps the pointer keeps the widget.
       body: omitOwnReference(edit?.body ?? m.body, self),
       // Milliseconds from the fold, seconds everywhere else on this shape.
-      editedAt: edit ? Math.floor(edit.at / 1000) : undefined,
+      // Only a body change marks it: an edit that re-attaches files under the
+      // same text is not "edited" (§7.2.1, CON-5).
+      editedAt: edit?.edited ? Math.floor(edit.at / 1000) : undefined,
       anchor: resolveBlockAnchor(m.blockId, body?.value ?? '', body?.format ?? 'marker'),
       // Carried for the unread rule only: your own writing is never new to you.
       by: m.author,

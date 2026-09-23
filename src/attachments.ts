@@ -31,18 +31,22 @@
  */
 import type { Imeta, SignedEvent } from '@estiva-app/protocol'
 import { BLOCK_DOCUMENT_FORMAT, imetaOf } from '@estiva-app/protocol'
+import { editsByTarget } from './edits'
 import { KIND } from './kinds'
 
 /** Message id → its attachments, in the order the sender wrote them. */
 export type AttachmentIndex = Record<string, Imeta[]>
 
 /**
- * Read `imeta` off every message that carries one.
+ * Read `imeta` off every message that carries one, then fold edits over it.
  *
- * Only the kinds the fold treats as messages. A `kind:40003` edit replaces the
- * body and nothing else (RFC 0.4 §7.2.1), so an `imeta` on one would be a
- * claim this reader has no rule for — attachments stay whatever the original
- * message said they were.
+ * A message's own set comes from the kinds the fold treats as messages. A
+ * `kind:40003` edit MAY carry `imeta` too (RFC 0.4 §7.2.1, amended 2026-09-23,
+ * CON-5): the set is that of the **latest edit carrying at least one**, in the
+ * body fold's own order (`editsByTarget`, not a second ordering). An edit with
+ * none leaves the set alone — every edit written before the amendment means
+ * what it meant — and a set replaces, it never appends. An edit whose target
+ * this reader cannot see is kept under the target's id, as `foldEdits` keeps it.
  *
  * Pure and event-shaped, so it runs in a test with no app around it, and so it
  * can move into `@estiva-app/conversation` (CON-5) rather than be rewritten.
@@ -53,6 +57,14 @@ export function foldAttachments(events: readonly SignedEvent[]): AttachmentIndex
     if (event.kind !== KIND.MESSAGE && event.kind !== KIND.COMMENT) continue
     const files = imetaOf(event)
     if (files.length > 0) out[event.id] = files
+  }
+  for (const [target, list] of editsByTarget(events)) {
+    for (let i = list.length - 1; i >= 0; i--) {
+      const files = imetaOf(list[i])
+      if (files.length === 0) continue
+      out[target] = files
+      break
+    }
   }
   return out
 }
