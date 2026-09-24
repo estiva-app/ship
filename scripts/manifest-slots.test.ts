@@ -16,8 +16,8 @@
  *
  *   npx tsx scripts/manifest-slots.test.ts
  */
-import { manifestContent, resolveSlotValue, type SlotSource } from '../src/manifest'
-import { KIND } from '../src/kinds'
+import { manifestContent, resolveSlotValue, type SlotSource } from '../src/nostr/manifest'
+import { KIND } from '../src/nostr/kinds'
 
 let failures = 0
 function check(label: string, condition: boolean, detail = '') {

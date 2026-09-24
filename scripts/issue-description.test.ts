@@ -19,9 +19,9 @@
  *
  *   npx tsx scripts/issue-description.test.ts
  */
-import { foldFolder } from '../src/fold'
-import { manifestContent, resolveSlotValue, type SlotSource } from '../src/manifest'
-import { KIND } from '../src/kinds'
+import { foldFolder } from '../src/nostr/fold'
+import { manifestContent, resolveSlotValue, type SlotSource } from '../src/nostr/manifest'
+import { KIND } from '../src/nostr/kinds'
 import type { SignedEvent } from '@estiva-app/protocol'
 
 let failures = 0

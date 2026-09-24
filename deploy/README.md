@@ -155,7 +155,7 @@ The image wraps a bundle that is built first, as `publish` does (PER-16):
 
 ```bash
 RELAY_URL=https://estiva.estiva.app ID_BASE=https://id.estiva.app \
-  npm --prefix web run build
+  npm run build
 docker build -t estiva-ship:local .
 docker run -d --name ship-verify estiva-ship:local
 docker exec ship-verify wget -q -S -O /dev/null http://127.0.0.1/

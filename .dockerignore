@@ -2,13 +2,12 @@
 # Everything else would be dead weight in the build context — and dist/ is the
 # one thing that must *not* be ignored any more.
 node_modules
-web/node_modules
 .git
 .github
 .smoke
 src
-lib
-web
+.storybook
+index.html
 scripts
 conformance
 docs

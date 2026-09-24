@@ -11,6 +11,9 @@ name: deploy
 # Laid out as Peek's is (PER-16): every job installs through the shared action,
 # the tests are sharded, and `publish` builds the bundle and wraps it in nginx.
 # The critical path on a pull request is the slowest job, not the sum.
+#
+# One package at the top folder since PER-19, so every job installs `.` and
+# nothing else — the action's default. There used to be a second tree in web/.
 
 on:
   push:
@@ -22,9 +25,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # The root: the shared wire and fold code in lib/ and src/, and the tsx
-  # scripts that test it. Fast and pure, and the only thing standing between a
-  # broken push and a broken shared workspace.
+  # The data layer in src/nostr and the tsx scripts that test it. Fast and pure,
+  # and the only thing standing between a broken push and a broken shared
+  # workspace. `typecheck` is `tsc -b`: the app, vite.config.ts, and src/nostr
+  # with scripts/ under their own stricter settings.
   check:
     runs-on: ubuntu-latest
     steps:
@@ -38,30 +42,21 @@ jobs:
         run: npm run typecheck
 
       - name: Test
-        run: npm test
+        run: npm run test:scripts
 
-  # The app, compiled exactly as `publish` compiles it. The jobs above and below
-  # see none of it: the root `tsc --noEmit` reads only lib, src and scripts, and
-  # the tests do not build. Without this the workflow could go green having
-  # compiled nothing a person can see.
+  # The app, compiled exactly as `publish` compiles it. The tests do not build,
+  # so without this the workflow could go green having bundled nothing a person
+  # can see.
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      # Both trees: web/ compiles ../lib/nostr, whose imports of @noble/hashes
-      # and @noble/curves resolve out of the *root* node_modules. Installing
-      # only web/ fails with seven TS2307s that look like the shared library is
-      # broken.
       - uses: estiva-app/estiva-foundation/.github/actions/install@ci-v1
-        with:
-          directories: |
-            .
-            web
 
-      # `tsc -b && vite build`. It writes ../dist/ship, where the image looks.
+      # `tsc -b && vite build`. It writes dist/ship, where the image looks.
       - name: Build
-        run: npm --prefix web run build
+        run: npm run build
 
       # @estiva-app/ui's classes only reach the stylesheet if `content` covers
       # the package, and Tailwind does not merge `content` from a preset. When
@@ -74,7 +69,7 @@ jobs:
             exit 1
           fi
 
-  # web/'s Vitest suite, sharded by file as Peek's is (PER-7). A private
+  # The app's Vitest suite, sharded by file as Peek's is (PER-7). A private
   # repository's runner has 2 vCPUs and Vitest leaves one for itself, so the
   # suite ran one file at a time — ~95 s, the longest step in the workflow.
   # Every shard must pass; `fail-fast` is off so a failure in one still reports
@@ -88,16 +83,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Both trees, for the reason in `build`: the tests import ../src and
-      # ../lib, which resolve out of the root node_modules.
       - uses: estiva-app/estiva-foundation/.github/actions/install@ci-v1
-        with:
-          directories: |
-            .
-            web
 
       - name: Test (shard ${{ matrix.shard }} of 3)
-        working-directory: web
         run: npx vitest run --shard=${{ matrix.shard }}/3
 
   # The UI Guardrails' rules, on their own (UIG-4, as Peek's UIG-3): a raw
@@ -109,19 +97,12 @@ jobs:
   # A job of its own, because GitHub can require only a whole job, by its name
   # (UIG-6): branch protection on main requires `gate`. Renaming this job leaves
   # every pull request waiting for a check that never reports.
-  #
-  # Only web/ is installed: the lints read files and compile nothing.
   gate:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: web
     steps:
       - uses: actions/checkout@v4
 
       - uses: estiva-app/estiva-foundation/.github/actions/install@ci-v1
-        with:
-          directories: web
 
       - name: Gate lint
         run: npm run lint:rules
@@ -158,12 +139,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Both trees: the smoke script builds web/.
       - uses: estiva-app/estiva-foundation/.github/actions/install@ci-v1
-        with:
-          directories: |
-            .
-            web
 
       - name: Chromium, with its system libraries
         run: npx playwright-core install --with-deps --only-shell chromium
@@ -197,10 +173,6 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: estiva-app/estiva-foundation/.github/actions/install@ci-v1
-        with:
-          directories: |
-            .
-            web
 
       # The image is an envelope for dist/ship since PER-16, as Peek's is for
       # dist/. The relay URL is the workspace, so it is baked into the bundle
@@ -208,7 +180,7 @@ jobs:
       # design. CLIENT_ID must match a `client_id` seeded in Estiva ID, or /sign
       # refuses every request as an unknown app.
       - name: Build
-        run: npm --prefix web run build
+        run: npm run build
         env:
           RELAY_URL: https://estiva.estiva.app
           ID_BASE: https://id.estiva.app

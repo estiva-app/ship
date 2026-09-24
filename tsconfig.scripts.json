@@ -1,0 +1,32 @@
+{
+  "$comment": [
+    "The data layer (src/nostr) and the tsx scripts beside it, under the settings",
+    "they have always been checked with: Node's types, and the unused-name checks",
+    "the app's config turns off. The app compiles src/nostr too, through its",
+    "imports; this is the stricter of the two passes."
+  ],
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.scripts.tsbuildinfo",
+    "target": "es2022",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "lib": [
+      "es2022",
+      "dom"
+    ],
+    "types": [
+      "node"
+    ],
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": [
+    "src/nostr",
+    "scripts"
+  ]
+}

@@ -7,7 +7,7 @@
  *
  *   npx tsx scripts/directory.test.ts
  */
-import { lookupMembers, type Member } from '../lib/estiva-id/directory'
+import { lookupMembers, type Member } from '../src/auth/directory'
 
 let failures = 0
 function check(label: string, condition: boolean, detail = '') {

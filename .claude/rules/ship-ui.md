@@ -1,12 +1,12 @@
 ---
 paths:
-  - "web/src/**/*.{ts,tsx}"
+  - "src/**/*.{ts,tsx}"
   - "scripts/smoke.ts"
 ---
 
 # Ship's UI files
 
-Ship-only rules for `web/src/`. The package's skill (`estiva-ui`) covers the
+Ship-only rules for `src/`. The package's skill (`estiva-ui`) covers the
 rest: search first, read the part's page, the known mistakes. The lint
 enforces raw elements, owned behaviour, restyled parts and tokens, and its
 messages name what to use.
@@ -19,9 +19,9 @@ fourth kind.
 
 | Kind | The app knows… | Where | Example |
 |---|---|---|---|
-| **Shim** | nothing extra | `web/src/components/ui/X.tsx`, one line: `export { X } from '@estiva-app/ui'` | `Button.tsx` |
-| **Wrapper** | its data, its defaults, its copy | `web/src/components/X.tsx`, mapping Ship's types onto the package's props and forwarding the rest | `Sidebar.tsx`: the package's shell and rows, Ship's entries and counts |
-| **Product** | a product object (an issue, a project, a thread, a description) | `web/src/components/` (`RichText` sits in `components/ui/`) | `IssueRow`, `ProjectCard`, `RichText` |
+| **Shim** | nothing extra | `src/components/ui/X.tsx`, one line: `export { X } from '@estiva-app/ui'` | `Button.tsx` |
+| **Wrapper** | its data, its defaults, its copy | `src/components/X.tsx`, mapping Ship's types onto the package's props and forwarding the rest | `Sidebar.tsx`: the package's shell and rows, Ship's entries and counts |
+| **Product** | a product object (an issue, a project, a thread, a description) | `src/components/` (`RichText` sits in `components/ui/`) | `IssueRow`, `ProjectCard`, `RichText` |
 
 - A file that re-implements a package component, in whole or in part, is a fork. A fork needs a ticket in `estiva-ui` saying what the package lacks, and a `// FORK: <ticket>` comment at the top. Without both it is reverted.
 - A second copy of anything inside this app is a shared component wanting a name. If you are about to paste a class string you can already see in another file, stop: that string is a component. Say so and ask (the `estiva-ui` skill, step 3); she decides what goes into the package.
@@ -30,16 +30,16 @@ fourth kind.
 ## Two things the lint does not read
 
 - **Tables.** The package has no table yet, and no rule reads `<table>`. Two files draw one: `IssuesTable` (the issue list) and `RichText` (a table inside a document). That is not a licence for a third; a new table is a ticket to the package.
-- **Class merging.** Merge classes with the package's `cn()`, re-exported from `web/src/lib/cn.ts`, never a plain `twMerge`: the package's knows the ramp, stock `tailwind-merge` drops a token size beside a text colour.
+- **Class merging.** Merge classes with the package's `cn()`, re-exported from `src/lib/cn.ts`, never a plain `twMerge`: the package's knows the ramp, stock `tailwind-merge` drops a token size beside a text colour.
 
 A token-lint exception is kept at the line, with its reason (her ruling A2):
 `// eslint-disable-next-line <rule> -- @estiva-escape: <reason>`.
-`web/src/components/ui/prose.ts` has two.
+`src/components/ui/prose.ts` has two.
 
 ## Links: every one goes through `linkTo`
 
-A package component that takes an `href` — `NavItem`, `Breadcrumb`, `Link`, `Card` — renders a plain `<a>`. An anchor left unwired reloads the whole app. So every link uses the one wrapper, `linkTo` in `web/src/router.ts`: `{...linkTo(href)}`.
-Ship's own `NavItem` (`web/src/components/NavItem.tsx`) already does it; use that one.
+A package component that takes an `href` — `NavItem`, `Breadcrumb`, `Link`, `Card` — renders a plain `<a>`. An anchor left unwired reloads the whole app. So every link uses the one wrapper, `linkTo` in `src/router.ts`: `{...linkTo(href)}`.
+Ship's own `NavItem` (`src/components/NavItem.tsx`) already does it; use that one.
 
 ## Empty states and pages
 
@@ -55,7 +55,7 @@ Ship's own `NavItem` (`web/src/components/NavItem.tsx`) already does it; use tha
   clicks it finds by role and accessible name, on purpose — a class-name
   selector proves nothing about whether a person using a screen reader can get
   there.
-- **Comments across `web/src/` cite `apps/ship/*` paths** as the provenance of
+- **Comments across `src/` cite `apps/ship/*` paths** as the provenance of
   ported behaviour ("copied from the old app's `ago()`"). Those files no longer
   exist. The references are kept because they say *why* the code is shaped as it
   is, and git still has them; do not "fix" them by deleting the reasoning.

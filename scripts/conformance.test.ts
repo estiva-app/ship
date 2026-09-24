@@ -1,5 +1,7 @@
 /**
- * Two repos, one fold. This file is identical in `estiva-agent` and `estiva-ship`.
+ * Two repos, one fold. This file is identical in `estiva-agent` and `estiva-ship`
+ * but for the `foldFolder` import: Ship's data layer is `src/nostr/` since
+ * PER-19, and the agent's copy is still `src/` until PER-21.
  *
  * The agent's tooling was extracted out of Ship (PEEK-155), and the honest cost
  * of that was a duplicated protocol layer — `lib/nostr/` and `src/` existed in
@@ -47,7 +49,7 @@ import { readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
-import { foldFolder } from '../src/fold'
+import { foldFolder } from '../src/nostr/fold'
 import type { SignedEvent } from '@estiva-app/protocol'
 
 const here = dirname(fileURLToPath(import.meta.url))

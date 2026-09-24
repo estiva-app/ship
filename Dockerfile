@@ -1,7 +1,7 @@
 # Estiva Ship — production image.
 #
 # The delivery envelope for a bundle CI has already built, the same as Peek's
-# (PER-16). `publish` runs `npm --prefix web run build` with the three build
+# (PER-16). `publish` runs `npm run build` with the three build
 # values, which writes dist/ship, and this copies it behind nginx.
 #
 # The build used to happen here, so that the image was the whole artifact. It
@@ -12,7 +12,7 @@
 # image's bundle is the one the `build` job runs on every pull request.
 #
 # The three values are baked into the bundle, not read at runtime, because the
-# relay URL *is* the workspace — see the header of web/vite.config.ts. They are
+# relay URL *is* the workspace — see the header of vite.config.ts. They are
 # set in deploy.yml's `publish` job; built without them the bundle points at
 # http://localhost:3000 and offers no sign-in.
 #

@@ -13,14 +13,14 @@
  *
  *   npx tsx scripts/smoke.ts [--headed]
  *
- * ## It drives web/, not the vanilla app (REW-7)
+ * ## It drives the React app, not the vanilla one (REW-7)
  *
  * Until the cutover this built `apps/ship` with build.mjs and drove that DOM.
  * Production now serves the React app, so a smoke test of the old one measured
  * something nobody could reach — and REW-9 deletes `apps/` and `build.mjs`
  * outright, which would have taken this file with it.
  *
- * Rewritten against `web/`, which shares none of the old selectors: the vanilla
+ * Rewritten against the React app (then `web/`, `src/` since PER-19), which shares none of the old selectors: the vanilla
  * app had hand-written classes (`.card`, `.kanban-card`, `.detail-side select`)
  * and the React app is Tailwind utilities plus `@estiva-app/ui` components.
  * So the selectors here are **roles and accessible names** wherever one exists,
@@ -187,7 +187,7 @@ async function main() {
 
   // Everything the app sends to the relay is answered here instead. The build
   // under test defaults `RELAY_URL` to exactly this origin — see the header of
-  // web/vite.config.ts, which says so for this reason.
+  // vite.config.ts, which says so for this reason.
   /** Requests this stub does not model, reported rather than guessed at. */
   const unmodelled: string[] = []
   /** Filters carried by each `POST /query`, so the read's cost is visible. */

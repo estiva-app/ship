@@ -5,3 +5,7 @@ dist
 
 # `tsc -b` writes this; it is a build cache, not source.
 *.tsbuildinfo
+
+# The catalogue of Ship's parts (UIG-13): built from the code every time it is read,
+# written to a file only by `npm run registry`, and never committed.
+/registry.json
