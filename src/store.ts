@@ -145,6 +145,31 @@ function read(events: SignedEvent[], folders: string[]): WorkspaceState {
   }
 }
 
+/**
+ * The events a workspace read returned, before the fold — PER-17.
+ *
+ * Not a materialised state: every event in it is exactly what the relay
+ * answered, and it is folded fresh each time, so the header's claim still
+ * holds. What it buys is that a read scoped to the Folders that changed can
+ * replace just their slice and leave the rest as last answered, rather than
+ * re-asking for the whole workspace — 3,483 events, 32 times in one minute,
+ * when a person deleted issues with a few Ship tabs open.
+ */
+export interface WorkspaceEvents {
+  events: SignedEvent[]
+  /** Every Folder the read fetched. See `WorkspaceState.folders`. */
+  folders: string[]
+}
+
+/** Fold a workspace read. `loadAll` is `foldWorkspace(await loadAllEvents())`. */
+export function foldWorkspace(snapshot: WorkspaceEvents): WorkspaceState {
+  return read(snapshot.events, snapshot.folders)
+}
+
+function folderOfEvent(event: SignedEvent): string | undefined {
+  return event.tags.find((t) => t[0] === 'h')?.[1]
+}
+
 export class Store {
   constructor(
     private readonly relay: Relay,
@@ -772,6 +797,11 @@ export class Store {
    * different Folders, and folding those separately would drop changes.
    */
   async loadAll(): Promise<WorkspaceState> {
+    return foldWorkspace(await this.loadAllEvents())
+  }
+
+  /** `loadAll` without the fold, for a caller that will re-read part of it — see `reloadFolders`. */
+  async loadAllEvents(): Promise<WorkspaceEvents> {
     /*
       Two discovery queries, not one, and the second is the whole of SHI-7.
 
@@ -786,12 +816,40 @@ export class Store {
       report already used to *count* them. The count was honest and the read
       was not; this closes that gap.
     */
-    let events = await this.relay.queryAll([
+    const events = await this.relay.queryAll([
       { kinds: [KIND.PROJECT] },
       { kinds: [KIND.ISSUE] },
     ])
-    const fetched = new Set<string>()
+    return this.widen(events, new Set())
+  }
 
+  /**
+   * Re-read only `folders`, keeping the rest of a previous read as it was —
+   * PER-17.
+   *
+   * Every event of the previous read that carries one of these `h` is dropped
+   * and the Folders are read again, so a deletion, an edit or a replaced record
+   * in them shows exactly as `loadAll` would show it. Then the same widening
+   * pass runs, so a Folder this change introduced — an issue filed into one
+   * not read before — is fetched rather than folded without its changes.
+   *
+   * What it cannot see is anything *outside* those Folders: a global project
+   * record (`buzz-channel`, no `h`) or a Folder the discovery query would newly
+   * turn up. A write to either needs `loadAll`, which is why the app still
+   * reads everything on load and on focus.
+   */
+  async reloadFolders(previous: WorkspaceEvents, folders: string[]): Promise<WorkspaceEvents> {
+    const scope = new Set(folders)
+    if (!scope.size) return previous
+    const kept = previous.events.filter((event) => {
+      const folder = folderOfEvent(event)
+      return !folder || !scope.has(folder)
+    })
+    const fresh = await this.rawFolders([...scope])
+    return this.widen([...kept, ...fresh], new Set([...previous.folders, ...scope]))
+  }
+
+  private async widen(events: SignedEvent[], fetched: Set<string>): Promise<WorkspaceEvents> {
     /**
      * Widen until no new Folder appears.
      *
@@ -842,7 +900,7 @@ export class Store {
       events = [...events, ...(await this.rawFolders([...wanted]))]
     }
 
-    return read(events, [...fetched])
+    return { events, folders: [...fetched] }
   }
 
   /**

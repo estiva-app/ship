@@ -122,14 +122,15 @@ export interface LiveWorkspace {
 }
 
 /**
- * Subscribe to every Folder in `folders`, and call `onChange` when one changes.
+ * Subscribe to every Folder in `folders`, and call `onChange` with the ones
+ * that changed.
  *
  * `folders` comes from the last read, because discovery *derives* it — so the
  * first subscription can only open after a read has landed, and the set is
  * re-subscribed when it changes. Compared by value: an unchanged tick must not
  * tear down and rebuild 34 subscriptions, and a re-linked project must.
  */
-export function useLiveWorkspace(folders: string[], onChange: () => void): LiveWorkspace {
+export function useLiveWorkspace(folders: string[], onChange: (changed: string[]) => void): LiveWorkspace {
   const [relayState, setRelayState] = useState<RelayState | 'off'>('off')
   const latest = useRef(onChange)
   useEffect(() => {
@@ -150,14 +151,21 @@ export function useLiveWorkspace(folders: string[], onChange: () => void): LiveW
     if (!key) return releaseState
 
     let timer: ReturnType<typeof setTimeout> | undefined
+    // The Folders signalled since the last call — what the re-read is scoped to (PER-17).
+    let changed = new Set<string>()
     const watch = client.watchFolders(
       key.split(','),
-      () => {
+      (folder) => {
         // Debounced: one gesture in another app can be several events — a
         // status change is a `kind:1851` and a comment is a `kind:1111`, and a
-        // re-link is both — and each would otherwise be its own full re-read.
+        // re-link is both — and each would otherwise be its own re-read.
+        changed.add(folder)
         if (timer !== undefined) clearTimeout(timer)
-        timer = setTimeout(() => latest.current(), DEBOUNCE_MS)
+        timer = setTimeout(() => {
+          const folders = [...changed]
+          changed = new Set()
+          latest.current(folders)
+        }, DEBOUNCE_MS)
       },
       { kinds: WORKSPACE_KINDS },
     )

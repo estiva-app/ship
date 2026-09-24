@@ -11,14 +11,15 @@
  * Components import from '@/api'. A component importing '../../src/...' is a
  * boundary violation, whatever it does.
  */
-import type { WorkspaceState } from '../../../src/store'
+import type { WorkspaceEvents } from '../../../src/store'
 import type { Directory } from '../../../src/profiles'
 import { addrToNaddr, naddrToAddr } from '@estiva-app/protocol'
 import { folderLink, parseFolderLink } from '../../../src/events'
 import { RELAY_URL } from '../config'
 
 export type { Change, Conversation, FolderState, Issue, Message, Project } from '../../../src/fold'
-export type { WorkspaceState } from '../../../src/store'
+export type { WorkspaceEvents, WorkspaceState } from '../../../src/store'
+export { foldWorkspace } from '../../../src/store'
 export type { Directory, Profile } from '../../../src/profiles'
 export { initials } from '../../../src/profiles'
 export { ISSUE_STATUSES, PROJECT_STATUSES, lookupStatus, type VocabEntry } from '../../../src/kinds'
@@ -79,9 +80,18 @@ import { foldReactions } from '../../../src/reactions'
 import type { ReactionsByTarget } from '../../../src/reactions'
 
 
-/** Everything the reader can see: projects, issues, their changes and threads. */
-export function loadAll(): Promise<WorkspaceState> {
-  return store.loadAll()
+/**
+ * Everything the reader can see: projects, issues, their changes and threads —
+ * unfolded, so a later read can replace one Folder's part of it. Fold it with
+ * `foldWorkspace`.
+ */
+export function loadAllEvents(): Promise<WorkspaceEvents> {
+  return store.loadAllEvents()
+}
+
+/** Re-read only `folders`, keeping the rest of `previous` — PER-17, see `Store.reloadFolders`. */
+export function reloadFolders(previous: WorkspaceEvents, folders: string[]): Promise<WorkspaceEvents> {
+  return store.reloadFolders(previous, folders)
 }
 
 /**
