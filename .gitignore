@@ -2,15 +2,6 @@ node_modules
 dist
 .manifest-key
 .smoke
-extension/build
-extension/*.mcpb
-
-.pro7/
-
-.pro10/
 
 # `tsc -b` writes this; it is a build cache, not source.
 *.tsbuildinfo
-.ric8/
-.ric7/
-.ric9/
