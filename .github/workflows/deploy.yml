@@ -38,9 +38,7 @@ jobs:
       - name: Test
         run: npm test
 
-      # `npm run smoke` is deliberately absent: it needs chromium system
-      # libraries Playwright does not bundle, which is a CI rabbit hole for
-      # little gain when typecheck and tests already gate the deploy.
+      # `npm run smoke` is not here; it has a job of its own, `smoke`, below.
       #
       # There is no Build step here any more either. It ran `node build.mjs`,
       # the vanilla app's bundler, which REW-9 deleted along with the app. The
@@ -151,6 +149,55 @@ jobs:
       # it before someone builds it again (UIG-13). Built from the code; nothing kept.
       - name: Every part is described
         run: npm run registry:check
+
+  # The app driven in a real browser against the in-memory relay in
+  # scripts/smoke.ts (SHI-24). It used to run only by hand, and it rotted
+  # silently twice: red on main 2026-09-08 → ship#134, and again from
+  # 2026-09-11 until this job landed. It stops at the first failure, so each
+  # break hid the ones behind it.
+  #
+  # Chromium's system libraries were the reason it stayed out. `--with-deps`
+  # apt-installs them, and `--only-shell` fetches the headless shell alone,
+  # which is all `chromium.launch({ headless: true })` uses. The browser comes
+  # from playwright-core, so the lockfile pins its version.
+  #
+  # Not in `publish`'s needs. It is the slowest job and the only one with a
+  # browser, so a red run here should stop a merge, not a deploy that typecheck
+  # and the tests have already passed. Whether a merge must wait for it is
+  # branch protection's call, which requires the check by this job's name.
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            web/package-lock.json
+
+      # Both installs, for the same reason as in `web`: the smoke script builds
+      # web/, which compiles ../lib/nostr out of the root node_modules.
+      - run: npm ci
+      - run: npm ci
+        working-directory: web
+
+      - name: Chromium, with its system libraries
+        run: npx playwright-core install --with-deps --only-shell chromium
+
+      - name: Smoke
+        run: npm run smoke
+
+      # One PNG per surface it reached; on a failure the last one is the
+      # screen it stopped on.
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-screenshots
+          path: .smoke/
+          include-hidden-files: true
 
   publish:
     # Both, since the cutover (REW-8). `web` used to be advisory — it could fail

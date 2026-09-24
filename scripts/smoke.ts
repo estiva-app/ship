@@ -315,7 +315,10 @@ async function main() {
   // Scoped to the dialog throughout: a bare placeholder also matches controls on
   // the surface behind it, and a click returns before the async re-render, so an
   // unscoped selector can fill something that is about to be replaced.
-  const projectDialog = page.getByRole('dialog')
+  //
+  // By name, never a bare `getByRole('dialog')`: the toast is a `role="dialog"`
+  // too, and "Project created" is still on screen when the next form opens.
+  const projectDialog = page.getByRole('dialog', { name: 'New project' })
   await projectDialog.waitFor()
   check('the project form opens in a modal', await projectDialog.isVisible())
   await projectDialog.getByPlaceholder('New project title').fill('Payment integration')
@@ -324,7 +327,7 @@ async function main() {
     .fill('Stripe Checkout for workspace billing.')
   await page.getByRole('button', { name: 'Create project' }).click()
   await page.getByRole('link', { name: /Payment integration/ }).first().waitFor()
-  check('the modal closes once the project is created', (await page.getByRole('dialog').count()) === 0)
+  check('the modal closes once the project is created', (await projectDialog.count()) === 0)
 
   const project = stored.find((e) => e.kind === 30850)
   const folder = stored.find((e) => e.kind === 9007)
@@ -354,7 +357,7 @@ async function main() {
   )
 
   await page.getByRole('button', { name: 'Add issue' }).click()
-  const issueDialog = page.getByRole('dialog')
+  const issueDialog = page.getByRole('dialog', { name: /^New issue in / })
   await issueDialog.waitFor()
   await issueDialog.getByPlaceholder(/^New issue in /).fill('Billing entry + add payment method')
   await page.getByRole('button', { name: 'Create issue' }).click()
@@ -815,47 +818,35 @@ async function main() {
   )
 
   /*
-    The sub-file roll-up, end to end — CON-9's Activity, the half that needs no
-    new protocol.
+    An issue's comments stay on the issue (PEE-26, which undid CON-9's sub-file
+    roll-up). Walk back to the project: the comment just written on its issue
+    must be in neither the project's Activity — which is mentions only now — nor
+    its Conversations, which are the project's OWN discussion. A leak into the
+    latter would be the §5.1 merge one level up.
 
-    Walk back to the project and the comment just written on its issue must be
-    in the project's Activity, badged as the issue's and naming it. This is the
-    demo beat and it is the one assertion here that cannot be made anywhere
-    else: `references.test.ts` proves the roll-up selects the right threads, and
-    `Activity.test.tsx` proves a selected thread is drawn — only the browser
-    proves the project page actually asks for it.
-
-    Deliberately also checked *negatively*: the comment must not appear under
-    Conversations, which is the project's OWN discussion. A roll-up that leaked
-    into the primary list would be the §5.1 merge one level up.
+    Both checks are absences, and an absence passes on a page that has not
+    loaded yet — Activity draws its empty state before and after. So first wait
+    for the issue's row (the same load that reads the issue threads the
+    exclusion set is built from) and for the stub relay to go quiet.
   */
   await page.getByRole('link', { name: 'Payment integration' }).first().click()
   await page.waitForSelector('[data-surface="project"]', { timeout: 10000 })
+  await page.locator('table tbody tr').first().waitFor({ timeout: 10000 })
+  await page.waitForLoadState('networkidle')
   const projectActivity = sectionFor('Activity')
-  await projectActivity.locator('li').first().waitFor({ timeout: 10000 })
   check(
-    "a project's Activity carries its issues' conversations",
-    (await projectActivity.textContent())?.includes('Blocked on the Stripe key.') ?? false,
-  )
-  /*
-    Every row is the project's own issues' work, and none is a mention. Stated
-    as a property rather than as "exactly one row" — that count was true only
-    while this test posted a single comment, and it broke the moment CON-10's
-    checks posted a second one. A count is a fact about the fixture; this is a
-    fact about the split.
-  */
-  check(
-    '  …badged as a sub-file, not as a mention',
-    (await projectActivity.locator('[data-relation="sub-file"]').count()) > 0 &&
-      (await projectActivity.locator('[data-relation="mention"]').count()) === 0,
+    "a project's Activity does not carry its issues' conversations",
+    (await projectActivity.count()) === 1 &&
+      !(await projectActivity.textContent())?.includes('Blocked on the Stripe key.'),
   )
   check(
-    '  …and naming the issue, because replying goes there',
-    (await projectActivity.textContent())?.includes('PAY-1') ?? false,
+    '  …and draws no sub-file row',
+    (await projectActivity.locator('[data-relation="sub-file"]').count()) === 0,
   )
   check(
-    "  …while the project's OWN conversations stay empty",
-    !(await sectionFor('Conversations').textContent())?.includes('Blocked on the Stripe key.'),
+    "  …nor do the project's OWN conversations",
+    (await sectionFor('Conversations').count()) === 1 &&
+      !(await sectionFor('Conversations').textContent())?.includes('Blocked on the Stripe key.'),
   )
   await shot(page, '11-project-activity')
 
@@ -1027,19 +1018,24 @@ async function main() {
   const folderView = page.locator(`[data-folder="${FOLDER_ID}"]`)
   check('the Folder resolves from its relay-maintained state', (await folderView.getAttribute('data-source')) === 'state')
   const rows = folderView.locator('[data-foreign-object]')
-  check('it lists every file in the Folder as a peer', (await rows.count()) === 3, `${await rows.count()} rows`)
+  /*
+    Navigation is by kind (RFC 0.5 §10.7, be4deec): Ship draws its own kinds and
+    only counts the rest, because Peek — which lists everything — is where they
+    are. So of the three files the Folder holds, one is a row and two are a
+    number, and the Peek topic and the tide are asserted *absent* from the list.
+  */
+  check('it lists only its own kinds from the Folder', (await rows.count()) === 1, `${await rows.count()} rows`)
   const shown = await folderView.innerText()
-  check('  …a Ship project', shown.includes('Payment integration'))
-  check('  …a Peek topic, which is a channel and still a file', shown.includes('Onboarding'))
+  check('  …the Ship project', shown.includes('Payment integration'))
   check(
-    '  …and a kind neither app designed for, via the widget fallback chain',
-    shown.includes('Spring tides'),
+    '  …and counts the Peek topic and the tide rather than drawing them',
+    shown.includes('2 other files, listed in Peek') && !shown.includes('Spring tides'),
   )
   check(
-    '  …drawn as a card, because nothing implements "tideboard"',
-    (await folderView.locator('[data-widget="card"]').count()) >= 1,
+    'the Folder appears in the sidebar',
+    // A team is a collapsible section now, not a link; its header is the button.
+    await sidebar().getByRole('button', { name: 'Onboarding', exact: true }).isVisible(),
   )
-  check('the Folder appears in the sidebar', await sidebar().getByRole('link', { name: 'Onboarding' }).isVisible())
   await shot(page, '10-folder-view')
 
   check(
