@@ -1050,6 +1050,26 @@ async function main() {
   )
   await shot(page, '10-folder-view')
 
+  // ── Delete, and the team lets go of it ────────────────────────────────────
+  // Last, because everything above reads the project. A team with state lists
+  // what its 30890 names, deleted or not, so the delete must be followed by a
+  // 1852 remove or Peek keeps a row pointing at nothing (FOL-48).
+  await page.goto(`http://localhost:${PORT}/#/project/${encodeURIComponent(projectAddr)}`)
+  await page.waitForSelector('[data-surface="project"]')
+  await page.getByRole('button', { name: 'Delete project' }).click()
+  const deleteDialog = page.getByRole('alertdialog', { name: /^Delete “Payment integration”/ })
+  await deleteDialog.waitFor()
+  await deleteDialog.getByRole('button', { name: 'Delete project' }).click()
+  await page.waitForSelector('[data-surface="projects"]')
+  const projectDeletion = stored.findIndex((e) => e.kind === 5 && e.tags.some((t) => t[0] === 'a' && t[1] === projectAddr))
+  check('deleting a project publishes a kind:5 for its record', projectDeletion >= 0)
+  const unlist = stored.findIndex((e) => e.kind === 1852 && tagValue(e, 'op') === 'remove')
+  check(
+    '  …then a kind:1852 removes it from its team',
+    unlist > projectDeletion && projectDeletion >= 0 && tagValue(stored[unlist]!, 'h') === TEAM_ID && tagValue(stored[unlist]!, 'a') === projectAddr,
+    unlist < 0 ? 'no remove' : `h=${tagValue(stored[unlist]!, 'h')?.slice(0, 8)} a=${tagValue(stored[unlist]!, 'a')?.slice(0, 16)}`,
+  )
+
   check(
     "it measured the relay's clock before signing anything",
     clockProbes > 0,

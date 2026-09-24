@@ -12,8 +12,10 @@ vi.mock('./store', () => ({
   },
 }))
 vi.mock('./clock', () => ({ clockProblem: vi.fn() }))
+vi.mock('./foreign', () => ({ readFolders: vi.fn() }))
 
 import { clockProblem } from './clock'
+import { readFolders } from './foreign'
 import { store } from './store'
 import { archiveProject, createIssue, createProject, deleteProject, explainRejection, pairProjectFolder, reply, setIssueField, setProjectField, startConversation } from './writes'
 
@@ -26,6 +28,7 @@ const ISSUE = { addr: `30851:${PK}:2`, id: '2', author: PK, createdAt: 1, title:
 beforeEach(() => {
   vi.mocked(clockProblem).mockResolvedValue(null)
   for (const fn of Object.values(s)) fn.mockReset()
+  vi.mocked(readFolders).mockReset().mockResolvedValue([])
 })
 
 describe('the clock is checked before anything is signed', () => {
@@ -69,13 +72,47 @@ describe('which Folder each write goes to', () => {
   it("a project's record change, archive and delete go to the Folder the record names", async () => {
     s.setField.mockResolvedValue({ ok: true })
     s.archiveProject.mockResolvedValue({ ok: true })
-    s.deleteProject.mockResolvedValue({ ok: true })
+    s.deleteProject.mockResolvedValue({ result: { ok: true } })
     await setProjectField(PROJECT, 'lead', 'k', 'Assign project')
     expect(s.setField).toHaveBeenCalledWith({ folder: 'origin-folder', target: PROJECT.addr, field: 'lead', value: 'k', note: 'Assign project' })
     await archiveProject(PROJECT, true)
     expect(s.archiveProject).toHaveBeenCalledWith({ recordFolder: 'origin-folder', project: PROJECT.addr, archived: true })
-    await deleteProject(PROJECT)
-    expect(s.deleteProject).toHaveBeenCalledWith({ recordFolder: 'origin-folder', project: PROJECT.addr })
+    await deleteProject(PROJECT, [{ id: 'content-folder', hasState: true }])
+    expect(s.deleteProject).toHaveBeenCalledWith({ recordFolder: 'origin-folder', project: PROJECT.addr, team: { folder: 'content-folder', hasState: true } })
+  })
+})
+
+describe('deleting a project unlists it from its team (FOL-48)', () => {
+  it("takes hasState from the caller's Folder read, without reading again", async () => {
+    s.deleteProject.mockResolvedValue({ result: { ok: true }, unlisted: { ok: true } })
+    expect(await deleteProject(PROJECT, [{ id: 'content-folder', hasState: true }])).toEqual({ ok: true })
+    expect(readFolders).not.toHaveBeenCalled()
+  })
+
+  it('reads the Folders when the caller has none, or does not hold this one', async () => {
+    s.deleteProject.mockResolvedValue({ result: { ok: true } })
+    vi.mocked(readFolders).mockResolvedValue([{ id: 'content-folder', hasState: true }] as never)
+    await deleteProject(PROJECT, undefined)
+    await deleteProject(PROJECT, [{ id: 'another-team', hasState: true }])
+    expect(readFolders).toHaveBeenCalledTimes(2)
+    expect(s.deleteProject).toHaveBeenLastCalledWith(expect.objectContaining({ team: { folder: 'content-folder', hasState: true } }))
+  })
+
+  it('a Folder nobody can read has no state to change', async () => {
+    s.deleteProject.mockResolvedValue({ result: { ok: true } })
+    vi.mocked(readFolders).mockResolvedValue([])
+    await deleteProject(PROJECT, [])
+    expect(s.deleteProject).toHaveBeenCalledWith(expect.objectContaining({ team: { folder: 'content-folder', hasState: false } }))
+  })
+
+  it('a refused delete is refused, whatever the unlist did', async () => {
+    s.deleteProject.mockResolvedValue({ result: { ok: false, reason: 'not the author' } })
+    expect(await deleteProject(PROJECT, [])).toEqual({ ok: false, reason: 'not the author' })
+  })
+
+  it('a refused unlist is a deleted project that says why its row stays', async () => {
+    s.deleteProject.mockResolvedValue({ result: { ok: true }, unlisted: { ok: false, reason: 'rate limited' } })
+    expect(await deleteProject(PROJECT, [{ id: 'content-folder', hasState: true }])).toEqual({ ok: true, stillListed: 'rate limited' })
   })
 
   it("a new issue goes to the project's content Folder with the next ref among what is visible", async () => {

@@ -312,7 +312,7 @@ export function ProjectPage({
   state: WorkspaceState
   directory: DirectoryView
   /** The teams, so a project filed into one is not given the team's chat (`recordChannel`). */
-  teams: readonly { id: string }[] | undefined
+  teams: readonly { id: string; hasState: boolean }[] | undefined
   /** The object's `d`, which is all a §7.2 URL carries. */
   d: string
   view: ProjectViewName
@@ -613,12 +613,13 @@ export function ProjectPage({
           destructive
           onClose={() => setDialog(null)}
           onConfirm={async () => {
-            const result = await deleteProject(project)
+            const result = await deleteProject(project, teams)
             if (!result.ok) {
               say(`Delete rejected — ${result.reason}`, 'error')
               return false
             }
-            say('Project deleted')
+            if (result.stillListed) say(`Project deleted, but its team refused to unlist it: ${result.stillListed}. Peek may keep showing a row for it.`, 'error')
+            else say('Project deleted')
             // Nothing left to render here.
             go({ name: 'projects', archived: false })
             await refresh()

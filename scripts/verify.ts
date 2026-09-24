@@ -416,15 +416,15 @@ async function main() {
 
   // NIP-09 is scoped to the pubkey that signed the original. Ravi asking for
   // Ana's project to go away must not work, or "delete" would be an attack.
-  await ravi.store.deleteProject({ recordFolder: folder, project: project.addr })
+  await ravi.store.deleteProject({ recordFolder: folder, project: project.addr, team: { folder, hasState: false } })
   const afterRavi = await ravi.store.rawFolders([folder])
   check(
     'a non-author CANNOT delete somebody else\'s project',
     afterRavi.some((e) => e.kind === KIND.PROJECT),
   )
 
-  await must('Ana deletes her own project', () =>
-    ana.store.deleteProject({ recordFolder: folder, project: project.addr }),
+  await must('Ana deletes her own project', async () =>
+    (await ana.store.deleteProject({ recordFolder: folder, project: project.addr, team: { folder, hasState: false } })).result,
   )
   const afterAna = await ana.store.rawFolders([folder])
   check(

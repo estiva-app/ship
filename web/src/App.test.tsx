@@ -266,7 +266,8 @@ describe('Project page — one project from the fold', () => {
     const dialog = within(screen.getByRole('alertdialog', { name: /Delete .Mine./ }))
     expect(deleteProject).not.toHaveBeenCalled()
     fireEvent.click(dialog.getByRole('button', { name: 'Delete project' }))
-    await waitFor(() => expect(deleteProject).toHaveBeenCalledWith(expect.objectContaining({ addr: `30850:x:${MINE}` })))
+    // The second argument is the Folder read the unlist takes hasState from (FOL-48); writes.test.ts covers it.
+    await waitFor(() => expect(vi.mocked(deleteProject).mock.calls[0]?.[0]).toMatchObject({ addr: `30850:x:${MINE}` }))
     expect(await screen.findByText('Project deleted')).toBeInTheDocument()
     await waitFor(() => expect(location.pathname).toBe('/projects'))
   })
