@@ -26,7 +26,7 @@ import {
   projectAddr,
 } from './events'
 import { findNaddrs, naddrToAddr, buildReaction, buildEdit, buildDeletion as buildEventDeletion } from '@estiva-app/protocol'
-import { planPlaceFile } from '@estiva-app/interop'
+import { planPlaceFile, planUnlistFile } from '@estiva-app/interop'
 import { foldFolder, projectFolders, type FolderState } from './fold'
 import { anchorIndex, type AnchorIndex } from './references'
 import { foldEdits, type EditIndex } from './edits'
@@ -311,19 +311,41 @@ export class Store {
    * the NIP-OA owner of an authoring agent (SPEC §6.5, corrected 2026-09-06).
    * This comment used to say "only the project's author can do this", which is
    * the rule SHI-14 found wrong and CON-3 withdrew.
+   *
+   * **Then it is unlisted from its team** (FOL-48), `createProject` in
+   * reverse. A Folder with state lists what its `kind:30890` names, deleted or
+   * not, so without the `kind:1852` remove the team keeps a row pointing at
+   * nothing — measured on production on 2026-09-24. Delete first, as
+   * `planUnlistFile` says: a refused remove then leaves a stale row, where the
+   * other order would unlist a project the relay kept. A team without state
+   * lists by `h` and needs nothing.
+   *
+   * `unlisted` is reported separately, as `placed` is: a refused delete is a
+   * project that still exists, a refused unlist is a deleted project Peek
+   * still shows a row for.
    */
-  deleteProject(args: {
+  async deleteProject(args: {
     recordFolder: string
     project: string
     reason?: string
-  }): Promise<PublishResult> {
-    return this.publish(
+    /** The project's Folder (`contentFolder`), and whether it has state — from a read, never a guess. */
+    team: { folder: string; hasState: boolean }
+  }): Promise<{ result: PublishResult; unlisted?: PublishResult }> {
+    const result = await this.publish(
       buildDeletion(this.signer.pubkey, Date.now(), {
         target: args.project,
         folder: args.recordFolder,
         reason: args.reason,
       }),
     )
+    if (!result.ok) return { result }
+
+    let unlisted: PublishResult | undefined
+    for (const command of planUnlistFile(this.signer.pubkey, Date.now(), { folder: args.team.folder, address: args.project, hasState: args.team.hasState })) {
+      unlisted = await this.publish(command)
+      if (!unlisted.ok) break
+    }
+    return { result, unlisted }
   }
 
   /**

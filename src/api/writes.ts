@@ -4,6 +4,7 @@ import type { Conversation, Issue, Project } from '../nostr/fold'
 import { nextRef, refPrefix } from '../nostr/store'
 import { RELAY_URL } from '../config'
 import { clockProblem } from './clock'
+import { readFolders } from './foreign'
 import { store } from './store'
 
 /**
@@ -133,9 +134,27 @@ export function archiveProject(project: Project, archived: boolean): Promise<Wri
  * `users.agent_owner_pubkey`, which no event carries and no route returns —
  * so guessing it hid the control from the one person most likely to want it,
  * and left an agent-authored project nobody could remove (SHI-14).
+ *
+ * Then it is unlisted from its team (FOL-48). Whether the team has state comes
+ * from the Folder read the caller already holds (`useFolders`), or a fresh one
+ * if that has not landed — never a guess. A refused unlist is still a deleted
+ * project, so it comes back `ok` with `stillListed` saying why Peek keeps the row.
  */
-export function deleteProject(project: Project): Promise<WriteResult> {
-  return publish(() => store.deleteProject({ recordFolder: project.originFolder, project: project.addr }))
+export async function deleteProject(project: Project, folders: readonly { id: string; hasState: boolean }[] | undefined): Promise<WriteResult & { stillListed?: string }> {
+  const clock = await clockProblem()
+  if (clock) return refused(clock)
+  try {
+    // Not among the caller's Folders is not "no state": it may be listed in
+    // another Folder, or the read may not have landed. Ask the relay.
+    const own = (list: readonly { id: string; hasState: boolean }[]) => list.find((folder) => folder.id === project.contentFolder)
+    const hasState = (own(folders ?? []) ?? own(await readFolders()))?.hasState ?? false
+    const { result, unlisted } = await store.deleteProject({ recordFolder: project.originFolder, project: project.addr, team: { folder: project.contentFolder, hasState } })
+    if (!result.ok) return refused(result.reason)
+    if (unlisted && !unlisted.ok) return { ok: true, stillListed: unlisted.reason ?? 'no reason given' }
+    return { ok: true }
+  } catch (error) {
+    return refused(error instanceof Error ? error.message : String(error))
+  }
 }
 
 /**

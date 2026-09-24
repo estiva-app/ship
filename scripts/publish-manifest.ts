@@ -413,8 +413,8 @@ async function main() {
   */
   const removed: boolean[] = []
   for (const addr of [issue.addr, project.addr]) {
-    const r = await store.deleteProject({ recordFolder: folder, project: addr, reason: 'manifest verification fixture' })
-    removed.push(r.ok)
+    const { result } = await store.deleteProject({ recordFolder: folder, project: addr, reason: 'manifest verification fixture', team: { folder, hasState: false } })
+    removed.push(result.ok)
   }
   for (const e of raw.filter((x) => x.kind === KIND.CHANGE && x.pubkey === identity.pubkey)) {
     const r = await relay.publish(signEvent(buildEventDeletion(identity.pubkey, Date.now(), { targetEventId: e.id }), identity.secretKeyHex))
