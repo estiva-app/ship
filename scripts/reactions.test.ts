@@ -7,7 +7,7 @@
  * gets wrong: the same person reacting twice, a reaction whose target is not on
  * this page, an empty `content`, and the horizon cutting the wrong end.
  */
-import { foldReactions, reactionTargets, REACTION_TARGET_LIMIT } from '../src/reactions'
+import { foldReactions, reactionTargets, REACTION_TARGET_LIMIT } from '../src/nostr/reactions'
 import type { SignedEvent } from '@estiva-app/protocol'
 
 let failures = 0

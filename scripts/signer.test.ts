@@ -19,7 +19,7 @@ import { schnorr } from '@noble/curves/secp256k1'
 import { hexToBytes } from '@noble/hashes/utils'
 import { computeEventId, type UnsignedEvent } from '@estiva-app/protocol'
 import { authorizationHeader } from '@estiva-app/protocol'
-import { estivaIdSigner, secretKeySigner, SignerTokenExpired } from '../lib/nostr/signer'
+import { estivaIdSigner, secretKeySigner, SignerTokenExpired } from '../src/nostr/signer'
 
 let failures = 0
 function check(label: string, condition: boolean, detail = '') {

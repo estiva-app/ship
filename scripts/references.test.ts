@@ -14,9 +14,9 @@
  * Ship's `a` tag, Peek's body-only reference — because the whole claim is that
  * the split falls out of what production already publishes.
  */
-import { foldFolder } from '../src/fold'
-import { conversationsAbout } from '../src/fold'
-import { attachmentOf, commentsOn, commentsOnAny, mentionsOf, anchorIndex } from '../src/references'
+import { foldFolder } from '../src/nostr/fold'
+import { conversationsAbout } from '../src/nostr/fold'
+import { attachmentOf, commentsOn, commentsOnAny, mentionsOf, anchorIndex } from '../src/nostr/references'
 import { findNaddrs, naddrToAddr } from '@estiva-app/protocol'
 import type { SignedEvent } from '@estiva-app/protocol'
 

@@ -8,8 +8,8 @@
  */
 import type { SignedEvent } from '@estiva-app/protocol'
 import { imetaTag } from '@estiva-app/protocol'
-import { attachmentsInDocument, foldAttachments } from '../src/attachments'
-import { KIND } from '../src/kinds'
+import { attachmentsInDocument, foldAttachments } from '../src/nostr/attachments'
+import { KIND } from '../src/nostr/kinds'
 
 let passed = 0
 const check = (label: string, ok: boolean) => {

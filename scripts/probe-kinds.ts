@@ -15,7 +15,7 @@ import { randomUUID } from 'node:crypto'
 import { buildCreateChannel, type NostrTag, type UnsignedEvent } from '@estiva-app/protocol'
 import { signEvent, publicKeyFromSecret } from '@estiva-app/protocol'
 import { Relay } from '@estiva-app/protocol'
-import { secretKeySigner } from '../lib/nostr/signer'
+import { secretKeySigner } from '../src/nostr/signer'
 
 const RELAY_URL = process.env.RELAY_URL ?? 'http://localhost:3000'
 

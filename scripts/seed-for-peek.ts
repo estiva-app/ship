@@ -17,10 +17,10 @@
  *   npm run seed:peek -- <pubkey> [<pubkey> …]
  */
 import { Relay } from '@estiva-app/protocol'
-import { secretKeySigner } from '../lib/nostr/signer'
+import { secretKeySigner } from '../src/nostr/signer'
 import { publicKeyFromSecret, signEvent } from '@estiva-app/protocol'
 import { buildAddMember, buildProfile } from '@estiva-app/protocol'
-import { Store } from '../src/store'
+import { Store } from '../src/nostr/store'
 import { addrToNaddr } from '@estiva-app/protocol'
 
 const RELAY_URL = 'http://localhost:3000'

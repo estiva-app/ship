@@ -11,19 +11,19 @@
  * Two more used to be: a route that does not survive a round trip through the
  * URL bar, and an issue whose status is outside the vocabulary and vanishes from
  * every list. Both subjects moved into `web/` with the rewrite, so their checks
- * moved with them (REW-9) — routing to `web/src/router.test.tsx`, grouping to
- * `web/src/components/batch2.test.tsx`. They are not gone, and this note is here
+ * moved with them (REW-9) — routing to `src/router.test.tsx`, grouping to
+ * `src/components/batch2.test.tsx`. They are not gone, and this note is here
  * because a deleted test and a relocated one look identical in a diff.
  *
  * No DOM: everything below is pure. Rendering is checked by `smoke.ts`.
  *
  *   npx tsx scripts/app.test.ts
  */
-import { buildChange, buildConversationMessage, buildIssue, buildProject } from '../src/events'
-import { buildManifest } from '../src/manifest'
-import { foldFolder, projectFolders, type Change, type Project } from '../src/fold'
-import { foldAttachments } from '../src/attachments'
-import { directoryFrom, initials, parseProfile } from '../src/profiles'
+import { buildChange, buildConversationMessage, buildIssue, buildProject } from '../src/nostr/events'
+import { buildManifest } from '../src/nostr/manifest'
+import { foldFolder, projectFolders, type Change, type Project } from '../src/nostr/fold'
+import { foldAttachments } from '../src/nostr/attachments'
+import { directoryFrom, initials, parseProfile } from '../src/nostr/profiles'
 import type { SignedEvent } from '@estiva-app/protocol'
 import { actionProblems } from '@estiva-app/interop'
 
