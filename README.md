@@ -27,22 +27,16 @@ The spec and the reasoning behind it live in the Peek repo:
 
 ## What is already here
 
-`lib/nostr/` — a working, tested protocol library, copied from `~/nfb-demos`:
+One package, laid out as Peek is (PER-19): `package.json`, `vite.config.ts` and
+the rest of the app's config at the top folder, the app in `src/`.
 
-- `events.ts` — event builders, NIP-01 id computation. Verified byte-identical to
-  Buzz's own Rust SDK
-- `sign.ts` — BIP-340 Schnorr signing
-- `nip98.ts` — HTTP auth for the relay bridge
-- `relay.ts` — publish and query
+The wire format — event builders, NIP-01 ids, signing, NIP-98, the relay
+clients — is `@estiva-app/protocol` since SHA-3. **Read the comments there.**
+They record behaviours that cost real debugging time — the NIP-98 nonce
+requirement, `HTTP 200` not meaning accepted, `/query` taking a bare array. None
+of it is guessable.
 
-**Read the comments in these files.** They record behaviours that cost real
-debugging time — the NIP-98 nonce requirement, `HTTP 200` not meaning accepted,
-`/query` taking a bare array. None of it is guessable.
-
-The duplication from `~/nfb-demos` is deliberate: apps in this ecosystem are meant
-to be independent implementations, not siblings sharing a package.
-
-`src/` — Ship's own data layer:
+`src/nostr/` — Ship's own data layer, where Peek keeps its own:
 
 - `kinds.ts` — the three kinds and the status vocabularies. The vocabularies get
   published verbatim in the manifest at build-order step 3
@@ -55,12 +49,13 @@ to be independent implementations, not siblings sharing a package.
   the names and avatars here were mostly written by Peek, about people who have
   never opened this app. Neither app has the other's user table and both read
   the same profiles, which is the whole of cross-app identity
+- `signer.ts` — the app's signers over protocol's `Signer`: Estiva ID, a
+  per-browser key, NIP-07
 
-`web/` — the app. React + Vite + Tailwind, with `@estiva-app/ui` for the shared
-primitives. `src/router.ts` is hash routing, `src/pages/` wires each surface to
-the data, `src/views/` is the surface itself, `src/api/` is the seam onto
-`../src` and `../lib`. Its own `package.json`, so it builds and tests
-independently of the shared code below it.
+The rest of `src/` is the app. React + Vite + Tailwind, with `@estiva-app/ui`
+for the shared primitives. `src/router.ts` is path routing, `src/pages/` wires
+each surface to the data, `src/views/` is the surface itself, `src/api/` is the
+one seam onto `src/nostr/`.
 
 There is no `apps/` any more: the vanilla-DOM app it replaced was deleted in
 REW-9, after the React app had served production. It is in git history if you
@@ -68,7 +63,7 @@ need to see what a behaviour used to do.
 
 `scripts/` — `probe-kinds.ts` asks the relay which kinds it will accept;
 `verify.ts` is the end-to-end check that Ravi can close Ana's issue;
-`app.test.ts` pins the things that fail silently; `smoke.ts` builds `web/` and
+`app.test.ts` pins the things that fail silently; `smoke.ts` builds the app and
 drives it in a real browser against an in-memory relay.
 
 ## The Folder *is* the project
@@ -182,9 +177,8 @@ All four properties are pinned in `npm run verify`.
 Needs a Buzz relay on `:3000` — see `RUNNING.md` above.
 
 ```bash
-npm install                  # the shared code below web/
-npm install --prefix web     # and the app itself
-npm --prefix web run dev     # Vite on :5191, with hot reload
+npm install
+npm run dev        # Vite on :5191, with hot reload
 ```
 
 Then open **http://localhost:5191/** and add a project. It gets its
@@ -193,10 +187,10 @@ to pair a topic with it — or paste a topic's Folder link when creating the
 project, and they are the same container from the start.
 
 ```bash
-npm run typecheck  # tsc --noEmit, over lib/ src/ scripts/
-npm test           # pure logic: Folder placement, the manifest, profiles
-npm --prefix web run test    # the app: components, pages, router, auth boot
-npm --prefix web run build   # tsc -b && vite build → dist/ship
+npm run typecheck     # tsc -b: the app, and src/nostr + scripts/ more strictly
+npm run test:scripts  # pure logic: Folder placement, the manifest, profiles
+npm test              # the app: components, pages, router, auth boot
+npm run build         # tsc -b && vite build → dist/ship
 npm run probe      # does the relay accept our kinds?
 npm run verify     # full round trip against the relay, two identities
 npm run manifest   # publish the NIP-89 manifest and check it is satisfiable

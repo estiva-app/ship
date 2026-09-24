@@ -9,9 +9,9 @@
  * it did not ask about is kept rather than lost.
  */
 import { publicKeyFromSecret, signEvent, type Relay, type SignedEvent, type UnsignedEvent } from '@estiva-app/protocol'
-import { Store, foldWorkspace } from '../src/store'
-import { buildChange, buildIssue, buildProject, issueAddr, projectAddr } from '../src/events'
-import type { Signer } from '../lib/nostr/signer'
+import { Store, foldWorkspace } from '../src/nostr/store'
+import { buildChange, buildIssue, buildProject, issueAddr, projectAddr } from '../src/nostr/events'
+import type { Signer } from '../src/nostr/signer'
 
 let failures = 0
 function check(label: string, condition: boolean, detail = '') {

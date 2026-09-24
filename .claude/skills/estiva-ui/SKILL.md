@@ -5,4 +5,4 @@ description: "Use before building, adding or changing anything on screen in an a
 
 <!-- Written by `estiva-ui skill` from @estiva-app/ui; `estiva-ui check` fails when it differs. The text is the installed package’s, read in below. -->
 
-!`cat "${CLAUDE_PROJECT_DIR}/web/node_modules/@estiva-app/ui/skill/estiva-ui.md"`
+!`cat "${CLAUDE_PROJECT_DIR}/node_modules/@estiva-app/ui/skill/estiva-ui.md"`

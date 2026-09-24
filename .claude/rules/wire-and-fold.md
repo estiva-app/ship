@@ -1,7 +1,6 @@
 ---
 paths:
-  - "src/**"
-  - "lib/nostr/**"
+  - "src/nostr/**"
   - "scripts/conformance.test.ts"
   - "conformance/**"
 ---
@@ -18,16 +17,22 @@ Nothing in this repository depends on it. It depends on this one, by copy.
 
 ## The copies that must not drift
 
-`estiva-agent` vendors `src/` and `lib/nostr/` (now only `signer.ts`) from
-here, at identical paths, so `diff -r` is a check anybody can run:
+`estiva-agent` vendors Ship's data layer, `src/nostr/`. Since PER-19 it no
+longer sits at the same path in both repos: the agent still keeps it as `src/`
+plus `lib/nostr/signer.ts`, until PER-21 replaces the copy altogether
+(conversations from `@estiva-app/conversation`, PER-20; Ship's objects through
+its manifest and `@estiva-app/interop`). Until then the check is:
 
 ```bash
-diff -r src ../estiva-agent/src
-diff -r lib/nostr ../estiva-agent/lib/nostr
+diff -r -x signer.ts src/nostr ../estiva-agent/src
+diff src/nostr/signer.ts ../estiva-agent/lib/nostr/signer.ts
 ```
 
-Do not assume they match: on 2026-09-23, `attachments.ts`, `edits.ts` and
-`events.ts` differed between the two `main` branches.
+`scripts/conformance.test.ts` differs by one import line for the same reason.
+
+Do not assume they match: on 2026-09-24, `attachments.ts`, `edits.ts`,
+`events.ts` and `store.ts` differed between the two `main` branches — the
+agent's copy predates CON-5, FOL-30, FOL-2 and PER-17.
 
 Duplication is the deliberate choice — the same argument `README.md` already
 makes for duplicating the protocol library rather than sharing a package. What

@@ -8,8 +8,8 @@
  * reader happens to sort first. `ts` is what settles it, under §6.2's rule.
  */
 import type { SignedEvent } from '@estiva-app/protocol'
-import { foldEdits } from '../src/edits'
-import { KIND } from '../src/kinds'
+import { foldEdits } from '../src/nostr/edits'
+import { KIND } from '../src/nostr/kinds'
 
 let passed = 0
 const check = (label: string, ok: boolean) => {

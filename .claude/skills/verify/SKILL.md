@@ -9,7 +9,7 @@ description: Use when you check a change to Ship's screens by looking at it (Sto
 
 ## Render it and measure it
 
-- Start Ship's Storybook: `npm --prefix web run storybook` → `http://localhost:6007`.
+- Start Ship's Storybook: `npm run storybook` → `http://localhost:6007`.
 - Open the story and compare against the package component it is built from:
   height, radius, padding, colour.
 - The package's own Storybook runs from the `estiva-ui` checkout beside this
@@ -28,7 +28,7 @@ file you replaced with a re-export. Until then it serves the old build.
 
 ## `npm run smoke`
 
-- `npm run smoke` builds `web/` and drives it in chromium, against an
+- `npm run smoke` builds the app and drives it in chromium, against an
   in-memory relay (not production). Run it by hand before anything that
   touches a surface.
 - It needs chromium's system libraries, which Playwright does not bundle —

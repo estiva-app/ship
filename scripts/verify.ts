@@ -25,11 +25,11 @@
  */
 import { randomUUID } from 'node:crypto'
 import { Relay } from '@estiva-app/protocol'
-import { secretKeySigner } from '../lib/nostr/signer'
+import { secretKeySigner } from '../src/nostr/signer'
 import { addrToNaddr } from '@estiva-app/protocol'
-import { Store } from '../src/store'
-import { conversationsAbout, foldFolder, projectFolders } from '../src/fold'
-import { KIND } from '../src/kinds'
+import { Store } from '../src/nostr/store'
+import { conversationsAbout, foldFolder, projectFolders } from '../src/nostr/fold'
+import { KIND } from '../src/nostr/kinds'
 
 const RELAY_URL = process.env.RELAY_URL ?? 'http://localhost:3000'
 
@@ -205,7 +205,7 @@ async function main() {
     state.activity.every((c) => c.ts !== undefined && Math.floor(c.ts / 1000) === c.createdAt),
   )
 
-  const { buildChange } = await import('../src/events')
+  const { buildChange } = await import('../src/nostr/events')
   const { signEvent } = await import('@estiva-app/protocol')
 
   // ── 5. A `ts` nobody should believe ────────────────────────────────────────
