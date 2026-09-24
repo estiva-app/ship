@@ -20,6 +20,7 @@ import { archiveProject, createIssue, createProject, deleteProject, explainRejec
 const s = store as unknown as Record<string, ReturnType<typeof vi.fn>>
 const PK = 'ab'.repeat(32)
 const PROJECT = { addr: `30850:${PK}:1`, id: '1', author: PK, createdAt: 1, title: 'Relay Migration', description: '', descriptionFormat: 'marker' as const, contentFolder: 'content-folder', originFolder: 'origin-folder', status: 'planned', archived: false, fields: {} }
+const TEAM = { folder: '3167adea-877f-43c4-96fb-517a2b2d5d24', hasState: true }
 const ISSUE = { addr: `30851:${PK}:2`, id: '2', author: PK, createdAt: 1, title: 'I', description: '', descriptionFormat: 'marker' as const, folder: 'issue-folder', projectAddr: PROJECT.addr, ref: 'REL-2', status: 'todo', fields: {} }
 
 beforeEach(() => {
@@ -31,7 +32,7 @@ describe('the clock is checked before anything is signed', () => {
   it('refuses every write with the clock sentence, and calls nothing', async () => {
     vi.mocked(clockProblem).mockResolvedValue('clock is off')
     expect(await setIssueField(ISSUE, 'status', 'done', 'Status → done')).toEqual({ ok: false, reason: 'clock is off' })
-    expect(await createProject({ title: 'X', description: '' })).toEqual({ ok: false, reason: 'clock is off' })
+    expect(await createProject({ title: 'X', description: '', team: TEAM })).toEqual({ ok: false, reason: 'clock is off' })
     expect(await createIssue(PROJECT, [], { title: 'X', description: '' })).toEqual({ ok: false, reason: 'clock is off' })
     expect(await pairProjectFolder(PROJECT, 'f')).toEqual({ ok: false, reason: 'clock is off' })
     expect(s.setField).not.toHaveBeenCalled()
@@ -118,9 +119,19 @@ describe('pairing and its explanation', () => {
     expect(await pairProjectFolder(PROJECT, 'f')).toEqual({ ok: true, announced: false, announceReason: 'refused' })
   })
 
-  it('a project created in a pasted Folder gets the same explanation on rejection', async () => {
-    s.createProject.mockResolvedValue({ result: { ok: false, reason: 'not a channel member' }, addr: 'a', id: 'i', folder: 'f' })
-    const result = await createProject({ title: 'X', description: '', folder: '11111111-2222-4333-8444-555555555555' })
-    expect(result).toMatchObject({ ok: false, reason: expect.stringContaining('has not been published yet') })
+  it('a project is created in the team it names', async () => {
+    s.createProject.mockResolvedValue({ result: { ok: true }, placed: { ok: true }, addr: 'a', id: 'i', folder: TEAM.folder })
+    expect(await createProject({ title: 'X', description: '', team: TEAM })).toEqual({ ok: true, addr: 'a' })
+    expect(s.createProject).toHaveBeenCalledWith({ title: 'X', description: '', team: TEAM })
+  })
+
+  it('a refused record is no project', async () => {
+    s.createProject.mockResolvedValue({ result: { ok: false, reason: 'refused' }, addr: 'a', id: 'i', folder: TEAM.folder })
+    expect(await createProject({ title: 'X', description: '', team: TEAM })).toEqual({ ok: false, reason: 'refused' })
+  })
+
+  it('a refused listing is a created project that says why Peek will not place it', async () => {
+    s.createProject.mockResolvedValue({ result: { ok: true }, placed: { ok: false, reason: 'rate limited' }, addr: 'a', id: 'i', folder: TEAM.folder })
+    expect(await createProject({ title: 'X', description: '', team: TEAM })).toEqual({ ok: true, addr: 'a', unlisted: 'rate limited' })
   })
 })

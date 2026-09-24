@@ -31,6 +31,8 @@ vi.mock('@/api', async (importOriginal) => {
 vi.mock('@/api/foreign', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/api/foreign')>()),
   readFolder: vi.fn(() => new Promise(() => {})),
+  // One team, so a new project has somewhere to be filed (FOL-2).
+  readFolders: vi.fn(() => Promise.resolve([{ id: '3167adea-877f-43c4-96fb-517a2b2d5d24', name: 'Ship', hasState: true }])),
 }))
 
 import { createIssue, createProject, deleteIssue, deleteProject, resolveInbound, setIssueField, startConversation, useDirectory, useWorkspace } from '@/api'
@@ -167,11 +169,14 @@ describe('Projects page — cards from the fold', () => {
     vi.mocked(createProject).mockResolvedValue({ ok: true, addr: '30850:x:new' })
     goTo('/projects')
     render(<App />)
+    await screen.findByText('Ship') // the teams read has landed: the sidebar lists it
     fireEvent.click(screen.getByRole('button', { name: 'Add project' }))
     const dialog = within(screen.getByRole('dialog', { name: 'New project' }))
     fireEvent.change(dialog.getByPlaceholderText('New project title'), { target: { value: 'Mobile app' } })
+    await userEvent.click(dialog.getByRole('combobox', { name: 'Team' }))
+    await userEvent.click(await screen.findByRole('option', { name: 'Ship' }))
     fireEvent.click(dialog.getByRole('button', { name: 'Create project' }))
-    await waitFor(() => expect(createProject).toHaveBeenCalledWith({ title: 'Mobile app', description: '', folder: undefined }))
+    await waitFor(() => expect(createProject).toHaveBeenCalledWith({ title: 'Mobile app', description: '', team: { folder: '3167adea-877f-43c4-96fb-517a2b2d5d24', hasState: true } }))
     await waitFor(() => expect(refresh).toHaveBeenCalled())
     expect(await screen.findByText('Project created')).toBeInTheDocument()
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'New project' })).not.toBeInTheDocument())
@@ -181,9 +186,12 @@ describe('Projects page — cards from the fold', () => {
     vi.mocked(createProject).mockResolvedValue({ ok: false, reason: 'not a channel member' })
     goTo('/projects')
     render(<App />)
+    await screen.findByText('Ship')
     fireEvent.click(screen.getByRole('button', { name: 'Add project' }))
     const dialog = within(screen.getByRole('dialog', { name: 'New project' }))
     fireEvent.change(dialog.getByPlaceholderText('New project title'), { target: { value: 'X' } })
+    await userEvent.click(dialog.getByRole('combobox', { name: 'Team' }))
+    await userEvent.click(await screen.findByRole('option', { name: 'Ship' }))
     fireEvent.click(dialog.getByRole('button', { name: 'Create project' }))
     expect(await screen.findByText(/Project rejected — not a channel member/)).toBeInTheDocument()
     expect(screen.getByRole('dialog', { name: 'New project' })).toBeInTheDocument()
@@ -221,14 +229,15 @@ describe('Issues page — rows from the fold', () => {
 })
 
 describe('Project page — one project from the fold', () => {
-  it('draws the table with Updated from the last change, the Folder threads, the rail — and offers Delete to a non-author', () => {
+  it('draws the table with Updated from the last change, the Folder threads, the rail — and offers Delete to a non-author', async () => {
     goTo(`/project/live-${LIVE}`)
     render(<App />)
     const main = within(screen.getByRole('main'))
     expect(main.getByRole('button', { name: 'Edit title' })).toHaveTextContent('Live')
     expect(main.getByRole('table')).toBeInTheDocument()
     expect(main.getAllByRole('row')).toHaveLength(3) // header + 2 issues
-    expect(main.getByText('about the project')).toBeInTheDocument()
+    // The record channel's chat waits for the teams read, which tells it from a team's (FOL-2).
+    expect(await main.findByText('about the project')).toBeInTheDocument()
     expect(main.getByText('reply')).toBeInTheDocument()
     expect(main.getByRole('combobox', { name: 'Status' })).toBeEnabled()
     expect(main.getByRole('button', { name: 'Copy Folder link' })).toBeEnabled()

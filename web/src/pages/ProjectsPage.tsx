@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { PROJECT_STATUSES, createProject, lookupStatus, type DirectoryView, type FolderState } from '@/api'
+import type { FolderSummary } from '@estiva-app/interop'
 import { NewProjectDialog } from '@/components/NewProjectDialog'
 import type { ProjectCardProps } from '@/components/ProjectCard'
 import { ProjectsView } from '@/views/ProjectsView'
@@ -14,7 +15,7 @@ import { type Say } from './act'
  * the folded project. "Add project" opens the form in a dialog; a created
  * project is on screen only once the relay has been read again.
  */
-export function ProjectsPage({ state, directory, archived, say, refresh }: { state: FolderState; directory: DirectoryView; archived: boolean; say: Say; refresh: () => Promise<void> }) {
+export function ProjectsPage({ state, directory, teams, archived, say, refresh }: { state: FolderState; directory: DirectoryView; teams: FolderSummary[] | undefined; archived: boolean; say: Say; refresh: () => Promise<void> }) {
   const [adding, setAdding] = useState(false)
 
   const cards = useMemo(() => {
@@ -50,6 +51,7 @@ export function ProjectsPage({ state, directory, archived, say, refresh }: { sta
       />
       {adding && (
         <NewProjectDialog
+          teams={teams?.map((team) => ({ id: team.id, name: team.name ?? `Folder ${team.id.slice(0, 8)}…`, hasState: team.hasState }))}
           onClose={() => setAdding(false)}
           onCreate={async (draft) => {
             const result = await createProject(draft)
@@ -58,7 +60,8 @@ export function ProjectsPage({ state, directory, archived, say, refresh }: { sta
               return false
             }
             await refresh()
-            say('Project created')
+            if (result.unlisted) say(`Project created, but not listed in its team, so Peek will not show it there — ${result.unlisted}`, 'error')
+            else say('Project created')
             return true
           }}
         />

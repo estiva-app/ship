@@ -90,10 +90,13 @@ async function main() {
   }
 
   // ── 1. Ana authors the objects ─────────────────────────────────────────────
-  // createProject publishes two events: the Folder, then the record inside it.
+  // A project is filed into a team (FOL-2); a bare channel stands in for one here.
+  const team = randomUUID()
+  await must('A team Folder exists', () => ana.store.ensureFolder(team, `team-${team.slice(0, 8)}`))
   const project = await ana.store.createProject({
     title: 'Payment integration',
     description: 'Stripe Checkout for workspace billing — redirect flow, no custom card form.',
+    team: { folder: team, hasState: false },
   })
   await must('Ana creates the project', async () => project.result)
   const folder = project.folder

@@ -1,6 +1,6 @@
 import { IconLinkOff } from '@tabler/icons-react'
 import { useMarkRead } from '@/lib/useMarkRead'
-import { ownConversations } from '@/lib/ownConversation'
+import { ownConversations, recordChannel } from '@/lib/ownConversation'
 import { pointerToAddress, referenceToPointer, resolveBlockAnchor, type ContentFormat } from '@estiva-app/protocol'
 import type { AttachmentIndex, EditIndex } from '@/api'
 import { signedIn } from '@/auth/estivaId'
@@ -303,6 +303,7 @@ export async function copyText(text: string, done: string, prompt: string, say: 
 export function ProjectPage({
   state,
   directory,
+  teams,
   d,
   view,
   say,
@@ -310,6 +311,8 @@ export function ProjectPage({
 }: {
   state: WorkspaceState
   directory: DirectoryView
+  /** The teams, so a project filed into one is not given the team's chat (`recordChannel`). */
+  teams: readonly { id: string }[] | undefined
   /** The object's `d`, which is all a §7.2 URL carries. */
   d: string
   view: ProjectViewName
@@ -355,12 +358,13 @@ export function ProjectPage({
     () => (project ? subFileThreads(state, new Set(state.issues.filter((issue) => issue.projectAddr === project.addr).map((issue) => issue.addr))) : new Set<string>()),
     [project, state],
   )
+  const record = recordChannel(project?.originFolder, teams)
   const conversations = useMemo(
     () =>
       project
-        ? ownConversations(state.conversations, { addr: project.addr, originFolder: project.originFolder, folders: projectFolders(project, state.activity) }, state.anchors).filter((c) => !rolledUp.has(c.id))
+        ? ownConversations(state.conversations, { addr: project.addr, originFolder: record ?? '', folders: projectFolders(project, state.activity) }, state.anchors).filter((c) => !rolledUp.has(c.id))
         : [],
-    [project, state, rolledUp],
+    [project, state, rolledUp, record],
   )
   /* This feed is two streams drawn as one — SPEC §11.1 (FOL-16): the record
      channel's chat, which answers to its bare channel uuid, and the project's
@@ -373,8 +377,9 @@ export function ProjectPage({
      The channel is the **record** channel, not the content Folder (FOL-1): that
      is the only Folder whose chat this page draws. For a project pointing at a
      team, marking the content Folder would advance the team's chat, which is
-     not on this page. For a project never relinked the two are the same. */
-  useMarkRead([projectContext(project?.originFolder), fileContext(project?.addr)])
+     not on this page. For a project never relinked the two are the same. A
+     project filed into a team (FOL-2) has no record channel, only a team. */
+  useMarkRead([projectContext(record), fileContext(project?.addr)])
   const threads = useMemo(
     () => conversations.map((c) => threadFor(c, directory, project ? { value: project.description, format: project.descriptionFormat } : undefined, project?.addr, state.edits, state.attachments)),
     [conversations, directory, project],
@@ -386,11 +391,11 @@ export function ProjectPage({
      cases. */
   const merged = useMergedReadState()
   const unread = useMemo(() => {
-    const channel = projectContext(project?.originFolder)
+    const channel = projectContext(record)
     const file = fileContext(project?.addr)
     const aboutProject = new Set(conversations.filter((c) => project && (state.anchors[c.root.id] ?? []).includes(project.addr)).map((c) => c.id))
     return firstUnreadByThread(threads, merged, (thread) => (aboutProject.has(thread.id) ? file : channel), me)
-  }, [threads, merged, project, conversations, state.anchors])
+  }, [threads, merged, project, conversations, state.anchors, record])
   const people = useMemo(() => railPeople(state, directory), [state, directory])
   /*
     What somebody placed under this project from another app — RFC 0.5 §10.7.

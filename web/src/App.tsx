@@ -18,7 +18,7 @@ import type { Say } from '@/pages/act'
 import { ProjectsPage } from '@/pages/ProjectsPage'
 import { ID_CONFIG, RELAY_URL } from './config'
 import { beginSignIn, beginSignOut, signInAvailable, signedIn } from './auth/estivaId'
-import { identifierFromRef } from '@estiva-app/interop'
+import { identifierFromRef, type FolderSummary } from '@estiva-app/interop'
 import { go, href, replace, useRoute, type Route } from './router'
 
 /**
@@ -47,6 +47,8 @@ function Shell() {
   const { state, error, loading, busy, refresh } = useWorkspace()
   const route = useRoute()
   const folders = useFolders()
+  // The teams: what the sidebar lists, what a new project is filed into (FOL-2).
+  const teams = useMemo(() => (folders ? topLevelFolders(folders) : undefined), [folders])
   const { showToast } = useToast()
   const { banner, say, clear } = useBanner(showToast)
 
@@ -121,7 +123,7 @@ function Shell() {
           {...sidebarProps(
             state,
             route,
-            folders ? topLevelFolders(folders).map((f) => ({ id: f.id, name: f.name })) : [],
+            (teams ?? []).map((f) => ({ id: f.id, name: f.name })),
           )}
           onOpenFolder={(folder) => go({ name: 'folder', id: folder.id })}
           loading={!state && loading}
@@ -129,7 +131,7 @@ function Shell() {
         />
       }
     >
-      <Page route={route} state={state} loading={loading} directory={directory} say={say} refresh={refresh} />
+      <Page route={route} state={state} loading={loading} directory={directory} teams={teams} say={say} refresh={refresh} />
     </AppShell>
   )
 }
@@ -143,7 +145,7 @@ const SKELETON: Partial<Record<Route['name'], PageSkeletonShape>> = {
 }
 
 /** Which page the route names; an inbound reference shows nothing until it resolves. */
-function Page({ route, state, loading, directory, say, refresh }: { route: Route; state: WorkspaceState | null; loading: boolean; directory: DirectoryView; say: Say; refresh: (folders?: string[]) => Promise<void> }) {
+function Page({ route, state, loading, directory, teams, say, refresh }: { route: Route; state: WorkspaceState | null; loading: boolean; directory: DirectoryView; teams: FolderSummary[] | undefined; say: Say; refresh: (folders?: string[]) => Promise<void> }) {
   /*
     The first read has not landed. This used to render nothing at all, which is
     what "Ship sometimes does not load the projects and issues" was: a full read
@@ -165,11 +167,11 @@ function Page({ route, state, loading, directory, say, refresh }: { route: Route
   if (!state) return null
   switch (route.name) {
     case 'projects':
-      return <ProjectsPage state={state} directory={directory} archived={route.archived} say={say} refresh={refresh} />
+      return <ProjectsPage state={state} directory={directory} teams={teams} archived={route.archived} say={say} refresh={refresh} />
     case 'issues':
       return <IssuesPage state={state} directory={directory} say={say} refresh={refresh} />
     case 'project':
-      return <ProjectPage state={state} directory={directory} d={route.d} view={route.view} say={say} refresh={refresh} />
+      return <ProjectPage state={state} directory={directory} teams={teams} d={route.d} view={route.view} say={say} refresh={refresh} />
     case 'issue':
       return <IssuePage state={state} directory={directory} d={route.d} say={say} refresh={refresh} />
     default:

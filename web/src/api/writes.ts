@@ -79,16 +79,17 @@ export function explainRejection(reason: string | undefined, folder: string): st
 // ── Projects ────────────────────────────────────────────────────────────────
 
 /**
- * Create a project — and, unless a Folder was pasted, its own Folder. A
- * pasted Folder makes the project live *in* that Peek topic from the first
- * event (PEEK-17); a rejection there gets the specific explanation.
+ * Create a project in a team (FOL-2): the record, then its listing in the
+ * team. A refused listing is still a created project — Ship shows it under
+ * the team — so it comes back `ok` with `unlisted` saying why Peek will not.
  */
-export async function createProject(draft: { title: string; description: string; folder?: string }): Promise<CreateResult> {
+export async function createProject(draft: { title: string; description: string; team: { folder: string; hasState: boolean } }): Promise<CreateResult & { unlisted?: string }> {
   const clock = await clockProblem()
   if (clock) return { ok: false, reason: clock }
   try {
-    const { result, addr } = await store.createProject({ title: draft.title, description: draft.description, folder: draft.folder })
-    if (!result.ok) return { ok: false, reason: draft.folder ? explainRejection(result.reason, draft.folder) : (result.reason ?? 'no reason given') }
+    const { result, placed, addr } = await store.createProject({ title: draft.title, description: draft.description, team: draft.team })
+    if (!result.ok) return { ok: false, reason: result.reason ?? 'no reason given' }
+    if (placed && !placed.ok) return { ok: true, addr, unlisted: placed.reason ?? 'no reason given' }
     return { ok: true, addr }
   } catch (error) {
     return { ok: false, reason: error instanceof Error ? error.message : String(error) }
