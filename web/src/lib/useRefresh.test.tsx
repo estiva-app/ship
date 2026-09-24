@@ -202,3 +202,26 @@ describe('useRefresh — standing down while the socket delivers (PER-3)', () =>
     expect(refresh).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('useRefresh — one page, one beat (PER-6)', () => {
+  /*
+    The project page mounts the workspace poll, then a thread's references and
+    its reactions as each section renders — three subscribers on `REFRESH_MS`,
+    subscribed at different moments. With a timer each they woke at three
+    phases, and the page read every few seconds on a ten-second interval.
+  */
+  it('reads no more often than REFRESH_MS, however far apart the views mounted', () => {
+    const wakes = new Set<number>()
+    const reader = () => () => void wakes.add(Date.now())
+    renderHook(() => useRefresh(reader()))
+    vi.advanceTimersByTime(3_100)
+    renderHook(() => useRefresh(reader()))
+    vi.advanceTimersByTime(4_300)
+    renderHook(() => useRefresh(reader()))
+    wakes.clear()
+    vi.advanceTimersByTime(60_000)
+    const at = [...wakes].sort((a, b) => a - b)
+    expect(at).toHaveLength(60_000 / REFRESH_MS)
+    for (let i = 1; i < at.length; i++) expect(at[i] - at[i - 1]).toBe(REFRESH_MS)
+  })
+})
