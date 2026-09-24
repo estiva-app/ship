@@ -1,4 +1,4 @@
-import { Link } from '@estiva-app/ui'
+import { Card, Link } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
 import { ago } from '@/lib/time'
 import { statusLabel, type StatusEntry } from '@/lib/issues'
@@ -35,6 +35,7 @@ export interface IssuesTableProps {
 // else in a cell, the date included, is body-2, the table's own 14 (Katerina,
 // 2026-08-26). These were arbitrary values while tailwind-merge dropped a
 // token size beside a colour class; the package's cn() names the ramp now.
+// @estiva-escape: B3 (Katerina, 24 September: record only): a table header in the label style Property also uses; a table part is for later
 const TH_CLASSES = 'h-9 px-3 text-left text-menu font-medium uppercase tracking-widest text-text-secondary'
 const TD = 'h-10 px-3 text-body-2'
 const SMALL = 'text-caption'
@@ -46,7 +47,7 @@ export function IssuesTable({ issues, statuses, hrefFor, className }: IssuesTabl
        without. `overflow-hidden` keeps the corners round, as the scrolling
        box itself used to. The frame is a box of our own around the region,
        not pushed into it (UIG-9). */
-    <div className={cn('overflow-hidden rounded-lg border border-border-default', className)}>
+    <Card clip fill="none" className={className}>
     <ScrollArea orientation="horizontal">
       <table className="w-full min-w-[840px] table-fixed border-collapse">
         <thead className="bg-bg-surface">
@@ -105,6 +106,6 @@ export function IssuesTable({ issues, statuses, hrefFor, className }: IssuesTabl
         </tbody>
       </table>
     </ScrollArea>
-    </div>
+    </Card>
   )
 }

@@ -68,6 +68,7 @@ export function IssueRow({ issue, statuses, href, className }: IssueRowProps) {
       <Link {...linkTo(href)} variant="plain" className="flex min-w-0 flex-1 items-center gap-3 after:absolute after:inset-0">
         {/* `w-14`: 56px, the room the project table's ref cell has (S25), so
             the two surfaces line up. */}
+        {/* @estiva-escape: B5 (Katerina, 24 September: record only): an issue's ref in the mono caption style Breadcrumb's id also uses */}
         <span className={cn('w-14 shrink-0 truncate font-mono text-caption', issue.ref ? 'text-text-muted' : 'text-text-disabled')}>{issue.ref ?? '—'}</span>
         <span className="flex min-w-0 flex-1 items-center gap-1.5">
           <StatusShape value={issue.status} label={statusLabel(issue.status, statuses)} />
