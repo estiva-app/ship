@@ -32,7 +32,7 @@ jobs:
 
       # Node and node_modules, from the cache when the lockfiles are unchanged.
       # The action is estiva-foundation's, shared with Peek (PER-16).
-      - uses: estiva-app/estiva-foundation/.github/actions/install@d4bfce573e813925d00f63be087555ea3dc76596
+      - uses: estiva-app/estiva-foundation/.github/actions/install@ci-v1
 
       - name: Typecheck
         run: npm run typecheck
@@ -53,7 +53,7 @@ jobs:
       # and @noble/curves resolve out of the *root* node_modules. Installing
       # only web/ fails with seven TS2307s that look like the shared library is
       # broken.
-      - uses: estiva-app/estiva-foundation/.github/actions/install@d4bfce573e813925d00f63be087555ea3dc76596
+      - uses: estiva-app/estiva-foundation/.github/actions/install@ci-v1
         with:
           directories: |
             .
@@ -90,7 +90,7 @@ jobs:
 
       # Both trees, for the reason in `build`: the tests import ../src and
       # ../lib, which resolve out of the root node_modules.
-      - uses: estiva-app/estiva-foundation/.github/actions/install@d4bfce573e813925d00f63be087555ea3dc76596
+      - uses: estiva-app/estiva-foundation/.github/actions/install@ci-v1
         with:
           directories: |
             .
@@ -119,7 +119,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: estiva-app/estiva-foundation/.github/actions/install@d4bfce573e813925d00f63be087555ea3dc76596
+      - uses: estiva-app/estiva-foundation/.github/actions/install@ci-v1
         with:
           directories: web
 
@@ -159,7 +159,7 @@ jobs:
       - uses: actions/checkout@v4
 
       # Both trees: the smoke script builds web/.
-      - uses: estiva-app/estiva-foundation/.github/actions/install@d4bfce573e813925d00f63be087555ea3dc76596
+      - uses: estiva-app/estiva-foundation/.github/actions/install@ci-v1
         with:
           directories: |
             .
@@ -196,7 +196,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: estiva-app/estiva-foundation/.github/actions/install@d4bfce573e813925d00f63be087555ea3dc76596
+      - uses: estiva-app/estiva-foundation/.github/actions/install@ci-v1
         with:
           directories: |
             .
