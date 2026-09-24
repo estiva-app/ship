@@ -35,10 +35,8 @@ export default function define(h) {
     until then. Returns why a page fails, or null.
   */
   const usagePage = (mdx) => (h.exists(mdx) ? pageProblem(h.read(mdx)) : "no page");
-  const catalogue = () => { try { return JSON.parse(h.read(registry())); } catch { return null; } };
   const probe = (code, expect, mentions, file = PROBE, config = GATES) => () => h.lint({ config, file, code, expect, mentions });
   const component = (body) => `export function Probe() {\n  return ${body}\n}\n`;
-  const registry = () => "registry.json";
 
   // Ship's own: a ticket of Ship's, or a check that reads a file only Ship has.
   const own = [
@@ -66,12 +64,10 @@ export default function define(h) {
         const missing = ["ui/ForeignObject", "ui/RichText", "ui/ConversationCount", "ui/BlockAnchorNote"].filter((p) => !h.exists(`src/components/${p}.stories.tsx`));
         return missing.length ? h.FAIL(`no story file: ${missing.join(", ")}`) : h.PASS("ForeignObject, RichText, ConversationCount and BlockAnchorNote each have a story");
       } },
-      { what: "every Ship component in the catalogue has a class", run: () => {
-        const d = catalogue();
-        if (!d) return h.UNKNOWN("no catalogue yet: run npm run registry");
-        const bad = d.entries.filter((e) => !e.app || !e.app.class);
-        return bad.length ? h.FAIL(`${bad.length} with no class: ${bad.slice(0, 3).map((e) => e.name).join(", ")}`) : h.PASS(`${d.entries.length} parts, every one classified`);
-      } },
+      // Built in memory, as `estiva-ui check` builds it: the catalogue is never
+      // committed, and a local registry.json read stale, or not at all on a
+      // clean checkout (the audit before UIG-26, A5).
+      { what: "every Ship component in the catalogue has a class", run: () => h.catalogue(".") },
     ] },
     { ref: "UIG-27", checks: [
       // The adoption deleted these; the checks keep them deleted.
