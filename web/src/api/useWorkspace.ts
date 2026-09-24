@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { WorkspaceState } from '../../../src/store'
+import type { WorkspaceEvents, WorkspaceState } from '../../../src/store'
 import { useRefresh } from '../lib/useRefresh'
 import { isRateLimited } from '../lib/relayBudget'
 import { useLiveWorkspace } from './liveWorkspace'
-import { loadAll } from './index'
+import { foldWorkspace, loadAllEvents, reloadFolders } from './index'
 
 export interface Workspace {
   /** `null` until the first read completes. */
@@ -35,8 +35,13 @@ export interface Workspace {
    *
    * This is what a write awaits, so it may not be coalesced: a read that began
    * before the write cannot contain it. See `read` below.
+   *
+   * **Pass the Folders the write went into** and only they are re-read — one
+   * request instead of the whole workspace (PER-17). Omit them when the write
+   * is outside any Folder, such as a global project record, or when it is not
+   * known where it went; that reads everything, as before.
    */
-  refresh: () => Promise<void>
+  refresh: (folders?: string[]) => Promise<void>
   /**
    * The socket is delivering, so the poll is standing down (PER-3).
    *
@@ -71,6 +76,9 @@ export function useWorkspace(): Workspace {
   const inFlight = useRef<Promise<void> | null>(null)
   const latest = useRef(0)
   const mounted = useRef(true)
+  /** The last applied read, unfolded — what a Folder-scoped re-read keeps. */
+  const events = useRef<WorkspaceEvents | null>(null)
+  const scoped = useRef<Promise<void>>(Promise.resolve())
 
   /**
    * One read, always a new one.
@@ -82,12 +90,13 @@ export function useWorkspace(): Workspace {
    * Without it the fix for a stale re-read would introduce a worse bug, where
    * a slow poll overwrites the state a write just produced.
    */
-  const read = useCallback((): Promise<void> => {
+  const start = useCallback((load: () => Promise<WorkspaceEvents>, whole: boolean): Promise<void> => {
     const ticket = ++latest.current
-    const run = loadAll()
+    const run = load()
       .then((next) => {
         if (!mounted.current || ticket !== latest.current) return
-        setState(next)
+        events.current = next
+        setState(foldWorkspace(next))
         setError(null)
         setBusy(false)
       })
@@ -120,9 +129,39 @@ export function useWorkspace(): Workspace {
         // Only if it is still ours: a newer read may already have claimed it.
         if (inFlight.current === run) inFlight.current = null
       })
-    inFlight.current = run
+    // Only a whole read is one the poll may join: a focus that joined a
+    // Folder-scoped read would skip the full read it exists to make.
+    if (whole) inFlight.current = run
     return run
   }, [])
+
+  const read = useCallback((): Promise<void> => start(loadAllEvents, true), [start])
+
+  /**
+   * Re-read only the Folders that changed — PER-17.
+   *
+   * Deleting issues with a few Ship tabs open re-read the whole workspace,
+   * 3,483 events, 32 times in one minute: once for the write and once per tab
+   * for the socket's echo of it, each a full `loadAll`. The socket already says
+   * *which* Folder changed and a write knows where it went, so this replaces
+   * that Folder's part of the last read and keeps the rest — one request.
+   *
+   * Queued one behind another so each starts from the read before it; two
+   * running side by side would each drop the other's Folder. Before the first
+   * read has landed there is nothing to keep, so it reads everything.
+   */
+  const reread = useCallback(
+    (folders?: string[]): Promise<void> => {
+      if (!folders) return read()
+      const next = scoped.current.then(() => {
+        const previous = events.current
+        return previous ? start(() => reloadFolders(previous, folders), false) : read()
+      })
+      scoped.current = next
+      return next
+    },
+    [read, start],
+  )
 
   /**
    * The poll's read, which *is* coalesced — two identical reads a second apart
@@ -145,7 +184,7 @@ export function useWorkspace(): Workspace {
   }, [read])
 
   /*
-    The socket triggers `read`, not `poll`.
+    The socket triggers `reread` with the Folders it saw change, not `poll`.
 
     `poll` joins a read already in flight, and a read that began before the
     pushed event cannot contain it — the same reasoning that keeps writes off
@@ -158,7 +197,7 @@ export function useWorkspace(): Workspace {
     opens before there is a Folder set to subscribe to. Discovery derives that
     set while reading; there is no index to consult.
   */
-  const { live } = useLiveWorkspace(state?.folders ?? [], read)
+  const { live } = useLiveWorkspace(state?.folders ?? [], reread)
 
   // The interval stands down while the socket delivers; `visibilitychange` and
   // `focus` still fire, because a tab that was hidden has had no frames either.
@@ -169,7 +208,7 @@ export function useWorkspace(): Workspace {
     error,
     loading: state === null && !busy,
     busy: busy && state === null,
-    refresh: read,
+    refresh: reread,
     live,
   }
 }

@@ -143,7 +143,7 @@ const SKELETON: Partial<Record<Route['name'], PageSkeletonShape>> = {
 }
 
 /** Which page the route names; an inbound reference shows nothing until it resolves. */
-function Page({ route, state, loading, directory, say, refresh }: { route: Route; state: WorkspaceState | null; loading: boolean; directory: DirectoryView; say: Say; refresh: () => Promise<void> }) {
+function Page({ route, state, loading, directory, say, refresh }: { route: Route; state: WorkspaceState | null; loading: boolean; directory: DirectoryView; say: Say; refresh: (folders?: string[]) => Promise<void> }) {
   /*
     The first read has not landed. This used to render nothing at all, which is
     what "Ship sometimes does not load the projects and issues" was: a full read

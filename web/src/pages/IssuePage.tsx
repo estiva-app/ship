@@ -38,7 +38,7 @@ export function historyFor(issueAddr: string, state: FolderState, directory: Dir
  * field edit is one change event to the issue's own Folder, followed by a
  * re-read; a refused one leaves the field as the relay has it.
  */
-export function IssuePage({ state, directory, d, say, refresh }: { state: WorkspaceState; directory: DirectoryView; /** The object's `d`, which is all a §7.2 URL carries. */ d: string; say: Say; refresh: () => Promise<void> }) {
+export function IssuePage({ state, directory, d, say, refresh }: { state: WorkspaceState; directory: DirectoryView; /** The object's `d`, which is all a §7.2 URL carries. */ d: string; say: Say; refresh: (folders?: string[]) => Promise<void> }) {
   const issue = state.issues.find((candidate) => candidate.id === d)
   const project = issue?.projectAddr ? state.projects.find((candidate) => candidate.addr === issue.projectAddr) : undefined
 
@@ -96,7 +96,7 @@ export function IssuePage({ state, directory, d, say, refresh }: { state: Worksp
   }
 
   const set = (field: 'title' | 'description' | 'status' | 'assignee' | 'project', value: string, note: string, contentFormat?: string) =>
-    act(note, () => setIssueField(issue, field, value, note, contentFormat), say, refresh)
+    act(note, () => setIssueField(issue, field, value, note, contentFormat), say, () => refresh([issue.folder]))
 
   return (
     <>
@@ -117,11 +117,11 @@ export function IssuePage({ state, directory, d, say, refresh }: { state: Worksp
         unread={unread}
         // Threads about an issue carry a reference in the body so Peek renders
         // the issue's widget above them (withReference: true), as the old app has it.
-        onStartConversation={(body, files, blockId) => act('Message', () => startConversation({ folder: issue.folder, about: issue.addr, withReference: true, body, blockId, files }), say, refresh)}
+        onStartConversation={(body, files, blockId) => act('Message', () => startConversation({ folder: issue.folder, about: issue.addr, withReference: true, body, blockId, files }), say, () => refresh([issue.folder]))}
         onReply={(threadId, body, files) => {
           const conversation = conversations.find((c) => c.id === threadId)
           if (!conversation) return false
-          return act('Reply', () => reply(conversation, issue.folder, body, files), say, refresh)
+          return act('Reply', () => reply(conversation, issue.folder, body, files), say, () => refresh([issue.folder]))
         }}
         activity={activity.items}
         activityTruncated={activity.truncated}
@@ -164,7 +164,10 @@ export function IssuePage({ state, directory, d, say, refresh }: { state: Worksp
           is reported (SPEC §6.5, corrected 2026-09-06). `act` returns false on
           a refusal, which keeps the confirm dialog open behind the banner.
         */
-        onDeleteMessage={(messageId) => act('Delete', () => deleteMessage(messageId), say, refresh)}
+        onDeleteMessage={(messageId) => {
+          const folder = folderOfMessage(state, messageId)
+          return act('Delete', () => deleteMessage(messageId), say, () => refresh(folder ? [folder] : undefined))
+        }}
         /*
           Editing a comment — CON-4.
 
@@ -189,12 +192,12 @@ export function IssuePage({ state, directory, d, say, refresh }: { state: Worksp
             say('That message has no Folder to publish an edit into.', 'error')
             return false
           }
-          return act('Edit', () => editMessage(folder, messageId, body), say, refresh)
+          return act('Edit', () => editMessage(folder, messageId, body), say, () => refresh([folder]))
         }}
         onReplyInActivity={(threadId, body, files) => {
           const conversation = state.conversations.find((c) => c.id === threadId)
           if (!conversation?.root.folder) return false
-          return act('Reply', () => reply(conversation, conversation.root.folder, body, files), say, refresh)
+          return act('Reply', () => reply(conversation, conversation.root.folder, body, files), say, () => refresh([conversation.root.folder]))
         }}
         history={history}
         rail={{
@@ -231,7 +234,8 @@ export function IssuePage({ state, directory, d, say, refresh }: { state: Worksp
             say('Issue deleted')
             // Nothing left to render here.
             go(project ? { name: 'project', d: project.id, slug: project.title, view: 'table' } : { name: 'issues' })
-            await refresh()
+            // Its own Folder only: re-reading the whole workspace per delete is PER-17.
+            await refresh([issue.folder])
             return true
           }}
         >

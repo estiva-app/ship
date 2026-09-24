@@ -314,7 +314,8 @@ export function ProjectPage({
   d: string
   view: ProjectViewName
   say: Say
-  refresh: () => Promise<void>
+  /** Folders given: only they are re-read (PER-17). Omitted: everything, for a write outside them. */
+  refresh: (folders?: string[]) => Promise<void>
 }) {
   const project = state.projects.find((candidate) => candidate.id === d)
   const [dialog, setDialog] = useState<'issue' | 'pair' | 'delete' | null>(null)
@@ -459,11 +460,11 @@ export function ProjectPage({
         unread={unread}
         // A project conversation is already in the topic it belongs to, so a
         // reference would be noise (withReference: false), as the old app has it.
-        onStartConversation={(body, files) => act('Message', () => startConversation({ folder: project.contentFolder, about: project.addr, withReference: false, body, files }), say, refresh)}
+        onStartConversation={(body, files) => act('Message', () => startConversation({ folder: project.contentFolder, about: project.addr, withReference: false, body, files }), say, () => refresh([project.contentFolder]))}
         onReply={(threadId, body, files) => {
           const conversation = conversations.find((c) => c.id === threadId)
           if (!conversation) return false
-          return act('Reply', () => reply(conversation, project.contentFolder, body, files), say, refresh)
+          return act('Reply', () => reply(conversation, project.contentFolder, body, files), say, () => refresh([project.contentFolder]))
         }}
         activity={activity.items}
         activityTruncated={activity.truncated}
@@ -501,7 +502,10 @@ export function ProjectPage({
           is reported (SPEC §6.5, corrected 2026-09-06). `act` returns false on
           a refusal, which keeps the confirm dialog open behind the banner.
         */
-        onDeleteMessage={(messageId) => act('Delete', () => deleteMessage(messageId), say, refresh)}
+        onDeleteMessage={(messageId) => {
+          const folder = folderOfMessage(state, messageId)
+          return act('Delete', () => deleteMessage(messageId), say, () => refresh(folder ? [folder] : undefined))
+        }}
         /*
           Editing a comment — CON-4.
 
@@ -526,12 +530,12 @@ export function ProjectPage({
             say('That message has no Folder to publish an edit into.', 'error')
             return false
           }
-          return act('Edit', () => editMessage(folder, messageId, body), say, refresh)
+          return act('Edit', () => editMessage(folder, messageId, body), say, () => refresh([folder]))
         }}
         onReplyInActivity={(threadId, body, files) => {
           const conversation = state.conversations.find((c) => c.id === threadId)
           if (!conversation?.root.folder) return false
-          return act('Reply', () => reply(conversation, conversation.root.folder, body, files), say, refresh)
+          return act('Reply', () => reply(conversation, conversation.root.folder, body, files), say, () => refresh([conversation.root.folder]))
         }}
         rail={{
           status: project.status,
@@ -566,7 +570,7 @@ export function ProjectPage({
               say(`Issue rejected — ${result.reason}`, 'error')
               return false
             }
-            await refresh()
+            await refresh([project.contentFolder])
             say('Issue created')
             return true
           }}

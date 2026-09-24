@@ -124,6 +124,25 @@ describe('a pushed event', () => {
     expect(onChange).toHaveBeenCalledTimes(1)
   })
 
+  it('names the Folders that changed, so the re-read can be scoped to them (PER-17)', () => {
+    const onChange = vi.fn()
+    renderHook(() => useLiveWorkspace([FOLDER_A, FOLDER_B], onChange))
+    const notify = watchFolders.mock.calls[0][1] as (folder: string) => void
+
+    act(() => {
+      notify(FOLDER_B)
+      notify(FOLDER_A)
+      notify(FOLDER_B)
+    })
+    act(() => vi.advanceTimersByTime(400))
+    expect(onChange).toHaveBeenCalledExactlyOnceWith([FOLDER_B, FOLDER_A])
+
+    // The next burst starts empty.
+    act(() => notify(FOLDER_A))
+    act(() => vi.advanceTimersByTime(400))
+    expect(onChange).toHaveBeenLastCalledWith([FOLDER_A])
+  })
+
   it('drops a pending re-read on unmount rather than reading into a dead component', () => {
     const onChange = vi.fn()
     const { unmount } = renderHook(() => useLiveWorkspace([FOLDER_A], onChange))
