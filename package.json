@@ -10,7 +10,7 @@
     "probe": "tsx scripts/probe-kinds.ts",
     "verify": "tsx scripts/verify.ts",
     "manifest": "tsx scripts/publish-manifest.ts",
-    "test": "tsx scripts/docker-context.test.ts && tsx scripts/trees-agree.test.ts && tsx scripts/nip19.test.ts && tsx scripts/app.test.ts && tsx scripts/signer.test.ts && tsx scripts/directory.test.ts && tsx scripts/auth-shell.test.ts && tsx scripts/manifest-slots.test.ts && tsx scripts/issue-description.test.ts && tsx scripts/references.test.ts && tsx scripts/reactions.test.ts && tsx scripts/edits.test.ts && tsx scripts/attachments.test.ts && tsx scripts/reload-folders.test.ts &&tsx scripts/conformance.test.ts",
+    "test": "tsx scripts/trees-agree.test.ts && tsx scripts/nip19.test.ts && tsx scripts/app.test.ts && tsx scripts/signer.test.ts && tsx scripts/directory.test.ts && tsx scripts/auth-shell.test.ts && tsx scripts/manifest-slots.test.ts && tsx scripts/issue-description.test.ts && tsx scripts/references.test.ts && tsx scripts/reactions.test.ts && tsx scripts/edits.test.ts && tsx scripts/attachments.test.ts && tsx scripts/reload-folders.test.ts && tsx scripts/conformance.test.ts",
     "test:directory": "tsx scripts/directory.test.ts",
     "test:nip19": "tsx scripts/nip19.test.ts",
     "test:app": "tsx scripts/app.test.ts",
@@ -27,7 +27,6 @@
   },
   "devDependencies": {
     "@types/node": "^24.13.3",
-    "esbuild": "^0.25.0",
     "playwright-core": "^1.61.1",
     "tsx": "^4.19.0",
     "typescript": "~5.9.3"

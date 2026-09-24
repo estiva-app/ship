@@ -151,10 +151,12 @@ ESTIVA_SHIP_IMAGE=ghcr.io/estiva-app/ship:<sha> docker compose up -d --force-rec
 
 ## Testing the image on a dev machine
 
+The image wraps a bundle that is built first, as `publish` does (PER-16):
+
 ```bash
-docker build -t estiva-ship:local \
-  --build-arg RELAY_URL=https://estiva.estiva.app \
-  --build-arg ID_BASE=https://id.estiva.app .
+RELAY_URL=https://estiva.estiva.app ID_BASE=https://id.estiva.app \
+  npm --prefix web run build
+docker build -t estiva-ship:local .
 docker run -d --name ship-verify estiva-ship:local
 docker exec ship-verify wget -q -S -O /dev/null http://127.0.0.1/
 ```

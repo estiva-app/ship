@@ -20,8 +20,8 @@ Two package.json files. The root holds the shared wire and fold code — `src/`,
 with `@estiva-app/ui` for the primitives.
 
 The root's `npm run typecheck` (`tsc --noEmit` over `lib`, `src`, `scripts`)
-and `npm test` never see a line of the app. CI has a separate `web` job for it,
-and `publish` needs it. Run both:
+and `npm test` never see a line of the app. CI has separate `build` and `test`
+jobs for it, and `publish` needs both. Run both:
 
 ```bash
 npm test && npm --prefix web run test
