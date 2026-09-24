@@ -2,6 +2,9 @@ import { useCallback, useEffect, useState } from 'react'
 import { resolveForeign, type ForeignObject } from '@/api/foreign'
 import { useRefresh } from '@/lib/useRefresh'
 
+/** A resolve that threw — not an answer, unlike `null`. */
+const FAILED: unique symbol = Symbol('failed')
+
 /**
  * Resolve a body's `nostr:` references, once for the whole body.
  *
@@ -21,8 +24,9 @@ import { useRefresh } from '@/lib/useRefresh'
  * is liveness and it was not true.
  *
  * `useRefresh` rather than a socket, deliberately: it is what every other view
- * already uses (5s while visible, immediately on focus, never in a hidden tab),
- * so a reference is exactly as fresh as the page around it.
+ * already uses (`REFRESH_MS` while visible, immediately on focus, never in a
+ * hidden tab), so a reference is exactly as fresh as the page around it. A
+ * refresh never blanks what is on screen — see the effects below.
  *
  * @returns `undefined` while the first resolve is in flight, then one entry per
  *   reference — `null` where nothing resolved, which is a real answer and not
@@ -42,13 +46,14 @@ export function useForeignObjects(references: readonly string[]): (ForeignObject
       return undefined
     }
     let cancelled = false
-    // Only the *first* resolve blanks the list. A refresh that cleared it would
-    // flash a skeleton over a card that is already correct, every five seconds.
-    setObjects((held) => (held === undefined ? undefined : held))
-    Promise.all(references.map((r) => resolveForeign(r).catch(() => null))).then((found) => {
+    Promise.all(references.map((r) => resolveForeign(r).catch((): typeof FAILED => FAILED))).then((found) => {
       // The body can change while this is in flight, and a late answer about a
       // reference that is no longer there would be worse than none.
-      if (!cancelled) setObjects(found)
+      if (cancelled) return
+      // A throw is not an answer. On the first resolve it draws as `null`, as
+      // it always has; on a refresh it keeps the card that is already there,
+      // so one dropped request does not take a correct card off the page.
+      setObjects((held) => found.map((f, i) => (f === FAILED ? (held?.[i] ?? null) : f)))
     })
     return () => {
       cancelled = true
@@ -56,11 +61,25 @@ export function useForeignObjects(references: readonly string[]): (ForeignObject
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key])
 
+  /*
+    Only a new set of references blanks the list (PER-6).
+
+    This used to run `setObjects(undefined)` on `nonce` as well, so every tick
+    put every card back to its skeleton and every in-place mention back to its
+    pending state until the re-resolve landed — on the project page that is
+    each message carrying an issue pointer, which is most of them, and it is
+    what "reloads the conversations" was. What is held belongs to the same
+    references until `key` changes, so a refresh replaces it in one step.
+  */
   useEffect(() => {
     setObjects(undefined)
-    return resolve()
+  }, [key])
+
+  useEffect(
+    () => resolve(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, nonce])
+    [key, nonce],
+  )
 
   useRefresh(() => setNonce((n) => n + 1))
 
