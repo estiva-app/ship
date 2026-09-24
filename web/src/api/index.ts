@@ -22,7 +22,7 @@ export type { WorkspaceState } from '../../../src/store'
 export type { Directory, Profile } from '../../../src/profiles'
 export { initials } from '../../../src/profiles'
 export { ISSUE_STATUSES, PROJECT_STATUSES, lookupStatus, type VocabEntry } from '../../../src/kinds'
-export { conversationsAbout } from '../../../src/fold'
+export { conversationsAbout, projectFolders } from '../../../src/fold'
 /*
   The two lists, and the rule that separates them — SPEC §6.4, CON-7.
 

@@ -32,6 +32,7 @@ import {
   commentsOn,
   mentionsOf,
   commentsOnAny,
+  projectFolders,
   type DirectoryView,
   type FolderState,
   type WorkspaceState,
@@ -340,45 +341,51 @@ export function ProjectPage({
     ones about an issue*. Those are the issues' own conversations, read on each
     issue's page, so they are not here and, since PEE-26, not in Activity either.
 
-    **The filter stays the Folder, not the `a` tag.** A project *is* a Folder, so
-    a message written in the paired Peek topic is the project's conversation even
-    though nobody tagged anything — that is identity, and identity merges. Asking
-    for `commentsOn(project.addr)` instead would have been tidier and would have
-    silently emptied every project paired with a topic people actually talk in.
-
-    **And since RFC 0.5 §10.7, a thread rooted at another file is not here.** A
-    bare-file topic started under the project lives in this same Folder, and its
-    messages are rooted at the topic — a different file, so a different
-    conversation. `ownConversations` keeps the Folder rule and drops those; the
-    topic reaches this page as a Related card with its count instead.
+    **Since FOL-1 the filter is the anchor, not the Folder.** A project's
+    content Folder may be its team's, shared with every other project in the
+    team and with the team's own chat, so "every thread in the Folder" is no
+    longer the project's. `ownConversations` keeps the threads whose root is a
+    comment on the project, across every Folder it has pointed at, and keeps the
+    Folder rule ("names nothing is the project's") only for the record channel,
+    the one Folder that was the project's alone. A thread rooted at another file
+    — a bare-file topic, an issue — is that file's (RFC 0.5 §10.7).
   */
   const rolledUp = useMemo(
     () => (project ? subFileThreads(state, new Set(state.issues.filter((issue) => issue.projectAddr === project.addr).map((issue) => issue.addr))) : new Set<string>()),
     [project, state],
   )
   const conversations = useMemo(
-    () => (project ? ownConversations(state.conversations, project.contentFolder, project.addr, state.anchors).filter((c) => !rolledUp.has(c.id)) : []),
+    () =>
+      project
+        ? ownConversations(state.conversations, { addr: project.addr, originFolder: project.originFolder, folders: projectFolders(project, state.activity) }, state.anchors).filter((c) => !rolledUp.has(c.id))
+        : [],
     [project, state, rolledUp],
   )
-  /* This feed is two streams drawn as one — SPEC §11.1 (FOL-16): the Folder's
-     chat, which answers to its bare channel uuid, and the project's own
-     comments, which answer to the project's address. Looking at the page
+  /* This feed is two streams drawn as one — SPEC §11.1 (FOL-16): the record
+     channel's chat, which answers to its bare channel uuid, and the project's
+     own comments, which answer to the project's address. Looking at the page
      advances both, because both are on it — §11.2, "exactly the streams you are
      showing". Its issues' comments are other files' streams and are untouched;
      before FOL-16 their roots answered to the channel marker, so this line
-     silently read every issue in the project. */
-  useMarkRead([projectContext(project?.contentFolder), fileContext(project?.addr)])
+     silently read every issue in the project.
+
+     The channel is the **record** channel, not the content Folder (FOL-1): that
+     is the only Folder whose chat this page draws. For a project pointing at a
+     team, marking the content Folder would advance the team's chat, which is
+     not on this page. For a project never relinked the two are the same. */
+  useMarkRead([projectContext(project?.originFolder), fileContext(project?.addr)])
   const threads = useMemo(
     () => conversations.map((c) => threadFor(c, directory, project ? { value: project.description, format: project.descriptionFormat } : undefined, project?.addr, state.edits, state.attachments)),
     [conversations, directory, project],
   )
   /* The divider in the feed (CRO-13). A root about the project — its own `a`
      tag names it — answers to the project's marker; a root with no `a` is the
-     Folder's chat and answers to the channel's. `ownConversations` already
-     dropped roots about any other file, so those are the only two cases. */
+     record channel's chat and answers to that channel's. `ownConversations`
+     already dropped roots about any other file, so those are the only two
+     cases. */
   const merged = useMergedReadState()
   const unread = useMemo(() => {
-    const channel = projectContext(project?.contentFolder)
+    const channel = projectContext(project?.originFolder)
     const file = fileContext(project?.addr)
     const aboutProject = new Set(conversations.filter((c) => project && (state.anchors[c.root.id] ?? []).includes(project.addr)).map((c) => c.id))
     return firstUnreadByThread(threads, merged, (thread) => (aboutProject.has(thread.id) ? file : channel), me)
