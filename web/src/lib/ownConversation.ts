@@ -12,6 +12,22 @@ export interface ConversationHome {
 }
 
 /**
+ * A project's record channel — the one Folder whose chat is the project's
+ * even where it names nothing — or `undefined` when it has none.
+ *
+ * Its `originFolder`, unless that is a team. A project created since FOL-2
+ * names its team there: it has no channel of its own, and the team's chat is
+ * the team's, so neither drawing it nor marking it read belongs on the page.
+ * Until the teams are read that cannot be told, and it is `undefined` — a
+ * legacy project's unanchored chat arrives a moment late, rather than a
+ * team's appearing on every project filed in it.
+ */
+export function recordChannel(originFolder: string | undefined, teams: readonly { id: string }[] | undefined): string | undefined {
+  if (!originFolder || !teams) return undefined
+  return teams.some((team) => team.id === originFolder) ? undefined : originFolder
+}
+
+/**
  * A project's own conversation: the threads whose root is a comment on the
  * project, wherever in its Folders they were filed — plus the legacy record
  * channel's talk that names nothing (FOL-1).

@@ -56,9 +56,13 @@ async function main() {
       console.log(`member ${pubkey.slice(0, 12)}… → ${label} ${r.ok ? 'ok' : `FAILED ${r.reason}`}`)
     }
   }
+  // A project is filed into a team (FOL-2); a bare channel stands in for one here.
+  const team = crypto.randomUUID()
+  await store.ensureFolder(team, `team-${team.slice(0, 8)}`)
   const project = await store.createProject({
     title: 'Payment integration',
     description: 'Stripe Checkout for workspace billing — redirect flow, no custom card form.',
+    team: { folder: team, hasState: false },
   })
   const folder = project.folder
   await grant(folder, 'project')

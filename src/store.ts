@@ -26,6 +26,7 @@ import {
   projectAddr,
 } from './events'
 import { findNaddrs, naddrToAddr, buildReaction, buildEdit, buildDeletion as buildEventDeletion } from '@estiva-app/protocol'
+import { planPlaceFile } from '@estiva-app/interop'
 import { foldFolder, projectFolders, type FolderState } from './fold'
 import { anchorIndex, type AnchorIndex } from './references'
 import { foldEdits, type EditIndex } from './edits'
@@ -208,9 +209,10 @@ export class Store {
    *
    * The trade-off is real and belongs in the UI rather than buried here: on this
    * relay `open` also bypasses the write gate, so anyone on the relay can write
-   * into the Folder, not just read it. For a Folder that should be restricted,
-   * pair with an existing one (`adoptFolder`) whose membership already means
-   * something.
+   * into the Folder, not just read it.
+   *
+   * No project is created this way any more: a project is filed into its
+   * team's Folder (`createProject`, FOL-2).
    */
   async ensureFolder(folder: string, name: string): Promise<PublishResult> {
     assertFolderId(folder)
@@ -226,71 +228,36 @@ export class Store {
   }
 
   /**
-   * Open a Folder somebody else already created — typically a Peek topic.
+   * Create a project in a team — SPEC §6.7, RFC 0.5 §10.5 (FOL-2).
    *
-   * This is the case the RFC actually describes: "the Peek topic, the Linear
-   * project, the messages all carry the same `h`. One container, many
-   * projections" (RFC_UPDATES.md §1.1). Creating a *new* Folder for a project
-   * that already has a Peek topic produces two containers for one thing, and
-   * then nobody in the topic can see the issues.
+   * **No Folder of its own.** It used to be paired with one: a fresh
+   * `project-…` channel (`ensureFolder`) or a pasted Peek topic. A project
+   * belongs to a team now, and its issues, changes and conversation carry the
+   * team's `h` — the record's `buzz-channel` names the team, so `contentFolder`
+   * and `originFolder` both fold to it and nothing downstream changes meaning.
    *
-   * Deliberately does NOT publish a `kind:9007`. The channel exists; re-creating
-   * it would either be a no-op duplicate or, worse, hand ownership questions to
-   * whoever clicked last. Access is whatever the Folder's owner already decided,
-   * which is the point of pairing rather than forking.
-   */
-  async adoptFolder(folder: string): Promise<{ ok: boolean; reason?: string }> {
-    assertFolderId(folder)
-    // A read is the honest membership test: if this returns rows we can see the
-    // Folder, and if it throws or returns nothing we say so rather than
-    // discovering it three publishes later.
-    try {
-      await this.relay.query([{ kinds: [KIND.ISSUE], '#h': [folder], limit: 1 }])
-      return { ok: true }
-    } catch (error) {
-      return { ok: false, reason: (error as Error).message }
-    }
-  }
-
-  /**
-   * Create a project — which is to say, create a Folder and put a project
-   * record in it.
+   * **Then it is listed in the team**, which the record alone never does. A
+   * Folder with state lists only what its `kind:30890` names, and filing by `h`
+   * never updates it, so without the `kind:1852` Peek does not place the
+   * project — which is how 6 of 17 active projects came to be in no team.
+   * Record first: `planPlaceFile` lists a file that was just published, and a
+   * listing that names a record the relay refused would point at nothing.
    *
-   * Pass `folder` to use one that **already exists**, in practice a Peek topic.
-   * That path deliberately does not publish a `kind:9007`: the container is
-   * already there, and re-creating it would fork one thing into two, which is
-   * the exact failure pairing exists to avoid. It is also all that "linking a
-   * topic to a project" needs to be — the project is created *in* the topic,
-   * so there is no second container and nothing to reconcile afterwards.
-   *
-   * When creating a new Folder the order matters: it has to exist before
-   * anything can be written into it (FRICTION.md A4).
-   *
-   * That ordering survives REW-11 even though the reason narrowed. The project
-   * record is global now, so it no longer needs the channel to exist — but its
-   * issues, changes and conversation all still carry an `h`, so a project whose
-   * Folder was never created is a project nothing can be filed into. Bailing out
-   * when `ensureFolder` fails is therefore still right: publishing the record
-   * anyway would advertise a container that does not exist, and advertising it
-   * *globally* would put that claim in front of everyone rather than only the
-   * person who tried.
+   * `placed` is reported separately rather than folded into `result`, because
+   * the two failures differ: a refused record is no project at all, a refused
+   * listing is a project Ship shows under its team and Peek does not.
    */
   async createProject(args: {
     title: string
     description?: string
     lead?: string
-    /** Use an existing Folder — a Peek topic — instead of making one. */
-    folder?: string
-  }): Promise<{ result: PublishResult; addr: string; id: string; folder: string }> {
+    /** The team's Folder, and whether it has state — from a read, never a guess. */
+    team: { folder: string; hasState: boolean }
+  }): Promise<{ result: PublishResult; placed?: PublishResult; addr: string; id: string; folder: string }> {
+    assertFolderId(args.team.folder)
     const id = crypto.randomUUID()
-    const folder = args.folder ?? crypto.randomUUID()
-
-    if (!args.folder) {
-      const created = await this.ensureFolder(folder, `project-${folder.slice(0, 8)}`)
-      if (!created.ok) {
-        return { result: created, addr: projectAddr(this.signer.pubkey, id), id, folder }
-      }
-    }
+    const folder = args.team.folder
+    const addr = projectAddr(this.signer.pubkey, id)
 
     const result = await this.publish(
       buildProject(this.signer.pubkey, Date.now(), {
@@ -301,7 +268,14 @@ export class Store {
         folder,
       }),
     )
-    return { result, addr: projectAddr(this.signer.pubkey, id), id, folder }
+    if (!result.ok) return { result, addr, id, folder }
+
+    let placed: PublishResult | undefined
+    for (const command of planPlaceFile(this.signer.pubkey, Date.now(), { folder, address: addr, hasState: args.team.hasState })) {
+      placed = await this.publish(command)
+      if (!placed.ok) break
+    }
+    return { result, placed, addr, id, folder }
   }
 
   /**

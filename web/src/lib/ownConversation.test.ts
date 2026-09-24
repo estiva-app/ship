@@ -10,7 +10,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import type { Conversation, Message } from '../../../src/fold'
-import { ownConversations, type ConversationHome } from './ownConversation'
+import { ownConversations, recordChannel, type ConversationHome } from './ownConversation'
 
 const RECORD = '85db5b59-9e49-4ea1-8e93-3d2a2d78c048'
 const TEAM = '05bebd5b-b699-4bd4-af50-f5377df0fd67'
@@ -63,6 +63,24 @@ describe('ownConversations — a project under its team', () => {
 
   it('keeps the record channel’s talk that names nothing — that Folder was the project’s alone', () => {
     expect(ids(ownConversations([general], underTeam, anchors))).toEqual(['general'])
+  })
+})
+
+describe('ownConversations — a project filed into its team (FOL-2)', () => {
+  /** Its record names the team: no record channel of its own. */
+  const filed: ConversationHome = { addr: PROJECT, originFolder: recordChannel(TEAM, [{ id: TEAM }]) ?? '', folders: [TEAM] }
+
+  it('has no record channel — its origin Folder is a team', () => {
+    expect(recordChannel(TEAM, [{ id: TEAM }])).toBeUndefined()
+    expect(recordChannel(RECORD, [{ id: TEAM }])).toBe(RECORD)
+  })
+
+  it('has none until the teams are read, rather than taking a team for one', () => {
+    expect(recordChannel(RECORD, undefined)).toBeUndefined()
+  })
+
+  it("shows its own comments and neither the team's chat nor a sibling's", () => {
+    expect(ids(ownConversations([teamChat, onSiblingInTeam, onProjectInTeam], filed, anchors))).toEqual(['project-in-team'])
   })
 })
 

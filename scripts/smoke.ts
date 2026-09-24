@@ -301,6 +301,25 @@ async function main() {
 
   const sidebar = () => page.getByRole('navigation', { name: 'Workspace' })
 
+  /* Relay-signed events go straight into the stub: a client publishing a
+     `kind:30890` is refused (`is_relay_only_kind`), which is what is modelled. */
+  const RELAY_KEY = 'f'.repeat(64)
+  const seed = (event: Partial<Event> & { kind: number; tags: string[][] }) =>
+    ingest({
+      id: Math.random().toString(16).slice(2).padEnd(64, '0'),
+      pubkey: RELAY_KEY,
+      created_at: Math.floor(Date.now() / 1000),
+      content: '',
+      ...event,
+    } as Event)
+
+  /* A team for the new project to be filed into (FOL-2). It has state, as all
+     five production teams do, and before the first load: the app reads the
+     Folders once, on mount. */
+  const TEAM_ID = '3c1f6e0a-58d2-4b7e-9a41-0f6d2c8b7e15'
+  seed({ kind: 39000, tags: [['d', TEAM_ID], ['name', 'Smoke team']] })
+  seed({ kind: 30890, tags: [['d', TEAM_ID], ['name', 'Smoke team']] })
+
   await page.goto(`http://localhost:${PORT}/`)
 
   // ── Lands straight on the issue list; there is no workspace to choose ─────
@@ -325,26 +344,28 @@ async function main() {
   await projectDialog
     .getByPlaceholder('Description (optional)')
     .fill('Stripe Checkout for workspace billing.')
+  await pick('Team', 'Smoke team')
   await page.getByRole('button', { name: 'Create project' }).click()
   await page.getByRole('link', { name: /Payment integration/ }).first().waitFor()
   check('the modal closes once the project is created', (await projectDialog.count()) === 0)
 
   const project = stored.find((e) => e.kind === 30850)
-  const folder = stored.find((e) => e.kind === 9007)
-  check('a kind:9007 was published for the project Folder', !!folder)
+  check('no kind:9007 — a project gets no Folder of its own (FOL-2)', !stored.some((e) => e.kind === 9007))
   check(
-    'exactly one Folder was created, for the project',
-    stored.filter((e) => e.kind === 9007).length === 1,
-  )
-  check(
-    'the project record points at that Folder, and is not filed under it',
+    'the project record points at its team, and is not filed under it',
     // REW-11 made the record global: `buzz-channel` names the Folder, and there
     // is deliberately no `h`. Asserting the absence too, because a record that
     // carried both would fold correctly and still be the old shape.
-    !!project && !!folder && tagValue(project, 'buzz-channel') === tagValue(folder, 'h'),
+    !!project && tagValue(project, 'buzz-channel') === TEAM_ID,
     `buzz-channel=${tagValue(project!, 'buzz-channel')?.slice(0, 8)}`,
   )
   check('  …with no `h` of its own', !!project && tagValue(project, 'h') === undefined)
+  const listing = stored.find((e) => e.kind === 1852)
+  check(
+    '  …and a kind:1852 lists it in the team, so Peek places it',
+    !!project && !!listing && tagValue(listing, 'h') === TEAM_ID && tagValue(listing, 'op') === 'add' &&
+      tagValue(listing, 'a') === `30850:${project.pubkey}:${tagValue(project, 'd')}`,
+  )
   await shot(page, '02-projects')
 
   // ── Project detail, and an issue inside it ────────────────────────────────
@@ -938,17 +959,8 @@ async function main() {
     is relay-signed and a client publishing one is refused (`is_relay_only_kind`)
     — which is exactly the behaviour being modelled.
   */
-  const RELAY_KEY = 'f'.repeat(64)
   const FOLDER_ID = '7b32200c-e4c0-4216-b79a-8490fc05e0bd'
   const TIDE_KIND = 30911
-  const seed = (event: Partial<Event> & { kind: number; tags: string[][] }) =>
-    ingest({
-      id: Math.random().toString(16).slice(2).padEnd(64, '0'),
-      pubkey: RELAY_KEY,
-      created_at: Math.floor(Date.now() / 1000),
-      content: '',
-      ...event,
-    } as Event)
 
   // A third app's manifest, declaring a widget chain this consumer only half
   // understands. Nothing in Ship has heard of a tide table.

@@ -26,9 +26,15 @@ type Story = StoryObj<typeof meta>
 
 const PROJECT_OPTIONS = SIDEBAR_PROJECTS.map((p) => ({ value: p.addr, label: p.title }))
 
-/** Production's form: a title, a description, and an optional Folder link to pair with a Peek topic. */
+const TEAMS = [
+  { id: '05bebd5b-b699-4bd4-af50-f5377df0fd67', name: 'Estiva HQ', hasState: true },
+  { id: 'fd03975a-eb00-49d6-a4b7-33ead1854672', name: 'Peek', hasState: true },
+  { id: '3167adea-877f-43c4-96fb-517a2b2d5d24', name: 'Ship', hasState: true },
+]
+
+/** Production's form: a title, a description, and the team the project is filed into (FOL-2). */
 export const NewProject: Story = {
-  render: () => <NewProjectDialog onClose={fn()} onCreate={fn()} />,
+  render: () => <NewProjectDialog teams={TEAMS} onClose={fn()} onCreate={fn()} />,
 }
 
 /** From the Issues page: the project is chosen here. */
@@ -75,13 +81,11 @@ export const PairFolderRefused: Story = {
   },
 }
 
-/** The same line under the optional Folder field of a new project: the helper until there is an error. */
-export const NewProjectRefused: Story = {
-  render: () => <NewProjectDialog onClose={fn()} onCreate={fn()} />,
+/** No teams came back from the read: the picker says why it is shut, and nothing can be created. */
+export const NewProjectNoTeams: Story = {
+  render: () => <NewProjectDialog teams={[]} onClose={fn()} onCreate={fn()} />,
   play: async () => {
     await userEvent.type(screen.getByPlaceholderText('New project title'), 'Relay migration')
-    await userEvent.type(screen.getByPlaceholderText(/Paste a Peek topic link/), 'nope')
-    await userEvent.click(screen.getByRole('button', { name: 'Create project' }))
   },
 }
 
@@ -103,7 +107,7 @@ export const OpenAndClose: Story = {
         <Button variant="outlined" onClick={() => setOpen('pair')}>
           Pair with another Folder…
         </Button>
-        {open === 'project' && <NewProjectDialog onClose={() => setOpen(null)} onCreate={fn()} />}
+        {open === 'project' && <NewProjectDialog teams={TEAMS} onClose={() => setOpen(null)} onCreate={fn()} />}
         {open === 'issue' && <NewIssueDialog projects={PROJECT_OPTIONS} onClose={() => setOpen(null)} onCreate={fn()} />}
         {open === 'delete' && (
           <ConfirmDialog title="Delete “Relay Migration”?" confirmLabel="Delete project" destructive onConfirm={fn()} onClose={() => setOpen(null)}>

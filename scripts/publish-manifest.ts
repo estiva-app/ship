@@ -248,8 +248,10 @@ async function main() {
   // Publish one real project and one real issue, move the issue's status, then
   // resolve every declared slot against the actual events.
   const store = new Store(relay, secretKeySigner(identity.secretKeyHex))
-  // createProject makes the Folder too — a project *is* a Folder.
-  const project = await store.createProject({ title: 'Payment integration', description: 'Stripe Checkout.' })
+  // A project is filed into a team (FOL-2); a bare channel stands in for one here.
+  const team = crypto.randomUUID()
+  await store.ensureFolder(team, `team-${team.slice(0, 8)}`)
+  const project = await store.createProject({ title: 'Payment integration', description: 'Stripe Checkout.', team: { folder: team, hasState: false } })
   const folder = project.folder
   const issue = await store.createIssue({ folder, title: 'Billing entry', description: 'Settings entry point.', projectAddr: project.addr, ref: 'PAY-1' })
   await store.setField({ folder, target: issue.addr, field: 'status', value: 'in_progress' })
