@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 /**
  * A project's Activity is where it was mentioned, and nothing else — PEE-26.
  *

@@ -3,10 +3,8 @@ import react from '@vitejs/plugin-react'
 import { fileURLToPath } from 'node:url'
 
 /**
- * The three values baked in at build time — the same names, the same defaults
- * and the same meaning as the old app's build.mjs, so the Dockerfile's
- * `RELAY_URL=… ID_BASE=… CLIENT_ID=… npm run build` line works unchanged at
- * the cutover.
+ * The three values baked in at build time. deploy.yml's `publish` job sets
+ * them for production; the image only wraps what that build wrote (PER-16).
  *
  * Build-time on purpose: the relay URL *is* the workspace, not a runtime
  * choice, and Ship has no backend to read it from. A bundle pointed at a
@@ -32,21 +30,17 @@ const repoRoot = fileURLToPath(new URL('..', import.meta.url))
 // from npm into node_modules, where it used to be a `file:` link to a sibling
 // directory that existed on one machine.
 
-// The dev server takes :5191 so the old app can keep :5190 beside it. Both apps
-// still exist in the tree — REW-9 removes the old one — but only this one is
-// built into the image and served.
+// The dev server takes :5191, the port it had beside the old app's :5190;
+// the scripts and docs that name it did not move when REW-9 deleted that app.
 //
 // `outDir` is <repo>/dist/ship because that is where the image looks:
-// `COPY --from=build /app/dist/ship /usr/share/nginx/html`. It used to be the
-// old app's esbuild output; the cutover (REW-8) moved the name to this build
-// rather than changing the Dockerfile's destination, so nginx, deploy/ and
-// update.sh are all untouched by the switch.
+// `COPY dist/ship /usr/share/nginx/html`. It was the old app's esbuild output
+// first; the cutover (REW-8) kept the name so nginx, deploy/ and update.sh
+// were untouched by the switch.
 //
 // `emptyOutDir` is required and not merely tidy: Vite refuses to clear a
-// directory outside its root without it, and the directory already holds the
-// old app's `bundle.js` in any tree that has run the root build. Left behind,
-// that file is served by nothing and read by no one, but it makes `dist/ship`
-// look like it holds two apps.
+// directory outside its root without it, and a stale file left in dist/ship
+// would go into the image.
 export default defineConfig({
   plugins: [react()],
   define: BUILD_DEFINES,
@@ -69,9 +63,24 @@ export default defineConfig({
       allow: [here, repoRoot],
     },
   },
+  /**
+   * Two projects, split by extension, as Peek's PER-14. Setting up jsdom was
+   * the largest single cost in the suite (PER-16), and a `.test.ts` file mostly
+   * has no DOM to test, so it runs under node. A `.test.ts` file that does need
+   * the DOM says so with a `// @vitest-environment jsdom` header.
+   */
   test: {
-    environment: 'jsdom',
     globals: true,
     setupFiles: './src/test-setup.ts',
+    projects: [
+      {
+        extends: true,
+        test: { name: 'dom', environment: 'jsdom', include: ['**/*.test.tsx'] },
+      },
+      {
+        extends: true,
+        test: { name: 'node', environment: 'node', include: ['**/*.test.ts'] },
+      },
+    ],
   },
 })
