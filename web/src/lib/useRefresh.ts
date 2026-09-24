@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
-import { pausedForMs } from './relayBudget'
+import { createRefreshScheduler, type RefreshScheduler } from '@estiva-app/platform'
+import { relayBudget } from './relayBudget'
 
 /**
  * How often a visible tab re-reads.
@@ -64,10 +65,25 @@ import { pausedForMs } from './relayBudget'
 export const REFRESH_MS = 10_000
 
 /**
- * Two events often fire for one gesture — switching to a tab raises both
- * `visibilitychange` and `focus` — and one read is enough for it.
+ * The tab's scheduler (PER-13).
+ *
+ * This hook's own mechanism — the listeners, the 1 s merge of the two events a
+ * tab switch raises, the skip while `relayBudget` is paused — moved into
+ * `@estiva-app/platform` so Peek could have it: without it every Peek tab
+ * switch sent every read twice. One scheduler also means one pair of listeners
+ * for the tab rather than one per hook. The package keeps no binding, so this
+ * is it; built on first use so importing registers nothing.
  */
-const COALESCE_MS = 1000
+let scheduler: RefreshScheduler | undefined
+function refreshScheduler(): RefreshScheduler {
+  scheduler ??= createRefreshScheduler({
+    document,
+    window,
+    budget: relayBudget,
+    intervalMs: REFRESH_MS,
+  })
+  return scheduler
+}
 
 export interface RefreshOptions {
   intervalMs?: number
@@ -111,49 +127,8 @@ export function useRefresh(
     latest.current = refresh
   }, [refresh])
 
-  useEffect(() => {
-    let timer: ReturnType<typeof setInterval> | undefined
-    let lastAt = 0
-
-    const tick = () => {
-      const now = Date.now()
-      if (now - lastAt < COALESCE_MS) return
-      // The relay has refused on quota and said how long to wait. Skipping is
-      // the whole backoff: `lastAt` is left alone, so the first tick after the
-      // pause expires runs immediately rather than waiting out another
-      // interval. See `relayBudget` for why this is the right place.
-      if (pausedForMs(now) > 0) return
-      lastAt = now
-      void latest.current()
-    }
-    const start = () => {
-      if (!interval) return
-      if (timer === undefined) timer = setInterval(tick, intervalMs)
-    }
-    const stop = () => {
-      if (timer !== undefined) {
-        clearInterval(timer)
-        timer = undefined
-      }
-    }
-    const onVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        tick()
-        start()
-      } else {
-        stop()
-      }
-    }
-    const onFocus = () => tick()
-
-    document.addEventListener('visibilitychange', onVisibility)
-    window.addEventListener('focus', onFocus)
-    if (document.visibilityState === 'visible') start()
-
-    return () => {
-      stop()
-      document.removeEventListener('visibilitychange', onVisibility)
-      window.removeEventListener('focus', onFocus)
-    }
-  }, [intervalMs, interval])
+  useEffect(
+    () => refreshScheduler().subscribe(() => latest.current(), { interval, intervalMs }),
+    [intervalMs, interval],
+  )
 }
