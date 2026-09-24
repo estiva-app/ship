@@ -1,4 +1,4 @@
-import { Link } from '@estiva-app/ui'
+import { Card, Link } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
 import { ago } from '@/lib/time'
 import { statusLabel, type StatusEntry } from '@/lib/issues'
@@ -46,7 +46,7 @@ export function IssuesTable({ issues, statuses, hrefFor, className }: IssuesTabl
        without. `overflow-hidden` keeps the corners round, as the scrolling
        box itself used to. The frame is a box of our own around the region,
        not pushed into it (UIG-9). */
-    <div className={cn('overflow-hidden rounded-lg border border-border-default', className)}>
+    <Card clip fill="none" className={className}>
     <ScrollArea orientation="horizontal">
       <table className="w-full min-w-[840px] table-fixed border-collapse">
         <thead className="bg-bg-surface">
@@ -105,6 +105,6 @@ export function IssuesTable({ issues, statuses, hrefFor, className }: IssuesTabl
         </tbody>
       </table>
     </ScrollArea>
-    </div>
+    </Card>
   )
 }
