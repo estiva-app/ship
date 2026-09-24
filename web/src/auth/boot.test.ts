@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 /**
  * The boot decision's plumbing (REW-2).
  *

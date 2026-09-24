@@ -1,10 +1,17 @@
-# The build stage installs from the lockfile; a host node_modules would be both
-# large and wrong (possibly a different platform).
+# The image carries only the prebuilt dist/ship and the nginx config (PER-16).
+# Everything else would be dead weight in the build context — and dist/ is the
+# one thing that must *not* be ignored any more.
 node_modules
-dist
+web/node_modules
 .git
 .github
 .smoke
+src
+lib
+web
+scripts
+conformance
+docs
 
 # Never let the manifest key reach an image layer. It is the identity the
 # published NIP-89 manifest is signed with, and a layer is not a secret.
