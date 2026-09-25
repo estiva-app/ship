@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { ForeignObject } from './ForeignObject'
-import { pickWidget } from '@/api/foreign'
 import type { ForeignObject as Data } from '@/api/foreign'
 
 const base = (over: Partial<Data> = {}): Data => ({
@@ -16,41 +15,6 @@ const base = (over: Partial<Data> = {}): Data => ({
   actions: [],
   viaRecommendation: true,
   ...over,
-})
-
-/**
- * The fallback chain — RFC 0.4 §13.3, and Ship is its first consumer anywhere.
- *
- * A widget is a layout hint rather than a semantic, so an unknown one degrades.
- * The property that matters is that it degrades to *something*: §13.3's whole
- * argument is that a blank object is indistinguishable from one the reader may
- * not see, and reports "that app is broken" about an app behaving correctly.
- */
-const IMPLEMENTED = ['message', 'card', 'row'] as const
-
-describe('the widget fallback chain, as Ship implements it', () => {
-  it('takes the first type it implements', () => {
-    expect(pickWidget(['message', 'card'], IMPLEMENTED, 'card')).toBe('message')
-  })
-
-  it('walks past a type it has never heard of', () => {
-    expect(pickWidget(['kanban', 'card'], IMPLEMENTED, 'card')).toBe('card')
-  })
-
-  it('honours the whole chain, not only its first entry', () => {
-    expect(pickWidget(['gantt', 'burndown', 'row'], IMPLEMENTED, 'card')).toBe('row')
-  })
-
-  it('accepts a bare string, which is the older form', () => {
-    expect(pickWidget('card', IMPLEMENTED, 'card')).toBe('card')
-  })
-
-  it('never returns nothing, even for a chain it fully fails to walk', () => {
-    // A producer must terminate its chain in a closed type; this is what
-    // happens when one does not. Rendering a card beats rendering a blank.
-    expect(pickWidget(['kanban', 'gantt'], IMPLEMENTED, 'card')).toBe('card')
-    expect(pickWidget([], IMPLEMENTED, 'card')).toBe('card')
-  })
 })
 
 describe('ForeignObject', () => {

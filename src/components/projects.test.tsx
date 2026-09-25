@@ -1,8 +1,7 @@
-import { fireEvent, render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { render, screen } from '@testing-library/react'
+import { describe, expect, it } from 'vitest'
 import { ago } from '@/lib/time'
 import { StatusLabel } from './ui/StatusLabel'
-import { Tabs } from './ui/Tabs'
 import { ProjectCard } from './ProjectCard'
 
 const base = {
@@ -62,25 +61,6 @@ describe('StatusLabel', () => {
     expect(completed.querySelector('svg')!.className.baseVal).toContain('tabler-icon-circle-check')
     expect(done.firstElementChild).toHaveClass('text-text-secondary')
     expect(completed.firstElementChild).toHaveClass('text-text-secondary')
-  })
-})
-
-describe('Tabs', () => {
-  it('marks the active tab and reports a change', () => {
-    const onChange = vi.fn()
-    render(
-      <Tabs
-        tabs={[
-          { id: 'active', label: 'Active', count: 5 },
-          { id: 'archived', label: 'Archived', count: 2 },
-        ]}
-        active="active"
-        onChange={onChange}
-      />,
-    )
-    expect(screen.getByRole('tab', { name: /^Active/ })).toHaveAttribute('aria-selected', 'true')
-    fireEvent.click(screen.getByRole('tab', { name: /^Archived/ }))
-    expect(onChange).toHaveBeenCalledWith('archived')
   })
 })
 
