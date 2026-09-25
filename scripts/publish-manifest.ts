@@ -203,6 +203,12 @@ async function main() {
   check('it declares how to fold a record', manifest.records?.changeKind === KIND.CHANGE, `changeKind=${manifest.records?.changeKind}`)
   check('it declares the ordering rule', Array.isArray(manifest.records?.order) && manifest.records.order[0] === 'ts', manifest.records?.order?.join(' → '))
 
+  // Every action this build declares, read back off the relay rather than off
+  // the event we signed — the relay's copy is the only one a consumer sees.
+  const storedIds = new Set((manifest.actions as { id?: string }[]).map((a) => a.id))
+  const missingActions = (manifestContent().actions as { id: string }[]).map((a) => a.id).filter((id) => !storedIds.has(id))
+  check('every declared action reads back', missingActions.length === 0, missingActions.join(', ') || [...storedIds].join(', '))
+
   // ── The way back ──────────────────────────────────────────────────────────
   // A consumer that can render an object but cannot open it has half a
   // reference. This is a tag rather than manifest content because that is where
@@ -376,9 +382,13 @@ async function main() {
     fallback. A consumer can survive a missing `started` by treating it as open;
     there is nothing sensible to assume about a status that is neither
     outstanding nor progress, and Ship has one (`cancelled`) in both vocabularies.
+
+    Only the vocabularies a slot maps — the statuses. `archived` (MAN-4) feeds
+    an action's select and says whether a project is listed, not how far along
+    it is; giving it a stage would make it read as progress.
   */
   const STAGES = new Set(['open', 'started', 'done', 'dropped'])
-  const entries = Object.entries(manifest.vocabularies ?? {})
+  const entries = Object.entries(manifest.vocabularies ?? {}).filter(([name]) => referenced.has(name))
   const missing = entries.flatMap(([name, values]) =>
     values.filter((v) => !v.stage).map((v) => `${name}.${v.value}`),
   )

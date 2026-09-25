@@ -21,6 +21,7 @@
  */
 import { buildChange, buildConversationMessage, buildIssue, buildProject } from '../src/nostr/events'
 import { buildManifest } from '../src/nostr/manifest'
+import { KIND } from '../src/nostr/kinds'
 import { foldFolder, projectFolders, type Change, type Project } from '../src/nostr/fold'
 import { foldAttachments } from '../src/nostr/attachments'
 import { directoryFrom, initials, parseProfile } from '../src/nostr/profiles'
@@ -506,7 +507,7 @@ const allActions = (JSON.parse(buildManifest(PK, Date.now()).content) as {
   actions: { id: string; effect?: string }[]
 }).actions
 
-check('the manifest declares six actions', allActions.length === 6)
+check('the manifest declares ten actions', allActions.length === 10, allActions.map((a) => a.id).join(', '))
 for (const action of allActions) {
   // The problems are sentences naming the action, so a failure here says what
   // to write rather than which assertion index went red.
@@ -515,16 +516,33 @@ for (const action of allActions) {
 }
 
 /*
-  Ship offers no destructive action to another app, and that is an inventory
-  rather than an oversight — archive is a folded field a consumer honours via
-  `hiddenWhen`, and delete is a NIP-09 request honoured only for the author.
-  Asserted so that adding one is a deliberate act with a failing test in front
+  The destructive inventory is exactly one: deleting an issue (MAN-4). Asserted
+  as a list, not a count, so adding another — deleting a project, which also
+  unlists it from its Folder — is a deliberate act with a failing test in front
   of it.
 */
+const destructive = allActions.filter((a) => a.effect === 'destructive').map((a) => a.id)
+check('the only destructive action is delete-issue', destructive.join() === 'delete-issue', destructive.join(', '))
+
+/*
+  The shapes a consumer turns into controls — MAN-4. Peek finds Rename by the
+  field the title slot folds, draws a select only for an input naming a
+  vocabulary, and a confirm for a `kind:5`. Each of those is a property of the
+  declaration, so each is checked here rather than trusted.
+*/
+const declared = JSON.parse(buildManifest(PK, Date.now()).content) as {
+  actions: { id: string; appliesTo: string | string[]; emits: { kind: number; field?: string }; input?: { enum?: string } }[]
+  vocabularies: Record<string, { value: string }[]>
+}
+const byId = (id: string) => declared.actions.find((a) => a.id === id)
+check('rename-issue and rename-project both set `title`', byId('rename-issue')?.emits.field === 'title' && byId('rename-project')?.emits.field === 'title')
 check(
-  'no action is destructive, because none is offered',
-  allActions.every((a) => a.effect !== 'destructive'),
+  'archive-project names a vocabulary holding exactly true and empty',
+  declared.vocabularies[byId('archive-project')?.input?.enum ?? '']?.map((v) => v.value).sort().join('|') === '|true',
 )
+check('delete-issue emits kind:5 on an issue', byId('delete-issue')?.emits.kind === KIND.DELETION && byId('delete-issue')?.appliesTo === String(KIND.ISSUE))
+// RFC 0.4 §13.9: the display key is derived by its owner alone.
+check('no action sets `ref`', declared.actions.every((a) => a.emits.field !== 'ref'))
 
 // ── The manifest still projects a renamed tag ───────────────────────────────
 

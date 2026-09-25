@@ -183,6 +183,18 @@ export const ISSUE_STATUSES: VocabEntry[] = [
 ]
 
 /**
+ * A project's `archived` field, as a vocabulary — MAN-4.
+ *
+ * The two values `Store.archiveProject` writes (SPEC §6.5): any non-empty value
+ * archives and the empty string restores. Not a status, so no `stage`: it
+ * says whether a project is listed, not how far along it is.
+ */
+export const ARCHIVED_STATES: VocabEntry[] = [
+  { value: '', label: 'Active', colour: 'neutral' },
+  { value: 'true', label: 'Archived', colour: 'muted' },
+]
+
+/**
  * The status an object has before anyone has said otherwise.
  *
  * A root Issue carries no status at all — that is the whole point of §1.3 — so
