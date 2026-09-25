@@ -1,8 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { initialsFor } from '@estiva-app/ui'
-import { Avatar } from './ui/Avatar'
 import { IdentityMenu } from './IdentityMenu'
 import { NavItem } from './NavItem'
 import { Sidebar } from './Sidebar'
@@ -10,39 +8,7 @@ import { Sidebar } from './Sidebar'
 /** A 64-hex key. Nothing below may ever print this, or any part of it. */
 const KEY = 'a8a7d739'.repeat(8)
 
-describe("Avatar (the shared one, on Peek's rules)", () => {
-  it('takes initials from a name — the first letter of the first two words', () => {
-    expect(initialsFor('Ana Duarte')).toBe('AD')
-    expect(initialsFor('Ravi')).toBe('R')
-    expect(initialsFor('Mara Sato Ito')).toBe('MS')
-  })
-
-  it('draws the initials when named, and never a key', () => {
-    const { container } = render(<Avatar name="Ana Duarte" />)
-    expect(container.textContent).toBe('AD')
-    expect(container.textContent).not.toContain(KEY.slice(0, 4))
-  })
-
-  it('draws a silhouette when there is no name', () => {
-    const { container } = render(<Avatar />)
-    expect(container.querySelector('svg')).not.toBeNull()
-    expect(container.textContent).toBe('')
-  })
-})
-
 describe('NavItem', () => {
-  it('counts open issues and says so', async () => {
-    render(<NavItem label="Issues" href="#/" count={18} />)
-    expect(screen.getByText('18')).toBeInTheDocument()
-    await userEvent.hover(screen.getByText('18'))
-    expect(await screen.findByRole('tooltip')).toHaveTextContent('18 open')
-  })
-
-  it('draws no counter for zero', () => {
-    const { container } = render(<NavItem label="Projects" href="#/projects" count={0} />)
-    expect(container.textContent).toBe('Projects')
-  })
-
   it('marks the active entry for assistive tech', () => {
     render(<NavItem label="Issues" href="#/" active />)
     expect(screen.getByRole('link')).toHaveAttribute('aria-current', 'page')

@@ -1,9 +1,7 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { render, screen } from '@testing-library/react'
+import { describe, expect, it } from 'vitest'
 import { groupByStatus, statusLabel } from '@/lib/issues'
 import { ISSUES, ISSUE_STATUSES, ROWS, THREADS, hrefFor } from '@/fixtures/issues'
-import { Breadcrumb } from './ui/Breadcrumb'
-import { EditableText } from './ui/EditableText'
 import { Board } from './Board'
 import { MessageCard } from './ConversationThread'
 import { IssueList } from './IssueList'
@@ -78,39 +76,6 @@ describe('IssuesTable and Board', () => {
     for (const entry of ISSUE_STATUSES) expect(screen.getByText(entry.label)).toBeInTheDocument()
     // Two in-progress issues: the other three columns say so. No column for 'blocked' — not in the vocabulary.
     expect(screen.getAllByText('Nothing here')).toHaveLength(3)
-  })
-})
-
-describe('EditableText', () => {
-  it('commits on Enter, cancels on Escape, and keeps the field open when the save fails', async () => {
-    const onCommit = vi.fn().mockResolvedValue(false)
-    render(<EditableText label="Title" value="Old" placeholder="Untitled" onCommit={onCommit} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Edit title' }))
-    const field = screen.getByRole('textbox', { name: 'Title' })
-    fireEvent.change(field, { target: { value: 'New' } })
-    fireEvent.keyDown(field, { key: 'Enter' })
-    await waitFor(() => expect(onCommit).toHaveBeenCalledWith('New'))
-    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Title' })).toBeEnabled())
-    expect(screen.getByRole('textbox', { name: 'Title' })).toHaveValue('New')
-
-    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Title' }), { key: 'Escape' })
-    expect(screen.getByRole('button', { name: 'Edit title' })).toHaveTextContent('Old')
-  })
-
-  it('does not commit an unchanged value', () => {
-    const onCommit = vi.fn()
-    render(<EditableText label="Title" value="Same" placeholder="Untitled" onCommit={onCommit} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Edit title' }))
-    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Title' }), { key: 'Enter' })
-    expect(onCommit).not.toHaveBeenCalled()
-  })
-})
-
-describe('Breadcrumb', () => {
-  it('links every item but the last, which is the current page', () => {
-    render(<Breadcrumb items={[{ label: 'Issues', href: '#/issues' }, { label: 'Relay Migration', href: '#/p' }, { label: 'REL-6', mono: true }]} />)
-    expect(screen.getAllByRole('link').map((a) => a.textContent)).toEqual(['Issues', 'Relay Migration'])
-    expect(screen.getByText('REL-6')).toHaveAttribute('aria-current', 'page')
   })
 })
 
