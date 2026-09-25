@@ -38,6 +38,7 @@
  */
 import { toNostrSeconds, type NostrTag, type UnsignedEvent } from '@estiva-app/protocol'
 import {
+  ARCHIVED_STATES,
   DEFAULT_ISSUE_STATUS,
   DEFAULT_PROJECT_STATUS,
   ISSUE_STATUSES,
@@ -359,6 +360,15 @@ export function manifestContent(): ManifestContent {
     vocabularies: {
       statuses: PROJECT_STATUSES,
       issueStatuses: ISSUE_STATUSES,
+      /*
+        Not a status, and deliberately without `stage` — MAN-4. It exists so
+        `archive-project` resolves as a select: a consumer draws a picker only
+        for an input naming a vocabulary, and a free-text box asking for
+        `'true'` is not a control. The two values are the ones `store.ts`
+        writes and SPEC §6.5 defines; `''` is a real option, as Peek's person
+        picker already treats it.
+      */
+      archived: ARCHIVED_STATES,
     },
 
     // ── What another app may DO ───────────────────────────────────────────
@@ -375,14 +385,22 @@ export function manifestContent(): ManifestContent {
       the issue, that a project's lead is not an issue's assignee, that an
       issue's root event holds immutable facts only.
 
-      **All six are `writes`, and none is `destructive` — because Ship offers no
-      destructive action to anyone else.** Archiving and deleting a project are
-      real operations with real UI, and neither is declared here, so no other
-      app can invoke them. That is a decision rather than an oversight: delete
-      is a NIP-09 request honoured only for the author, and archive is a folded
-      field a consumer already honours through `hiddenWhen`. Worth stating
-      because "no destructive actions" otherwise reads as an unexercised
-      vocabulary rather than as an inventory.
+      **One is `destructive`: `delete-issue`** (MAN-4). Until then Ship offered
+      no destructive action to anyone else, on the grounds that a delete is a
+      NIP-09 request only its author could make. That stopped being the reason
+      when the relay began accepting a deletion from the owner of an authoring
+      agent too (SPEC §6.5, SHI-14) — no client can evaluate that half, so every
+      app offers the control and reports the relay's answer, which is exactly
+      what a declared action lets a consumer do. Deleting a *project* is still
+      undeclared: Ship also unlists it from its Folder, and a consumer given
+      only the `kind:5` would leave that half behind (it waits on MAN-1).
+
+      Archive is `writes`, not `destructive`: it is a folded field, reversible
+      by anyone in the Folder, and nothing is removed.
+
+      Never declared: the `ref` change. A display key is derived from the
+      project's title and a count of its issues, which only Ship can work out
+      (RFC 0.4 §13.9) — a consumer offered it could only write a wrong one.
 
       Nothing reads either field yet. They are here because adding a field costs
       a line and adding one after several apps have published manifests is a
@@ -516,6 +534,59 @@ export function manifestContent(): ManifestContent {
           properties: { title: { type: 'string' }, description: { type: 'string' } },
           required: ['title'],
         },
+      },
+      /*
+        Rename, archive and delete — MAN-4, the first slice of Ship's full set.
+
+        Each is something Ship's own UI already does, published the way Ship
+        publishes it: a rename is a `kind:1851` on `title`, which both title
+        slots above already fold, so a rename by anyone in the Folder lands for
+        every reader. Peek finds the rename by that field rather than by id, and
+        offers it on the file page, not as a box under every card.
+      */
+      {
+        id: 'rename-issue',
+        label: 'Rename',
+        description:
+          'Give an issue a new title. A change event, so anyone in the Folder may; the issue root keeps the title ' +
+          'it was filed with, and every app reading the issue folds the new one over it.',
+        effect: 'writes',
+        appliesTo: String(KIND.ISSUE),
+        emits: { kind: KIND.CHANGE, field: 'title' },
+        input: { type: 'string' },
+      },
+      {
+        id: 'rename-project',
+        label: 'Rename',
+        description:
+          'Give a whole project a new name. A change event on `title`, whichever of `name` or `title` the project ' +
+          'record carries, so anyone in the Folder may, and every app reading the project folds it over the root.',
+        effect: 'writes',
+        appliesTo: String(KIND.PROJECT),
+        emits: { kind: KIND.CHANGE, field: 'title' },
+        input: { type: 'string' },
+      },
+      {
+        id: 'archive-project',
+        label: 'Archive',
+        description:
+          'Take a project out of every list once nobody needs to see it, or bring it back: `true` archives, an ' +
+          'empty value restores. Nothing is deleted — the project and its issues stay readable, hidden through ' +
+          'hiddenWhen.',
+        effect: 'writes',
+        appliesTo: String(KIND.PROJECT),
+        emits: { kind: KIND.CHANGE, field: 'archived' },
+        input: { type: 'string', enum: 'archived' },
+      },
+      {
+        id: 'delete-issue',
+        label: 'Delete',
+        description:
+          'Ask the relay to delete an issue outright. The relay decides — only its author, or the owner of an ' +
+          'agent that wrote it, may — and its status changes and comments are separate events that stay.',
+        effect: 'destructive',
+        appliesTo: String(KIND.ISSUE),
+        emits: { kind: KIND.DELETION },
       },
     ],
   }
