@@ -57,11 +57,11 @@ export function BoardColumn({
   hrefFor: (issue: IssueRowData) => string
 }) {
   return (
-    // @estiva-escape: N10 (Katerina, 24 September: record only): a board column is a section with a heading; Card draws a plain box
+    // @estiva-escape(no-copied-look): N10 (Katerina, 24 September: record only): a board column is a section with a heading; Card draws a plain box
     <section className="flex min-h-40 min-w-0 flex-col gap-2 rounded-lg border border-border-default bg-bg-surface p-2">
       <header className="flex h-7 items-center gap-2 px-1">
         <StatusLabel value={status} label={label} strong />
-        {/* @estiva-escape: B4 (Katerina, 24 September: record only): a count in the mono caption style NavItem's count also uses, not a NavItem */}
+        {/* @estiva-escape(no-copied-look): B4 (Katerina, 24 September: record only): a count in the mono caption style NavItem's count also uses, not a NavItem */}
         <span className="font-mono text-caption tabular-nums text-text-muted">{issues.length}</span>
       </header>
       <div className="flex flex-col gap-1.5">

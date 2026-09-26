@@ -64,11 +64,11 @@ export function IssueRow({ issue, statuses, href, className }: IssueRowProps) {
   const threads = issue.conversations ?? 0
   return (
     <div className={cn('relative flex h-9 min-w-0 items-center gap-3 rounded-md px-3 transition-colors hover:bg-bg-hover', className)}>
-      {/* @estiva-escape: the link covers the whole row with an after: layer, so the project chip can be a second link above it and never inside it; Link has no covering layer of its own (UIG-9, Katerina 17 September; UIG-14) */}
+      {/* @estiva-escape(no-restyled-part): the link covers the whole row with an after: layer, so the project chip can be a second link above it and never inside it; Link has no covering layer of its own (UIG-9, Katerina 17 September; UIG-14) */}
       <Link {...linkTo(href)} variant="plain" className="flex min-w-0 flex-1 items-center gap-3 after:absolute after:inset-0">
         {/* `w-14`: 56px, the room the project table's ref cell has (S25), so
             the two surfaces line up. */}
-        {/* @estiva-escape: B5 (Katerina, 24 September: record only): an issue's ref in the mono caption style Breadcrumb's id also uses */}
+        {/* @estiva-escape(no-copied-look): B5 (Katerina, 24 September: record only): an issue's ref in the mono caption style Breadcrumb's id also uses */}
         <span className={cn('w-14 shrink-0 truncate font-mono text-caption', issue.ref ? 'text-text-muted' : 'text-text-disabled')}>{issue.ref ?? '—'}</span>
         <span className="flex min-w-0 flex-1 items-center gap-1.5">
           <StatusShape value={issue.status} label={statusLabel(issue.status, statuses)} />
@@ -79,7 +79,7 @@ export function IssueRow({ issue, statuses, href, className }: IssueRowProps) {
           about the issue, then where it lives, then who and when. */}
       <ConversationCount count={threads} unit="conversation" />
       {issue.project && (
-        // @estiva-escape: a second link lifted over the row's own, with the chip's round focus ring; kept with the row link (UIG-9, Katerina 17 September)
+        // @estiva-escape(no-restyled-part): a second link lifted over the row's own, with the chip's round focus ring; kept with the row link (UIG-9, Katerina 17 September)
         <Link {...linkTo(issue.project.href)} variant="plain" className="relative z-10 shrink-0 rounded-full">
           <Chip label={issue.project.title} leadingIcon={<IconBox size={12} stroke={1.5} />} className="max-w-[200px]" />
         </Link>

@@ -28,7 +28,7 @@ export function IssueGroup({ status, label, issues, statuses, hrefFor }: IssueGr
       {/* `px-3`, as the rows: the heading and its rows share a left edge. */}
       <h3 className="flex h-8 items-center gap-2 px-3">
         <StatusLabel value={status} label={label} strong />
-        {/* @estiva-escape: B4 (Katerina, 24 September: record only): a count in the mono caption style NavItem's count also uses, not a NavItem */}
+        {/* @estiva-escape(no-copied-look): B4 (Katerina, 24 September: record only): a count in the mono caption style NavItem's count also uses, not a NavItem */}
         <span className="font-mono text-caption tabular-nums text-text-muted">{issues.length}</span>
       </h3>
       {issues.map((issue) => (

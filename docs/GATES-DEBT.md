@@ -39,3 +39,15 @@ escaped.
 
 Earlier, 16 September 2026, UIG-4: the rule was `estiva/no-raw-button`, and it
 found 0 raw `<button>`.
+
+**How the escapes are counted now** (estiva-ui 0.36.0, Katerina's rulings B1
+and B3, 25 September). The numbers above are the history of each ticket; they
+are not kept current by hand. Every escape names the rules it keeps off,
+`// @estiva-escape(<rule>): <reason>`, and `npm run gates:status -- --escapes`
+lists every one from the code, with its age from git; `npm run gates:status`
+shows the ones older than 30 days, to keep with a new reason or fix.
+
+## Folders the gate does not read
+
+None. CI's job `gate` (`estiva-gates ci`) fails on a folder the gate skips that
+is not named here (B11, B13).
