@@ -35,7 +35,7 @@ export interface IssuesTableProps {
 // else in a cell, the date included, is body-2, the table's own 14 (Katerina,
 // 2026-08-26). These were arbitrary values while tailwind-merge dropped a
 // token size beside a colour class; the package's cn() names the ramp now.
-// @estiva-escape: B3 (Katerina, 24 September: record only): a table header in the label style Property also uses; a table part is for later
+// @estiva-escape(no-copied-look): B3 (Katerina, 24 September: record only): a table header in the label style Property also uses; a table part is for later
 const TH_CLASSES = 'h-9 px-3 text-left text-menu font-medium uppercase tracking-widest text-text-secondary'
 const TD = 'h-10 px-3 text-body-2'
 const SMALL = 'text-caption'

@@ -74,7 +74,7 @@ export function DescriptionEditor({
   const empty = value.trim() === ''
 
   const reading = (
-    // @estiva-escape: a click-to-edit surface holding headings and lists, which a button cannot hold; Tab reaches it and Enter opens it since the Edit button went (D37, UIG-8)
+    // @estiva-escape(no-raw-element, no-rebuilt-behaviour): a click-to-edit surface holding headings and lists, which a button cannot hold; Tab reaches it and Enter opens it since the Edit button went (D37, UIG-8)
     <div
       /* Named for the browser test. `smoke.ts` used to find this surface by the
          screen-reader-only "Edit description" button, and D37 deleted that
