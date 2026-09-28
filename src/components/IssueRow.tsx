@@ -19,10 +19,11 @@ import { linkTo } from '@/router'
  * (2026-08-26); the description is the issue page's now.
  *
  * Two links, and no link inside a link: the issue link is the ref, the
- * shape and the title, and it stretches over the whole row (its `after:`
- * covers the box), so a click anywhere opens the issue — except on the
- * project chip, which is its own link to the project and sits above the
- * stretch (her ask, 2026-09-09). Her second pass the same day: 12px at the
+ * shape and the title, and it covers the whole row (the package's `Link`
+ * `cover`, UIG-33), so a click anywhere opens the issue and the keyboard ring
+ * goes round the row — except on the project chip, which is its own link to
+ * the project (the package's `Chip` `href`) and sits above the cover (her
+ * ask, 2026-09-09). Her second pass the same day: 12px at the
  * sides, 6px between the shape and the title, the title at 400 as the
  * table's is, and 36px tall. The count sits inline rather than on a second
  * line so every row is one height.
@@ -64,8 +65,7 @@ export function IssueRow({ issue, statuses, href, className }: IssueRowProps) {
   const threads = issue.conversations ?? 0
   return (
     <div className={cn('relative flex h-9 min-w-0 items-center gap-3 rounded-md px-3 transition-colors hover:bg-bg-hover', className)}>
-      {/* @estiva-escape(no-restyled-part): the link covers the whole row with an after: layer, so the project chip can be a second link above it and never inside it; Link has no covering layer of its own (UIG-9, Katerina 17 September; UIG-14) */}
-      <Link {...linkTo(href)} variant="plain" className="flex min-w-0 flex-1 items-center gap-3 after:absolute after:inset-0">
+      <Link {...linkTo(href)} variant="plain" cover className="flex min-w-0 flex-1 items-center gap-3">
         {/* `w-14`: 56px, the room the project table's ref cell has (S25), so
             the two surfaces line up. */}
         {/* @estiva-escape(no-copied-look): B5 (Katerina, 24 September: record only): an issue's ref in the mono caption style Breadcrumb's id also uses */}
@@ -79,10 +79,7 @@ export function IssueRow({ issue, statuses, href, className }: IssueRowProps) {
           about the issue, then where it lives, then who and when. */}
       <ConversationCount count={threads} unit="conversation" />
       {issue.project && (
-        // @estiva-escape(no-restyled-part): a second link lifted over the row's own, with the chip's round focus ring; kept with the row link (UIG-9, Katerina 17 September)
-        <Link {...linkTo(issue.project.href)} variant="plain" className="relative z-10 shrink-0 rounded-full">
-          <Chip label={issue.project.title} leadingIcon={<IconBox size={12} stroke={1.5} />} className="max-w-[200px]" />
-        </Link>
+        <Chip {...linkTo(issue.project.href)} label={issue.project.title} leadingIcon={<IconBox size={12} stroke={1.5} />} className="max-w-[200px] shrink-0" />
       )}
       {issue.assignee && <Avatar name={issue.assignee.name} src={issue.assignee.picture} size={16} label={issue.assignee.name} />}
       {/* A fixed column, right-aligned, so the times stack down the list. */}

@@ -18,6 +18,11 @@ import { linkTo } from '@/router'
  *
  * A missing ref is an em dash (audit L2); people are faces and names, never
  * keys; a status the vocabulary does not know is shown raw.
+ *
+ * A row opens its issue wherever it is clicked, as the list's row does: the
+ * title is the package's `Link` with `cover`, over a `relative` row (UIG-33,
+ * Katerina 28 September). Before, the whole row lit up on hover while only
+ * the title opened anything.
  */
 export interface IssuesTableRow extends IssueRowData {
   openedBy: { name?: string; picture?: string }
@@ -78,7 +83,7 @@ export function IssuesTable({ issues, statuses, hrefFor, className }: IssuesTabl
         </thead>
         <tbody>
           {issues.map((issue) => (
-            <tr key={issue.addr} className="border-b border-border-subtle last:border-b-0 hover:bg-bg-hover">
+            <tr key={issue.addr} className="relative border-b border-border-subtle last:border-b-0 hover:bg-bg-hover">
               {/* A dash while Ship has not numbered this one yet — an issue created
                   through the manifest by another app arrives without a key, and
                   the project page assigns one. Nothing to click: it is the
@@ -86,7 +91,7 @@ export function IssuesTable({ issues, statuses, hrefFor, className }: IssuesTabl
               <td className={cn(TD, 'whitespace-nowrap font-mono', SMALL, issue.ref ? 'text-text-muted' : 'text-text-disabled')}>{issue.ref ?? '—'}</td>
               <td className={TD}>
                 <div className="text-text-primary">
-                  <Link {...linkTo(hrefFor(issue))} variant="quiet" truncate className="block">
+                  <Link {...linkTo(hrefFor(issue))} variant="quiet" truncate cover className="block">
                     {issue.title}
                   </Link>
                 </div>
