@@ -51,9 +51,9 @@ import { DescriptionEditor } from '@/components/ui/DescriptionEditor'
 
 - **Blur commits. Escape reverts. Enter does not commit** — it makes a
   paragraph, because that is what Enter does in a document.
-- **Reading and writing kept 1:1 by sharing the styles**, not by care:
-  `PROSE_BLOCKS` is applied to both wrappers and addresses elements both
-  surfaces emit.
+- **Reading and writing kept 1:1 by sharing the look**, not by care: the
+  package's RichText draws the reading surface, and the writing surface wears
+  the same classes, `richTextClassName()`.
 - **A reader never downloads an editor.** The writing surface loads on the
   first click, and the fallback while it loads is the reading surface itself —
   the same pixels, so the fetch shows as nothing rather than as a spinner.

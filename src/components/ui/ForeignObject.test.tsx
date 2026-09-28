@@ -33,21 +33,23 @@ describe('ForeignObject', () => {
     expect(screen.getByText('hello there')).toBeInTheDocument()
   })
 
-  it('shows a body as text, never as markup', () => {
-    // Ship's discipline, and it has to survive contact with another app's
-    // content: 41% of production messages carry markdown.
+  it('draws a body formatted and small, and markup in it stays text', () => {
+    // Formatted since UIG-30 (Katerina, 28 September): the package's RichText,
+    // small. Ship's discipline survives it: a tag another app wrote is text.
     render(
       <ForeignObject
         object={base({
           kind: 9,
           widget: ['message', 'card'],
-          slots: { title: { value: 'a'.repeat(64), isPubkey: true }, body: { value: '**bold** and `code`' } },
+          slots: { title: { value: 'a'.repeat(64), isPubkey: true }, body: { value: '**bold** and `code` and <b>not bold</b>' } },
         })}
       />,
     )
-    expect(screen.getByText('**bold** and `code`')).toBeInTheDocument()
-    expect(document.querySelector('strong')).toBeNull()
-    expect(document.querySelector('code')).toBeNull()
+    expect(document.querySelector('strong')?.textContent).toBe('bold')
+    expect(document.querySelector('code')?.textContent).toBe('code')
+    expect(document.querySelector('b')).toBeNull()
+    expect(document.body.textContent).toContain('<b>not bold</b>')
+    expect(document.querySelector('[data-rich-text]')?.className).toContain('text-caption')
   })
 
   it('renders an unknown widget rather than refusing', () => {

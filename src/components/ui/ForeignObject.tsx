@@ -1,4 +1,3 @@
-import { stripNaddrs } from '@estiva-app/protocol'
 import { Card, Link } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
 import { Avatar } from './Avatar'
@@ -7,6 +6,7 @@ import { ConversationCount } from './ConversationCount'
 import { EmptyState } from './EmptyState'
 import { Person } from './Person'
 import { StatusLabel } from './StatusLabel'
+import { RichText } from './RichText'
 import { pickWidget } from '@/api/foreign'
 import type { ForeignObject as ForeignObjectData, ResolvedSlot } from '@/api/foreign'
 
@@ -22,14 +22,15 @@ import type { ForeignObject as ForeignObjectData, ResolvedSlot } from '@/api/for
  * of children, and a widget *hint*. What does not arrive is layout — an owner
  * who could specify that would be designing Ship's product.
  *
- * ## Ship renders a foreign body as text, and that survives here
+ * ## A foreign message's body is formatted, small
  *
  * Ship's rule is that a body is "untrusted text from other people and other
- * apps: rendered as text, never as markup". 41% of production messages carry
- * markdown, so this deliberately shows it raw rather than parsing it. That is
- * not an omission to fix later — RIC-1 decides the format, and until it does,
- * inventing a parser here would be the third private dialect in the workspace
- * (RFC 0.4 §14.2).
+ * apps: rendered as text, never as markup". It used to be shown raw, because
+ * RIC-1 had not decided the format and a parser here would have been a third
+ * private dialect (RFC 0.4 §14.2). It has decided: `toRenderTree` resolves the
+ * body, and the package's `RichText` draws it as text, in the `small` size an
+ * item inside a card takes (Katerina, 28 September, UIG-30). Nothing is ever
+ * set as markup.
  */
 
 /**
@@ -143,18 +144,14 @@ function ForeignMessage({ object, className }: ForeignObjectProps) {
             {profile?.displayName ?? '—'}
           </span>
         </div>
-        {/* Text, never markup. See the note at the top of this file. */}
         {/*
-          References are stripped from a body for the same reason as the
-          description above: bech32 is not readable, and a message that is
-          *only* a reference then renders as an empty line rather than a wall
-          of it. Rendering the referenced object here instead is inline
-          transclusion — §6 anchoring, RIC-1, deliberately not this ticket.
+          Formatted, never markup. See the note at the top of this file. A
+          pointer alone on its line leaves the text, so a message that is only
+          one draws nothing rather than a line of bech32; one inside a sentence
+          stays, as a chip.
         */}
-        {object.slots.body && stripNaddrs(object.slots.body.value).trim() && (
-          <p className="whitespace-pre-wrap break-words text-body-2 text-text-primary">
-            {stripNaddrs(object.slots.body.value).trim()}
-          </p>
+        {object.slots.body && (
+          <RichText value={object.slots.body.value} format={object.slots.body.format ?? 'marker'} size="small" hideStandalone />
         )}
       </div>
     </div>

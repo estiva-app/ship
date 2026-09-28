@@ -498,7 +498,6 @@ export function MessageCard({
         hideStandalone={(reference) => resolved?.[reference] !== null}
         nameOf={nameOf}
         resolved={resolved}
-        className="break-words text-body-2 text-text-primary"
       />
       )}
       {/*

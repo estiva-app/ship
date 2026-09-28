@@ -4,14 +4,13 @@ import StarterKit from '@tiptap/starter-kit'
 import { TableKit } from '@tiptap/extension-table'
 import { IconPaperclip, IconTable } from '@tabler/icons-react'
 import type { ContentFormat, Imeta } from '@estiva-app/protocol'
-import { FieldLine, FilePicker } from '@estiva-app/ui'
+import { FieldLine, FilePicker, richTextClassName } from '@estiva-app/ui'
 import type { ForeignObject } from '@/api/foreign'
 import { cn } from '@/lib/cn'
 import { documentFor, publishableFrom, toEditorDocument, type EditorDocument } from '@/lib/blockEditor'
 import { AttachmentNode, BlockId, ReferenceNode, ReferenceProvider, UnknownBlock } from './editorSchema'
 import { uploadAttachment } from '@/api/blobs'
 import { IconButton } from './IconButton'
-import { PROSE_BLOCKS } from './prose'
 
 /**
  * The writing half of {@link DescriptionEditor} — RIC-14.
@@ -135,7 +134,8 @@ export default function DescriptionEditing({
           'aria-label': 'Description',
           role: 'textbox',
           'aria-multiline': 'true',
-          class: cn(PROSE_BLOCKS, 'outline-none'),
+          // RichText's look, so the description reads the same while it is written (UIG-30).
+          class: richTextClassName('default', 'outline-none'),
         },
       },
       /*
