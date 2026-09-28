@@ -72,7 +72,7 @@ export function NewProjectDialog({ teams, onClose, onCreate }: NewProjectDialogP
         </>
       }
     >
-      <Form id="new-project" onSubmit={submit} busy={busy} className="flex flex-col gap-6">
+      <Form id="new-project" onSubmit={submit} busy={busy}>
         <Field label="Title" required>
           <TextInput value={title} onChange={(e) => setTitle(e.target.value)} placeholder="New project title" autoFocus />
         </Field>

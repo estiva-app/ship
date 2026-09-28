@@ -73,7 +73,7 @@ export function NewIssueDialog({ projects, project, onClose, onCreate }: NewIssu
       {none ? (
         <EmptyState scope="section" message="Create a project first." />
       ) : (
-        <Form id="new-issue" onSubmit={submit} busy={busy} className="flex flex-col gap-6">
+        <Form id="new-issue" onSubmit={submit} busy={busy}>
           <Field label="Title" required>
             <TextInput value={title} onChange={(e) => setTitle(e.target.value)} placeholder={project ? `New issue in ${project.title}` : 'Issue title'} autoFocus />
           </Field>

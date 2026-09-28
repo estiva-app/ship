@@ -358,8 +358,8 @@ function EditMessage({
   }
 
   return (
-    // The package Form (UIG-7): Ctrl+Enter or Save saves; Enter in the text is a new line; it locks while saving.
-    <Form busy={saving} onSubmit={save} className="flex flex-col gap-1.5" data-editing={body ? 'message' : 'message'}>
+    // The package Form (UIG-7): Ctrl+Enter or Save saves; Enter in the text is a new line; it locks while saving. `free`: an edit box and its buttons, not a list of fields.
+    <Form busy={saving} onSubmit={save} layout="free" className="flex flex-col gap-1.5" data-editing={body ? 'message' : 'message'}>
       <Textarea
         value={text}
         autoFocus
