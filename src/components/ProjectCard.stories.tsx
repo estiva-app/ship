@@ -104,6 +104,7 @@ export const InTheList: Story = {
 export const NothingArchived: Story = {
   parameters: { layout: 'fullscreen' },
   render: () => (
+    // @estiva-escape(no-handmade-empty-state): the story's stage, the projects view's own padding round the tab it stands for (UIG-42)
     <div className="flex w-full flex-col gap-4 p-6">
       <EmptyState message="Nothing archived." />
     </div>
