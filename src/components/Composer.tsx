@@ -164,8 +164,8 @@ export function Composer({ kind = 'conversation', onSubmit, autoFocus = false, d
   const blocked = disabledReason || (uploading ? 'Uploading…' : undefined)
 
   return (
-    // `busy` locks the field, both buttons and the cards' ✕ while a post is in flight (UIG-7).
-    <Form onSubmit={submit} busy={busy} className={cn('flex flex-col gap-1', className)}>
+    // `busy` locks the field, both buttons and the cards' ✕ while a post is in flight (UIG-7). `free`: a composer, not a list of fields.
+    <Form onSubmit={submit} busy={busy} layout="free" className={cn('flex flex-col gap-1', className)}>
       <div className="flex items-center gap-2">
         <TextInput
           value={text}
