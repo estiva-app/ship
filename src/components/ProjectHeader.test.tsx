@@ -34,7 +34,7 @@ describe('ProjectHeader draws its description', () => {
   it('renders structure as elements', () => {
     const c = show('# Heading\n\n- one\n- two\n\nand `code`')
     // The element, not the class. RIC-14 moved the type styles onto the
-    // wrapper (`PROSE_BLOCKS`) so the editor and the reader cannot be styled
+    // wrapper (now the package's `richTextClassName`) so the editor and the reader cannot be styled
     // apart, which means a heading is an `<h1>` here rather than a styled div.
     expect(c.querySelector('h1, h2')).not.toBeNull()
     expect(c.querySelectorAll('li')).toHaveLength(2)

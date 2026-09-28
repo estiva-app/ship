@@ -5,15 +5,18 @@ import * as RichTextStories from './RichText.stories'
 
 # RichText
 
-A body, drawn — every block and mark SPEC §13 defines, in both content models.
-Every string reaches the DOM as a React child, so a body written by somebody
-else on a shared relay is safe by construction rather than by care.
+A body, drawn — every block and mark SPEC §13 defines, in both content models,
+through the package's RichText. Every string reaches the DOM as a React child,
+so a body written by somebody else on a shared relay is safe by construction
+rather than by care.
 
 <Canvas of={RichTextStories.MarkerBody} />
 
 ## When
 
 - Any body that came off the relay: a message, a description, another app's.
+- `size="small"` — another app's message inside a card: the same text one step
+  down, every structure kept.
 - Whenever you have the format from the event's own tag. The caller reads it
   off the fold and passes it on.
 
@@ -26,7 +29,7 @@ else on a shared relay is safe by construction rather than by care.
 - Do not expect a table in marker text. §13.2 has no table, so `| a | b |`
   stays the line somebody typed — that is the protocol's ruling, not Ship's.
 - For the editor as well as the rendering → **DescriptionEditor**, which wears
-  the same block styles.
+  the same look (`richTextClassName`).
 
 ## How
 
@@ -44,18 +47,14 @@ import { RichText } from '@/components/ui/RichText'
 
 ## What it owns
 
-- **Tables**, since 22 September. The protocol names `table` and not its
-  parts, so the nesting is the editor's — ProseMirror's names — and a first row
-  of header cells becomes a `thead`. A table written some other way still
-  renders its text.
-- **One element per block**, unstyled, with the look coming from `PROSE_BLOCKS`
-  — the same styles the editor wears, so neither surface can be restyled
-  without the other.
-- **The fallback for a block it has never heard of**: its inline text is drawn,
-  never dropped, because a block that vanishes is indistinguishable from one the
-  reader is not allowed to see.
-- **`strong` / `em` / `u`, not `b` / `i`.** The mark is meaning, and a literal
-  `<b>` typed by an author never reaches the DOM as one.
+- **What is Ship's in a body**: a person or an item a run points at
+  (`Reference`), a file (`Attachment`), and which standalone pointers leave the
+  text. Everything else — the look, tables, links, the fallback for a block it
+  has never heard of — is the package's `RichText` (UIG-30, Katerina,
+  28 September), the same part Peek draws with.
+- **The look is the one the editor wears**: `richTextClassName()` on
+  DescriptionEditor's writing surface, so neither can be restyled without the
+  other.
 
 ## Props
 

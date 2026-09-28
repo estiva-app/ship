@@ -23,8 +23,9 @@ import { RichText } from './RichText'
  * ## Why there are still two surfaces under here
  *
  * Reading is `RichText` and writing is ProseMirror, and they are kept 1:1 by
- * **sharing the styles rather than by care** — `PROSE_BLOCKS`, applied to both
- * wrappers, addressing elements that both surfaces emit. RIC-9 is what happens
+ * **sharing the look rather than by care** — the package's RichText draws the
+ * reading surface and the writing surface wears `richTextClassName()`, the same
+ * classes, addressing elements that both surfaces emit (UIG-30). RIC-9 is what happens
  * when two surfaces are meant to match and nothing makes them: every suite
  * green while one of them quietly lacked a feature.
  *
