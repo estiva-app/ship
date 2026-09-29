@@ -26,7 +26,7 @@ import {
   projectAddr,
 } from './events'
 import { findNaddrs, naddrToAddr, buildReaction, buildEdit, buildDeletion as buildEventDeletion } from '@estiva-app/protocol'
-import { planMoveFile, planPlaceFile, planUnlistFile, type FolderRef, type MoveRefusal } from '@estiva-app/interop'
+import { planCreateFolder, planMoveFile, planPlaceFile, planRenameFolder, planUnlistFile, type FolderRef, type MoveRefusal } from '@estiva-app/interop'
 import { foldFolder, projectFolders, type FolderState } from './fold'
 import { anchorIndex, type AnchorIndex } from './references'
 import { foldEdits, type EditIndex } from './edits'
@@ -228,6 +228,48 @@ export class Store {
   }
 
   /**
+   * Create a top-level Folder — FOL-8, RFC 0.4 §4.1: `kind:9007`, then
+   * `kind:1852 add + name` listing nothing, planned by `planCreateFolder`.
+   *
+   * **Peek's `createFolderAsViewer`, event for event**, so a Folder made here
+   * and one made there are the same wire object: no visibility (the relay's
+   * default, open) and no channel type. The command gives it state from birth,
+   * which is what makes it a top-level Folder in both apps' navigation — the
+   * listings show only Folders with state that nothing lists.
+   *
+   * Published in order, stopping at the first refusal; `refusedAt` is its
+   * index. 0 is no Folder at all; 1 is a channel that exists by its id and is
+   * listed nowhere.
+   */
+  async createFolder(name: string): Promise<{ id: string; refusedAt?: number; result: PublishResult }> {
+    const id = crypto.randomUUID()
+    const { refusedAt, result } = await this.publishInOrder(planCreateFolder(this.signer.pubkey, Date.now(), { folder: id, name }))
+    return { id, ...(refusedAt === undefined ? {} : { refusedAt }), result }
+  }
+
+  /**
+   * Rename a Folder — FOL-8: `kind:9002`, and `kind:1852 add + name` when it
+   * has state, planned by `planRenameFolder` as Peek's `renameFolderAsViewer`
+   * does. A Folder's name has two homes and the state's shadows the channel's,
+   * so both are written; `hasState` is from a read, because a command against a
+   * Folder with none would empty it.
+   */
+  async renameFolder(args: { folder: string; name: string; hasState: boolean }): Promise<{ refusedAt?: number; result: PublishResult }> {
+    assertFolderId(args.folder)
+    return this.publishInOrder(planRenameFolder(this.signer.pubkey, Date.now(), args))
+  }
+
+  /** Publish a Folder plan in order, stopping at the first refusal — each later event assumes the earlier ones were accepted. */
+  private async publishInOrder(events: UnsignedEvent[]): Promise<{ refusedAt?: number; result: PublishResult }> {
+    let result: PublishResult = { ok: true }
+    for (const [index, event] of events.entries()) {
+      result = await this.publish(event)
+      if (!result.ok) return { refusedAt: index, result }
+    }
+    return { result }
+  }
+
+  /**
    * Create a project in a team — SPEC §6.7, RFC 0.5 §10.5 (FOL-2).
    *
    * **No Folder of its own.** It used to be paired with one: a fresh
@@ -270,11 +312,7 @@ export class Store {
     )
     if (!result.ok) return { result, addr, id, folder }
 
-    let placed: PublishResult | undefined
-    for (const command of planPlaceFile(this.signer.pubkey, Date.now(), { folder, address: addr, hasState: args.team.hasState })) {
-      placed = await this.publish(command)
-      if (!placed.ok) break
-    }
+    const { result: placed } = await this.publishInOrder(planPlaceFile(this.signer.pubkey, Date.now(), { folder, address: addr, hasState: args.team.hasState }))
     return { result, placed, addr, id, folder }
   }
 

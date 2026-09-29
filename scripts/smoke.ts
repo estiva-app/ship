@@ -1081,6 +1081,46 @@ async function main() {
     moveWrites.map((e) => `${e.kind} ${tagValue(e, 'op')} ${tagValue(e, 'h')?.slice(0, 8)}`).join(' | ') || 'nothing published',
   )
 
+  // ── New folder, and rename it (FOL-8) ─────────────────────────────────────
+  // Peek's two writes, event for event: 9007 then 1852 add naming it; then
+  // 9002 and 1852 add with the new name, because the Folder has state.
+  const beforeCreate = stored.length
+  await sidebar().getByRole('button', { name: 'New folder' }).click()
+  const folderDialog = page.getByRole('dialog', { name: 'New folder' })
+  await folderDialog.waitFor()
+  await folderDialog.getByRole('textbox', { name: 'Folder name' }).fill('Smoke folder')
+  await folderDialog.getByRole('button', { name: 'Create folder' }).click()
+  await folderDialog.waitFor({ state: 'detached' })
+  const createWrites = stored.slice(beforeCreate).filter((e) => e.kind === 9007 || e.kind === 1852)
+  const newFolderId = (createWrites[0] && tagValue(createWrites[0], 'h')) ?? ''
+  check(
+    '"New folder" publishes a kind:9007, then a kind:1852 add naming it on the same id',
+    createWrites.map((e) => `${e.kind} ${tagValue(e, 'op') ?? '-'} ${tagValue(e, 'name')} ${tagValue(e, 'h') === newFolderId}`).join(' | ') ===
+      '9007 - Smoke folder true | 1852 add Smoke folder true',
+    createWrites.map((e) => `${e.kind} ${tagValue(e, 'op') ?? '-'} ${tagValue(e, 'name')}`).join(' | ') || 'nothing published',
+  )
+  check('  …and opens the new Folder', !!newFolderId && page.url().endsWith(`/folder/${newFolderId}`), page.url())
+
+  // The stub does not derive a channel or state from commands; write them as the relay would have.
+  seed({ kind: 39000, tags: [['d', newFolderId], ['name', 'Smoke folder']] })
+  seed({ kind: 30890, tags: [['d', newFolderId], ['name', 'Smoke folder']] })
+  // A fresh load, so the page reads what was just seeded.
+  await page.goto(`http://localhost:${PORT}/#/folder/${newFolderId}`)
+  await page.waitForSelector(`[data-folder="${newFolderId}"]`)
+  const beforeRename = stored.length
+  await page.getByRole('button', { name: 'Edit folder name' }).click()
+  const nameField = page.getByRole('textbox', { name: 'Folder name' })
+  await nameField.fill('Smoke folder renamed')
+  await nameField.press('Enter')
+  await nameField.waitFor({ state: 'detached' })
+  const renameWrites = stored.slice(beforeRename).filter((e) => e.kind === 9002 || e.kind === 1852)
+  check(
+    'renaming it from its title publishes a kind:9002, then a kind:1852 add with the new name',
+    renameWrites.map((e) => `${e.kind} ${tagValue(e, 'op') ?? '-'} ${tagValue(e, 'name')} ${tagValue(e, 'h') === newFolderId}`).join(' | ') ===
+      '9002 - Smoke folder renamed true | 1852 add Smoke folder renamed true',
+    renameWrites.map((e) => `${e.kind} ${tagValue(e, 'op') ?? '-'} ${tagValue(e, 'name')}`).join(' | ') || 'nothing published',
+  )
+
   await page.goto(`http://localhost:${PORT}/#/project/${encodeURIComponent(projectAddr)}`)
   await page.waitForSelector('[data-surface="project"]')
   await page.getByRole('button', { name: 'Delete project' }).click()

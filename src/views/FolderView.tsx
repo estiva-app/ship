@@ -1,4 +1,5 @@
 import type { FolderContents } from '@/api/foreign'
+import { EditableText } from '@/components/ui/EditableText'
 import { ForeignObject } from '@/components/ui/ForeignObject'
 import { splitByKind } from '@/lib/ownKinds'
 
@@ -33,12 +34,33 @@ import { splitByKind } from '@/lib/ownKinds'
  * another, which is exactly what §5's "a file is anything with an address that
  * a folder can list" rules out.
  */
-export function FolderView({ folder }: { folder: FolderContents }) {
+export function FolderView({ folder, onRename }: {
+  folder: FolderContents
+  /**
+   * The title is click-to-edit, as a project's is (FOL-8). Resolves whether the
+   * relay took it; absent, the title is text.
+   */
+  onRename?: (name: string) => Promise<boolean> | boolean
+}) {
   const { own, foreign } = splitByKind(folder.files)
   return (
     <div className="flex flex-col gap-4 p-6" data-surface="folder" data-folder={folder.id} data-source={folder.source}>
       <div className="flex flex-col gap-1">
-        <h1 className="text-h3 text-text-primary">{folder.name ?? 'Folder'}</h1>
+        {onRename ? (
+          /*
+            Still the page's heading: EditableText takes its size from where it
+            sits (UIG-9), and editable it draws a button or an input, both of
+            which an `h1` may hold. Only its read-only form is a `div`, and
+            this one is never read-only. Named for the Folder, because the
+            button's own name ("Edit folder name") would otherwise be the
+            heading's.
+          */
+          <h1 className="text-h3 text-text-primary" aria-label={folder.name ?? 'Untitled folder'}>
+            <EditableText label="Folder name" value={folder.name ?? ''} placeholder="Untitled folder" onCommit={onRename} className="-mx-2" />
+          </h1>
+        ) : (
+          <h1 className="text-h3 text-text-primary">{folder.name ?? 'Folder'}</h1>
+        )}
         <p className="text-caption text-text-muted" data-own={own.length} data-foreign={foreign.length}>
           {countLine(own.length, foreign.length)}
           {/*

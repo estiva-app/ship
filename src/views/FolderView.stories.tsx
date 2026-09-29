@@ -94,3 +94,9 @@ export const Empty: Story = { args: { folder: folder({ files: [] }) } }
 
 /** No name: a Folder with no state has only its channel's, and may have none. */
 export const Unnamed: Story = { args: { folder: folder({ name: undefined }) } }
+
+/** The title is click-to-edit (FOL-8), as a project's is; Enter renames, Escape leaves it. */
+export const Renameable: Story = { args: { onRename: () => true } }
+
+/** Renameable with no name: the placeholder says what it is. */
+export const RenameableUnnamed: Story = { args: { folder: folder({ name: undefined }), onRename: () => true } }

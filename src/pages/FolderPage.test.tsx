@@ -11,9 +11,16 @@
  * The fixtures still include a kind neither app designed for, and now it is
  * there to pin the *other* side: "not mine" has no list of kinds in it.
  */
-import { render, screen, waitFor } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { FolderPage } from './FolderPage'
+
+// The rename's write and the sidebar's listing: what is under test is which Folder, which name and which `hasState` they get.
+const renameFolder = vi.fn()
+const reloadFolders = vi.fn(async () => {})
+vi.mock('@/api', () => ({ renameFolder: (...args: unknown[]) => renameFolder(...args) }))
+vi.mock('@/api/useFolders', () => ({ reloadFolders: () => reloadFolders() }))
+const say = vi.fn()
 
 /*
   `pickWidget` comes straight from the runtime rather than through the real
@@ -65,7 +72,7 @@ describe('FolderPage', () => {
     readFolder.mockImplementation(
       () => new Promise((_resolve, reject) => setTimeout(() => reject(new Error('nope')), 0)),
     )
-    render(<FolderPage id="f1" />)
+    render(<FolderPage id="f1" say={say} />)
     await waitFor(() => expect(screen.getByText('This folder could not be read.')).toBeInTheDocument())
   })
 
@@ -79,7 +86,7 @@ describe('FolderPage', () => {
         ],
       }),
     )
-    render(<FolderPage id="f1" />)
+    render(<FolderPage id="f1" say={say} />)
     await waitFor(() => expect(screen.getByText('Onboarding work')).toBeInTheDocument())
     expect(screen.getByText('Broken link')).toBeInTheDocument()
     // Navigation is by kind (§10.7): the topic is not a peer in Ship's tree —
@@ -97,7 +104,7 @@ describe('FolderPage', () => {
         files: [1, 2, 3, 4].map((n) => file({ ref: `t${n}`, kind: 30840, appName: 'File', slots: { title: { value: `Topic ${n}` } } })),
       }),
     )
-    render(<FolderPage id="f1" />)
+    render(<FolderPage id="f1" say={say} />)
     await waitFor(() => expect(screen.getByText('No projects or issues here · 4 other files, listed in Peek')).toBeInTheDocument())
     expect(screen.queryByText('Nothing in this folder yet.')).not.toBeInTheDocument()
     expect(document.querySelectorAll('[data-foreign-object]')).toHaveLength(0)
@@ -114,7 +121,7 @@ describe('FolderPage', () => {
         ],
       }),
     )
-    render(<FolderPage id="f1" />)
+    render(<FolderPage id="f1" say={say} />)
     await waitFor(() => expect(screen.getByText('Onboarding work')).toBeInTheDocument())
     expect(screen.queryByText('Spring tides')).not.toBeInTheDocument()
     expect(screen.getByText('1 file · 1 other file, listed in Peek')).toBeInTheDocument()
@@ -124,13 +131,88 @@ describe('FolderPage', () => {
     // The visible symptom of the approximation is a short list; without this
     // line nothing on screen would say why a topic is missing.
     readFolder.mockResolvedValue(folder({ hasState: false, source: 'channel' }))
-    render(<FolderPage id="f1" />)
+    render(<FolderPage id="f1" say={say} />)
     await waitFor(() => expect(screen.getByText(/no folder state yet/)).toBeInTheDocument())
   })
 
   it('an empty folder says so rather than rendering nothing', async () => {
     readFolder.mockResolvedValue(folder({ files: [] }))
-    render(<FolderPage id="f1" />)
+    render(<FolderPage id="f1" say={say} />)
     await waitFor(() => expect(screen.getByText('Nothing in this folder yet.')).toBeInTheDocument())
+  })
+})
+
+describe('FolderPage renames its Folder (FOL-8)', () => {
+  beforeEach(() => {
+    renameFolder.mockReset()
+    reloadFolders.mockClear()
+    readFolder.mockReset()
+    say.mockReset()
+  })
+
+  const rename = async (to: string) => {
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit folder name' }))
+    const field = screen.getByRole('textbox', { name: 'Folder name' })
+    fireEvent.change(field, { target: { value: to } })
+    fireEvent.keyDown(field, { key: 'Enter' })
+  }
+
+  it('writes the new name with the hasState its own read found, then shows what the relay holds', async () => {
+    readFolder.mockResolvedValueOnce(folder()).mockResolvedValueOnce(folder()).mockResolvedValueOnce(folder({ name: 'Onboarding 2' }))
+    renameFolder.mockResolvedValue({ ok: true })
+    render(<FolderPage id="f1" say={say} />)
+    expect(await screen.findByRole('heading', { name: 'Onboarding' })).toBeInTheDocument()
+    await rename('Onboarding 2')
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Onboarding 2' })).toBeInTheDocument())
+    expect(renameFolder).toHaveBeenCalledWith({ id: 'f1', hasState: true }, 'Onboarding 2')
+    // Read again, not assumed: before the write for `hasState`, after it for the name, and the sidebar's listing.
+    expect(readFolder).toHaveBeenCalledTimes(3)
+    expect(reloadFolders).toHaveBeenCalledTimes(1)
+  })
+
+  it('a Folder with no state is renamed as one — a command would empty it', async () => {
+    readFolder.mockResolvedValue(folder({ hasState: false, source: 'channel' }))
+    renameFolder.mockResolvedValue({ ok: true })
+    render(<FolderPage id="f1" say={say} />)
+    await rename('Renamed')
+    await waitFor(() => expect(renameFolder).toHaveBeenCalledWith({ id: 'f1', hasState: false }, 'Renamed'))
+  })
+
+  it('hasState is read at the rename, not taken from when the page opened', async () => {
+    // Opened with none; another app has given it state since.
+    readFolder.mockResolvedValueOnce(folder({ hasState: false, source: 'channel' })).mockResolvedValue(folder())
+    renameFolder.mockResolvedValue({ ok: true })
+    render(<FolderPage id="f1" say={say} />)
+    await rename('Renamed')
+    await waitFor(() => expect(renameFolder).toHaveBeenCalledWith({ id: 'f1', hasState: true }, 'Renamed'))
+  })
+
+  it('an accepted rename that cannot be read back says so rather than showing the old name as though nothing happened', async () => {
+    readFolder
+      .mockResolvedValueOnce(folder())
+      .mockResolvedValueOnce(folder())
+      .mockImplementationOnce(() => new Promise((_resolve, reject) => setTimeout(() => reject(new Error('rate-limited')), 0)))
+    renameFolder.mockResolvedValue({ ok: true })
+    render(<FolderPage id="f1" say={say} />)
+    await rename('Onboarding 2')
+    await waitFor(() => expect(say).toHaveBeenCalledWith('Renamed to Onboarding 2, but the folder could not be read back — reload to see it.', 'error'))
+  })
+
+  it('a refusal is said with its reason, the field stays open, and nothing is re-read', async () => {
+    readFolder.mockResolvedValue(folder())
+    renameFolder.mockResolvedValue({ ok: false, reason: 'restricted: not an admin' })
+    render(<FolderPage id="f1" say={say} />)
+    await rename('Nope')
+    await waitFor(() => expect(say).toHaveBeenCalledWith('Rename rejected — restricted: not an admin', 'error'))
+    expect(screen.getByRole('textbox', { name: 'Folder name' })).toBeInTheDocument()
+    expect(reloadFolders).not.toHaveBeenCalled()
+  })
+
+  it('an empty name is refused before anything is sent', async () => {
+    readFolder.mockResolvedValue(folder())
+    render(<FolderPage id="f1" say={say} />)
+    await rename('   ')
+    await waitFor(() => expect(say).toHaveBeenCalledWith('A folder needs a name.', 'error'))
+    expect(renameFolder).not.toHaveBeenCalled()
   })
 })
