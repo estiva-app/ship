@@ -10,12 +10,16 @@ const PROJECTS: SidebarProject[] = [
   { addr: '30850:a:mob', title: 'Mobile app', href: '#/p/mob', openCount: 0 },
 ]
 
-/** The teams as the sidebar sees them: a name, and deliberately no count. */
+/**
+ * The teams as the sidebar sees them: a name, what the team's state lists
+ * (FOL-5), and deliberately no count. A state lists topics too; the sidebar
+ * draws only the projects it holds.
+ */
 const FOLDERS: SidebarFolder[] = [
-  { id: '7b32200c-e4c0-4216-b79a-8490fc05e0bd', name: 'Ship' },
-  { id: '0212db6d-bcbf-40d0-890e-f4f056db2f5d', name: 'Estiva HQ' },
+  { id: '7b32200c-e4c0-4216-b79a-8490fc05e0bd', name: 'Ship', addresses: ['30850:a:rel', '30850:a:pay', '39000:r:ship-talk'] },
+  { id: '0212db6d-bcbf-40d0-890e-f4f056db2f5d', name: 'Estiva HQ', addresses: ['30850:a:des', '30850:a:onb'] },
 ]
-/** The same projects, each under a team (SHI-25); the last one under none. */
+/** The same projects, each with its own Folder; the last one in no team. */
 const FILED: SidebarProject[] = [
   { ...PROJECTS[0]!, folder: '0212db6d-bcbf-40d0-890e-f4f056db2f5d' },
   { ...PROJECTS[1]!, folder: '7b32200c-e4c0-4216-b79a-8490fc05e0bd' },
@@ -59,8 +63,9 @@ export const OnAProject: Story = { args: { current: { projectAddr: '30850:a:rel'
 export const Empty: Story = { args: { openIssues: 0, projects: [] } }
 
 /**
- * With teams (SHI-25): one fold per top-level Folder, its projects as the
- * rows, and a project under no team in a plain "Projects" fold after them. A
+ * With teams (SHI-25): one fold per top-level Folder, the projects its state
+ * lists as the rows (FOL-5), and a project in no team under "Not in a team"
+ * after them — not a fold named like a Folder, because it is not one. A
  * team carries **no count**, unlike every other row here — a Folder holds
  * files from apps Ship does not own, so any number would be Ship's records
  * only, which is a lie about a container that also holds a topic.

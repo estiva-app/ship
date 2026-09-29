@@ -123,7 +123,7 @@ function Shell() {
           {...sidebarProps(
             state,
             route,
-            (teams ?? []).map((f) => ({ id: f.id, name: f.name })),
+            (teams ?? []).map((f) => ({ id: f.id, name: f.name, addresses: f.addresses })),
           )}
           onOpenFolder={(folder) => go({ name: 'folder', id: folder.id })}
           loading={!state && loading}
@@ -202,8 +202,9 @@ export function sidebarProps(
       title: p.title,
       href: href({ name: 'project', d: p.id, slug: p.title, view: 'table' }),
       openCount: issues.filter((i) => i.projectAddr === p.addr && isOpen(i.status)).length,
-      // The team it is under: the Folder its record names, or the one
-      // `ship link-project` re-pointed it at (SHI-25).
+      // Its own Folder: the one its record names, or the one `ship
+      // link-project` re-pointed it at. The sidebar places it by the teams'
+      // state and falls back to this only when no state lists it (FOL-5).
       ...(p.contentFolder ? { folder: p.contentFolder } : {}),
     }))
   const current =

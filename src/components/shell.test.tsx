@@ -64,7 +64,37 @@ describe('Sidebar', () => {
     expect(screen.queryByRole('link', { name: 'Peek' })).not.toBeInTheDocument()
   })
 
-  it('a project under no team keeps a row under a plain Projects fold', () => {
+  it("a team's rows are what its state lists, not each project's own Folder (FOL-5)", () => {
+    // One is filed by `contentFolder` under Peek, but Estiva HQ's state lists
+    // it — which is what Peek's Folders column draws, so Ship draws it there.
+    const listed = [
+      { id: 'peek', name: 'Peek', addresses: ['30850:x:two'] },
+      { id: 'hq', name: 'Estiva HQ', addresses: ['30850:x:one', '39000:relay:some-topic'] },
+    ]
+    const { container } = render(
+      <Sidebar openIssues={5} issuesHref="#/" projectsHref="#/projects" projects={filed} folders={listed} current="issues" />,
+    )
+    const rowsOf = (id: string) =>
+      [...container.querySelectorAll(`[data-sidebar-team="${id}"] a`)].map((a) => a.textContent)
+    expect(rowsOf('hq')).toEqual(['One2'])
+    expect(rowsOf('peek')).toEqual(['Two'])
+    expect(screen.queryByRole('button', { name: 'Not in a team' })).not.toBeInTheDocument()
+  })
+
+  it('a project no state lists falls back to its own Folder when that is a team', () => {
+    // Created a moment ago: its record names the team, and the listing has not
+    // been read again since the team's state gained it.
+    const listed = [
+      { id: 'peek', name: 'Peek', addresses: [] },
+      { id: 'hq', name: 'Estiva HQ', addresses: ['30850:x:two'] },
+    ]
+    const { container } = render(
+      <Sidebar openIssues={5} issuesHref="#/" projectsHref="#/projects" projects={filed} folders={listed} current="issues" />,
+    )
+    expect([...container.querySelectorAll('[data-sidebar-team="peek"] a')].map((a) => a.textContent)).toEqual(['One2'])
+  })
+
+  it('a project in no team is under "Not in a team", not a fold named like a Folder', () => {
     render(
       <Sidebar
         openIssues={5}
@@ -76,7 +106,7 @@ describe('Sidebar', () => {
       />,
     )
     const folds = screen.getAllByRole('button').map((b) => b.textContent)
-    expect(folds).toEqual(['Estiva HQ', 'Peek', 'Projects'])
+    expect(folds).toEqual(['Estiva HQ', 'Peek', 'Not in a team'])
     const labels = screen.getAllByRole('link').map((a) => a.textContent)
     expect(labels).toEqual(['Issues5', 'Projects3', 'One2', 'Two', 'Three1'])
   })
@@ -110,7 +140,8 @@ describe('Sidebar', () => {
 
   it('shows placeholder rows while either read is still coming, and no team yet', () => {
     const { container } = render(<Sidebar openIssues={0} issuesHref="#/" projectsHref="#/projects" projects={[]} current="issues" loading folders={[]} foldersLoading />)
-    expect(screen.getByRole('button', { name: 'Projects' })).toBeInTheDocument()
+    // No heading over the placeholder: it used to be "Projects", the catch-all's title (FOL-5).
+    expect(screen.queryByRole('button')).not.toBeInTheDocument()
     expect(container.querySelectorAll('[aria-hidden="true"].animate-skeleton-in')).toHaveLength(1)
     const { container: withProjects } = render(
       <Sidebar openIssues={0} issuesHref="#/" projectsHref="#/projects" projects={filed} current="issues" folders={[]} foldersLoading />,
