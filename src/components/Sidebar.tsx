@@ -1,5 +1,6 @@
-import { IconArrowUpRight, IconBox, IconDots, IconListDetails } from '@tabler/icons-react'
+import { IconArrowUpRight, IconBox, IconDots, IconFolderPlus, IconListDetails } from '@tabler/icons-react'
 import { CollapsibleSection, Sidebar as SidebarShell } from '@estiva-app/ui'
+import { Button } from '@/components/ui/Button'
 import { IconButton } from '@/components/ui/IconButton'
 import { Menu, MenuItem } from '@/components/ui/Menu'
 import { SkeletonBar } from '@/components/ui/Skeleton'
@@ -101,6 +102,11 @@ export interface SidebarProps {
   onOpenFolder?: (folder: SidebarFolder) => void
   /** "Move to Folder…" in a project row's menu (FOL-7). Absent, the rows have no menu. */
   onMoveProject?: (project: SidebarProject) => void
+  /**
+   * "New folder" under the teams (FOL-8): a new top-level Folder, which then
+   * shows here beside them. Absent, there is no such entry.
+   */
+  onNewFolder?: () => void
   /** Which entry the route is on. A project's `addr` marks its own row. */
   current: 'issues' | 'projects' | { projectAddr: string } | { folderId: string }
   /** The first workspace read has not landed, so the project list is unknown
@@ -140,7 +146,7 @@ function SkeletonProjects() {
   )
 }
 
-export function Sidebar({ openIssues, issuesHref, projectsHref, projects, folders = [], onOpenFolder, onMoveProject, current, loading = false, foldersLoading = false, className }: SidebarProps) {
+export function Sidebar({ openIssues, issuesHref, projectsHref, projects, folders = [], onOpenFolder, onMoveProject, onNewFolder, current, loading = false, foldersLoading = false, className }: SidebarProps) {
   /*
     Both branches of `current` are objects now, so `typeof current === 'object'`
     no longer distinguishes them — it was correct while a project route was the
@@ -250,6 +256,19 @@ export function Sidebar({ openIssues, issuesHref, projectsHref, projects, folder
             <CollapsibleSection title="Not in a team" storageKey={STORAGE.unfiled} className="mt-2 shrink-0" contentClassName="gap-px">
               {unfiled.map(row)}
             </CollapsibleSection>
+          )}
+          {/*
+            After the teams, not in a heading above them: there is no
+            "Folders" heading to hang it on, and one would be a section named
+            like a Folder that is not one. Peek puts the same action in its
+            Folders column's header, which Ship's sidebar does not have.
+          */}
+          {onNewFolder && (
+            <div className="mt-2 flex shrink-0">
+              <Button variant="muted" size="small" leadingIcon={<IconFolderPlus size={16} stroke={1.5} />} onClick={onNewFolder}>
+                New folder
+              </Button>
+            </div>
           )}
         </>
       )}

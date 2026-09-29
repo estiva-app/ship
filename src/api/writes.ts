@@ -183,6 +183,48 @@ export async function moveProject(
 }
 
 /**
+ * Create a top-level Folder (FOL-8): the channel, then its state
+ * (`Store.createFolder`). Resolves the new id, which the caller opens.
+ *
+ * **A refused command after an accepted channel is still a Folder** — one
+ * that exists by its id and has no state, so no sidebar lists it. It comes
+ * back `ok` with the id and `unlisted`, as `createProject`'s does, so the
+ * caller opens it: reporting it as a failure would leave the dialog open, and
+ * Create again would mint a second channel beside an orphan nobody can reach.
+ */
+export async function createFolder(name: string): Promise<{ ok: true; id: string; unlisted?: string } | { ok: false; reason: string }> {
+  const clock = await clockProblem()
+  if (clock) return { ok: false, reason: clock }
+  try {
+    const { id, refusedAt, result } = await store.createFolder(name)
+    if (refusedAt === undefined) return { ok: true, id }
+    if (refusedAt === 0) return { ok: false, reason: result.reason ?? 'no reason given' }
+    return { ok: true, id, unlisted: result.reason ?? 'no reason given' }
+  } catch (error) {
+    return { ok: false, reason: error instanceof Error ? error.message : String(error) }
+  }
+}
+
+/**
+ * Rename a Folder (FOL-8): its channel, and its state's name when it has
+ * state. `hasState` is from the caller's read of that Folder, never a guess
+ * (`Store.renameFolder`).
+ */
+export async function renameFolder(folder: { id: string; hasState: boolean }, name: string): Promise<WriteResult> {
+  const clock = await clockProblem()
+  if (clock) return refused(clock)
+  try {
+    const { refusedAt, result } = await store.renameFolder({ folder: folder.id, name, hasState: folder.hasState })
+    if (refusedAt === undefined) return { ok: true }
+    // The channel took the new name and the state did not: the state's shadows it, so the old one is still what both apps show.
+    if (refusedAt === 1) return refused(`the channel was renamed but the folder's own name was not (${result.reason ?? 'no reason given'})`)
+    return refused(result.reason)
+  } catch (error) {
+    return refused(error instanceof Error ? error.message : String(error))
+  }
+}
+
+/**
  * Delete an issue. Same contract as `deleteProject`, one level down: a NIP-09
  * request, offered to everyone, adjudicated by the relay.
  *

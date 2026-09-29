@@ -8,6 +8,8 @@ vi.mock('./store', () => ({
     archiveProject: vi.fn(),
     deleteProject: vi.fn(),
     moveProject: vi.fn(),
+    createFolder: vi.fn(),
+    renameFolder: vi.fn(),
     linkProjectFolder: vi.fn(),
     postMessage: vi.fn(),
   },
@@ -18,7 +20,7 @@ vi.mock('./foreign', () => ({ readFolders: vi.fn() }))
 import { clockProblem } from './clock'
 import { readFolders } from './foreign'
 import { store } from './store'
-import { archiveProject, createIssue, createProject, deleteProject, moveProject, reply, setIssueField, setProjectField, startConversation } from './writes'
+import { archiveProject, createFolder, createIssue, createProject, deleteProject, moveProject, renameFolder, reply, setIssueField, setProjectField, startConversation } from './writes'
 
 const s = store as unknown as Record<string, ReturnType<typeof vi.fn>>
 const PK = 'ab'.repeat(32)
@@ -203,5 +205,37 @@ describe('moving a project', () => {
   it('a refused remove is a move that says which Folder still lists it', async () => {
     s.moveProject.mockResolvedValue({ added: { ok: true }, removed: [{ folder: FROM.id, result: { ok: false, reason: 'rate limited' } }] })
     expect(await moveProject(PROJECT, [FROM], TO)).toEqual({ ok: true, stillIn: [{ folder: FROM.id, reason: 'rate limited' }] })
+  })
+})
+
+describe('createFolder and renameFolder say what the relay did (FOL-8)', () => {
+  const FOLDER = { id: '11111111-1111-4111-8111-111111111111', hasState: true }
+
+  it('a created Folder resolves its id', async () => {
+    s.createFolder.mockResolvedValue({ id: FOLDER.id, result: { ok: true } })
+    expect(await createFolder('New')).toEqual({ ok: true, id: FOLDER.id })
+  })
+
+  it('a refused channel is no Folder at all', async () => {
+    s.createFolder.mockResolvedValue({ id: FOLDER.id, refusedAt: 0, result: { ok: false, reason: 'restricted' } })
+    expect(await createFolder('New')).toEqual({ ok: false, reason: 'restricted' })
+  })
+
+  it('a refused command is still a Folder — its id comes back, so it is opened rather than made twice', async () => {
+    s.createFolder.mockResolvedValue({ id: FOLDER.id, refusedAt: 1, result: { ok: false, reason: 'rate limited' } })
+    expect(await createFolder('New')).toEqual({ ok: true, id: FOLDER.id, unlisted: 'rate limited' })
+  })
+
+  it('a rename passes the Folder, the name and its hasState through', async () => {
+    s.renameFolder.mockResolvedValue({ result: { ok: true } })
+    expect(await renameFolder(FOLDER, 'Renamed')).toEqual({ ok: true })
+    expect(s.renameFolder).toHaveBeenCalledWith({ folder: FOLDER.id, name: 'Renamed', hasState: true })
+  })
+
+  it('a refused channel rename is the relay’s reason; a refused command says the name did not change', async () => {
+    s.renameFolder.mockResolvedValue({ refusedAt: 0, result: { ok: false, reason: 'restricted' } })
+    expect(await renameFolder(FOLDER, 'Renamed')).toEqual({ ok: false, reason: 'restricted' })
+    s.renameFolder.mockResolvedValue({ refusedAt: 1, result: { ok: false, reason: 'rate limited' } })
+    expect(await renameFolder(FOLDER, 'Renamed')).toEqual({ ok: false, reason: "the channel was renamed but the folder's own name was not (rate limited)" })
   })
 })

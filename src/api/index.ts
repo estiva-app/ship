@@ -61,6 +61,8 @@ export {
   editMessage,
   deleteProject,
   moveProject,
+  createFolder,
+  renameFolder,
   react,
   unreact,
   reply,

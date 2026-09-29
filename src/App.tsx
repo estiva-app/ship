@@ -1,6 +1,6 @@
 import { IconLink } from '@tabler/icons-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { me, peopleIn, resolveInbound, useDirectory, useWorkspace, type DirectoryView, type FolderState, type WorkspaceState, installReadStateFlush } from '@/api'
+import { createFolder, me, peopleIn, resolveInbound, useDirectory, useWorkspace, type DirectoryView, type FolderState, type WorkspaceState, installReadStateFlush } from '@/api'
 import { AppShell } from '@/components/AppShell'
 import { Banner } from '@/components/Banner'
 import { ToastProvider, useToast, type ToastOptions } from '@/components/ui/Toast'
@@ -9,12 +9,13 @@ import { PageSkeleton, type PageSkeletonShape } from '@/components/PageSkeleton'
 import { IdentityMenu } from '@/components/IdentityMenu'
 import { Sidebar, type SidebarFolder, type SidebarProject } from '@/components/Sidebar'
 import { EmptyState } from '@/components/ui/EmptyState'
-import { topLevelFolders, useFolders } from '@/api/useFolders'
+import { reloadFolders, topLevelFolders, useFolders } from '@/api/useFolders'
+import { NewFolderDialog } from '@/components/NewFolderDialog'
 import { FolderPage } from '@/pages/FolderPage'
 import { IssuePage } from '@/pages/IssuePage'
 import { IssuesPage } from '@/pages/IssuesPage'
 import { ProjectPage } from '@/pages/ProjectPage'
-import type { Say } from '@/pages/act'
+import { act, type Say } from '@/pages/act'
 import { MoveProject } from '@/components/MoveProject'
 import { ProjectsPage } from '@/pages/ProjectsPage'
 import { ID_CONFIG, RELAY_URL } from './config'
@@ -55,6 +56,35 @@ function Shell() {
   // The project a sidebar row's "Move to Folder…" was chosen on (FOL-7), by address.
   const [moving, setMoving] = useState<string | null>(null)
   const movingProject = moving ? state?.projects.find((project) => project.addr === moving) : undefined
+  const [creatingFolder, setCreatingFolder] = useState(false)
+
+  /*
+    "New folder" (FOL-8): the write, then the Folder listing read again — a new
+    Folder is a channel and a state, neither of which is in the fold — and the
+    new Folder's page, which is where it is renamed.
+  */
+  const newFolder = useCallback(
+    async (name: string) => {
+      let id: string | undefined
+      let unlisted: string | undefined
+      const ok = await act(
+        'New folder',
+        async () => {
+          const result = await createFolder(name)
+          if (result.ok) ({ id, unlisted } = result)
+          return result
+        },
+        say,
+        reloadFolders,
+      )
+      if (!ok || !id) return false
+      // Created and not listed: opened anyway, so the one Folder that exists is the one on screen rather than a retry's second.
+      say(unlisted ? `Created ${name}, but the relay refused to list it, so it is in no sidebar — ${unlisted}` : `Created ${name}`, unlisted ? 'error' : 'ok')
+      go({ name: 'folder', id })
+      return true
+    },
+    [say],
+  )
 
   // Names and faces for everyone in the snapshot; re-read in full on navigation.
   const people = useMemo(() => (state ? peopleIn(state, me) : [me]), [state])
@@ -131,6 +161,7 @@ function Shell() {
           )}
           onOpenFolder={(folder) => go({ name: 'folder', id: folder.id })}
           {...(teams?.length ? { onMoveProject: (project: SidebarProject) => setMoving(project.addr) } : {})}
+          onNewFolder={() => setCreatingFolder(true)}
           loading={!state && loading}
           foldersLoading={folders === undefined}
         />
@@ -138,6 +169,7 @@ function Shell() {
     >
       <Page route={route} state={state} loading={loading} directory={directory} teams={teams} say={say} refresh={refresh} />
       {movingProject && teams && <MoveProject project={movingProject} teams={teams} say={say} onClose={() => setMoving(null)} />}
+      {creatingFolder && <NewFolderDialog onCreate={newFolder} onClose={() => setCreatingFolder(false)} />}
     </AppShell>
   )
 }
@@ -168,7 +200,7 @@ function Page({ route, state, loading, directory, teams, say, refresh }: { route
     so it never waits for the workspace, and draws its own rows while its
     files load (UIG-14 C8). The workspace's skeleton used to sit there first.
   */
-  if (route.name === 'folder') return <FolderPage id={route.id} />
+  if (route.name === 'folder') return <FolderPage id={route.id} say={say} />
   if (!state && loading) return <PageSkeleton shape={SKELETON[route.name] ?? 'rows'} />
   if (!state) return null
   switch (route.name) {

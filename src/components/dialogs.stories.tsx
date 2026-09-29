@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/Button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { SIDEBAR_PROJECTS } from '@/fixtures/projects'
 import { MoveProjectDialog } from './MoveProjectDialog'
+import { NewFolderDialog } from './NewFolderDialog'
 import { NewIssueDialog } from './NewIssueDialog'
 import { NewProjectDialog } from './NewProjectDialog'
 
@@ -84,6 +85,11 @@ export const MoveProjectInTwo: Story = {
 /** Nowhere else it can go: said, and no Move. */
 export const MoveProjectNowhere: Story = {
   render: () => <MoveProjectDialog title="Ship: Feedback & Bugs" current={[TEAMS[2]!]} folders={[TEAMS[2]!]} onClose={fn()} onMove={fn()} />,
+}
+
+/** "New folder" from the sidebar (FOL-8): one field, and Create folder stays off until it holds a name. */
+export const NewFolder: Story = {
+  render: () => <NewFolderDialog onClose={fn()} onCreate={fn(async () => true)} />,
 }
 
 /** Open each from a button, and close it with Cancel, ✕, the backdrop or Escape. */
