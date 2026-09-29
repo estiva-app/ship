@@ -72,6 +72,9 @@ export const Empty: Story = { args: { openIssues: 0, projects: [] } }
  */
 export const WithFolders: Story = { args: { folders: FOLDERS, projects: FILED, onOpenFolder: () => {} } }
 
+/** A project row's menu (FOL-7): on hover or focus, over the count, with "Move to Folder…". */
+export const WithRowMenu: Story = { args: { folders: FOLDERS, projects: FILED, onOpenFolder: () => {}, onMoveProject: () => {} } }
+
 /** A folder route marks its own row, and leaves the project rows alone. */
 export const OnAFolder: Story = {
   args: { folders: FOLDERS, current: { folderId: '7b32200c-e4c0-4216-b79a-8490fc05e0bd' } },

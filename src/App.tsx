@@ -15,6 +15,7 @@ import { IssuePage } from '@/pages/IssuePage'
 import { IssuesPage } from '@/pages/IssuesPage'
 import { ProjectPage } from '@/pages/ProjectPage'
 import type { Say } from '@/pages/act'
+import { MoveProject } from '@/pages/MoveProject'
 import { ProjectsPage } from '@/pages/ProjectsPage'
 import { ID_CONFIG, RELAY_URL } from './config'
 import { beginSignIn, beginSignOut, signInAvailable, signedIn } from './auth/estivaId'
@@ -51,6 +52,9 @@ function Shell() {
   const teams = useMemo(() => (folders ? topLevelFolders(folders) : undefined), [folders])
   const { showToast } = useToast()
   const { banner, say, clear } = useBanner(showToast)
+  // The project a sidebar row's "Move to Folder…" was chosen on (FOL-7), by address.
+  const [moving, setMoving] = useState<string | null>(null)
+  const movingProject = moving ? state?.projects.find((project) => project.addr === moving) : undefined
 
   // Names and faces for everyone in the snapshot; re-read in full on navigation.
   const people = useMemo(() => (state ? peopleIn(state, me) : [me]), [state])
@@ -126,12 +130,14 @@ function Shell() {
             (teams ?? []).map((f) => ({ id: f.id, name: f.name, addresses: f.addresses })),
           )}
           onOpenFolder={(folder) => go({ name: 'folder', id: folder.id })}
+          {...(teams?.length ? { onMoveProject: (project: SidebarProject) => setMoving(project.addr) } : {})}
           loading={!state && loading}
           foldersLoading={folders === undefined}
         />
       }
     >
       <Page route={route} state={state} loading={loading} directory={directory} teams={teams} say={say} refresh={refresh} />
+      {movingProject && teams && <MoveProject project={movingProject} teams={teams} say={say} onClose={() => setMoving(null)} />}
     </AppShell>
   )
 }

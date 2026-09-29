@@ -48,6 +48,7 @@ import { ProjectView } from '@/views/ProjectView'
 import { go, href, type ProjectView as ProjectViewName } from '../router'
 import { act, type Say } from './act'
 import { hrefForIssue, rowFor } from './IssuesPage'
+import { MoveProject } from './MoveProject'
 
 export type { Say } from './act'
 
@@ -324,7 +325,7 @@ export function ProjectPage({
   refresh: (folders?: string[]) => Promise<void>
 }) {
   const project = state.projects.find((candidate) => candidate.id === d)
-  const [dialog, setDialog] = useState<'issue' | 'delete' | null>(null)
+  const [dialog, setDialog] = useState<'issue' | 'delete' | 'move' | null>(null)
 
   const issues = useMemo<IssuesTableRow[]>(() => {
     if (!project) return []
@@ -562,6 +563,8 @@ export function ProjectPage({
             (teams.length === 0
               ? null
               : placedIn({ addr: project.addr, folder: project.contentFolder }, teams).map((folder) => ({ name: folder.name ?? 'Untitled Folder', href: href({ name: 'folder', id: folder.id }) }))),
+          // Only once there are Folders to move between (FOL-7).
+          ...(teams?.length ? { onMove: () => setDialog('move') } : {}),
           onArchive: () =>
             void act(project.archived ? 'Unarchive' : 'Archive', () => archiveProject(project, !project.archived), say, refresh).then((ok) => {
               if (ok) say(project.archived ? 'Project restored' : 'Project archived')
@@ -587,6 +590,8 @@ export function ProjectPage({
           }}
         />
       )}
+
+      {dialog === 'move' && teams && <MoveProject project={project} teams={teams} say={say} onClose={() => setDialog(null)} />}
 
       {dialog === 'delete' && (
         <ConfirmDialog

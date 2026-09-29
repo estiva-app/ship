@@ -67,6 +67,7 @@ export interface ProjectViewProps {
     done: number
     total: number
     folders: RailFolder[] | null | undefined
+    onMove?: () => void
     onArchive: () => void
     onDelete: () => void
   }

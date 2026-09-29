@@ -7,6 +7,7 @@ vi.mock('./store', () => ({
     setField: vi.fn(),
     archiveProject: vi.fn(),
     deleteProject: vi.fn(),
+    moveProject: vi.fn(),
     linkProjectFolder: vi.fn(),
     postMessage: vi.fn(),
   },
@@ -17,7 +18,7 @@ vi.mock('./foreign', () => ({ readFolders: vi.fn() }))
 import { clockProblem } from './clock'
 import { readFolders } from './foreign'
 import { store } from './store'
-import { archiveProject, createIssue, createProject, deleteProject, reply, setIssueField, setProjectField, startConversation } from './writes'
+import { archiveProject, createIssue, createProject, deleteProject, moveProject, reply, setIssueField, setProjectField, startConversation } from './writes'
 
 const s = store as unknown as Record<string, ReturnType<typeof vi.fn>>
 const PK = 'ab'.repeat(32)
@@ -76,7 +77,7 @@ describe('which Folder each write goes to', () => {
     await archiveProject(PROJECT, true)
     expect(s.archiveProject).toHaveBeenCalledWith({ recordFolder: 'origin-folder', project: PROJECT.addr, archived: true })
     await deleteProject(PROJECT, [{ id: 'content-folder', hasState: true }])
-    expect(s.deleteProject).toHaveBeenCalledWith({ recordFolder: 'origin-folder', project: PROJECT.addr, team: { folder: 'content-folder', hasState: true } })
+    expect(s.deleteProject).toHaveBeenCalledWith({ recordFolder: 'origin-folder', project: PROJECT.addr, teams: [{ folder: 'content-folder', hasState: true }] })
   })
 })
 
@@ -93,14 +94,25 @@ describe('deleting a project unlists it from its team (FOL-48)', () => {
     await deleteProject(PROJECT, undefined)
     await deleteProject(PROJECT, [{ id: 'another-team', hasState: true }])
     expect(readFolders).toHaveBeenCalledTimes(2)
-    expect(s.deleteProject).toHaveBeenLastCalledWith(expect.objectContaining({ team: { folder: 'content-folder', hasState: true } }))
+    expect(s.deleteProject).toHaveBeenLastCalledWith(expect.objectContaining({ teams: [{ folder: 'content-folder', hasState: true }] }))
+  })
+
+  it('a moved project is unlisted from the Folders that list it, not its content Folder (FOL-7)', async () => {
+    s.deleteProject.mockResolvedValue({ result: { ok: true }, unlisted: { ok: true } })
+    const folders = [
+      { id: 'content-folder', hasState: true, addresses: [] },
+      { id: 'new-team', hasState: true, addresses: [PROJECT.addr] },
+    ]
+    expect(await deleteProject(PROJECT, folders)).toEqual({ ok: true })
+    expect(s.deleteProject).toHaveBeenCalledWith(expect.objectContaining({ teams: [{ folder: 'new-team', hasState: true }] }))
+    expect(readFolders).not.toHaveBeenCalled()
   })
 
   it('a Folder nobody can read has no state to change', async () => {
     s.deleteProject.mockResolvedValue({ result: { ok: true } })
     vi.mocked(readFolders).mockResolvedValue([])
     await deleteProject(PROJECT, [])
-    expect(s.deleteProject).toHaveBeenCalledWith(expect.objectContaining({ team: { folder: 'content-folder', hasState: false } }))
+    expect(s.deleteProject).toHaveBeenCalledWith(expect.objectContaining({ teams: [{ folder: 'content-folder', hasState: false }] }))
   })
 
   it('a refused delete is refused, whatever the unlist did', async () => {
@@ -155,5 +167,31 @@ describe('creating a project', () => {
   it('a refused listing is a created project that says why Peek will not place it', async () => {
     s.createProject.mockResolvedValue({ result: { ok: true }, placed: { ok: false, reason: 'rate limited' }, addr: 'a', id: 'i', folder: TEAM.folder })
     expect(await createProject({ title: 'X', description: '', team: TEAM })).toEqual({ ok: true, addr: 'a', unlisted: 'rate limited' })
+  })
+})
+
+describe('moving a project', () => {
+  const FROM = { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', hasState: true }
+  const TO = { id: TEAM.folder, hasState: true }
+
+  it('moves by address, from the Folders that list it, to the one chosen', async () => {
+    s.moveProject.mockResolvedValue({ added: { ok: true }, removed: [{ folder: FROM.id, result: { ok: true } }] })
+    expect(await moveProject(PROJECT, [FROM], TO)).toEqual({ ok: true })
+    expect(s.moveProject).toHaveBeenCalledWith({ project: PROJECT.addr, from: [FROM], to: TO })
+  })
+
+  it('a move planned as unsafe is refused, saying why', async () => {
+    s.moveProject.mockResolvedValue({ refused: 'target-has-no-state', removed: [] })
+    expect(await moveProject(PROJECT, [FROM], TO)).toEqual({ ok: false, reason: expect.stringMatching(/no list of its own/) })
+  })
+
+  it('a refused add is a refused move', async () => {
+    s.moveProject.mockResolvedValue({ added: { ok: false, reason: 'restricted: not a channel member' }, removed: [] })
+    expect(await moveProject(PROJECT, [FROM], TO)).toEqual({ ok: false, reason: 'restricted: not a channel member' })
+  })
+
+  it('a refused remove is a move that says which Folder still lists it', async () => {
+    s.moveProject.mockResolvedValue({ added: { ok: true }, removed: [{ folder: FROM.id, result: { ok: false, reason: 'rate limited' } }] })
+    expect(await moveProject(PROJECT, [FROM], TO)).toEqual({ ok: true, stillIn: [{ folder: FROM.id, reason: 'rate limited' }] })
   })
 })

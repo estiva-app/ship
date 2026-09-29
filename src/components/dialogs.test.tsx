@@ -1,11 +1,55 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
+import { MoveProjectDialog } from './MoveProjectDialog'
 import { NewIssueDialog } from './NewIssueDialog'
 import { NewProjectDialog } from './NewProjectDialog'
 
 const FOLDER = '5c1e2a7b-9d40-4f3a-8e6b-2f0c7d1a9b34'
 const OTHER = '11111111-2222-4333-8444-555555555555'
+
+describe('MoveProjectDialog', () => {
+  const ship = { id: FOLDER, name: 'Ship', hasState: true }
+  const peek = { id: OTHER, name: 'Peek', hasState: true }
+  const bare = { id: 'bare', name: 'Bare', hasState: false }
+  const options = async () => {
+    fireEvent.click(screen.getByRole('combobox', { name: 'Destination Folder' }))
+    // The label alone, without the selected row's check mark.
+    return (await screen.findAllByRole('option')).map((option) => option.textContent?.replace(/\W+$/u, ''))
+  }
+
+  it('offers the Folders with state other than where it is, and moves to the one chosen', async () => {
+    const onMove = vi.fn().mockResolvedValue(true)
+    const onClose = vi.fn()
+    render(<MoveProjectDialog title="P" current={[ship]} folders={[ship, peek, bare]} onMove={onMove} onClose={onClose} />)
+    expect(await options()).toEqual(['Peek'])
+    await userEvent.click(screen.getByRole('option', { name: 'Peek' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Move' }))
+    await waitFor(() => expect(onMove).toHaveBeenCalledWith(peek))
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+  })
+
+  it('in two Folders after a half move, both are destinations', async () => {
+    render(<MoveProjectDialog title="P" current={[ship, peek]} folders={[ship, peek]} onMove={vi.fn()} onClose={vi.fn()} />)
+    expect(await options()).toEqual(['Ship', 'Peek'])
+  })
+
+  it('stays open, Move ready again, when the caller says the move did not finish', async () => {
+    const onMove = vi.fn().mockResolvedValue(false)
+    const onClose = vi.fn()
+    render(<MoveProjectDialog title="P" current={[ship]} folders={[ship, peek]} onMove={onMove} onClose={onClose} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Move' }))
+    await waitFor(() => expect(onMove).toHaveBeenCalledWith(peek))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Move' })).toBeEnabled())
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('says when there is nowhere else to go', () => {
+    render(<MoveProjectDialog title="P" current={[ship]} folders={[ship, bare]} onMove={vi.fn()} onClose={vi.fn()} />)
+    expect(screen.getByText('There is no other Folder it can be moved to.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Move' })).toBeDisabled()
+  })
+})
 
 describe('NewProjectDialog', () => {
   const teams = [

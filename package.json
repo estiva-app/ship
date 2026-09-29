@@ -11,7 +11,7 @@
     "typecheck": "tsc -b",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:scripts": "tsx scripts/app.test.ts && tsx scripts/manifest-slots.test.ts && tsx scripts/issue-description.test.ts && tsx scripts/references.test.ts && tsx scripts/reactions.test.ts && tsx scripts/edits.test.ts && tsx scripts/attachments.test.ts && tsx scripts/reload-folders.test.ts && tsx scripts/conformance.test.ts",
+    "test:scripts": "tsx scripts/app.test.ts && tsx scripts/manifest-slots.test.ts && tsx scripts/issue-description.test.ts && tsx scripts/references.test.ts && tsx scripts/reactions.test.ts && tsx scripts/edits.test.ts && tsx scripts/attachments.test.ts && tsx scripts/reload-folders.test.ts && tsx scripts/move-project.test.ts &&tsx scripts/conformance.test.ts",
     "test:app": "tsx scripts/app.test.ts",
     "smoke": "npm run build && tsx scripts/smoke.ts",
     "storybook": "storybook dev -p 6007",

@@ -11,7 +11,7 @@ const STATUSES = [
 const PEOPLE = [{ value: 'ana', name: 'Ana Duarte' }]
 
 describe('ProjectRail', () => {
-  const rail = (folders: RailFolder[] | null | undefined) => (
+  const rail = (folders: RailFolder[] | null | undefined, onMove?: () => void) => (
     <ProjectRail
       status="in_progress"
       statuses={STATUSES}
@@ -22,6 +22,7 @@ describe('ProjectRail', () => {
       done={10}
       total={14}
       folders={folders}
+      onMove={onMove}
       archived={false}
       onArchive={vi.fn()}
       onDelete={vi.fn()}
@@ -52,6 +53,19 @@ describe('ProjectRail', () => {
     rerender(rail(undefined))
     expect(screen.queryByText('—')).not.toBeInTheDocument()
     expect(screen.queryByRole('link')).not.toBeInTheDocument()
+  })
+
+  it('"Move to Folder…" sits under the Folder once the Folders are read, in none as well as in one (FOL-7)', () => {
+    const onMove = vi.fn()
+    const { rerender } = render(rail([{ name: 'Ship', href: `/folder/${FOLDER}` }], onMove))
+    fireEvent.click(screen.getByRole('button', { name: 'Move to Folder…' }))
+    expect(onMove).toHaveBeenCalled()
+    rerender(rail([], onMove))
+    expect(screen.getByRole('button', { name: 'Move to Folder…' })).toBeInTheDocument()
+    rerender(rail(undefined, onMove))
+    expect(screen.queryByRole('button', { name: 'Move to Folder…' })).not.toBeInTheDocument()
+    rerender(rail([{ name: 'Ship', href: `/folder/${FOLDER}` }]))
+    expect(screen.queryByRole('button', { name: 'Move to Folder…' })).not.toBeInTheDocument()
   })
 })
 

@@ -18,7 +18,8 @@ import { SkeletonBar } from '@/components/ui/Skeleton'
  * **No pairing** (FOL-3). The Folder used to be a raw uuid with "Copy Folder
  * link" and "Pair with another Folder…" beside it, from when a project was
  * paired with a Peek topic. A project is in a top-level Folder now, placed by
- * that Folder's state, so the rail names it and links to its page.
+ * that Folder's state, so the rail names it and links to its page — and
+ * "Move to Folder…" beneath it changes which one lists it (FOL-7).
  *
  * Ship-only: it knows what a project is. The writes behind the controls
  * arrive with REW-5; until then the callbacks are the caller's.
@@ -53,6 +54,8 @@ export interface ProjectRailProps {
    * still being read.
    */
   folders: RailFolder[] | null | undefined
+  /** "Move to Folder…" under the Folder (FOL-7). Offered once the Folders are read; absent, no button. */
+  onMove?: () => void
   archived: boolean
   onArchive: () => void
   onDelete: () => void
@@ -83,6 +86,7 @@ export function ProjectRail({
   done,
   total,
   folders,
+  onMove,
   archived,
   onArchive,
   onDelete,
@@ -114,15 +118,22 @@ export function ProjectRail({
           </div>
         ) : folders === null ? (
           <span className="text-text-muted">Folders could not be read</span>
-        ) : folders.length === 0 ? (
-          <span className="text-text-muted">—</span>
         ) : (
           <div className="flex flex-col items-start gap-1">
-            {folders.map((folder) => (
-              <Link key={folder.href} {...linkTo(folder.href)} variant="quiet">
-                {folder.name}
-              </Link>
-            ))}
+            {folders.length === 0 ? (
+              <span className="text-text-muted">—</span>
+            ) : (
+              folders.map((folder) => (
+                <Link key={folder.href} {...linkTo(folder.href)} variant="quiet">
+                  {folder.name}
+                </Link>
+              ))
+            )}
+            {onMove && (
+              <Button size="small" variant="muted" onClick={onMove} disabledReason={readOnlyReason}>
+                Move to Folder…
+              </Button>
+            )}
           </div>
         )}
       </Property>

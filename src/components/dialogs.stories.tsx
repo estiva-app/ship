@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { SIDEBAR_PROJECTS } from '@/fixtures/projects'
+import { MoveProjectDialog } from './MoveProjectDialog'
 import { NewIssueDialog } from './NewIssueDialog'
 import { NewProjectDialog } from './NewProjectDialog'
 
@@ -68,6 +69,21 @@ export const NewProjectNoTeams: Story = {
   play: async () => {
     await userEvent.type(screen.getByPlaceholderText('New project title'), 'Relay migration')
   },
+}
+
+/** Move a project to another Folder (FOL-7): where it is now is not offered. */
+export const MoveProject: Story = {
+  render: () => <MoveProjectDialog title="Ship: Feedback & Bugs" current={[TEAMS[2]!]} folders={TEAMS} onClose={fn()} onMove={fn()} />,
+}
+
+/** A move that half-worked left it in two: both are destinations, and Move again is the retry. */
+export const MoveProjectInTwo: Story = {
+  render: () => <MoveProjectDialog title="Ship: Feedback & Bugs" current={[TEAMS[1]!, TEAMS[2]!]} folders={TEAMS} onClose={fn()} onMove={fn()} />,
+}
+
+/** Nowhere else it can go: said, and no Move. */
+export const MoveProjectNowhere: Story = {
+  render: () => <MoveProjectDialog title="Ship: Feedback & Bugs" current={[TEAMS[2]!]} folders={[TEAMS[2]!]} onClose={fn()} onMove={fn()} />,
 }
 
 /** Open each from a button, and close it with Cancel, ✕, the backdrop or Escape. */

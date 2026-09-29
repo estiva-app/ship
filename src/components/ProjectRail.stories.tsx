@@ -28,6 +28,7 @@ const meta = {
     done: 10,
     total: 14,
     folders: [{ name: 'Ship', href: '/folder/5c1e2a7b-9d40-4f3a-8e6b-2f0c7d1a9b34' }],
+    onMove: fn(),
     archived: false,
     onArchive: fn(),
     onDelete: fn(),
@@ -57,6 +58,19 @@ export const Archived: Story = { args: { archived: true, status: 'completed', do
 
 /** In no top-level Folder: a dash, as any empty value in Ship, rather than inventing one. */
 export const NoFolder: Story = { args: { folders: [] } }
+
+/** A move that half-worked (FOL-7): listed in both, and "Move to Folder…" is the retry. */
+export const InTwoFolders: Story = {
+  args: {
+    folders: [
+      { name: 'Ship', href: '/folder/5c1e2a7b-9d40-4f3a-8e6b-2f0c7d1a9b34' },
+      { name: 'Peek', href: '/folder/11111111-2222-4333-8444-555555555555' },
+    ],
+  },
+}
+
+/** No Folders read to move between: no "Move to Folder…". */
+export const NoMove: Story = { args: { onMove: undefined } }
 
 /** The Folders are still being read: a placeholder, not a dash that changes a moment later. */
 export const FolderLoading: Story = { args: { folders: undefined } }
