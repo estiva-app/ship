@@ -1,0 +1,40 @@
+import { Meta } from '@storybook/addon-docs/blocks'
+
+<Meta title="Conversations/MentionList" />
+
+# MentionList
+
+"Mentioned in": conversations elsewhere that name this object, each under a
+line saying where it lives — the sidebar's icon for a project or an issue, and
+its name.
+
+**Seen in** Conversations/Conversations: Mentioned In, Mentioned In Empty,
+Mentioned In Truncated.
+
+## When
+
+- On the Activity tab, under an **AppSection** titled "Mentioned in", below the
+  object's own conversations.
+
+## When not
+
+- For the object's own conversations → **ThreadList**. A thread about this
+  object belongs there, and only a relation belongs here.
+
+## How
+
+```tsx
+import { MentionList } from '@/components/conversations/ThreadList'
+
+<MentionList items={activity} truncated={activityTruncated} onReply={replyInItsFolder} />
+```
+
+- The props are production's `ActivityProps`. A reply goes to the thread's own
+  Folder, never this object's — which is why the place line is there.
+
+## What it owns
+
+- **The place line**, in words for a screen reader ("Mentioned in" is SPEC
+  §6.4's phrase) and a mention drawn quieter than a sub-file's thread (CON-9).
+- **Saying what it could not see**: the horizon, and that conversations in
+  Folders this reader cannot read are absent without being counted.

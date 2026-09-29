@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react'
 import { IconBox, IconLayoutKanban, IconTable } from '@tabler/icons-react'
 import type { ContentFormat, Imeta } from '@estiva-app/protocol'
 import { Breadcrumb } from '@/components/ui/Breadcrumb'
@@ -18,6 +17,7 @@ import { ProjectRail, type RailFolder, type RailPerson } from '@/components/Proj
 import { Related, hasRelated } from '@/components/Related'
 import { LiveHeader } from '@/components/editing/LiveHeader'
 import { MentionList, ThreadList } from '@/components/conversations/ThreadList'
+import { AppSection, Centred } from '@/components/layout/ReadingColumn'
 import type { RelatedState } from '@/api/useRelated'
 
 /**
@@ -97,28 +97,7 @@ const TABS: { id: ProjectTab; label: string }[] = [
   { id: 'issues', label: 'Issues' },
 ]
 
-/**
- * The reading column Overview and Activity share: 768px, centred, 52px under
- * the tab row (Katerina, 29 September: Linear's Activity gap; the grid gives
- * 16px and `pt-9` adds 36).
- */
-export function Centred({ children }: { children: ReactNode }) {
-  return <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 pt-9">{children}</div>
-}
-
-/**
- * A section the app adds, as opposed to a heading someone typed: the type
- * ramp's h4, 16px semibold (Katerina, 29 September), and no count.
- */
-export function AppSection({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="flex flex-col gap-2" data-app-section={title}>
-      <h2 className="flex h-8 items-center text-h4 text-text-primary">{title}</h2>
-      {children}
-    </section>
-  )
-}
-
+/** One project's page, in tabs: Overview, Activity and Issues, with the rail on every tab. */
 export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onView, issues, issueStatuses, hrefFor, related, threads, unread, onStartConversation, onReply, activity, activityTruncated, onReplyInActivity, rail, about, onReact, onDeleteMessage, onEditMessage, readOnlyReason, upload }: ProjectViewProps) {
   return (
     // `data-surface`, `data-view` and `data-tab` are the smoke test's waypoints — see IssuesView. The Table/Board

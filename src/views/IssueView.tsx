@@ -13,7 +13,7 @@ import { Related, hasRelated } from '@/components/Related'
 import { LiveHeader } from '@/components/editing/LiveHeader'
 import { MentionList, ThreadList } from '@/components/conversations/ThreadList'
 import type { RelatedState } from '@/api/useRelated'
-import { AppSection, Centred } from './ProjectView'
+import { AppSection, Centred } from '@/components/layout/ReadingColumn'
 
 /**
  * One issue, in the project page's format (Katerina, 29 September): two tabs,
@@ -85,6 +85,7 @@ const TABS: { id: IssueTab; label: string }[] = [
   { id: 'activity', label: 'Activity' },
 ]
 
+/** One issue's page, in tabs: Overview and Activity, with the rail on every tab. */
 export function IssueView({ crumbs, tab, onTab, title, description, descriptionFormat, nameOf, onRename, onDescribe, related, threads, unread, onStartConversation, onReply, activity, activityTruncated, onReplyInActivity, history, rail, about, onReact, onDeleteMessage, onEditMessage, readOnlyReason, upload }: IssueViewProps) {
   // `linkTo` on each crumb (S15, 0.10.0): the breadcrumbs were the last links in Ship that reloaded the app (SHI-20).
   const items: Crumb[] = [{ label: 'Issues', ...linkTo(crumbs.issuesHref) }]

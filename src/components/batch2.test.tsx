@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { groupByStatus, statusLabel } from '@/lib/issues'
 import { ISSUES, ISSUE_STATUSES, ROWS, THREADS, hrefFor } from '@/fixtures/issues'
 import { Board } from './Board'
-import { MessageCard } from './ConversationThread'
+import { ThreadListView } from './conversations/ThreadList'
 import { IssueList } from './IssueList'
 import { IssueRow } from './IssueRow'
 import { IssuesTable } from './IssuesTable'
@@ -79,9 +79,11 @@ describe('IssuesTable and Board', () => {
   })
 })
 
-describe('MessageCard', () => {
+// Moved with the card to the conversations list (the old MessageCard, 30 September).
+describe('a message in the conversations list', () => {
   it('names the author as a person or an em dash, never a key, and keeps the body as text', () => {
-    const { container } = render(<MessageCard message={{ ...THREADS[0].replies[1], author: {}, body: '<b>not markup</b>' }} />)
+    const message = { ...THREADS[0].replies[1], author: {}, body: '<b>not markup</b>' }
+    const { container } = render(<ThreadListView threads={[{ id: 't', root: message, replies: [] }]} onStart={() => {}} onReply={() => {}} />)
     expect(container.textContent).toContain('—')
     expect(container.querySelector('b')).toBeNull()
     expect(container.textContent).not.toMatch(/[0-9a-f]{8}/)

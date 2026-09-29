@@ -38,10 +38,10 @@ const meta = {
   title: 'Projects/Related',
   component: Related,
   args: { related: { files: [TOPIC, SECOND], inside: {}, counts: { t1: 7, t2: 0 } } },
-  // The width a project page's content column gives the section, as Activity's story does.
+  // The page's reading column (Katerina, 29 September: 768px).
   decorators: [
     (Story) => (
-      <div className="w-[640px]">
+      <div className="w-[768px]">
         <Story />
       </div>
     ),
@@ -73,3 +73,25 @@ export const Nested: Story = {
 
 /** The read did not come back. Says so, and is never mistaken for "nothing placed here". */
 export const Failed: Story = { args: { related: 'failed' } }
+
+/**
+ * Every state a row can be in, as quiet rows (Katerina, 29 September): the
+ * app's name after the title; a subtitle and the meta on a second line; the
+ * status and the comment count in columns that line up; a message drawn as a
+ * face and its words; an object's own list nested under it; and one this
+ * reader may not see, said so.
+ */
+export const EveryState: Story = {
+  args: {
+    related: {
+      files: [
+        file({ ref: 'r1', slots: { title: { value: 'Cut-over checklist' }, status: { value: 'In Progress', colour: 'blue' } } as ForeignObject['slots'] }),
+        file({ ref: 'r2', appName: 'Peek', slots: { title: { value: 'Pairing notes' }, subtitle: { value: 'What we agreed on Tuesday, and what is still open' } } as ForeignObject['slots'], meta: [{ label: 'Owner', value: 'Mara Sato' }] as ForeignObject['meta'] }),
+        file({ ref: 'r3', appName: 'Leaf', slots: { title: { value: 'Cut-over plan' } } as ForeignObject['slots'], children: [file({ ref: 'r3a', appName: 'Leaf', slots: { title: { value: 'Step 1: reads' }, status: { value: 'Done', colour: 'green' } } as ForeignObject['slots'] }), file({ ref: 'r3b', appName: 'Leaf', slots: { title: { value: 'Step 2: writes' }, status: { value: 'Todo', colour: 'gray' } } as ForeignObject['slots'] })] }),
+        file({ ref: 'r4', appName: 'Peek', unreachable: true, openUrl: '#' } as Partial<ForeignObject>),
+      ],
+      inside: {},
+      counts: { r1: 7, r2: 12 },
+    },
+  },
+}

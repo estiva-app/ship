@@ -1,12 +1,12 @@
 import type { Imeta } from '@estiva-app/protocol'
-import { useMemo } from 'react'
-import { Chip } from '@/components/ui/Chip'
-import { EmptyState } from '@/components/ui/EmptyState'
-import { cn } from '@/lib/cn'
-import { ConversationThread, useThreadReactions, useThreadReferences, type ThreadData } from './ConversationThread'
+import type { ThreadData } from './ConversationThread'
 
 /**
  * **Activity: the conversations of files *related* to this one** — CON-9.
+ *
+ * The model and its types. The list is drawn by `MentionList`
+ * (`conversations/ThreadList.tsx`), under "Mentioned in" on a page's Activity
+ * tab, with the relation's words in `conversations/shared.tsx`.
  *
  * The model agreed 2026-09-05 replaces a growing list of modes with two lists,
  * and one rule decides which a thread lands in:
@@ -51,18 +51,6 @@ import { ConversationThread, useThreadReactions, useThreadReferences, type Threa
  * on the sub-file. `sub-file` stays drawable here for another app's relation.
  */
 export type Relation = 'mention' | 'sub-file'
-
-/**
- * The words, in one place.
- *
- * *"Mentioned in"* is SPEC §6.4's own phrase for the secondary section, kept
- * verbatim so the screen and the specification cannot drift into two names for
- * one thing.
- */
-const RELATION: Record<Relation, { label: string; muted: boolean }> = {
-  mention: { label: 'Mentioned in', muted: true },
-  'sub-file': { label: 'On an issue', muted: false },
-}
 
 export interface ActivityItem {
   thread: ThreadData
@@ -109,71 +97,4 @@ export interface ActivityProps {
    */
   truncated?: number
   className?: string
-}
-
-export function Activity({ items, onReply, disabledReason, nameOf, onReact, onDeleteMessage, onEditMessage, truncated = 0, className }: ActivityProps) {
-  const threads = useMemo(() => items.map((item) => item.thread), [items])
-  const { resolved, resolving } = useThreadReferences(threads)
-  /* Activity's threads belong to other files, and a reaction is a property of
-     the message wherever it is read — so they carry theirs too. */
-  const { reactionsBy, refresh: refreshReactions } = useThreadReactions(threads)
-  const react = onReact
-    ? async (messageId: string, emoji: string, mine?: string) => {
-        await onReact(messageId, emoji, mine)
-        refreshReactions()
-      }
-    : undefined
-
-  if (!items.length) {
-    // Where the list starts, with no room of its own (Katerina, 2026-09-14): the list's box has no padding either.
-    return <EmptyState scope="section" className={className} message="No related conversations yet." />
-  }
-
-  return (
-    <div className={cn('flex flex-col gap-2.5', className)}>
-      <ol className="flex flex-col gap-2.5">
-        {items.map((item) => {
-          const relation = RELATION[item.relation]
-          return (
-            <li key={item.thread.id} className="flex flex-col gap-1" data-relation={item.relation}>
-              <div className="flex items-center gap-2">
-                <Chip type="neutral" label={relation.label} />
-                {item.where && <span className="truncate text-caption text-text-muted">{item.where}</span>}
-              </div>
-              {/* The same card `Conversations` draws, deliberately — a thread
-                  looks like a thread wherever it is read, and re-typing the card
-                  here would be the second copy .claude/rules/ship-ui.md calls a component. */}
-              <ConversationThread
-                thread={item.thread}
-                onReply={onReply}
-                disabledReason={disabledReason}
-                resolved={resolved}
-                resolving={resolving}
-                nameOf={nameOf}
-                reactionsBy={reactionsBy}
-                onReact={react}
-                onDeleteMessage={onDeleteMessage}
-                onEditMessage={onEditMessage}
-                subdued={relation.muted}
-              />
-            </li>
-          )
-        })}
-      </ol>
-      {/*
-        What this list could not see, said rather than implied.
-
-        Two readers open the same object and honestly see different numbers,
-        because a mentioning conversation in a Folder they cannot read is absent
-        — no count, no locked row, no placeholder (§6.4). The inconsistency is
-        the privacy working, and a global count would "fix" it by leaking the
-        existence of a private discussion. So the honest move is to decline to
-        present the length as authoritative, which is what this line does.
-      */}
-      <p className="text-caption text-text-muted">
-        {truncated > 0 && `The ${items.length} most recent, of ${items.length + truncated}. The rest are on the issues themselves. `}
-        What this reader can see. Conversations in Folders you cannot read are absent, without being counted.
-      </p>
-    </div>
-  )
 }

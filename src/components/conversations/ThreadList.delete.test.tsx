@@ -1,3 +1,4 @@
+// Moved from src/components/ConversationThread.delete.test.tsx
 /**
  * Deleting a comment — CON-3.
  *
@@ -21,7 +22,8 @@
  */
 import { describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { ConversationThread, type ThreadData } from './ConversationThread'
+import { ThreadListView } from './ThreadList'
+import type { ThreadData } from '@/components/ConversationThread'
 
 const ANA = 'a'.repeat(64)
 const AGENT = 'b'.repeat(64)
@@ -34,10 +36,13 @@ const thread: ThreadData = {
   ],
 }
 
+// Changed on purpose: replies are folded behind the replies button, so the thread is opened to reach the reply's menu.
 function open(onDeleteMessage?: (id: string) => Promise<boolean | void> | boolean | void) {
-  return render(
-    <ConversationThread thread={thread} onReply={() => true} onDeleteMessage={onDeleteMessage} />,
+  const view = render(
+    <ThreadListView threads={[thread]} onStart={() => true} onReply={() => true} onDeleteMessage={onDeleteMessage} />,
   )
+  fireEvent.click(screen.getByRole('button', { name: '1 reply' }))
+  return view
 }
 
 /** The `…` triggers, in render order: the root's, then each reply's. */

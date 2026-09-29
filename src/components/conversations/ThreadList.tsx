@@ -1,6 +1,6 @@
 import { Fragment, Suspense, lazy, useMemo, useState, type ComponentProps } from 'react'
 import { IconDotsVertical, IconMessage2, IconMoodPlus } from '@tabler/icons-react'
-import { standaloneReference, toRenderTree, type Imeta } from '@estiva-app/protocol'
+import type { Imeta } from '@estiva-app/protocol'
 import { Avatar, Button, Card, EmptyState, IconButton, Menu, MenuItem, Popover, ReactionPicker, WithTooltip } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
 import { ago } from '@/lib/time'
@@ -15,7 +15,7 @@ import { SkeletonBar } from '@/components/ui/Skeleton'
 import { REACTION_OPTIONS, Reactions } from '@/components/Reactions'
 import { ConfirmDeleteMessage, NewSinceHere, useThreadReactions, useThreadReferences, type ConversationsProps, type MessageData, type ThreadData } from '@/components/ConversationThread'
 import type { ActivityProps } from '@/components/Activity'
-import { MESSAGE_FORMAT, PLACE_ICON, RELATION, Time, meaningLabel, type MentionListViewProps, type ThreadListViewProps } from './shared'
+import { MESSAGE_FORMAT, PLACE_ICON, RELATION, Time, meaningLabel, standaloneReferencesOf, type MentionListViewProps, type ThreadListViewProps } from './shared'
 import { MessageBoxShell } from './writingBox'
 
 /*
@@ -110,8 +110,7 @@ function AddReaction({ onPick, disabledReason }: { onPick: (emoji: string) => vo
 function Message({ message, resolved, resolving, nameOf, reactions, onToggleReaction, onDelete, onEdit, repliesLeftBehind = 0, disabledReason, drafts, footer }: MessageProps) {
   const [editing, setEditing] = useState(false)
   const [confirming, setConfirming] = useState(false)
-  const blocks = toRenderTree(message.body, MESSAGE_FORMAT)
-  const attached = blocks.map(standaloneReference).filter((r): r is string => !!r)
+  const attached = standaloneReferencesOf(message.body)
   const objects = attached.map((r) => resolved?.[r]).filter((o): o is ForeignObjectData => !!o)
   const react = onToggleReaction && ((emoji: string) => onToggleReaction(emoji, reactions?.find((r) => r.emoji === emoji)?.mine))
 
@@ -326,8 +325,15 @@ export function MentionListView(props: MentionListViewProps) {
             <li key={item.thread.id} className="flex flex-col gap-1.5" data-relation={item.relation}>
               <p className={cn('flex min-w-0 items-center gap-1.5 text-caption', relation.muted ? 'text-text-muted' : 'text-text-secondary')}>
                 {item.whereKind && <span className="flex shrink-0">{PLACE_ICON[item.whereKind]}</span>}
-                <span className="sr-only">{relation.label} </span>
-                <span className="truncate">{item.where ?? 'A Folder'}</span>
+                {/* A place Ship cannot name gets no invented one (ActivityItem.where): the relation's words alone, as production had. */}
+                {item.where ? (
+                  <>
+                    <span className="sr-only">{relation.label} </span>
+                    <span className="truncate">{item.where}</span>
+                  </>
+                ) : (
+                  <span>{relation.label}</span>
+                )}
               </p>
               <Thread thread={item.thread} {...threadProps(props)} />
             </li>

@@ -1,3 +1,4 @@
+// Moved from src/components/ConversationThread.attachments.test.tsx
 /**
  * A file on a message reaches the screen — CON-12, SHI-1's screenshot half.
  *
@@ -5,7 +6,7 @@
  *
  *   - `scripts/attachments.test.ts` — `imeta` folds into an index.
  *   - **here** — `threadFor` carries that index onto the message, and
- *     `MessageCard` draws it.
+ *     the thread list draws it.
  *   - `ui/Attachment.test.tsx` — the component's own states.
  *
  * The middle one is the one that has broken before. Peek's reply reactions had
@@ -18,13 +19,15 @@ import { render, waitFor } from '@testing-library/react'
 import type { Imeta } from '@estiva-app/protocol'
 
 const blobObjectUrl = vi.fn(async (_url: string) => 'blob:fake')
-vi.mock('@/api/blobs', () => ({ blobObjectUrl: (url: string) => blobObjectUrl(url) }))
+// `uploadAttachment` too: the writing box above the list takes it as its default upload.
+vi.mock('@/api/blobs', () => ({ blobObjectUrl: (url: string) => blobObjectUrl(url), uploadAttachment: vi.fn() }))
 vi.mock(import('@/api/foreign'), async (importOriginal) => ({
   ...(await importOriginal()),
   resolveForeign: vi.fn(async () => null),
 }))
 
-import { MessageCard } from './ConversationThread'
+import { ThreadListView } from './ThreadList'
+import type { MessageData } from '@/components/ConversationThread'
 import { threadFor } from '@/pages/ProjectPage'
 
 const SHA = 'a'.repeat(64)
@@ -81,18 +84,19 @@ describe('threadFor', () => {
   })
 })
 
-describe('MessageCard', () => {
+/* `MessageCard` is gone: a message is drawn inside the thread list, so it is
+   handed to the list as a thread's first message. */
+const show = (root: MessageData) =>
+  render(<ThreadListView threads={[{ id: root.id, root, replies: [] }]} onStart={() => true} onReply={() => true} />).container
+
+describe('a message in the thread list', () => {
   it('draws the file the thread handed it', async () => {
-    const c = render(
-      <MessageCard message={{ id: 'm1', author: { name: 'Bob' }, at: 1000, body: 'look at this', by: BOB, files: [file] }} />,
-    ).container
+    const c = show({ id: 'm1', author: { name: 'Bob' }, at: 1000, body: 'look at this', by: BOB, files: [file] })
     await waitFor(() => expect(c.querySelector('[data-attachment="image"]')).toBeTruthy())
   })
 
   it('draws no attachment row at all for a message without one', () => {
-    const c = render(
-      <MessageCard message={{ id: 'm1', author: { name: 'Bob' }, at: 1000, body: 'plain', by: BOB }} />,
-    ).container
+    const c = show({ id: 'm1', author: { name: 'Bob' }, at: 1000, body: 'plain', by: BOB })
     expect(c.querySelector('[data-attachment]')).toBeNull()
   })
 })

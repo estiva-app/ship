@@ -6,15 +6,16 @@ import * as RelatedStories from './Related.stories'
 # Related
 
 The foreign files somebody placed under this project or issue — RFC 0.5 §10.7,
-*nesting is by intent*. Every row is a **ForeignObject**, and nothing here knows
-what any of them are.
+*nesting is by intent* — as quiet rows (Katerina, 29 September). Every row is
+whatever the other app's projection says, and nothing here knows what any app
+is.
 
 <Canvas of={RelatedStories.Topics} />
 
 ## When
 
-- On an object's page, under a "Related" heading, with `hasRelated` deciding
-  whether the heading is drawn at all.
+- On an object's Overview tab, under a line and an **AppSection** titled
+  "Related", with `hasRelated` deciding whether any of it is drawn at all.
 - One level, in the Folder's order. A sub-topic under a related topic is that
   topic's to show.
 
@@ -34,10 +35,12 @@ No alternative: in both cases nothing is drawn, on purpose.
 import { Related, hasRelated } from '@/components/Related'
 
 {hasRelated(related) && (
-  <section>
-    <h2 className="text-h4 text-text-primary">Related</h2>
-    <Related related={related} />
-  </section>
+  <>
+    <Divider className="mx-0" />
+    <AppSection title="Related">
+      <Related related={related} />
+    </AppSection>
+  </>
 )}
 ```
 
@@ -45,6 +48,11 @@ import { Related, hasRelated } from '@/components/Related'
   back, and `'failed'` when it did not.
 
 ## What it owns
+
+- **Every state a row can be in**: the app's name after the title, a subtitle
+  and the meta on a second line, the status and the comment count in columns
+  that line up, a message as a face and its words, an object's own list nested
+  under it, and one this reader may not open said so.
 
 - **The failed-read line.** A read that did not come back must never look like
   "nothing is placed under this".

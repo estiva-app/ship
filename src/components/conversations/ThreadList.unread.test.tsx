@@ -1,6 +1,8 @@
+// Moved from src/components/ConversationThread.unread.test.tsx
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import { Conversations, type ThreadData } from './ConversationThread'
+import { ThreadList } from './ThreadList'
+import type { ThreadData } from '@/components/ConversationThread'
 
 /**
  * The divider reaches the screen (CRO-13).
@@ -22,19 +24,22 @@ const noop = () => {}
 
 describe('the new-since-you-looked divider', () => {
   it('is absent when nothing is unread', () => {
-    render(<Conversations threads={[thread('t1')]} onStart={noop} onReply={noop} />)
+    render(<ThreadList threads={[thread('t1')]} onStart={noop} onReply={noop} />)
     expect(screen.queryByText(LABEL)).toBeNull()
   })
 
   it('appears above the root when the whole thread is new', () => {
-    render(<Conversations threads={[thread('t1')]} unread={{ t1: 't1' }} onStart={noop} onReply={noop} />)
+    render(<ThreadList threads={[thread('t1')]} unread={{ t1: 't1' }} onStart={noop} onReply={noop} />)
     expect(screen.getAllByText(LABEL)).toHaveLength(1)
   })
 
+  // Changed on purpose: replies are folded, and a thread holding an unread reply opens by itself — which is what
+  // puts the divider on screen here without a click. The replies button says how many are new.
   it('appears above the first unread reply, not the root', () => {
     render(
-      <Conversations threads={[thread('t1', ['r1', 'r2'])]} unread={{ t1: 'r2' }} onStart={noop} onReply={noop} />,
+      <ThreadList threads={[thread('t1', ['r1', 'r2'])]} unread={{ t1: 'r2' }} onStart={noop} onReply={noop} />,
     )
+    expect(screen.getByRole('button', { name: '2 replies, 1 new' })).toHaveAttribute('aria-expanded', 'true')
     const nodes = screen.getAllByText(LABEL)
     expect(nodes).toHaveLength(1)
     // Ordering is the whole point of a divider: everything below it is new.
@@ -45,7 +50,7 @@ describe('the new-since-you-looked divider', () => {
 
   it('marks only the threads that have something new', () => {
     render(
-      <Conversations
+      <ThreadList
         threads={[thread('t1'), thread('t2')]}
         unread={{ t2: 't2' }}
         onStart={noop}

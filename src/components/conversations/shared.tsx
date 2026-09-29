@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { IconBox, IconListDetails } from '@tabler/icons-react'
-import type { Imeta } from '@estiva-app/protocol'
+import { standaloneReference, toRenderTree, type Imeta } from '@estiva-app/protocol'
 import { WithTooltip } from '@estiva-app/ui'
 import { ago } from '@/lib/time'
 import type { DraftStore } from '@/lib/drafts'
@@ -12,6 +12,18 @@ import type { ActivityProps, Relation } from '@/components/Activity'
 
 /** Messages are marker text (SPEC §13.2); only a rich text *field* is a block document. */
 export const MESSAGE_FORMAT = 'marker' as const
+
+/**
+ * The pointers standing alone on a line of a message: drawn below it as the
+ * object they name, while a pointer inside a sentence stays where it was
+ * written (RIC-10). The package's rule (`standaloneReference`), so Peek reaches
+ * the same answer. Reading the tree only — `RichText` draws it.
+ */
+export function standaloneReferencesOf(body: string): string[] {
+  return toRenderTree(body, MESSAGE_FORMAT)
+    .map(standaloneReference)
+    .filter((r): r is string => !!r)
+}
 
 /** The time as "3h ago", and the date and time on hover (Katerina, 29 September). */
 export function Time({ at }: { at: number }) {

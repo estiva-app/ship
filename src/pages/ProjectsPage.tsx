@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { PROJECT_STATUSES, createProject, lookupStatus, type DirectoryView, type FolderState } from '@/api'
 import type { FolderSummary } from '@estiva-app/interop'
+import { renderTreeText, toRenderTree } from '@estiva-app/protocol'
 import { NewProjectDialog } from '@/components/NewProjectDialog'
 import type { ProjectCardProps } from '@/components/ProjectCard'
 import { ProjectsView } from '@/views/ProjectsView'
@@ -25,7 +26,9 @@ export function ProjectsPage({ state, directory, teams, archived, say, refresh }
       return {
         href: href({ name: 'project', d: project.id, slug: project.title, view: 'table' }),
         title: project.title,
-        description: project.description || undefined,
+        // The words a reader would see, never the stored document: a description saved by the editor is a block
+        // document, and the card printed its JSON (found 30 September).
+        description: renderTreeText(toRenderTree(project.description, project.descriptionFormat)).trim() || undefined,
         status: { value: status.value, label: status.label },
         issueCount: issues.length,
         doneCount: issues.filter((issue) => issue.status === 'done').length,

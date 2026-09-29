@@ -13,36 +13,8 @@ import { documentFor, fromEditorDocument, toEditorDocument, type EditorDocument 
 import { ReferenceNode, ReferenceProvider } from '@/components/ui/editorSchema'
 import { LinkDecoration } from '@/components/editing/linkDecoration'
 import { DescriptionSlashMenu } from '@/components/editing/slashMenu'
-
-/**
- * The writing box for conversations (Katerina, 29–30 September), on production's
- * rules. What it looks like is Peek's writing box; what it does is Ship's
- * `Composer` and `EditMessage`, rule for rule, so nothing production does is lost:
- *
- * - **What is sent is marker text** (SPEC §13.2), the same string the one-line
- *   field sends today. The editor's document goes through the block bridge
- *   (`fromEditorDocument`, then `blockDocumentToMarkerText`), so bold, italic,
- *   underline, code, headings, lists, quotes and a pasted reference survive, and
- *   an edit starts from the same text (`markerTextToBlockDocument`). `/` offers
- *   no Table: marker text has none.
- * - **A file uploads when it is picked**, one after another, and waits as the
- *   package's `AttachmentCard` with its ✕. A refusal shows in the relay's words
- *   under the box. Send waits while a file is uploading.
- * - **A message can be only files.** Nothing at all cannot be sent.
- * - **Cleared only when the relay took it.** `onSubmit` resolving `false` keeps
- *   the text and the files. Everything locks while it is sending.
- * - **Drafts** (CON-10): the text is kept per destination as it is typed, and
- *   comes back when the box is shown again. Files are not kept, as today.
- * - **Signed out:** `disabledReason` locks the box and every button, with the
- *   reason as the tooltip.
- * - **Keys:** Enter sends; Shift+Enter is Enter as a document has it (a new
- *   bullet, a new line in code, a new paragraph); Ctrl/Cmd+Enter also sends
- *   (today's edit shortcut). Escape: an edit cancels; an empty reply closes.
- *
- * A new conversation is Peek's tall box, the tools on a row under the text; a
- * reply is one short line with the tools at its end (Katerina, 30 September).
- */
 import { WRITING_BOX } from './writingBox'
+
 
 export type MessageBoxKind = 'conversation' | 'reply' | 'edit'
 
@@ -82,6 +54,34 @@ export interface MessageBoxProps {
   className?: string
 }
 
+/**
+ * The writing box for conversations (Katerina, 29–30 September), on production's
+ * rules. What it looks like is Peek's writing box; what it does is Ship's
+ * `Composer` and `EditMessage`, rule for rule, so nothing production does is lost:
+ *
+ * - **What is sent is marker text** (SPEC §13.2), the same string the one-line
+ *   field sends today. The editor's document goes through the block bridge
+ *   (`fromEditorDocument`, then `blockDocumentToMarkerText`), so bold, italic,
+ *   underline, code, headings, lists, quotes and a pasted reference survive, and
+ *   an edit starts from the same text (`markerTextToBlockDocument`). `/` offers
+ *   no Table: marker text has none.
+ * - **A file uploads when it is picked**, one after another, and waits as the
+ *   package's `AttachmentCard` with its ✕. A refusal shows in the relay's words
+ *   under the box. Send waits while a file is uploading.
+ * - **A message can be only files.** Nothing at all cannot be sent.
+ * - **Cleared only when the relay took it.** `onSubmit` resolving `false` keeps
+ *   the text and the files. Everything locks while it is sending.
+ * - **Drafts** (CON-10): the text is kept per destination as it is typed, and
+ *   comes back when the box is shown again. Files are not kept, as today.
+ * - **Signed out:** `disabledReason` locks the box and every button, with the
+ *   reason as the tooltip.
+ * - **Keys:** Enter sends; Shift+Enter is Enter as a document has it (a new
+ *   bullet, a new line in code, a new paragraph); Ctrl/Cmd+Enter also sends
+ *   (today's edit shortcut). Escape: an edit cancels; an empty reply closes.
+ *
+ * A new conversation is Peek's tall box, the tools on a row under the text; a
+ * reply is one short line with the tools at its end (Katerina, 30 September).
+ */
 export function MessageBox({ kind = 'conversation', onSubmit, initial = '', onCancel, autoFocus = false, disabledReason, draftKey, drafts = DEFAULT_DRAFTS, upload = uploadAttachment, nameOf, look = 'box', me, className }: MessageBoxProps) {
   const [text, setText] = useState(initial)
   const [files, setFiles] = useState<readonly Imeta[]>([])
@@ -165,22 +165,34 @@ export function MessageBox({ kind = 'conversation', onSubmit, initial = '', onCa
 
   // Seed from the draft, and again when the destination changes (Composer's rule).
   useEffect(() => {
-    if (!editor || kind === 'edit') return
-    const draft = draftKey ? (store.current.read(draftKey) ?? '') : ''
-    editor.commands.setContent(editorDocFor(draft), { emitUpdate: false })
-    setText(draft)
-    setFiles([])
-    setUploadError(null)
+    if (!editor || editor.isDestroyed || kind === 'edit') return
+    const seed = () => {
+      const draft = draftKey ? (store.current.read(draftKey) ?? '') : ''
+      editor.commands.setContent(editorDocFor(draft), { emitUpdate: false })
+      setText(draft)
+      setFiles([])
+      setUploadError(null)
+    }
+    // Loaded lazily, the editor can reach here before its view (and its commands) exist: seed once it is made.
+    if (editor.isInitialized) seed()
+    else editor.on('create', seed)
+    return () => void editor.off('create', seed)
   }, [editor, draftKey, kind])
 
   // Locked while sending, which takes the caret away; after a send it goes back, ready for the next one.
   const sent = useRef(false)
   useEffect(() => {
-    editor?.setEditable(!disabledReason && !busy)
-    if (!busy && sent.current && editor) {
-      sent.current = false
-      editor.commands.focus()
+    if (!editor || editor.isDestroyed) return
+    const apply = () => {
+      editor.setEditable(!disabledReason && !busy)
+      if (!busy && sent.current) {
+        sent.current = false
+        editor.commands.focus()
+      }
     }
+    if (editor.isInitialized) apply()
+    else editor.on('create', apply)
+    return () => void editor.off('create', apply)
   }, [editor, disabledReason, busy])
 
   const submit = async () => {

@@ -1,10 +1,11 @@
+// Moved from src/components/ConversationThread.references.test.tsx
 /**
  * A comment shows the object it points at — SHI-1.
  *
  * Katerina's report was *"screenshots and reference widgets aren't rendered in
  * conversation or replies. Avatar + name + timestamp only."* Descriptions had
  * had this since PRO-7 and RIC-10 and conversations had never been given it, so
- * the assertions here are the ones `Description.test.tsx` already makes, on the
+ * the assertions here are the ones `LiveHeader.test.tsx` already makes, on the
  * surface that lacked them.
  *
  * The failing case worth naming: `startConversation` appends the issue's
@@ -14,17 +15,18 @@
  * and a time — which is exactly what the report describes.
  */
 import { describe, expect, it, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 // Only the network call is stubbed. Resolving nothing is a real answer, and it
 // is the one that isolates "which text reached the screen" from "what the relay
-// happened to hold" — the same stub `Description.test.tsx` uses.
+// happened to hold" — the same stub `LiveHeader.test.tsx` uses.
 vi.mock(import('@/api/foreign'), async (importOriginal) => ({
   ...(await importOriginal()),
   resolveForeign: vi.fn(async () => null),
 }))
 
-import { Conversations, type ThreadData } from './ConversationThread'
+import { ThreadList } from './ThreadList'
+import type { ThreadData } from '@/components/ConversationThread'
 import { omitOwnReference } from '@/pages/ProjectPage'
 
 const NADDR =
@@ -40,7 +42,7 @@ const thread = (body: string, replyBody?: string): ThreadData => ({
 })
 
 const noop = () => {}
-const show = (t: ThreadData) => render(<Conversations threads={[t]} onStart={noop} onReply={noop} />).container
+const show = (t: ThreadData) => render(<ThreadList threads={[t]} onStart={noop} onReply={noop} />).container
 
 describe('a comment that points at an object', () => {
   it('draws a mid-sentence pointer in place, keeping the sentence', () => {
@@ -68,8 +70,10 @@ describe('a comment that points at an object', () => {
     expect(c.textContent).not.toContain(NADDR)
   })
 
+  // Changed on purpose: replies are folded behind the replies button, so the thread is opened first.
   it('renders a pointer in a reply, not only in the root', () => {
     const c = show(thread('Have a look at this.', `Here: ${NADDR}`))
+    fireEvent.click(screen.getByRole('button', { name: '1 reply' }))
     expect(c.textContent).toContain('Here:')
     expect(c.querySelectorAll('[data-reference]').length).toBe(1)
   })

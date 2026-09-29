@@ -1,7 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { fn } from 'storybook/test'
 import type { BlockAnchor } from '@estiva-app/protocol'
-import { ConversationThread, type ThreadData } from '@/components/ConversationThread'
+import type { ThreadData } from '@/components/ConversationThread'
+import { ThreadListView } from '@/components/conversations/ThreadList'
 import { THREADS } from '@/fixtures/issues'
 import { BlockAnchorNote } from './BlockAnchorNote'
 
@@ -39,20 +40,20 @@ type Story = StoryObj<typeof meta>
 
 /** The paragraph the comment is about, quoted above it, so the remark sits beside its subject instead of somewhere above the fold. */
 export const Resolved: Story = {
-  render: () => <ConversationThread thread={anchored(resolved)} onReply={fn()} />,
+  render: () => <ThreadListView threads={[anchored(resolved)]} onStart={fn()} onReply={fn()} />,
 }
 
 /** That paragraph has since been deleted. Said out loud — silence here is indistinguishable from a comment about the whole object. */
 export const Detached: Story = {
-  render: () => <ConversationThread thread={anchored({ state: 'detached', id: 'p3' } as BlockAnchor)} onReply={fn()} />,
+  render: () => <ThreadListView threads={[anchored({ state: 'detached', id: 'p3' } as BlockAnchor)]} onStart={fn()} onReply={fn()} />,
 }
 
 /** A different fact, deliberately worded differently: nothing was deleted, this description simply has no parts to point at. */
 export const Unaddressable: Story = {
-  render: () => <ConversationThread thread={anchored({ state: 'unaddressable', id: 'p3' } as BlockAnchor)} onReply={fn()} />,
+  render: () => <ThreadListView threads={[anchored({ state: 'unaddressable', id: 'p3' } as BlockAnchor)]} onStart={fn()} onReply={fn()} />,
 }
 
 /** No `block` tag at all: a comment about the whole object, which is what every comment in the workspace used to be. Nothing is drawn, and the card looks as it always has. */
 export const Unanchored: Story = {
-  render: () => <ConversationThread thread={anchored({ state: 'unanchored' } as BlockAnchor)} onReply={fn()} />,
+  render: () => <ThreadListView threads={[anchored({ state: 'unanchored' } as BlockAnchor)]} onStart={fn()} onReply={fn()} />,
 }
