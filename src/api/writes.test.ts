@@ -17,7 +17,7 @@ vi.mock('./foreign', () => ({ readFolders: vi.fn() }))
 import { clockProblem } from './clock'
 import { readFolders } from './foreign'
 import { store } from './store'
-import { archiveProject, createIssue, createProject, deleteProject, explainRejection, pairProjectFolder, reply, setIssueField, setProjectField, startConversation } from './writes'
+import { archiveProject, createIssue, createProject, deleteProject, reply, setIssueField, setProjectField, startConversation } from './writes'
 
 const s = store as unknown as Record<string, ReturnType<typeof vi.fn>>
 const PK = 'ab'.repeat(32)
@@ -37,11 +37,9 @@ describe('the clock is checked before anything is signed', () => {
     expect(await setIssueField(ISSUE, 'status', 'done', 'Status → done')).toEqual({ ok: false, reason: 'clock is off' })
     expect(await createProject({ title: 'X', description: '', team: TEAM })).toEqual({ ok: false, reason: 'clock is off' })
     expect(await createIssue(PROJECT, [], { title: 'X', description: '' })).toEqual({ ok: false, reason: 'clock is off' })
-    expect(await pairProjectFolder(PROJECT, 'f')).toEqual({ ok: false, reason: 'clock is off' })
     expect(s.setField).not.toHaveBeenCalled()
     expect(s.createProject).not.toHaveBeenCalled()
     expect(s.createIssue).not.toHaveBeenCalled()
-    expect(s.linkProjectFolder).not.toHaveBeenCalled()
   })
 })
 
@@ -142,20 +140,7 @@ describe('conversations', () => {
   })
 })
 
-describe('pairing and its explanation', () => {
-  it('names the likely cause when the relay does not know the Folder', async () => {
-    s.linkProjectFolder.mockResolvedValue({ ok: false, reason: 'not a channel member' })
-    const result = await pairProjectFolder(PROJECT, '11111111-2222-4333-8444-555555555555')
-    expect(result.ok).toBe(false)
-    expect(result).toMatchObject({ reason: expect.stringContaining('has not been published yet') })
-    expect(explainRejection('something else', 'f')).toBe('something else')
-  })
-
-  it('reports the announcement separately from the link', async () => {
-    s.linkProjectFolder.mockResolvedValue({ ok: true, announced: false, announceReason: 'refused' })
-    expect(await pairProjectFolder(PROJECT, 'f')).toEqual({ ok: true, announced: false, announceReason: 'refused' })
-  })
-
+describe('creating a project', () => {
   it('a project is created in the team it names', async () => {
     s.createProject.mockResolvedValue({ result: { ok: true }, placed: { ok: true }, addr: 'a', id: 'i', folder: TEAM.folder })
     expect(await createProject({ title: 'X', description: '', team: TEAM })).toEqual({ ok: true, addr: 'a' })

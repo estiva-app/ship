@@ -13,9 +13,7 @@ import {
   deleteMessage,
   editMessage,
   deleteProject,
-  folderLink,
   me,
-  pairProjectFolder,
   peopleIn,
   react,
 
@@ -42,8 +40,8 @@ import type { ThreadData } from '@/components/ConversationThread'
 import type { ActivityItem } from '@/components/Activity'
 import type { IssuesTableRow } from '@/components/IssuesTable'
 import { NewIssueDialog } from '@/components/NewIssueDialog'
-import { PairFolderDialog } from '@/components/PairFolderDialog'
 import type { RailPerson } from '@/components/ProjectRail'
+import { placedIn } from '@/lib/placement'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { ProjectView } from '@/views/ProjectView'
@@ -183,8 +181,9 @@ export function folderOfMessage(state: FolderState, messageId: string): string |
  * project names its content Folder; an issue names its own. Both are checked
  * because a mention may have been written in either.
  *
- * **`undefined` is a real answer and is drawn as nothing.** A Peek topic paired
- * with no project is a Folder and nothing else — Ship has no name for it, and
+ * **`undefined` is a real answer and is drawn as nothing.** A Folder that is no
+ * project's — a top-level Folder's own chat, an old Peek topic channel — is a
+ * Folder and nothing else to Ship: it has no name for it, and
  * inventing one ("Folder 4f3a…") would be a worse row than a quiet one. The
  * same goes for a Folder this reader cannot see into: the thread reached them
  * some other way and its home did not.
@@ -311,8 +310,12 @@ export function ProjectPage({
 }: {
   state: WorkspaceState
   directory: DirectoryView
-  /** The teams, so a project filed into one is not given the team's chat (`recordChannel`). */
-  teams: readonly { id: string; hasState: boolean }[] | undefined
+  /**
+   * The top-level Folders, so a project filed into one is not given that
+   * Folder's chat (`recordChannel`), and so the rail can name the one it is in
+   * (`placedIn`). `undefined` while they are read.
+   */
+  teams: readonly { id: string; name?: string; hasState: boolean; addresses?: readonly string[] }[] | undefined
   /** The object's `d`, which is all a §7.2 URL carries. */
   d: string
   view: ProjectViewName
@@ -321,7 +324,7 @@ export function ProjectPage({
   refresh: (folders?: string[]) => Promise<void>
 }) {
   const project = state.projects.find((candidate) => candidate.id === d)
-  const [dialog, setDialog] = useState<'issue' | 'pair' | 'delete' | null>(null)
+  const [dialog, setDialog] = useState<'issue' | 'delete' | null>(null)
 
   const issues = useMemo<IssuesTableRow[]>(() => {
     if (!project) return []
@@ -552,10 +555,8 @@ export function ProjectPage({
           onLeadChange: (value) => void set('lead', value, value ? 'Assign project' : 'Unassign project'),
           done,
           total: issues.length,
-          folder: project.contentFolder,
-          onCopyFolderLink: () =>
-            void copyText(folderLink(project.contentFolder), 'Folder link copied', 'Copy this Folder link:', say),
-          onPairFolder: () => setDialog('pair'),
+          // The top-level Folder it is in, by the sidebar's rule: the state that lists it, then its own Folder (FOL-3).
+          folders: teams && placedIn({ addr: project.addr, folder: project.contentFolder }, teams).map((folder) => ({ name: folder.name ?? folder.id, href: href({ name: 'folder', id: folder.id }) })),
           onArchive: () =>
             void act(project.archived ? 'Unarchive' : 'Archive', () => archiveProject(project, !project.archived), say, refresh).then((ok) => {
               if (ok) say(project.archived ? 'Project restored' : 'Project archived')
@@ -577,30 +578,6 @@ export function ProjectPage({
             }
             await refresh([project.contentFolder])
             say('Issue created')
-            return true
-          }}
-        />
-      )}
-
-      {dialog === 'pair' && (
-        <PairFolderDialog
-          currentFolder={project.contentFolder}
-          onClose={() => setDialog(null)}
-          onPair={async (folder) => {
-            const result = await pairProjectFolder(project, folder)
-            if (!result.ok) {
-              say(`Folder link rejected — ${result.reason}`, 'error')
-              return false
-            }
-            await refresh()
-            if (result.announced === false) {
-              say(
-                `Paired, and new issues will land in that Folder — but the Folder itself refused the note that says so${result.announceReason ? `: ${result.announceReason}` : '.'} Apps reading that Folder may not find this project until an issue is filed in it.`,
-                'error',
-              )
-            } else {
-              say('Folder paired')
-            }
             return true
           }}
         />

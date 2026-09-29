@@ -70,8 +70,9 @@ export interface ActivityItem {
   /**
    * The file this thread belongs to, in words a reader recognises — a project
    * title, an issue's ref. Absent when Ship cannot name it, which is ordinary:
-   * a Peek topic that is paired with no project is a Folder and nothing else,
-   * and inventing a name for it would be worse than saying nothing.
+   * a Folder that is no project's — a top-level Folder's own chat, an old Peek
+   * topic channel — is a Folder and nothing else, and inventing a name for it
+   * would be worse than saying nothing.
    */
   where?: string
 }

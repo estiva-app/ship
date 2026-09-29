@@ -1,6 +1,7 @@
 import { IconArrowUpRight, IconBox, IconListDetails } from '@tabler/icons-react'
 import { CollapsibleSection, Sidebar as SidebarShell } from '@estiva-app/ui'
 import { SkeletonBar } from '@/components/ui/Skeleton'
+import { placedIn } from '@/lib/placement'
 import { NavItem } from './NavItem'
 
 /**
@@ -153,16 +154,9 @@ export function Sidebar({ openIssues, issuesHref, projectsHref, projects, folder
   const teams = [...folders].sort((a, b) =>
     (a.name ?? a.id).localeCompare(b.name ?? b.id, undefined, { sensitivity: 'base' }),
   )
-  const teamIds = new Set(teams.map((team) => team.id))
-  const listedBy = new Map<string, string[]>()
-  for (const team of teams) {
-    for (const address of team.addresses ?? []) listedBy.set(address, [...(listedBy.get(address) ?? []), team.id])
-  }
-  // The teams whose state lists it; failing that, its own Folder if that is a team.
-  const teamsOf = (project: SidebarProject) =>
-    listedBy.get(project.addr) ?? (project.folder && teamIds.has(project.folder) ? [project.folder] : [])
-  const under = (team: SidebarFolder) => projects.filter((project) => teamsOf(project).includes(team.id))
-  const unfiled = projects.filter((project) => teamsOf(project).length === 0)
+  // The teams whose state lists it; failing that, its own Folder if that is a team (`placedIn`, which the project rail names too).
+  const under = (team: SidebarFolder) => projects.filter((project) => placedIn(project, teams).includes(team))
+  const unfiled = projects.filter((project) => placedIn(project, teams).length === 0)
   const row = (project: SidebarProject) => (
     <NavItem
       key={project.addr}

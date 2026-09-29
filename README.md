@@ -102,11 +102,14 @@ not there.
 
 Two consequences worth knowing:
 
-- **Pairing with a Peek topic is not a linking step.** You create the project
-  *in* the topic's Folder, and they are one container from the first event.
-  `store.linkProjectFolder` exists only to re-point a project that already
-  exists somewhere else — an event cannot change its own `h` — and readers take
-  the union of every Folder a project has pointed at, so nothing disappears.
+- **A project is filed into a top-level Folder, and that is the whole
+  placement** (FOL-2, FOL-3). Its issues and conversation live in that Folder,
+  and the Folder's state lists it, which is what both apps draw it under.
+  There is no pairing step and no control for one. `store.linkProjectFolder`
+  survives only to repair a record that points at the wrong Folder — an event
+  cannot change its own `h` — and readers take the union of every Folder a
+  project has pointed at, so the projects re-linked before this still list
+  every issue.
 - **An issue cannot exist without a project**, because the only Folders in this
   app are projects and every event needs an `h`.
 

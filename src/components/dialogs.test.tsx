@@ -3,7 +3,6 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { NewIssueDialog } from './NewIssueDialog'
 import { NewProjectDialog } from './NewProjectDialog'
-import { PairFolderDialog } from './PairFolderDialog'
 
 const FOLDER = '5c1e2a7b-9d40-4f3a-8e6b-2f0c7d1a9b34'
 const OTHER = '11111111-2222-4333-8444-555555555555'
@@ -88,22 +87,5 @@ describe('NewIssueDialog', () => {
     render(<NewIssueDialog projects={[]} onClose={vi.fn()} onCreate={vi.fn()} />)
     expect(screen.getByText(/Create a project first/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Create issue' })).not.toBeInTheDocument()
-  })
-})
-
-describe('PairFolderDialog', () => {
-  it('parses the link, refuses the current Folder, and pairs another', async () => {
-    const onPair = vi.fn().mockResolvedValue(true)
-    render(<PairFolderDialog currentFolder={FOLDER} onClose={vi.fn()} onPair={onPair} />)
-    const input = screen.getByPlaceholderText(/Folder link/)
-    fireEvent.change(input, { target: { value: 'nope' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Pair' }))
-    expect(await screen.findByText(/does not look like a Folder link/)).toBeInTheDocument()
-    fireEvent.change(input, { target: { value: `folder:${FOLDER}` } })
-    fireEvent.click(screen.getByRole('button', { name: 'Pair' }))
-    expect(await screen.findByText('Already paired with that Folder.')).toBeInTheDocument()
-    fireEvent.change(input, { target: { value: `https://peek.example/topic?folder=${OTHER}` } })
-    fireEvent.click(screen.getByRole('button', { name: 'Pair' }))
-    await waitFor(() => expect(onPair).toHaveBeenCalledWith(OTHER))
   })
 })

@@ -41,7 +41,7 @@ export const SubFileOnly: Story = { args: { items: ACTIVITY_ITEMS.filter((i) => 
  */
 export const MentionOnly: Story = { args: { items: ACTIVITY_ITEMS.filter((i) => i.relation === 'mention') } }
 
-/** A thread whose Folder Ship cannot name — a Peek topic paired with no project. */
+/** A thread whose Folder Ship cannot name — a Folder that is no project's. */
 export const NowhereNamed: Story = {
   args: { items: ACTIVITY_ITEMS.map((item) => ({ ...item, where: undefined })) },
 }
