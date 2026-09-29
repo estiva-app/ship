@@ -6,7 +6,6 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { SIDEBAR_PROJECTS } from '@/fixtures/projects'
 import { NewIssueDialog } from './NewIssueDialog'
 import { NewProjectDialog } from './NewProjectDialog'
-import { PairFolderDialog } from './PairFolderDialog'
 
 /**
  * The four dialogs the writes need (REW-5), every one built from the shared
@@ -63,24 +62,6 @@ export const DeleteProject: Story = {
   ),
 }
 
-/** Pair with another Folder — replaces production's prompt(). */
-export const PairFolder: Story = {
-  render: () => <PairFolderDialog currentFolder="5c1e2a7b-9d40-4f3a-8e6b-2f0c7d1a9b34" onClose={fn()} onPair={fn()} />,
-}
-
-/**
- * The error line is `Field`'s own since 0.10.0 (S7): it takes the helper's
- * place, marks the control invalid, and is announced. This canvas pastes
- * something that is not a link and presses Pair.
- */
-export const PairFolderRefused: Story = {
-  render: () => <PairFolderDialog currentFolder="5c1e2a7b-9d40-4f3a-8e6b-2f0c7d1a9b34" onClose={fn()} onPair={fn()} />,
-  play: async () => {
-    await userEvent.type(screen.getByPlaceholderText(/Folder link/), 'nope')
-    await userEvent.click(screen.getByRole('button', { name: 'Pair' }))
-  },
-}
-
 /** No teams came back from the read: the picker says why it is shut, and nothing can be created. */
 export const NewProjectNoTeams: Story = {
   render: () => <NewProjectDialog teams={[]} onClose={fn()} onCreate={fn()} />,
@@ -92,7 +73,7 @@ export const NewProjectNoTeams: Story = {
 /** Open each from a button, and close it with Cancel, ✕, the backdrop or Escape. */
 export const OpenAndClose: Story = {
   render: () => {
-    const [open, setOpen] = useState<'project' | 'issue' | 'delete' | 'pair' | null>(null)
+    const [open, setOpen] = useState<'project' | 'issue' | 'delete' | null>(null)
     return (
       <div className="flex h-screen items-center justify-center gap-2">
         <Button variant="primary" onClick={() => setOpen('project')}>
@@ -104,9 +85,6 @@ export const OpenAndClose: Story = {
         <Button variant="destructive" onClick={() => setOpen('delete')}>
           Delete project
         </Button>
-        <Button variant="outlined" onClick={() => setOpen('pair')}>
-          Pair with another Folder…
-        </Button>
         {open === 'project' && <NewProjectDialog teams={TEAMS} onClose={() => setOpen(null)} onCreate={fn()} />}
         {open === 'issue' && <NewIssueDialog projects={PROJECT_OPTIONS} onClose={() => setOpen(null)} onCreate={fn()} />}
         {open === 'delete' && (
@@ -114,7 +92,6 @@ export const OpenAndClose: Story = {
             <p>This publishes a NIP-09 deletion request. Relays may decline it, and copies held elsewhere are unaffected.</p>
           </ConfirmDialog>
         )}
-        {open === 'pair' && <PairFolderDialog currentFolder="5c1e2a7b-9d40-4f3a-8e6b-2f0c7d1a9b34" onClose={() => setOpen(null)} onPair={fn()} />}
       </div>
     )
   },

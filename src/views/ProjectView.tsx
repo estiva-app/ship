@@ -14,7 +14,7 @@ import { Activity, type ActivityItem } from '@/components/Activity'
 import type { IssueRowData } from '@/components/IssueRow'
 import { IssuesTable, type IssuesTableRow } from '@/components/IssuesTable'
 import { ProjectHeader } from '@/components/ProjectHeader'
-import { ProjectRail, type RailPerson } from '@/components/ProjectRail'
+import { ProjectRail, type RailFolder, type RailPerson } from '@/components/ProjectRail'
 import { Related, hasRelated } from '@/components/Related'
 import type { RelatedState } from '@/api/useRelated'
 
@@ -66,9 +66,7 @@ export interface ProjectViewProps {
     onLeadChange: (v: string) => void
     done: number
     total: number
-    folder: string
-    onCopyFolderLink: () => void
-    onPairFolder: () => void
+    folders: RailFolder[] | null | undefined
     onArchive: () => void
     onDelete: () => void
   }

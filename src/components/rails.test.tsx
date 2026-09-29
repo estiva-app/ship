@@ -1,8 +1,9 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { IssueRail } from './IssueRail'
-import { ProjectRail } from './ProjectRail'
+import { ProjectRail, type RailFolder } from './ProjectRail'
 
+const FOLDER = '5c1e2a7b-9d40-4f3a-8e6b-2f0c7d1a9b34'
 const STATUSES = [
   { value: 'planned', label: 'Planned' },
   { value: 'in_progress', label: 'In Progress' },
@@ -10,39 +11,47 @@ const STATUSES = [
 const PEOPLE = [{ value: 'ana', name: 'Ana Duarte' }]
 
 describe('ProjectRail', () => {
-  it('lays out production’s rail: the four properties, the progress words, the folder id, and every action as a small button', () => {
-    const onDelete = vi.fn()
-    const { container } = render(
-      <ProjectRail
-        status="in_progress"
-        statuses={STATUSES}
-        onStatusChange={vi.fn()}
-        lead="ana"
-        people={PEOPLE}
-        onLeadChange={vi.fn()}
-        done={10}
-        total={14}
-        folder="5c1e2a7b-9d40-4f3a-8e6b-2f0c7d1a9b34"
-        onCopyFolderLink={vi.fn()}
-        onPairFolder={vi.fn()}
-        archived={false}
-        onArchive={vi.fn()}
-        onDelete={onDelete}
-      />,
-    )
+  const rail = (folders: RailFolder[] | null | undefined) => (
+    <ProjectRail
+      status="in_progress"
+      statuses={STATUSES}
+      onStatusChange={vi.fn()}
+      lead="ana"
+      people={PEOPLE}
+      onLeadChange={vi.fn()}
+      done={10}
+      total={14}
+      folders={folders}
+      archived={false}
+      onArchive={vi.fn()}
+      onDelete={vi.fn()}
+    />
+  )
+
+  it('lays out production’s rail: the four properties, the progress words, the Folder by name, and every action as a small button', () => {
+    const { container } = render(rail([{ name: 'Ship', href: `/folder/${FOLDER}` }]))
     for (const label of ['Status', 'Assignee', 'Progress', 'Folder']) expect(screen.getByText(label)).toBeInTheDocument()
     expect(screen.getByRole('progressbar', { name: 'Issues done' })).toHaveAttribute('aria-valuenow', '10')
     expect(screen.getByText('10 of 14 done')).toBeInTheDocument()
-    expect(screen.getByText('5c1e2a7b-9d40-4f3a-8e6b-2f0c7d1a9b34')).toBeInTheDocument()
+    // The Folder it is in, by name, opening that Folder's page (FOL-3).
+    expect(screen.getByRole('link', { name: 'Ship' })).toHaveAttribute('href', `/folder/${FOLDER}`)
     // The assignee select shows the chosen person's face before the name.
     expect(screen.getByRole('combobox', { name: 'Assignee' }).querySelector('svg')).not.toBeNull()
-    for (const name of ['Copy Folder link', 'Pair with another Folder…', 'Archive project', 'Delete project']) {
-      expect(screen.getByRole('button', { name })).toHaveClass('h-6')
-    }
-    fireEvent.click(screen.getByRole('button', { name: 'Delete project' }))
-    expect(onDelete).toHaveBeenCalledTimes(1)
-    // The folder id is the one legitimate hex on the rail; nothing else may be.
-    expect(container.textContent!.replace('5c1e2a7b-9d40-4f3a-8e6b-2f0c7d1a9b34', '')).not.toMatch(/[0-9a-f]{8}/)
+    for (const name of ['Archive project', 'Delete project']) expect(screen.getByRole('button', { name })).toHaveClass('h-6')
+    // No pairing is left: no link to copy, nothing to pair with, and no id on the rail at all.
+    expect(screen.queryByRole('button', { name: /Folder link|Pair/ })).not.toBeInTheDocument()
+    expect(container.textContent).not.toMatch(/[0-9a-f]{8}|pair/i)
+  })
+
+  it('draws a dash for a project in no Folder, and a placeholder while the Folders are read', () => {
+    const { rerender } = render(rail([]))
+    expect(screen.getByText('—')).toBeInTheDocument()
+    // A read that returned no Folders is not the same claim as "in none".
+    rerender(rail(null))
+    expect(screen.getByText('Folders could not be read')).toBeInTheDocument()
+    rerender(rail(undefined))
+    expect(screen.queryByText('—')).not.toBeInTheDocument()
+    expect(screen.queryByRole('link')).not.toBeInTheDocument()
   })
 })
 
@@ -90,7 +99,6 @@ describe('a write control that cannot succeed says why', () => {
     them.
   */
   it('disables every action in the project rail, keeps each reachable by keyboard, and calls nothing', () => {
-    const onPairFolder = vi.fn()
     const onArchive = vi.fn()
     const onDelete = vi.fn()
     render(
@@ -103,16 +111,14 @@ describe('a write control that cannot succeed says why', () => {
         onLeadChange={vi.fn()}
         done={10}
         total={14}
-        folder="5c1e2a7b"
-        onCopyFolderLink={vi.fn()}
-        onPairFolder={onPairFolder}
+        folders={[{ name: 'Ship', href: `/folder/${FOLDER}` }]}
         archived={false}
         onArchive={onArchive}
         onDelete={onDelete}
         readOnlyReason={REASON}
       />,
     )
-    for (const name of ['Pair with another Folder…', 'Archive project', 'Delete project']) {
+    for (const name of ['Archive project', 'Delete project']) {
       const button = screen.getByRole('button', { name })
       // Base UI's `focusableWhenDisabled` spells disablement with aria, not the
       // `disabled` attribute, precisely so the control keeps its tab stop.
@@ -120,7 +126,8 @@ describe('a write control that cannot succeed says why', () => {
       expect(button.getAttribute('tabindex')).toBe('0')
       fireEvent.click(button)
     }
-    expect(onPairFolder).not.toHaveBeenCalled()
+    // The Folder is a link, not a write, so it stays open.
+    expect(screen.getByRole('link', { name: 'Ship' })).not.toHaveAttribute('aria-disabled')
     expect(onArchive).not.toHaveBeenCalled()
     expect(onDelete).not.toHaveBeenCalled()
   })

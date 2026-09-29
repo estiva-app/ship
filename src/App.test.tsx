@@ -31,8 +31,10 @@ vi.mock('@/api', async (importOriginal) => {
 vi.mock('@/api/foreign', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/api/foreign')>()),
   readFolder: vi.fn(() => new Promise(() => {})),
-  // One team, so a new project has somewhere to be filed (FOL-2).
-  readFolders: vi.fn(() => Promise.resolve([{ id: '3167adea-877f-43c4-96fb-517a2b2d5d24', name: 'Ship', hasState: true }])),
+  // One team, so a new project has somewhere to be filed (FOL-2); its state lists Live, so the rail names it (FOL-3).
+  readFolders: vi.fn(() =>
+    Promise.resolve([{ id: '3167adea-877f-43c4-96fb-517a2b2d5d24', name: 'Ship', hasState: true, addresses: ['30850:x:00000000-0000-4000-8000-000000000001'] }]),
+  ),
 }))
 
 import { createIssue, createProject, deleteIssue, deleteProject, resolveInbound, setIssueField, startConversation, useDirectory, useWorkspace } from '@/api'
@@ -240,7 +242,9 @@ describe('Project page — one project from the fold', () => {
     expect(await main.findByText('about the project')).toBeInTheDocument()
     expect(main.getByText('reply')).toBeInTheDocument()
     expect(main.getByRole('combobox', { name: 'Status' })).toBeEnabled()
-    expect(main.getByRole('button', { name: 'Copy Folder link' })).toBeEnabled()
+    // The Folder it is in, by name — the one whose state lists it — and no pairing (FOL-3).
+    expect(main.getByRole('link', { name: 'Ship' })).toHaveAttribute('href', '/folder/3167adea-877f-43c4-96fb-517a2b2d5d24')
+    expect(main.queryByRole('button', { name: /Folder link|Pair/ })).not.toBeInTheDocument()
     expect(main.getByRole('button', { name: /Archive project/ })).toBeEnabled()
     /*
       Offered even though this viewer did not author the project (SHI-14). The

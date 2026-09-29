@@ -13,7 +13,6 @@
 import type { WorkspaceEvents } from '../nostr/store'
 import type { Directory } from '../nostr/profiles'
 import { addrToNaddr, naddrToAddr } from '@estiva-app/protocol'
-import { folderLink, parseFolderLink } from '../nostr/events'
 import { RELAY_URL } from '../config'
 
 export type { Change, Conversation, FolderState, Issue, Message, Project } from '../nostr/fold'
@@ -61,8 +60,6 @@ export {
   deleteMessage,
   editMessage,
   deleteProject,
-  explainRejection,
-  pairProjectFolder,
   react,
   unreact,
   reply,
@@ -119,9 +116,6 @@ export const me: string = signer.pubkey
 export function referenceFor(addr: string): string {
   return `nostr:${addrToNaddr(addr, [RELAY_URL])}`
 }
-
-/** A `folder:<uuid>` link, the handle pasted into Peek to pair a topic — and the parser for one somebody pasted here. */
-export { folderLink, parseFolderLink }
 
 /**
  * Land an inbound `#/o/<naddr>` on the right surface. Resolves the pointer

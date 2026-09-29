@@ -61,22 +61,6 @@ async function publish(action: () => Promise<PublishResult>): Promise<WriteResul
   }
 }
 
-/**
- * A rejection with a specific, fixable cause is worth naming: pairing with a
- * Folder the relay does not know is almost always a Peek topic that has not
- * been published yet (the old app's `explainRejection`).
- */
-export function explainRejection(reason: string | undefined, folder: string): string {
-  if (reason?.includes('not a channel member')) {
-    return (
-      `The relay does not know Folder ${folder.slice(0, 8)}… — most likely the Peek topic ` +
-      'has not been published yet. Send a message in that topic, then try again. ' +
-      "(If it is somebody else's private topic, you need to be added to it.)"
-    )
-  }
-  return reason ?? 'no reason given'
-}
-
 // ── Projects ────────────────────────────────────────────────────────────────
 
 /**
@@ -167,25 +151,6 @@ export async function deleteProject(project: Project, folders: readonly { id: st
  */
 export function deleteIssue(issue: Issue): Promise<WriteResult> {
   return publish(() => store.deleteIssue({ folder: issue.folder, issue: issue.addr }))
-}
-
-/**
- * Re-point a project at another Folder. Two writes: the change that decides
- * it, and the same statement inside the Folder being paired so other apps
- * can find the project there. The second can be refused on its own — a
- * Folder that will not take a write is still a Folder we can point at — so
- * its outcome is reported separately rather than folded into the boolean.
- */
-export async function pairProjectFolder(project: Project, folder: string): Promise<WriteResult & { announced?: boolean; announceReason?: string }> {
-  const clock = await clockProblem()
-  if (clock) return refused(clock)
-  try {
-    const result = await store.linkProjectFolder({ recordFolder: project.originFolder, project: project.addr, folder })
-    if (!result.ok) return refused(explainRejection(result.reason, folder))
-    return { ok: true, announced: result.announced, announceReason: result.announceReason }
-  } catch (error) {
-    return refused(error instanceof Error ? error.message : String(error))
-  }
 }
 
 // ── Issues ──────────────────────────────────────────────────────────────────

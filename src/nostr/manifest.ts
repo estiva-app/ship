@@ -468,7 +468,7 @@ export function manifestContent(): ManifestContent {
         label: 'Comment',
         description:
           'Say something about a project or an issue that is not a change to one of its fields. ' +
-          'The comment lands in the Folder both apps read, so it appears in the paired conversation as well as on the object.',
+          'The comment lands in the Folder both apps read, so it appears in that Folder’s conversation as well as on the object.',
         effect: 'writes',
         /**
          * Emits NIP-22 `kind:1111`, and **also declares the `kind:9` it used

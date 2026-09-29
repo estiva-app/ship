@@ -149,9 +149,7 @@ export const Project: Story = {
             onLeadChange: setLead,
             done,
             total: ISSUES.length,
-            folder: '5c1e2a7b-9d40-4f3a-8e6b-2f0c7d1a9b34',
-            onCopyFolderLink: fn(),
-            onPairFolder: fn(),
+            folders: [{ name: 'Ship', href: '/folder/5c1e2a7b-9d40-4f3a-8e6b-2f0c7d1a9b34' }],
             onArchive: fn(),
             onDelete: fn(),
           }}
