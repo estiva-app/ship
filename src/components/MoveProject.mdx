@@ -1,0 +1,46 @@
+import { Meta } from '@storybook/addon-docs/blocks'
+
+<Meta title="Overlays/MoveProject" />
+
+# MoveProject
+
+"Move to Folder…" for one project (FOL-7): the **MoveProjectDialog**, the
+write behind it, and what is said afterwards.
+
+**Seen in** — *Overlays/Dialogs*: **Move Project**, **Move Project In Two** and
+**Move Project Nowhere** show the dialog it draws. This part adds the write and
+the words, so it has no story of its own.
+
+## When
+
+- From the project rail's Folder row (`ProjectPage`) and a sidebar project
+  row's menu (`App`). The same part in both places, so a move reads, writes
+  and reports the same way whichever one it started from.
+
+## When not
+
+- Not to create a project in a Folder. That is `NewProjectDialog`, which
+  files the record and lists it in one go.
+- Not to re-point a project's record. The record, its issues and its
+  conversation never move; `ship link-project` is the record repair.
+
+## How
+
+```tsx
+import { MoveProject } from '@/components/MoveProject'
+
+{moving && teams && <MoveProject project={project} teams={teams} say={say} onClose={() => setMoving(false)} />}
+```
+
+- `teams` is the live top-level listing (`useFolders` → `topLevelFolders`),
+  not a copy. After a move that only half worked, the dialog, which is still
+  open, then shows the project in both Folders.
+
+## What it owns
+
+- **Where it is now**, by the sidebar's rule (`placedIn`). The Folders it is
+  taken out of are the ones the person sees it under.
+- **The half move.** A refused remove is said as "listed in both", the dialog
+  stays open, and Move again is the retry.
+- **What is read again**: the Folder listing only. A move changes two
+  `kind:30890` states and nothing in the fold.

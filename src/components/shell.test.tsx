@@ -111,6 +111,20 @@ describe('Sidebar', () => {
     expect(labels).toEqual(['Issues5', 'Projects3', 'One2', 'Two', 'Three1'])
   })
 
+  it('a project row\'s menu offers "Move to Folder…" for that project, and only when asked for (FOL-7)', async () => {
+    const onMoveProject = vi.fn()
+    const { rerender } = render(
+      <Sidebar openIssues={0} issuesHref="#/" projectsHref="#/projects" projects={filed} folders={teams} current="issues" onMoveProject={onMoveProject} />,
+    )
+    // The rows are still links, and the menu is beside the link, not inside it.
+    expect(screen.getAllByRole('link').map((a) => a.textContent)).toEqual(['Issues', 'Projects2', 'Two', 'One2'])
+    await userEvent.click(screen.getByRole('button', { name: 'More options for One' }))
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Move to Folder…' }))
+    expect(onMoveProject).toHaveBeenCalledWith(filed[0])
+    rerender(<Sidebar openIssues={0} issuesHref="#/" projectsHref="#/projects" projects={filed} folders={teams} current="issues" />)
+    expect(screen.queryByRole('button', { name: /More options/ })).not.toBeInTheDocument()
+  })
+
   it("the arrow on a team's fold opens the Folder", async () => {
     const onOpenFolder = vi.fn()
     render(

@@ -60,6 +60,7 @@ export {
   deleteMessage,
   editMessage,
   deleteProject,
+  moveProject,
   react,
   unreact,
   reply,

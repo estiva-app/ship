@@ -44,6 +44,15 @@ const listing = createRetryingRead<FolderSummary[]>({ retryable })
  * rather than drawing every project as unfiled and regrouping a moment later.
  * An empty list once a read has landed, or once a refusal says none will.
  */
+/**
+ * Read the Folders again, now — after a write that changed what one lists, a
+ * project moved (FOL-7). The held listing stays on screen until the answer
+ * lands, and a failure keeps it, as a first read's would.
+ */
+export function reloadFolders(): Promise<void> {
+  return listing.reload(readFolders)
+}
+
 export function useFolders(): FolderSummary[] | undefined {
   const snapshot = useSyncExternalStore(listing.subscribe, listing.snapshot)
   useEffect(() => {

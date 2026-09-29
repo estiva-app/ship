@@ -26,7 +26,7 @@ import {
   projectAddr,
 } from './events'
 import { findNaddrs, naddrToAddr, buildReaction, buildEdit, buildDeletion as buildEventDeletion } from '@estiva-app/protocol'
-import { planPlaceFile, planUnlistFile } from '@estiva-app/interop'
+import { planMoveFile, planPlaceFile, planUnlistFile, type FolderRef, type MoveRefusal } from '@estiva-app/interop'
 import { foldFolder, projectFolders, type FolderState } from './fold'
 import { anchorIndex, type AnchorIndex } from './references'
 import { foldEdits, type EditIndex } from './edits'
@@ -279,6 +279,54 @@ export class Store {
   }
 
   /**
+   * Move a project to another top-level Folder — FOL-7, RFC 0.4 §2.
+   *
+   * **Only the listings change.** One `kind:1852 add` to `to`, then one
+   * `kind:1852 remove` from each Folder in `from`, planned by `planMoveFile`.
+   * No `kind:1851` and no `buzz-channel` change: the conversation stays in the
+   * channel it was always in, so `contentFolder`, interop's `folderOf` and every
+   * comment's `h` still agree. The old "Pair with another Folder…" wrote the
+   * record's Folder instead, and that is how Ship and Peek came to read one
+   * project's conversation from two channels (PRO-21).
+   *
+   * `from` is every Folder that lists it now, not only one: a project a move
+   * left in two (below) is taken out of both by moving it again. Empty for a
+   * project no Folder lists, which is then only added.
+   *
+   * **Add first, and nothing at all if either side has no state** — the
+   * planner's rules. A refused `remove` leaves the project listed in both,
+   * which is visible and fixed by moving again; `removed` says which Folders
+   * still list it. `refused` is a move planned as unsafe, before anything was
+   * sent.
+   */
+  async moveProject(args: {
+    project: string
+    /** The Folders that list it now, each with `hasState` from a read. The target, if among them, is ignored. */
+    from: readonly FolderRef[]
+    to: FolderRef
+  }): Promise<{ refused?: MoveRefusal; added?: PublishResult; removed: { folder: string; result: PublishResult }[] }> {
+    assertFolderId(args.to.id)
+    const sources = args.from.filter((folder) => folder.id !== args.to.id)
+    // Already there and nowhere else: nothing to write, as the planner says of a move to the same Folder.
+    if (sources.length === 0 && args.from.length > 0) return { removed: [] }
+    if (!args.to.hasState) return { refused: 'target-has-no-state', removed: [] }
+    const now = Date.now()
+    const plans = sources.map((from) => planMoveFile(this.signer.pubkey, now, { address: args.project, from, to: args.to }))
+    const unsafe = plans.find((plan) => !plan.ok)
+    if (unsafe && !unsafe.ok) return { refused: unsafe.reason, removed: [] }
+    // Each plan is `[add to target, remove from source]`: one add, then every remove.
+    const events = plans.map((plan) => (plan.ok ? plan.events : []))
+    const add = events[0]?.[0] ?? planPlaceFile(this.signer.pubkey, now, { folder: args.to.id, address: args.project, hasState: true })[0]
+    const added = await this.publish(add)
+    const removed: { folder: string; result: PublishResult }[] = []
+    if (!added.ok) return { added, removed }
+    for (const [i, source] of sources.entries()) {
+      removed.push({ folder: source.id, result: await this.publish(events[i][1]) })
+    }
+    return { added, removed }
+  }
+
+  /**
    * Hide a project from the lists, or bring it back.
    *
    * A change event, so it is reversible, attributable and available to anyone
@@ -323,13 +371,19 @@ export class Store {
    * `unlisted` is reported separately, as `placed` is: a refused delete is a
    * project that still exists, a refused unlist is a deleted project Peek
    * still shows a row for.
+   *
+   * **Every Folder that lists it**, not its `contentFolder` alone (FOL-7).
+   * Once a project can be moved, the Folder listing it and the Folder its
+   * conversation lives in are different Folders, and unlisting only the second
+   * leaves the first with a row pointing at nothing. `unlisted` is the first
+   * refusal, or the last answer when none was refused.
    */
   async deleteProject(args: {
     recordFolder: string
     project: string
     reason?: string
-    /** The project's Folder (`contentFolder`), and whether it has state — from a read, never a guess. */
-    team: { folder: string; hasState: boolean }
+    /** The Folders that list it, each with `hasState` — from a read, never a guess. */
+    folders: readonly { folder: string; hasState: boolean }[]
   }): Promise<{ result: PublishResult; unlisted?: PublishResult }> {
     const result = await this.publish(
       buildDeletion(this.signer.pubkey, Date.now(), {
@@ -341,9 +395,11 @@ export class Store {
     if (!result.ok) return { result }
 
     let unlisted: PublishResult | undefined
-    for (const command of planUnlistFile(this.signer.pubkey, Date.now(), { folder: args.team.folder, address: args.project, hasState: args.team.hasState })) {
-      unlisted = await this.publish(command)
-      if (!unlisted.ok) break
+    for (const listing of args.folders) {
+      for (const command of planUnlistFile(this.signer.pubkey, Date.now(), { folder: listing.folder, address: args.project, hasState: listing.hasState })) {
+        const answer = await this.publish(command)
+        if (!unlisted || unlisted.ok) unlisted = answer
+      }
     }
     return { result, unlisted }
   }

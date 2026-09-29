@@ -123,19 +123,60 @@ export function archiveProject(project: Project, archived: boolean): Promise<Wri
  * from the Folder read the caller already holds (`useFolders`), or a fresh one
  * if that has not landed — never a guess. A refused unlist is still a deleted
  * project, so it comes back `ok` with `stillListed` saying why Peek keeps the row.
+ *
+ * **The team is whichever Folders list it** (FOL-7): after a move that is no
+ * longer its content Folder, which keeps its conversation. Only when none of
+ * the caller's Folders lists it is the content Folder the one unlisted.
  */
-export async function deleteProject(project: Project, folders: readonly { id: string; hasState: boolean }[] | undefined): Promise<WriteResult & { stillListed?: string }> {
+export async function deleteProject(
+  project: Project,
+  folders: readonly { id: string; hasState: boolean; addresses?: readonly string[] }[] | undefined,
+): Promise<WriteResult & { stillListed?: string }> {
   const clock = await clockProblem()
   if (clock) return refused(clock)
   try {
-    // Not among the caller's Folders is not "no state": it may be listed in
-    // another Folder, or the read may not have landed. Ask the relay.
-    const own = (list: readonly { id: string; hasState: boolean }[]) => list.find((folder) => folder.id === project.contentFolder)
-    const hasState = (own(folders ?? []) ?? own(await readFolders()))?.hasState ?? false
-    const { result, unlisted } = await store.deleteProject({ recordFolder: project.originFolder, project: project.addr, team: { folder: project.contentFolder, hasState } })
+    type Read = readonly { id: string; hasState: boolean; addresses?: readonly string[] }[]
+    const listing = (list: Read) => list.filter((folder) => folder.addresses?.includes(project.addr)).map((folder) => ({ folder: folder.id, hasState: folder.hasState }))
+    const own = (list: Read) => list.find((folder) => folder.id === project.contentFolder)
+    // Neither listed in nor holding its content Folder is not "no state": the
+    // read may not have landed, or it lists Folders the caller did not pass. Ask the relay.
+    const held = folders ?? []
+    const read = listing(held).length > 0 || own(held) ? held : await readFolders()
+    const lists = listing(read)
+    const unlistFrom = lists.length > 0 ? lists : [{ folder: project.contentFolder, hasState: own(read)?.hasState ?? false }]
+    const { result, unlisted } = await store.deleteProject({ recordFolder: project.originFolder, project: project.addr, folders: unlistFrom })
     if (!result.ok) return refused(result.reason)
     if (unlisted && !unlisted.ok) return { ok: true, stillListed: unlisted.reason ?? 'no reason given' }
     return { ok: true }
+  } catch (error) {
+    return refused(error instanceof Error ? error.message : String(error))
+  }
+}
+
+/**
+ * Move a project to another top-level Folder (FOL-7): listed in `to`, then
+ * unlisted from each Folder in `from` — the ones that list it now, each with
+ * `hasState` from the caller's read. Its record, its issues and its
+ * conversation are not touched (`Store.moveProject`).
+ *
+ * A refused `remove` is still a move — the project is in `to` — so it comes
+ * back `ok` with `stillIn`, each Folder that still lists it and why, as
+ * `createProject`'s `unlisted` does. Moving it again is the retry.
+ */
+export async function moveProject(
+  project: Project,
+  from: readonly { id: string; hasState: boolean }[],
+  to: { id: string; hasState: boolean },
+): Promise<WriteResult & { stillIn?: { folder: string; reason: string }[] }> {
+  const clock = await clockProblem()
+  if (clock) return refused(clock)
+  try {
+    const { refused: unsafe, added, removed } = await store.moveProject({ project: project.addr, from, to })
+    if (unsafe === 'source-has-no-state') return refused('the Folder it is in has no list of its own, so taking it out would empty that Folder')
+    if (unsafe === 'target-has-no-state') return refused('that Folder has no list of its own, so adding to it would hide what is already there')
+    if (added && !added.ok) return refused(added.reason)
+    const stillIn = removed.filter(({ result }) => !result.ok).map(({ folder, result }) => ({ folder, reason: result.reason ?? 'no reason given' }))
+    return stillIn.length > 0 ? { ok: true, stillIn } : { ok: true }
   } catch (error) {
     return refused(error instanceof Error ? error.message : String(error))
   }
