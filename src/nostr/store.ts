@@ -308,7 +308,7 @@ export class Store {
     assertFolderId(args.to.id)
     const sources = args.from.filter((folder) => folder.id !== args.to.id)
     // Already there and nowhere else: nothing to write, as the planner says of a move to the same Folder.
-    if (sources.length === 0 && sources.length < args.from.length) return { removed: [] }
+    if (sources.length === 0 && args.from.length > 0) return { removed: [] }
     if (!args.to.hasState) return { refused: 'target-has-no-state', removed: [] }
     const now = Date.now()
     const plans = sources.map((from) => planMoveFile(this.signer.pubkey, now, { address: args.project, from, to: args.to }))
@@ -383,7 +383,7 @@ export class Store {
     project: string
     reason?: string
     /** The Folders that list it, each with `hasState` — from a read, never a guess. */
-    teams: readonly { folder: string; hasState: boolean }[]
+    folders: readonly { folder: string; hasState: boolean }[]
   }): Promise<{ result: PublishResult; unlisted?: PublishResult }> {
     const result = await this.publish(
       buildDeletion(this.signer.pubkey, Date.now(), {
@@ -395,8 +395,8 @@ export class Store {
     if (!result.ok) return { result }
 
     let unlisted: PublishResult | undefined
-    for (const team of args.teams) {
-      for (const command of planUnlistFile(this.signer.pubkey, Date.now(), { folder: team.folder, address: args.project, hasState: team.hasState })) {
+    for (const listing of args.folders) {
+      for (const command of planUnlistFile(this.signer.pubkey, Date.now(), { folder: listing.folder, address: args.project, hasState: listing.hasState })) {
         const answer = await this.publish(command)
         if (!unlisted || unlisted.ok) unlisted = answer
       }

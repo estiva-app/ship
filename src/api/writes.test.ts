@@ -77,7 +77,7 @@ describe('which Folder each write goes to', () => {
     await archiveProject(PROJECT, true)
     expect(s.archiveProject).toHaveBeenCalledWith({ recordFolder: 'origin-folder', project: PROJECT.addr, archived: true })
     await deleteProject(PROJECT, [{ id: 'content-folder', hasState: true }])
-    expect(s.deleteProject).toHaveBeenCalledWith({ recordFolder: 'origin-folder', project: PROJECT.addr, teams: [{ folder: 'content-folder', hasState: true }] })
+    expect(s.deleteProject).toHaveBeenCalledWith({ recordFolder: 'origin-folder', project: PROJECT.addr, folders: [{ folder: 'content-folder', hasState: true }] })
   })
 })
 
@@ -94,7 +94,7 @@ describe('deleting a project unlists it from its team (FOL-48)', () => {
     await deleteProject(PROJECT, undefined)
     await deleteProject(PROJECT, [{ id: 'another-team', hasState: true }])
     expect(readFolders).toHaveBeenCalledTimes(2)
-    expect(s.deleteProject).toHaveBeenLastCalledWith(expect.objectContaining({ teams: [{ folder: 'content-folder', hasState: true }] }))
+    expect(s.deleteProject).toHaveBeenLastCalledWith(expect.objectContaining({ folders: [{ folder: 'content-folder', hasState: true }] }))
   })
 
   it('a moved project is unlisted from the Folders that list it, not its content Folder (FOL-7)', async () => {
@@ -104,15 +104,25 @@ describe('deleting a project unlists it from its team (FOL-48)', () => {
       { id: 'new-team', hasState: true, addresses: [PROJECT.addr] },
     ]
     expect(await deleteProject(PROJECT, folders)).toEqual({ ok: true })
-    expect(s.deleteProject).toHaveBeenCalledWith(expect.objectContaining({ teams: [{ folder: 'new-team', hasState: true }] }))
+    expect(s.deleteProject).toHaveBeenCalledWith(expect.objectContaining({ folders: [{ folder: 'new-team', hasState: true }] }))
     expect(readFolders).not.toHaveBeenCalled()
+  })
+
+  it('a moved project deleted before the caller has Folders is unlisted from what the fresh read lists it in', async () => {
+    s.deleteProject.mockResolvedValue({ result: { ok: true }, unlisted: { ok: true } })
+    vi.mocked(readFolders).mockResolvedValue([
+      { id: 'content-folder', hasState: true, addresses: [] },
+      { id: 'new-team', hasState: true, addresses: [PROJECT.addr] },
+    ] as never)
+    await deleteProject(PROJECT, undefined)
+    expect(s.deleteProject).toHaveBeenCalledWith(expect.objectContaining({ folders: [{ folder: 'new-team', hasState: true }] }))
   })
 
   it('a Folder nobody can read has no state to change', async () => {
     s.deleteProject.mockResolvedValue({ result: { ok: true } })
     vi.mocked(readFolders).mockResolvedValue([])
     await deleteProject(PROJECT, [])
-    expect(s.deleteProject).toHaveBeenCalledWith(expect.objectContaining({ teams: [{ folder: 'content-folder', hasState: false }] }))
+    expect(s.deleteProject).toHaveBeenCalledWith(expect.objectContaining({ folders: [{ folder: 'content-folder', hasState: false }] }))
   })
 
   it('a refused delete is refused, whatever the unlist did', async () => {

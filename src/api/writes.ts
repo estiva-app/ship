@@ -135,12 +135,16 @@ export async function deleteProject(
   const clock = await clockProblem()
   if (clock) return refused(clock)
   try {
-    const listing = (folders ?? []).filter((folder) => folder.addresses?.includes(project.addr)).map((folder) => ({ folder: folder.id, hasState: folder.hasState }))
-    // Not among the caller's Folders is not "no state": it may be listed in
-    // another Folder, or the read may not have landed. Ask the relay.
-    const own = (list: readonly { id: string; hasState: boolean }[]) => list.find((folder) => folder.id === project.contentFolder)
-    const teams = listing.length > 0 ? listing : [{ folder: project.contentFolder, hasState: (own(folders ?? []) ?? own(await readFolders()))?.hasState ?? false }]
-    const { result, unlisted } = await store.deleteProject({ recordFolder: project.originFolder, project: project.addr, teams })
+    type Read = readonly { id: string; hasState: boolean; addresses?: readonly string[] }[]
+    const listing = (list: Read) => list.filter((folder) => folder.addresses?.includes(project.addr)).map((folder) => ({ folder: folder.id, hasState: folder.hasState }))
+    const own = (list: Read) => list.find((folder) => folder.id === project.contentFolder)
+    // Neither listed in nor holding its content Folder is not "no state": the
+    // read may not have landed, or it lists Folders the caller did not pass. Ask the relay.
+    const held = folders ?? []
+    const read = listing(held).length > 0 || own(held) ? held : await readFolders()
+    const lists = listing(read)
+    const unlistFrom = lists.length > 0 ? lists : [{ folder: project.contentFolder, hasState: own(read)?.hasState ?? false }]
+    const { result, unlisted } = await store.deleteProject({ recordFolder: project.originFolder, project: project.addr, folders: unlistFrom })
     if (!result.ok) return refused(result.reason)
     if (unlisted && !unlisted.ok) return { ok: true, stillListed: unlisted.reason ?? 'no reason given' }
     return { ok: true }
