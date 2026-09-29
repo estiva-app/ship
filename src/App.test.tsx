@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorkspaceState } from '@/api'
@@ -235,11 +235,19 @@ describe('Project page — one project from the fold', () => {
     goTo(`/project/live-${LIVE}`)
     render(<App />)
     const main = within(screen.getByRole('main'))
-    expect(main.getByRole('button', { name: 'Edit title' })).toHaveTextContent('Live')
+    // Overview (Katerina, 29 September): the title is always editable, with no box.
+    expect(await main.findByRole('textbox', { name: 'Title' })).toHaveTextContent('Live')
+    // The tabs are in the URL: Issues shows the table, Activity the conversations.
+    fireEvent.click(main.getByRole('tab', { name: 'Issues' }))
+    await waitFor(() => expect(location.search).toBe('?tab=issues'))
     expect(main.getByRole('table')).toBeInTheDocument()
     expect(main.getAllByRole('row')).toHaveLength(3) // header + 2 issues
+    fireEvent.click(main.getByRole('tab', { name: 'Activity' }))
+    await waitFor(() => expect(location.search).toBe('?tab=activity'))
     // The record channel's chat waits for the teams read, which tells it from a team's (FOL-2).
     expect(await main.findByText('about the project')).toBeInTheDocument()
+    // Replies fold behind the replies button, and it opens them.
+    fireEvent.click(main.getByRole('button', { name: /1 reply/ }))
     expect(main.getByText('reply')).toBeInTheDocument()
     expect(main.getByRole('combobox', { name: 'Status' })).toBeEnabled()
     // The Folder it is in, by name — the one whose state lists it — and no pairing (FOL-3).
@@ -278,11 +286,13 @@ describe('Project page — one project from the fold', () => {
 
   it('posts a project conversation into its content Folder and re-reads', async () => {
     vi.mocked(startConversation).mockResolvedValue({ ok: true })
-    goTo(`/project/live-${LIVE}`)
+    goTo(`/project/live-${LIVE}?tab=activity`)
     render(<App />)
     const main = within(screen.getByRole('main'))
-    fireEvent.change(main.getByPlaceholderText('Start a conversation…'), { target: { value: 'hello' } })
-    fireEvent.click(main.getByRole('button', { name: 'Post' }))
+    // The writing box is an editor now (it loads on first use); what it posts is the same marker text.
+    const box = (await main.findByRole('textbox', { name: 'Start a conversation…' })) as HTMLElement & { editor: { commands: { insertContent: (s: string) => void } } }
+    act(() => box.editor.commands.insertContent('hello'))
+    fireEvent.click(main.getByRole('button', { name: 'Send' }))
     await waitFor(() => expect(startConversation).toHaveBeenCalledWith({ folder: 'f', about: `30850:x:${LIVE}`, withReference: false, body: 'hello', files: [] }))
     await waitFor(() => expect(refresh).toHaveBeenCalled())
   })
@@ -295,14 +305,17 @@ describe('Project page — one project from the fold', () => {
 })
 
 describe('Issue page — one issue from the fold', () => {
-  it('draws the trail, the conversation about it, the history in words newest first, and the rail', () => {
+  it('draws the trail, the conversation about it, the history in words newest first, and the rail', async () => {
     goTo(`/issue/${D('14')}`)
     render(<App />)
     const main = within(screen.getByRole('main'))
-    expect(main.getByRole('button', { name: 'Edit title' })).toHaveTextContent('issue 14')
+    expect(await main.findByRole('textbox', { name: 'Title' })).toHaveTextContent('issue 14')
     expect(main.getByText('X-4')).toBeInTheDocument()
     expect(main.queryByRole('link', { name: 'Live' })).not.toBeInTheDocument()
-    expect(main.getByText('hi')).toBeInTheDocument()
+    // Conversations and History are on the Activity tab.
+    fireEvent.click(main.getByRole('tab', { name: 'Activity' }))
+    await waitFor(() => expect(location.search).toBe('?tab=activity'))
+    expect(await main.findByText('hi')).toBeInTheDocument()
     const feed = main.getAllByText(/set (status|assignee) to/)
     expect(feed.map((node) => node.textContent)).toEqual(['Me Myself set status to in_progress', 'Someone set assignee to Me Myself'])
     expect(main.getByRole('combobox', { name: 'Assignee' })).toBeEnabled()
@@ -359,11 +372,12 @@ describe('Issue page — one issue from the fold', () => {
 
   it('starts a thread about the issue with the reference Peek needs', async () => {
     vi.mocked(startConversation).mockResolvedValue({ ok: true })
-    goTo(`/issue/${D('14')}`)
+    goTo(`/issue/${D('14')}?tab=activity`)
     render(<App />)
     const main = within(screen.getByRole('main'))
-    fireEvent.change(main.getByPlaceholderText('Start a conversation…'), { target: { value: 'seen this?' } })
-    fireEvent.click(main.getByRole('button', { name: 'Post' }))
+    const box = (await main.findByRole('textbox', { name: 'Start a conversation…' })) as HTMLElement & { editor: { commands: { insertContent: (s: string) => void } } }
+    act(() => box.editor.commands.insertContent('seen this?'))
+    fireEvent.click(main.getByRole('button', { name: 'Send' }))
     await waitFor(() => expect(startConversation).toHaveBeenCalledWith({ folder: 'f', about: `30851:x:${D('14')}`, withReference: true, body: 'seen this?', files: [] }))
   })
 

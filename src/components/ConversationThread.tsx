@@ -291,7 +291,7 @@ export function MessageActions({
  * conversation carries on without its opening line, which is worth knowing
  * before rather than after.
  */
-function ConfirmDeleteMessage({
+export function ConfirmDeleteMessage({
   replies,
   onConfirm,
   onClose,
@@ -531,7 +531,7 @@ export function MessageCard({
  * reader has not seen, and everything below it is new. Ship's lists stay clean —
  * the signal lives where the reading happens.
  */
-function NewSinceHere() {
+export function NewSinceHere() {
   // The package's labelled Divider (0.11.0, D40), in the warning colour: the
   // accent this drew in measured 3.3:1 on Ship's background and could not
   // be read (Katerina, 2026-09-08); the warning colour measures 9.6:1.

@@ -12,6 +12,11 @@ import { IssueView } from './IssueView'
 import { IssuesView, type IssuesScope } from './IssuesView'
 import { ProjectView } from './ProjectView'
 import { ProjectsView } from './ProjectsView'
+import type { IssueTab, ProjectTab } from '@/router'
+import type { Imeta } from '@estiva-app/protocol'
+
+/** Attach without a relay: the picked file, shown from the browser's own memory. */
+const pretendUpload = async (file: File) => ({ url: URL.createObjectURL(file), m: file.type || 'application/octet-stream', x: '0'.repeat(64), size: file.size, filename: file.name }) as unknown as Imeta
 
 /**
  * A bare-file topic somebody started under the project in Peek — RFC 0.5
@@ -114,10 +119,11 @@ export const IssuesEmpty: Story = {
   },
 }
 
-/** One project: title and description, Issues as a table or a board, Conversations, and the rail. */
-export const Project: Story = {
+/** One project, in tabs: Overview (title, description, Related), Activity (Conversations, Mentioned in), Issues (table or board). The rail on every tab. */
+const projectPage = (startTab: ProjectTab, startView: 'table' | 'board' = 'table', readOnlyReason?: string): Story => ({
   render: () => {
-    const [view, setView] = useState<'table' | 'board'>('table')
+    const [tab, setTab] = useState<ProjectTab>(startTab)
+    const [view, setView] = useState<'table' | 'board'>(startView)
     const [status, setStatus] = useState('in_progress')
     const [lead, setLead] = useState('ravi')
     const [title, setTitle] = useState('Relay Migration')
@@ -129,6 +135,8 @@ export const Project: Story = {
           onAddIssue={fn()}
           crumbs={{ projectsHref: '#/projects', title }}
           header={{ title, description, descriptionFormat: 'marker', archived: false, onRename: (v) => (setTitle(v), true), onDescribe: (v) => (setDescription(v), true) }}
+          tab={tab}
+          onTab={setTab}
           view={view}
           onView={setView}
           issues={ISSUES}
@@ -140,6 +148,8 @@ export const Project: Story = {
           onReply={fn()}
           activity={ACTIVITY_ITEMS}
           onReplyInActivity={fn()}
+          readOnlyReason={readOnlyReason}
+          upload={pretendUpload}
           rail={{
             status,
             statuses: PROJECT_STATUSES,
@@ -157,12 +167,24 @@ export const Project: Story = {
       </Shell>
     )
   },
-}
+})
 
-/** One issue: the trail, editable title and description, Conversations, Activity, and the rail. */
-export const Issue: Story = {
+/** A project, Overview: the title and description, always editable, then Related under a line. */
+export const Project: Story = projectPage('overview')
+/** A project, Activity: Conversations and Mentioned in. */
+export const ProjectActivity: Story = projectPage('activity')
+/** A project, Issues: full width, Table / Board at the right of the tab row. */
+export const ProjectIssues: Story = projectPage('issues')
+/** A project's Issues as a board — `?view=board`. */
+export const ProjectBoard: Story = projectPage('issues', 'board')
+/** Signed out: the title and description are text, and every write control is disabled with the reason. */
+export const ProjectSignedOut: Story = projectPage('activity', 'table', 'Sign in to react or reply.')
+
+/** One issue, in tabs: Overview (title, description, Related) and Activity (Conversations, Mentioned in, History). The rail on every tab. */
+const issuePage = (startTab: IssueTab): Story => ({
   render: () => {
     const issue = ISSUES[0]
+    const [tab, setTab] = useState<IssueTab>(startTab)
     const [status, setStatus] = useState(issue.status)
     const [assignee, setAssignee] = useState('ana')
     const [project, setProject] = useState('rel')
@@ -172,6 +194,8 @@ export const Issue: Story = {
       <Shell current={{ projectAddr: '30850:a:rel' }}>
         <IssueView
           crumbs={{ issuesHref: '#/issues', project: { title: 'Relay Migration', href: '#/project/30850%3Aa%3Arel' }, ref: issue.ref }}
+          tab={tab}
+          onTab={setTab}
           title={title}
           description={description}
           descriptionFormat="marker"
@@ -183,6 +207,7 @@ export const Issue: Story = {
           activity={ACTIVITY_ITEMS}
           onReplyInActivity={fn()}
           history={ACTIVITY}
+          upload={pretendUpload}
           rail={{
             status,
             statuses: ISSUE_STATUSES,
@@ -202,4 +227,9 @@ export const Issue: Story = {
       </Shell>
     )
   },
-}
+})
+
+/** An issue, Overview. */
+export const Issue: Story = issuePage('overview')
+/** An issue, Activity: Conversations, Mentioned in, History. */
+export const IssueActivity: Story = issuePage('activity')

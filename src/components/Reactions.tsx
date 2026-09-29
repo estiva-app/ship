@@ -60,6 +60,7 @@ export function Reactions({
   nameOf,
   onToggle,
   disabledReason,
+  labelOf = reactorLabel,
   className,
 }: {
   reactions: readonly Reaction[] | undefined
@@ -75,6 +76,8 @@ export function Reactions({
   onToggle?: (emoji: string, mine?: string) => void
   /** Why nothing can be written right now — every control here is disabled with it. */
   disabledReason?: string
+  /** The words on a pill's tooltip. Today's: "Ana and Ravi reacted with 👍". */
+  labelOf?: (reaction: Reaction, nameOf?: (pubkey: string) => string) => string
   className?: string
 }) {
   const existing = reactions ?? []
@@ -97,7 +100,7 @@ export function Reactions({
         */
         if (!onToggle) {
           return (
-            <WithTooltip key={reaction.emoji} label={reactorLabel(reaction, nameOf)}>
+            <WithTooltip key={reaction.emoji} label={labelOf(reaction, nameOf)}>
               <span>
                 <Chip
                   type="neutral"
@@ -125,7 +128,7 @@ export function Reactions({
           />
         )
         return (
-          <WithTooltip key={reaction.emoji} label={disabledReason ?? reactorLabel(reaction, nameOf)}>
+          <WithTooltip key={reaction.emoji} label={disabledReason ?? labelOf(reaction, nameOf)}>
             <span>{button}</span>
           </WithTooltip>
         )

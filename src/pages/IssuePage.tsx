@@ -7,7 +7,7 @@ import type { HistoryEntry } from '@/components/History'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { IssueView } from '@/views/IssueView'
-import { go, href } from '../router'
+import { go, href, type IssueTab } from '../router'
 import { act, type Say } from './act'
 import { activityFor, copyText, folderOfMessage, railPeople, threadFor } from './ProjectPage'
 
@@ -38,7 +38,7 @@ export function historyFor(issueAddr: string, state: FolderState, directory: Dir
  * field edit is one change event to the issue's own Folder, followed by a
  * re-read; a refused one leaves the field as the relay has it.
  */
-export function IssuePage({ state, directory, d, say, refresh }: { state: WorkspaceState; directory: DirectoryView; /** The object's `d`, which is all a §7.2 URL carries. */ d: string; say: Say; refresh: (folders?: string[]) => Promise<void> }) {
+export function IssuePage({ state, directory, d, tab, say, refresh }: { state: WorkspaceState; directory: DirectoryView; /** The object's `d`, which is all a §7.2 URL carries. */ d: string; /** The open tab — Overview or Activity. */ tab: IssueTab; say: Say; refresh: (folders?: string[]) => Promise<void> }) {
   const issue = state.issues.find((candidate) => candidate.id === d)
   const project = issue?.projectAddr ? state.projects.find((candidate) => candidate.addr === issue.projectAddr) : undefined
 
@@ -101,6 +101,8 @@ export function IssuePage({ state, directory, d, say, refresh }: { state: Worksp
   return (
     <>
       <IssueView
+        tab={tab}
+        onTab={(next) => go({ name: 'issue', d: issue.id, slug: issue.title, tab: next })}
         crumbs={{
           issuesHref: href({ name: 'issues' }),
           project: project ? { title: project.title, href: href({ name: 'project', d: project.id, slug: project.title, view: 'table' }) } : undefined,

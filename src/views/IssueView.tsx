@@ -1,39 +1,41 @@
-import { useState } from 'react'
 import { IconBox } from '@tabler/icons-react'
 import { Breadcrumb, type Crumb } from '@/components/ui/Breadcrumb'
 import { ScrollArea } from '@/components/ui/ScrollArea'
-import { linkTo } from '@/router'
+import { linkTo, type IssueTab } from '@/router'
 import type { ContentFormat, Imeta } from '@estiva-app/protocol'
 import { Divider } from '@/components/ui/Divider'
-import { EditableText } from '@/components/ui/EditableText'
-import { Description } from '@/components/Description'
+import { Tabs } from '@/components/ui/Tabs'
 import { History, type HistoryEntry } from '@/components/History'
-import { Activity, type ActivityItem } from '@/components/Activity'
-import { Conversations, type ThreadData } from '@/components/ConversationThread'
+import type { ActivityItem } from '@/components/Activity'
+import type { ThreadData } from '@/components/ConversationThread'
 import { IssueRail, type IssueRailProps } from '@/components/IssueRail'
 import { Related, hasRelated } from '@/components/Related'
+import { LiveHeader } from '@/components/editing/LiveHeader'
+import { MentionList, ThreadList } from '@/components/conversations/ThreadList'
 import type { RelatedState } from '@/api/useRelated'
+import { AppSection, Centred } from './ProjectView'
 
 /**
- * One issue, as production: the trail (Issues / project / ref — no project
- * crumb when it has none), the editable title and description, and then the
- * three lists — and the rail on the right.
+ * One issue, in the project page's format (Katerina, 29 September): two tabs,
+ * **Overview** (the title, the description, "Related") and **Activity** (the
+ * three lists), in the same centred column, with the rail on every tab.
  *
- * **The three are three different questions, and CON-9 renamed one of them.**
+ * **The three lists are three different questions, and CON-9 renamed one.**
  *
  * | | what it holds |
  * | --- | --- |
  * | **Conversations** | threads that declared themselves to be about this issue |
- * | **Activity** | threads elsewhere that mention it — never its sub-files' (PEE-26) |
- * | **History** | this issue's own change events |
+ * | **Mentioned in** | threads elsewhere that mention it — never its sub-files' (PEE-26) |
+ * | **History** | this issue's own change events, newest first |
  *
- * History was called "Activity" until CON-9 gave that word the middle row.
- * Two sections on one page cannot both be Activity, and the change feed was
- * always the history — REW-4 separated it from conversation for the same
- * reason, and that separation is untouched.
+ * "Mentioned in" was the "Activity" section until the tab took that word; it is
+ * SPEC §6.4's own phrase for the list.
  */
 export interface IssueViewProps {
   crumbs: { issuesHref: string; project?: { title: string; href: string }; ref?: string }
+  /** The open tab — in the URL. */
+  tab: IssueTab
+  onTab: (tab: IssueTab) => void
   title: string
   description: string
   /** Which content model the description is in — from the fold, never sniffed. */
@@ -43,36 +45,24 @@ export interface IssueViewProps {
   onRename: (v: string) => Promise<boolean> | boolean
   /** The body, and the format tag the editor built it in — RIC-14. */
   onDescribe: (v: string, contentFormat?: string) => Promise<boolean> | boolean
-  /**
-   * Foreign files placed under this issue — RFC 0.5 §10.7. An issue has no
-   * sub-files of Ship's own, so this is the whole of what nests under it;
-   * drawn before Conversations, only when there is something to say.
-   */
+  /** Foreign files placed under this issue — RFC 0.5 §10.7. Drawn only when there is something to say. */
   related?: RelatedState
   /** Threads that are *about* this issue — a tag at the root, never a passing mention (§6.4). */
   threads: ThreadData[]
-  /** Threads on files related to it, time-ordered, each carrying how it is related. */
+  /** Threads elsewhere that mention it, time-ordered, each carrying how it is related. */
   activity: ActivityItem[]
   /** How many the horizon left out — `ACTIVITY_HORIZON`. Said on screen, never implied. */
   activityTruncated?: number
-  /** Thread id → first unread message id. Drives the feed divider (CRO-13). */
+  /** Thread id → first unread message id. Drives the "new since" line (CRO-13). */
   unread?: Record<string, string>
   /**
    * `files` are attachments already on the relay — SHI-2. `blockId` is set when
-   * the reader clicked a specific block — SPEC §13.6.
-   *
-   * `files` comes second because that is the shape `Conversations` calls with;
-   * the block a comment is about is chosen by a different affordance and is
-   * supplied by whoever built it.
+   * a comment is about one block of the description — SPEC §13.6; supplied by
+   * whoever built that affordance.
    */
   onStartConversation: (text: string, files: readonly Imeta[], blockId?: string) => Promise<boolean | void> | boolean | void
   onReply: (threadId: string, text: string, files: readonly Imeta[]) => Promise<boolean | void> | boolean | void
-  /**
-   * Reply into a thread that belongs to another file — CON-9.
-   *
-   * A separate handler from `onReply` because the destination is different:
-   * this one publishes into the thread's own Folder, never into this issue's.
-   */
+  /** Reply into a thread that belongs to another file — its own Folder, never this issue's (CON-9). */
   onReplyInActivity: (threadId: string, text: string, files: readonly Imeta[]) => Promise<boolean | void> | boolean | void
   history: HistoryEntry[]
   rail: Omit<IssueRailProps, 'className'>
@@ -86,84 +76,68 @@ export interface IssueViewProps {
   onEditMessage?: (messageId: string, body: string) => Promise<boolean | void> | boolean | void
   /** Why writes are unavailable — every write control on the page is disabled with it. */
   readOnlyReason?: string
+  /** The upload behind attach. Injected so a story needs no relay; the app's by default. */
+  upload?: (file: File) => Promise<Imeta>
 }
 
-export function IssueView({ crumbs, title, description, descriptionFormat,
-  nameOf, onRename, onDescribe, related, threads, unread, onStartConversation, onReply, activity, activityTruncated, onReplyInActivity, history, rail, about, onReact, onDeleteMessage, onEditMessage, readOnlyReason }: IssueViewProps) {
+const TABS: { id: IssueTab; label: string }[] = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'activity', label: 'Activity' },
+]
 
-  // `linkTo` on each crumb (S15, 0.10.0): the breadcrumbs were the last links
-  // in Ship that reloaded the whole app on a click (SHI-20).
+export function IssueView({ crumbs, tab, onTab, title, description, descriptionFormat, nameOf, onRename, onDescribe, related, threads, unread, onStartConversation, onReply, activity, activityTruncated, onReplyInActivity, history, rail, about, onReact, onDeleteMessage, onEditMessage, readOnlyReason, upload }: IssueViewProps) {
+  // `linkTo` on each crumb (S15, 0.10.0): the breadcrumbs were the last links in Ship that reloaded the app (SHI-20).
   const items: Crumb[] = [{ label: 'Issues', ...linkTo(crumbs.issuesHref) }]
-  // The box before the project's name says it is a project, as the sidebar's
-  // entry does (Katerina, 2026-09-09) — a crumb that is only a title reads
-  // as any place at all.
+  // The box before the project's name says it is a project, as the sidebar's entry does (Katerina, 2026-09-09).
   if (crumbs.project) items.push({ label: crumbs.project.title, icon: <IconBox size={16} stroke={1.5} />, ...linkTo(crumbs.project.href) })
   if (crumbs.ref) items.push({ label: crumbs.ref, mono: true })
 
   return (
-    // `data-surface` is the smoke test's waypoint — see IssuesView.
-    // A page that scrolls inside itself: `flex-1 min-h-0 [contain:size]` — it
-    // takes exactly the frame's height and adds none of its own, so its columns
-    // scroll and the frame does not (the frame owns the bar, 2026-09-09).
-    <div data-surface="issue" className="grid min-h-0 flex-1 [contain:size] grid-cols-[minmax(0,1fr)_1px_auto] grid-rows-[auto_minmax(0,1fr)] gap-y-4">
+    // `data-surface` and `data-tab` are the smoke test's waypoints — see IssuesView. A page that scrolls inside
+    // itself: `flex-1 min-h-0 [contain:size]` takes exactly the frame's height, so its columns scroll and the frame does not.
+    <div data-surface="issue" data-tab={tab} className="grid min-h-0 flex-1 [contain:size] grid-cols-[minmax(0,1fr)_1px_auto] grid-rows-[auto_auto_minmax(0,1fr)] gap-y-4">
       <div className="col-start-1 row-start-1 pl-6 pt-5">
         <Breadcrumb items={items} />
       </div>
-      {/* Only the content column scrolls — with Peek's thin scrollbar right
-          beside the hairline, which runs from the top bar to the bottom. The
-          content keeps 24px inside the column (pl/pr-6), the rail 24px either
-          side, and the rail starts level with the title and never moves. */}
-      {/* Both columns scroll in a ScrollArea (D40): the bar takes no width, so
-          the 24px of padding read the same with a bar as without. */}
-      <ScrollArea className="col-start-1 row-start-2 min-h-0 min-w-0" contentClassName="flex flex-col gap-6 px-6 pb-5">
-        <div className="flex flex-col gap-2">
-          {/* EditableText takes its size from where it sits (UIG-9). */}
-          <div className="contents text-h2">
-            <EditableText label="Title" value={title} placeholder="Untitled issue" onCommit={onRename} readOnly={!!readOnlyReason} className="-mx-2" />
-          </div>
-          <Description
-            value={description}
-            format={descriptionFormat}
-            onCommit={onDescribe}
-            readOnly={!!readOnlyReason}
-            nameOf={nameOf}
-          />
-        </div>
-        {/* Nesting is by intent (RFC 0.5 §10.7): what somebody placed under
-            this issue — a sub-discussion started in Peek, a document — from
-            whichever app owns it. */}
-        {hasRelated(related) && (
-          <section className="flex flex-col gap-3">
-            <h2 className="text-h4 text-text-primary">Related</h2>
-            <Related related={related} />
-          </section>
+      {/* The tab row is its own grid row, level with the rail's top, so the rail starts where it always has. */}
+      <div className="col-start-1 row-start-2 flex min-h-8 items-center px-6">
+        <Tabs tabs={TABS} active={tab} onChange={onTab} />
+      </div>
+
+      <ScrollArea className="col-start-1 row-start-3 min-h-0 min-w-0" contentClassName="flex flex-col gap-6 px-6 pb-5">
+        {tab === 'overview' && (
+          <Centred>
+            <LiveHeader title={title} titlePlaceholder="Untitled issue" onRename={onRename} description={description} format={descriptionFormat} onDescribe={onDescribe} nameOf={nameOf} readOnly={!!readOnlyReason} upload={upload} />
+            {/* Nesting is by intent (RFC 0.5 §10.7): what somebody placed under this issue, from whichever app owns it. */}
+            {hasRelated(related) && (
+              <>
+                <Divider className="mx-0" />
+                <AppSection title="Related">
+                  <Related related={related} />
+                </AppSection>
+              </>
+            )}
+          </Centred>
         )}
-        <section className="flex flex-col gap-3">
-          <h2 className="text-h4 text-text-primary">Conversations</h2>
-          <Conversations
-            threads={threads}
-            unread={unread}
-            onStart={onStartConversation}
-            onReply={onReply}
-            disabledReason={readOnlyReason}
-            nameOf={nameOf}
-            onReact={onReact}
-            onDeleteMessage={onDeleteMessage}
-            onEditMessage={onEditMessage}
-            about={about}
-          />
-        </section>
-        <section className="flex flex-col gap-3">
-          <h2 className="text-h4 text-text-primary">Activity</h2>
-          <Activity items={activity} truncated={activityTruncated} onReply={onReplyInActivity} disabledReason={readOnlyReason} nameOf={nameOf} onReact={onReact} onDeleteMessage={onDeleteMessage} onEditMessage={onEditMessage} />
-        </section>
-        <section className="flex flex-col gap-3">
-          <h2 className="text-h4 text-text-primary">History</h2>
-          <History entries={history} />
-        </section>
+
+        {tab === 'activity' && (
+          <Centred>
+            <AppSection title="Conversations">
+              <ThreadList threads={threads} unread={unread} onStart={onStartConversation} onReply={onReply} disabledReason={readOnlyReason} nameOf={nameOf} onReact={onReact} onDeleteMessage={onDeleteMessage} onEditMessage={onEditMessage} about={about} upload={upload} />
+            </AppSection>
+            <AppSection title="Mentioned in">
+              <MentionList items={activity} truncated={activityTruncated} onReply={onReplyInActivity} disabledReason={readOnlyReason} nameOf={nameOf} onReact={onReact} onDeleteMessage={onDeleteMessage} onEditMessage={onEditMessage} upload={upload} />
+            </AppSection>
+            <AppSection title="History">
+              <History entries={history} />
+            </AppSection>
+          </Centred>
+        )}
       </ScrollArea>
-      <Divider orientation="vertical" className="col-start-2 row-span-2 row-start-1" />
-      <ScrollArea className="col-start-3 row-start-2 min-h-0" contentClassName="px-6 pb-5">
+
+      <Divider orientation="vertical" className="col-start-2 row-span-3 row-start-1" />
+      {/* The rail on every tab, starting level with the tab row and never moving (Katerina, 29 September). */}
+      <ScrollArea className="col-start-3 row-span-2 row-start-2 min-h-0" contentClassName="px-6 pb-5">
         <IssueRail {...rail} readOnlyReason={readOnlyReason} />
       </ScrollArea>
     </div>

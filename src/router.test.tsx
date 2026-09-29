@@ -40,7 +40,10 @@ describe('useRoute', () => {
       [{ name: 'projects', archived: false }, { name: 'projects', archived: false }],
       [{ name: 'projects', archived: true }, { name: 'projects', archived: true }],
       [{ name: 'project', d: UUID, slug: 'payments', view: 'table' }, { name: 'project', d: UUID, view: 'table' }],
-      [{ name: 'project', d: UUID, view: 'board' }, { name: 'project', d: UUID, view: 'board' }],
+      // The board is on the Issues tab, so a link that asks for it opens that tab (Katerina, 30 September).
+      [{ name: 'project', d: UUID, view: 'board' }, { name: 'project', d: UUID, view: 'board', tab: 'issues' }],
+      [{ name: 'project', d: UUID, view: 'table', tab: 'activity' }, { name: 'project', d: UUID, view: 'table', tab: 'activity' }],
+      [{ name: 'issue', d: UUID, tab: 'activity' }, { name: 'issue', d: UUID, tab: 'activity' }],
       [{ name: 'issue', d: UUID, slug: 'billing-entry' }, { name: 'issue', d: UUID }],
       [{ name: 'inbound', naddr: 'naddr1xyz' }, { name: 'inbound', naddr: 'naddr1xyz' }],
     ] as const
@@ -111,7 +114,7 @@ describe('the §7.2 grammar', () => {
 
   it('still resolves an old hash link, address and all', () => {
     expect(parse(`#/issue/30851:pk:${UUID}`)).toEqual({ name: 'issue', d: UUID })
-    expect(parse(`#/project/30850:pk:${OTHER}?view=board`)).toEqual({ name: 'project', d: OTHER, view: 'board' })
+    expect(parse(`#/project/30850:pk:${OTHER}?view=board`)).toEqual({ name: 'project', d: OTHER, view: 'board', tab: 'issues' })
   })
 
   it('rewrites an old hash link to the path form, once', () => {
