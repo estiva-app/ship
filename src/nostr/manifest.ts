@@ -36,7 +36,7 @@
  * as a fold alone loses the value the project was created with. Surfaced by
  * PEEK-24, where Peek offers the reassignment and then has to show the result.
  */
-import { toNostrSeconds, type NostrTag, type UnsignedEvent } from '@estiva-app/protocol'
+import { BLOCK_DOCUMENT_FORMAT, toNostrSeconds, type NostrTag, type UnsignedEvent } from '@estiva-app/protocol'
 import {
   ARCHIVED_STATES,
   DEFAULT_ISSUE_STATUS,
@@ -528,10 +528,23 @@ export function manifestContent(): ManifestContent {
           `recordDescription`) and the issue projection's `body` slot below,
           which needed the same `tag: 'description'` a project's already had.
           Three places, all of which had to agree.
+
+          **Since MAN-1 it is the issue's body, as a block document** (RIC-13).
+          `target: 'content'` puts it where Ship's own composer puts it
+          (`buildIssue`), and `format: 'estiva-blocks-1'` (SPEC §7.3) tells a
+          consumer the owner accepts §13.3's document there — so Peek draws its
+          editor and the runtime writes `content-format`, which is what
+          `descriptionFormat` folds (`contentFormatOf`). The wire value is a
+          string either way: a consumer that ignores the format still publishes
+          correct marker text, untagged. Issues filed before this carry the
+          `description` tag and still read through `recordDescription`.
         */
         input: {
           type: 'object',
-          properties: { title: { type: 'string' }, description: { type: 'string' } },
+          properties: {
+            title: { type: 'string' },
+            description: { type: 'string', target: 'content', format: BLOCK_DOCUMENT_FORMAT },
+          },
           required: ['title'],
         },
       },

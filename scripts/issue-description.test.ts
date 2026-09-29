@@ -22,7 +22,8 @@
 import { foldFolder } from '../src/nostr/fold'
 import { manifestContent, resolveSlotValue, type SlotSource } from '../src/nostr/manifest'
 import { KIND } from '../src/nostr/kinds'
-import type { SignedEvent } from '@estiva-app/protocol'
+import { buildActionEvent } from '@estiva-app/interop'
+import { BLOCK_DOCUMENT_FORMAT, markerTextToBlockDocument, serializeBlockDocument, type SignedEvent } from '@estiva-app/protocol'
 
 let failures = 0
 function check(label: string, condition: boolean, detail = '') {
@@ -133,6 +134,46 @@ check(
 check(
   'identical to the project’s chain, which had the tag all along',
   JSON.stringify(manifest.projections?.[String(KIND.PROJECT)]?.slots?.body) === JSON.stringify(body),
+)
+
+// ── 4. A block document, built from this declaration (MAN-1, RIC-13) ───────
+/*
+  What Peek does, with the runtime Peek uses: `buildActionEvent` reads this
+  manifest and is handed `contentFormat` because the declaration says the
+  description may be a block document. The fold must then read it as blocks —
+  the issue page draws a document, not the JSON of one.
+*/
+const PROJECT = `${KIND.PROJECT}:${AUTHOR}:p1`
+const document = serializeBlockDocument(markerTextToBlockDocument('# Why\nThe **total** is wrong'))
+const build = (value: Record<string, string>, contentFormat?: string) =>
+  buildActionEvent({
+    manifest: manifest as unknown as Parameters<typeof buildActionEvent>[0]['manifest'],
+    kind: KIND.PROJECT,
+    address: PROJECT,
+    objectAuthor: AUTHOR,
+    folder: FOLDER,
+    actionId: 'add-issue',
+    value,
+    newId: 'i6',
+    contentFormat,
+    pubkey: AUTHOR,
+    createdAtMs: 1_756_000_200_000,
+  })
+const built = build({ title: 'Billing entry', description: document }, BLOCK_DOCUMENT_FORMAT)
+check('the runtime builds add-issue with a block-document description', typeof built !== 'string', typeof built === 'string' ? built : '')
+if (typeof built !== 'string') {
+  check('into the content, where Ship’s own composer puts it', built.content === document)
+  check('tagged content-format: estiva-blocks-1', built.tags.some((t) => t[0] === 'content-format' && t[1] === BLOCK_DOCUMENT_FORMAT))
+  check('and not also as a description tag', !built.tags.some((t) => t[0] === 'description'))
+  const folded = only([{ ...built, id: 'd'.repeat(64), sig: 'f'.repeat(128) } as SignedEvent])
+  check('which Ship folds as blocks', folded.descriptionFormat === 'blocks', folded.descriptionFormat)
+  check('with the document as its description', folded.description === document)
+}
+const titleOnly = build({ title: 'Billing entry' })
+check(
+  'a title-only capture still builds, with no body and no format',
+  typeof titleOnly !== 'string' && titleOnly.content === '' && !titleOnly.tags.some((t) => t[0] === 'content-format'),
+  typeof titleOnly === 'string' ? titleOnly : '',
 )
 
 console.log(`\n${failures === 0 ? 'add-issue’s description is readable by every reader.' : `${failures} check(s) failed`}`)
