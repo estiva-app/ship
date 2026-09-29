@@ -155,8 +155,9 @@ export function Sidebar({ openIssues, issuesHref, projectsHref, projects, folder
     (a.name ?? a.id).localeCompare(b.name ?? b.id, undefined, { sensitivity: 'base' }),
   )
   // The teams whose state lists it; failing that, its own Folder if that is a team (`placedIn`, which the project rail names too).
-  const under = (team: SidebarFolder) => projects.filter((project) => placedIn(project, teams).includes(team))
-  const unfiled = projects.filter((project) => placedIn(project, teams).length === 0)
+  const placed = new Map(projects.map((project) => [project.addr, placedIn(project, teams)]))
+  const under = (team: SidebarFolder) => projects.filter((project) => placed.get(project.addr)!.includes(team))
+  const unfiled = projects.filter((project) => placed.get(project.addr)!.length === 0)
   const row = (project: SidebarProject) => (
     <NavItem
       key={project.addr}

@@ -107,7 +107,10 @@ export function ProjectRail({
       </Property>
       <Property layout="stacked" label="Folder">
         {folders === undefined ? (
-          <SkeletonBar className="h-3.5 w-24" />
+          // Held back 150ms like the sidebar's placeholder, so a fast read never flashes it.
+          <div className="animate-skeleton-in" aria-hidden>
+            <SkeletonBar className="h-3.5 w-24" />
+          </div>
         ) : folders.length === 0 ? (
           <span className="text-text-muted">—</span>
         ) : (
