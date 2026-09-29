@@ -11,7 +11,7 @@ const STATUSES = [
 const PEOPLE = [{ value: 'ana', name: 'Ana Duarte' }]
 
 describe('ProjectRail', () => {
-  const rail = (folders: RailFolder[] | undefined) => (
+  const rail = (folders: RailFolder[] | null | undefined) => (
     <ProjectRail
       status="in_progress"
       statuses={STATUSES}
@@ -46,6 +46,9 @@ describe('ProjectRail', () => {
   it('draws a dash for a project in no Folder, and a placeholder while the Folders are read', () => {
     const { rerender } = render(rail([]))
     expect(screen.getByText('—')).toBeInTheDocument()
+    // A read that returned no Folders is not the same claim as "in none".
+    rerender(rail(null))
+    expect(screen.getByText('Folders could not be read')).toBeInTheDocument()
     rerender(rail(undefined))
     expect(screen.queryByText('—')).not.toBeInTheDocument()
     expect(screen.queryByRole('link')).not.toBeInTheDocument()

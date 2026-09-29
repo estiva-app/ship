@@ -556,7 +556,12 @@ export function ProjectPage({
           done,
           total: issues.length,
           // The top-level Folder it is in, by the sidebar's rule: the state that lists it, then its own Folder (FOL-3).
-          folders: teams && placedIn({ addr: project.addr, folder: project.contentFolder }, teams).map((folder) => ({ name: folder.name ?? folder.id, href: href({ name: 'folder', id: folder.id }) })),
+          // No top-level Folders at all is a refused or empty read, not "in none" — the rail says so (`null`).
+          folders:
+            teams &&
+            (teams.length === 0
+              ? null
+              : placedIn({ addr: project.addr, folder: project.contentFolder }, teams).map((folder) => ({ name: folder.name ?? 'Untitled Folder', href: href({ name: 'folder', id: folder.id }) }))),
           onArchive: () =>
             void act(project.archived ? 'Unarchive' : 'Archive', () => archiveProject(project, !project.archived), say, refresh).then((ok) => {
               if (ok) say(project.archived ? 'Project restored' : 'Project archived')

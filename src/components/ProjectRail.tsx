@@ -49,9 +49,10 @@ export interface ProjectRailProps {
   /**
    * The top-level Folders this project is in (`placedIn`, the sidebar's rule),
    * each by name and linking to its Folder page. Usually one; empty when it is
-   * in none; `undefined` while the Folders are still being read.
+   * in none; `null` when no Folders could be read; `undefined` while they are
+   * still being read.
    */
-  folders: RailFolder[] | undefined
+  folders: RailFolder[] | null | undefined
   archived: boolean
   onArchive: () => void
   onDelete: () => void
@@ -111,6 +112,8 @@ export function ProjectRail({
           <div className="animate-skeleton-in" aria-hidden>
             <SkeletonBar className="h-3.5 w-24" />
           </div>
+        ) : folders === null ? (
+          <span className="text-text-muted">Folders could not be read</span>
         ) : folders.length === 0 ? (
           <span className="text-text-muted">—</span>
         ) : (
