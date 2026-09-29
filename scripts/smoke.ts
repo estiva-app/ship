@@ -1054,6 +1054,33 @@ async function main() {
   // Last, because everything above reads the project. A team with state lists
   // what its 30890 names, deleted or not, so the delete must be followed by a
   // 1852 remove or Peek keeps a row pointing at nothing (FOL-48).
+  //
+  // Every Folder that lists it, not its content Folder alone (FOL-7): a moved
+  // project is listed where its conversation is not. The stub does not derive
+  // state from the create's 1852 add, so the team's state is written here as
+  // the relay's would read by now — and Onboarding's, above, lists it too.
+  seed({ kind: 30890, created_at: Math.floor(Date.now() / 1000) + 1, tags: [['d', TEAM_ID], ['name', 'Smoke team'], ['a', projectAddr]] })
+
+  // ── Move to Folder… (FOL-7) ───────────────────────────────────────────────
+  // Listed in both now, as a half move leaves it: moving into the team takes
+  // it out of Onboarding — an add, then a remove, and never a kind:1851.
+  await page.goto(`http://localhost:${PORT}/#/project/${encodeURIComponent(projectAddr)}`)
+  await page.waitForSelector('[data-surface="project"]')
+  const beforeMove = stored.length
+  await page.getByRole('button', { name: 'Move to Folder…' }).click()
+  const moveDialog = page.getByRole('dialog', { name: 'Move to Folder' })
+  await moveDialog.waitFor()
+  await pick('Destination Folder', 'Smoke team')
+  await moveDialog.getByRole('button', { name: 'Move', exact: true }).click()
+  await moveDialog.waitFor({ state: 'detached' })
+  const moveWrites = stored.slice(beforeMove).filter((e) => e.kind === 1852 || e.kind === 1851)
+  check(
+    '"Move to Folder…" publishes an add to the new Folder, then a remove from the other, and no kind:1851',
+    moveWrites.map((e) => `${e.kind} ${tagValue(e, 'op')} ${tagValue(e, 'h')?.slice(0, 8)} ${tagValue(e, 'a') === projectAddr}`).join(' | ') ===
+      `1852 add ${TEAM_ID.slice(0, 8)} true | 1852 remove ${FOLDER_ID.slice(0, 8)} true`,
+    moveWrites.map((e) => `${e.kind} ${tagValue(e, 'op')} ${tagValue(e, 'h')?.slice(0, 8)}`).join(' | ') || 'nothing published',
+  )
+
   await page.goto(`http://localhost:${PORT}/#/project/${encodeURIComponent(projectAddr)}`)
   await page.waitForSelector('[data-surface="project"]')
   await page.getByRole('button', { name: 'Delete project' }).click()
@@ -1063,11 +1090,12 @@ async function main() {
   await page.waitForSelector('[data-surface="projects"]')
   const projectDeletion = stored.findIndex((e) => e.kind === 5 && e.tags.some((t) => t[0] === 'a' && t[1] === projectAddr))
   check('deleting a project publishes a kind:5 for its record', projectDeletion >= 0)
-  const unlist = stored.findIndex((e) => e.kind === 1852 && tagValue(e, 'op') === 'remove')
+  const unlists = stored.slice(projectDeletion + 1).filter((e) => e.kind === 1852 && tagValue(e, 'op') === 'remove' && tagValue(e, 'a') === projectAddr)
+  const unlistedFrom = unlists.map((e) => tagValue(e, 'h')).sort()
   check(
-    '  …then a kind:1852 removes it from its team',
-    unlist > projectDeletion && projectDeletion >= 0 && tagValue(stored[unlist]!, 'h') === TEAM_ID && tagValue(stored[unlist]!, 'a') === projectAddr,
-    unlist < 0 ? 'no remove' : `h=${tagValue(stored[unlist]!, 'h')?.slice(0, 8)} a=${tagValue(stored[unlist]!, 'a')?.slice(0, 16)}`,
+    '  …then a kind:1852 removes it from every Folder that lists it',
+    projectDeletion >= 0 && JSON.stringify(unlistedFrom) === JSON.stringify([TEAM_ID, FOLDER_ID].sort()),
+    `from ${unlistedFrom.map((h) => h?.slice(0, 8)).join(', ') || 'none'}`,
   )
 
   check(

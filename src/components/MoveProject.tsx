@@ -2,7 +2,7 @@ import { moveProject, type Project } from '@/api'
 import { reloadFolders } from '@/api/useFolders'
 import { MoveProjectDialog, type MoveProjectFolder } from '@/components/MoveProjectDialog'
 import { placedIn } from '@/lib/placement'
-import { act, type Say } from './act'
+import { act, type Say } from '@/pages/act'
 
 /**
  * "Move to Folder…", from the project rail or a sidebar row (FOL-7): the

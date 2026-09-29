@@ -48,7 +48,7 @@ import { ProjectView } from '@/views/ProjectView'
 import { go, href, type ProjectView as ProjectViewName } from '../router'
 import { act, type Say } from './act'
 import { hrefForIssue, rowFor } from './IssuesPage'
-import { MoveProject } from './MoveProject'
+import { MoveProject } from '@/components/MoveProject'
 
 export type { Say } from './act'
 
