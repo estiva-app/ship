@@ -1,55 +1,54 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useSyncExternalStore } from 'react'
+import { createRetryingRead } from '@estiva-app/platform'
 import { readFolders } from './foreign'
 import type { FolderSummary } from './foreign'
 
 /**
- * The Folders a person navigates by — the teams (SHI-25).
- *
- * `listFolders` answers with every channel this identity can see, and most
- * of production's are nobody's Folder: Ship's own record channels (one
- * `project-…` per project, `Store.ensureFolder`), the channel a project's
- * issues live in by `h`, Peek's test topics. Each is reached through the
- * object it belongs to. What marks a Folder out is the relay's own mark:
- * a `kind:30890` exists once somebody has sent a Folder command at the
- * channel — placed something in it, named it — and a record channel never
- * gets one. A Folder another Folder lists (`listedIn`) is a row in that one.
- *
- * The same predicate Peek draws its Folders column from (`topLevelFolders`
- * in peek#221), so the two apps show the same five. Not the five by id: a
- * sixth team is a Folder somebody creates, not a code change.
+ * The Folders a person navigates by — the teams (SHI-25): the ones with state
+ * that nothing lists. Peek draws its Folders column from the same predicate,
+ * which now lives in `@estiva-app/interop` rather than word for word in both
+ * apps (FOL-5), so the two show the same sections.
  */
-export function topLevelFolders(folders: FolderSummary[]): FolderSummary[] {
-  return folders.filter((folder) => folder.hasState && !folder.listedIn?.length)
-}
+export { topLevelFolders } from '@estiva-app/interop'
+
+/**
+ * A refusal answers the same way next time; anything else — the relay did not
+ * answer, or asked us to wait — may not. The words are the relay's
+ * (`restricted: not a channel member`), as `Store` already reads them.
+ */
+const retryable = (error: unknown) => !/restricted:|not[ _]a[ _](channel[ _])?member/i.test(String(error))
+
+/**
+ * One listing per tab, held past the sidebar that asked for it — the
+ * platform's `createRetryingRead`, which is Peek's FOL-42 `useFolders`
+ * without React.
+ */
+const listing = createRetryingRead<FolderSummary[]>({ retryable })
 
 /**
  * The Folders this identity can see, for the sidebar.
  *
- * **Read once on mount, not on the workspace poll.** A Folder's name changes
+ * **Read once per tab, not on the workspace poll.** A Folder's name changes
  * about as often as a channel is created, and this is a global query across two
  * kinds — putting it on the tick would spend a request a second of the relay's
- * 300-a-minute budget (SHI-12) to re-learn the same list. The folder *page*
- * re-reads its own contents; the navigation does not need to.
+ * 300-a-minute budget (SHI-12) to re-learn the same list.
  *
- * A failure is an empty list rather than a thrown error: the sidebar's other
- * sections are unaffected, and a workspace with no folder state yet is
- * indistinguishable from a relay that did not answer — both mean "no folders to
- * show here", and neither is worth a banner over the projects list.
+ * **A failed read is read again, and never replaces a good one** (FOL-5).
+ * Until then a failure was an empty list for the rest of the session, and
+ * with it every project fell out of its team until a reload. Now it is read
+ * again on the platform's backoff (5 s doubling to 60 s, or the relay's own
+ * wait for a quota refusal).
+ *
+ * `undefined` while the answer is still coming — including a first read that
+ * failed and is being read again — so the sidebar keeps its placeholder rows
+ * rather than drawing every project as unfiled and regrouping a moment later.
+ * An empty list once a read has landed, or once a refusal says none will.
  */
 export function useFolders(): FolderSummary[] | undefined {
-  // `undefined` until the first read lands, so the sidebar can say a list is
-  // coming rather than draw nothing and then a section (Katerina,
-  // 2026-09-09); an empty list after, whether the workspace has no Folders
-  // or the relay did not answer — the two are still one thing here.
-  const [folders, setFolders] = useState<FolderSummary[] | undefined>(undefined)
+  const snapshot = useSyncExternalStore(listing.subscribe, listing.snapshot)
   useEffect(() => {
-    let live = true
-    readFolders()
-      .then((next) => live && setFolders(next))
-      .catch(() => live && setFolders([]))
-    return () => {
-      live = false
-    }
+    void listing.ensure(readFolders)
   }, [])
-  return folders
+  if (snapshot.value) return snapshot.value
+  return snapshot.error !== undefined && !snapshot.retrying ? [] : undefined
 }

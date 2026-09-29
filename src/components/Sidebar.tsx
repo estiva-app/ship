@@ -16,10 +16,17 @@ import { NavItem } from './NavItem'
  * Peek and Ship have 5 folders — Estiva HQ, Ship, Peek, Steer, Leaf. Under
  * those there should be all the topics and projects. The issues should be
  * under the dedicated project." Which Folders are the teams is the caller's
- * to say (`topLevelFolders` — the ones with state that nothing lists); which
- * project is under which team is Ship's own fold (`Project.contentFolder`,
- * the Folder `ship link-project` re-points it at). A project whose Folder is
- * no team keeps a row under a plain "Projects" fold rather than vanishing.
+ * to say (`topLevelFolders` — the ones with state that nothing lists).
+ *
+ * **Which project is under which team is the team's state** (FOL-5): the
+ * projects its `kind:30890` lists, which is what Peek's Folders column draws
+ * under it. Until then Ship grouped by each project's own `contentFolder`, so
+ * the two apps placed projects from different sources and disagreed, and six
+ * active projects sat under a catch-all titled "Projects" that read like a
+ * Folder. `contentFolder` is now only the fallback, for a project no state
+ * lists whose own Folder is a team — a project created a moment ago, before
+ * the listing is read again. One that is genuinely in no team is under "Not
+ * in a team", which is not named like a Folder because it is not one.
  *
  * A team's title toggles its fold; the arrow on hover opens the Folder page,
  * which lists everything in it — the topics Peek filed there beside the
@@ -40,7 +47,7 @@ import { NavItem } from './NavItem'
  *
  * Desktop only: the narrow-screen drawer is parked (ruling A5).
  */
-const STORAGE = { projects: 'ship.sidebar.projects', team: (id: string) => `ship.sidebar.team.${id}` }
+const STORAGE = { unfiled: 'ship.sidebar.unfiled', team: (id: string) => `ship.sidebar.team.${id}` }
 
 export interface SidebarProject {
   /** The identity — refs and titles collide, addresses do not. */
@@ -49,7 +56,10 @@ export interface SidebarProject {
   href: string
   /** Open issues in this project. */
   openCount: number
-  /** The Folder the project is under — its `contentFolder`. Absent when it names none. */
+  /**
+   * The project's own Folder — its `contentFolder`. Absent when it names none.
+   * Only the fallback for placing it: see {@link SidebarFolder.addresses}.
+   */
   folder?: string
 }
 
@@ -59,6 +69,11 @@ export interface SidebarFolder {
   id: string
   /** Absent until something names it; the fold falls back to the id. */
   name?: string
+  /**
+   * What the team's state lists (`FolderSummary.addresses`). A project whose
+   * `addr` is here is one of the team's rows, wherever its own Folder is.
+   */
+  addresses?: string[]
 }
 
 export interface SidebarProps {
@@ -139,8 +154,15 @@ export function Sidebar({ openIssues, issuesHref, projectsHref, projects, folder
     (a.name ?? a.id).localeCompare(b.name ?? b.id, undefined, { sensitivity: 'base' }),
   )
   const teamIds = new Set(teams.map((team) => team.id))
-  const under = (team: SidebarFolder) => projects.filter((project) => project.folder === team.id)
-  const elsewhere = projects.filter((project) => !project.folder || !teamIds.has(project.folder))
+  const listedBy = new Map<string, string[]>()
+  for (const team of teams) {
+    for (const address of team.addresses ?? []) listedBy.set(address, [...(listedBy.get(address) ?? []), team.id])
+  }
+  // The teams whose state lists it; failing that, its own Folder if that is a team.
+  const teamsOf = (project: SidebarProject) =>
+    listedBy.get(project.addr) ?? (project.folder && teamIds.has(project.folder) ? [project.folder] : [])
+  const under = (team: SidebarFolder) => projects.filter((project) => teamsOf(project).includes(team.id))
+  const unfiled = projects.filter((project) => teamsOf(project).length === 0)
   const row = (project: SidebarProject) => (
     <NavItem
       key={project.addr}
@@ -171,9 +193,11 @@ export function Sidebar({ openIssues, issuesHref, projectsHref, projects, folder
         active={current === 'projects'}
       />
       {pending ? (
-        <CollapsibleSection title="Projects" storageKey={STORAGE.projects} className="mt-2 shrink-0" contentClassName="gap-px">
+        /* No title: which teams are coming is exactly what is not known yet,
+           and a heading here would be one more section named like a Folder. */
+        <div className="mt-2 shrink-0">
           <SkeletonProjects />
-        </CollapsibleSection>
+        </div>
       ) : (
         <>
           {teams.map((team) => (
@@ -193,14 +217,14 @@ export function Sidebar({ openIssues, issuesHref, projectsHref, projects, folder
             </div>
           ))}
           {/*
-            A project under no team, or under a Folder that is not one. Nothing
+            A project no team lists and whose own Folder is no team. Nothing
             is dropped from the navigation for being unfiled; on production
-            every project is under a team since 2026-09-15, so this fold is
-            usually absent.
+            every active project is in exactly one team's state since FOL-6
+            (2026-09-29), so this fold is usually absent.
           */}
-          {elsewhere.length > 0 && (
-            <CollapsibleSection title="Projects" storageKey={STORAGE.projects} className="mt-2 shrink-0" contentClassName="gap-px">
-              {elsewhere.map(row)}
+          {unfiled.length > 0 && (
+            <CollapsibleSection title="Not in a team" storageKey={STORAGE.unfiled} className="mt-2 shrink-0" contentClassName="gap-px">
+              {unfiled.map(row)}
             </CollapsibleSection>
           )}
         </>
