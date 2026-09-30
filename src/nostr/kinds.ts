@@ -44,8 +44,9 @@ export const KIND = {
    * as `kind:9`", which REW-10 itself then made false and nobody came back to.
    *
    * What actually decides the kind is one line in `events.ts`
-   * (`buildConversationMessage`): a comment that names what it is **about**
-   * becomes a `kind:1111`, and every other message stays a `kind:9`. So the two
+   * (`buildConversationMessage`): a comment that names what it is **about**,
+   * and since SHI-28 a reply to one, becomes a `kind:1111`, and every other
+   * message stays a `kind:9`. So the two
    * files two apart from each other said opposite things about production.
    *
    * Not a cosmetic disagreement. A `kind:9` filter looks like the way to read

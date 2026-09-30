@@ -321,13 +321,29 @@ export function startConversation(args: { folder: string; about: string; withRef
   )
 }
 
-/** Reply into a conversation — the thread's own Folder, anchored to its root. */
+/**
+ * Reply into a conversation — the thread's own Folder, anchored to its root.
+ *
+ * A thread whose root is a comment gets a flat `kind:1111` naming that comment
+ * (SHI-28); a chat thread gets a `kind:9`. The root's `anchor` is what tells
+ * them apart — only a NIP-22 comment carries one.
+ */
 export function reply(conversation: Conversation, fallbackFolder: string, body: string, files?: readonly Imeta[]): Promise<WriteResult> {
+  const { root } = conversation
   return publish(() =>
     store.postMessage({
-      folder: conversation.root.folder || fallbackFolder,
+      folder: root.folder || fallbackFolder,
       body,
-      replyTo: { rootId: conversation.id, parentId: conversation.id },
+      ...(root.anchor
+        ? {
+            replyToComment: {
+              id: conversation.id,
+              anchor: root.anchor,
+              // A reply standing in for a root outside the read is not its author.
+              author: root.id === conversation.id ? root.author : undefined,
+            },
+          }
+        : { replyTo: { rootId: conversation.id, parentId: conversation.id } }),
       files,
     }),
   )

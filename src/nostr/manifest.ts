@@ -484,27 +484,24 @@ export function manifestContent(): ManifestContent {
           'The comment lands in the Folder both apps read, so it appears in that Folder’s conversation as well as on the object.',
         effect: 'writes',
         /**
-         * Emits NIP-22 `kind:1111`, and **also declares the `kind:9` it used
-         * to**. Both halves matter and they are not the same statement.
+         * Emits NIP-22 `kind:1111`. Ship moved to it because scoping a threaded
+         * comment to an *addressable* event is exactly what lets two apps
+         * comment on the same object without either owning the comment kind —
+         * and because it is the standard version of what Ship was already
+         * doing with a bare `a` tag.
          *
-         * `kind` is what a consumer publishes. Ship moved to `1111` because
-         * scoping a threaded comment to an *addressable* event is exactly what
-         * lets two apps comment on the same object without either owning the
-         * comment kind — and because it is the standard version of what Ship
-         * was already doing with a bare `a` tag.
-         *
-         * `alsoRead` is what a consumer must still *fetch*. A `kind:9` message
-         * is not replaceable at all, so every comment written before this stays
-         * a `kind:9` permanently — there is no migration and there never will
-         * be. Omitting `alsoRead` would not lose the new comments, it would
-         * lose all the old ones, and it would do it silently: a thread that
-         * begins in the middle. See `protocol/SPEC.md` §7.3.
+         * **No `alsoRead: [9]` any more.** It told a consumer to keep fetching
+         * the `kind:9` comments Ship used to write. CON-20 (2026-09-30)
+         * republished every one on production as a `kind:1111`, and SHI-28
+         * made Ship's last `kind:9` writer — the reply button — write a
+         * `1111`, so nothing comment-shaped is a `kind:9` to fetch
+         * (`protocol/SPEC.md` §6.4, §7.3).
          *
          * This manifest does not describe Ship so much as instruct Peek. Peek
-         * publishes under `kind` and reads the union of both (`commentKindsOf`),
-         * so this event and Ship's writer have to change together — flipping
-         * one without the other makes Peek publish a kind Ship is not writing,
-         * or query a kind that has no history.
+         * publishes under `kind` and reads the union of `kind` and `alsoRead`
+         * (`commentKindsOf`), so this event and Ship's writer change together:
+         * republish it only once the writer is deployed, or a Ship reply
+         * written as a `kind:9` in between is one Peek no longer asks for.
          *
          * The conversation stays shared either way, which was the original
          * point of declaring `kind:9`: a project is a Folder, a Peek topic is
@@ -512,7 +509,7 @@ export function manifestContent(): ManifestContent {
          * `1111` carrying `h` is in that same container.
          */
         appliesTo: [String(KIND.PROJECT), String(KIND.ISSUE)],
-        emits: { kind: KIND.COMMENT, scope: 'address', alsoRead: [KIND.MESSAGE] },
+        emits: { kind: KIND.COMMENT, scope: 'address' },
         input: { type: 'string' },
       },
       {
