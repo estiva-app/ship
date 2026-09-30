@@ -11,7 +11,7 @@
     "typecheck": "tsc -b",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:scripts": "tsx scripts/app.test.ts && tsx scripts/manifest-slots.test.ts && tsx scripts/issue-description.test.ts && tsx scripts/references.test.ts && tsx scripts/reactions.test.ts && tsx scripts/edits.test.ts && tsx scripts/attachments.test.ts && tsx scripts/reload-folders.test.ts && tsx scripts/move-project.test.ts && tsx scripts/folder-create-rename.test.ts && tsx scripts/conformance.test.ts",
+    "test:scripts": "tsx scripts/app.test.ts && tsx scripts/manifest-slots.test.ts && tsx scripts/issue-description.test.ts && tsx scripts/manifest-actions.test.ts &&tsx scripts/references.test.ts && tsx scripts/reactions.test.ts && tsx scripts/edits.test.ts && tsx scripts/attachments.test.ts && tsx scripts/reload-folders.test.ts && tsx scripts/move-project.test.ts && tsx scripts/folder-create-rename.test.ts && tsx scripts/conformance.test.ts",
     "test:app": "tsx scripts/app.test.ts",
     "smoke": "npm run build && tsx scripts/smoke.ts",
     "storybook": "storybook dev -p 6007",
@@ -30,7 +30,7 @@
   },
   "dependencies": {
     "@estiva-app/identity": "^0.2.2",
-    "@estiva-app/interop": "^0.36.0",
+    "@estiva-app/interop": "^0.37.1",
     "@estiva-app/platform": "^0.4.0",
     "@estiva-app/protocol": "^0.24.0",
     "@estiva-app/ui": "^0.45.0",

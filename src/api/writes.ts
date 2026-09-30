@@ -101,9 +101,34 @@ export function setProjectField(project: Project, field: 'title' | 'description'
   return publish(() => store.setField({ folder: project.originFolder, target: project.addr, field, ...body, note }))
 }
 
-/** Archive hides the project from the lists, reversibly, by a change anyone in the Folder can make. */
-export function archiveProject(project: Project, archived: boolean): Promise<WriteResult> {
-  return publish(() => store.archiveProject({ recordFolder: project.originFolder, project: project.addr, archived }))
+/**
+ * Archive hides the project, and its issues with it, from the lists,
+ * reversibly, by a change anyone in the Folder can make. `resolution` is shown
+ * first when it is opened (FOL-46).
+ */
+export function archiveProject(project: Project, archived: boolean, resolution?: string): Promise<WriteResult> {
+  return publish(() => store.archiveProject({ recordFolder: project.originFolder, project: project.addr, archived, resolution }))
+}
+
+/** Archive one issue, or restore it — the project's rule, one level down (FOL-46). */
+export function archiveIssue(issue: Issue, archived: boolean, resolution?: string): Promise<WriteResult> {
+  return publish(() => store.archiveIssue({ folder: issue.folder, issue: issue.addr, archived, resolution }))
+}
+
+/**
+ * Archive a Folder, or restore it (FOL-46): a change on its address, so its
+ * projects stay where they are and come back with it. `channel` is the
+ * listing's `FolderSummary.channel`.
+ */
+export async function archiveFolder(folder: { id: string; channel: string }, archived: boolean, resolution?: string): Promise<WriteResult> {
+  const clock = await clockProblem()
+  if (clock) return refused(clock)
+  try {
+    const result = await store.archiveFolder({ folder: folder.id, channel: folder.channel, archived, resolution })
+    return result.ok ? { ok: true } : refused(result.reason)
+  } catch (error) {
+    return refused(error instanceof Error ? error.message : String(error))
+  }
 }
 
 /**
@@ -296,13 +321,29 @@ export function startConversation(args: { folder: string; about: string; withRef
   )
 }
 
-/** Reply into a conversation — the thread's own Folder, anchored to its root. */
+/**
+ * Reply into a conversation — the thread's own Folder, anchored to its root.
+ *
+ * A thread whose root is a comment gets a flat `kind:1111` naming that comment
+ * (SHI-28); a chat thread gets a `kind:9`. The root's `anchor` is what tells
+ * them apart — only a NIP-22 comment carries one.
+ */
 export function reply(conversation: Conversation, fallbackFolder: string, body: string, files?: readonly Imeta[]): Promise<WriteResult> {
+  const { root } = conversation
   return publish(() =>
     store.postMessage({
-      folder: conversation.root.folder || fallbackFolder,
+      folder: root.folder || fallbackFolder,
       body,
-      replyTo: { rootId: conversation.id, parentId: conversation.id },
+      ...(root.anchor
+        ? {
+            replyToComment: {
+              id: conversation.id,
+              anchor: root.anchor,
+              // A reply standing in for a root outside the read is not its author.
+              author: root.id === conversation.id ? root.author : undefined,
+            },
+          }
+        : { replyTo: { rootId: conversation.id, parentId: conversation.id } }),
       files,
     }),
   )

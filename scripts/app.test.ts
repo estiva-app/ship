@@ -366,15 +366,46 @@ const plain = buildConversationMessage(PK, Date.now(), { folder: CONTENT, body: 
 check('a message about nothing stays a kind:9', plain.kind === 9)
 check('  …and carries no A tag to be malformed by', tag(plain, 'A') === undefined)
 
-// A reply has no anchor available, so it stays kind:9 rather than becoming a
-// 1111 with no root. Both shapes fold into one thread either way.
+// A reply in chat stays a kind:9, threaded by Buzz's tags (SPEC §6.4).
 const reply = buildConversationMessage(PK, Date.now(), {
   folder: CONTENT,
   body: 'Replying',
   replyTo: { rootId: 'r1', parentId: 'r1' },
 })
-check('a reply stays a kind:9 until a caller can supply the anchor', reply.kind === 9)
+check('a reply in chat stays a kind:9', reply.kind === 9)
 check('  …and threads by e, as it always did', tag(reply, 'e') === 'r1')
+
+// A reply to a comment is a flat 1111 — SHI-28. It was a kind:9 until then,
+// which a NIP-22 client that is not Ship does not see.
+const OTHER = 'c'.repeat(64)
+const commentReply = buildConversationMessage(PK, Date.now(), {
+  folder: CONTENT,
+  body: 'Replying to the comment',
+  replyToComment: { id: 'c1', anchor: ISSUE_ADDR2, author: OTHER },
+})
+check('a reply to a comment is a kind:1111', commentReply.kind === 1111)
+check(
+  '  …uppercase copied from the comment, lowercase naming it, in interop’s order',
+  JSON.stringify(commentReply.tags.map((t) => t[0])) === JSON.stringify(['A', 'K', 'P', 'e', 'k', 'p', 'h', 'ts']),
+)
+check('  …A/K/P are the object', tag(commentReply, 'A') === ISSUE_ADDR2 && tag(commentReply, 'K') === '30851' && tag(commentReply, 'P') === PK)
+check('  …e/k/p are the comment', tag(commentReply, 'e') === 'c1' && tag(commentReply, 'k') === '1111' && tag(commentReply, 'p') === OTHER)
+check('  …no lowercase a, which NIP-22 would read as the parent', tag(commentReply, 'a') === undefined)
+check('  …and the Folder, or it is world-readable', tag(commentReply, 'h') === CONTENT)
+const standIn = buildConversationMessage(PK, Date.now(), {
+  folder: CONTENT,
+  body: 'x',
+  replyToComment: { id: 'c1', anchor: ISSUE_ADDR2 },
+})
+check('  …no p when the comment’s author is not known', tag(standIn, 'p') === undefined)
+
+// The round trip: the reply folds into the comment's thread, and the comment
+// carries the anchor the reply was built from.
+const topComment = sign(buildConversationMessage(PK, 1_000_000, { folder: CONTENT, body: 'Top', about: ISSUE_ADDR2 }), 'c1')
+const replied = foldFolder([topComment, sign(commentReply, 'r2')]).conversations
+check('  …folds under the comment', replied.length === 1 && replied[0]?.id === 'c1' && replied[0]?.replies[0]?.id === 'r2')
+check('  …whose root carries the anchor a reply copies', replied[0]?.root.anchor === ISSUE_ADDR2)
+check('a kind:9 carries no anchor, so its thread gets a kind:9 reply', convo.conversations.find((c) => c.root.id === 'm1')?.root.anchor === undefined)
 
 /*
   Attaching a file — SHI-2, the other end of `attachments.ts`.
@@ -476,7 +507,7 @@ const commentAction = (JSON.parse(shipManifest.content) as {
   actions: { id: string; emits: { kind: number; alsoRead?: number[] } }[]
 }).actions.find((a) => a.id === 'comment')!
 check('the manifest tells consumers to publish 1111', commentAction.emits.kind === 1111)
-check('  …and to keep reading the kind:9 it used to emit', commentAction.emits.alsoRead?.includes(9) === true)
+check('  …and nothing else: no comment is a kind:9 since CON-20 and SHI-28', commentAction.emits.alsoRead === undefined)
 
 // ── Every action says what it does and what it costs (PRO-5) ───────────────
 
@@ -507,7 +538,9 @@ const allActions = (JSON.parse(buildManifest(PK, Date.now()).content) as {
   actions: { id: string; effect?: string }[]
 }).actions
 
-check('the manifest declares ten actions', allActions.length === 10, allActions.map((a) => a.id).join(', '))
+// Eleven since FOL-46 added archive-issue: archive is one field for every kind.
+// Sixteen since MAN-4 added describe-*, move-issue, add-project and delete-project.
+check('the manifest declares sixteen actions', allActions.length === 16, allActions.map((a) => a.id).join(', '))
 for (const action of allActions) {
   // The problems are sentences naming the action, so a failure here says what
   // to write rather than which assertion index went red.
@@ -516,13 +549,12 @@ for (const action of allActions) {
 }
 
 /*
-  The destructive inventory is exactly one: deleting an issue (MAN-4). Asserted
-  as a list, not a count, so adding another — deleting a project, which also
-  unlists it from its Folder — is a deliberate act with a failing test in front
-  of it.
+  The destructive inventory is exactly two: deleting an issue and deleting a
+  project (MAN-4). Asserted as a list, not a count, so adding another is a
+  deliberate act with a failing test in front of it.
 */
 const destructive = allActions.filter((a) => a.effect === 'destructive').map((a) => a.id)
-check('the only destructive action is delete-issue', destructive.join() === 'delete-issue', destructive.join(', '))
+check('the destructive actions are delete-issue and delete-project', destructive.join() === 'delete-issue,delete-project', destructive.join(', '))
 
 /*
   The shapes a consumer turns into controls — MAN-4. Peek finds Rename by the

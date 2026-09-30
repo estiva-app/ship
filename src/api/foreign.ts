@@ -17,6 +17,7 @@
 import type { SignedEvent } from '@estiva-app/protocol'
 import {
   conversationCountsOf,
+  archiveImpact,
   createPeopleCache,
   createProjectionCache,
   listFolders,
@@ -202,4 +203,36 @@ export async function readRelated(folder: string, address: string): Promise<Rela
 /** Every Folder this identity can see, for the sidebar. */
 export function readFolders(): Promise<FolderSummary[]> {
   return listFolders(query)
+}
+
+/**
+ * What archiving a Folder would hide, worded for the warning (FOL-46).
+ *
+ * The counts are interop's `archiveImpact`, so Ship and Peek say the same
+ * numbers; the words are Ship's. `folders` is the sidebar's listing, which
+ * saves reading it again and names where a file stays visible.
+ */
+export async function folderArchiveImpact(channel: string, folders?: FolderSummary[]): Promise<{ hides: string[]; staysVisible: string[] }> {
+  const impact = await archiveImpact(channel, query, { folders, cache: manifests })
+  const hides = impact.hides.map(({ kind, count }) => countOf(kind, count))
+  const byFolder = new Map<string, number>()
+  for (const file of impact.staysVisible) {
+    const name = file.in[0]?.name ?? 'another folder'
+    byFolder.set(name, (byFolder.get(name) ?? 0) + 1)
+  }
+  const staysVisible = [...byFolder].map(([name, n]) => `${n} ${n === 1 ? 'file' : 'files'} also in ${name}`)
+  return { hides, staysVisible }
+}
+
+/** "14 issues", by the kind's plain name. A kind Ship has never heard of is a file. */
+function countOf(kind: number, n: number): string {
+  const [one, many] = KIND_WORDS[kind] ?? ['file', 'files']
+  return `${n} ${n === 1 ? one : many}`
+}
+
+const KIND_WORDS: Record<number, [string, string]> = {
+  30850: ['project', 'projects'],
+  30851: ['issue', 'issues'],
+  30840: ['topic', 'topics'],
+  39000: ['folder', 'folders'],
 }

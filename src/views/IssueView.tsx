@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { IconBox } from '@tabler/icons-react'
 import { Breadcrumb, type Crumb } from '@/components/ui/Breadcrumb'
 import { ScrollArea } from '@/components/ui/ScrollArea'
@@ -78,6 +79,8 @@ export interface IssueViewProps {
   readOnlyReason?: string
   /** The upload behind attach. Injected so a story needs no relay; the app's by default. */
   upload?: (file: File) => Promise<Imeta>
+  /** The `ArchivedNotice` of an archived issue, or one archived with its project: the first thing on every tab (FOL-46). */
+  archivedNotice?: ReactNode
 }
 
 const TABS: { id: IssueTab; label: string }[] = [
@@ -86,7 +89,7 @@ const TABS: { id: IssueTab; label: string }[] = [
 ]
 
 /** One issue's page, in tabs: Overview and Activity, with the rail on every tab. */
-export function IssueView({ crumbs, tab, onTab, title, description, descriptionFormat, nameOf, onRename, onDescribe, related, threads, unread, onStartConversation, onReply, activity, activityTruncated, onReplyInActivity, history, rail, about, onReact, onDeleteMessage, onEditMessage, readOnlyReason, upload }: IssueViewProps) {
+export function IssueView({ crumbs, tab, onTab, title, description, descriptionFormat, nameOf, onRename, onDescribe, related, threads, unread, onStartConversation, onReply, activity, activityTruncated, onReplyInActivity, history, rail, about, onReact, onDeleteMessage, onEditMessage, readOnlyReason, upload, archivedNotice }: IssueViewProps) {
   // `linkTo` on each crumb (S15, 0.10.0): the breadcrumbs were the last links in Ship that reloaded the app (SHI-20).
   const items: Crumb[] = [{ label: 'Issues', ...linkTo(crumbs.issuesHref) }]
   // The box before the project's name says it is a project, as the sidebar's entry does (Katerina, 2026-09-09).
@@ -108,6 +111,7 @@ export function IssueView({ crumbs, tab, onTab, title, description, descriptionF
       <ScrollArea className="col-start-1 row-start-3 min-h-0 min-w-0" contentClassName="flex flex-col gap-6 px-6 pb-5">
         {tab === 'overview' && (
           <Centred>
+            {archivedNotice}
             <LiveHeader title={title} titlePlaceholder="Untitled issue" onRename={onRename} description={description} format={descriptionFormat} onDescribe={onDescribe} nameOf={nameOf} readOnly={!!readOnlyReason} upload={upload} />
             {/* Nesting is by intent (RFC 0.5 §10.7): what somebody placed under this issue, from whichever app owns it. */}
             {hasRelated(related) && (
@@ -123,6 +127,7 @@ export function IssueView({ crumbs, tab, onTab, title, description, descriptionF
 
         {tab === 'activity' && (
           <Centred>
+            {archivedNotice}
             <AppSection title="Conversations">
               <ThreadList threads={threads} unread={unread} onStart={onStartConversation} onReply={onReply} disabledReason={readOnlyReason} nameOf={nameOf} onReact={onReact} onDeleteMessage={onDeleteMessage} onEditMessage={onEditMessage} about={about} upload={upload} />
             </AppSection>

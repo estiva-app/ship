@@ -21,6 +21,7 @@ import { ProjectsPage } from '@/pages/ProjectsPage'
 import { ID_CONFIG, RELAY_URL } from './config'
 import { beginSignIn, beginSignOut, signInAvailable, signedIn } from './auth/estivaId'
 import { identifierFromRef, type FolderSummary } from '@estiva-app/interop'
+import { archivesOf, type Archives } from '@/lib/archive'
 import { go, href, replace, useRoute, type Route } from './router'
 
 /**
@@ -51,6 +52,8 @@ function Shell() {
   const folders = useFolders()
   // The teams: what the sidebar lists, what a new project is filed into (FOL-2).
   const teams = useMemo(() => (folders ? topLevelFolders(folders) : undefined), [folders])
+  // What is archived, and what with (FOL-46): read against every Folder, archived teams included.
+  const archives = useMemo(() => (state ? archivesOf(state, folders ?? []) : undefined), [state, folders])
   const { showToast } = useToast()
   const { banner, say, clear } = useBanner(showToast)
   // The project a sidebar row's "Move to Folder…" was chosen on (FOL-7), by address.
@@ -158,6 +161,7 @@ function Shell() {
             state,
             route,
             (teams ?? []).map((f) => ({ id: f.id, name: f.name, addresses: f.addresses })),
+            archives,
           )}
           onOpenFolder={(folder) => go({ name: 'folder', id: folder.id })}
           {...(teams?.length ? { onMoveProject: (project: SidebarProject) => setMoving(project.addr) } : {})}
@@ -167,7 +171,7 @@ function Shell() {
         />
       }
     >
-      <Page route={route} state={state} loading={loading} directory={directory} teams={teams} say={say} refresh={refresh} />
+      <Page route={route} state={state} loading={loading} directory={directory} teams={teams} folders={folders} archives={archives} say={say} refresh={refresh} />
       {movingProject && teams && <MoveProject project={movingProject} teams={teams} say={say} onClose={() => setMoving(null)} />}
       {creatingFolder && <NewFolderDialog onCreate={newFolder} onClose={() => setCreatingFolder(false)} />}
     </AppShell>
@@ -183,7 +187,7 @@ const SKELETON: Partial<Record<Route['name'], PageSkeletonShape>> = {
 }
 
 /** Which page the route names; an inbound reference shows nothing until it resolves. */
-function Page({ route, state, loading, directory, teams, say, refresh }: { route: Route; state: WorkspaceState | null; loading: boolean; directory: DirectoryView; teams: FolderSummary[] | undefined; say: Say; refresh: (folders?: string[]) => Promise<void> }) {
+function Page({ route, state, loading, directory, teams, folders, archives, say, refresh }: { route: Route; state: WorkspaceState | null; loading: boolean; directory: DirectoryView; teams: FolderSummary[] | undefined; folders: FolderSummary[] | undefined; archives: Archives | undefined; say: Say; refresh: (folders?: string[]) => Promise<void> }) {
   /*
     The first read has not landed. This used to render nothing at all, which is
     what "Ship sometimes does not load the projects and issues" was: a full read
@@ -200,18 +204,18 @@ function Page({ route, state, loading, directory, teams, say, refresh }: { route
     so it never waits for the workspace, and draws its own rows while its
     files load (UIG-14 C8). The workspace's skeleton used to sit there first.
   */
-  if (route.name === 'folder') return <FolderPage id={route.id} say={say} />
+  if (route.name === 'folder') return <FolderPage id={route.id} folders={folders} nameOf={directory.nameOf} say={say} />
   if (!state && loading) return <PageSkeleton shape={SKELETON[route.name] ?? 'rows'} />
-  if (!state) return null
+  if (!state || !archives) return null
   switch (route.name) {
     case 'projects':
-      return <ProjectsPage state={state} directory={directory} teams={teams} archived={route.archived} say={say} refresh={refresh} />
+      return <ProjectsPage state={state} directory={directory} teams={teams} archives={archives} archived={route.archived} say={say} refresh={refresh} />
     case 'issues':
-      return <IssuesPage state={state} directory={directory} say={say} refresh={refresh} />
+      return <IssuesPage state={state} directory={directory} archives={archives} say={say} refresh={refresh} />
     case 'project':
-      return <ProjectPage state={state} directory={directory} teams={teams} d={route.d} view={route.view} tab={route.tab ?? 'overview'} say={say} refresh={refresh} />
+      return <ProjectPage state={state} directory={directory} teams={teams} archives={archives} d={route.d} view={route.view} tab={route.tab ?? 'overview'} say={say} refresh={refresh} />
     case 'issue':
-      return <IssuePage state={state} directory={directory} d={route.d} tab={route.tab ?? 'overview'} say={say} refresh={refresh} />
+      return <IssuePage state={state} directory={directory} archives={archives} d={route.d} tab={route.tab ?? 'overview'} say={say} refresh={refresh} />
     default:
       return <EmptyState icon={<IconLink size={16} stroke={1.5} />} message="Resolving reference…" />
   }
@@ -222,19 +226,23 @@ function Page({ route, state, loading, directory, teams, say, refresh }: { route
  * counts open issues outside archived projects; a project counts its open
  * issues (the old app counted all of them — our tooltip says "open", so open
  * it is; noted for Jan); archived projects are out of the navigation.
+ *
+ * Archived is FOL-46's rule (`archivesOf`): an issue archived itself or with
+ * its project is not counted, and a project archived itself or with its team
+ * is not listed. Without `archives` only a project's own flag is read.
  */
 export function sidebarProps(
   state: FolderState | null,
   route: Route,
   folders: SidebarFolder[] = [],
+  archives: Archives | undefined = state ? archivesOf(state) : undefined,
 ) {
   const projects = state?.projects ?? []
-  const issues = state?.issues ?? []
   const isOpen = (status: string) => status !== 'done' && status !== 'cancelled'
-  const archived = new Set(projects.filter((p) => p.archived).map((p) => p.addr))
-  const openIssues = issues.filter((i) => isOpen(i.status) && !archived.has(i.projectAddr ?? '')).length
+  const issues = (state?.issues ?? []).filter((i) => !archives?.ofIssue(i))
+  const openIssues = issues.filter((i) => isOpen(i.status)).length
   const active: SidebarProject[] = projects
-    .filter((p) => !p.archived)
+    .filter((p) => !archives?.ofProject(p.addr))
     .map((p) => ({
       addr: p.addr,
       title: p.title,

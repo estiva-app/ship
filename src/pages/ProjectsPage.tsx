@@ -5,6 +5,7 @@ import { renderTreeText, toRenderTree } from '@estiva-app/protocol'
 import { NewProjectDialog } from '@/components/NewProjectDialog'
 import type { ProjectCardProps } from '@/components/ProjectCard'
 import { ProjectsView } from '@/views/ProjectsView'
+import type { Archives } from '@/lib/archive'
 import { go, href } from '../router'
 import { type Say } from './act'
 
@@ -15,13 +16,22 @@ import { type Say } from './act'
  * recomputes what the fold decided — `archived` and `status` are read off
  * the folded project. "Add project" opens the form in a dialog; a created
  * project is on screen only once the relay has been read again.
+ *
+ * Archived is FOL-46's (`archivesOf`): a project archived itself or with its
+ * team is on the Archived tab, and a card counts only the issues not archived
+ * on their own.
  */
-export function ProjectsPage({ state, directory, teams, archived, say, refresh }: { state: FolderState; directory: DirectoryView; teams: FolderSummary[] | undefined; archived: boolean; say: Say; refresh: () => Promise<void> }) {
+export function ProjectsPage({ state, directory, teams, archives, archived, say, refresh }: { state: FolderState; directory: DirectoryView; teams: FolderSummary[] | undefined; archives: Archives; archived: boolean; say: Say; refresh: () => Promise<void> }) {
   const [adding, setAdding] = useState(false)
 
   const cards = useMemo(() => {
+    const isArchived = (project: FolderState['projects'][number]) => !!archives.ofProject(project.addr)
     const toCard = (project: FolderState['projects'][number]): ProjectCardProps => {
-      const issues = state.issues.filter((issue) => issue.projectAddr === project.addr)
+      // An issue archived with its project is still that project's to count; one archived on its own is not.
+      const issues = state.issues.filter((issue) => {
+        const archive = archives.ofIssue(issue)
+        return issue.projectAddr === project.addr && (!archive || !!archive.with)
+      })
       const status = lookupStatus(PROJECT_STATUSES, project.status)
       return {
         href: href({ name: 'project', d: project.id, slug: project.title, view: 'table' }),
@@ -34,14 +44,14 @@ export function ProjectsPage({ state, directory, teams, archived, say, refresh }
         doneCount: issues.filter((issue) => issue.status === 'done').length,
         author: directory.personOf(project.author),
         createdAt: project.createdAt,
-        archived: project.archived,
+        archived: isArchived(project),
       }
     }
     return {
-      active: state.projects.filter((p) => !p.archived).map(toCard),
-      archived: state.projects.filter((p) => p.archived).map(toCard),
+      active: state.projects.filter((p) => !isArchived(p)).map(toCard),
+      archived: state.projects.filter(isArchived).map(toCard),
     }
-  }, [state, directory])
+  }, [state, directory, archives])
 
   return (
     <>

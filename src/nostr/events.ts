@@ -335,17 +335,7 @@ const PLACEMENT_FIELDS = new Set(['assignee', 'lead'])
  * `assertFolderId` above is the only thing standing there, which is why this
  * builder takes a Folder rather than an optional one.
  *
- * ## Why replies are still kind:9
- *
- * A `1111` MUST name its root, and a reply's root is the *object*, not the
- * comment it answers — so building one needs the thread's anchor, which
- * `replyTo` does not carry and the caller does not currently pass. Emitting a
- * `1111` without an `A` would be worse than a `kind:9`: malformed rather than
- * merely old. So a reply stays a `kind:9` until a caller can supply the anchor,
- * which is a change in the app rather than here.
- *
- * Nothing breaks in the meantime. `fold.ts` reads both kinds into one thread,
- * and Peek's topic sync reads both since peek#58.
+ * A reply to one is `buildNip22Reply`, below.
  */
 function buildNip22Comment(
   pubkey: string,
@@ -382,14 +372,72 @@ function buildNip22Comment(
   }
 }
 
+/**
+ * kind:1111 reply to a top-level comment — SPEC §6.4 *Replies*, SHI-28. Tag
+ * order: A, K, P, e, k, p, h, ts — the order interop's `replyTo` writes.
+ *
+ * **Flat, one level deep.** Uppercase is the object the thread is about,
+ * copied from the comment answered; lowercase `e`/`k`/`p` name that comment,
+ * never another reply, because when the root is an address NIP-22 carries no
+ * id for the thread and a reader would have to walk parents to find it.
+ *
+ * **No lowercase `a`.** NIP-22 reads it as the parent, so the object's address
+ * there would claim the reply is itself a top-level comment. The reply is found
+ * by `#e` on the comment instead.
+ *
+ * Until SHI-28 this was a `kind:9` with Buzz's thread tags, which a client
+ * that knows NIP-22 and not Ship does not see; CON-20 migrated the 25 of them.
+ */
+function buildNip22Reply(
+  pubkey: string,
+  createdAtMs: number,
+  args: { folder: string; body: string; comment: CommentRef; files?: readonly Imeta[] },
+): UnsignedEvent {
+  const [kind, author] = args.comment.anchor.split(':')
+  return {
+    pubkey,
+    created_at: toNostrSeconds(createdAtMs),
+    kind: KIND.COMMENT,
+    tags: [
+      ['A', args.comment.anchor],
+      ['K', kind],
+      ['P', author],
+      ['e', args.comment.id],
+      ['k', String(KIND.COMMENT)],
+      // Unknown only when the comment itself is outside the read — see `CommentRef`.
+      ...(args.comment.author ? [['p', args.comment.author]] : []),
+      ['h', args.folder],
+      ['ts', String(Math.floor(createdAtMs))],
+      ...(args.files ?? []).map(imetaTag),
+    ],
+    content: args.body,
+  }
+}
+
+/** The top-level comment a reply answers — what `buildNip22Reply` copies from. */
+export interface CommentRef {
+  /** Its event id. */
+  id: string
+  /** The address of the object its thread is about: its `A`. */
+  anchor: string
+  /**
+   * Its author. Undefined when the comment is not in what was read and a
+   * reply stands in for it (`foldConversations`): the stand-in's author is
+   * somebody else, and a wrong `p` notifies the wrong person.
+   */
+  author?: string
+}
+
 export function buildConversationMessage(
   pubkey: string,
   createdAtMs: number,
   args: {
     folder: string
     body: string
-    /** Omit to start a conversation; pass to reply into an existing one. */
+    /** Omit to start a conversation; pass to reply into a chat thread (`kind:9`). */
     replyTo?: ThreadRef
+    /** Pass instead of `replyTo` to reply to a comment — a `kind:1111`, SHI-28. */
+    replyToComment?: CommentRef
     /** Address of the Issue or Project this conversation is about. */
     about?: string
     /** A block of that object, when the comment is about one part — §13.6. */
@@ -408,9 +456,16 @@ export function buildConversationMessage(
 ): UnsignedEvent {
   assertFolderId(args.folder)
 
-  // A comment that names what it is about becomes a NIP-22 `kind:1111`; every
-  // other message stays a `kind:9`. See `buildNip22Comment` for why the split
-  // is where it is.
+  // A comment, or a reply to one, is a NIP-22 `kind:1111`; chat — a message in
+  // the Folder or a reply in its thread — stays a `kind:9` (SPEC §6.4).
+  if (args.replyToComment) {
+    return buildNip22Reply(pubkey, createdAtMs, {
+      folder: args.folder,
+      body: args.body,
+      comment: args.replyToComment,
+      files: args.files,
+    })
+  }
   if (args.about && !args.replyTo) {
     return buildNip22Comment(pubkey, createdAtMs, {
       folder: args.folder,

@@ -24,9 +24,10 @@ import {
   buildProject,
   issueAddr,
   projectAddr,
+  type CommentRef,
 } from './events'
 import { findNaddrs, naddrToAddr, buildReaction, buildEdit, buildDeletion as buildEventDeletion } from '@estiva-app/protocol'
-import { planCreateFolder, planMoveFile, planPlaceFile, planRenameFolder, planUnlistFile, type FolderRef, type MoveRefusal } from '@estiva-app/interop'
+import { planArchiveFolder, planCreateFolder, planMoveFile, planPlaceFile, planRenameFolder, planUnlistFile, type FolderRef, type MoveRefusal } from '@estiva-app/interop'
 import { foldFolder, projectFolders, type FolderState } from './fold'
 import { anchorIndex, type AnchorIndex } from './references'
 import { foldEdits, type EditIndex } from './edits'
@@ -370,19 +371,52 @@ export class Store {
    * A change event, so it is reversible, attributable and available to anyone
    * in the Folder rather than only the project's author. This is the operation
    * that should be reached for; `deleteProject` is the narrow one.
+   *
+   * `resolution` is what the person archiving said about it (FOL-46), carried
+   * as the change's `content` — one event, so it cannot land without the
+   * archive. It replaces the `archived` / `unarchived` placeholder notes, which
+   * nothing ever displayed. The project's issues are archived with it when
+   * read; nothing is written to them.
    */
   archiveProject(args: {
     recordFolder: string
     project: string
     archived: boolean
+    resolution?: string
   }): Promise<PublishResult> {
     return this.setField({
       folder: args.recordFolder,
       target: args.project,
       field: 'archived',
       value: args.archived ? 'true' : '',
-      note: args.archived ? 'archived' : 'unarchived',
+      note: args.archived ? (args.resolution ?? '') : '',
     })
+  }
+
+  /**
+   * Hide one issue from the lists, or bring it back — FOL-46. The same field
+   * and shape as a project's, written into the issue's own Folder where its
+   * status lives.
+   */
+  archiveIssue(args: { folder: string; issue: string; archived: boolean; resolution?: string }): Promise<PublishResult> {
+    return this.setField({
+      folder: args.folder,
+      target: args.issue,
+      field: 'archived',
+      value: args.archived ? 'true' : '',
+      note: args.archived ? (args.resolution ?? '') : '',
+    })
+  }
+
+  /**
+   * Archive a Folder, or restore it — FOL-46. A change on the Folder's own
+   * address (`FolderSummary.channel`), published into it; never a `kind:9008`,
+   * which hides everything under its `h` for good.
+   */
+  async archiveFolder(args: { folder: string; channel: string; archived: boolean; resolution?: string }): Promise<PublishResult> {
+    assertFolderId(args.folder)
+    const [change] = planArchiveFolder(this.signer.pubkey, Date.now(), args)
+    return this.publish(change)
   }
 
   /**
@@ -629,10 +663,10 @@ export class Store {
   /**
    * Start a conversation, or reply in one.
    *
-   * A `kind:9` in the Folder — the same kind and shape Peek writes for a topic
-   * message. That is the entire integration: Peek's sync imports a foreign
-   * pubkey's root message as a conversation and one carrying an `e` tag as a
-   * reply, so anything posted here appears there without Peek changing.
+   * A comment about an object, and a reply to one, is a NIP-22 `kind:1111`;
+   * a message in the Folder and a reply in its thread are a `kind:9`, the
+   * shape Peek writes for chat (SPEC §6.4). Either lands in the Folder, so
+   * anything posted here appears there without Peek changing.
    *
    * `about` names the Issue or Project the conversation concerns. When it is an
    * issue, its `nostr:naddr` is appended to the body as well — Peek renders that
@@ -643,6 +677,8 @@ export class Store {
     folder: string
     body: string
     replyTo?: ThreadRef
+    /** A reply to a comment, instead of `replyTo` — SHI-28. */
+    replyToComment?: CommentRef
     about?: string
     /** A block of that object, when the comment is about one part — §13.6. */
     blockId?: string
@@ -657,6 +693,7 @@ export class Store {
         folder: args.folder,
         body,
         replyTo: args.replyTo,
+        replyToComment: args.replyToComment,
         about: args.about,
         blockId: args.blockId,
         files: args.files,

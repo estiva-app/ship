@@ -134,8 +134,13 @@ export type SlotSource =
    * too, and the app at risk of the render loop is the one drawing it. §13.4's
    * honour-system rule cuts this way: a producer that could set the consumer's
    * recursion budget could hang it.
+   *
+   * `movedBy` names the field whose change moves a child to another parent
+   * (SPEC §7.2, MAN-1): the `via` tag is written once, on a root only its
+   * author may replace, so a move is a change and a consumer folds it over the
+   * tag.
    */
-  | { children: { kind: number; via: string; limit?: number }; label?: string }
+  | { children: { kind: number; via: string; limit?: number; movedBy?: string }; label?: string }
 
 export interface Projection {
   /**
@@ -300,8 +305,15 @@ export function manifestContent(): ManifestContent {
            * is by tag rather than by folder: a Folder holds the conversation,
            * the `a` tag holds the containment, and REW-11 made them different
            * questions when it made the project record global.
+           *
+           * `movedBy: 'project'` since MAN-4: an issue moves by a `kind:1851`
+           * on `project` (`setIssueField`), which `fold.ts` already reads over
+           * the tag, so a consumer that folds the same field lists a moved
+           * issue under the project it was moved to. It is also what tells a
+           * consumer that `move-issue`'s value is a project's address, to be
+           * picked rather than typed.
            */
-          list: { children: { kind: KIND.ISSUE, via: 'a', limit: 200 } },
+          list: { children: { kind: KIND.ISSUE, via: 'a', limit: 200, movedBy: 'project' } },
           /*
            * The description — PRO-2's third slot, unblocked by RIC-1.
            *
@@ -385,15 +397,16 @@ export function manifestContent(): ManifestContent {
       the issue, that a project's lead is not an issue's assignee, that an
       issue's root event holds immutable facts only.
 
-      **One is `destructive`: `delete-issue`** (MAN-4). Until then Ship offered
-      no destructive action to anyone else, on the grounds that a delete is a
-      NIP-09 request only its author could make. That stopped being the reason
-      when the relay began accepting a deletion from the owner of an authoring
-      agent too (SPEC §6.5, SHI-14) — no client can evaluate that half, so every
-      app offers the control and reports the relay's answer, which is exactly
-      what a declared action lets a consumer do. Deleting a *project* is still
-      undeclared: Ship also unlists it from its Folder, and a consumer given
-      only the `kind:5` would leave that half behind (it waits on MAN-1).
+      **Two are `destructive`: `delete-issue` and `delete-project`** (MAN-4).
+      Until then Ship offered no destructive action to anyone else, on the
+      grounds that a delete is a NIP-09 request only its author could make. That
+      stopped being the reason when the relay began accepting a deletion from
+      the owner of an authoring agent too (SPEC §6.5, SHI-14) — no client can
+      evaluate that half, so every app offers the control and reports the
+      relay's answer, which is exactly what a declared action lets a consumer
+      do. Deleting a project waited on MAN-1, because Ship also unlists it from
+      its Folder and a consumer given only the `kind:5` would leave that half
+      behind; `listed: true` (SPEC §7.3) is how it now says so.
 
       Archive is `writes`, not `destructive`: it is a folded field, reversible
       by anyone in the Folder, and nothing is removed.
@@ -471,27 +484,24 @@ export function manifestContent(): ManifestContent {
           'The comment lands in the Folder both apps read, so it appears in that Folder’s conversation as well as on the object.',
         effect: 'writes',
         /**
-         * Emits NIP-22 `kind:1111`, and **also declares the `kind:9` it used
-         * to**. Both halves matter and they are not the same statement.
+         * Emits NIP-22 `kind:1111`. Ship moved to it because scoping a threaded
+         * comment to an *addressable* event is exactly what lets two apps
+         * comment on the same object without either owning the comment kind —
+         * and because it is the standard version of what Ship was already
+         * doing with a bare `a` tag.
          *
-         * `kind` is what a consumer publishes. Ship moved to `1111` because
-         * scoping a threaded comment to an *addressable* event is exactly what
-         * lets two apps comment on the same object without either owning the
-         * comment kind — and because it is the standard version of what Ship
-         * was already doing with a bare `a` tag.
-         *
-         * `alsoRead` is what a consumer must still *fetch*. A `kind:9` message
-         * is not replaceable at all, so every comment written before this stays
-         * a `kind:9` permanently — there is no migration and there never will
-         * be. Omitting `alsoRead` would not lose the new comments, it would
-         * lose all the old ones, and it would do it silently: a thread that
-         * begins in the middle. See `protocol/SPEC.md` §7.3.
+         * **No `alsoRead: [9]` any more.** It told a consumer to keep fetching
+         * the `kind:9` comments Ship used to write. CON-20 (2026-09-30)
+         * republished every one on production as a `kind:1111`, and SHI-28
+         * made Ship's last `kind:9` writer — the reply button — write a
+         * `1111`, so nothing comment-shaped is a `kind:9` to fetch
+         * (`protocol/SPEC.md` §6.4, §7.3).
          *
          * This manifest does not describe Ship so much as instruct Peek. Peek
-         * publishes under `kind` and reads the union of both (`commentKindsOf`),
-         * so this event and Ship's writer have to change together — flipping
-         * one without the other makes Peek publish a kind Ship is not writing,
-         * or query a kind that has no history.
+         * publishes under `kind` and reads the union of `kind` and `alsoRead`
+         * (`commentKindsOf`), so this event and Ship's writer change together:
+         * republish it only once the writer is deployed, or a Ship reply
+         * written as a `kind:9` in between is one Peek no longer asks for.
          *
          * The conversation stays shared either way, which was the original
          * point of declaring `kind:9`: a project is a Folder, a Peek topic is
@@ -499,7 +509,7 @@ export function manifestContent(): ManifestContent {
          * `1111` carrying `h` is in that same container.
          */
         appliesTo: [String(KIND.PROJECT), String(KIND.ISSUE)],
-        emits: { kind: KIND.COMMENT, scope: 'address', alsoRead: [KIND.MESSAGE] },
+        emits: { kind: KIND.COMMENT, scope: 'address' },
         input: { type: 'string' },
       },
       {
@@ -591,6 +601,22 @@ export function manifestContent(): ManifestContent {
         emits: { kind: KIND.CHANGE, field: 'archived' },
         input: { type: 'string', enum: 'archived' },
       },
+      /*
+        The same field on an issue (FOL-46): archive is one concept for every
+        file. A project's issues are archived with it when read, so this is for
+        the one issue that is finished with while its project is not.
+      */
+      {
+        id: 'archive-issue',
+        label: 'Archive',
+        description:
+          'Take one issue out of every list once nobody needs to see it, or bring it back: `true` archives, an ' +
+          'empty value restores. Nothing is deleted — a link still opens it — and its project stays where it is.',
+        effect: 'writes',
+        appliesTo: String(KIND.ISSUE),
+        emits: { kind: KIND.CHANGE, field: 'archived' },
+        input: { type: 'string', enum: 'archived' },
+      },
       {
         id: 'delete-issue',
         label: 'Delete',
@@ -600,6 +626,103 @@ export function manifestContent(): ManifestContent {
         effect: 'destructive',
         appliesTo: String(KIND.ISSUE),
         emits: { kind: KIND.DELETION },
+      },
+      /*
+        The rest of Ship's set — MAN-4's second slice, declarable since MAN-1
+        (SPEC §7.2–7.3, interop 0.36.0).
+
+        Each is written exactly as Ship's own UI writes it, so an object changed
+        from another app is indistinguishable from one changed here:
+
+        - **describe-*** is `setProjectField` / `setIssueField` on
+          `description`: a `kind:1851` whose value is a block document tagged
+          `content-format` (RIC-14). `format` says the owner accepts one; a
+          plain value is still correct, written untagged as marker text.
+        - **move-issue** is `setIssueField(…, 'project', addr)`, the field the
+          issue list above declares as `movedBy`. Empty is "No project", as
+          Ship's own picker offers. It never rewrites `ref`, which stays the
+          owner's (RFC 0.4 §13.9).
+        - **add-project** is `createProject`: a `kind:30850` naming its Folder
+          in `buzz-channel` (REW-11), then a `kind:1852 add` when the Folder has
+          state (FOL-2). It applies to the Folder — the NIP-29 channel record,
+          `kind:39000` — because a project hangs under nothing else; the
+          runtime reads the Folder off that record's own `d`. **No consumer
+          reaches it yet**: a consumer resolves one manifest per kind, and a
+          Folder's is Peek's, so an action one app declares on a kind another
+          app owns is found by nobody until interop collects them.
+        - **delete-project** is `deleteProject`: the `kind:5`, then a
+          `kind:1852 remove` from every Folder whose state names it (FOL-48,
+          FOL-7).
+      */
+      {
+        id: 'describe-issue',
+        label: 'Edit description',
+        description:
+          'Replace the body of an issue with new text. A change event, so anyone in the Folder may, and every app ' +
+          'reading the issue folds it over the body it was filed with; a block document keeps its headings and lists.',
+        effect: 'writes',
+        appliesTo: String(KIND.ISSUE),
+        emits: { kind: KIND.CHANGE, field: 'description' },
+        input: { type: 'string', format: BLOCK_DOCUMENT_FORMAT },
+      },
+      {
+        id: 'describe-project',
+        label: 'Edit description',
+        description:
+          'Replace the description of a whole project — what it is for and what done means. A change event, so ' +
+          'anyone in the Folder may, folded over the description the record was created with.',
+        effect: 'writes',
+        appliesTo: String(KIND.PROJECT),
+        emits: { kind: KIND.CHANGE, field: 'description' },
+        input: { type: 'string', format: BLOCK_DOCUMENT_FORMAT },
+      },
+      {
+        id: 'move-issue',
+        label: 'Move to project',
+        description:
+          'Put an issue under another project, by the project’s address, or under none with an empty value. The ' +
+          'issue keeps its Folder, its conversation and its reference; only the project it is listed under changes.',
+        effect: 'writes',
+        appliesTo: String(KIND.ISSUE),
+        emits: { kind: KIND.CHANGE, field: 'project' },
+        input: { type: 'string' },
+      },
+      {
+        id: 'add-project',
+        label: 'New project',
+        description:
+          'Start a project in a Folder: a name, and optionally a description of what it is for. Issues are filed ' +
+          'under it afterwards with add-issue; its status and lead are their own actions.',
+        effect: 'writes',
+        // NIP-29's channel record — a Folder, as `folderOf` reads one (interop's KIND_CHANNEL_METADATA).
+        appliesTo: '39000',
+        emits: { kind: KIND.PROJECT, placement: 'buzz-channel', listed: true },
+        input: {
+          type: 'object',
+          properties: {
+            // `name`, the tag `buildProject` writes since REW-11 — the title slot reads it first.
+            name: { type: 'string' },
+            /*
+              A tag, not `content`, and so no `format`: `buildProject` writes
+              the description to a `description` tag and leaves content empty,
+              so a reader holding only tags — a discovery query, another app's
+              index — has it. Rich text arrives by `describe-project` afterwards,
+              as it does in Ship.
+            */
+            description: { type: 'string' },
+          },
+          required: ['name'],
+        },
+      },
+      {
+        id: 'delete-project',
+        label: 'Delete',
+        description:
+          'Ask the relay to delete a project outright, then take it out of every Folder that lists it. The relay ' +
+          'decides who may; the issues filed under it are separate events and survive it.',
+        effect: 'destructive',
+        appliesTo: String(KIND.PROJECT),
+        emits: { kind: KIND.DELETION, listed: true },
       },
     ],
   }

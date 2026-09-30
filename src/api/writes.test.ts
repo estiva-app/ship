@@ -162,6 +162,17 @@ describe('conversations', () => {
     await reply({ ...conversation, root: { ...conversation.root, folder: '' } }, 'fallback', 'yes')
     expect(s.postMessage).toHaveBeenLastCalledWith(expect.objectContaining({ folder: 'fallback' }))
   })
+
+  it('a reply to a comment names the comment and copies its anchor — SHI-28', async () => {
+    s.postMessage.mockResolvedValue({ ok: true })
+    const root = { id: 'root-id', author: 'a', createdAt: 1, body: 'x', folder: 'thread-folder', about: [ISSUE.addr], anchor: ISSUE.addr }
+    const conversation = { id: 'root-id', root, replies: [], about: [ISSUE.addr], createdAt: 1, lastAt: 1 }
+    await reply(conversation, 'fallback', 'yes')
+    expect(s.postMessage).toHaveBeenLastCalledWith({ folder: 'thread-folder', body: 'yes', replyToComment: { id: 'root-id', anchor: ISSUE.addr, author: 'a' } })
+    // The comment is outside the read and a reply stands in: its author is not the comment's.
+    await reply({ ...conversation, root: { ...root, id: 'stand-in', author: 'b' } }, 'fallback', 'yes')
+    expect(s.postMessage).toHaveBeenLastCalledWith(expect.objectContaining({ replyToComment: { id: 'root-id', anchor: ISSUE.addr, author: undefined } }))
+  })
 })
 
 describe('creating a project', () => {

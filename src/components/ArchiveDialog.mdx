@@ -1,0 +1,52 @@
+import { Meta } from '@storybook/addon-docs/blocks'
+
+<Meta title="Overlays/ArchiveDialog" />
+
+# ArchiveDialog
+
+"Archive …?" for a project, an issue or a Folder (FOL-46): what archiving it
+hides, counted, what stays visible elsewhere, and an optional **resolution
+summary** that anyone opening it later sees first.
+
+## When
+
+- From a project's or an issue's rail ("Archive project", "Archive issue")
+  and from a Folder's page ("Archive folder"). One dialog for every kind,
+  because archive is one concept for every file.
+
+## When not
+
+- Not to restore. Unarchive puts back exactly what was there, hides nothing,
+  and needs no warning: it is the notice's action (`ArchivedNotice`) and the
+  rail's toggle.
+- Not to delete. Delete is a NIP-09 request with its own `ConfirmDialog` and
+  its own words; this one says nothing is deleted.
+
+## How
+
+```tsx
+import { ArchiveDialog } from '@/components/ArchiveDialog'
+
+<ArchiveDialog
+  title={project.title}
+  what="project"
+  hides={[`its ${issues.length} issues`]}
+  onClose={() => setDialog(null)}
+  onArchive={(resolution) => act('Archive', () => archiveProject(project, true, resolution || undefined), say, refresh)}
+/>
+```
+
+- `hides` and `staysVisible` arrive worded: the page knows its counts (a
+  project counts its issues from the fold), and a Folder's come from
+  interop's `archiveImpact` through `folderArchiveImpact`, so Ship and Peek
+  say the same numbers.
+- `onArchive` resolves `false` to keep the dialog open; the caller has said why.
+
+## What it owns
+
+- **The sentence.** "This hides the project and its 14 issues from every
+  list, in Ship and in Peek", then what stays visible, then that nothing is
+  deleted and Unarchive brings it back.
+- **The resolution field**, optional and trimmed. It travels as the
+  archiving change's content, one event, so it cannot land without the
+  archive.

@@ -1,4 +1,6 @@
+import type { ReactNode } from 'react'
 import type { FolderContents } from '@/api/foreign'
+import { Button } from '@/components/ui/Button'
 import { EditableText } from '@/components/ui/EditableText'
 import { ForeignObject } from '@/components/ui/ForeignObject'
 import { splitByKind } from '@/lib/ownKinds'
@@ -34,17 +36,22 @@ import { splitByKind } from '@/lib/ownKinds'
  * another, which is exactly what §5's "a file is anything with an address that
  * a folder can list" rules out.
  */
-export function FolderView({ folder, onRename }: {
+export function FolderView({ folder, onRename, onArchive, archivedNotice }: {
   folder: FolderContents
   /**
    * The title is click-to-edit, as a project's is (FOL-8). Resolves whether the
    * relay took it; absent, the title is text.
    */
   onRename?: (name: string) => Promise<boolean> | boolean
+  /** "Archive folder" (FOL-46). Absent: no control — an archived Folder is restored from its notice. */
+  onArchive?: () => void
+  /** The `ArchivedNotice` of an archived Folder: the first thing on the page (FOL-46). */
+  archivedNotice?: ReactNode
 }) {
   const { own, foreign } = splitByKind(folder.files)
   return (
     <div className="flex flex-col gap-4 p-6" data-surface="folder" data-folder={folder.id} data-source={folder.source}>
+      {archivedNotice}
       <div className="flex flex-col gap-1">
         {onRename ? (
           /*
@@ -73,6 +80,11 @@ export function FolderView({ folder, onRename }: {
           */}
           {folder.source === 'channel' && ' · from channel contents; this folder has no folder state yet'}
         </p>
+        {onArchive && (
+          <Button size="small" variant="muted" className="mt-2 self-start" onClick={onArchive}>
+            Archive folder
+          </Button>
+        )}
       </div>
       {own.length > 0 && (
         <div className="flex flex-col gap-2">

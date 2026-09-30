@@ -1,5 +1,6 @@
 import { IconBox, IconLayoutKanban, IconTable } from '@tabler/icons-react'
 import type { ContentFormat, Imeta } from '@estiva-app/protocol'
+import type { ReactNode } from 'react'
 import { Breadcrumb } from '@/components/ui/Breadcrumb'
 import { ScrollArea } from '@/components/ui/ScrollArea'
 import { linkTo, type ProjectTab } from '@/router'
@@ -74,6 +75,8 @@ export interface ProjectViewProps {
     total: number
     folders: RailFolder[] | null | undefined
     onMove?: () => void
+    /** The project's own archive, when it differs from the header's (archived with its team, FOL-46). */
+    archived?: boolean
     onArchive: () => void
     onDelete: () => void
   }
@@ -89,6 +92,8 @@ export interface ProjectViewProps {
   readOnlyReason?: string
   /** The upload behind attach. Injected so a story needs no relay; the app's by default. */
   upload?: (file: File) => Promise<Imeta>
+  /** The `ArchivedNotice` of an archived project: the first thing on every tab (FOL-46). */
+  archivedNotice?: ReactNode
 }
 
 const TABS: { id: ProjectTab; label: string }[] = [
@@ -98,7 +103,7 @@ const TABS: { id: ProjectTab; label: string }[] = [
 ]
 
 /** One project's page, in tabs: Overview, Activity and Issues, with the rail on every tab. */
-export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onView, issues, issueStatuses, hrefFor, related, threads, unread, onStartConversation, onReply, activity, activityTruncated, onReplyInActivity, rail, about, onReact, onDeleteMessage, onEditMessage, readOnlyReason, upload }: ProjectViewProps) {
+export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onView, issues, issueStatuses, hrefFor, related, threads, unread, onStartConversation, onReply, activity, activityTruncated, onReplyInActivity, rail, about, onReact, onDeleteMessage, onEditMessage, readOnlyReason, upload, archivedNotice }: ProjectViewProps) {
   return (
     // `data-surface`, `data-view` and `data-tab` are the smoke test's waypoints — see IssuesView. The Table/Board
     // toggle and the tabs swap content in place on the same route, so without them a test cannot tell "it
@@ -132,6 +137,7 @@ export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onVi
       <ScrollArea className="col-start-1 row-start-3 min-h-0 min-w-0" contentClassName="flex flex-col gap-6 px-6 pb-5">
         {tab === 'overview' && (
           <Centred>
+            {archivedNotice}
             <LiveHeader title={header.title} titlePlaceholder="Untitled project" onRename={header.onRename} description={header.description} format={header.descriptionFormat} onDescribe={header.onDescribe} nameOf={header.nameOf} readOnly={!!readOnlyReason} archived={header.archived} upload={upload} />
             {/* Nesting is by intent (RFC 0.5 §10.7): what somebody placed under this project, whatever app it belongs
                 to. A line first, so the list the app adds never reads as part of the description someone typed. */}
@@ -148,6 +154,7 @@ export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onVi
 
         {tab === 'activity' && (
           <Centred>
+            {archivedNotice}
             <AppSection title="Conversations">
               <ThreadList threads={threads} unread={unread} onStart={onStartConversation} onReply={onReply} disabledReason={readOnlyReason} nameOf={header.nameOf} onReact={onReact} onDeleteMessage={onDeleteMessage} onEditMessage={onEditMessage} about={about} upload={upload} />
             </AppSection>
@@ -157,6 +164,7 @@ export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onVi
           </Centred>
         )}
 
+        {tab === 'issues' && archivedNotice}
         {tab === 'issues' &&
           (!issues.length ? (
             <EmptyState scope="section" message="No issues yet." />
@@ -170,7 +178,7 @@ export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onVi
       <Divider orientation="vertical" className="col-start-2 row-span-3 row-start-1" />
       {/* The rail on every tab, starting level with the tab row and never moving (Katerina, 29 September). */}
       <ScrollArea className="col-start-3 row-span-2 row-start-2 min-h-0" contentClassName="px-6 pb-5">
-        <ProjectRail {...rail} archived={header.archived} readOnlyReason={readOnlyReason} />
+        <ProjectRail {...rail} archived={rail.archived ?? header.archived} readOnlyReason={readOnlyReason} />
       </ScrollArea>
     </div>
   )

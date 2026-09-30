@@ -1,7 +1,10 @@
 import { IconLinkOff } from '@tabler/icons-react'
 import { useMarkRead } from '@/lib/useMarkRead'
 import { useMemo, useState } from 'react'
-import { ISSUE_STATUSES, commentsOn, deleteIssue, deleteMessage, editMessage, react, referenceFor, reply, setIssueField, unreact, startConversation, type DirectoryView, type FolderState, type WorkspaceState, threadContext, fileContext, useMergedReadState, firstUnreadByThread, me } from '@/api'
+import { ArchiveDialog } from '@/components/ArchiveDialog'
+import { ArchivedNotice } from '@/components/ArchivedNotice'
+import { ownArchive, type Archives } from '@/lib/archive'
+import { ISSUE_STATUSES, archiveIssue, commentsOn, deleteIssue, deleteMessage, editMessage, react, referenceFor, reply, setIssueField, unreact, startConversation, type DirectoryView, type FolderState, type WorkspaceState, threadContext, fileContext, useMergedReadState, firstUnreadByThread, me } from '@/api'
 import { useRelated } from '@/api/useRelated'
 import type { HistoryEntry } from '@/components/History'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
@@ -38,7 +41,7 @@ export function historyFor(issueAddr: string, state: FolderState, directory: Dir
  * field edit is one change event to the issue's own Folder, followed by a
  * re-read; a refused one leaves the field as the relay has it.
  */
-export function IssuePage({ state, directory, d, tab, say, refresh }: { state: WorkspaceState; directory: DirectoryView; /** The object's `d`, which is all a §7.2 URL carries. */ d: string; /** The open tab — Overview or Activity. */ tab: IssueTab; say: Say; refresh: (folders?: string[]) => Promise<void> }) {
+export function IssuePage({ state, directory, archives, d, tab, say, refresh }: { state: WorkspaceState; directory: DirectoryView; /** What is archived, and what with — FOL-46. */ archives: Archives; /** The object's `d`, which is all a §7.2 URL carries. */ d: string; /** The open tab — Overview or Activity. */ tab: IssueTab; say: Say; refresh: (folders?: string[]) => Promise<void> }) {
   const issue = state.issues.find((candidate) => candidate.id === d)
   const project = issue?.projectAddr ? state.projects.find((candidate) => candidate.addr === issue.projectAddr) : undefined
 
@@ -81,6 +84,7 @@ export function IssuePage({ state, directory, d, tab, say, refresh }: { state: W
     [state],
   )
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [archiving, setArchiving] = useState(false)
   /* What somebody placed under this issue from another app — RFC 0.5 §10.7.
      Read from the issue's own Folder, the one a file placed under it is
      written into; see the same line on ProjectPage. */
@@ -97,12 +101,29 @@ export function IssuePage({ state, directory, d, tab, say, refresh }: { state: W
 
   const set = (field: 'title' | 'description' | 'status' | 'assignee' | 'project', value: string, note: string, contentFormat?: string) =>
     act(note, () => setIssueField(issue, field, value, note, contentFormat), say, () => refresh([issue.folder]))
+  // Its own archive, which the rail toggles; and the one shown first, which may be its project's (FOL-46).
+  const own = ownArchive(issue, state.activity)
+  const archive = archives.ofIssue(issue)
+  const unarchive = () =>
+    void act('Unarchive', () => archiveIssue(issue, false), say, () => refresh([issue.folder])).then((ok) => {
+      if (ok) say('Issue restored')
+    })
 
   return (
     <>
       <IssueView
         tab={tab}
         onTab={(next) => go({ name: 'issue', d: issue.id, slug: issue.title, tab: next })}
+        archivedNotice={
+          archive && (
+            <ArchivedNotice
+              archive={archive}
+              nameOf={directory.nameOf}
+              onUnarchive={unarchive}
+              {...(archive.with && project ? { onOpenParent: () => go({ name: 'project', d: project.id, slug: project.title, view: 'table' }) } : {})}
+            />
+          )
+        }
         crumbs={{
           issuesHref: href({ name: 'issues' }),
           project: project ? { title: project.title, href: href({ name: 'project', d: project.id, slug: project.title, view: 'table' }) } : undefined,
@@ -218,9 +239,24 @@ export function IssuePage({ state, directory, d, tab, say, refresh }: { state: W
           openedBy: directory.personOf(issue.author),
           openedAt: issue.createdAt,
           onCopyReference: () => void copyText(referenceFor(issue.addr), 'Reference copied', 'Copy this reference:', say),
+          archived: !!own,
+          onArchive: () => (own ? unarchive() : setArchiving(true)),
           onDelete: () => setConfirmingDelete(true),
         }}
       />
+      {archiving && (
+        <ArchiveDialog
+          title={issue.title}
+          what="issue"
+          hides={conversations.length ? [`its ${conversations.length} ${conversations.length === 1 ? 'conversation' : 'conversations'}`] : []}
+          onClose={() => setArchiving(false)}
+          onArchive={async (resolution) => {
+            const ok = await act('Archive', () => archiveIssue(issue, true, resolution || undefined), say, () => refresh([issue.folder]))
+            if (ok) say('Issue archived')
+            return ok
+          }}
+        />
+      )}
       {confirmingDelete && (
         <ConfirmDialog
           title={`Delete “${issue.title}”?`}
