@@ -5,8 +5,10 @@ import { Meta } from '@storybook/addon-docs/blocks'
 # ArchivedNotice
 
 The first thing on an archived project's, issue's or Folder's page (FOL-46):
-the package's `Banner` saying who archived it and when, with Unarchive, and the
-resolution summary under it in full.
+a quiet grey box saying who archived it and when, the resolution summary in
+full inside it, and Unarchive. Grey, not a blue banner (Katerina, 30
+September): archived is a state, not news, and the package's `Banner` is the
+app-wide strip under the header, not a box in the page.
 
 ## When
 
@@ -41,4 +43,4 @@ import { ArchivedNotice } from '@/components/ArchivedNotice'
 - **The one action.** Unarchive for a file archived itself; for one archived
   with a parent, "Open project" or "Open folder" — that is where it is
   restored, and restoring there brings back everything archived with it.
-- **The resolution**, in full, under the one-line banner, which truncates.
+- **The resolution**, in full, under the line, inside the box.
