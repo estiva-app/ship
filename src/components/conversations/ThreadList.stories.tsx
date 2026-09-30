@@ -26,7 +26,7 @@ const meta = {
   // The page's reading column.
   decorators: [
     (Story) => (
-      <div className="w-[768px]">
+      <div className="w-full max-w-3xl">
         <Story />
       </div>
     ),

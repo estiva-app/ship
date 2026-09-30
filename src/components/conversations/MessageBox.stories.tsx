@@ -27,7 +27,7 @@ const meta = {
   args: { onSubmit: fn(async () => true), drafts: noDrafts, upload: uploadAttachment },
   decorators: [
     (Story) => (
-      <div className="w-[768px]">
+      <div className="w-full max-w-3xl">
         <Story />
       </div>
     ),
