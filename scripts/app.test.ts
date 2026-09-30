@@ -91,6 +91,15 @@ check('  …and so does making someone a project lead', tag(lead, 'p') === WHO)
 check('  …while clearing an assignment names nobody', tag(unassign, 'p') === undefined)
 check('  …and the fixed four keep their order ahead of it', assign.tags.slice(0, 4).map((t) => t[0]).join(',') === 'a,field,value,h')
 
+// A move names its new parent where a relay indexes it: `A`, never a second `a` (SPEC §7.2, FOL-45).
+const P2 = `30850:${PK}:p2`
+const moved = buildChange(PK, Date.now(), { target: `30851:${PK}:i1`, field: 'project', value: P2, folder: CONTENT })
+const detached = buildChange(PK, Date.now(), { target: `30851:${PK}:i1`, field: 'project', value: '', folder: CONTENT })
+check('moving an issue names its new project as an A tag (FOL-45)', tag(moved, 'A') === P2)
+check('  …after ts, with the one `a` still the issue', moved.tags.at(-1)?.[0] === 'A' && moved.tags.filter((t) => t[0] === 'a').length === 1)
+check('  …while a move to no project names nothing', tag(detached, 'A') === undefined)
+check('  …and no other change carries it', tag(statusChange, 'A') === undefined && tag(assign, 'A') === undefined)
+
 // Still one container — but the record now *names* it instead of sitting in it.
 // Access to the Peek topic is access to the issues, the history and the
 // conversation; the record itself is public and points at the same uuid.

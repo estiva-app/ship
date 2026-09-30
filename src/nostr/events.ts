@@ -284,10 +284,24 @@ export function buildChange(
         value and names nobody.
       */
       ...(PLACEMENT_FIELDS.has(args.field) && /^[0-9a-f]{64}$/.test(args.value) ? [['p', args.value]] : []),
+      /*
+        A move names its new parent again, as `A` — SPEC §7.2 (FOL-45). The
+        manifest declares an issue's `project` as what moves it (`movedBy`), and
+        the value is the one place the new project is: no relay indexes it, so
+        a reader listing a project's issues by `#a` never saw one moved in, and
+        Peek drew it under no project at all. `A` rather than a second `a`,
+        which every reader would take for the target. Only a project address:
+        a move to "No project" names nothing.
+      */
+      ...(isMove(args.target, args.field) && PROJECT_ADDRESS.test(args.value) ? [['A', args.value]] : []),
     ],
     content: args.note ?? '',
   }
 }
+
+/** Whether a change is a move: the field the manifest declares as `movedBy` for the target's kind — see `buildChange`. */
+const isMove = (target: string, field: string) => field === 'project' && target.startsWith(`${KIND.ISSUE}:`)
+const PROJECT_ADDRESS = new RegExp(`^${KIND.PROJECT}:[0-9a-f]{64}:.+`)
 
 /** The fields whose value is a person being placed on the object — see `buildChange`. */
 const PLACEMENT_FIELDS = new Set(['assignee', 'lead'])
