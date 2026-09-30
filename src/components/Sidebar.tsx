@@ -1,8 +1,7 @@
-import { IconArrowUpRight, IconBox, IconDots, IconFolderPlus, IconListDetails } from '@tabler/icons-react'
+import { IconArrowUpRight, IconBox, IconFolderPlus, IconListDetails } from '@tabler/icons-react'
 import { CollapsibleSection, Sidebar as SidebarShell } from '@estiva-app/ui'
 import { Button } from '@/components/ui/Button'
-import { IconButton } from '@/components/ui/IconButton'
-import { Menu, MenuItem } from '@/components/ui/Menu'
+import { MenuItem } from '@/components/ui/Menu'
 import { SkeletonBar } from '@/components/ui/Skeleton'
 import { placedIn } from '@/lib/placement'
 import { NavItem } from './NavItem'
@@ -168,41 +167,19 @@ export function Sidebar({ openIssues, issuesHref, projectsHref, projects, folder
   const placed = new Map(projects.map((project) => [project.addr, placedIn(project, teams)]))
   const under = (team: SidebarFolder) => projects.filter((project) => placed.get(project.addr)!.includes(team))
   const unfiled = projects.filter((project) => placed.get(project.addr)!.length === 0)
-  const row = (project: SidebarProject) => {
-    const item = (
-      <NavItem
-        key={project.addr}
-        label={project.title}
-        href={project.href}
-        count={project.openCount}
-        countLabel={`${project.openCount} open`}
-        active={isProject && current.projectAddr === project.addr}
-      />
-    )
-    if (!onMoveProject) return item
-    /*
-      The row's menu (FOL-7): shown while the row is hovered or has focus, over
-      the count, as a section's actions are over its header. Beside the link,
-      not inside it — a button inside an anchor is not a button.
-    */
-    return (
-      <div key={project.addr} className="group/row relative">
-        {item}
-        <div className="absolute inset-y-0 right-1 flex items-center opacity-0 group-hover/row:opacity-100 group-focus-within/row:opacity-100 has-[[aria-expanded=true]]:opacity-100">
-          <Menu
-            align="right"
-            trigger={
-              <IconButton tooltip="More options" aria-label={`More options for ${project.title}`}>
-                <IconDots size={16} stroke={1.5} />
-              </IconButton>
-            }
-          >
-            <MenuItem label="Move to Folder…" onClick={() => onMoveProject(project)} />
-          </Menu>
-        </div>
-      </div>
-    )
-  }
+  const row = (project: SidebarProject) => (
+    <NavItem
+      key={project.addr}
+      label={project.title}
+      href={project.href}
+      count={project.openCount}
+      countLabel={`${project.openCount} open`}
+      active={isProject && current.projectAddr === project.addr}
+      /* The row's menu (FOL-7) is the row's own now (UIG-44): the ⋮ shows
+         while the row is pointed at or focused, in the count's place. */
+      {...(onMoveProject ? { menu: <MenuItem label="Move to Folder…" onClick={() => onMoveProject(project)} /> } : {})}
+    />
+  )
   const pending = (projects.length === 0 && loading) || (folders.length === 0 && foldersLoading)
   return (
     <SidebarShell className={className}>
