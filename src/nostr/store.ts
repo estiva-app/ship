@@ -24,6 +24,7 @@ import {
   buildProject,
   issueAddr,
   projectAddr,
+  type CommentRef,
 } from './events'
 import { findNaddrs, naddrToAddr, buildReaction, buildEdit, buildDeletion as buildEventDeletion } from '@estiva-app/protocol'
 import { planArchiveFolder, planCreateFolder, planMoveFile, planPlaceFile, planRenameFolder, planUnlistFile, type FolderRef, type MoveRefusal } from '@estiva-app/interop'
@@ -662,10 +663,10 @@ export class Store {
   /**
    * Start a conversation, or reply in one.
    *
-   * A `kind:9` in the Folder — the same kind and shape Peek writes for a topic
-   * message. That is the entire integration: Peek's sync imports a foreign
-   * pubkey's root message as a conversation and one carrying an `e` tag as a
-   * reply, so anything posted here appears there without Peek changing.
+   * A comment about an object, and a reply to one, is a NIP-22 `kind:1111`;
+   * a message in the Folder and a reply in its thread are a `kind:9`, the
+   * shape Peek writes for chat (SPEC §6.4). Either lands in the Folder, so
+   * anything posted here appears there without Peek changing.
    *
    * `about` names the Issue or Project the conversation concerns. When it is an
    * issue, its `nostr:naddr` is appended to the body as well — Peek renders that
@@ -676,6 +677,8 @@ export class Store {
     folder: string
     body: string
     replyTo?: ThreadRef
+    /** A reply to a comment, instead of `replyTo` — SHI-28. */
+    replyToComment?: CommentRef
     about?: string
     /** A block of that object, when the comment is about one part — §13.6. */
     blockId?: string
@@ -690,6 +693,7 @@ export class Store {
         folder: args.folder,
         body,
         replyTo: args.replyTo,
+        replyToComment: args.replyToComment,
         about: args.about,
         blockId: args.blockId,
         files: args.files,

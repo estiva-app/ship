@@ -37,12 +37,11 @@
  *    its Folder with `h`; it now merely *points* at one with `buzz-channel`.
  *    The check is therefore `project.buzz-channel === folder.h`, which tests
  *    what REW-11 actually did rather than asserting the tag it removed.
- *  - **A root comment is a `kind:1111` (REW-10).** A *reply* is still a
- *    `kind:9`, deliberately — see `buildNip22Comment`: a `1111` must name its
- *    root, a reply's root is the object rather than the comment it answers, and
- *    the caller cannot supply that anchor yet, so a malformed `1111` would be
- *    worse than a merely old `kind:9`. Both kinds are asserted here so the
- *    split stays visible instead of being something the fold quietly absorbs.
+ *  - **A root comment is a `kind:1111` (REW-10), and so is a reply to one
+ *    (SHI-28).** The reply copies the comment's `A` and names the comment with
+ *    lowercase `e` — `buildNip22Reply`. It was a `kind:9` until then, which is
+ *    why the shape is asserted here rather than left to the fold, which reads
+ *    both.
  */
 import { createServer } from 'node:http'
 import { readFileSync, mkdirSync } from 'node:fs'
@@ -643,13 +642,16 @@ async function main() {
   await page.waitForFunction(
     () => document.querySelectorAll('section article').length >= 2,
   )
-  // Still a kind:9, deliberately — see the header. This asserts the split rather
-  // than the aspiration, so the day a reply becomes a 1111 this fails loudly.
-  const reply = stored.filter((e) => e.kind === 9).at(-1)
-  check('a reply is still a kind:9, by design', !!reply)
+  // A flat kind:1111 naming the comment — SHI-28, SPEC §6.4 *Replies*.
+  const reply = stored.filter((e) => e.kind === 1111 && e.id !== comment?.id).at(-1)
+  check('a reply to a comment is a kind:1111', !!reply)
   check(
-    '  …threaded under the root comment',
+    '  …naming the root comment with a lowercase e',
     !!reply && !!comment && reply.tags.some((t) => t[0] === 'e' && t[1] === comment.id),
+  )
+  check(
+    '  …and the object with the comment’s own A, with no lowercase a',
+    !!reply && !!comment && tagValue(reply, 'A') === tagValue(comment, 'A') && tagValue(reply, 'a') === undefined,
   )
   check('  …and renders nested', (await conversations.locator('article').count()) === 2)
 

@@ -284,6 +284,11 @@ export interface Message {
   /** Object addresses this message is about — `a` tags plus naddrs in the body. */
   about: string[]
   /**
+   * A NIP-22 comment's `A`: the object its thread is about. Undefined on a
+   * `kind:9`. A reply to the comment copies it (`buildNip22Reply`, SHI-28).
+   */
+  anchor?: string
+  /**
    * The block this comment is anchored to — SPEC §13.6.
    *
    * The address in `about` says *which object*; this says *which part of it*.
@@ -412,6 +417,7 @@ function parseNip22Comment(
         ...resolveRefs(event.content),
       ]),
     ],
+    ...(tag(event, 'A') ? { anchor: tag(event, 'A') } : {}),
     ...(blockAnchorOf(event) ? { blockId: blockAnchorOf(event) } : {}),
   }
 }
