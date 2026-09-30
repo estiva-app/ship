@@ -217,3 +217,19 @@ describe('a description whose save is refused', () => {
     expect(textbox).toHaveTextContent('a description and more')
   })
 })
+
+/*
+  A page hands `onCommit` in as an inline arrow (`IssuePage`'s `onDescribe`), so
+  every render of the page is a new one. The unmount save was keyed on it, and
+  published the half-typed text each time the page re-rendered (MAN-9).
+*/
+describe('a description being typed while its page re-renders', () => {
+  it('publishes nothing until the person leaves', async () => {
+    const onCommit = vi.fn(() => true)
+    const { rerender } = render(<LiveDescription value="a description" format="marker" onCommit={onCommit} resolved={{}} />)
+    type(await ready(), ' and more')
+    rerender(<LiveDescription value="a description" format="marker" onCommit={() => true} resolved={{}} />)
+    rerender(<LiveDescription value="a description" format="marker" onCommit={onCommit} resolved={{}} />)
+    expect(onCommit).not.toHaveBeenCalled()
+  })
+})

@@ -105,6 +105,15 @@ export function LiveDescription({
     },
     [onCommit],
   )
+  /*
+    The latest `save`, for the editor's `onBlur` (created once) and the unmount
+    below. A cleanup keyed on `save` ran on every render a page's inline
+    `onDescribe` caused, publishing mid-typing (MAN-9, found in Peek's copy).
+  */
+  const latestSave = useRef(save)
+  useEffect(() => {
+    latestSave.current = save
+  }, [save])
 
   const editor = useEditor(
     {
@@ -142,7 +151,7 @@ export function LiveDescription({
       },
       onBlur: () => {
         if (picking.current) return
-        void save(typed.current)
+        void latestSave.current(typed.current)
       },
     },
     [],
@@ -177,7 +186,7 @@ export function LiveDescription({
   }, [editor, onEditor])
 
   // Leaving the tab or the page unmounts this: save on the way out.
-  useEffect(() => () => void save(typed.current), [save])
+  useEffect(() => () => void latestSave.current(typed.current), [])
 
   return (
     <ReferenceProvider value={{ resolved, nameOf }}>
