@@ -1,6 +1,5 @@
 import { Suspense, lazy } from 'react'
 import { referencesIn, standaloneReference, toRenderTree, type ContentFormat, type Imeta } from '@estiva-app/protocol'
-import { Chip } from '@/components/ui/Chip'
 import { ForeignObject } from '@/components/ui/ForeignObject'
 import { RichText } from '@/components/ui/RichText'
 import { SkeletonBar } from '@/components/ui/Skeleton'
@@ -26,8 +25,6 @@ export interface LiveHeaderProps {
   nameOf?: (pubkey: string) => string
   /** Title and description as text only, for a reader who cannot write. */
   readOnly?: boolean
-  /** A project's "Archived" chip beside its title. */
-  archived?: boolean
   /** The upload behind `/` File. Injected so a story needs no relay. */
   upload?: (file: File) => Promise<Imeta>
 }
@@ -75,28 +72,17 @@ export function LiveHeader(props: LiveHeaderProps) {
   )
 }
 
-/** The title row: the title, and a project's "Archived" chip. */
-export function TitleRow({ archived, children }: { archived?: boolean; children: React.ReactNode }) {
-  return (
-    <div className="flex items-start gap-2">
-      <div className="min-w-0 flex-1">{children}</div>
-      {archived && <Chip label="Archived" className="mt-2 shrink-0" />}
-    </div>
-  )
-}
-
 /**
  * The same page as text: for a reader who cannot write, and for a writer in
  * the moment before the editor arrives. Laid out exactly as the editors are,
  * so nothing moves when they replace it.
  */
-function ReadingHeader({ title, titlePlaceholder, description, format, nameOf, readOnly, archived, resolved }: LiveHeaderProps & { resolved: Record<string, ForeignObjectData | null | undefined> }) {
+function ReadingHeader({ title, titlePlaceholder, description, format, nameOf, readOnly, resolved }: LiveHeaderProps & { resolved: Record<string, ForeignObjectData | null | undefined> }) {
   const empty = description.trim() === ''
   return (
     <div className="flex flex-col gap-4">
-      <TitleRow archived={archived}>
-        <h1 className={title ? '-mx-2 px-2 py-1 text-h2 text-text-primary' : '-mx-2 px-2 py-1 text-h2 text-text-muted'}>{title || titlePlaceholder}</h1>
-      </TitleRow>
+      {/* No "Archived" chip beside the title: the Archived notice above it says so in words (Katerina, 30 September). */}
+      <h1 className={title ? '-mx-2 px-2 py-1 text-h2 text-text-primary' : '-mx-2 px-2 py-1 text-h2 text-text-muted'}>{title || titlePlaceholder}</h1>
       <div className="-mx-2 px-2 py-1">
         {empty ? <span className="text-body-2 text-text-muted">{readOnly ? '' : 'Add a description…'}</span> : <RichText value={description} format={format} nameOf={nameOf} resolved={resolved} hideStandalone />}
       </div>

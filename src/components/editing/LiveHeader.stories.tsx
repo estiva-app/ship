@@ -27,7 +27,7 @@ const LONG = [
  * the description opens Format and Insert (tables, files); selecting words
  * shows bold, italic, underline and code; links are drawn as you type.
  */
-function Header({ title: t0 = 'Relay Migration', description: d0 = LONG, archived, readOnly, issue }: { title?: string; description?: string; archived?: boolean; readOnly?: boolean; issue?: boolean }) {
+function Header({ title: t0 = 'Relay Migration', description: d0 = LONG, readOnly, issue }: { title?: string; description?: string; readOnly?: boolean; issue?: boolean }) {
   const [title, setTitle] = useState(t0)
   const [description, setDescription] = useState(d0)
   const [format, setFormat] = useState<ContentFormat>('marker')
@@ -41,7 +41,6 @@ function Header({ title: t0 = 'Relay Migration', description: d0 = LONG, archive
       // The editor saves with its tag; the app reads that back as 'blocks' (contentFormatOf).
       onDescribe={(v, f) => (setDescription(v), setFormat(f === 'estiva-blocks-1' ? 'blocks' : 'marker'), true)}
       readOnly={readOnly}
-      archived={archived}
       upload={pretendUpload}
     />
   )
@@ -67,9 +66,6 @@ export const Default: Story = {}
 
 /** Nothing written yet: "Untitled issue" and "Add a description…", muted, over empty editors. */
 export const Empty: Story = { args: { title: '', description: '', issue: true } }
-
-/** An archived project: the chip beside its title. */
-export const Archived: Story = { args: { archived: true } }
 
 /** A reader who cannot write: text, and no editor is downloaded. */
 export const ReadOnly: Story = { args: { readOnly: true } }

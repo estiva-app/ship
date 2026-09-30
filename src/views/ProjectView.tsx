@@ -138,7 +138,7 @@ export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onVi
         {tab === 'overview' && (
           <Centred>
             {archivedNotice}
-            <LiveHeader title={header.title} titlePlaceholder="Untitled project" onRename={header.onRename} description={header.description} format={header.descriptionFormat} onDescribe={header.onDescribe} nameOf={header.nameOf} readOnly={!!readOnlyReason} archived={header.archived} upload={upload} />
+            <LiveHeader title={header.title} titlePlaceholder="Untitled project" onRename={header.onRename} description={header.description} format={header.descriptionFormat} onDescribe={header.onDescribe} nameOf={header.nameOf} readOnly={!!readOnlyReason} upload={upload} />
             {/* Nesting is by intent (RFC 0.5 §10.7): what somebody placed under this project, whatever app it belongs
                 to. A line first, so the list the app adds never reads as part of the description someone typed. */}
             {hasRelated(related) && (
