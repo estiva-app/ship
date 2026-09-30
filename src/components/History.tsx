@@ -1,48 +1,39 @@
+import { Avatar, EmptyState, WithTooltip } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
 import { ago } from '@/lib/time'
-import { Avatar } from '@/components/ui/Avatar'
-import { EmptyState } from '@/components/ui/EmptyState'
 
-/**
- * An issue's history: the folded change events replayed as prose — who did
- * what, when.
- *
- * **Called `ActivityFeed` until CON-9.** The name moved rather than the
- * component: "Activity" now means *conversations on files related to this one*
- * — its sub-files, and places it was mentioned — which is a different thing
- * from an audit trail of field changes. Two sections on one page cannot both
- * be Activity, and this one was always a history: its own first line said so.
- *
- * The two stay apart for the reason REW-4 gave when it separated them: The words are the caller's, built from the vocabulary's labels
- * (audit A2: never a wire value like `in_progress` in a sentence); people
- * are faces and names, never keys. The time sits under the entry, relative
- * (Peek's history ruling). History and conversation are different things.
- * Ship-only.
- */
+/** One change, already in words: "set status to In Progress" (audit A2: never a wire value). */
 export interface HistoryEntry {
   id: string
   by: { name?: string; picture?: string }
   /** Seconds. */
   at: number
-  /** Already in words: "set status to In Progress". */
   text: string
 }
 
+/**
+ * An issue's history — its own change events, replayed as prose (Katerina,
+ * 29 September): one line a change, the face, "Ravi Mehta set status to In
+ * Progress", and when, muted at the end, with the date on hover. Newest first,
+ * the same direction as the conversations above it. The words are the
+ * caller's, built from the vocabulary's labels; a person is a face and a name.
+ * History and conversation stay apart (REW-4).
+ */
 export function History({ entries, className }: { entries: HistoryEntry[]; className?: string }) {
-  // Where the list starts, with no room of its own (Katerina, 2026-09-14): the list's box has no padding either.
   if (!entries.length) return <EmptyState scope="section" className={className} message="Nothing has changed yet." />
+  const newestFirst = [...entries].sort((a, b) => b.at - a.at)
   return (
-    <ol className={cn('flex flex-col gap-3', className)}>
-      {entries.map((entry) => (
-        <li key={entry.id} className="flex gap-2">
-          {/* 16px (Katerina, UIG-14); `mt-0.5` puts its middle on the first line's, as `mt-px` did for 18px. */}
-          <Avatar name={entry.by.name} src={entry.by.picture} size={16} className="mt-0.5" />
-          <div className="flex min-w-0 flex-col gap-0.5">
-            <span className="text-body-2 text-text-secondary">
-              <span className={cn('font-medium', entry.by.name ? 'text-text-primary' : 'text-text-muted')}>{entry.by.name ?? '—'}</span> {entry.text}
-            </span>
-            <span className="text-caption text-text-muted">{ago(entry.at)}</span>
-          </div>
+    <ol className={cn('flex flex-col', className)}>
+      {newestFirst.map((entry) => (
+        // One line a change; a long one wraps rather than being cut (production shows every word of a rename).
+        <li key={entry.id} className="flex min-h-7 items-start gap-2 py-1 text-body-2">
+          <Avatar name={entry.by.name} src={entry.by.picture} size={16} className="mt-0.5 shrink-0" />
+          <span className="min-w-0 flex-1 text-text-secondary">
+            <span className={cn('font-medium', entry.by.name ? 'text-text-primary' : 'text-text-muted')}>{entry.by.name ?? '—'}</span> {entry.text}
+          </span>
+          <WithTooltip label={new Date(entry.at * 1000).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}>
+            <span className="shrink-0 whitespace-nowrap pt-px text-caption text-text-muted">{ago(entry.at)}</span>
+          </WithTooltip>
         </li>
       ))}
     </ol>

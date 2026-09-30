@@ -45,7 +45,7 @@ import { placedIn } from '@/lib/placement'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { ProjectView } from '@/views/ProjectView'
-import { go, href, type ProjectView as ProjectViewName } from '../router'
+import { go, href, type ProjectTab, type ProjectView as ProjectViewName } from '../router'
 import { act, type Say } from './act'
 import { hrefForIssue, rowFor } from './IssuesPage'
 import { MoveProject } from '@/components/MoveProject'
@@ -193,12 +193,17 @@ export function folderOfMessage(state: FolderState, messageId: string): string |
  * some other way and its home did not.
  */
 export function whereThreadLives(folder: string, state: FolderState): string | undefined {
-  if (!folder) return undefined
+  return placeOf(folder, state).where
+}
+
+/** The same answer, and whether it named a project or an issue — so the place can carry that one's icon. */
+export function placeOf(folder: string, state: FolderState): { where?: string; whereKind?: 'project' | 'issue' } {
+  if (!folder) return {}
   const project = state.projects.find((candidate) => candidate.contentFolder === folder)
-  if (project) return project.title
+  if (project) return { where: project.title, whereKind: 'project' }
   const issue = state.issues.find((candidate) => candidate.folder === folder)
-  if (issue) return issue.ref ? `${issue.ref} · ${issue.title}` : issue.title
-  return undefined
+  if (issue) return { where: issue.ref ? `${issue.ref} · ${issue.title}` : issue.title, whereKind: 'issue' }
+  return {}
 }
 
 /**
@@ -228,7 +233,7 @@ export function activityFor(
   const mentions: ActivityItem[] = mentionsOf(state.conversations, addr, state.anchors).map((conversation) => ({
     thread: threadFor(conversation, directory, undefined, addr, state.edits, state.attachments),
     relation: 'mention' as const,
-    where: whereThreadLives(conversation.root.folder, state),
+    ...placeOf(conversation.root.folder, state),
   }))
   return { items: mentions.slice(0, ACTIVITY_HORIZON), truncated: Math.max(0, mentions.length - ACTIVITY_HORIZON) }
 }
@@ -310,6 +315,7 @@ export function ProjectPage({
   archives,
   d,
   view,
+  tab,
   say,
   refresh,
 }: {
@@ -326,6 +332,8 @@ export function ProjectPage({
   /** The object's `d`, which is all a §7.2 URL carries. */
   d: string
   view: ProjectViewName
+  /** The open tab — Overview, Activity, Issues. */
+  tab: ProjectTab
   say: Say
   /** Folders given: only they are re-read (PER-17). Omitted: everything, for a write outside them. */
   refresh: (folders?: string[]) => Promise<void>
@@ -487,8 +495,10 @@ export function ProjectPage({
           onDescribe: (value, contentFormat) => set('description', value, 'Description', contentFormat),
         }}
         onAddIssue={() => setDialog('issue')}
+        tab={tab}
+        onTab={(next) => go({ name: 'project', d: project.id, slug: project.title, view, tab: next })}
         view={view}
-        onView={(next) => go({ name: 'project', d: project.id, slug: project.title, view: next })}
+        onView={(next) => go({ name: 'project', d: project.id, slug: project.title, view: next, tab })}
         issues={issues}
         issueStatuses={ISSUE_STATUSES}
         hrefFor={hrefForIssue}

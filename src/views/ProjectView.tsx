@@ -3,56 +3,62 @@ import type { ContentFormat, Imeta } from '@estiva-app/protocol'
 import type { ReactNode } from 'react'
 import { Breadcrumb } from '@/components/ui/Breadcrumb'
 import { ScrollArea } from '@/components/ui/ScrollArea'
-import { linkTo } from '@/router'
+import { linkTo, type ProjectTab } from '@/router'
 import { Button } from '@/components/ui/Button'
 import { Divider } from '@/components/ui/Divider'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Tabs } from '@/components/ui/Tabs'
 import type { StatusEntry } from '@/lib/issues'
 import { Board } from '@/components/Board'
-import { Conversations, type ThreadData } from '@/components/ConversationThread'
-import { Activity, type ActivityItem } from '@/components/Activity'
+import type { ThreadData } from '@/components/ConversationThread'
+import type { ActivityItem } from '@/components/Activity'
 import type { IssueRowData } from '@/components/IssueRow'
 import { IssuesTable, type IssuesTableRow } from '@/components/IssuesTable'
-import { ProjectHeader } from '@/components/ProjectHeader'
 import { ProjectRail, type RailFolder, type RailPerson } from '@/components/ProjectRail'
 import { Related, hasRelated } from '@/components/Related'
+import { LiveHeader } from '@/components/editing/LiveHeader'
+import { MentionList, ThreadList } from '@/components/conversations/ThreadList'
+import { AppSection, Centred } from '@/components/layout/ReadingColumn'
 import type { RelatedState } from '@/api/useRelated'
 
 /**
- * One project, as production lays it out (ruling C11): the trail, the
- * editable title and description, "Issues" with the Table / Board toggle,
- * "Conversations", "Activity" — and the rail on the right. The toggle lives in
- * the URL (`?view=board`), so the caller owns it.
+ * One project, in tabs (Katerina, 29 September, shaped like Linear's):
  *
- * The two lists are CON-9's, the same pair the issue surface shows:
- * *Conversations* is what declared itself about this project, *Activity* is
- * what is related to it. A project has no History section — its change events
- * are shown in the rail, not as a feed.
+ * - **Overview** — the title and the description, always editable, and what is
+ *   placed under the project ("Related").
+ * - **Activity** — "Conversations" (what declared itself about this project)
+ *   and "Mentioned in" (conversations elsewhere that name it; CON-9's two lists).
+ * - **Issues** — the issues, full width, with Table / Board at the right end of
+ *   the tab row.
+ *
+ * Overview and Activity sit in one centred 768px column; Issues takes the full
+ * width, because the board has a column per status. "Add issue" is on every
+ * tab. The rail is on every tab and never moves: the tab row is a grid row of
+ * its own, level with the rail's top. The open tab and the Table / Board toggle
+ * are in the URL (`?tab=activity`, `?view=board`), so the caller owns them.
  */
 export interface ProjectViewProps {
   crumbs: { projectsHref: string; title: string }
   header: { title: string; description: string; descriptionFormat: ContentFormat; nameOf?: (pubkey: string) => string; archived: boolean; onRename: (v: string) => Promise<boolean> | boolean; onDescribe: (v: string, contentFormat?: string) => Promise<boolean> | boolean }
-  /** Production's "Add issue" beside the title. */
+  /** "Add issue", at the right end of the tab row. */
   onAddIssue?: () => void
+  /** The open tab — in the URL. */
+  tab: ProjectTab
+  onTab: (tab: ProjectTab) => void
   view: 'table' | 'board'
   onView: (view: 'table' | 'board') => void
   issues: IssuesTableRow[]
   issueStatuses: StatusEntry[]
   hrefFor: (issue: IssueRowData) => string
-  /**
-   * Foreign files placed under this project — RFC 0.5 §10.7. Drawn as a
-   * section after Issues (its own sub-files first, then what others put here)
-   * only when there is something to say; see `hasRelated`.
-   */
+  /** Foreign files placed under this project — RFC 0.5 §10.7. Drawn only when there is something to say; see `hasRelated`. */
   related?: RelatedState
   threads: ThreadData[]
-  /** Thread id → first unread message id. Drives the feed divider (CRO-13). */
+  /** Thread id → first unread message id. Drives the "new since" line (CRO-13). */
   unread?: Record<string, string>
   /** `files` are attachments already on the relay — SHI-2. */
   onStartConversation: (text: string, files: readonly Imeta[]) => Promise<boolean | void> | boolean | void
   onReply: (threadId: string, text: string, files: readonly Imeta[]) => Promise<boolean | void> | boolean | void
-  /** Threads on files related to this project, time-ordered — CON-9. */
+  /** Threads elsewhere that mention this project — CON-9. */
   activity: ActivityItem[]
   /** How many the horizon left out — `ACTIVITY_HORIZON`. Said on screen, never implied. */
   activityTruncated?: number
@@ -84,77 +90,94 @@ export interface ProjectViewProps {
   onEditMessage?: (messageId: string, body: string) => Promise<boolean | void> | boolean | void
   /** Why writes are unavailable — every write control on the page is disabled with it. */
   readOnlyReason?: string
-  /** The `ArchivedNotice` of an archived project: the first thing on the page (FOL-46). */
+  /** The upload behind attach. Injected so a story needs no relay; the app's by default. */
+  upload?: (file: File) => Promise<Imeta>
+  /** The `ArchivedNotice` of an archived project: the first thing on every tab (FOL-46). */
   archivedNotice?: ReactNode
 }
 
-export function ProjectView({ crumbs, header, onAddIssue, view, onView, issues, issueStatuses, hrefFor, related, threads, unread, onStartConversation, onReply, activity, activityTruncated, onReplyInActivity, rail, about, onReact, onDeleteMessage, onEditMessage, readOnlyReason, archivedNotice }: ProjectViewProps) {
-  const addIssue = (
-    <Button variant="primary" onClick={onAddIssue} disabledReason={readOnlyReason}>
-      Add issue
-    </Button>
-  )
+const TABS: { id: ProjectTab; label: string }[] = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'activity', label: 'Activity' },
+  { id: 'issues', label: 'Issues' },
+]
+
+/** One project's page, in tabs: Overview, Activity and Issues, with the rail on every tab. */
+export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onView, issues, issueStatuses, hrefFor, related, threads, unread, onStartConversation, onReply, activity, activityTruncated, onReplyInActivity, rail, about, onReact, onDeleteMessage, onEditMessage, readOnlyReason, upload, archivedNotice }: ProjectViewProps) {
   return (
-    // `data-surface` and `data-view` are the smoke test's waypoints — see
-    // IssuesView. `data-view` matters more than it looks: the Table/Board toggle
-    // swaps the list *in place* on the same route, so without it a test cannot
-    // tell "the board rendered" from "the toggle did nothing".
-    // A page that scrolls inside itself — see IssueView.
-    <div data-surface="project" data-view={view} className="grid min-h-0 flex-1 [contain:size] grid-cols-[minmax(0,1fr)_1px_auto] grid-rows-[auto_minmax(0,1fr)] gap-y-4">
+    // `data-surface`, `data-view` and `data-tab` are the smoke test's waypoints — see IssuesView. The Table/Board
+    // toggle and the tabs swap content in place on the same route, so without them a test cannot tell "it
+    // rendered" from "the click did nothing". A page that scrolls inside itself — see IssueView.
+    <div data-surface="project" data-view={view} data-tab={tab} className="grid min-h-0 flex-1 [contain:size] grid-cols-[minmax(0,1fr)_1px_auto] grid-rows-[auto_auto_minmax(0,1fr)] gap-y-4">
       <div className="col-start-1 row-start-1 pl-6 pt-5">
-        {/* The box before the name says it is a project — the sidebar's icon
-            for one (Katerina, 2026-09-09). */}
+        {/* The box before the name says it is a project — the sidebar's icon for one (Katerina, 2026-09-09). */}
         <Breadcrumb items={[{ label: 'Projects', ...linkTo(crumbs.projectsHref) }, { label: crumbs.title, icon: <IconBox size={16} stroke={1.5} /> }]} />
       </div>
-      {/* Only the content column scrolls — with Peek's thin scrollbar right
-          beside the hairline, which runs from the top bar to the bottom. The
-          content keeps 24px inside the column (pl/pr-6), the rail 24px either
-          side, and the rail starts level with the title and never moves. */}
-      {/* Both columns scroll in a ScrollArea (D40): the bar takes no width, so
-          the 24px of padding read the same with a bar as without. */}
-      <ScrollArea className="col-start-1 row-start-2 min-h-0 min-w-0" contentClassName="flex flex-col gap-6 px-6 pb-5">
-        {archivedNotice}
-        <ProjectHeader {...header} readOnly={!!readOnlyReason} action={addIssue} />
-        <section className="flex flex-col gap-3">
-          <div className="flex items-center gap-3">
-            <h2 className="flex-1 text-h4 text-text-primary">Issues</h2>
-            <Tabs
-              tabs={[
-                { id: 'table', label: 'Table', icon: <IconTable size={16} stroke={1.5} /> },
-                { id: 'board', label: 'Board', icon: <IconLayoutKanban size={16} stroke={1.5} /> },
-              ]}
-              active={view}
-              onChange={onView}
-            />
-          </div>
-          {!issues.length ? (
+      {/* The tab row is its own grid row, level with the rail's top, so the rail starts where it always has. */}
+      <div className="col-start-1 row-start-2 flex min-h-8 items-center gap-3 px-6">
+        <Tabs tabs={TABS} active={tab} onChange={onTab} />
+        <div className="flex-1" />
+        {tab === 'issues' && (
+          <Tabs
+            tabs={[
+              { id: 'table', label: 'Table', icon: <IconTable size={16} stroke={1.5} /> },
+              { id: 'board', label: 'Board', icon: <IconLayoutKanban size={16} stroke={1.5} /> },
+            ]}
+            active={view}
+            onChange={onView}
+            size="small"
+          />
+        )}
+        <Button variant="primary" onClick={onAddIssue} disabledReason={readOnlyReason}>
+          Add issue
+        </Button>
+      </div>
+
+      {/* Both columns scroll in a ScrollArea (D40): the bar takes no width, so the 24px of padding read the same with a bar as without. */}
+      <ScrollArea className="col-start-1 row-start-3 min-h-0 min-w-0" contentClassName="flex flex-col gap-6 px-6 pb-5">
+        {tab === 'overview' && (
+          <Centred>
+            {archivedNotice}
+            <LiveHeader title={header.title} titlePlaceholder="Untitled project" onRename={header.onRename} description={header.description} format={header.descriptionFormat} onDescribe={header.onDescribe} nameOf={header.nameOf} readOnly={!!readOnlyReason} upload={upload} />
+            {/* Nesting is by intent (RFC 0.5 §10.7): what somebody placed under this project, whatever app it belongs
+                to. A line first, so the list the app adds never reads as part of the description someone typed. */}
+            {hasRelated(related) && (
+              <>
+                <Divider className="mx-0" />
+                <AppSection title="Related">
+                  <Related related={related} />
+                </AppSection>
+              </>
+            )}
+          </Centred>
+        )}
+
+        {tab === 'activity' && (
+          <Centred>
+            {archivedNotice}
+            <AppSection title="Conversations">
+              <ThreadList threads={threads} unread={unread} onStart={onStartConversation} onReply={onReply} disabledReason={readOnlyReason} nameOf={header.nameOf} onReact={onReact} onDeleteMessage={onDeleteMessage} onEditMessage={onEditMessage} about={about} upload={upload} />
+            </AppSection>
+            <AppSection title="Mentioned in">
+              <MentionList items={activity} truncated={activityTruncated} onReply={onReplyInActivity} disabledReason={readOnlyReason} nameOf={header.nameOf} onReact={onReact} onDeleteMessage={onDeleteMessage} onEditMessage={onEditMessage} upload={upload} />
+            </AppSection>
+          </Centred>
+        )}
+
+        {tab === 'issues' && archivedNotice}
+        {tab === 'issues' &&
+          (!issues.length ? (
             <EmptyState scope="section" message="No issues yet." />
           ) : view === 'board' ? (
             <Board issues={issues} statuses={issueStatuses} hrefFor={hrefFor} />
           ) : (
             <IssuesTable issues={issues} statuses={issueStatuses} hrefFor={hrefFor} />
-          )}
-        </section>
-        {/* Nesting is by intent (RFC 0.5 §10.7): what somebody placed under
-            this project, whatever app it belongs to. After Issues, because
-            those are the project's own sub-files and these are the others'. */}
-        {hasRelated(related) && (
-          <section className="flex flex-col gap-3">
-            <h2 className="text-h4 text-text-primary">Related</h2>
-            <Related related={related} />
-          </section>
-        )}
-        <section className="flex flex-col gap-3">
-          <h2 className="text-h4 text-text-primary">Conversations</h2>
-          <Conversations threads={threads} unread={unread} onStart={onStartConversation} onReply={onReply} disabledReason={readOnlyReason} nameOf={header.nameOf} onReact={onReact} onDeleteMessage={onDeleteMessage} onEditMessage={onEditMessage} about={about} />
-        </section>
-        <section className="flex flex-col gap-3">
-          <h2 className="text-h4 text-text-primary">Activity</h2>
-          <Activity items={activity} truncated={activityTruncated} onReply={onReplyInActivity} disabledReason={readOnlyReason} nameOf={header.nameOf} onReact={onReact} onDeleteMessage={onDeleteMessage} onEditMessage={onEditMessage} />
-        </section>
+          ))}
       </ScrollArea>
-      <Divider orientation="vertical" className="col-start-2 row-span-2 row-start-1" />
-      <ScrollArea className="col-start-3 row-start-2 min-h-0" contentClassName="px-6 pb-5">
+
+      <Divider orientation="vertical" className="col-start-2 row-span-3 row-start-1" />
+      {/* The rail on every tab, starting level with the tab row and never moving (Katerina, 29 September). */}
+      <ScrollArea className="col-start-3 row-span-2 row-start-2 min-h-0" contentClassName="px-6 pb-5">
         <ProjectRail {...rail} archived={rail.archived ?? header.archived} readOnlyReason={readOnlyReason} />
       </ScrollArea>
     </div>

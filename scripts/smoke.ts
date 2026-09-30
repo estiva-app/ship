@@ -300,6 +300,27 @@ async function main() {
 
   const sidebar = () => page.getByRole('navigation', { name: 'Workspace' })
 
+  /* The project and issue pages are in tabs (Katerina, 29 September): Overview,
+     Activity and, on a project, Issues. `data-tab` on the surface is the waypoint
+     that says the click landed. */
+  const openTab = async (name: 'Overview' | 'Activity' | 'Issues') => {
+    await page.getByRole('tab', { name, exact: true }).click()
+    await page.waitForSelector(`[data-tab="${name.toLowerCase()}"]`)
+  }
+
+  /* A write that leaves nothing new on screen — a description saved as the
+     field is left — is waited for on the stub's own store, never on a timer. */
+  const until = async (condition: () => boolean, timeout = 15000) => {
+    const end = Date.now() + timeout
+    while (!condition()) {
+      if (Date.now() > end) throw new Error('timed out waiting for the relay')
+      await new Promise((resolve) => setTimeout(resolve, 100))
+    }
+  }
+
+  /* The writing boxes are editors, not textareas: what is in one is its text. */
+  const textOf = async (box: ReturnType<typeof page.locator>) => (await box.innerText()).trim()
+
   /* Relay-signed events go straight into the stub: a client publishing a
      `kind:30890` is refused (`is_relay_only_kind`), which is what is modelled. */
   const RELAY_KEY = 'f'.repeat(64)
@@ -369,11 +390,11 @@ async function main() {
 
   // ── Project detail, and an issue inside it ────────────────────────────────
   await page.getByRole('link', { name: /Payment integration/ }).first().click()
-  await page.waitForSelector('[data-surface="project"][data-view="table"]')
-  check('the project opens on one page, issues in table view', page.url().includes('/project/'))
+  await page.waitForSelector('[data-surface="project"][data-tab="overview"]')
+  check('the project opens on its Overview tab', page.url().includes('/project/'))
   check(
-    '  …with the description and conversations on the same page',
-    (await sectionFor('Conversations').count()) === 1,
+    '  …with Overview, Activity and Issues as tabs on one page',
+    (await page.getByRole('tab', { name: /^(Overview|Activity|Issues)$/ }).count()) === 3,
   )
 
   await page.getByRole('button', { name: 'Add issue' }).click()
@@ -381,6 +402,10 @@ async function main() {
   await issueDialog.waitFor()
   await issueDialog.getByPlaceholder(/^New issue in /).fill('Billing entry + add payment method')
   await page.getByRole('button', { name: 'Create issue' }).click()
+  await issueDialog.waitFor({ state: 'detached' })
+  // Add issue is on every tab; the list is on Issues, full width, in table view.
+  await openTab('Issues')
+  await page.waitForSelector('[data-surface="project"][data-view="table"]')
   await page.waitForSelector('table tbody tr')
 
   const issue = stored.find((e) => e.kind === 30851)
@@ -398,19 +423,19 @@ async function main() {
   await page.getByRole('tab', { name: 'Board' }).click()
   await page.waitForSelector('[data-surface="project"][data-view="board"]')
   check(
-    'the toggle swaps the list in place, same page',
-    (await sectionFor('Conversations').count()) === 1 && page.url().includes('/project/'),
+    'the toggle swaps the list in place, same page and tab',
+    (await page.locator('[data-surface="project"][data-tab="issues"]').count()) === 1 && page.url().includes('/project/'),
   )
   const board = page.locator('[data-surface="project"][data-view="board"]')
-  check('the board renders a column per status', (await board.locator('section section').count()) === 4)
+  check('the board renders a column per status', (await board.locator('section').count()) === 4)
   check(
     'the issue starts in the first column',
-    (await board.locator('section section').first().getByRole('link').count()) === 1,
+    (await board.locator('section').first().getByRole('link').count()) === 1,
   )
   await shot(page, '05-project-board')
 
   // ── Issue detail, and a status change ─────────────────────────────────────
-  await board.locator('section section').first().getByRole('link').first().click()
+  await board.locator('section').first().getByRole('link').first().click()
   await page.waitForSelector('[data-surface="issue"]')
   check('the issue detail opens', page.url().includes('/issue/'))
 
@@ -427,15 +452,13 @@ async function main() {
     a heading is still a heading inside it.
 
     The four-row textarea this replaced would fail every line below.
+
+    Since the tabbed pages (Katerina, 29 September) there is nothing to open:
+    the description is always an editor, the Notion way.
   */
-  // The reading surface itself: Tab reaches it and Enter opens it, since D37
-  // deleted the screen-reader-only "Edit description" button this used to use.
-  const description = page.locator('[data-description="reading"]')
-  await description.focus()
-  await description.press('Enter')
   const editor = page.getByRole('textbox', { name: 'Description' })
   await editor.waitFor()
-  check('the description opens an editor, not a textarea', (await page.locator('textarea').count()) === 0)
+  check('the description is an editor where it is read, not a textarea', (await page.locator('textarea').count()) === 0)
 
   await editor.click()
   await page.keyboard.type('# What we agreed\n')
@@ -449,14 +472,14 @@ async function main() {
   )
   const editingBox = await editor.boundingBox()
 
-  // Blur commits, the way `EditableText` always did.
-  await page.getByRole('heading', { name: 'Activity' }).click()
-  await page.locator('[data-block-id] h1, h1[data-block-id]').first().waitFor()
-  const readingBox = await page.locator('[data-description="reading"]').boundingBox()
+  // Leaving the field saves it; Escape leaves and keeps the text (Notion's Esc, Katerina 29 September).
+  await editor.press('Escape')
+  await until(() => stored.some((e) => e.kind === 1851 && tagValue(e, 'field') === 'description'))
+  const leftBox = await editor.boundingBox()
   check(
-    'the field is the same size reading and writing — the report itself',
-    !!editingBox && !!readingBox && Math.abs(editingBox.height - readingBox.height) < 24,
-    `editing ${Math.round(editingBox?.height ?? 0)}px, reading ${Math.round(readingBox?.height ?? 0)}px`,
+    'the field is the same size writing and after it is left — the report itself',
+    !!editingBox && !!leftBox && Math.abs(editingBox.height - leftBox.height) < 2,
+    `writing ${Math.round(editingBox?.height ?? 0)}px, left ${Math.round(leftBox?.height ?? 0)}px`,
   )
 
   const described = stored.filter((e) => e.kind === 1851).find((e) => tagValue(e, 'field') === 'description')
@@ -476,6 +499,8 @@ async function main() {
     of conversations on *related* files. Two sections on one page could not both
     be Activity, and this one was always the history.
   */
+  // Conversations, Mentioned in and History are the issue's Activity tab; the rail is on every tab.
+  await openTab('Activity')
   const history = sectionFor('History')
   await pick('Status', 'In Progress')
   await history.locator('li').first().waitFor()
@@ -492,8 +517,10 @@ async function main() {
 
   // ── Comment, reply, assignee ──────────────────────────────────────────────
   const conversations = sectionFor('Conversations')
-  await conversations.getByPlaceholder('Start a conversation…').fill('Blocked on the Stripe key.')
-  await conversations.getByRole('button', { name: 'Post', exact: true }).click()
+  const startBox = () => sectionFor('Conversations').getByRole('textbox', { name: 'Start a conversation…' })
+  await startBox().click()
+  await page.keyboard.type('Blocked on the Stripe key.')
+  await conversations.locator('[data-message-box="conversation"]').getByRole('button', { name: 'Send', exact: true }).click()
   await conversations.locator('article').first().waitFor()
 
   const comment = stored.find((e) => e.kind === 1111)
@@ -637,8 +664,11 @@ async function main() {
     !(await conversations.textContent())?.includes('naddr1'),
   )
 
-  await conversations.getByPlaceholder('Reply…').first().fill('Key is in 1Password now.')
+  // The reply box opens from the small reply button under a message with none yet (Katerina, 29 September).
   await conversations.getByRole('button', { name: 'Reply', exact: true }).first().click()
+  await conversations.getByRole('textbox', { name: 'Reply…' }).first().click()
+  await page.keyboard.type('Key is in 1Password now.')
+  await conversations.locator('[data-message-box="reply"]').getByRole('button', { name: 'Send', exact: true }).first().click()
   await page.waitForFunction(
     () => document.querySelectorAll('section article').length >= 2,
   )
@@ -788,14 +818,14 @@ async function main() {
     which is why the populated case is asserted in `Activity.test.tsx` — this
     checks the wiring a unit test cannot see.
   */
-  check('the page shows Conversations, Activity and History as three lists', (await sectionFor('Activity').count()) === 1 && (await history.count()) === 1 && (await conversations.count()) === 1)
+  check('the Activity tab shows Conversations, Mentioned in and History as three lists', (await sectionFor('Mentioned in').count()) === 1 && (await history.count()) === 1 && (await conversations.count()) === 1)
   check(
-    '  …with the comment in Conversations and not in Activity',
-    !(await sectionFor('Activity').textContent())?.includes('Blocked on the Stripe key.'),
+    '  …with the comment in Conversations and not in Mentioned in',
+    !(await sectionFor('Mentioned in').textContent())?.includes('Blocked on the Stripe key.'),
   )
   check(
-    '  …and Activity saying what it holds rather than nothing',
-    (await sectionFor('Activity').textContent())?.includes('No related conversations yet.') ?? false,
+    '  …and Mentioned in saying what it holds rather than nothing',
+    (await sectionFor('Mentioned in').textContent())?.includes('No related conversations yet.') ?? false,
   )
   await shot(page, '06-issue-detail')
 
@@ -811,34 +841,32 @@ async function main() {
     not appear in a composer for something else.
   */
   const draft = 'a thought I did not finish'
-  await conversations.getByPlaceholder('Start a conversation…').fill(draft)
+  await startBox().click()
+  await page.keyboard.type(draft)
   await page.reload()
-  await page.waitForSelector('[data-surface="issue"]', { timeout: 10000 })
+  // The tab is in the address, so a reload comes back to Activity.
+  await page.waitForSelector('[data-surface="issue"][data-tab="activity"]', { timeout: 10000 })
   const afterReload = sectionFor('Conversations')
-  check(
-    'an unsent message survives a reload',
-    (await afterReload.getByPlaceholder('Start a conversation…').inputValue()) === draft,
-  )
+  await startBox().waitFor()
+  check('an unsent message survives a reload', (await textOf(startBox())) === draft, await textOf(startBox()))
 
   // The reply box on the same page is a different destination and must be empty.
-  check(
-    '  …and does not appear in a different composer',
-    (await afterReload.getByPlaceholder('Reply…').first().inputValue()) === '',
-  )
+  await afterReload.getByRole('button', { name: /^(Reply$|\d+ repl)/ }).first().click()
+  const replyBox = afterReload.getByRole('textbox', { name: 'Reply…' }).first()
+  await replyBox.waitFor()
+  check('  …and does not appear in a different composer', (await textOf(replyBox)) === '', await textOf(replyBox))
 
   // Sending clears it: the next load starts empty rather than re-offering text
   // that has already been posted.
-  await afterReload.getByRole('button', { name: 'Post', exact: true }).click()
+  await afterReload.locator('[data-message-box="conversation"]').getByRole('button', { name: 'Send', exact: true }).click()
   await page.waitForFunction(
     (n) => document.querySelectorAll('section article').length > n,
     await afterReload.locator('article').count(),
   )
   await page.reload()
-  await page.waitForSelector('[data-surface="issue"]', { timeout: 10000 })
-  check(
-    '  …and is forgotten once it has been sent',
-    (await sectionFor('Conversations').getByPlaceholder('Start a conversation…').inputValue()) === '',
-  )
+  await page.waitForSelector('[data-surface="issue"][data-tab="activity"]', { timeout: 10000 })
+  await startBox().waitFor()
+  check('  …and is forgotten once it has been sent', (await textOf(startBox())) === '', await textOf(startBox()))
 
   /*
     An issue's comments stay on the issue (PEE-26, which undid CON-9's sub-file
@@ -854,9 +882,11 @@ async function main() {
   */
   await page.getByRole('link', { name: 'Payment integration' }).first().click()
   await page.waitForSelector('[data-surface="project"]', { timeout: 10000 })
+  await openTab('Issues')
   await page.locator('table tbody tr').first().waitFor({ timeout: 10000 })
+  await openTab('Activity')
   await page.waitForLoadState('networkidle')
-  const projectActivity = sectionFor('Activity')
+  const projectActivity = sectionFor('Mentioned in')
   check(
     "a project's Activity does not carry its issues' conversations",
     (await projectActivity.count()) === 1 &&

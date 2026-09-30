@@ -55,8 +55,8 @@ export type Route =
    * is absent when the caller has no title to hand (an inbound redirect, a
    * test, a link built before the object loaded).
    */
-  | { name: 'project'; d: string; slug?: string; view: ProjectView }
-  | { name: 'issue'; d: string; slug?: string }
+  | { name: 'project'; d: string; slug?: string; view: ProjectView; tab?: ProjectTab }
+  | { name: 'issue'; d: string; slug?: string; tab?: IssueTab }
   /**
    * A Folder, addressed by its uuid — the same uuid that is its channel id and
    * the `d` of its state event (RFC 0.4 §5.2). No slug: a Folder's name lives
@@ -76,6 +76,18 @@ export type Route =
  */
 export type ProjectView = 'table' | 'board'
 
+/**
+ * Which tab of a project page is open (Katerina, 29 September: Overview ·
+ * Activity · Issues). In the URL for the same reason the view is — "look at
+ * the conversation on this project" is a link you can send — and left out
+ * when it is the first tab, so the everyday link stays short.
+ */
+export type ProjectTab = 'overview' | 'activity' | 'issues'
+/** An issue page's tabs: an issue has no Issues tab. */
+export type IssueTab = 'overview' | 'activity'
+const PROJECT_TABS: ProjectTab[] = ['overview', 'activity', 'issues']
+const ISSUE_TABS: IssueTab[] = ['overview', 'activity']
+
 const PROJECT_VIEWS: ProjectView[] = ['table', 'board']
 const DEFAULT_PROJECT_VIEW: ProjectView = 'table'
 
@@ -88,12 +100,18 @@ export function href(route: Route): string {
       return route.archived ? '/projects?archived' : '/projects'
     case 'project': {
       const base = `/project/${objectRef(route.d, route.slug)}`
-      // The default is left out — a shared link should be the short one unless
-      // the sender meant a specific toggle.
-      return route.view === DEFAULT_PROJECT_VIEW ? base : `${base}?view=${route.view}`
+      // The defaults are left out — a shared link should be the short one unless
+      // the sender meant a specific tab or toggle.
+      const query = new URLSearchParams()
+      if (route.tab && route.tab !== 'overview') query.set('tab', route.tab)
+      if (route.view !== DEFAULT_PROJECT_VIEW) query.set('view', route.view)
+      const q = query.toString()
+      return q ? `${base}?${q}` : base
     }
-    case 'issue':
-      return `/issue/${objectRef(route.d, route.slug)}`
+    case 'issue': {
+      const base = `/issue/${objectRef(route.d, route.slug)}`
+      return route.tab && route.tab !== 'overview' ? `${base}?tab=${route.tab}` : base
+    }
     case 'folder':
       return `/folder/${route.id}`
     case 'inbound':
@@ -125,11 +143,16 @@ export function parse(location: string): Route {
   if (parts[0] === 'project' && parts[1]) {
     const d = identifierFromRef(parts[1])
     if (d) {
-      const requested = new URLSearchParams(query ?? '').get('view')
+      const params = new URLSearchParams(query ?? '')
+      const requested = params.get('view')
       const view = PROJECT_VIEWS.includes(requested as ProjectView)
         ? (requested as ProjectView)
         : DEFAULT_PROJECT_VIEW
-      return { name: 'project', d, view }
+      const asked = params.get('tab')
+      // A link from before the tabs that asked for a view meant the issues: open that tab.
+      const tab: ProjectTab = PROJECT_TABS.includes(asked as ProjectTab) ? (asked as ProjectTab) : requested ? 'issues' : 'overview'
+      // The first tab is no tab at all, so a plain link reads back as it was written.
+      return tab === 'overview' ? { name: 'project', d, view } : { name: 'project', d, view, tab }
     }
   }
   if (parts[0] === 'folder' && parts[1]) {
@@ -137,7 +160,10 @@ export function parse(location: string): Route {
   }
   if (parts[0] === 'issue' && parts[1]) {
     const d = identifierFromRef(parts[1])
-    if (d) return { name: 'issue', d }
+    if (d) {
+      const asked = new URLSearchParams(query ?? '').get('tab')
+      return ISSUE_TABS.includes(asked as IssueTab) && asked !== 'overview' ? { name: 'issue', d, tab: asked as IssueTab } : { name: 'issue', d }
+    }
   }
   return { name: 'issues' }
 }

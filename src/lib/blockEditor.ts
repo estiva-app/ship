@@ -173,6 +173,17 @@ function blockToEditor(block: Block): EditorNode {
     return { type: 'codeBlock', attrs, ...(text ? { content: [{ type: 'text', text }] } : {}) }
   }
 
+  if (block.type === 'blockquote') {
+    /*
+      A quote is the same shape as a list item: §13.3's holds inline runs,
+      ProseMirror's holds blocks, and the paragraph is the wrapper. Without it
+      the quote's text was read as no text at all — typed into a description or
+      a message, a quote saved empty (found 30 September).
+    */
+    const inline = isInlineRun(block.content) ? inlineToEditor(block.content) : []
+    return { type: 'blockquote', attrs, content: [{ type: 'paragraph', content: inline }] }
+  }
+
   if (block.type === 'listItem') {
     /*
       §13.3's list item holds inline runs; ProseMirror's holds blocks. The
@@ -294,6 +305,16 @@ function blockFromEditor(node: EditorNode, seen: Set<string>): Block | null {
   if (node.type === 'codeBlock') {
     const text = (node.content ?? []).map((n) => n.text ?? '').join('')
     return { ...base, ...(text ? { content: [{ type: 'text', text }] } : {}) }
+  }
+
+  if (node.type === 'blockquote') {
+    // Back out of the paragraph wrappers; a second paragraph in a quote is a second line of it.
+    const inline: InlineTextNode[] = []
+    ;(node.content ?? []).forEach((child, i) => {
+      if (i > 0) inline.push({ type: 'text', text: '\n' })
+      inline.push(...inlineFromEditor(child.content ?? []))
+    })
+    return { ...base, content: inline }
   }
 
   if (node.type === 'listItem') {

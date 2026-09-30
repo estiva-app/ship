@@ -1,0 +1,57 @@
+import { Meta, Canvas, Controls } from '@storybook/addon-docs/blocks'
+import * as ThreadListStories from './ThreadList.stories'
+
+<Meta of={ThreadListStories} />
+
+# ThreadList
+
+The conversations on a project or an issue: the writing box, then a card per
+conversation, or a line saying there are none yet.
+
+<Canvas of={ThreadListStories.Default} />
+
+## When
+
+- On the Activity tab of the object the conversations are about, under an
+  **AppSection** titled "Conversations".
+- Wherever somebody may write. Leave a write callback out where nobody may,
+  which removes the control instead of disabling it; pass `disabledReason` when
+  writing is only momentarily impossible (signed out).
+
+## When not
+
+- For conversations that belong to other files and only mention this one →
+  **MentionList**. The distinction is the model (CON-9), not a layout choice.
+- For a single message box on its own → **MessageBox**.
+
+## How
+
+```tsx
+import { ThreadList } from '@/components/conversations/ThreadList'
+
+<ThreadList threads={threads} onStart={start} onReply={reply} about={issue.addr} unread={unread}
+  onReact={react} onDeleteMessage={remove} onEditMessage={edit} />
+```
+
+- The props are production's `ConversationsProps`. A write resolves `false` on
+  a refusal, which keeps the box, the edit or the delete question open with
+  what was typed.
+- `ThreadListView` is the drawing alone, with the reads handed in — for a story
+  (see `fixtures/fakeRelay`) or a caller that already has them.
+
+## What it owns
+
+- **Reading the references and the reactions once for the whole surface**, and
+  re-reading reactions after a write rather than patching the count.
+- **The card**: 20px faces, "…" always there, reactions then the add-reaction
+  button under every message and reply, the replies button under a first
+  message ("💬 2", or the icon alone), replies behind a left rule.
+- **Folding**: replies are folded, opening puts you in the reply box, and a
+  thread with an unread reply opens by itself under "New since you last read
+  this".
+- **The drafts**, keyed by the object for a new conversation and by the thread
+  for a reply.
+
+## Props
+
+<Controls of={ThreadListStories.Default} />

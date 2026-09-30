@@ -1,0 +1,49 @@
+import { Meta, Canvas, Controls } from '@storybook/addon-docs/blocks'
+import * as LiveHeaderStories from './LiveHeader.stories'
+
+<Meta of={LiveHeaderStories} />
+
+# LiveHeader
+
+The top of a project or an issue page: the title and the description, always
+editable, with no box — you read and write in the same place.
+
+<Canvas of={LiveHeaderStories.Default} />
+
+## When
+
+- At the top of an object's Overview tab.
+
+## When not
+
+- For a one-line name somewhere else (a Folder's title) → **EditableText**.
+- For a message → **MessageBox**. A message is marker text and is sent; a
+  description is a block document and is saved.
+
+## How
+
+```tsx
+import { LiveHeader } from '@/components/editing/LiveHeader'
+
+<LiveHeader title={title} titlePlaceholder="Untitled issue" onRename={rename}
+  description={description} format={format} onDescribe={describe} readOnly={!!readOnlyReason} />
+```
+
+- `onRename` and `onDescribe` resolve `true` when saved. A refused description
+  keeps its text and says so.
+
+## What it owns
+
+- **Two surfaces kept 1:1**: a reader gets the text and never downloads an
+  editor; a writer gets the editors (their own chunk) over the same pixels.
+- **Saving when you leave**, never while typing — each save is a line in
+  History. Enter in the title moves into the description; Escape leaves and
+  keeps.
+- **Someone else's edit** loads while you are not in the field, and your own
+  save coming back is never mistaken for it.
+- **The objects the description points at** on a line of their own, drawn
+  below it. No "Archived" chip: an archived page says so in its Archived notice.
+
+## Props
+
+<Controls of={LiveHeaderStories.Default} />

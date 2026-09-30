@@ -255,6 +255,26 @@ describe('the two spellings that differ', () => {
     expect(fromEditorDocument(editing)).toEqual(stored)
   })
 
+  it('unwraps a quote the same way, and keeps its text', () => {
+    /*
+      Found 30 September: the quote's text sits in a paragraph inside the
+      quote in ProseMirror, and was read off the quote itself — so a quote
+      typed into a description or a message saved empty.
+    */
+    const stored = parseBlockDocument(reopen('> quoted').value)
+    const editing = toEditorDocument(stored)
+    expect(editing.content[0].type).toBe('blockquote')
+    expect(editing.content[0].content?.[0].type).toBe('paragraph')
+    expect(fromEditorDocument(editing)).toEqual(stored)
+
+    // Typed in the editor: two paragraphs in one quote are two lines of it.
+    const typed: EditorDocument = { type: 'doc', content: [{ type: 'blockquote', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'one' }] }, { type: 'paragraph', content: [{ type: 'text', text: 'two' }] }] }] }
+    const saved = fromEditorDocument(typed)
+    expect(saved.content[0].type).toBe('blockquote')
+    expect(JSON.stringify(saved.content[0].content)).toContain('one')
+    expect(JSON.stringify(saved.content[0].content)).toContain('two')
+  })
+
   it('keeps a fence literal, newlines and all', () => {
     const stored = parseBlockDocument(reopen('```\nconst a = 1\nconst b = 2\n```').value)
     expect(fromEditorDocument(toEditorDocument(stored))).toEqual(stored)

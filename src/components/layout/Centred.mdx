@@ -1,0 +1,32 @@
+import { Meta } from '@storybook/addon-docs/blocks'
+
+<Meta title="Pages/Centred" />
+
+# Centred
+
+The reading column a page's Overview and Activity tabs share: 768px, centred,
+52px under the tab row.
+
+**Seen in** Pages/In the shell: Project, Project Activity, Issue, Issue Activity.
+
+## When
+
+- For a tab that is read top to bottom — a description, conversations, history.
+
+## When not
+
+- For a list that needs the width — the Issues tab's **IssuesTable** and
+  **Board** take the whole column.
+
+## How
+
+```tsx
+import { Centred } from '@/components/layout/ReadingColumn'
+
+{tab === 'activity' && <Centred>…</Centred>}
+```
+
+## What it owns
+
+- **The width and the gap under the tabs** (Katerina, 29 September: Linear's
+  width, measured; 52px on both tabs), so the two tabs cannot drift apart.

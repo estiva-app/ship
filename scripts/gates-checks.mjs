@@ -47,8 +47,9 @@ export default function define(h) {
     { ref: "UIG-18", title: "Usage rules — Ship's own components", owner: true, checks: [
       { what: "every reusable component has a usage page that keeps the contract", run: () => h.contract(".") },
       { what: "the two one-offs Katerina kept in scope have one too", run: () => {
-        const bad = [["DescriptionEditor", "src/components/ui/DescriptionEditor.mdx"], ["BlockAnchorNote", "src/components/ui/BlockAnchorNote.mdx"]].map(([n, f]) => [n, usagePage(f)]).filter(([, why]) => why);
-        return bad.length ? h.FAIL(bad.map(([n, why]) => `${n}: ${why}`).join("; ")) : h.PASS("DescriptionEditor and BlockAnchorNote have pages");
+        // DescriptionEditor gave way to LiveHeader, its successor on both pages (30 September); the page moved with it.
+        const bad = [["LiveHeader", "src/components/editing/LiveHeader.mdx"], ["BlockAnchorNote", "src/components/ui/BlockAnchorNote.mdx"]].map(([n, f]) => [n, usagePage(f)]).filter(([, why]) => why);
+        return bad.length ? h.FAIL(bad.map(([n, why]) => `${n}: ${why}`).join("; ")) : h.PASS("LiveHeader and BlockAnchorNote have pages");
       } },
       // A page is findable either because it carries its own stories, or because
       // it names the stories that already draw the part — Katerina, 21 September:
