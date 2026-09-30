@@ -899,12 +899,22 @@ async function main() {
   const projectAddr = `30850:${project!.pubkey}:${tagValue(project!, 'd')}`
   await page.goto(`http://localhost:${PORT}/#/project/${encodeURIComponent(projectAddr)}`)
   await page.waitForSelector('[data-surface="project"]')
+  // FOL-46: archiving asks first, and carries the resolution the person gives.
   await page.getByRole('button', { name: 'Archive project' }).click()
+  const archiveDialog = page.getByRole('alertdialog', { name: /^Archive / })
+  await archiveDialog.getByRole('textbox', { name: /Resolution/ }).fill('Smoke test: done with it.')
+  await archiveDialog.getByRole('button', { name: 'Archive project' }).click()
   await page.getByRole('button', { name: 'Unarchive project' }).waitFor()
   check(
     'archiving publishes a change, not a deletion',
     stored.some((e) => e.kind === 1851 && tagValue(e, 'field') === 'archived'),
   )
+  check(
+    '  …carrying the resolution as its content',
+    stored.some((e) => e.kind === 1851 && tagValue(e, 'field') === 'archived' && e.content === 'Smoke test: done with it.'),
+  )
+  check('  …which the page shows first', await page.getByText('Smoke test: done with it.').isVisible())
+  await shot(page, '09-archived-notice')
   check(
     '  …and is reversible from the same control',
     await page.getByRole('button', { name: 'Unarchive project' }).isVisible(),
@@ -921,6 +931,16 @@ async function main() {
   await projects.getByRole('link').first().waitFor()
   check('  …which shows it', (await projects.getByRole('link').count()) === 1)
   await shot(page, '10-archived')
+
+  // And back (FOL-46): restoring asks nothing and puts it where it was. Later
+  // sections read this project through its Folder, which leaves an archived
+  // file out whatever its app declares.
+  await projects.getByRole('link').first().click()
+  await page.getByRole('button', { name: 'Unarchive project' }).click()
+  await page.getByRole('button', { name: 'Archive project' }).waitFor()
+  const restoredRow = sidebar().getByRole('link', { name: /Payment integration/ })
+  await restoredRow.waitFor({ timeout: 10_000 }).catch(() => {})
+  check('unarchiving restores it to the sidebar', await restoredRow.isVisible())
 
   // ── The profile menu ──────────────────────────────────────────────────────
   // By what it does, not by what it says: the trigger's accessible name is the

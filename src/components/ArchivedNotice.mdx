@@ -1,0 +1,44 @@
+import { Meta } from '@storybook/addon-docs/blocks'
+
+<Meta title="Projects/ArchivedNotice" />
+
+# ArchivedNotice
+
+The first thing on an archived project's, issue's or Folder's page (FOL-46):
+the package's `Banner` saying who archived it and when, with Unarchive, and the
+resolution summary under it in full.
+
+## When
+
+- At the top of `ProjectView`, `IssueView` and `FolderView`, through their
+  `archivedNotice` slot, whenever `archivesOf` (or a Folder read's `archived`)
+  says the file is archived — itself, or **with** a parent.
+
+## When not
+
+- Not in a list. An archived file is out of every list; the Projects page's
+  Archived tab marks a card with the **Chip** instead.
+- Not for transient feedback: "Project archived" is a **Toast**. This stays
+  true for as long as the file is archived.
+
+## How
+
+```tsx
+import { ArchivedNotice } from '@/components/ArchivedNotice'
+
+<ArchivedNotice
+  archive={archives.ofIssue(issue)!}
+  nameOf={directory.nameOf}
+  onUnarchive={unarchive}
+  onOpenParent={() => go(projectRoute)}
+/>
+```
+
+## What it owns
+
+- **The line.** "Archived by Miky, 2d ago", or "Archived with its project
+  “Hive” by Miky, 2d ago" when only its parent is archived.
+- **The one action.** Unarchive for a file archived itself; for one archived
+  with a parent, "Open project" or "Open folder" — that is where it is
+  restored, and restoring there brings back everything archived with it.
+- **The resolution**, in full, under the one-line banner, which truncates.

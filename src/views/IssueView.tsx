@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { IconBox } from '@tabler/icons-react'
 import { Breadcrumb, type Crumb } from '@/components/ui/Breadcrumb'
 import { ScrollArea } from '@/components/ui/ScrollArea'
@@ -86,10 +86,12 @@ export interface IssueViewProps {
   onEditMessage?: (messageId: string, body: string) => Promise<boolean | void> | boolean | void
   /** Why writes are unavailable — every write control on the page is disabled with it. */
   readOnlyReason?: string
+  /** The `ArchivedNotice` of an archived issue, or one archived with its project: the first thing on the page (FOL-46). */
+  archivedNotice?: ReactNode
 }
 
 export function IssueView({ crumbs, title, description, descriptionFormat,
-  nameOf, onRename, onDescribe, related, threads, unread, onStartConversation, onReply, activity, activityTruncated, onReplyInActivity, history, rail, about, onReact, onDeleteMessage, onEditMessage, readOnlyReason }: IssueViewProps) {
+  nameOf, onRename, onDescribe, related, threads, unread, onStartConversation, onReply, activity, activityTruncated, onReplyInActivity, history, rail, about, onReact, onDeleteMessage, onEditMessage, readOnlyReason, archivedNotice }: IssueViewProps) {
 
   // `linkTo` on each crumb (S15, 0.10.0): the breadcrumbs were the last links
   // in Ship that reloaded the whole app on a click (SHI-20).
@@ -116,6 +118,7 @@ export function IssueView({ crumbs, title, description, descriptionFormat,
       {/* Both columns scroll in a ScrollArea (D40): the bar takes no width, so
           the 24px of padding read the same with a bar as without. */}
       <ScrollArea className="col-start-1 row-start-2 min-h-0 min-w-0" contentClassName="flex flex-col gap-6 px-6 pb-5">
+        {archivedNotice}
         <div className="flex flex-col gap-2">
           {/* EditableText takes its size from where it sits (UIG-9). */}
           <div className="contents text-h2">

@@ -30,6 +30,10 @@ export interface IssueRailProps {
   /** Seconds, as the relay keeps them. */
   openedAt: number
   onCopyReference: () => void
+  /** The issue's own archive (FOL-46); archived only with its project, there is nothing here to unarchive. */
+  archived?: boolean
+  /** Archive or unarchive it. Omitted: no control. */
+  onArchive?: () => void
   onDelete: () => void
   /** Why writes are unavailable: holds the three selects shut and says why on hover and on keyboard focus. Copy stays. */
   readOnlyReason?: string
@@ -49,6 +53,8 @@ export function IssueRail({
   openedBy,
   openedAt,
   onCopyReference,
+  archived = false,
+  onArchive,
   onDelete,
   readOnlyReason,
   className,
@@ -81,9 +87,17 @@ export function IssueRail({
         Copy reference for Peek
       </Button>
       <Divider className="mx-0" />
-      <Button size="small" variant="destructive" className="self-start" onClick={onDelete} disabledReason={readOnlyReason}>
-        Delete issue
-      </Button>
+      {/* The project rail's pair (FOL-46): archive, the reversible one, first. */}
+      <div className="flex flex-col items-start gap-1">
+        {onArchive && (
+          <Button size="small" variant="muted" onClick={onArchive} disabledReason={readOnlyReason}>
+            {archived ? 'Unarchive issue' : 'Archive issue'}
+          </Button>
+        )}
+        <Button size="small" variant="destructive" onClick={onDelete} disabledReason={readOnlyReason}>
+          Delete issue
+        </Button>
+      </div>
     </aside>
   )
 }
