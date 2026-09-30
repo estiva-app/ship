@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { EditorContent, useEditor, type Editor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import { Extension } from '@tiptap/core'
+import { Selection } from '@tiptap/pm/state'
 import { IconArrowUp, IconPaperclip } from '@tabler/icons-react'
 import { blockDocumentToMarkerText, type Imeta } from '@estiva-app/protocol'
 import { AttachmentCard, Avatar, Button, FieldLine, FilePicker, IconButton, Kbd, Toolbar, ToolbarButton, richTextClassName } from '@estiva-app/ui'
@@ -142,7 +143,9 @@ export function MessageBox({ kind = 'conversation', onSubmit, initial = '', onCa
   const editor = useEditor(
     {
       extensions: [
-        StarterKit.configure({ link: false, strike: false, heading: { levels: [1, 2] } }),
+        // No trailing empty line after a list or a quote: in a document it lets you type below them, in a message it
+        // made the box a line taller the moment a bullet appeared (Katerina, 30 September). Shift+Enter leaves a list.
+        StarterKit.configure({ link: false, strike: false, heading: { levels: [1, 2] }, trailingNode: false }),
         ReferenceNode,
         LinkDecoration,
         DescriptionSlashMenu.configure({ onFile: () => picker.current?.click(), without: kind === 'edit' ? ['table', 'file'] : ['table'] }),
@@ -169,6 +172,9 @@ export function MessageBox({ kind = 'conversation', onSubmit, initial = '', onCa
     const seed = () => {
       const draft = draftKey ? (store.current.read(draftKey) ?? '') : ''
       editor.commands.setContent(editorDocFor(draft), { emitUpdate: false })
+      // A caret at the end, not the whole text selected: loading a draft left the line selected, and the formatting
+      // strip showed on every reply box that opened (Katerina, 30 September).
+      editor.view.dispatch(editor.state.tr.setSelection(Selection.atEnd(editor.state.doc)))
       setText(draft)
       setFiles([])
       setUploadError(null)

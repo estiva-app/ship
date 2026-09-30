@@ -154,3 +154,20 @@ describe('MessageBox', () => {
     expect(pressable(send())).toBe(false)
   })
 })
+
+// Found by Katerina, 30 September.
+describe('the box as it opens and grows', () => {
+  it('opens with a caret, not the line selected — so the formatting strip does not show', async () => {
+    render(<MessageBox kind="reply" autoFocus onSubmit={() => true} drafts={{ read: () => undefined, write: () => {}, clear: () => {} }} />)
+    const target = await ready('Reply…')
+    await waitFor(() => expect(target.editor.state.selection.empty).toBe(true))
+  })
+
+  it('keeps no empty line after a list, so a bullet is no taller than a line of text', async () => {
+    render(<MessageBox kind="conversation" onSubmit={() => true} drafts={{ read: () => undefined, write: () => {}, clear: () => {} }} />)
+    const target = await ready('Start a conversation…')
+    type(target, 'a')
+    act(() => void target.editor.commands.toggleBulletList())
+    expect(target.editor.getJSON().content?.map((n) => n.type)).toEqual(['bulletList'])
+  })
+})
