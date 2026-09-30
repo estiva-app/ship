@@ -28,78 +28,38 @@
  * this does not change it: the same events fold to the same state, and this is a
  * second, separate reading of the same input.
  *
- * So `foldFolder` is untouched and this is additive. `estiva-agent` gets the
- * file by copy like the rest of `src/`, and nothing it already does changes.
+ * So `foldFolder` is untouched and this is additive.
  *
- * ## What counts as an anchor — §6.4's per-tag rule (CON-13)
+ * ## What counts as an anchor is `@estiva-app/conversation`'s (CON-5)
  *
- * Not every `a` tag is the object a thread is about. Since RIC-11 and peek#272
- * a message carries every `nostr:naddr…` its body names as an `a` tag as well —
- * the body is what the person wrote, the tag is the index that lets one `#a`
- * filter answer *who named this file* — so a Peek comment written on a file
- * that names a Ship issue carries the issue as `a`, and reading that as a
- * comment put another file's discussion inside the issue's own. §6.4 says which
- * tag carries which strength, and this is that table:
- *
- * - A `kind:1111`'s `A` is the comment. NIP-22's uppercase names the thread
- *   root, and a comment is about one object. Its `a` tags are read only when it
- *   has no `A` at all — malformed, and absent from production — and any `a`
- *   that is not the `A` is a mention, because NIP-22 makes a root's own
- *   lowercase pair equal its uppercase one and so any other `a` is a reference.
- * - A `kind:9`'s `a` is the comment when the body does **not** name it — the
- *   anchor of a comment written before REW-10 moved comments to `1111`, which
- *   nothing writes any more and which is not replaceable, so it is read for
- *   good (112 threads on production, 2026-09-21). One the body *does* name is
- *   the index of that reference: a mention, on a kind that has no `A`.
- *
- * A reply's tags are never consulted below: its lowercase pair names the
- * comment being answered, or repeats what the root already said.
+ * §6.4's per-tag rule lived here until CON-5 and now lives in the package,
+ * as `isCommentOn`: a `kind:1111`'s `A` (every `a` when it has none), never a
+ * reply, and **never a `kind:9`** — CON-20 republished every comment-shaped
+ * `kind:9` as a `kind:1111`, and this manifest declares no `alsoRead`, so
+ * the pre-REW-10 row this file used to read is gone. What stays here is
+ * Ship's shape: an index over the fold's `Conversation`s.
  */
-import { findNaddrs, naddrToAddr, type SignedEvent } from '@estiva-app/protocol'
-import { KIND } from './kinds'
+import { anchorsOf, isReply, type Strength } from '@estiva-app/conversation'
+import type { SignedEvent } from '@estiva-app/protocol'
 import type { Conversation } from './fold'
 
-/** Message id → the addresses that message is a **comment on**, by the rule above. */
+/** Message id → the addresses that message is a **comment on**, by SPEC §6.4. */
 export type AnchorIndex = Record<string, string[]>
 
 /** Which of the two strengths §6.4 allows. */
-export type Attachment = 'comment' | 'mention'
-
-/** The addresses a body names, as `store.ts` reads them; a pointer that will not decode is prose. */
-function namedInBody(body: string): Set<string> {
-  const out = new Set<string>()
-  for (const naddr of findNaddrs(body)) {
-    try {
-      out.add(naddrToAddr(naddr))
-    } catch {
-      // Not a pointer we can read, so not a reference either.
-    }
-  }
-  return out
-}
+export type Attachment = Strength
 
 /**
- * Read the comment half of `about` back off the events.
- *
- * Keyed by message id rather than by address because the question asked of it is
- * always *"how did this thread attach"*, which is a property of the thread's
- * root message. An address-keyed index would answer the same question at the
- * cost of a scan per lookup.
+ * Read the comment half of `about` back off the events: each root's
+ * `anchorsOf`, the package's reading of §6.4. Keyed by message id because the
+ * question asked of it is always *"how did this thread attach"*.
  */
 export function anchorIndex(events: readonly SignedEvent[]): AnchorIndex {
   const index: AnchorIndex = {}
   for (const event of events) {
-    if (event.kind !== KIND.MESSAGE && event.kind !== KIND.COMMENT) continue
-    const values = (name: string) => event.tags.filter((t) => t[0] === name && t[1]).map((t) => t[1])
-    let anchors: string[]
-    if (event.kind === KIND.COMMENT) {
-      const roots = values('A')
-      anchors = roots.length ? roots : values('a')
-    } else {
-      const named = namedInBody(event.content)
-      anchors = values('a').filter((address) => !named.has(address))
-    }
-    if (anchors.length) index[event.id] = [...new Set(anchors)]
+    if (isReply(event)) continue
+    const anchors = anchorsOf(event)
+    if (anchors.length) index[event.id] = anchors
   }
   return index
 }

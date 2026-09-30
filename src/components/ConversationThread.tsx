@@ -51,7 +51,8 @@ export interface MessageData {
    * only the page holds the description; see `threadFor`.
    */
   anchor?: BlockAnchor
-  author: { name?: string; picture?: string }
+  /** `bot` is the author's profile flag, undefined when none was read — what §6.5's controls rule reads. */
+  author: { name?: string; picture?: string; bot?: boolean }
   /** Seconds. */
   at: number
   /**
@@ -141,18 +142,17 @@ export function useThreadReferences(threads: readonly ThreadData[]): {
 export function useThreadReactions(threads: readonly ThreadData[]): {
   reactionsBy: Record<string, readonly Reaction[]>
   omitted: number
+  cut: boolean
   refresh: () => void
 } {
-  const ids = useMemo(
-    () =>
-      threads
-        .flatMap((thread) => [thread.root, ...thread.replies])
-        .sort((a, b) => a.at - b.at)
-        .map((message) => message.id),
+  // Every root and reply with its `created_at`: the horizon is the newest 100
+  // by time across both (SPEC §6.6), so the order passed no longer matters.
+  const targets = useMemo(
+    () => threads.flatMap((thread) => [thread.root, ...thread.replies]).map((message) => ({ id: message.id, at: message.at })),
     [threads],
   )
-  const { reactions, omitted, refresh } = useReactions(ids)
-  return { reactionsBy: reactions, omitted, refresh }
+  const { reactions, omitted, cut, refresh } = useReactions(targets)
+  return { reactionsBy: reactions, omitted, cut, refresh }
 }
 
 export interface ThreadData {
@@ -224,6 +224,13 @@ export interface ConversationsProps {
   onReply: (threadId: string, text: string, files: readonly Imeta[]) => Promise<boolean | void> | boolean | void
   /** Why nothing can be posted right now — every composer here is disabled with it. */
   disabledReason?: string
+  /**
+   * The viewer's pubkey. Edit and Delete are offered on the viewer's own
+   * messages and on a `bot: true` author's, not on another human's, which the
+   * relay refuses every time (SPEC §6.5, CON-5). Omitted, only the second half
+   * applies.
+   */
+  viewer?: string
 
   /** Resolve a mentioned key to a name — SPEC §13.1. The workspace directory's. */
   nameOf?: (pubkey: string) => string

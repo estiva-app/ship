@@ -29,10 +29,8 @@ import {
 import { findNaddrs, naddrToAddr, buildReaction, buildEdit, buildDeletion as buildEventDeletion } from '@estiva-app/protocol'
 import { planArchiveFolder, planCreateFolder, planMoveFile, planPlaceFile, planRenameFolder, planUnlistFile, type FolderRef, type MoveRefusal } from '@estiva-app/interop'
 import { foldFolder, projectFolders, type FolderState } from './fold'
+import { decorationsOf, foldAttachments, foldEdits, type Decorations, type EditFold, type QueryFn } from '@estiva-app/conversation'
 import { anchorIndex, type AnchorIndex } from './references'
-import { foldEdits, type EditIndex } from './edits'
-import { foldAttachments, type AttachmentIndex } from './attachments'
-import { REACTION_EVENT_LIMIT } from './reactions'
 import { directoryFrom, type Directory } from './profiles'
 import { KIND } from './kinds'
 import { buildRecommendation } from './manifest'
@@ -101,17 +99,19 @@ export interface WorkspaceState extends FolderState {
    *
    * Beside the fold rather than inside it. `foldFolder` is a contract with
    * `estiva-agent` and its conformance test walks the union of keys, so an
-   * `edited` field on `Message` would turn both repos red — see `edits.ts`.
+   * `edited` field on `Message` would turn both repos red. The fold is
+   * `@estiva-app/conversation`'s (SPEC §6.8, CON-5).
    */
-  edits: EditIndex
+  edits: Record<string, EditFold>
   /**
-   * Message id → the files it carries, from its `imeta` tags (CON-12).
+   * Message id → the files it carries: its own `imeta`, replaced by the
+   * latest edit carrying any (CON-12, §6.8).
    *
    * Beside the fold for the same reason as `edits`: a `files` field on
    * `Message` would walk into the conformance test's union of keys and turn
-   * both repos red — see `attachments.ts`.
+   * both repos red.
    */
-  attachments: AttachmentIndex
+  attachments: Record<string, Imeta[]>
   /**
    * Every Folder this read actually fetched (PER-3).
    *
@@ -715,21 +715,19 @@ export class Store {
    * (The note that used to sit here said `#h` does not OR at all. It does —
    * see `rawFolders`, re-measured 2026-09-07.)
    *
-   * The horizon is applied by the caller through `reactionTargets`, so this
-   * method has no opinion about how much of a page it is being asked about; it
-   * bounds the *events* it will take back, which is a different limit and the
-   * one a single very busy message could otherwise blow past.
+   * The read is `@estiva-app/conversation`'s `decorationsOf` (CON-5): the
+   * horizon is SPEC §6.6's newest 100 by `created_at`, and a read that comes
+   * back at the relay's page ceiling is reported as cut — this used to take
+   * 500 events and say nothing past them. It also brings edits, which this
+   * app folds from the Folder read instead and ignores here.
    *
    * No `kind:5` query. The relay stops returning an event once it holds a
    * deletion for it, and this app caches nothing — so a retracted reaction is
-   * absent from the next read rather than something to reconcile. Peek asks
-   * because Peek keeps a copy.
+   * absent from the next read rather than something to reconcile.
    */
-  async reactionsFor(eventIds: string[]): Promise<SignedEvent[]> {
-    if (!eventIds.length) return []
-    return this.relay.query([
-      { kinds: [KIND.REACTION], '#e': eventIds, limit: REACTION_EVENT_LIMIT },
-    ] as never)
+  decorationsFor(targets: readonly { id: string; at: number }[]): Promise<Decorations> {
+    const query: QueryFn = (filters) => this.relay.query(filters as never)
+    return decorationsOf(targets, query)
   }
 
   /**

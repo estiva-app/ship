@@ -24,6 +24,12 @@ export interface Profile {
   /** Verifiable handle, `user@domain`. Buzz canonicalises these to the relay's domain. */
   nip05?: string
   about?: string
+  /**
+   * NIP-24's `bot: true` — an agent. What decides whether Edit and Delete are
+   * offered on its messages (SPEC §6.5, CON-5): the viewer may be its owner.
+   * `false` or absent for a profile that does not say so.
+   */
+  bot?: boolean
   /** `created_at`, kept so a later profile can replace an earlier one. */
   createdAt: number
 }
@@ -64,6 +70,7 @@ export function parseProfile(event: SignedEvent): Profile | null {
     picture: str('picture'),
     nip05: str('nip05'),
     about: str('about'),
+    bot: meta.bot === true,
     createdAt: event.created_at,
   }
 }

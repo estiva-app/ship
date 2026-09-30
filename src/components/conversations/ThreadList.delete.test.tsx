@@ -49,7 +49,7 @@ function open(onDeleteMessage?: (id: string) => Promise<boolean | void> | boolea
 const actions = () => screen.getAllByRole('button', { name: 'Message actions' })
 
 describe('the delete control', () => {
-  it('is offered on somebody else’s message, because the relay decides and this app cannot', () => {
+  it('is offered when the author’s profile could not be read — the relay decides (SPEC §6.5)', () => {
     open(vi.fn())
     // Two messages, two menus — neither gated on who wrote it.
     expect(actions()).toHaveLength(2)

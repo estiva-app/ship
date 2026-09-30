@@ -19,8 +19,16 @@ import {
   type ThreadRef,
   type UnsignedEvent,
 } from '@estiva-app/protocol'
+import { buildComment, buildReply, type CommentRef } from '@estiva-app/conversation'
 import { KIND } from './kinds'
 import { attachmentsInDocument } from './attachments'
+
+/*
+  A comment and a reply to one are `@estiva-app/conversation`'s builders
+  (CON-5): the NIP-22 shape the SPEC decided (§6.4 *Replies*, C16), in the tag
+  order this file wrote until then, so no event id Ship computes has moved.
+*/
+export type { CommentRef }
 
 /**
  * The Folder id.
@@ -310,124 +318,6 @@ const PLACEMENT_FIELDS = new Set(['assignee', 'lead'])
  * about an issue, so Peek renders the issue widget above the message instead of
  * showing a bare comment with no indication of what it refers to.
  */
-/**
- * kind:1111 NIP-22 comment. Tag order: A, K, P, a, k, p, h, ts.
- *
- * ## Uppercase is the root, lowercase is the parent
- *
- * That is the whole of NIP-22 and the only thing to get right. Uppercase
- * `A`/`K`/`P` name the **thread root** — the object being discussed, its kind,
- * its author. Lowercase name the **immediate parent**. For a top-level comment
- * the two are the same object, which is why both are written and why a reply
- * three deep still knows what the thread is about.
- *
- * `K` and `P` are derived from the address rather than passed in: an address is
- * `<kind>:<pubkey>:<d>`, so it already carries both, and taking them from a
- * second argument would let a caller state a kind that contradicts the `A` it
- * just gave.
- *
- * ## `h` is not optional, and nothing will tell you
- *
- * `1111` is channel-scoped when it carries an `h` and **global when it does
- * not**. The relay accepts both — measured, not assumed — so a comment
- * published without one is stored world-readable however private the issue it
- * hangs off. There is no error and no warning; the event simply becomes public.
- * `assertFolderId` above is the only thing standing there, which is why this
- * builder takes a Folder rather than an optional one.
- *
- * A reply to one is `buildNip22Reply`, below.
- */
-function buildNip22Comment(
-  pubkey: string,
-  createdAtMs: number,
-  args: { folder: string; body: string; about: string; blockId?: string; files?: readonly Imeta[] },
-): UnsignedEvent {
-  const [kind, author] = args.about.split(':')
-  return {
-    pubkey,
-    created_at: toNostrSeconds(createdAtMs),
-    kind: KIND.COMMENT,
-    tags: [
-      ['A', args.about],
-      ['K', kind],
-      ['P', author],
-      ['a', args.about],
-      ['k', kind],
-      ['p', author],
-      /*
-        SPEC §13.6. The address above says which object; this says which part.
-        Written only when the author was looking at a block — a comment about
-        the whole object carries no tag, and §13.6 requires a reader to keep
-        that distinct from an anchor that has stopped resolving.
-      */
-      ...(args.blockId ? [['block', args.blockId]] : []),
-      ['h', args.folder],
-      // Same `ts` as everything else Ship writes, for the same reason: see
-      // `buildConversationMessage` below.
-      ['ts', String(Math.floor(createdAtMs))],
-      // Attachments last, as on the `kind:9` branch — see there for why.
-      ...(args.files ?? []).map(imetaTag),
-    ],
-    content: args.body,
-  }
-}
-
-/**
- * kind:1111 reply to a top-level comment — SPEC §6.4 *Replies*, SHI-28. Tag
- * order: A, K, P, e, k, p, h, ts — the order interop's `replyTo` writes.
- *
- * **Flat, one level deep.** Uppercase is the object the thread is about,
- * copied from the comment answered; lowercase `e`/`k`/`p` name that comment,
- * never another reply, because when the root is an address NIP-22 carries no
- * id for the thread and a reader would have to walk parents to find it.
- *
- * **No lowercase `a`.** NIP-22 reads it as the parent, so the object's address
- * there would claim the reply is itself a top-level comment. The reply is found
- * by `#e` on the comment instead.
- *
- * Until SHI-28 this was a `kind:9` with Buzz's thread tags, which a client
- * that knows NIP-22 and not Ship does not see; CON-20 migrated the 25 of them.
- */
-function buildNip22Reply(
-  pubkey: string,
-  createdAtMs: number,
-  args: { folder: string; body: string; comment: CommentRef; files?: readonly Imeta[] },
-): UnsignedEvent {
-  const [kind, author] = args.comment.anchor.split(':')
-  return {
-    pubkey,
-    created_at: toNostrSeconds(createdAtMs),
-    kind: KIND.COMMENT,
-    tags: [
-      ['A', args.comment.anchor],
-      ['K', kind],
-      ['P', author],
-      ['e', args.comment.id],
-      ['k', String(KIND.COMMENT)],
-      // Unknown only when the comment itself is outside the read — see `CommentRef`.
-      ...(args.comment.author ? [['p', args.comment.author]] : []),
-      ['h', args.folder],
-      ['ts', String(Math.floor(createdAtMs))],
-      ...(args.files ?? []).map(imetaTag),
-    ],
-    content: args.body,
-  }
-}
-
-/** The top-level comment a reply answers — what `buildNip22Reply` copies from. */
-export interface CommentRef {
-  /** Its event id. */
-  id: string
-  /** The address of the object its thread is about: its `A`. */
-  anchor: string
-  /**
-   * Its author. Undefined when the comment is not in what was read and a
-   * reply stands in for it (`foldConversations`): the stand-in's author is
-   * somebody else, and a wrong `p` notifies the wrong person.
-   */
-  author?: string
-}
-
 export function buildConversationMessage(
   pubkey: string,
   createdAtMs: number,
@@ -459,7 +349,7 @@ export function buildConversationMessage(
   // A comment, or a reply to one, is a NIP-22 `kind:1111`; chat — a message in
   // the Folder or a reply in its thread — stays a `kind:9` (SPEC §6.4).
   if (args.replyToComment) {
-    return buildNip22Reply(pubkey, createdAtMs, {
+    return buildReply(pubkey, createdAtMs, {
       folder: args.folder,
       body: args.body,
       comment: args.replyToComment,
@@ -467,7 +357,7 @@ export function buildConversationMessage(
     })
   }
   if (args.about && !args.replyTo) {
-    return buildNip22Comment(pubkey, createdAtMs, {
+    return buildComment(pubkey, createdAtMs, {
       folder: args.folder,
       body: args.body,
       about: args.about,

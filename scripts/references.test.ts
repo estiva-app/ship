@@ -207,9 +207,11 @@ const late = [
 
 {
   /*
-    A `kind:9` has no `A`, so its `a` is read against the body. Peek's topic
-    message since RIC-11 tags what the body names; Ship's pre-REW-10 comment
-    tagged the issue and said nothing about it in the body.
+    A `kind:9` is chat, and lists under no object as a comment (SPEC §6.4,
+    C10). Peek's topic message since RIC-11 tags what the body names, which is
+    a mention. Ship's pre-REW-10 comment tagged the issue and said nothing
+    about it in the body; it read as a comment until CON-20 republished every
+    one as a `kind:1111`, and since CON-5 it is a mention like any other `a`.
   */
   const topicMention = event({ id: 'k1', kind: 9, tags: [['a', POINTED_AT]], content: `About ${POINTER}` })
   const legacyComment = event({ id: 'k2', kind: 9, tags: [['a', ISSUE]], content: 'Reopening: the fix did not land.' })
@@ -219,7 +221,7 @@ const late = [
   const mention = state.conversations.find((c) => c.id === 'k1')!
   const legacy = state.conversations.find((c) => c.id === 'k2')!
   check('a kind:9 `a` the body also names is a mention', attachmentOf(mention, POINTED_AT, anchors) === 'mention')
-  check('a kind:9 `a` the body does not name is the legacy comment anchor', attachmentOf(legacy, ISSUE, anchors) === 'comment')
+  check('a kind:9 `a` the body does not name is no comment either — CON-20 migrated them', attachmentOf(legacy, ISSUE, anchors) === 'mention')
 }
 
 {

@@ -115,7 +115,7 @@ export function threadFor(
     Edits, applied here rather than in the fold — CON-4.
 
     `foldFolder` is a two-repo contract whose conformance test walks the union
-    of keys, so the edit cannot be a field on `Message`; `edits.ts` folds it
+    of keys, so the edit cannot be a field on `Message`; the package folds it
     beside the fold and this is where the two meet. A message with no edit is
     untouched, so the omitted case is exactly today's behaviour.
   */
@@ -141,7 +141,7 @@ export function threadFor(
       // Milliseconds from the fold, seconds everywhere else on this shape.
       // Only a body change marks it: an edit that re-attaches files under the
       // same text is not "edited" (§7.2.1, CON-5).
-      editedAt: edit?.edited ? Math.floor(edit.at / 1000) : undefined,
+      editedAt: edit?.editedAt !== undefined ? Math.floor(edit.editedAt / 1000) : undefined,
       anchor: resolveBlockAnchor(m.blockId, body?.value ?? '', body?.format ?? 'marker'),
       // Carried for the unread rule only: your own writing is never new to you.
       by: m.author,

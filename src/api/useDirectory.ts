@@ -7,6 +7,8 @@ import { short } from './people'
 export interface Person {
   name?: string
   picture?: string
+  /** The profile's `bot` flag; undefined when no profile was read (SPEC §6.5 then offers the controls). */
+  bot?: boolean
 }
 
 export interface DirectoryView {
@@ -74,7 +76,7 @@ export function useDirectory(pubkeys: string[], navKey: string): DirectoryView {
   const personOf = useCallback(
     (pubkey: string): Person => {
       const profile = directory.get(pubkey)
-      return { name: profile?.name ?? short(pubkey), picture: profile?.picture }
+      return { name: profile?.name ?? short(pubkey), picture: profile?.picture, ...(profile ? { bot: profile.bot === true } : {}) }
     },
     [directory],
   )
