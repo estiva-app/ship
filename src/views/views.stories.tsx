@@ -14,6 +14,7 @@ import { ProjectView } from './ProjectView'
 import { ProjectsView } from './ProjectsView'
 import type { IssueTab, ProjectTab } from '@/router'
 import type { Imeta } from '@estiva-app/protocol'
+import { ArchivedNotice } from '@/components/ArchivedNotice'
 
 /** Attach without a relay: the picked file, shown from the browser's own memory. */
 const pretendUpload = async (file: File) => ({ url: URL.createObjectURL(file), m: file.type || 'application/octet-stream', x: '0'.repeat(64), size: file.size, filename: file.name }) as unknown as Imeta
@@ -120,7 +121,22 @@ export const IssuesEmpty: Story = {
 }
 
 /** One project, in tabs: Overview (title, description, Related), Activity (Conversations, Mentioned in), Issues (table or board). The rail on every tab. */
-const projectPage = (startTab: ProjectTab, startView: 'table' | 'board' = 'table', readOnlyReason?: string): Story => ({
+/** FOL-46's notice, as the pages build it: archived by Miky two days ago, with a resolution. */
+const ARCHIVED_AT = Math.floor(Date.now() / 1000) - 2 * 86400
+const archivedNotice = (withProject?: boolean) => (
+  <ArchivedNotice
+    archive={{
+      by: 'a'.repeat(64),
+      at: ARCHIVED_AT,
+      resolution: 'Shipped as interop 0.37.0. The follow-ups are FOL-49 and FOL-50.',
+      ...(withProject ? { with: { kind: 'project' as const, addr: '30850:a:rel', title: 'Relay Migration' } } : {}),
+    }}
+    nameOf={() => 'Miky'}
+    {...(withProject ? { onOpenParent: fn() } : { onUnarchive: fn() })}
+  />
+)
+
+const projectPage = (startTab: ProjectTab, startView: 'table' | 'board' = 'table', readOnlyReason?: string, archived = false): Story => ({
   render: () => {
     const [tab, setTab] = useState<ProjectTab>(startTab)
     const [view, setView] = useState<'table' | 'board'>(startView)
@@ -134,7 +150,7 @@ const projectPage = (startTab: ProjectTab, startView: 'table' | 'board' = 'table
         <ProjectView
           onAddIssue={fn()}
           crumbs={{ projectsHref: '#/projects', title }}
-          header={{ title, description, descriptionFormat: 'marker', archived: false, onRename: (v) => (setTitle(v), true), onDescribe: (v) => (setDescription(v), true) }}
+          header={{ title, description, descriptionFormat: 'marker', archived, onRename: (v) => (setTitle(v), true), onDescribe: (v) => (setDescription(v), true) }}
           tab={tab}
           onTab={setTab}
           view={view}
@@ -150,6 +166,7 @@ const projectPage = (startTab: ProjectTab, startView: 'table' | 'board' = 'table
           onReplyInActivity={fn()}
           readOnlyReason={readOnlyReason}
           upload={pretendUpload}
+          archivedNotice={archived && archivedNotice()}
           rail={{
             status,
             statuses: PROJECT_STATUSES,
@@ -179,9 +196,11 @@ export const ProjectIssues: Story = projectPage('issues')
 export const ProjectBoard: Story = projectPage('issues', 'board')
 /** Signed out: the title and description are text, and every write control is disabled with the reason. */
 export const ProjectSignedOut: Story = projectPage('activity', 'table', 'Sign in to react or reply.')
+/** Archived (FOL-46): the notice first on every tab, the rail where it always is. */
+export const ProjectArchived: Story = projectPage('overview', 'table', undefined, true)
 
 /** One issue, in tabs: Overview (title, description, Related) and Activity (Conversations, Mentioned in, History). The rail on every tab. */
-const issuePage = (startTab: IssueTab): Story => ({
+const issuePage = (startTab: IssueTab, archivedWithProject = false): Story => ({
   render: () => {
     const issue = ISSUES[0]
     const [tab, setTab] = useState<IssueTab>(startTab)
@@ -208,6 +227,7 @@ const issuePage = (startTab: IssueTab): Story => ({
           onReplyInActivity={fn()}
           history={ACTIVITY}
           upload={pretendUpload}
+          archivedNotice={archivedWithProject && archivedNotice(true)}
           rail={{
             status,
             statuses: ISSUE_STATUSES,
@@ -221,6 +241,7 @@ const issuePage = (startTab: IssueTab): Story => ({
             openedBy: issue.openedBy,
             openedAt: issue.at,
             onCopyReference: fn(),
+            onArchive: fn(),
             onDelete: fn(),
           }}
         />
@@ -233,3 +254,5 @@ const issuePage = (startTab: IssueTab): Story => ({
 export const Issue: Story = issuePage('overview')
 /** An issue, Activity: Conversations, Mentioned in, History. */
 export const IssueActivity: Story = issuePage('activity')
+/** An issue archived with its project (FOL-46): the notice names the project and opens it. */
+export const IssueArchivedWithProject: Story = issuePage('overview', true)
