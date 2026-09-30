@@ -75,7 +75,7 @@ export const WithFolders: Story = { args: { folders: FOLDERS, projects: FILED, o
 /** A project row's menu (FOL-7): on hover or focus, over the count, with "Move to Folder…". */
 export const WithRowMenu: Story = { args: { folders: FOLDERS, projects: FILED, onOpenFolder: () => {}, onMoveProject: () => {} } }
 
-/** "New folder" under the teams (FOL-8): the Folder it makes shows here beside them. */
+/** "New folder" is the + on the quiet "Folders" label (FOL-8; Katerina, 30 September): the Folder it makes shows here beside them. */
 export const WithNewFolder: Story = { args: { folders: FOLDERS, projects: FILED, onOpenFolder: () => {}, onNewFolder: () => {} } }
 
 /** A folder route marks its own row, and leaves the project rows alone. */
