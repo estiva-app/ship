@@ -54,6 +54,8 @@ installReadStateDiagnostic()
 export { firstUnreadByThread, type FeedThread, type StreamOf } from './unreadFeed'
 export {
   archiveProject,
+  archiveIssue,
+  archiveFolder,
   createIssue,
   createProject,
   deleteIssue,

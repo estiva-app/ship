@@ -3,6 +3,7 @@ import { ISSUE_STATUSES, conversationsAbout, createIssue, me, type DirectoryView
 import type { IssueRowData } from '@/components/IssueRow'
 import { NewIssueDialog } from '@/components/NewIssueDialog'
 import { IssuesView, type IssuesScope } from '@/views/IssuesView'
+import type { Archives } from '@/lib/archive'
 import { href } from '../router'
 import { type Say } from './act'
 
@@ -34,13 +35,21 @@ export const hrefForIssue = (issue: { id: string; title?: string }) =>
  * over the grouped list. "Assigned to me" is by the viewer's key. The
  * list is what `loadAll` could read, and nothing here calls it complete.
  * "Add issue" asks which project, since none is selected here.
+ *
+ * An archived issue is not listed, nor one archived with its project or its
+ * team (FOL-46); a link still opens it. An archived project is not offered for
+ * a new issue.
  */
-export function IssuesPage({ state, directory, say, refresh }: { state: FolderState; directory: DirectoryView; say: Say; refresh: () => Promise<void> }) {
+export function IssuesPage({ state, directory, archives, say, refresh }: { state: FolderState; directory: DirectoryView; archives: Archives; say: Say; refresh: () => Promise<void> }) {
   const [scope, setScope] = useState<IssuesScope>('all')
   const [adding, setAdding] = useState(false)
-  const rows = useMemo(() => state.issues.map((issue) => rowFor(issue, state, directory)), [state, directory])
-  const mine = useMemo(() => new Set(state.issues.filter((issue) => issue.assignee === me).map((issue) => issue.addr)), [state])
-  const projectOptions = useMemo(() => state.projects.map((p) => ({ value: p.addr, label: p.title })), [state])
+  const live = useMemo(() => state.issues.filter((issue) => !archives.ofIssue(issue)), [state, archives])
+  const rows = useMemo(() => live.map((issue) => rowFor(issue, state, directory)), [live, state, directory])
+  const mine = useMemo(() => new Set(live.filter((issue) => issue.assignee === me).map((issue) => issue.addr)), [live])
+  const projectOptions = useMemo(
+    () => state.projects.filter((p) => !archives.ofProject(p.addr)).map((p) => ({ value: p.addr, label: p.title })),
+    [state, archives],
+  )
 
   return (
     <>

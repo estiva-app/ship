@@ -1,5 +1,6 @@
 import { IconBox, IconLayoutKanban, IconTable } from '@tabler/icons-react'
 import type { ContentFormat, Imeta } from '@estiva-app/protocol'
+import type { ReactNode } from 'react'
 import { Breadcrumb } from '@/components/ui/Breadcrumb'
 import { ScrollArea } from '@/components/ui/ScrollArea'
 import { linkTo } from '@/router'
@@ -68,6 +69,8 @@ export interface ProjectViewProps {
     total: number
     folders: RailFolder[] | null | undefined
     onMove?: () => void
+    /** The project's own archive, when it differs from the header's (archived with its team, FOL-46). */
+    archived?: boolean
     onArchive: () => void
     onDelete: () => void
   }
@@ -81,9 +84,11 @@ export interface ProjectViewProps {
   onEditMessage?: (messageId: string, body: string) => Promise<boolean | void> | boolean | void
   /** Why writes are unavailable — every write control on the page is disabled with it. */
   readOnlyReason?: string
+  /** The `ArchivedNotice` of an archived project: the first thing on the page (FOL-46). */
+  archivedNotice?: ReactNode
 }
 
-export function ProjectView({ crumbs, header, onAddIssue, view, onView, issues, issueStatuses, hrefFor, related, threads, unread, onStartConversation, onReply, activity, activityTruncated, onReplyInActivity, rail, about, onReact, onDeleteMessage, onEditMessage, readOnlyReason }: ProjectViewProps) {
+export function ProjectView({ crumbs, header, onAddIssue, view, onView, issues, issueStatuses, hrefFor, related, threads, unread, onStartConversation, onReply, activity, activityTruncated, onReplyInActivity, rail, about, onReact, onDeleteMessage, onEditMessage, readOnlyReason, archivedNotice }: ProjectViewProps) {
   const addIssue = (
     <Button variant="primary" onClick={onAddIssue} disabledReason={readOnlyReason}>
       Add issue
@@ -108,6 +113,7 @@ export function ProjectView({ crumbs, header, onAddIssue, view, onView, issues, 
       {/* Both columns scroll in a ScrollArea (D40): the bar takes no width, so
           the 24px of padding read the same with a bar as without. */}
       <ScrollArea className="col-start-1 row-start-2 min-h-0 min-w-0" contentClassName="flex flex-col gap-6 px-6 pb-5">
+        {archivedNotice}
         <ProjectHeader {...header} readOnly={!!readOnlyReason} action={addIssue} />
         <section className="flex flex-col gap-3">
           <div className="flex items-center gap-3">
@@ -149,7 +155,7 @@ export function ProjectView({ crumbs, header, onAddIssue, view, onView, issues, 
       </ScrollArea>
       <Divider orientation="vertical" className="col-start-2 row-span-2 row-start-1" />
       <ScrollArea className="col-start-3 row-start-2 min-h-0" contentClassName="px-6 pb-5">
-        <ProjectRail {...rail} archived={header.archived} readOnlyReason={readOnlyReason} />
+        <ProjectRail {...rail} archived={rail.archived ?? header.archived} readOnlyReason={readOnlyReason} />
       </ScrollArea>
     </div>
   )

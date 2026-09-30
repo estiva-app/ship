@@ -37,7 +37,7 @@ vi.mock('@/api/foreign', async (importOriginal) => ({
   ),
 }))
 
-import { createIssue, createProject, deleteIssue, deleteProject, resolveInbound, setIssueField, startConversation, useDirectory, useWorkspace } from '@/api'
+import { archiveProject, createIssue, createProject, deleteIssue, deleteProject, resolveInbound, setIssueField, startConversation, useDirectory, useWorkspace } from '@/api'
 import { fireEvent } from '@testing-library/react'
 import App, { sidebarProps } from './App'
 
@@ -52,8 +52,10 @@ const LIVE = D('01')
 const OLD = D('02')
 const MINE = D('03')
 
+// `archived` and the field it is folded from, together, as the fold writes them (FOL-46 reads the field).
 const project = (d: string, title: string, archived = false) => ({
-  addr: `30850:x:${d}`, id: d, author: OTHER, createdAt: 1, title, description: '', descriptionFormat: 'marker' as const, contentFolder: 'f', originFolder: 'f', status: 'planned', archived, fields: {},
+  addr: `30850:x:${d}`, id: d, author: OTHER, createdAt: 1, title, description: '', descriptionFormat: 'marker' as const, contentFolder: 'f', originFolder: 'f', status: 'planned', archived,
+  fields: (archived ? { archived: { value: 'true', by: OTHER, at: 1, format: 'marker' as const } } : {}) as WorkspaceState['projects'][number]['fields'],
 })
 const issue = (d: string, projectAddr: string | undefined, status: string) => ({
   addr: `30851:x:${d}`, id: d, author: OTHER, createdAt: 1, title: `issue ${d.slice(-2)}`, description: '', descriptionFormat: 'marker' as const, folder: 'f', projectAddr, status, fields: {},
@@ -98,7 +100,7 @@ const goTo = (path: string) => {
 beforeEach(() => {
   goTo('/')
   refresh.mockClear()
-  for (const write of [createProject, createIssue, setIssueField, deleteProject, deleteIssue, startConversation]) vi.mocked(write).mockReset()
+  for (const write of [createProject, createIssue, setIssueField, archiveProject, deleteProject, deleteIssue, startConversation]) vi.mocked(write).mockReset()
   vi.mocked(useWorkspace).mockReturnValue({ state: STATE, error: null, loading: false, busy: false, refresh , live: false })
   vi.mocked(useDirectory).mockReturnValue({
     directory: new Map(),
@@ -214,12 +216,14 @@ describe('Issues page — rows from the fold', () => {
     goTo('/issues')
     render(<App />)
     const main = within(screen.getByRole('main'))
-    expect(main.getByRole('tab', { name: /^All/ })).toHaveTextContent('4')
-    expect(main.getByRole('tab', { name: /^Open/ })).toHaveTextContent('3')
+    // Issue 13 is in the archived project, so it is archived with it (FOL-46).
+    expect(main.getByRole('tab', { name: /^All/ })).toHaveTextContent('3')
+    expect(main.getByRole('tab', { name: /^Open/ })).toHaveTextContent('2')
     expect(main.getByRole('tab', { name: /Assigned to me/ })).toHaveTextContent('1')
     // Issue links only: a row's project chip is a link of its own (S26).
     const issueLinks = () => main.getAllByRole('link').filter((a) => a.getAttribute('href')?.startsWith('/issue/'))
-    expect(issueLinks()).toHaveLength(4)
+    expect(issueLinks()).toHaveLength(3)
+    expect(issueLinks().some((a) => a.getAttribute('href')?.includes(D('13')))).toBe(false)
     // The row says the count as a small icon and a number, named in full for a reader who cannot see it (S26).
     expect(main.getByLabelText('1 conversation')).toBeInTheDocument()
     expect(main.getByRole('button', { name: 'Add issue' })).toBeEnabled()
@@ -274,6 +278,47 @@ describe('Project page — one project from the fold', () => {
     await waitFor(() => expect(vi.mocked(deleteProject).mock.calls[0]?.[0]).toMatchObject({ addr: `30850:x:${MINE}` }))
     expect(await screen.findByText('Project deleted')).toBeInTheDocument()
     await waitFor(() => expect(location.pathname).toBe('/projects'))
+  })
+
+  it('asks before archiving, counts the issues it hides, and sends the resolution (FOL-46)', async () => {
+    vi.mocked(archiveProject).mockResolvedValue({ ok: true })
+    goTo(`/project/live-${LIVE}`)
+    render(<App />)
+    const main = within(screen.getByRole('main'))
+    fireEvent.click(main.getByRole('button', { name: 'Archive project' }))
+    const dialog = within(screen.getByRole('alertdialog', { name: /Archive .Live./ }))
+    expect(dialog.getByText(/hides the project and its 2 issues from every list/)).toBeInTheDocument()
+    expect(archiveProject).not.toHaveBeenCalled()
+    fireEvent.change(dialog.getByRole('textbox', { name: /Resolution/ }), { target: { value: 'Shipped in 0.37.' } })
+    fireEvent.click(dialog.getByRole('button', { name: 'Archive project' }))
+    await waitFor(() => expect(vi.mocked(archiveProject).mock.calls[0]?.slice(1)).toEqual([true, 'Shipped in 0.37.']))
+    expect(await screen.findByText('Project archived')).toBeInTheDocument()
+  })
+
+  it('an archived project shows who archived it and the resolution first, and restores without asking', async () => {
+    vi.mocked(archiveProject).mockResolvedValue({ ok: true })
+    const archivedAt = STATE.projects.find((p) => p.id === OLD)!
+    vi.mocked(useWorkspace).mockReturnValue({
+      state: { ...STATE, activity: [...STATE.activity, { id: 'c'.repeat(64), author: OTHER, createdAt: 1, target: archivedAt.addr, field: 'archived', value: 'true', format: 'marker', note: 'Replaced by Live.' }] },
+      error: null, loading: false, busy: false, refresh, live: false,
+    })
+    goTo(`/project/old-${OLD}`)
+    render(<App />)
+    const main = within(screen.getByRole('main'))
+    expect(main.getByText(/^Archived by Someone/)).toBeInTheDocument()
+    expect(main.getByText('Replaced by Live.')).toBeInTheDocument()
+    fireEvent.click(main.getByRole('button', { name: 'Unarchive' }))
+    await waitFor(() => expect(vi.mocked(archiveProject).mock.calls[0]?.slice(1)).toEqual([false]))
+  })
+
+  it('an issue in an archived project says it is archived with it, and opens the project', async () => {
+    goTo(`/issue/issue-13-${D('13')}`)
+    render(<App />)
+    const main = within(screen.getByRole('main'))
+    expect(main.getByText(/^Archived with its project “Old”/)).toBeInTheDocument()
+    expect(main.getByRole('button', { name: 'Archive issue' })).toBeEnabled()
+    fireEvent.click(main.getByRole('button', { name: 'Open project' }))
+    await waitFor(() => expect(location.pathname).toMatch(new RegExp(`^/project/old-${OLD}`)))
   })
 
   it('posts a project conversation into its content Folder and re-reads', async () => {
