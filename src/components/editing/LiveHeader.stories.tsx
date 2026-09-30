@@ -71,3 +71,8 @@ export const Empty: Story = { args: { title: '', description: '', issue: true } 
 
 /** A reader who cannot write: text, and no editor is downloaded. */
 export const ReadOnly: Story = { args: { readOnly: true } }
+
+/** Links in the description open in a new tab on a click — a bare address and one with words. A click on plain text still places the caret. */
+export const WithLinks: Story = {
+  args: { description: 'The plan is in [the cut-over checklist](https://example.com/checklist), and the relay notes are at https://example.com/relay.' },
+}

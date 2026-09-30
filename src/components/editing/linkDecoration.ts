@@ -19,14 +19,34 @@ const LINK_SPLIT = /\[[^[\]\n]+\]\((?:https?:\/\/|mailto:)[^\s)]+\)|https?:\/\/[
 /** Punctuation after a bare address ends the sentence, not the address. */
 const TRAILING = /[.,;:!?)\]]+$/
 const LINK_CLASS = 'text-info-default underline underline-offset-2'
+/** `[words](url)` names its address in the brackets; a bare address is its own. */
+const LINK_TARGET = /\]\(([^\s)]+)\)$/
 
-export const LinkDecoration = Extension.create({
+/**
+ * `openOnClick`: a click on a link opens it in a new tab, as a link in a read
+ * page does (Katerina, 30 September: the always-editable description had made
+ * its links unclickable). On for the description; off in the message box,
+ * where a click is part of writing.
+ */
+export const LinkDecoration = Extension.create<{ openOnClick: boolean }>({
   name: 'linkDecoration',
+  addOptions() {
+    return { openOnClick: false }
+  },
   addProseMirrorPlugins() {
+    const openOnClick = this.options.openOnClick
     return [
       new Plugin({
         key: new PluginKey('linkDecoration'),
         props: {
+          handleClick: (_view, _pos, event) => {
+            if (!openOnClick || event.button !== 0) return false
+            const link = (event.target as HTMLElement | null)?.closest?.('[data-href]')
+            const href = link?.getAttribute('data-href')
+            if (!href) return false
+            window.open(href, '_blank', 'noopener,noreferrer')
+            return true
+          },
           decorations: ({ doc }) => {
             const found: Decoration[] = []
             doc.descendants((node, pos) => {
@@ -36,7 +56,13 @@ export const LinkDecoration = Extension.create({
               for (const match of node.text.matchAll(LINK_SPLIT)) {
                 if (match.index === undefined) continue
                 const text = match[0].startsWith('[') ? match[0] : match[0].replace(TRAILING, '')
-                found.push(Decoration.inline(pos + match.index, pos + match.index + text.length, { class: LINK_CLASS }))
+                const href = text.startsWith('[') ? (LINK_TARGET.exec(text)?.[1] ?? '') : text
+                found.push(
+                  Decoration.inline(pos + match.index, pos + match.index + text.length, {
+                    class: openOnClick ? `${LINK_CLASS} cursor-pointer` : LINK_CLASS,
+                    ...(openOnClick && href ? { 'data-href': href } : {}),
+                  }),
+                )
               }
             })
             return found.length ? DecorationSet.create(doc, found) : null

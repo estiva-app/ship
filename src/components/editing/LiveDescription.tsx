@@ -109,7 +109,7 @@ export function LiveDescription({
         ReferenceNode,
         UnknownBlock,
         AttachmentNode,
-        LinkDecoration,
+        LinkDecoration.configure({ openOnClick: true }),
         DescriptionSlashMenu.configure({ onFile: () => openPicker() }),
       ],
       // Built once. A value coming back must not rebuild the editor under the caret; see the effect below.
