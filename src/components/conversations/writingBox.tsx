@@ -1,7 +1,7 @@
 import { Kbd } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
 
-// @estiva-escape(no-copied-look): Peek's writing box, the same look in Ship; one package part for both apps is an estiva-ui candidate awaiting Katerina's call (30 September)
+// @estiva-escape(no-copied-look): Peek's writing box, the same look in Ship; one package part for both apps is tracked in UIG-46
 export const WRITING_BOX = 'relative bg-bg-inset border border-border-default rounded-lg p-3 flex gap-2 transition-colors focus-within:border-border-strong'
 
 /**

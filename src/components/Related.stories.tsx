@@ -39,6 +39,8 @@ const meta = {
   component: Related,
   args: { related: { files: [TOPIC, SECOND], inside: {}, counts: { t1: 7, t2: 0 } } },
   // The page's reading column (Katerina, 29 September: 768px).
+  // Padded, not centred: in the centred layout a column has no width to take, and a short one shrank to its words.
+  parameters: { layout: 'padded' },
   decorators: [
     (Story) => (
       <div className="w-full max-w-3xl">

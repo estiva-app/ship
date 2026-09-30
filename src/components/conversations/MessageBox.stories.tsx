@@ -25,6 +25,8 @@ const meta = {
   title: 'Inputs/Message box',
   component: MessageBox,
   args: { onSubmit: fn(async () => true), drafts: noDrafts, upload: uploadAttachment },
+  // Padded, not centred: in the centred layout a column has no width to take, and a short one shrank to its words.
+  parameters: { layout: 'padded' },
   decorators: [
     (Story) => (
       <div className="w-full max-w-3xl">
