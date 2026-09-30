@@ -4,13 +4,19 @@ import StarterKit from '@tiptap/starter-kit'
 import { Extension } from '@tiptap/core'
 import { Selection } from '@tiptap/pm/state'
 import { IconArrowUp, IconPaperclip } from '@tabler/icons-react'
-import { blockDocumentToMarkerText, type Imeta } from '@estiva-app/protocol'
+import {
+  blockDocumentToMarkerText,
+  documentForEditing,
+  fromEditorDocument,
+  toEditorDocument,
+  type EditorDocument,
+  type Imeta,
+} from '@estiva-app/protocol'
 import { AttachmentCard, Avatar, Button, FieldLine, FilePicker, IconButton, Kbd, Toolbar, ToolbarButton, richTextClassName } from '@estiva-app/ui'
 import { SelectionToolbar, isSuggestionActive } from '@estiva-app/ui/editor'
 import { cn } from '@/lib/cn'
 import { browserDrafts, type DraftStore } from '@/lib/drafts'
 import { uploadAttachment } from '@/api/blobs'
-import { documentFor, fromEditorDocument, toEditorDocument, type EditorDocument } from '@/lib/blockEditor'
 import { ReferenceNode, ReferenceProvider } from '@/components/ui/editorSchema'
 import { LinkDecoration } from '@/components/editing/linkDecoration'
 import { DescriptionSlashMenu } from '@/components/editing/slashMenu'
@@ -27,7 +33,7 @@ const DEFAULT_DRAFTS = browserDrafts()
 /** What to call a file on its card. `filename` is what the sender attached. */
 const fileName = (file: Imeta) => file.filename ?? file.alt ?? 'attachment'
 
-const editorDocFor = (text: string) => toEditorDocument(documentFor(text, 'marker'))
+const editorDocFor = (text: string) => toEditorDocument(documentForEditing(text, 'marker'))
 const markerOf = (editor: Editor) => blockDocumentToMarkerText(fromEditorDocument(editor.getJSON() as EditorDocument))
 
 export interface MessageBoxProps {

@@ -3,12 +3,18 @@ import { EditorContent, useEditor, type Editor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import { TableKit } from '@tiptap/extension-table'
 import { TextSelection } from '@tiptap/pm/state'
-import type { ContentFormat, Imeta } from '@estiva-app/protocol'
+import {
+  documentForEditing,
+  publishableFromEditor,
+  toEditorDocument,
+  type ContentFormat,
+  type EditorDocument,
+  type Imeta,
+} from '@estiva-app/protocol'
 import { FieldLine, FilePicker, richTextClassName } from '@estiva-app/ui'
 import { SelectionToolbar } from '@estiva-app/ui/editor'
 import { uploadAttachment } from '@/api/blobs'
 import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
-import { documentFor, publishableFrom, toEditorDocument, type EditorDocument } from '@/lib/blockEditor'
 import { AttachmentNode, BlockId, ReferenceNode, ReferenceProvider, UnknownBlock } from '@/components/ui/editorSchema'
 import { LinkDecoration } from './linkDecoration'
 import { DescriptionSlashMenu } from './slashMenu'
@@ -86,7 +92,7 @@ export function LiveDescription({
   const save = useCallback(
     async (doc: EditorDocument | null) => {
       if (committing.current || !doc) return
-      const next = publishableFrom(doc)
+      const next = publishableFromEditor(doc)
       if (next.value === saved.current) return
       committing.current = true
       try {
@@ -99,6 +105,15 @@ export function LiveDescription({
     },
     [onCommit],
   )
+  /*
+    The latest `save`, for the editor's `onBlur` (created once) and the unmount
+    below. A cleanup keyed on `save` ran on every render a page's inline
+    `onDescribe` caused, publishing mid-typing (MAN-9, found in Peek's copy).
+  */
+  const latestSave = useRef(save)
+  useEffect(() => {
+    latestSave.current = save
+  }, [save])
 
   const editor = useEditor(
     {
@@ -113,7 +128,7 @@ export function LiveDescription({
         DescriptionSlashMenu.configure({ onFile: () => openPicker() }),
       ],
       // Built once. A value coming back must not rebuild the editor under the caret; see the effect below.
-      content: toEditorDocument(documentFor(value, format)),
+      content: toEditorDocument(documentForEditing(value, format)),
       editorProps: {
         attributes: { 'aria-label': 'Description', role: 'textbox', 'aria-multiline': 'true', class: richTextClassName('default', 'outline-none') },
         handleKeyDown: (view, event) => {
@@ -136,7 +151,7 @@ export function LiveDescription({
       },
       onBlur: () => {
         if (picking.current) return
-        void save(typed.current)
+        void latestSave.current(typed.current)
       },
     },
     [],
@@ -145,7 +160,7 @@ export function LiveDescription({
   // Someone else's edit: loaded while you are not in the field; your own save coming back is left alone.
   useEffect(() => {
     if (!editor || editor.isDestroyed || value === saved.current || editor.isFocused || committing.current) return
-    editor.commands.setContent(toEditorDocument(documentFor(value, format)), { emitUpdate: false })
+    editor.commands.setContent(toEditorDocument(documentForEditing(value, format)), { emitUpdate: false })
     saved.current = value
     typed.current = null
     setEmpty(value.trim() === '')
@@ -171,7 +186,7 @@ export function LiveDescription({
   }, [editor, onEditor])
 
   // Leaving the tab or the page unmounts this: save on the way out.
-  useEffect(() => () => void save(typed.current), [save])
+  useEffect(() => () => void latestSave.current(typed.current), [])
 
   return (
     <ReferenceProvider value={{ resolved, nameOf }}>
