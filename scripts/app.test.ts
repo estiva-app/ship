@@ -508,7 +508,8 @@ const allActions = (JSON.parse(buildManifest(PK, Date.now()).content) as {
 }).actions
 
 // Eleven since FOL-46 added archive-issue: archive is one field for every kind.
-check('the manifest declares eleven actions', allActions.length === 11, allActions.map((a) => a.id).join(', '))
+// Sixteen since MAN-4 added describe-*, move-issue, add-project and delete-project.
+check('the manifest declares sixteen actions', allActions.length === 16, allActions.map((a) => a.id).join(', '))
 for (const action of allActions) {
   // The problems are sentences naming the action, so a failure here says what
   // to write rather than which assertion index went red.
@@ -517,13 +518,12 @@ for (const action of allActions) {
 }
 
 /*
-  The destructive inventory is exactly one: deleting an issue (MAN-4). Asserted
-  as a list, not a count, so adding another — deleting a project, which also
-  unlists it from its Folder — is a deliberate act with a failing test in front
-  of it.
+  The destructive inventory is exactly two: deleting an issue and deleting a
+  project (MAN-4). Asserted as a list, not a count, so adding another is a
+  deliberate act with a failing test in front of it.
 */
 const destructive = allActions.filter((a) => a.effect === 'destructive').map((a) => a.id)
-check('the only destructive action is delete-issue', destructive.join() === 'delete-issue', destructive.join(', '))
+check('the destructive actions are delete-issue and delete-project', destructive.join() === 'delete-issue,delete-project', destructive.join(', '))
 
 /*
   The shapes a consumer turns into controls — MAN-4. Peek finds Rename by the
