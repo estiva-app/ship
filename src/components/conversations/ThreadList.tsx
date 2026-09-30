@@ -186,7 +186,7 @@ function RepliesButton({ count, open, newCount, onToggle }: { count: number; ope
   return (
     <div className="flex">
       <WithTooltip label={count === 0 ? label : open ? 'Hide replies' : 'Show replies'}>
-        {/* @estiva-escape(no-restyled-part): Button has no pressed state yet (IconButton has); a `pressed` Button is an estiva-ui candidate awaiting Katerina's call (30 September) */}
+        {/* @estiva-escape(no-restyled-part): Button has no pressed state yet (IconButton has); a `pressed` Button is tracked in UIG-47 */}
         <Button
           variant="outlined"
           size="small"
