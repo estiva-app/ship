@@ -126,5 +126,15 @@ for (const [kind, field] of [
   )
 }
 
+// What a consumer calls each one — Peek's file menu read "Delete topic" on an
+// issue until the manifest said (SPEC §7.9, PEE-41).
+for (const [kind, noun] of [
+  [KIND.PROJECT, 'project'],
+  [KIND.ISSUE, 'issue'],
+] as const) {
+  const declared = published.projections[String(kind)]?.noun
+  check(`kind:${kind} is called "${noun}"`, declared === noun, `declared ${JSON.stringify(declared)}`)
+}
+
 console.log(failures === 0 ? '\nAll slot-chain checks passed.' : `\n${failures} check(s) FAILED.`)
 process.exit(failures === 0 ? 0 : 1)

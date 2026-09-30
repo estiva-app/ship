@@ -159,6 +159,11 @@ export interface Projection {
    */
   widget: 'card' | 'row' | 'table' | 'stat'
   slots: Record<string, SlotSource | SlotSource[]>
+  /**
+   * What one of these is called, lower case and singular (SPEC §7.9, PEE-41).
+   * Peek's file menu said "Delete topic" on an issue until it could read this.
+   */
+  noun?: string
 }
 
 /** The manifest's `content`, parsed. */
@@ -237,6 +242,7 @@ export function manifestContent(): ManifestContent {
     projections: {
       [KIND.PROJECT]: {
         widget: 'card',
+        noun: 'project',
         slots: {
           // `name` first, `title` behind it. REW-11 renamed this tag on the
           // record, and a record published before that keeps `title` forever —
@@ -334,6 +340,7 @@ export function manifestContent(): ManifestContent {
       },
       [KIND.ISSUE]: {
         widget: 'row',
+        noun: 'issue',
         slots: {
           title: { tag: 'title' },
           // No `subtitle` — same reason as the project above (PRO-8). Peek's
