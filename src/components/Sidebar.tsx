@@ -171,7 +171,6 @@ export function Sidebar({ openIssues, issuesHref, projectsHref, projects, folder
       key={project.addr}
       label={project.title}
       href={project.href}
-      icon={<IconBox size={16} stroke={1.5} />}
       count={project.openCount}
       countLabel={`${project.openCount} open`}
       active={isProject && current.projectAddr === project.addr}
@@ -208,11 +207,11 @@ export function Sidebar({ openIssues, issuesHref, projectsHref, projects, folder
       ) : (
         <>
           {/*
-            Leaf's folders (Katerina, 30 September, option A): a quiet
-            "Folders" label, its + on the right for a new top-level Folder
-            (FOL-8), over the folders drawn as rows — a chevron and the name at
-            a row's weight — so the label never reads as one of them. The
-            projects sit indented under each folder's name.
+            A quiet "Folders" label, its + on the right for a new top-level
+            Folder (FOL-8), over the folders in the package's own group look —
+            white, small, the small chevron, the Sidebar's standard (Katerina,
+            30 September: never a look of Ship's own). The label is grey and
+            regular, the folders white and medium, so it never reads as one.
           */}
           <SectionHeader
             title="Folders"
@@ -222,10 +221,9 @@ export function Sidebar({ openIssues, issuesHref, projectsHref, projects, folder
             actions={onNewFolder ? [{ icon: <IconPlus size={16} stroke={1.5} />, tooltip: 'New folder', onClick: onNewFolder }] : []}
           />
           {teams.map((team) => (
-            <div key={team.id} data-sidebar-team={team.id} className="shrink-0">
+            <div key={team.id} data-sidebar-team={team.id} className="mt-2 shrink-0">
               <CollapsibleSection
                 title={team.name ?? team.id}
-                look="row"
                 storageKey={STORAGE.team(team.id)}
                 contentClassName="gap-px"
                 actions={
@@ -245,7 +243,7 @@ export function Sidebar({ openIssues, issuesHref, projectsHref, projects, folder
             (2026-09-29), so this fold is usually absent.
           */}
           {unfiled.length > 0 && (
-            <CollapsibleSection title="Not in a team" look="row" storageKey={STORAGE.unfiled} className="shrink-0" contentClassName="gap-px">
+            <CollapsibleSection title="Not in a team" storageKey={STORAGE.unfiled} className="mt-2 shrink-0" contentClassName="gap-px">
               {unfiled.map(row)}
             </CollapsibleSection>
           )}

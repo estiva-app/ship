@@ -470,6 +470,26 @@ async function main() {
     'a heading typed in the editor is drawn as a heading, while typing',
     (await editor.locator('h1').count()) === 1 && (await editor.locator('li').count()) === 2,
   )
+
+  /*
+    A link in the description opens on a click (Katerina, 30 September). The
+    description is always an editor, so nothing else makes its links links:
+    for a day they were only painted blue. window.open is caught rather than
+    followed, so no request leaves the stub.
+  */
+  await page.keyboard.press('Enter')
+  await page.keyboard.press('Enter')
+  await page.keyboard.type('notes at https://example.com/notes ')
+  await page.evaluate(() => {
+    const w = window as unknown as { __opened: string; open: (url: string) => null }
+    w.__opened = ''
+    w.open = (url: string) => ((w.__opened = url), null)
+  })
+  await editor.locator('[data-href]').first().click()
+  check(
+    'a link in the description opens on a click',
+    (await page.evaluate(() => (window as unknown as { __opened: string }).__opened)) === 'https://example.com/notes',
+  )
   const editingBox = await editor.boundingBox()
 
   // Leaving the field saves it; Escape leaves and keeps the text (Notion's Esc, Katerina 29 September).
