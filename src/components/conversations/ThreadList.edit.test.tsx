@@ -2,15 +2,15 @@
 /**
  * Editing a comment — CON-4.
  *
- * Two claims, and the second is the one a future reader will be tempted to
- * "fix" back: an edit is offered on **every** message, and an edited message
- * **says so**.
+ * Two claims: an edit is offered where the relay may accept it, and an edited
+ * message **says so**.
  *
  * The relay takes an edit from the target's effective author or the NIP-OA
  * owner of an authoring agent (`validate_edit_ownership`), and no client can
- * evaluate the second half. So an author gate here would hide the control from
- * the one other party the relay would accept — the same rule, and the same
- * mistake, as SPEC §6.5's withdrawn one for deletion.
+ * evaluate the second half. SPEC §6.5 as decided 2026-09-29 (CON-5): offered
+ * on the viewer's own message and on a `bot: true` author's, and on one whose
+ * profile could not be read; not on another human's, which the relay refuses
+ * every time. `offersEditAndDelete` in `@estiva-app/conversation` is the rule.
  */
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
@@ -62,7 +62,26 @@ const replace = (box: EditorBox, text: string) =>
 const save = () => screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement
 
 describe('the edit control', () => {
-  it('is offered on somebody else’s message, because the relay decides', () => {
+  const HUMAN = 'c'.repeat(64)
+  const as = (author: ThreadData['root']['author'], by: string): ThreadData => ({ ...thread, root: { ...thread.root, author, by } })
+  const menuOffered = () => screen.queryAllByRole('button', { name: 'Message actions' }).length > 0
+
+  it('is offered on an agent’s message — the viewer may be its owner', () => {
+    render(<ThreadListView threads={[as({ name: 'Claude', bot: true }, AGENT)]} onStart={() => true} onReply={() => true} viewer={HUMAN} onEditMessage={vi.fn()} onDeleteMessage={vi.fn()} />)
+    expect(menuOffered()).toBe(true)
+  })
+
+  it('is not offered on another human’s message, which the relay refuses every time', () => {
+    render(<ThreadListView threads={[as({ name: 'Somebody', bot: false }, AGENT)]} onStart={() => true} onReply={() => true} viewer={HUMAN} onEditMessage={vi.fn()} onDeleteMessage={vi.fn()} />)
+    expect(menuOffered()).toBe(false)
+  })
+
+  it('is offered on the viewer’s own message', () => {
+    render(<ThreadListView threads={[as({ name: 'Me', bot: false }, HUMAN)]} onStart={() => true} onReply={() => true} viewer={HUMAN} onEditMessage={vi.fn()} />)
+    expect(menuOffered()).toBe(true)
+  })
+
+  it('is offered when the author’s profile could not be read, because the relay decides', () => {
     open({ onEditMessage: vi.fn() })
     expect(screen.getAllByRole('button', { name: 'Message actions' })).toHaveLength(1)
     fireEvent.click(screen.getAllByRole('button', { name: 'Message actions' })[0])

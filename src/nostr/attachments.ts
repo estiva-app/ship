@@ -5,74 +5,17 @@
  * The tag is the whole of what travels: `url`, `m`, `x` (the sha256) and
  * `size`, with `dim`, `alt`, `thumb` and `filename` where the sender had them.
  *
- * ## Why this is not in `foldFolder`
- *
- * The same reason as `edits.ts`. `foldFolder` is a contract between this repo
- * and `estiva-agent`, held by `scripts/conformance.test.ts`, which compares the
- * recorded state walking the **union of keys** — so a `files` field on
- * `Message` turns both repos red at once. An attachment has to be visible as an
- * attachment, which means a field, which means it cannot live there.
- *
- * So this reads the raw events beside the fold, exactly as `edits.ts` and
- * `references.ts` do, and the page looks a message's files up by id.
- *
- * ## What SHI-1 asked for
- *
- * Katerina: *"Screenshots and reference widgets aren't rendered in conversation
- * or replies."* The reference half was fixed when `Conversations` learned to
- * draw a `nostr:` pointer as the object it names. The screenshot half could not
- * be fixed here at all until peek#177 — Peek's outbox published `content` and
- * nothing else, so an attachment stayed in Convex storage and no other reader
- * had an image to draw. It publishes `imeta` now, and this reads it.
- *
- * Parsing lives in `@estiva-app/protocol` (`imetaOf`), not here: the tag is a
- * wire format two apps read, and the relay refuses a malformed one, so a second
- * parser is a second set of refusals to get wrong.
+ * A message's attachment set — its own `imeta`, replaced by the latest edit
+ * carrying any — is `@estiva-app/conversation`'s `foldAttachments` (CON-5).
+ * What stays here is Ship's block document, which only Ship writes.
  */
-import type { Imeta, SignedEvent } from '@estiva-app/protocol'
-import { BLOCK_DOCUMENT_FORMAT, imetaOf } from '@estiva-app/protocol'
-import { editsByTarget } from './edits'
-import { KIND } from './kinds'
-
-/** Message id → its attachments, in the order the sender wrote them. */
-export type AttachmentIndex = Record<string, Imeta[]>
-
-/**
- * Read `imeta` off every message that carries one, then fold edits over it.
- *
- * A message's own set comes from the kinds the fold treats as messages. A
- * `kind:40003` edit MAY carry `imeta` too (RFC 0.4 §7.2.1, amended 2026-09-23,
- * CON-5): the set is that of the **latest edit carrying at least one**, in the
- * body fold's own order (`editsByTarget`, not a second ordering). An edit with
- * none leaves the set alone — every edit written before the amendment means
- * what it meant — and a set replaces, it never appends. An edit whose target
- * this reader cannot see is kept under the target's id, as `foldEdits` keeps it.
- *
- * Pure and event-shaped, so it runs in a test with no app around it, and so it
- * can move into `@estiva-app/conversation` (CON-5) rather than be rewritten.
- */
-export function foldAttachments(events: readonly SignedEvent[]): AttachmentIndex {
-  const out: AttachmentIndex = {}
-  for (const event of events) {
-    if (event.kind !== KIND.MESSAGE && event.kind !== KIND.COMMENT) continue
-    const files = imetaOf(event)
-    if (files.length > 0) out[event.id] = files
-  }
-  for (const [target, list] of editsByTarget(events)) {
-    for (let i = list.length - 1; i >= 0; i--) {
-      const files = imetaOf(list[i])
-      if (files.length === 0) continue
-      out[target] = files
-      break
-    }
-  }
-  return out
-}
+import type { Imeta } from '@estiva-app/protocol'
+import { BLOCK_DOCUMENT_FORMAT } from '@estiva-app/protocol'
 
 /**
  * The files a block document places inline — SPEC §13.3's `attachment` block.
  *
- * The other half of {@link foldAttachments}. A message carries its files as
+ * The other half of `foldAttachments`. A message carries its files as
  * `imeta` **tags** because its body is text; a description carries them as
  * blocks, because a block document has somewhere to put them and an
  * addressable sub-unit to put them at. Same fields either way, so a reader that

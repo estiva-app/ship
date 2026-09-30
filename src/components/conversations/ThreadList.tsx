@@ -5,7 +5,8 @@ import { Avatar, Button, Card, EmptyState, IconButton, Menu, MenuItem, Popover, 
 import { cn } from '@/lib/cn'
 import { ago } from '@/lib/time'
 import { draftKeys, type DraftStore } from '@/lib/drafts'
-import { REACTION_TARGET_LIMIT, type Reaction } from '@/api'
+import { offersEditAndDelete } from '@estiva-app/conversation'
+import { REACTION_HORIZON, me, type Reaction } from '@/api'
 import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
 import { Attachments as FileAttachments } from '@/components/ui/Attachment'
 import { BlockAnchorNote } from '@/components/ui/BlockAnchorNote'
@@ -218,12 +219,13 @@ interface ThreadProps {
   onEditMessage?: (messageId: string, body: string) => Promise<boolean | void> | boolean | void
   upload?: (file: File) => Promise<Imeta>
   drafts?: DraftStore
+  viewer?: string
 }
 
 /** Replies hang one step in, behind today's left rule. */
 const REPLY_RULE = 'ml-2.5 border-l-2 border-border-default pl-3'
 
-function Thread({ thread, onReply, disabledReason, unreadFrom, resolved, resolving, nameOf, reactionsBy, onReact, onDeleteMessage, onEditMessage, upload, drafts }: ThreadProps) {
+function Thread({ thread, onReply, disabledReason, unreadFrom, resolved, resolving, nameOf, reactionsBy, onReact, onDeleteMessage, onEditMessage, upload, drafts, viewer }: ThreadProps) {
   const unreadIndex = thread.replies.findIndex((r) => r.id === unreadFrom)
   const newCount = unreadIndex < 0 ? 0 : thread.replies.length - unreadIndex
   const [open, setOpen] = useState(newCount > 0)
@@ -233,12 +235,15 @@ function Thread({ thread, onReply, disabledReason, unreadFrom, resolved, resolvi
     setOpen(!open)
   }
   const common = { resolved, resolving, nameOf, disabledReason, drafts }
-  const toolsFor = (message: MessageData) => ({
-    reactions: reactionsBy?.[message.id],
-    onToggleReaction: onReact && ((emoji: string, mine?: string) => onReact(message.id, emoji, mine)),
-    onDelete: onDeleteMessage && (() => onDeleteMessage(message.id)),
-    onEdit: onEditMessage && ((body: string) => onEditMessage(message.id, body)),
-  })
+  const toolsFor = (message: MessageData) => {
+    const offered = offersEditAndDelete({ viewer, authorIsBot: message.author.bot, author: message.by ?? '' })
+    return {
+      reactions: reactionsBy?.[message.id],
+      onToggleReaction: onReact && ((emoji: string, mine?: string) => onReact(message.id, emoji, mine)),
+      onDelete: offered && onDeleteMessage ? () => onDeleteMessage(message.id) : undefined,
+      onEdit: offered && onEditMessage ? (body: string) => onEditMessage(message.id, body) : undefined,
+    }
+  }
 
   return (
     <Card fill="surface" className="flex flex-col gap-3 px-4 py-3" data-thread={thread.id}>
@@ -282,13 +287,14 @@ const threadProps = (p: ThreadListViewProps | MentionListViewProps) => ({
   onReact: p.onReact && ((id: string, emoji: string, mine?: string) => void p.onReact?.(id, emoji, mine)),
   onDeleteMessage: p.onDeleteMessage,
   onEditMessage: p.onEditMessage,
+  viewer: p.viewer,
   upload: p.upload,
   drafts: p.drafts,
 })
 
 /** The drawing, with the reads handed in — for a story, or a caller that has them. */
 export function ThreadListView(props: ThreadListViewProps) {
-  const { threads, onStart, disabledReason, className, unread, nameOf, about, omitted = 0, upload, drafts } = props
+  const { threads, onStart, disabledReason, className, unread, nameOf, about, omitted = 0, reactionsCut = false, upload, drafts } = props
   return (
     <div className={cn('flex flex-col gap-3', className)}>
       <MessageBox kind="conversation" onSubmit={onStart} disabledReason={disabledReason} draftKey={about && draftKeys.object(about)} drafts={drafts} upload={upload} nameOf={nameOf} />
@@ -305,9 +311,10 @@ export function ThreadListView(props: ThreadListViewProps) {
       )}
       {omitted > 0 && (
         <p className="text-caption text-text-muted">
-          Reactions are shown for the {REACTION_TARGET_LIMIT} most recent messages. {omitted} older {omitted === 1 ? 'message was' : 'messages were'} not checked.
+          Reactions are shown for the {REACTION_HORIZON} most recent messages. {omitted} older {omitted === 1 ? 'message was' : 'messages were'} not checked.
         </p>
       )}
+      {reactionsCut && <p className="text-caption text-text-muted">Some reactions may be missing.</p>}
     </div>
   )
 }
@@ -355,14 +362,14 @@ export function MentionListView(props: MentionListViewProps) {
  */
 export function ThreadList(props: ConversationsProps & Pick<ThreadListViewProps, 'upload' | 'drafts'>) {
   const { resolved, resolving } = useThreadReferences(props.threads)
-  const { reactionsBy, omitted, refresh } = useThreadReactions(props.threads)
+  const { reactionsBy, omitted, cut, refresh } = useThreadReactions(props.threads)
   const onReact = props.onReact
     ? async (messageId: string, emoji: string, mine?: string) => {
         await props.onReact?.(messageId, emoji, mine)
         refresh()
       }
     : undefined
-  return <ThreadListView {...props} onReact={onReact} resolved={resolved} resolving={resolving} reactionsBy={reactionsBy} omitted={omitted} />
+  return <ThreadListView {...props} onReact={onReact} resolved={resolved} resolving={resolving} reactionsBy={reactionsBy} omitted={omitted} reactionsCut={cut} viewer={props.viewer ?? me} />
 }
 
 /** "Mentioned in" with production's `Activity` props and its reads. */
@@ -376,5 +383,5 @@ export function MentionList(props: ActivityProps & Pick<MentionListViewProps, 'u
         refresh()
       }
     : undefined
-  return <MentionListView {...props} onReact={onReact} resolved={resolved} resolving={resolving} reactionsBy={reactionsBy} />
+  return <MentionListView {...props} onReact={onReact} resolved={resolved} resolving={resolving} reactionsBy={reactionsBy} viewer={props.viewer ?? me} />
 }

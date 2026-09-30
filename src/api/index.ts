@@ -32,12 +32,14 @@ export { conversationsAbout, projectFolders } from '../nostr/fold'
   second attaches permanently and by accident.
 */
 export { commentsOn, commentsOnAny, mentionsOf, attachmentOf, type Attachment, type AnchorIndex } from '../nostr/references'
-export { foldEdits, type Edit, type EditIndex } from '../nostr/edits'
-export { foldAttachments, type AttachmentIndex } from '../nostr/attachments'
-/* Reactions — SPEC §6.6. The horizon and the fold are in the data layer, where
-   they can move into the conversation package; the hook that calls them is the
-   app's. */
-export { REACTION_TARGET_LIMIT, REACTION_EMOJI, type Reaction, type ReactionsByTarget } from '../nostr/reactions'
+/* Edits, attachments and reactions — SPEC §6.6, §6.8. The folds and the
+   horizon are `@estiva-app/conversation`'s (CON-5); the hook that calls them
+   is the app's. */
+export type EditIndex = Record<string, EditFold>
+export type AttachmentIndex = Record<string, Imeta[]>
+/** Target event id → its reactions, most reacted first. */
+export type ReactionsByTarget = Record<string, Reaction[]>
+export { REACTION_HORIZON, REACTION_EMOJI, type Reaction } from '@estiva-app/conversation'
 export { useReactions } from './useReactions'
 export { useWorkspace } from './useWorkspace'
 export { useDirectory, type DirectoryView, type Person } from './useDirectory'
@@ -77,8 +79,8 @@ export {
 } from './writes'
 export { clockProblem } from './clock'
 import { signer, store } from './store'
-import { foldReactions } from '../nostr/reactions'
-import type { ReactionsByTarget } from '../nostr/reactions'
+import { groupReactions, type EditFold, type Reaction } from '@estiva-app/conversation'
+import type { Imeta } from '@estiva-app/protocol'
 
 
 /**
@@ -98,12 +100,25 @@ export function reloadFolders(previous: WorkspaceEvents, folders: string[]): Pro
 /**
  * Reactions on a set of messages, folded into counts — CON-2.
  *
- * Addressed by target because a `kind:7` carries no `h` (SPEC §6.6). The
- * viewer is passed here rather than read inside the fold, so the fold stays
- * pure and testable with no app around it.
+ * Addressed by target because a `kind:7` carries no `h` (SPEC §6.6), through
+ * the package's `decorationsOf`: the newest 100 targets by `created_at`, one
+ * per `(target, pubkey, emoji)`, and both cuts reported. Sorted most reacted
+ * first here, which §6.6 leaves to the app.
  */
-export function reactionsOn(eventIds: string[]): Promise<ReactionsByTarget> {
-  return store.reactionsFor(eventIds).then((events) => foldReactions(events, signer.pubkey))
+export async function reactionsOn(targets: readonly { id: string; at: number }[]): Promise<{
+  reactions: ReactionsByTarget
+  /** Targets past the horizon, not asked about. */
+  omitted: number
+  /** Whether the relay may hold reactions this read did not bring back. */
+  cut: boolean
+}> {
+  const decorations = await store.decorationsFor(targets)
+  const reactions = groupReactions(
+    Object.values(decorations.byId).flatMap((d) => d.reactions),
+    signer.pubkey,
+  )
+  for (const list of Object.values(reactions)) list.sort((a, b) => b.count - a.count)
+  return { reactions, omitted: decorations.reactionTargetsOmitted, cut: decorations.reactionEventsCut }
 }
 
 /** kind:0 profiles for a set of pubkeys — names and faces, never keys. */

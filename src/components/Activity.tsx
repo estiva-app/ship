@@ -69,6 +69,8 @@ export interface ActivityItem {
 
 export interface ActivityProps {
   items: ActivityItem[]
+  /** The viewer's pubkey, for §6.5's Edit and Delete rule — see `ConversationsProps.viewer`. */
+  viewer?: string
   onReply: (threadId: string, text: string, files: readonly Imeta[]) => Promise<boolean | void> | boolean | void
   /** Why nothing can be posted right now — every composer here is disabled with it. */
   disabledReason?: string

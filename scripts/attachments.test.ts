@@ -8,7 +8,8 @@
  */
 import type { SignedEvent } from '@estiva-app/protocol'
 import { imetaTag } from '@estiva-app/protocol'
-import { attachmentsInDocument, foldAttachments } from '../src/nostr/attachments'
+import { foldAttachments } from '@estiva-app/conversation'
+import { attachmentsInDocument } from '../src/nostr/attachments'
 import { KIND } from '../src/nostr/kinds'
 
 let passed = 0

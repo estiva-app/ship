@@ -23,7 +23,7 @@ import { buildChange, buildConversationMessage, buildIssue, buildProject } from 
 import { buildManifest } from '../src/nostr/manifest'
 import { KIND } from '../src/nostr/kinds'
 import { foldFolder, projectFolders, type Change, type Project } from '../src/nostr/fold'
-import { foldAttachments } from '../src/nostr/attachments'
+import { foldAttachments } from '@estiva-app/conversation'
 import { directoryFrom, initials, parseProfile } from '../src/nostr/profiles'
 import type { SignedEvent } from '@estiva-app/protocol'
 import { actionProblems } from '@estiva-app/interop'

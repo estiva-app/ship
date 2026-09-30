@@ -72,6 +72,8 @@ export interface ThreadListViewProps extends ConversationsProps {
   reactionsBy?: Record<string, readonly Reaction[]>
   /** Messages past the reactions horizon — CON-1. */
   omitted?: number
+  /** The reaction read came back at the relay's page ceiling, so some may be missing — SPEC §6.6. */
+  reactionsCut?: boolean
   /** The upload behind attach. Injected so a story needs no relay. */
   upload?: (file: File) => Promise<Imeta>
   /** Where unsent text is kept — CON-10. Injected so a test needs no browser. */
