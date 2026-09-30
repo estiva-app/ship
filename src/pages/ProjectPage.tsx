@@ -49,6 +49,9 @@ import { go, href, type ProjectView as ProjectViewName } from '../router'
 import { act, type Say } from './act'
 import { hrefForIssue, rowFor } from './IssuesPage'
 import { MoveProject } from '@/components/MoveProject'
+import { ArchiveDialog } from '@/components/ArchiveDialog'
+import { ArchivedNotice } from '@/components/ArchivedNotice'
+import { ownArchive, type Archives } from '@/lib/archive'
 
 export type { Say } from './act'
 
@@ -304,6 +307,7 @@ export function ProjectPage({
   state,
   directory,
   teams,
+  archives,
   d,
   view,
   say,
@@ -311,6 +315,8 @@ export function ProjectPage({
 }: {
   state: WorkspaceState
   directory: DirectoryView
+  /** What is archived, and what with — FOL-46. */
+  archives: Archives
   /**
    * The top-level Folders, so a project filed into one is not given that
    * Folder's chat (`recordChannel`), and so the rail can name the one it is in
@@ -325,17 +331,22 @@ export function ProjectPage({
   refresh: (folders?: string[]) => Promise<void>
 }) {
   const project = state.projects.find((candidate) => candidate.id === d)
-  const [dialog, setDialog] = useState<'issue' | 'delete' | 'move' | null>(null)
+  const [dialog, setDialog] = useState<'issue' | 'delete' | 'move' | 'archive' | null>(null)
 
   const issues = useMemo<IssuesTableRow[]>(() => {
     if (!project) return []
+    // An issue archived on its own is out of the list (FOL-46); one archived
+    // only with this project is the project's, and on its page.
     return state.issues
-      .filter((issue) => issue.projectAddr === project.addr)
+      .filter((issue) => {
+        const archive = archives.ofIssue(issue)
+        return issue.projectAddr === project.addr && (!archive || !!archive.with)
+      })
       .map((issue) => {
         const touched = state.activity.filter((change) => change.target === issue.addr).at(-1)
         return { ...rowFor(issue, state, directory), openedBy: directory.personOf(issue.author), at: touched?.createdAt ?? issue.createdAt }
       })
-  }, [project, state, directory])
+  }, [project, state, directory, archives])
 
   const activity = useMemo(
     () => (project ? activityFor(project.addr, state, directory) : { items: [], truncated: 0 }),
@@ -444,17 +455,34 @@ export function ProjectPage({
 
   const done = issues.filter((issue) => issue.status === 'done').length
   const set = (field: 'title' | 'description' | 'status' | 'lead', value: string, note: string, contentFormat?: string) => act(note, () => setProjectField(project, field, value, note, contentFormat), say, refresh)
+  // Its own archive, which the rail toggles; and the one the page shows, which may be its team's (FOL-46).
+  const own = ownArchive(project, state.activity)
+  const archive = archives.ofProject(project.addr)
+  const unarchive = () =>
+    void act('Unarchive', () => archiveProject(project, false), say, refresh).then((ok) => {
+      if (ok) say('Project restored')
+    })
 
   return (
     <>
       <ProjectView
+        archivedNotice={
+          archive && (
+            <ArchivedNotice
+              archive={archive}
+              nameOf={directory.nameOf}
+              onUnarchive={unarchive}
+              {...(archive.with?.id ? { onOpenParent: () => go({ name: 'folder', id: archive.with!.id! }) } : {})}
+            />
+          )
+        }
         crumbs={{ projectsHref: href({ name: 'projects', archived: false }), title: project.title }}
         header={{
           title: project.title,
           description: project.description,
           descriptionFormat: project.descriptionFormat,
           nameOf: directory.nameOf,
-          archived: project.archived,
+          archived: !!archive,
           onRename: (value) => set('title', value, 'Rename'),
           onDescribe: (value, contentFormat) => set('description', value, 'Description', contentFormat),
         }}
@@ -565,10 +593,10 @@ export function ProjectPage({
               : placedIn({ addr: project.addr, folder: project.contentFolder }, teams).map((folder) => ({ name: folder.name ?? 'Untitled Folder', href: href({ name: 'folder', id: folder.id }) }))),
           // Only once there are Folders to move between (FOL-7).
           ...(teams?.length ? { onMove: () => setDialog('move') } : {}),
-          onArchive: () =>
-            void act(project.archived ? 'Unarchive' : 'Archive', () => archiveProject(project, !project.archived), say, refresh).then((ok) => {
-              if (ok) say(project.archived ? 'Project restored' : 'Project archived')
-            }),
+          // Archiving asks first — it hides the issues too; restoring does not need to (FOL-46).
+          // The rail says the project's own state: archived with its team, there is nothing here to unarchive.
+          archived: !!own,
+          onArchive: () => (own ? unarchive() : setDialog('archive')),
           onDelete: () => setDialog('delete'),
         }}
       />
@@ -592,6 +620,20 @@ export function ProjectPage({
       )}
 
       {dialog === 'move' && teams && <MoveProject project={project} teams={teams} say={say} onClose={() => setDialog(null)} />}
+
+      {dialog === 'archive' && (
+        <ArchiveDialog
+          title={project.title}
+          what="project"
+          hides={issues.length ? [`its ${issues.length} ${issues.length === 1 ? 'issue' : 'issues'}`] : []}
+          onClose={() => setDialog(null)}
+          onArchive={async (resolution) => {
+            const ok = await act('Archive', () => archiveProject(project, true, resolution || undefined), say, refresh)
+            if (ok) say('Project archived')
+            return ok
+          }}
+        />
+      )}
 
       {dialog === 'delete' && (
         <ConfirmDialog

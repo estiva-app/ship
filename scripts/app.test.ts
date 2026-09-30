@@ -507,7 +507,9 @@ const allActions = (JSON.parse(buildManifest(PK, Date.now()).content) as {
   actions: { id: string; effect?: string }[]
 }).actions
 
-check('the manifest declares fifteen actions', allActions.length === 15, allActions.map((a) => a.id).join(', '))
+// Eleven since FOL-46 added archive-issue: archive is one field for every kind.
+// Sixteen since MAN-4 added describe-*, move-issue, add-project and delete-project.
+check('the manifest declares sixteen actions', allActions.length === 16, allActions.map((a) => a.id).join(', '))
 for (const action of allActions) {
   // The problems are sentences naming the action, so a failure here says what
   // to write rather than which assertion index went red.

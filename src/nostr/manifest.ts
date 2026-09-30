@@ -604,6 +604,22 @@ export function manifestContent(): ManifestContent {
         emits: { kind: KIND.CHANGE, field: 'archived' },
         input: { type: 'string', enum: 'archived' },
       },
+      /*
+        The same field on an issue (FOL-46): archive is one concept for every
+        file. A project's issues are archived with it when read, so this is for
+        the one issue that is finished with while its project is not.
+      */
+      {
+        id: 'archive-issue',
+        label: 'Archive',
+        description:
+          'Take one issue out of every list once nobody needs to see it, or bring it back: `true` archives, an ' +
+          'empty value restores. Nothing is deleted — a link still opens it — and its project stays where it is.',
+        effect: 'writes',
+        appliesTo: String(KIND.ISSUE),
+        emits: { kind: KIND.CHANGE, field: 'archived' },
+        input: { type: 'string', enum: 'archived' },
+      },
       {
         id: 'delete-issue',
         label: 'Delete',

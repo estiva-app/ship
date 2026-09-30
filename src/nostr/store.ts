@@ -26,7 +26,7 @@ import {
   projectAddr,
 } from './events'
 import { findNaddrs, naddrToAddr, buildReaction, buildEdit, buildDeletion as buildEventDeletion } from '@estiva-app/protocol'
-import { planCreateFolder, planMoveFile, planPlaceFile, planRenameFolder, planUnlistFile, type FolderRef, type MoveRefusal } from '@estiva-app/interop'
+import { planArchiveFolder, planCreateFolder, planMoveFile, planPlaceFile, planRenameFolder, planUnlistFile, type FolderRef, type MoveRefusal } from '@estiva-app/interop'
 import { foldFolder, projectFolders, type FolderState } from './fold'
 import { anchorIndex, type AnchorIndex } from './references'
 import { foldEdits, type EditIndex } from './edits'
@@ -370,19 +370,52 @@ export class Store {
    * A change event, so it is reversible, attributable and available to anyone
    * in the Folder rather than only the project's author. This is the operation
    * that should be reached for; `deleteProject` is the narrow one.
+   *
+   * `resolution` is what the person archiving said about it (FOL-46), carried
+   * as the change's `content` — one event, so it cannot land without the
+   * archive. It replaces the `archived` / `unarchived` placeholder notes, which
+   * nothing ever displayed. The project's issues are archived with it when
+   * read; nothing is written to them.
    */
   archiveProject(args: {
     recordFolder: string
     project: string
     archived: boolean
+    resolution?: string
   }): Promise<PublishResult> {
     return this.setField({
       folder: args.recordFolder,
       target: args.project,
       field: 'archived',
       value: args.archived ? 'true' : '',
-      note: args.archived ? 'archived' : 'unarchived',
+      note: args.archived ? (args.resolution ?? '') : '',
     })
+  }
+
+  /**
+   * Hide one issue from the lists, or bring it back — FOL-46. The same field
+   * and shape as a project's, written into the issue's own Folder where its
+   * status lives.
+   */
+  archiveIssue(args: { folder: string; issue: string; archived: boolean; resolution?: string }): Promise<PublishResult> {
+    return this.setField({
+      folder: args.folder,
+      target: args.issue,
+      field: 'archived',
+      value: args.archived ? 'true' : '',
+      note: args.archived ? (args.resolution ?? '') : '',
+    })
+  }
+
+  /**
+   * Archive a Folder, or restore it — FOL-46. A change on the Folder's own
+   * address (`FolderSummary.channel`), published into it; never a `kind:9008`,
+   * which hides everything under its `h` for good.
+   */
+  async archiveFolder(args: { folder: string; channel: string; archived: boolean; resolution?: string }): Promise<PublishResult> {
+    assertFolderId(args.folder)
+    const [change] = planArchiveFolder(this.signer.pubkey, Date.now(), args)
+    return this.publish(change)
   }
 
   /**
