@@ -24,6 +24,8 @@ const meta = {
   title: 'Conversations/Conversations',
   component: Conversations,
   // The page's reading column.
+  // Padded, not centred: in the centred layout a column has no width to take, and a short one shrank to its words.
+  parameters: { layout: 'padded' },
   decorators: [
     (Story) => (
       <div className="w-full max-w-3xl">
