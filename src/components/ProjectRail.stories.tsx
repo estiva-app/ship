@@ -27,7 +27,7 @@ const meta = {
     onLeadChange: fn(),
     done: 10,
     total: 14,
-    folders: [{ name: 'Ship', href: '/folder/5c1e2a7b-9d40-4f3a-8e6b-2f0c7d1a9b34' }],
+    folders: [{ name: 'Ship', href: '/app/folder/5c1e2a7b-9d40-4f3a-8e6b-2f0c7d1a9b34' }],
     onMove: fn(),
     archived: false,
     onArchive: fn(),
@@ -63,7 +63,7 @@ export const NoFolder: Story = { args: { folders: [] } }
 export const InTwoFolders: Story = {
   args: {
     folders: [
-      { name: 'Ship', href: '/folder/5c1e2a7b-9d40-4f3a-8e6b-2f0c7d1a9b34' },
+      { name: 'Ship', href: '/app/folder/5c1e2a7b-9d40-4f3a-8e6b-2f0c7d1a9b34' },
       { name: 'Peek', href: '/folder/11111111-2222-4333-8444-555555555555' },
     ],
   },

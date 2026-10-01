@@ -30,12 +30,12 @@ describe('ProjectRail', () => {
   )
 
   it('lays out production’s rail: the four properties, the progress words, the Folder by name, and every action as a small button', () => {
-    const { container } = render(rail([{ name: 'Ship', href: `/folder/${FOLDER}` }]))
+    const { container } = render(rail([{ name: 'Ship', href: `/app/folder/${FOLDER}` }]))
     for (const label of ['Status', 'Assignee', 'Progress', 'Folder']) expect(screen.getByText(label)).toBeInTheDocument()
     expect(screen.getByRole('progressbar', { name: 'Issues done' })).toHaveAttribute('aria-valuenow', '10')
     expect(screen.getByText('10 of 14 done')).toBeInTheDocument()
     // The Folder it is in, by name, opening that Folder's page (FOL-3).
-    expect(screen.getByRole('link', { name: 'Ship' })).toHaveAttribute('href', `/folder/${FOLDER}`)
+    expect(screen.getByRole('link', { name: 'Ship' })).toHaveAttribute('href', `/app/folder/${FOLDER}`)
     // The assignee select shows the chosen person's face before the name.
     expect(screen.getByRole('combobox', { name: 'Assignee' }).querySelector('svg')).not.toBeNull()
     for (const name of ['Archive project', 'Delete project']) expect(screen.getByRole('button', { name })).toHaveClass('h-6')
@@ -57,14 +57,14 @@ describe('ProjectRail', () => {
 
   it('"Move to Folder…" sits under the Folder once the Folders are read, in none as well as in one (FOL-7)', () => {
     const onMove = vi.fn()
-    const { rerender } = render(rail([{ name: 'Ship', href: `/folder/${FOLDER}` }], onMove))
+    const { rerender } = render(rail([{ name: 'Ship', href: `/app/folder/${FOLDER}` }], onMove))
     fireEvent.click(screen.getByRole('button', { name: 'Move to Folder…' }))
     expect(onMove).toHaveBeenCalled()
     rerender(rail([], onMove))
     expect(screen.getByRole('button', { name: 'Move to Folder…' })).toBeInTheDocument()
     rerender(rail(undefined, onMove))
     expect(screen.queryByRole('button', { name: 'Move to Folder…' })).not.toBeInTheDocument()
-    rerender(rail([{ name: 'Ship', href: `/folder/${FOLDER}` }]))
+    rerender(rail([{ name: 'Ship', href: `/app/folder/${FOLDER}` }]))
     expect(screen.queryByRole('button', { name: 'Move to Folder…' })).not.toBeInTheDocument()
   })
 })
@@ -125,7 +125,7 @@ describe('a write control that cannot succeed says why', () => {
         onLeadChange={vi.fn()}
         done={10}
         total={14}
-        folders={[{ name: 'Ship', href: `/folder/${FOLDER}` }]}
+        folders={[{ name: 'Ship', href: `/app/folder/${FOLDER}` }]}
         archived={false}
         onArchive={onArchive}
         onDelete={onDelete}

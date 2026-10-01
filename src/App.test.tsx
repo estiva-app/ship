@@ -255,7 +255,7 @@ describe('Project page — one project from the fold', () => {
     expect(main.getByText('reply')).toBeInTheDocument()
     expect(main.getByRole('combobox', { name: 'Status' })).toBeEnabled()
     // The Folder it is in, by name — the one whose state lists it — and no pairing (FOL-3).
-    expect(main.getByRole('link', { name: 'Ship' })).toHaveAttribute('href', '/folder/3167adea-877f-43c4-96fb-517a2b2d5d24')
+    expect(main.getByRole('link', { name: 'Ship' })).toHaveAttribute('href', '/app/folder/3167adea-877f-43c4-96fb-517a2b2d5d24')
     expect(main.queryByRole('button', { name: /Folder link|Pair/ })).not.toBeInTheDocument()
     expect(main.getByRole('button', { name: /Archive project/ })).toBeEnabled()
     /*
@@ -483,7 +483,7 @@ describe('before the first read lands', () => {
     relay is busy.
   */
   it('draws a Folder page without waiting for the workspace', () => {
-    goTo(`/folder/${D('90')}`)
+    goTo(`/app/folder/${D('90')}`)
     vi.mocked(useWorkspace).mockReturnValue({ state: null, error: null, loading: true, busy: false, refresh, live: false })
     const { container, unmount } = render(<App />)
     expect(container.querySelector('[data-loading="workspace"]')).toBeNull()

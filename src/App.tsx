@@ -12,6 +12,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { reloadFolders, topLevelFolders, useFolders } from '@/api/useFolders'
 import { NewFolderDialog } from '@/components/NewFolderDialog'
 import { FolderPage } from '@/pages/FolderPage'
+import { HandoffPage } from '@/pages/HandoffPage'
 import { IssuePage } from '@/pages/IssuePage'
 import { IssuesPage } from '@/pages/IssuesPage'
 import { ProjectPage } from '@/pages/ProjectPage'
@@ -205,6 +206,8 @@ function Page({ route, state, loading, directory, teams, folders, archives, say,
     files load (UIG-14 C8). The workspace's skeleton used to sit there first.
   */
   if (route.name === 'folder') return <FolderPage id={route.id} folders={folders} nameOf={directory.nameOf} say={say} />
+  // Another app's file is not Ship's fold either: it resolves on its own (PRO-22).
+  if (route.name === 'elsewhere') return <HandoffPage word={route.word} fileRef={route.ref} query={route.query} />
   if (!state && loading) return <PageSkeleton shape={SKELETON[route.name] ?? 'rows'} />
   if (!state || !archives) return null
   switch (route.name) {
@@ -258,7 +261,10 @@ export function sidebarProps(
       ? { projectAddr: projects.find((p) => p.id === route.d)?.addr ?? '' }
       : route.name === 'folder'
         ? { folderId: route.id }
-        : route.name === 'projects' ? ('projects' as const) : ('issues' as const)
+        : route.name === 'elsewhere'
+          ? // Another app's file is none of the sidebar's places, so none is lit.
+            { projectAddr: '' }
+          : route.name === 'projects' ? ('projects' as const) : ('issues' as const)
   return {
     openIssues,
     issuesHref: href({ name: 'issues' }),
@@ -313,7 +319,8 @@ function useBanner(showToast: (options: ToastOptions) => void) {
 function useCanonicalPath(route: Route) {
   useEffect(() => {
     if (route.name === 'inbound') return
-    if (location.pathname === '/' || location.pathname === '') replace(route)
+    // `/app` too: the root of Ship's own pages, which has none of its own (PRO-22).
+    if (location.pathname === '/' || location.pathname === '' || /^\/app\/?$/.test(location.pathname)) replace(route)
   }, [route])
 }
 
