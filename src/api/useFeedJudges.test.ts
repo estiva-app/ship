@@ -52,10 +52,17 @@ beforeEach(() => {
 describe("a file's members, read from public events", () => {
   it('asks for the file in one request: its changes, its stream, and the mute list', () => {
     const filters = feedFactsFilters(FILE, ME)
-    expect(filters).toHaveLength(3)
+    expect(filters).toHaveLength(4)
     expect(filters[0]).toMatchObject({ kinds: [1851], '#a': [FILE] })
     expect(filters[1]).toMatchObject({ kinds: [1111], '#A': [FILE] })
-    expect(filters[2]).toMatchObject({ kinds: [30078], authors: [ME], '#d': [MUTED_D_TAG] })
+    expect(filters[2]).toMatchObject({ kinds: [1111], '#a': [FILE] })
+    expect(filters[3]).toMatchObject({ kinds: [30078], authors: [ME], '#d': [MUTED_D_TAG] })
+  })
+
+  it('makes you a member from a comment that carries only a lowercase a, and holds a repeated event once', async () => {
+    const legacy = event(1111, ME, 1500, [['a', FILE]], 'hi')
+    const { membership } = await facts([legacy, legacy])
+    expect(membership).toEqual({ member: true, since: 1500 })
   })
 
   it('makes the person who created the file a member from its creation', async () => {
@@ -92,18 +99,25 @@ describe("a file's members, read from public events", () => {
 describe('the mute list is read, not written', () => {
   it('mutes what the list names', async () => {
     const { muted } = await facts([mutedList([FILE])])
-    expect(muted.has(FILE)).toBe(true)
+    expect(muted?.has(FILE)).toBe(true)
   })
 
-  it('mutes nothing when there is no list, or it will not decrypt', async () => {
-    expect((await facts([])).muted.size).toBe(0)
+  it('mutes nothing when there is no list', async () => {
+    expect((await facts([])).muted?.size).toBe(0)
+  })
+
+  it('says the mutes are unknown, not none, when the list will not decrypt, and does not ask again at once', async () => {
     const broken = event(30078, ME, 5000, [['d', MUTED_D_TAG]], 'not a cipher')
-    expect((await facts([broken])).muted.size).toBe(0)
+    expect((await facts([broken])).muted).toBeUndefined()
+    expect((await facts([broken])).muted).toBeUndefined()
+    expect(decrypt).toHaveBeenCalledTimes(1)
+    // A different list is tried straight away.
+    expect((await facts([mutedList([FILE], 6000)])).muted?.has(FILE)).toBe(true)
   })
 
   it("ignores somebody else's list", async () => {
     const theirs = { ...mutedList([FILE]), pubkey: ELSE }
-    expect((await facts([theirs])).muted.size).toBe(0)
+    expect((await facts([theirs])).muted?.size).toBe(0)
   })
 
   it('decrypts a list once, not on every refresh', async () => {

@@ -21,17 +21,16 @@
  * is about, so what it needs is that one file's fold. The discovery query is
  * the right call the day Ship gets a list that lights.
  *
- * ## The channel is not folded
+ * ## The channel has nothing to read
  *
- * A Folder's general stream takes its members from the roster, which is the
- * relay's. A project page draws its record channel's chat only for somebody who
- * can read that Folder, so the reader is judged a member of it. The roster
- * carries no join time, so without a marker nothing in the channel counts
- * (`floor` beyond every `created_at`) — the quiet first run this feed has
- * always had; a message that names you still counts, and the page's marker
- * takes over after the first visit.
+ * A Folder has no read or unread (Miky, 2026-10-01): nobody is a member of its
+ * own chat, so the project page's record channel is judged with `member: false`
+ * and lights only for a message that names you — as in Peek. With no marker
+ * (`floor` beyond every `created_at`) not even that counts, the quiet first
+ * run this feed has always had; the page's marker takes over after the first
+ * visit.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   MUTED_D_TAG,
   membershipOf,
@@ -76,9 +75,18 @@ function rootOf(file: FeedFile): Pick<SignedEvent, 'id' | 'pubkey' | 'kind' | 'c
   }
 }
 
-/** The relay filters one page's facts need, in one request. */
+/**
+ * The relay filters one page's facts need, in one request. The stream is asked
+ * for by `#A` (a reply drops the lowercase `a`) and by `#a`, because a comment
+ * with no `A` anchors every `a` it has (`candidateFilesOf`).
+ */
 export function feedFactsFilters(file: string, me: string): Record<string, unknown>[] {
-  return [{ kinds: [KIND.CHANGE], '#a': [file] }, { kinds: [KIND.COMMENT], '#A': [file] }, mutedFilter(me)]
+  return [
+    { kinds: [KIND.CHANGE], '#a': [file] },
+    { kinds: [KIND.COMMENT], '#A': [file] },
+    { kinds: [KIND.COMMENT], '#a': [file] },
+    mutedFilter(me),
+  ]
 }
 
 /** The newest mute-list event, which is the whole list (§12.3: last write wins). */
@@ -91,33 +99,47 @@ function newestMuted(events: readonly SignedEvent[], me: string): SignedEvent | 
 /** What the last decrypted mute list said, so an unchanged list costs no `/nip44/decrypt`. */
 let mutedCache: { eventId: string; keys: ReadonlySet<string> } | undefined
 
+/** A list that would not decrypt, and when: tried again after {@link MUTED_RETRY_MS}, not on every refresh. */
+let mutedFailed: { eventId: string; at: number } | undefined
+const MUTED_RETRY_MS = 120_000
+
 /** Test seam. */
 export function resetFeedFactsForTests(): void {
   mutedCache = undefined
+  mutedFailed = undefined
 }
 
 /**
- * Membership of `file` for `me`, and the keys `me` has muted. A mute list that
- * will not decrypt mutes nothing: quiet is the wrong way to be wrong only for a
- * person who asked for it, and nothing here says they did.
+ * Membership of `file` for `me`, and the keys `me` has muted. `muted` is
+ * `undefined` when a list exists and could not be read (the `429` from
+ * `/nip44/decrypt` is the usual cause): unreadable is not empty, so the caller
+ * keeps what it knew, or holds back its verdict, rather than light a file the
+ * person muted.
  */
 export async function readFeedFacts(
   query: QueryFn,
   decrypt: (ciphertext: string) => Promise<string | undefined>,
   file: FeedFile,
   me: string,
-): Promise<{ membership: Membership; muted: ReadonlySet<string> }> {
-  const events = await query(feedFactsFilters(file.addr, me))
+): Promise<{ membership: Membership; muted: ReadonlySet<string> | undefined }> {
+  // The same comment can answer two of the filters; the fold counts events, so each is held once.
+  const events = [...new Map((await query(feedFactsFilters(file.addr, me))).map((e) => [e.id, e])).values()]
   const membership = membershipOf(file.addr, me, [rootOf(file), ...events])
 
   const list = newestMuted(events, me)
   if (!list) {
     mutedCache = undefined
+    mutedFailed = undefined
     return { membership, muted: NO_MUTES }
   }
   if (mutedCache?.eventId !== list.id) {
+    if (mutedFailed?.eventId === list.id && Date.now() - mutedFailed.at < MUTED_RETRY_MS) return { membership, muted: undefined }
     const parsed = parseMutedBlob((await decrypt(list.content)) ?? '')
-    if (!parsed) return { membership, muted: mutedCache?.keys ?? NO_MUTES }
+    if (!parsed) {
+      mutedFailed = { eventId: list.id, at: Date.now() }
+      return { membership, muted: undefined }
+    }
+    mutedFailed = undefined
     mutedCache = { eventId: list.id, keys: new Set(parsed.keys) }
   }
   return { membership, muted: mutedCache.keys }
@@ -139,12 +161,24 @@ export function useFeedJudges(file: FeedFile | undefined, channel: string | unde
   const addr = file?.addr
   const createdAt = file?.createdAt
   const [facts, setFacts] = useState<{ addr: string; membership: Membership; muted: ReadonlySet<string> }>()
+  /* The file the page is about now: a read for the one it just left must not replace the new one's facts. */
+  const current = useRef(addr)
+  useEffect(() => {
+    current.current = addr
+  }, [addr])
 
   const load = useCallback(async () => {
     if (addr === undefined || createdAt === undefined || !signedIn()) return
     try {
       const read = await readFeedFacts((filters) => relay.queryAll(filters), (c) => nip44.decrypt(c), { addr, createdAt }, signer.pubkey)
-      setFacts({ addr, ...read })
+      if (current.current !== addr) return
+      const { muted } = read
+      // An unreadable mute list keeps the mutes this file was last judged with, and with none yet the page holds back its verdict.
+      setFacts((held) => {
+        const kept = held?.addr === addr ? held.muted : undefined
+        const known = muted ?? kept
+        return known ? { addr, membership: read.membership, muted: known } : held
+      })
     } catch (error) {
       console.warn('[unread] could not read membership:', error)
     }
@@ -161,7 +195,7 @@ export function useFeedJudges(file: FeedFile | undefined, channel: string | unde
     return {
       file: { stream: facts.addr, me, member: facts.membership.member, since: facts.membership.since, muted: facts.muted.has(facts.addr) },
       channel: channel
-        ? { stream: channel, me, member: true, muted: facts.muted.has(channel), floor: Number.MAX_SAFE_INTEGER }
+        ? { stream: channel, me, member: false, muted: facts.muted.has(channel), floor: Number.MAX_SAFE_INTEGER }
         : undefined,
     }
   }, [facts, addr, channel])
