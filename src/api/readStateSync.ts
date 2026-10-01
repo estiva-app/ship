@@ -28,14 +28,61 @@ import { relay, signer } from './store'
 import { nip44 } from './nip44'
 import { signedIn } from '../auth/estivaId'
 import {
-  advanceContexts,
-  fetchMergedReadState,
-  loadSlotIdentity,
+  READ_STATE_HORIZON_DAYS,
+  advanceContexts as advance,
+  fetchReadState,
+  loadSlotIdentity as loadSlot,
   publishReadState,
   readStateDTag,
+  rotateSlotId,
   toContextSeconds,
+  type FetchedReadState,
+  type QueryFn,
   type SlotIdentity,
-} from './readState'
+} from '@estiva-app/conversation'
+
+/*
+  NIP-RS itself — the context grammar, the blob, the byte cap, the merge, the
+  slot's identity, the fetch and the publish — is `@estiva-app/conversation`'s
+  (CON-19), so Ship and Peek write the same blob by construction. What stays
+  here is Ship's own: where its slot is kept, what it is called, and the queue.
+*/
+
+/** Ship's slot, kept apart from anything else this app stores. Changing it gives every Ship user a fresh slot. */
+export const SLOT_STORAGE_KEY = 'ship.readstate.slot'
+
+/** Names Ship in a new `client_id`: `ship-1a2b3c4d`. Existing slots keep the one they have. */
+const CLIENT_PREFIX = 'ship'
+
+const random = (n: number): Uint8Array => crypto.getRandomValues(new Uint8Array(n))
+
+function safeStorage(): Storage | undefined {
+  try {
+    return typeof localStorage === 'undefined' ? undefined : localStorage
+  } catch {
+    return undefined
+  }
+}
+
+/** This installation's slot, minted once and reused. `localStorage`, never `sessionStorage`: a slot that dies with the tab piles up slots. */
+export function loadSlotIdentity(storage: Storage | undefined = safeStorage()): SlotIdentity {
+  return loadSlot({ storage, storageKey: SLOT_STORAGE_KEY, clientPrefix: CLIENT_PREFIX, random })
+}
+
+/** The relay, as the package's reads take it. */
+const query: QueryFn = (filters) => relay.query(filters as never)
+
+/** Everything the relay holds of the person's read state, merged. Ship keeps no cache behind it. */
+function loadReadState(): Promise<FetchedReadState> {
+  return fetchReadState(query, signer.pubkey, nip44, currentIdentity(), Date.now(), READ_STATE_HORIZON_DAYS)
+}
+
+/** Apply markers, taking the later of each, and cap to the byte ceiling. What the cap evicted is reported. */
+function advanceContexts(current: Record<string, number>, updates: Record<string, number>): Record<string, number> {
+  const { contexts, evicted } = advance(current, updates)
+  if (evicted.length > 0) console.warn(`[read-state] over the byte cap; ${evicted.length} oldest markers dropped`)
+  return contexts
+}
 
 /** Long enough to batch opening a few issues, short enough to survive a tab close. */
 export const PUBLISH_DEBOUNCE_MS = 3000
@@ -88,7 +135,7 @@ async function hydrate(): Promise<void> {
   if (hydrated) return
   if (!hydrating) {
     hydrating = (async () => {
-      const state = await fetchMergedReadState(relay, signer.pubkey, nip44, currentIdentity())
+      const state = await loadReadState()
       /*
        * Unreachable is not empty. Staying unhydrated means the next attempt
        * tries again; treating it as empty would publish a blob that drops every
@@ -106,6 +153,14 @@ async function hydrate(): Promise<void> {
       if (state.ownUndecryptable) {
         console.warn('[read-state] own slot could not be decrypted; not publishing over it')
         return
+      }
+      /*
+       * Our coordinate holds another installation's blob (a copied profile, a
+       * restored storage). Writing to it would overwrite theirs on every write,
+       * so take a new slot id under the same `client_id` and start it empty.
+       */
+      if (state.coordinateConflicted) {
+        identity = rotateSlotId(currentIdentity(), { storage: safeStorage(), storageKey: SLOT_STORAGE_KEY, random })
       }
       /*
        * Seeded from **our own slot**, not from the merge.
@@ -185,7 +240,13 @@ export function flushReadState(): Promise<void> {
     // three round trips to say nothing.
     if (published && sameContexts(published, contexts)) return noteAttempt('unchanged')
     try {
-      const result = await publishReadState(relay, signer, nip44, currentIdentity(), contexts)
+      const result = await publishReadState(
+        { sign: (event) => signer.sign(event), publish: (event) => relay.publish(event), nip44 },
+        signer.pubkey,
+        currentIdentity(),
+        contexts,
+        Date.now(),
+      )
       if (result.ok) {
         published = contexts
         retryMs = 0
@@ -227,7 +288,7 @@ function record(context: string | undefined, atMs: number): void {
  * Mark a set of contexts read, now.
  *
  * Takes already-built context ids so the mapping decision stays in one place
- * (`readState.ts`) and a caller cannot accidentally hand an issue address where
+ * (`@estiva-app/conversation`) and a caller cannot accidentally hand an issue address where
  * a container belongs — which is the mistake that would mark a whole project
  * read (SPEC §11.2).
  */
@@ -281,7 +342,7 @@ export function useMergedReadState(): Record<string, number> {
   const load = useCallback(async () => {
     if (!signedIn()) return
     try {
-      const state = await fetchMergedReadState(relay, signer.pubkey, nip44, currentIdentity())
+      const state = await loadReadState()
       // Unreachable is not empty — keep the last good frontier rather than
       // blanking every divider because one fetch failed.
       if (state.reachable) {
@@ -382,9 +443,9 @@ export function installReadStateDiagnostic(): void {
   fn.refresh = async () => {
     const seam = signedIn()
     if (!seam) return 'no session'
-    const state = await fetchMergedReadState(relay, signer.pubkey, nip44, currentIdentity())
+    const state = await loadReadState()
     if (state.reachable) lastMerged = state.merged
-    return { reachable: state.reachable, ownUndecryptable: state.ownUndecryptable ?? false, contexts: Object.keys(state.merged).length }
+    return { reachable: state.reachable, ownUndecryptable: state.ownUndecryptable, contexts: Object.keys(state.merged).length }
   }
   fn.marker = (context: string) => {
     const at = lastMerged[context]

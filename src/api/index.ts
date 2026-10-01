@@ -46,14 +46,16 @@ export { useDirectory, type DirectoryView, type Person } from './useDirectory'
 export { peopleIn, short } from './people'
 /* Read state on the relay (CRO-8). The context grammar is exported so a page
    builds ids through it rather than inventing one — the mapping is the part the
-   ticket says to get right, and a wrong id is permanent in a grow-only blob. */
-export { projectContext, fileContext, threadContext, messageContext } from './readState'
+   ticket says to get right, and a wrong id is permanent in a grow-only blob.
+   They are `@estiva-app/conversation`'s, as Peek's are (CON-19). */
+export { channelContext, fileContext, threadContext, messageContext } from '@estiva-app/conversation'
 export { markRead, flushReadState, installReadStateFlush, useMergedReadState, READ_DWELL_MS } from './readStateSync'
 import { installReadStateDiagnostic } from './readStateSync'
 /* `window.__readState()` — see readStateSync.ts. Installed at module scope so it
    is there before anything asks, including on a page loaded straight from a URL. */
 installReadStateDiagnostic()
-export { firstUnreadByThread, type FeedThread, type StreamOf } from './unreadFeed'
+export { firstUnreadByThread } from './unreadFeed'
+export { useFeedJudges, type FeedFile } from './useFeedJudges'
 export {
   archiveProject,
   archiveIssue,

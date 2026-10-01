@@ -1,134 +1,103 @@
 /**
- * Where "new since you looked" goes in a conversation (CRO-13).
+ * Where "new since you looked" goes in a conversation (CRO-13, CON-19).
  *
- * Ship publishes and merges NIP-RS read state already (CRO-8) and shows none of
- * it. This is the display rule, and it is deliberately the smallest surface that
- * makes the cross-app claim observable: **a divider inside the comment feed on
- * an issue or a project — no dots in lists, nothing in the sidebar.**
+ * Ship publishes and merges NIP-RS read state and draws the smallest surface
+ * that makes the cross-app claim observable: **a divider inside the comment feed
+ * on an issue or a project — no dots in lists, nothing in the sidebar.** An
+ * issue list is dense, an issue is not a container, and inside the feed the
+ * question "unread *of what*" does not arise: the divider sits above the first
+ * message you have not seen. SPEC §11.8 says an app lights nothing for a stream
+ * it has no screen for, so there is nothing to judge outside these two feeds.
  *
- * Ship is issues-first and its lists are dense tables. A dot per row would have
- * to answer "unread *of what*" for an object that is not a container and usually
- * has no discussion at all, and it would put the signal a level away from the
- * thing you act on. Inside the feed the question does not arise: the divider
- * sits above the first message you have not seen.
+ * ## What is unread is the package's call
  *
- * ## The two grains, and why replies are not governed by their own marker alone
+ * Which messages are unread — §11.8's four conditions against §11.3's effective
+ * marker — is `unreadIn` in `@estiva-app/conversation`, the same function Peek
+ * asks. This file only hands it Ship's messages and says, per thread, which
+ * stream it answers to and who is judging. In short:
  *
- * SPEC §11.3: a stream's frontier propagates down, so the effective marker for
- * a reply is the **later** of its thread's own marker and its stream's — the
- * channel uuid for the Folder's chat, the file's address for comments on a
- * project or an issue (FOL-16). Marking a stream read therefore clears replies
- * that predate that moment, while a reply newer than it stays new until the
- * thread's own marker advances. What does *not* propagate is the channel's
- * marker into a file's stream: reading the project page says nothing about
- * which of its issues you have read.
+ * - **Membership is the gate.** A message is unread to a member of the stream's
+ *   file, never to somebody who merely can read it, and a muted stream lights
+ *   only for a message that names you.
+ * - **A file with no marker counts from when you joined.** A message is unread
+ *   from the second you became a member, so a file you were placed on lights
+ *   from the placement, and Ship's years of history do not all arrive as new on
+ *   the first run.
+ * - A root answers to its stream's marker; a reply to the later of its thread's
+ *   marker and its stream's (§11.3). The channel's marker never reaches into a
+ *   file's stream: reading the project page says nothing about its issues.
  *
- * Applied here, at read time, and never written down. Writing the container's
- * value onto each thread would give the same answer today and be permanent —
- * the blob is grow-only.
- *
- * ## Absence means no divider, which is a decision and not the spec's default
- *
- * SPEC §11.6 says absence of a context means **unread**. Taken literally, Ship's
- * years of history would all be new on the first run, and the only way anyone
- * would clear that is by bulk-reading — which teaches people the marker means
- * nothing.
- *
- * So a container with no marker at all shows no divider. Nothing is published to
- * achieve it: the quiet first run costs one `undefined` check rather than a bulk
- * irreversible write over every container the person can see. The trade is that
- * a genuinely never-read old thread stays quiet until it gets activity, which is
- * the failure everybody prefers.
+ * Applied at read time and never written down — the blob is grow-only.
  */
+import { unreadIn, type StreamJudge } from '@estiva-app/conversation'
+import type { SignedEvent } from '@estiva-app/protocol'
+import type { Conversation, Message } from '../nostr/fold'
+import { KIND } from '../nostr/kinds'
 
-/** The shape this needs from a rendered message. `at` is unix seconds, as NIP-RS stores. */
-export interface FeedMessage {
-  id: string
-  at: number
-  /**
-   * Author pubkey — your own writing is never new to you.
-   *
-   * Optional because a rendered message may not carry one. Absent counts as
-   * somebody else, which errs towards showing the divider: a spurious "new"
-   * marker is noticed and dismissed, a missing one is never noticed at all.
-   */
-  by?: string
-}
-
-export interface FeedThread {
-  id: string
-  root: FeedMessage
-  replies: FeedMessage[]
-}
+type Judgable = Pick<SignedEvent, 'id' | 'pubkey' | 'kind' | 'created_at' | 'tags' | 'content'>
 
 /**
- * The stream a thread's root answers to — SPEC §11.1 (FOL-16).
- *
- * A bare channel uuid for a root with no `a` tag (the Folder's chat), a bare
- * file address for a root about that file; `undefined` when the caller has
- * neither in scope. A string applies to every thread in the feed, which is what
- * an issue page has — every root there is about the issue. The project page has
- * both kinds in one feed and passes a function.
+ * A fold message as the package judges one: its id, author, second and text,
+ * and the one `e` tag that says which thread it is in. Judging reads nothing
+ * else, so nothing else is invented.
  */
-export type StreamOf = string | undefined | ((thread: FeedThread) => string | undefined)
-
-/** The later of two markers, either of which may be absent. */
-function later(a: number | undefined, b: number | undefined): number | undefined {
-  if (a === undefined) return b
-  if (b === undefined) return a
-  return Math.max(a, b)
-}
-
-/**
- * The id of the first message in this thread the reader has not seen, or
- * `undefined` when there is nothing new.
- *
- * `streamOf` names the marker the root answers to (see {@link StreamOf}); `me`
- * is the viewer's pubkey.
- */
-export function firstUnreadIn(
-  thread: FeedThread,
-  merged: Readonly<Record<string, number>>,
-  streamOf: StreamOf,
-  me: string,
-): string | undefined {
-  const streamContext = typeof streamOf === 'function' ? streamOf(thread) : streamOf
-  const stream = streamContext === undefined ? undefined : merged[streamContext]
-  const ownThread = merged[`thread:${thread.root.id}`]
-  // §11.3 — the stream's frontier propagates down to its threads. Only the
-  // stream's: a file's roots never answer to the channel's marker, which is the
-  // one place the hierarchy stops and the reason a file has a marker at all.
-  const forReplies = later(ownThread, stream)
-
-  const isNew = (m: FeedMessage, mark: number | undefined) =>
-    mark !== undefined && m.at > mark && m.by !== me
-
-  // A root is a top-level message in its stream, so it answers to the stream's
-  // marker — not to its own thread marker, which governs the replies beneath it.
-  if (isNew(thread.root, stream)) return thread.root.id
-  for (const reply of thread.replies) {
-    if (isNew(reply, forReplies)) return reply.id
+function judgable(message: Message): Judgable {
+  const tags: string[][] =
+    message.rootId === undefined
+      ? []
+      : [
+          ['e', message.rootId, '', 'root'],
+          ['e', message.parentId ?? message.rootId, '', 'reply'],
+        ]
+  return {
+    id: message.id,
+    pubkey: message.author,
+    kind: KIND.MESSAGE,
+    created_at: message.createdAt,
+    tags,
+    content: message.body,
   }
-  return undefined
 }
 
 /**
- * `firstUnreadIn` across a feed, as the map the renderer wants.
+ * The id of the first unread message of each thread, as the map the renderer
+ * wants.
+ *
+ * `judgeOf` names the stream a thread answers to and who is judging it
+ * (see {@link StreamJudge}); `undefined` lights nothing for that thread, which
+ * is how a feed says "I have no verdict yet" — a membership still loading must
+ * read as quiet rather than flash a divider onto every thread and take it away.
+ * Threads that share a judge object are judged together.
  *
  * Threads with nothing new are omitted rather than mapped to `undefined`, so a
- * caller can ask `Object.keys(...).length` for "is anything new here" without
- * filtering.
+ * caller can ask `Object.keys(...).length` for "is anything new here".
  */
 export function firstUnreadByThread(
-  threads: readonly FeedThread[],
+  conversations: readonly Conversation[],
   merged: Readonly<Record<string, number>>,
-  streamOf: StreamOf,
-  me: string,
+  judgeOf: (conversation: Conversation) => StreamJudge | undefined,
 ): Record<string, string> {
+  const byJudge = new Map<StreamJudge, Judgable[]>()
+  const threadOf = new Map<string, string>()
+  for (const conversation of conversations) {
+    const judge = judgeOf(conversation)
+    if (!judge) continue
+    const events = byJudge.get(judge) ?? []
+    for (const message of [conversation.root, ...conversation.replies]) {
+      events.push(judgable(message))
+      threadOf.set(message.id, conversation.id)
+    }
+    byJudge.set(judge, events)
+  }
+
   const out: Record<string, string> = {}
-  for (const thread of threads) {
-    const id = firstUnreadIn(thread, merged, streamOf, me)
-    if (id) out[thread.id] = id
+  for (const [judge, events] of byJudge) {
+    // `unreadIn` answers oldest first within a thread, so the first message
+    // seen for a thread is the one the divider goes above.
+    for (const message of unreadIn(events, merged, judge)) {
+      const thread = threadOf.get(message.id)
+      if (thread !== undefined && !(thread in out)) out[thread] = message.id
+    }
   }
   return out
 }

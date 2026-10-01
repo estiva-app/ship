@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import type { MergedReadState } from './readState'
+import type { FetchedReadState } from '@estiva-app/conversation'
 
 /**
  * A slot is this installation's account of what *it* read.
@@ -11,7 +11,7 @@ import type { MergedReadState } from './readState'
  * that lossless, which is exactly why nothing failed and why it needed looking
  * at the numbers to notice.
  */
-const fetchMergedReadState = vi.fn<() => Promise<MergedReadState>>()
+const fetchReadState = vi.fn<() => Promise<Pick<FetchedReadState, 'reachable' | 'merged'> & Partial<FetchedReadState>>>()
 /** Typed loosely on purpose: the assertion is about argument 4, the blob. */
 const publishReadState = vi.fn<(...args: unknown[]) => Promise<{ ok: boolean }>>(async () => ({ ok: true }))
 
@@ -22,9 +22,9 @@ vi.mock('./store', () => ({
 vi.mock('./nip44', () => ({ nip44: { encrypt: async (p: string) => p, decrypt: async () => undefined } }))
 const signedIn = vi.fn(() => true)
 vi.mock('../auth/estivaId', () => ({ signedIn: () => signedIn() }))
-vi.mock('./readState', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./readState')>()),
-  fetchMergedReadState: (...a: unknown[]) => fetchMergedReadState(...(a as [])),
+vi.mock('@estiva-app/conversation', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@estiva-app/conversation')>()),
+  fetchReadState: (...a: unknown[]) => fetchReadState(...(a as [])),
   publishReadState: (...a: unknown[]) => publishReadState(...(a as [])),
 }))
 
@@ -41,7 +41,7 @@ describe('the slot holds what THIS installation read', () => {
 
   it("does not absorb another installation's contexts into our slot", async () => {
     const { markRead, flushReadState } = await import('./readStateSync')
-    fetchMergedReadState.mockResolvedValue({
+    fetchReadState.mockResolvedValue({
       reachable: true,
       // The merge holds both; our own slot holds only ours.
       merged: { [OURS]: 1000, [THEIRS]: 5000 },
@@ -52,7 +52,7 @@ describe('the slot holds what THIS installation read', () => {
     await flushReadState()
 
     expect(publishReadState).toHaveBeenCalledTimes(1)
-    const contexts = publishReadState.mock.calls[0][4] as unknown as Record<string, number>
+    const contexts = publishReadState.mock.calls[0][3] as unknown as Record<string, number>
     expect(contexts[OURS]).toBe(1000)
     expect(contexts[NEW]).toBe(2000)
     // The whole point: Peek's marker stays in Peek's slot. It is still in the
@@ -62,7 +62,7 @@ describe('the slot holds what THIS installation read', () => {
 
   it('still publishes the whole of OUR slot, not a delta', async () => {
     const { markRead, flushReadState } = await import('./readStateSync')
-    fetchMergedReadState.mockResolvedValue({
+    fetchReadState.mockResolvedValue({
       reachable: true,
       merged: { [OURS]: 1000 },
       own: { v: 1, client_id: 'ship-a', contexts: { [OURS]: 1000 } },
@@ -71,14 +71,14 @@ describe('the slot holds what THIS installation read', () => {
     markRead([NEW], 2_000_000)
     await flushReadState()
 
-    const contexts = publishReadState.mock.calls[0][4] as unknown as Record<string, number>
+    const contexts = publishReadState.mock.calls[0][3] as unknown as Record<string, number>
     // A replaceable coordinate: omitting the old marker would drop it.
     expect(Object.keys(contexts).sort()).toEqual([NEW, OURS].sort())
   })
 
   it('refuses to publish while the relay could not be asked', async () => {
     const { markRead, flushReadState } = await import('./readStateSync')
-    fetchMergedReadState.mockResolvedValue({ reachable: false, merged: {} })
+    fetchReadState.mockResolvedValue({ reachable: false, merged: {} })
 
     markRead([NEW], 2_000_000)
     await flushReadState()
@@ -101,7 +101,7 @@ describe('an unreadable own slot blocks the publish', () => {
    */
   it('refuses to publish when our own slot is present but undecryptable', async () => {
     const { markRead, flushReadState } = await import('./readStateSync')
-    fetchMergedReadState.mockResolvedValue({
+    fetchReadState.mockResolvedValue({
       reachable: true,
       merged: { [OURS]: 1000 },
       own: undefined,
@@ -116,7 +116,7 @@ describe('an unreadable own slot blocks the publish', () => {
 
   it('still publishes on a genuinely empty coordinate', async () => {
     const { markRead, flushReadState } = await import('./readStateSync')
-    fetchMergedReadState.mockResolvedValue({
+    fetchReadState.mockResolvedValue({
       reachable: true,
       merged: {},
       own: undefined,
@@ -147,7 +147,7 @@ describe('a marker is never stranded by a transient failure', () => {
    */
   it('retries after the session is unusable, and publishes once it is back', async () => {
     const { markRead, flushReadState } = await import('./readStateSync')
-    fetchMergedReadState.mockResolvedValue({ reachable: true, merged: {}, own: undefined })
+    fetchReadState.mockResolvedValue({ reachable: true, merged: {}, own: undefined })
     signedIn.mockReturnValue(false)
 
     markRead([NEW], 2_000_000)
@@ -162,7 +162,7 @@ describe('a marker is never stranded by a transient failure', () => {
   it('retries when our own slot could not be decrypted', async () => {
     const { markRead, flushReadState } = await import('./readStateSync')
     signedIn.mockReturnValue(true)
-    fetchMergedReadState.mockResolvedValue({
+    fetchReadState.mockResolvedValue({
       reachable: true, merged: {}, own: undefined, ownUndecryptable: true,
     })
 
@@ -170,7 +170,7 @@ describe('a marker is never stranded by a transient failure', () => {
     await flushReadState()
     expect(publishReadState).not.toHaveBeenCalled()
 
-    fetchMergedReadState.mockResolvedValue({ reachable: true, merged: {}, own: undefined })
+    fetchReadState.mockResolvedValue({ reachable: true, merged: {}, own: undefined })
     await vi.advanceTimersByTimeAsync(5_000)
     expect(publishReadState).toHaveBeenCalledTimes(1)
   })
@@ -224,7 +224,7 @@ describe('the diagnostic reports why a publish did not happen', () => {
   it('reports a successful publish, with pending emptied', async () => {
     const { installReadStateDiagnostic, markRead, flushReadState } = await import('./readStateSync')
     installReadStateDiagnostic()
-    fetchMergedReadState.mockResolvedValue({ reachable: true, merged: {}, own: undefined })
+    fetchReadState.mockResolvedValue({ reachable: true, merged: {}, own: undefined })
 
     markRead([NEW], 2_000_000)
     await flushReadState()
@@ -237,7 +237,7 @@ describe('the diagnostic reports why a publish did not happen', () => {
   it('distinguishes an undecryptable own slot from an empty one', async () => {
     const { installReadStateDiagnostic, markRead, flushReadState } = await import('./readStateSync')
     installReadStateDiagnostic()
-    fetchMergedReadState.mockResolvedValue({
+    fetchReadState.mockResolvedValue({
       reachable: true, merged: {}, own: undefined, ownUndecryptable: true,
     })
 
@@ -245,5 +245,47 @@ describe('the diagnostic reports why a publish did not happen', () => {
     await flushReadState()
 
     expect((diag().lastAttempt as { outcome: string }).outcome).toBe('not-hydrated')
+  })
+})
+
+describe("Ship's slot is the one it already had (CON-19)", () => {
+  const SLOT = 'a'.repeat(32)
+
+  beforeEach(async () => {
+    vi.clearAllMocks()
+    localStorage.clear()
+    const { resetReadStateForTests } = await import('./readStateSync')
+    resetReadStateForTests()
+    signedIn.mockReturnValue(true)
+  })
+
+  it('keeps a slot stored under ship.readstate.slot, client id and all', async () => {
+    const { loadSlotIdentity } = await import('./readStateSync')
+    localStorage.setItem('ship.readstate.slot', JSON.stringify({ slotId: SLOT, clientId: 'ship-1a2b3c4d' }))
+    expect(loadSlotIdentity()).toEqual({ slotId: SLOT, clientId: 'ship-1a2b3c4d' })
+  })
+
+  it('mints a new one as ship-<8 hex> under the same key, and reuses it', async () => {
+    const { loadSlotIdentity } = await import('./readStateSync')
+    const first = loadSlotIdentity()
+    expect(first.slotId).toMatch(/^[0-9a-f]{32}$/)
+    expect(first.clientId).toMatch(/^ship-[0-9a-f]{8}$/)
+    expect(JSON.parse(localStorage.getItem('ship.readstate.slot') ?? '{}')).toEqual(first)
+    expect(loadSlotIdentity()).toEqual(first)
+  })
+
+  it("takes a new slot id rather than overwrite another installation's blob", async () => {
+    const { markRead, flushReadState } = await import('./readStateSync')
+    localStorage.setItem('ship.readstate.slot', JSON.stringify({ slotId: SLOT, clientId: 'ship-1a2b3c4d' }))
+    fetchReadState.mockResolvedValue({ reachable: true, merged: { [OURS]: 1000 }, own: undefined, ownUndecryptable: false, coordinateConflicted: true })
+
+    markRead([NEW], 2_000_000)
+    await flushReadState()
+
+    expect(publishReadState).toHaveBeenCalledTimes(1)
+    const identity = publishReadState.mock.calls[0][2] as { slotId: string; clientId: string }
+    expect(identity.slotId).not.toBe(SLOT)
+    expect(identity.clientId).toBe('ship-1a2b3c4d')
+    expect(JSON.parse(localStorage.getItem('ship.readstate.slot') ?? '{}').slotId).toBe(identity.slotId)
   })
 })

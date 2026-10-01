@@ -23,9 +23,10 @@ import {
   assignMissingRefs,
   setProjectField,
   startConversation,
-  projectContext,
+  channelContext,
   fileContext,
   useMergedReadState,
+  useFeedJudges,
   firstUnreadByThread,
   commentsOn,
   mentionsOf,
@@ -402,7 +403,7 @@ export function ProjectPage({
      team, marking the content Folder would advance the team's chat, which is
      not on this page. For a project never relinked the two are the same. A
      project filed into a team (FOL-2) has no record channel, only a team. */
-  useMarkRead([projectContext(record), fileContext(project?.addr)])
+  useMarkRead([channelContext(record), fileContext(project?.addr)])
   const threads = useMemo(
     () => conversations.map((c) => threadFor(c, directory, project ? { value: project.description, format: project.descriptionFormat } : undefined, project?.addr, state.edits, state.attachments)),
     [conversations, directory, project],
@@ -413,12 +414,11 @@ export function ProjectPage({
      already dropped roots about any other file, so those are the only two
      cases. */
   const merged = useMergedReadState()
+  const judges = useFeedJudges(project ? { addr: project.addr, createdAt: project.createdAt } : undefined, channelContext(record))
   const unread = useMemo(() => {
-    const channel = projectContext(record)
-    const file = fileContext(project?.addr)
     const aboutProject = new Set(conversations.filter((c) => project && (state.anchors[c.root.id] ?? []).includes(project.addr)).map((c) => c.id))
-    return firstUnreadByThread(threads, merged, (thread) => (aboutProject.has(thread.id) ? file : channel), me)
-  }, [threads, merged, project, conversations, state.anchors, record])
+    return firstUnreadByThread(conversations, merged, (conversation) => (aboutProject.has(conversation.id) ? judges.file : judges.channel))
+  }, [merged, judges, project, conversations, state.anchors])
   const people = useMemo(() => railPeople(state, directory), [state, directory])
   /*
     What somebody placed under this project from another app — RFC 0.5 §10.7.

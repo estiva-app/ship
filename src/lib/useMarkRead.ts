@@ -11,7 +11,7 @@ import { markRead, READ_DWELL_MS } from '@/api'
  *
  * `contexts` is already-built context ids — `undefined` entries are ignored, so
  * a caller can hand in an object that has no protocol identity yet without
- * branching. Building them stays in `readState.ts`, so no page can accidentally
+ * branching. Building them stays in `@estiva-app/conversation`'s context helpers, so no page can accidentally
  * pass an issue where a container belongs and mark a whole project read.
  */
 export function useMarkRead(contexts: (string | undefined)[]): void {
