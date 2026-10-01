@@ -1,6 +1,6 @@
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
-import { hashRedirect, href, parse, useRoute } from './router'
+import { hashRedirect, href, movedRedirect, parse, useRoute } from './router'
 
 const UUID = '9c69f247-be6a-4ae7-9703-71cb971f5f93'
 const OTHER = 'a5f99f8b-d480-4439-8e3c-8fa915422809'
@@ -46,6 +46,8 @@ describe('useRoute', () => {
       [{ name: 'issue', d: UUID, tab: 'activity' }, { name: 'issue', d: UUID, tab: 'activity' }],
       [{ name: 'issue', d: UUID, slug: 'billing-entry' }, { name: 'issue', d: UUID }],
       [{ name: 'inbound', naddr: 'naddr1xyz' }, { name: 'inbound', naddr: 'naddr1xyz' }],
+      [{ name: 'folder', id: UUID }, { name: 'folder', id: UUID }],
+      [{ name: 'elsewhere', word: 'topic', ref: `level-2-${UUID}` }, { name: 'elsewhere', word: 'topic', ref: `level-2-${UUID}` }],
     ] as const
     for (const [route, expected] of routes) expect(parse(href(route))).toEqual(expected)
   })
@@ -129,5 +131,43 @@ describe('the §7.2 grammar', () => {
     // That would hide a broken link by pretending it pointed somewhere. Render
     // the fallback, but leave the URL saying what the person actually followed.
     expect(hashRedirect('https://ship.estiva.app/#/nonsense')).toBe(null)
+  })
+})
+
+/**
+ * RFC 0.5 §7.7 (PRO-22): the root is for files, whichever app owns them, and
+ * Ship's own pages are under `/app/`.
+ */
+describe('the §7.7 root', () => {
+  it('sends another app’s word to the hand-off, as written', () => {
+    expect(parse(`/topic/level-2-${UUID}`)).toEqual({ name: 'elsewhere', word: 'topic', ref: `level-2-${UUID}` })
+    // The query names a thread inside the topic; the file handed off is the topic.
+    expect(parse(`/topic/level-2-${UUID}?thread=abc`)).toEqual({ name: 'elsewhere', word: 'topic', ref: `level-2-${UUID}` })
+  })
+
+  it('keeps Ship’s own words, and a broken one of them, off the hand-off', () => {
+    expect(parse('/issue/no-uuid-here').name).toBe('issues')
+    expect(parse('/project/no-uuid-here').name).toBe('issues')
+    expect(parse('/app/nonsense').name).toBe('issues')
+  })
+
+  it('serves the Folder page under /app/', () => {
+    expect(href({ name: 'folder', id: UUID })).toBe(`/app/folder/${UUID}`)
+    expect(parse(`/app/folder/${UUID}`)).toEqual({ name: 'folder', id: UUID })
+  })
+
+  it('still opens the Folder page at its old path, and rewrites the bar once', () => {
+    expect(parse(`/folder/${UUID}`)).toEqual({ name: 'folder', id: UUID })
+    expect(movedRedirect(`/folder/${UUID}`)).toBe(`/app/folder/${UUID}`)
+    expect(movedRedirect(`https://ship.estiva.app/folder/${UUID}`)).toBe(`/app/folder/${UUID}`)
+    expect(movedRedirect(`/app/folder/${UUID}`)).toBe(null)
+    expect(movedRedirect(`/issue/x-${UUID}`)).toBe(null)
+  })
+
+  it('rewrites the address bar off the old Folder path on load', () => {
+    goTo(`/folder/${UUID}`)
+    const { result } = renderHook(() => useRoute())
+    expect(result.current).toEqual({ name: 'folder', id: UUID })
+    expect(location.pathname).toBe(`/app/folder/${UUID}`)
   })
 })

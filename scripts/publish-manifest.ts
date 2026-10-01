@@ -14,6 +14,20 @@
  *
  * Identity: reuses `.manifest-key` so republishing replaces the same
  * addressable event rather than creating a second competing manifest.
+ *
+ * **Before anything is signed it reads every other `kind:31990`** and refuses
+ * if one declares one of Ship's type words for a different kind — RFC 0.5
+ * §7.7 rule 1, PRO-22. Two apps naming different kinds `note` breaks every
+ * link with that word on every host, and this is the one moment somebody is
+ * looking.
+ *
+ *   npx tsx scripts/publish-manifest.ts --dry-run [--try-urls '<pattern>=<kind>' …]
+ *
+ * `--dry-run` runs the checks that need no signature and publishes nothing.
+ * It does not read or write `.manifest-key`: the pubkey comes from the
+ * committed `manifest-address.ts`, and the relay is read as a throwaway key.
+ * `--try-urls` adds a shape to the built manifest first — how a new word is
+ * checked against the relay before it goes into `manifest.ts`.
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { Relay } from '@estiva-app/protocol'
@@ -32,9 +46,27 @@ import { Store } from '../src/nostr/store'
 import { buildDeletion as buildEventDeletion } from '@estiva-app/protocol'
 import { KIND } from '../src/nostr/kinds'
 import { widgetChainProblem, CLOSED_WIDGETS } from '@estiva-app/interop'
+import { MANIFEST_ADDRESS } from '../src/nostr/manifest-address'
+import { wordCollisions } from '../src/lib/typeWords'
 
 const RELAY_URL = process.env.RELAY_URL ?? 'http://localhost:3000'
 const KEY_FILE = new URL('../.manifest-key', import.meta.url).pathname
+const DRY_RUN = process.argv.includes('--dry-run')
+
+/** `--try-urls '<pattern>=<kind>'`, each as the `urls` tag it would be. */
+function triedUrls(argv: string[]): string[][] {
+  const tags: string[][] = []
+  argv.forEach((arg, i) => {
+    if (arg !== '--try-urls') return
+    const [pattern, kind] = (argv[i + 1] ?? '').split(/=(?=\d+$)/)
+    if (!pattern || !kind) {
+      console.error(`--try-urls takes '<pattern>=<kind>', got ${JSON.stringify(argv[i + 1])}`)
+      process.exit(1)
+    }
+    tags.push(['urls', pattern, kind])
+  })
+  return tags
+}
 
 /**
  * A stable identity for the manifest.
@@ -126,7 +158,88 @@ async function checkListSlot(
   )
 }
 
+/**
+ * Refuse a type word another manifest declares for a different kind — §7.7
+ * rule 1. Every `kind:31990` on the relay except the one this run replaces.
+ */
+async function assertNoWordCollision(relay: Relay, own: { pubkey: string; tags: string[][] }): Promise<void> {
+  const all = await relay.query([{ kinds: [31990], limit: 500 }])
+  const others = all
+    .filter((e) => !(e.pubkey === own.pubkey && e.tags.some((t) => t[0] === 'd' && t[1] === MANIFEST_D_TAG)))
+    .map((e) => ({ ...e, name: `31990:${e.pubkey.slice(0, 8)}…:${e.tags.find((t) => t[0] === 'd')?.[1] ?? ''}` }))
+  const collisions = wordCollisions(own, others)
+  if (collisions.length) {
+    console.error(`\n✋ Refusing to publish. A type word names one kind on every host (RFC 0.5 §7.7):\n${collisions.map((c) => `   ${c}`).join('\n')}\n`)
+    process.exit(1)
+  }
+  check('no other manifest declares one of these words for a different kind', true, `${others.length} other manifest(s) read`)
+}
+
+/**
+ * The checks that need no signature, against the relay, publishing nothing.
+ *
+ * Reads `.manifest-key` and never writes it — it is the only copy of the live
+ * manifest's key, and `manifestIdentity` replaces a malformed one. The relay
+ * answers reads only to a member, and a throwaway key is refused
+ * (`relay_membership_required`), so the reads are signed with the manifest's
+ * own key; nothing else is. The pubkey is the committed address's, and a key
+ * that is not that address's is refused rather than checked against.
+ */
+async function dryRun() {
+  const pubkey = MANIFEST_ADDRESS.split(':')[1]
+  const key = existsSync(KEY_FILE) ? readFileSync(KEY_FILE, 'utf8').trim() : ''
+  if (!/^[0-9a-f]{64}$/.test(key) || publicKeyFromSecret(key) !== pubkey) {
+    console.error(
+      `\n✋ A dry run reads the relay as the manifest's key, and ${existsSync(KEY_FILE) ? '.manifest-key is not the key of' : 'there is no .manifest-key for'} ${MANIFEST_ADDRESS}.\n` +
+        `   Link the live one in (ln -s <checkout>/.manifest-key .manifest-key); the dry run never writes it.\n`,
+    )
+    process.exit(1)
+  }
+  const relay = new Relay(RELAY_URL, secretKeySigner(key))
+  console.log(`relay    ${RELAY_URL}`)
+  console.log(`dry run  31990:${pubkey.slice(0, 16)}…:${MANIFEST_D_TAG} — nothing is signed or published\n`)
+  assertUrlsAgree(RELAY_URL, process.env.APP_URL ?? DEFAULT_APP_URL)
+  assertWidgetChains()
+  const event = buildManifest(pubkey, Date.now(), process.env.APP_URL)
+  const tried = triedUrls(process.argv)
+  for (const tag of tried) console.log(`   trying ${tag[1]} → ${tag[2]}`)
+  event.tags.push(...tried)
+  await assertNoWordCollision(relay, event)
+  console.log(failures === 0 ? '\nDry run: the manifest would publish.' : `\n${failures} check(s) FAILED.`)
+  process.exit(failures === 0 ? 0 : 1)
+}
+
+/*
+  Every widget declaration is publishable — PRO-3, and the same check Peek's
+  publish script runs, from the same function.
+
+  Ship's own `Projection.widget` is the closed union, so today the compiler
+  already makes a bad value unwritable here and this cannot fail. It is worth
+  running anyway for two reasons: the thing being checked is the *published
+  JSON*, which is what another app reads and what the type stops describing
+  the moment the union is widened to allow a chain; and one implementation
+  checking both producers is what stops the rule drifting between them, which
+  is the same argument that put `CLOSED_WIDGETS` in the runtime rather than in
+  each app.
+*/
+function assertWidgetChains(): void {
+  for (const [kind, projection] of Object.entries(manifestContent().projections)) {
+    const problem = widgetChainProblem(projection.widget)
+    if (problem) {
+      console.error(`\n✋ Refusing to publish. kind:${kind} — ${problem}\n`)
+      process.exit(1)
+    }
+  }
+  check('every widget chain terminates in a closed type', true, CLOSED_WIDGETS.join(', '))
+}
+
 async function main() {
+  if (DRY_RUN) return dryRun()
+  // A tried shape is for checking, never for the live manifest.
+  if (process.argv.includes('--try-urls')) {
+    console.error('--try-urls is for a --dry-run; add the shape to src/nostr/manifest.ts to publish it.')
+    process.exit(1)
+  }
   const identity = manifestIdentity()
   const relay = new Relay(RELAY_URL, secretKeySigner(identity.secretKeyHex))
 
@@ -136,30 +249,10 @@ async function main() {
   // Overridable so a deployment somewhere other than the dev port publishes a
   // `web` tag that actually resolves for whoever follows it.
   assertUrlsAgree(RELAY_URL, process.env.APP_URL ?? DEFAULT_APP_URL)
-
-  /*
-    Every widget declaration is publishable — PRO-3, and the same check Peek's
-    publish script runs, from the same function.
-
-    Ship's own `Projection.widget` is the closed union, so today the compiler
-    already makes a bad value unwritable here and this cannot fail. It is worth
-    running anyway for two reasons: the thing being checked is the *published
-    JSON*, which is what another app reads and what the type stops describing
-    the moment the union is widened to allow a chain; and one implementation
-    checking both producers is what stops the rule drifting between them, which
-    is the same argument that put `CLOSED_WIDGETS` in the runtime rather than in
-    each app.
-  */
-  for (const [kind, projection] of Object.entries(manifestContent().projections)) {
-    const problem = widgetChainProblem(projection.widget)
-    if (problem) {
-      console.error(`\n✋ Refusing to publish. kind:${kind} — ${problem}\n`)
-      process.exit(1)
-    }
-  }
-  check('every widget chain terminates in a closed type', true, CLOSED_WIDGETS.join(', '))
+  assertWidgetChains()
 
   const event = buildManifest(identity.pubkey, Date.now(), process.env.APP_URL)
+  await assertNoWordCollision(relay, event)
   const published = await relay.publish(signEvent(event, identity.secretKeyHex))
   check('the relay accepts kind:31990', published.ok, published.reason ?? '')
   if (!published.ok) process.exit(1)

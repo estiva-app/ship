@@ -1097,7 +1097,7 @@ async function main() {
     ],
   })
 
-  await page.goto(`http://localhost:${PORT}/folder/${FOLDER_ID}`)
+  await page.goto(`http://localhost:${PORT}/app/folder/${FOLDER_ID}`)
   await page.waitForSelector(`[data-folder="${FOLDER_ID}"]`)
   const folderView = page.locator(`[data-folder="${FOLDER_ID}"]`)
   check('the Folder resolves from its relay-maintained state', (await folderView.getAttribute('data-source')) === 'state')
@@ -1121,6 +1121,37 @@ async function main() {
     await sidebar().getByRole('button', { name: 'Onboarding', exact: true }).isVisible(),
   )
   await shot(page, '10-folder-view')
+
+  // The Folder page's old path still opens it, and the bar moves to /app/ (PRO-22).
+  await page.goto(`http://localhost:${PORT}/folder/${FOLDER_ID}`)
+  await page.waitForSelector(`[data-folder="${FOLDER_ID}"]`)
+  check('the old Folder path opens the page and moves under /app/', new URL(page.url()).pathname === `/app/folder/${FOLDER_ID}`, page.url())
+
+  // ── Another app's file on Ship's host: the hand-off (PRO-22) ──────────────
+  // RFC 0.5 §7.7: a Peek topic's path with Ship's host in front names the same
+  // topic. Ship has no view of one, so it hands off — the file's title, its
+  // app, the link that opens it there — and the word `topic` is learnt from
+  // the manifest's `urls`, the way production's Peek manifest declares it.
+  const HANDOFF_D = '0d6c3a51-8a7e-4f2b-9c1d-5e4f3a2b1c0d'
+  seed({
+    kind: 31990,
+    tags: [
+      ['d', 'estiva-peek-topics-smoke'],
+      ['k', '30840'],
+      ['web', 'https://peek.estiva.app/o/<bech32>', 'naddr'],
+      ['urls', 'https://peek.estiva.app/topic/<slug>-<d>', '30840'],
+    ],
+    content: JSON.stringify({ name: 'Peek', projections: { 30840: { widget: 'card', slots: { title: { tag: 'title' } } } } }),
+  })
+  seed({ kind: 30840, tags: [['d', HANDOFF_D], ['title', 'Who will extract the conversation package']] })
+  await page.goto(`http://localhost:${PORT}/topic/who-will-extract-${HANDOFF_D}`)
+  await page.waitForSelector('[data-surface="handoff"]', { timeout: 10_000 }).catch(() => {})
+  const handoff = page.locator('[data-surface="handoff"]')
+  check('a Peek topic link on Ship shows the hand-off, not the issue list', await handoff.isVisible())
+  check('  …with the topic’s title', (await handoff.innerText().catch(() => '')).includes('Who will extract the conversation package'))
+  const openInPeek = handoff.getByRole('link', { name: 'Open in Peek' })
+  check('  …and a link that opens it in Peek', ((await openInPeek.getAttribute('href').catch(() => null)) ?? '').startsWith('https://peek.estiva.app/o/naddr1'))
+  await shot(page, '10b-handoff')
 
   // ── Delete, and the team lets go of it ────────────────────────────────────
   // Last, because everything above reads the project. A team with state lists

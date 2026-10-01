@@ -42,6 +42,21 @@
  * `d` but **not** the Folder, so this route cannot be rendered directly. It is
  * resolved against the relay and then replaced with a real route. See
  * `resolveObject` in `store.ts`.
+ *
+ * ## The root is for files; Ship's own pages are under `/app/`
+ *
+ * RFC 0.5 §7.7 (PRO-22): the path names the file and the host names the
+ * perspective, so `peek.estiva.app/topic/<slug>-<d>` and
+ * `ship.estiva.app/topic/<slug>-<d>` are one file. Ship has no view of a
+ * topic, so any `/<word>/<ref>` that is not one of Ship's own words is an
+ * `elsewhere` route, and `HandoffPage` asks the manifests what the word means
+ * and hands the file off to the app that draws it. The words are never listed
+ * here — this file knows only Ship's own.
+ *
+ * A page that is not a file lives under `/app/`, so a word some app declares
+ * tomorrow can never land on it. The Folder page is the one Ship has; it was
+ * `/folder/<id>` until PRO-22, and that path still opens it and is rewritten
+ * once (`movedRedirect`), the way an old hash link is.
  */
 import { useEffect, useState } from 'react'
 import { identifierFromRef, objectRef } from '@estiva-app/interop'
@@ -66,6 +81,19 @@ export type Route =
   | { name: 'folder'; id: string }
   /** An inbound `nostr:naddr…`, not yet resolved to an object. */
   | { name: 'inbound'; naddr: string }
+  /**
+   * `/<word>/<ref>` for a word that is not Ship's — another app's file, opened
+   * on Ship's host (RFC 0.5 §7.7). Kept as written: which kind the word names
+   * is the manifests' to say, and the page asks them.
+   */
+  | { name: 'elsewhere'; word: string; ref: string }
+
+/**
+ * The first segments Ship answers itself. Anything else with a ref after it is
+ * somebody's file, and goes to the hand-off. `folder` is here because the old
+ * Folder path still opens the Folder page; it is not a word Ship serves.
+ */
+const OWN_SEGMENTS = new Set(['app', 'o', 'project', 'projects', 'issue', 'issues', 'folder'])
 
 /**
  * How a project's issues are shown.
@@ -113,9 +141,11 @@ export function href(route: Route): string {
       return route.tab && route.tab !== 'overview' ? `${base}?tab=${route.tab}` : base
     }
     case 'folder':
-      return `/folder/${route.id}`
+      return `/app/folder/${route.id}`
     case 'inbound':
       return `/o/${route.naddr}`
+    case 'elsewhere':
+      return `/${route.word}/${route.ref}`
   }
 }
 
@@ -155,8 +185,15 @@ export function parse(location: string): Route {
       return tab === 'overview' ? { name: 'project', d, view } : { name: 'project', d, view, tab }
     }
   }
+  if (parts[0] === 'app' && parts[1] === 'folder' && parts[2]) {
+    return { name: 'folder', id: parts[2] }
+  }
+  // Where the Folder page was until PRO-22; `movedRedirect` corrects the bar.
   if (parts[0] === 'folder' && parts[1]) {
     return { name: 'folder', id: parts[1] }
+  }
+  if (parts.length === 2 && !OWN_SEGMENTS.has(parts[0])) {
+    return { name: 'elsewhere', word: parts[0], ref: parts[1] }
   }
   if (parts[0] === 'issue' && parts[1]) {
     const d = identifierFromRef(parts[1])
@@ -183,6 +220,19 @@ export function hashRedirect(location: string): string | null {
   // to `/issues` would hide that the link was broken rather than fix it.
   if (route.name === 'issues' && !hash.startsWith('/issues')) return null
   return href(route)
+}
+
+/**
+ * The path a page that moved under `/app/` (PRO-22) should become, or null.
+ *
+ * Only the Folder page moved. Its old path is in browser histories and in the
+ * sidebar links of every tab opened before the deploy, so it still opens the
+ * page, and this rewrites the bar once so the address copied next is the new one.
+ */
+export function movedRedirect(location: string): string | null {
+  const path = location.replace(/^[a-z]+:\/\/[^/]+/i, '').split(/[?#]/)[0]
+  if (!/^\/folder\/[^/]+\/?$/.test(path)) return null
+  return href(parse(path))
 }
 
 /** Navigate, adding a history entry. */
@@ -257,7 +307,7 @@ export function useRoute(): Route {
   const [route, setRoute] = useState<Route>(() => parse(`${location.pathname}${location.search}${location.hash}`))
   useEffect(() => {
     const here = () => `${location.pathname}${location.search}${location.hash}`
-    const moved = hashRedirect(here())
+    const moved = hashRedirect(here()) ?? movedRedirect(here())
     if (moved) history.replaceState(null, '', moved)
     const fire = () => setRoute(parse(here()))
     addEventListener('popstate', fire)

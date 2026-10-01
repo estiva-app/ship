@@ -176,7 +176,7 @@ const projectPage = (startTab: ProjectTab, startView: 'table' | 'board' = 'table
             onLeadChange: setLead,
             done,
             total: ISSUES.length,
-            folders: [{ name: 'Ship', href: '/folder/5c1e2a7b-9d40-4f3a-8e6b-2f0c7d1a9b34' }],
+            folders: [{ name: 'Ship', href: '/app/folder/5c1e2a7b-9d40-4f3a-8e6b-2f0c7d1a9b34' }],
             onArchive: fn(),
             onDelete: fn(),
           }}
