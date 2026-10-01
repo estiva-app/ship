@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { addrToNaddr, encodeNevent, type SignedEvent } from '@estiva-app/protocol'
-import { appNameOf, lookupFor, ownerOf, webLinkOf } from '@/lib/handoff'
+import type { SignedEvent } from '@estiva-app/protocol'
+import { appNameOf, lookupFor, manifestOfLink, safeLink } from '@/lib/handoff'
 import { isOwnKind } from '@/lib/ownKinds'
 import { resolveForeign, type ForeignObject } from './foreign'
 import { relay } from './store'
@@ -23,7 +23,10 @@ import { relay } from './store'
  */
 export type Handoff =
   | { state: 'own'; kind: number; d: string }
-  /** `app` and `openUrl` are the owner's — its manifest's name and `web` link. */
+  /**
+   * `openUrl` is the projection's link, `https:` only; `app` is the name of
+   * the manifest whose `web` template built it (`manifestOfLink`).
+   */
   | { state: 'found'; object: ForeignObject; app?: string; openUrl?: string }
   | { state: 'unclaimed' }
   | { state: 'missing' }
@@ -32,15 +35,23 @@ export type Handoff =
  * Every manifest on the relay, once per tab.
  *
  * A manifest changes when an app republishes it, which is rare and never
- * mid-visit; the hand-off is the only reader. A failed read is forgotten, so
- * the next hand-off asks again rather than inheriting the failure.
+ * mid-visit; the hand-off is the only reader. A failed read is forgotten, and
+ * so is an empty one — a relay always holds at least Ship's own manifest, so
+ * none means the read did not really answer, and keeping it would make every
+ * hand-off in the tab say "Nothing found" until a reload.
  */
 let manifests: Promise<SignedEvent[]> | null = null
 function declaredManifests(): Promise<SignedEvent[]> {
-  manifests ??= relay.query([{ kinds: [31990], limit: 100 }] as never).catch((error: unknown) => {
-    manifests = null
-    throw error
-  })
+  manifests ??= relay.query([{ kinds: [31990], limit: 500 }] as never).then(
+    (found) => {
+      if (found.length === 0) manifests = null
+      return found
+    },
+    (error: unknown) => {
+      manifests = null
+      throw error
+    },
+  )
   return manifests
 }
 
@@ -52,13 +63,11 @@ export async function resolveHandoff(word: string, ref: string): Promise<Handoff
   const [event] = (await relay.query([filter] as never)).sort((a, b) => b.created_at - a.created_at)
   if (!event) return { state: 'missing' }
   if (lookup.by === 'd' && isOwnKind(event.kind)) return { state: 'own', kind: event.kind, d: lookup.identifier }
-  const address = `${event.kind}:${event.pubkey}:${lookup.identifier}`
-  const object = await resolveForeign(lookup.by === 'd' ? address : event.id)
+  const object = await resolveForeign(lookup.by === 'd' ? `${event.kind}:${event.pubkey}:${lookup.identifier}` : event.id)
   if (!object) return { state: 'unclaimed' }
-  // The owner's own link, per §7.7 rule 2; the projection's is the fallback.
-  const owner = ownerOf(event.kind, word, all)
+  const openUrl = safeLink(object.openUrl)
+  const owner = openUrl ? manifestOfLink(openUrl, all) : undefined
   const app = owner ? appNameOf(owner) : undefined
-  const openUrl = (owner && (lookup.by === 'd' ? webLinkOf(owner, 'naddr', addrToNaddr(address)) : webLinkOf(owner, 'nevent', encodeNevent({ id: event.id, relays: [] })))) ?? object.openUrl
   return { state: 'found', object, ...(app ? { app } : {}), ...(openUrl ? { openUrl } : {}) }
 }
 

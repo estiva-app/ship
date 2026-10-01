@@ -29,6 +29,15 @@ describe('HandoffPage', () => {
     render(<HandoffPage word="topic" fileRef="x-d" />)
     expect(screen.getByText('Who will extract the conversation package')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Open in Peek' })).toHaveAttribute('href', 'https://peek.estiva.app/o/naddr1topic')
+    // The card names the same app the link goes to, not the projection's "File".
+    expect(screen.queryByText('File')).not.toBeInTheDocument()
+    expect(screen.getByText('Peek')).toBeInTheDocument()
+  })
+
+  it('draws one way to open an unreachable file, the card’s own', () => {
+    answer = { state: 'found', object: { ...TOPIC, unreachable: true }, app: 'Peek', openUrl: TOPIC.openUrl }
+    render(<HandoffPage word="topic" fileRef="x-d" />)
+    expect(screen.getAllByRole('link')).toHaveLength(1)
   })
 
   it('says nothing was found, and why that may be, rather than a blank page', () => {

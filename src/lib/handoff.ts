@@ -62,17 +62,39 @@ export function lookupFor(word: string, ref: string, manifests: readonly Manifes
 }
 
 /**
- * Who a file is handed off to: the app whose manifest declares a shape for its
- * kind — §7.7 rule 1's owner, the one entitled to the word. The shape under
- * the word the link used comes first, in case two apps declare the kind.
+ * The manifest whose NIP-89 `web` template made `url`, so the hand-off can
+ * name the app the link actually goes to.
  *
- * Not the projection's `appName`: that names whichever manifest *draws* the
- * kind, and on production a Peek topic is drawn as a bare file and resolves
- * with the app name "File". "Open in File" is not a hand-off.
+ * **The link is the projection layer's, not chosen here.** `openUrl` comes
+ * from the manifest the runtime picked for the file — the author's 31989
+ * recommendation first, the same choice every reference in Ship already
+ * makes. Picking a second manifest here, by relay order, would let any
+ * relay member's 31990 that declares `topic` put its own host behind a link
+ * labelled "Open in Peek". So the name follows the link: it is read off the
+ * manifest whose template the URL was built from, and when none matches the
+ * page names no app.
+ *
+ * Not the projection's `appName` either: on production a Peek topic is drawn
+ * as a bare file and resolves as "File" — "Open in File" is not a hand-off.
  */
-export function ownerOf<M extends Manifest & { content?: string }>(kind: number, word: string, manifests: readonly M[]): M | undefined {
-  const declaring = manifests.filter((m) => fileShapesOf(m).some((s) => s.kind === kind))
-  return declaring.find((m) => fileShapesOf(m).some((s) => s.kind === kind && s.word === word)) ?? declaring[0]
+export function manifestOfLink<M extends Manifest>(url: string, manifests: readonly M[]): M | undefined {
+  return manifests.find((m) =>
+    m.tags.some((t) => {
+      if (t[0] !== 'web' || !t[1]?.includes('<bech32>')) return false
+      const [before, after] = t[1].split('<bech32>')
+      return url.startsWith(before) && url.endsWith(after) && url.length > before.length + after.length
+    }),
+  )
+}
+
+/** Only an `https:` link is followed off the page; anything else is no link. */
+export function safeLink(url: string | undefined): string | undefined {
+  if (!url) return undefined
+  try {
+    return new URL(url).protocol === 'https:' ? url : undefined
+  } catch {
+    return undefined
+  }
 }
 
 /** A manifest's `name`, or undefined when its content says none. */
@@ -83,13 +105,4 @@ export function appNameOf(manifest: { content?: string }): string | undefined {
   } catch {
     return undefined
   }
-}
-
-/**
- * NIP-89's `web` link for one entity — `["web", "<url with <bech32>>", "naddr"]`
- * with the entity put in. A template naming no entity type serves any.
- */
-export function webLinkOf(manifest: Manifest, entity: 'naddr' | 'nevent', bech32: string): string | undefined {
-  const template = manifest.tags.find((t) => t[0] === 'web' && t[1]?.includes('<bech32>') && (!t[2] || t[2] === entity))?.[1]
-  return template?.replace('<bech32>', bech32)
 }

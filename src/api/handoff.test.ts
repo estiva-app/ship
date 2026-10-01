@@ -35,17 +35,21 @@ describe('resolveHandoff', () => {
   it('asks for the declared kind by `d` and resolves the file through its app', async () => {
     relayWith([{ kind: 30840, pubkey: PK, id: 'e1', created_at: 1 }])
     // What production answers for a topic: drawn as a bare file, named "File".
-    resolveForeign.mockResolvedValue({ ref: 'r', appName: 'File', openUrl: 'https://elsewhere.example/x' })
+    const openUrl = `https://peek.estiva.app/o/${addrToNaddr(`30840:${PK}:${D}`)}`
+    resolveForeign.mockResolvedValue({ ref: 'r', appName: 'File', openUrl })
     const handoff = await resolveHandoff('topic', `level-2-${D}`)
     expect(query).toHaveBeenLastCalledWith([{ kinds: [30840], '#d': [D], limit: 10 }])
     expect(resolveForeign).toHaveBeenCalledWith(`30840:${PK}:${D}`)
-    // The owner's name and the owner's `web` link — the manifest that declared `topic`.
-    expect(handoff).toEqual({
-      state: 'found',
-      object: expect.objectContaining({ appName: 'File' }),
-      app: 'Peek',
-      openUrl: `https://peek.estiva.app/o/${addrToNaddr(`30840:${PK}:${D}`)}`,
-    })
+    // The projection's link, named by the manifest whose `web` template built it.
+    expect(handoff).toEqual({ state: 'found', object: expect.objectContaining({ appName: 'File' }), app: 'Peek', openUrl })
+  })
+
+  it('names no app for a link no manifest’s template built, and follows only https', async () => {
+    relayWith([{ kind: 30840, pubkey: PK, id: 'e1', created_at: 1 }])
+    resolveForeign.mockResolvedValue({ ref: 'r', appName: 'File', openUrl: 'https://elsewhere.example/x' })
+    expect(await resolveHandoff('topic', D)).toEqual({ state: 'found', object: expect.anything(), openUrl: 'https://elsewhere.example/x' })
+    resolveForeign.mockResolvedValue({ ref: 'r', appName: 'File', openUrl: 'intent://peek.estiva.app/o/naddr1x' })
+    expect(await resolveHandoff('topic', D)).toEqual({ state: 'found', object: expect.anything() })
   })
 
   it('says a file of Ship’s own is Ship’s, for the page to open it here (rule 4)', async () => {

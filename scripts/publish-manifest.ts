@@ -24,8 +24,8 @@
  *   npx tsx scripts/publish-manifest.ts --dry-run [--try-urls '<pattern>=<kind>' …]
  *
  * `--dry-run` runs the checks that need no signature and publishes nothing.
- * It does not read or write `.manifest-key`: the pubkey comes from the
- * committed `manifest-address.ts`, and the relay is read as a throwaway key.
+ * It reads `.manifest-key` only to sign its relay reads and never writes it;
+ * the pubkey comes from the committed `manifest-address.ts`.
  * `--try-urls` adds a shape to the built manifest first — how a new word is
  * checked against the relay before it goes into `manifest.ts`.
  */
