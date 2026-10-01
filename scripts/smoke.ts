@@ -1141,7 +1141,9 @@ async function main() {
       ['web', 'https://peek.estiva.app/o/<bech32>', 'naddr'],
       ['urls', 'https://peek.estiva.app/topic/<slug>-<d>', '30840'],
     ],
-    content: JSON.stringify({ name: 'Peek', projections: { 30840: { widget: 'card', slots: { title: { tag: 'title' } } } } }),
+    // `aspect: conversation` is how the runtime finds where a bare file opens —
+    // no app owns 30840 — and what Peek's real manifest says.
+    content: JSON.stringify({ name: 'Peek', aspect: 'conversation', projections: {} }),
   })
   seed({ kind: 30840, tags: [['d', HANDOFF_D], ['title', 'Who will extract the conversation package']] })
   await page.goto(`http://localhost:${PORT}/topic/who-will-extract-${HANDOFF_D}`)
@@ -1150,7 +1152,12 @@ async function main() {
   check('a Peek topic link on Ship shows the hand-off, not the issue list', await handoff.isVisible())
   check('  …with the topic’s title', (await handoff.innerText().catch(() => '')).includes('Who will extract the conversation package'))
   const openInPeek = handoff.getByRole('link', { name: 'Open in Peek' })
-  check('  …and a link that opens it in Peek', ((await openInPeek.getAttribute('href').catch(() => null)) ?? '').startsWith('https://peek.estiva.app/o/naddr1'))
+  // The same path on Peek's host — only the host changes (Miky, 2026-10-01).
+  check(
+    '  …and a link that opens it in Peek',
+    (await openInPeek.getAttribute('href').catch(() => null)) === `https://peek.estiva.app/topic/who-will-extract-${HANDOFF_D}`,
+    (await openInPeek.getAttribute('href').catch(() => null)) ?? 'no link',
+  )
   await shot(page, '10b-handoff')
 
   // ── Delete, and the team lets go of it ────────────────────────────────────

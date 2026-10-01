@@ -17,6 +17,7 @@ const PEEK = {
     ['k', '39000'],
     ['web', 'https://peek.estiva.app/o/<bech32>', 'naddr'],
     ['urls', 'https://peek.estiva.app/topic/<slug>-<d>', '30840'],
+    ['urls', 'https://peek.estiva.app/topic/<slug>-<d>?thread=<id>', '1111'],
   ],
 }
 const SHIP = { kind: 31990, tags: [['urls', 'https://ship.estiva.app/issue/<slug>-<d>', '30851']] }
@@ -40,8 +41,16 @@ describe('resolveHandoff', () => {
     const handoff = await resolveHandoff('topic', `level-2-${D}`)
     expect(query).toHaveBeenLastCalledWith([{ kinds: [30840], '#d': [D], limit: 10 }])
     expect(resolveForeign).toHaveBeenCalledWith(`30840:${PK}:${D}`)
-    // The projection's link, named by the manifest whose `web` template built it.
-    expect(handoff).toEqual({ state: 'found', object: expect.objectContaining({ appName: 'File' }), app: 'Peek', openUrl })
+    // Named by the manifest whose `web` template built the projection's link,
+    // and the link is the same path on that app's host, which serves it.
+    expect(handoff).toEqual({ state: 'found', object: expect.objectContaining({ appName: 'File' }), app: 'Peek', openUrl: `https://peek.estiva.app/topic/level-2-${D}` })
+  })
+
+  it('carries a thread link’s comment on to the owner’s host', async () => {
+    relayWith([{ kind: 30840, pubkey: PK, id: 'e1', created_at: 1 }])
+    resolveForeign.mockResolvedValue({ ref: 'r', appName: 'File', openUrl: `https://peek.estiva.app/o/${addrToNaddr(`30840:${PK}:${D}`)}` })
+    const handoff = await resolveHandoff('topic', `level-2-${D}`, `thread=${'c'.repeat(64)}`)
+    expect(handoff).toMatchObject({ app: 'Peek', openUrl: `https://peek.estiva.app/topic/level-2-${D}?thread=${'c'.repeat(64)}` })
   })
 
   it('names no app for a link no manifest’s template built, and follows only https', async () => {

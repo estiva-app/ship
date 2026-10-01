@@ -19,8 +19,8 @@ import { replace } from '@/router'
  * there. Never a 404 and never the issue list, because the link named a real
  * file.
  */
-export function HandoffPage({ word, fileRef }: { word: string; fileRef: string }) {
-  const handoff = useHandoff(word, fileRef)
+export function HandoffPage({ word, fileRef, query }: { word: string; fileRef: string; query?: string }) {
+  const handoff = useHandoff(word, fileRef, query)
 
   // A word nobody declares that turned out to be Ship's own file (§7.7 rule
   // 4): drawn at its right word, without a history entry to bounce off.

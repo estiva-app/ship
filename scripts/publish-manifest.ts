@@ -28,6 +28,8 @@
  * the pubkey comes from the committed `manifest-address.ts`.
  * `--try-urls` adds a shape to the built manifest first — how a new word is
  * checked against the relay before it goes into `manifest.ts`.
+ * `--allow-collision` publishes anyway, printing what collides — for when
+ * another member's manifest is the cause and Ship's fix cannot wait.
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { Relay } from '@estiva-app/protocol'
@@ -168,6 +170,18 @@ async function assertNoWordCollision(relay: Relay, own: { pubkey: string; tags: 
     .filter((e) => !(e.pubkey === own.pubkey && e.tags.some((t) => t[0] === 'd' && t[1] === MANIFEST_D_TAG)))
     .map((e) => ({ ...e, name: `31990:${e.pubkey.slice(0, 8)}…:${e.tags.find((t) => t[0] === 'd')?.[1] ?? ''}` }))
   const collisions = wordCollisions(own, others)
+  /*
+    The override (Miky, 2026-10-01). Any relay member can publish a 31990, so
+    without it a stranger's manifest claiming `issue` for another kind would
+    hold up an urgent fix to Ship's own. Refusing stays the default, and the
+    collisions are still printed: overriding is a decision somebody made while
+    looking at them, which is the moment the rule exists for. Who may own a
+    word at all is a protocol question still open.
+  */
+  if (collisions.length && process.argv.includes('--allow-collision')) {
+    console.warn(`\n⚠ Publishing over a type-word collision (--allow-collision):\n${collisions.map((c) => `   ${c}`).join('\n')}\n`)
+    return
+  }
   if (collisions.length) {
     console.error(`\n✋ Refusing to publish. A type word names one kind on every host (RFC 0.5 §7.7):\n${collisions.map((c) => `   ${c}`).join('\n')}\n`)
     process.exit(1)

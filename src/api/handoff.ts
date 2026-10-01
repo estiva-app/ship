@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { SignedEvent } from '@estiva-app/protocol'
-import { appNameOf, lookupFor, manifestOfLink, safeLink } from '@/lib/handoff'
+import { appNameOf, lookupFor, manifestOfLink, safeLink, samePathOn } from '@/lib/handoff'
 import { isOwnKind } from '@/lib/ownKinds'
 import { resolveForeign, type ForeignObject } from './foreign'
 import { relay } from './store'
@@ -55,7 +55,7 @@ function declaredManifests(): Promise<SignedEvent[]> {
   return manifests
 }
 
-export async function resolveHandoff(word: string, ref: string): Promise<Handoff> {
+export async function resolveHandoff(word: string, ref: string, query?: string): Promise<Handoff> {
   const all = await declaredManifests()
   const lookup = lookupFor(word, ref, all)
   if (!lookup || (lookup.by === 'd' && lookup.kinds.length === 0)) return { state: 'missing' }
@@ -65,26 +65,29 @@ export async function resolveHandoff(word: string, ref: string): Promise<Handoff
   if (lookup.by === 'd' && isOwnKind(event.kind)) return { state: 'own', kind: event.kind, d: lookup.identifier }
   const object = await resolveForeign(lookup.by === 'd' ? `${event.kind}:${event.pubkey}:${lookup.identifier}` : event.id)
   if (!object) return { state: 'unclaimed' }
-  const openUrl = safeLink(object.openUrl)
-  const owner = openUrl ? manifestOfLink(openUrl, all) : undefined
+  const projected = safeLink(object.openUrl)
+  const owner = projected ? manifestOfLink(projected, all) : undefined
   const app = owner ? appNameOf(owner) : undefined
+  // The same path and query on the owner's host when it serves that shape, so
+  // a thread link opens on its comment; the projection's link otherwise.
+  const openUrl = (owner && safeLink(samePathOn(owner, word, ref, query))) ?? projected
   return { state: 'found', object, ...(app ? { app } : {}), ...(openUrl ? { openUrl } : {}) }
 }
 
 /** `resolveHandoff` for a page: `undefined` while it runs, `failed` if it threw. */
-export function useHandoff(word: string, ref: string): Handoff | 'failed' | undefined {
+export function useHandoff(word: string, ref: string, query?: string): Handoff | 'failed' | undefined {
   const [answer, setAnswer] = useState<{ key: string; value: Handoff | 'failed' } | undefined>(undefined)
-  const key = `${word}/${ref}`
+  const key = `${word}/${ref}?${query ?? ''}`
   useEffect(() => {
     let cancelled = false
-    resolveHandoff(word, ref).then(
+    resolveHandoff(word, ref, query).then(
       (value) => !cancelled && setAnswer({ key, value }),
       () => !cancelled && setAnswer({ key, value: 'failed' }),
     )
     return () => {
       cancelled = true
     }
-  }, [word, ref, key])
+  }, [word, ref, query, key])
   // An answer about the previous path is no answer about this one.
   return answer?.key === key ? answer.value : undefined
 }

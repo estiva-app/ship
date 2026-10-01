@@ -84,9 +84,11 @@ export type Route =
   /**
    * `/<word>/<ref>` for a word that is not Ship's — another app's file, opened
    * on Ship's host (RFC 0.5 §7.7). Kept as written: which kind the word names
-   * is the manifests' to say, and the page asks them.
+   * is the manifests' to say, and the page asks them. `query` too, because a
+   * Peek thread link names its comment there (`?thread=<id>`) and the hand-off
+   * carries it on (Miky, 2026-10-01).
    */
-  | { name: 'elsewhere'; word: string; ref: string }
+  | { name: 'elsewhere'; word: string; ref: string; query?: string }
 
 /**
  * The first segments Ship answers itself. Anything else with a ref after it is
@@ -145,7 +147,7 @@ export function href(route: Route): string {
     case 'inbound':
       return `/o/${route.naddr}`
     case 'elsewhere':
-      return `/${route.word}/${route.ref}`
+      return `/${route.word}/${route.ref}${route.query ? `?${route.query}` : ''}`
   }
 }
 
@@ -193,7 +195,7 @@ export function parse(location: string): Route {
     return { name: 'folder', id: parts[1] }
   }
   if (parts.length === 2 && !OWN_SEGMENTS.has(parts[0])) {
-    return { name: 'elsewhere', word: parts[0], ref: parts[1] }
+    return query ? { name: 'elsewhere', word: parts[0], ref: parts[1], query } : { name: 'elsewhere', word: parts[0], ref: parts[1] }
   }
   if (parts[0] === 'issue' && parts[1]) {
     const d = identifierFromRef(parts[1])

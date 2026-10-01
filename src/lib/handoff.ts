@@ -87,6 +87,26 @@ export function manifestOfLink<M extends Manifest>(url: string, manifests: reado
   )
 }
 
+/**
+ * The link as it was written, with the owner's host in front — or undefined
+ * when the owner declares no shape for it.
+ *
+ * Miky, 2026-10-01: a Peek thread link opened on Ship hands off to the
+ * comment, not to the top of the topic, so the hand-off changes the host and
+ * nothing else (§7.7: "a person moves between the two by changing the host").
+ * The `web` template cannot say this — `/o/<naddr>` names the topic alone.
+ * Only the owner's own shapes are tried, and the owner is the manifest whose
+ * template the projection's link came from, so this trusts nothing new.
+ */
+export function samePathOn(owner: Manifest, word: string, ref: string, query?: string): string | undefined {
+  const patterns = urlPatternsOf(owner)
+  const tail = `/${word}/${ref}${query ? `?${query}` : ''}`
+  for (const origin of new Set(patterns.map((p) => originOf(p.pattern)).filter((o): o is string => !!o))) {
+    if (matchObjectUrl(`${origin}${tail}`, patterns)) return `${origin}${tail}`
+  }
+  return undefined
+}
+
 /** Only an `https:` link is followed off the page; anything else is no link. */
 export function safeLink(url: string | undefined): string | undefined {
   if (!url) return undefined

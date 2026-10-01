@@ -141,8 +141,9 @@ describe('the §7.2 grammar', () => {
 describe('the §7.7 root', () => {
   it('sends another app’s word to the hand-off, as written', () => {
     expect(parse(`/topic/level-2-${UUID}`)).toEqual({ name: 'elsewhere', word: 'topic', ref: `level-2-${UUID}` })
-    // The query names a thread inside the topic; the file handed off is the topic.
-    expect(parse(`/topic/level-2-${UUID}?thread=abc`)).toEqual({ name: 'elsewhere', word: 'topic', ref: `level-2-${UUID}` })
+    // The query names a thread inside the topic, and the hand-off carries it on.
+    expect(parse(`/topic/level-2-${UUID}?thread=abc`)).toEqual({ name: 'elsewhere', word: 'topic', ref: `level-2-${UUID}`, query: 'thread=abc' })
+    expect(href({ name: 'elsewhere', word: 'topic', ref: `x-${UUID}`, query: 'thread=abc' })).toBe(`/topic/x-${UUID}?thread=abc`)
   })
 
   it('keeps Ship’s own words, and a broken one of them, off the hand-off', () => {
