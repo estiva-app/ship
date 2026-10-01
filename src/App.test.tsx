@@ -294,7 +294,7 @@ describe('Project page — one project from the fold', () => {
     render(<App />)
     const main = within(screen.getByRole('main'))
     fireEvent.click(main.getByRole('button', { name: 'Archive project' }))
-    const dialog = within(screen.getByRole('alertdialog', { name: /Archive .Live./ }))
+    const dialog = within(screen.getByRole('dialog', { name: /Archive .Live./ }))
     expect(dialog.getByText(/hides the project and its 2 issues from every list/)).toBeInTheDocument()
     expect(archiveProject).not.toHaveBeenCalled()
     fireEvent.change(dialog.getByRole('textbox', { name: /Resolution/ }), { target: { value: 'Shipped in 0.37.' } })

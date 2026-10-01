@@ -51,3 +51,7 @@ import { ArchiveDialog } from '@/components/ArchiveDialog'
 - **The resolution field**, optional and trimmed. It travels as the
   archiving change's content, one event, so it cannot land without the
   archive.
+- **Its form.** The shell is the package's `DialogShell` with the field in a
+  `Form`, not a `ConfirmDialog`: Ctrl+Enter in the resolution archives, the
+  field and the buttons are off while it does, and Escape or a press outside
+  closes it.
