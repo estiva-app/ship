@@ -953,7 +953,7 @@ async function main() {
   await page.waitForSelector('[data-surface="project"]')
   // FOL-46: archiving asks first, and carries the resolution the person gives.
   await page.getByRole('button', { name: 'Archive project' }).click()
-  const archiveDialog = page.getByRole('alertdialog', { name: /^Archive / })
+  const archiveDialog = page.getByRole('dialog', { name: /^Archive / })
   await archiveDialog.getByRole('textbox', { name: /Resolution/ }).fill('Smoke test: done with it.')
   await archiveDialog.getByRole('button', { name: 'Archive project' }).click()
   await page.getByRole('button', { name: 'Unarchive project' }).waitFor()
