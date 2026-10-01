@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 import { ArchiveDialog } from '@/components/ArchiveDialog'
 import { ArchivedNotice } from '@/components/ArchivedNotice'
 import { ownArchive, type Archives } from '@/lib/archive'
-import { ISSUE_STATUSES, archiveIssue, commentsOn, deleteIssue, deleteMessage, editMessage, react, referenceFor, reply, setIssueField, unreact, startConversation, type DirectoryView, type FolderState, type WorkspaceState, threadContext, fileContext, useMergedReadState, firstUnreadByThread, me } from '@/api'
+import { ISSUE_STATUSES, archiveIssue, commentsOn, deleteIssue, deleteMessage, editMessage, react, referenceFor, reply, setIssueField, unreact, startConversation, type DirectoryView, type FolderState, type WorkspaceState, threadContext, fileContext, useMergedReadState, useFeedJudges, firstUnreadByThread, me } from '@/api'
 import { useRelated } from '@/api/useRelated'
 import type { HistoryEntry } from '@/components/History'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
@@ -69,13 +69,17 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
     () => conversations.map((c) => threadFor(c, directory, issue ? { value: issue.description, format: issue.descriptionFormat } : undefined, issue?.addr, state.edits, state.attachments)),
     [conversations, directory, issue],
   )
-  /* The divider in the feed (CRO-13). Every root here is about the issue, so
-     they all answer to the issue's marker, which §11.3 propagates down to their
-     replies — and the project's marker is deliberately not in the picture. */
+  /* The divider in the feed (CRO-13, CON-19). Every root here is about the
+     issue, so they all answer to the issue's marker, which §11.3 propagates
+     down to their replies — and the project's marker is deliberately not in the
+     picture. Whether a message is new to you is §11.8's call, made by the
+     package: you must be a member of the issue, and a muted issue lights only
+     for a message that names you. */
   const merged = useMergedReadState()
+  const judges = useFeedJudges(issue ? { addr: issue.addr, createdAt: issue.createdAt } : undefined, undefined)
   const unread = useMemo(
-    () => firstUnreadByThread(threads, merged, fileContext(issue?.addr), me),
-    [threads, merged, issue],
+    () => firstUnreadByThread(conversations, merged, () => judges.file),
+    [conversations, merged, judges],
   )
   const history = useMemo(() => (issue ? historyFor(issue.addr, state, directory) : []), [issue, state, directory])
   const people = useMemo(() => railPeople(state, directory), [state, directory])

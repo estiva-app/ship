@@ -9,11 +9,11 @@
  * undecryptable message.
  *
  * Read state is the only caller today. It is a general capability, so it lives
- * on its own rather than inside `readState.ts`.
+ * on its own rather than inside `readStateSync.ts`.
  */
 import { ID_CONFIG } from '../config'
 import { currentToken } from '../auth/estivaId'
-import type { Nip44 } from './readState'
+import type { Nip44 } from '@estiva-app/conversation'
 
 async function call(op: 'encrypt' | 'decrypt', body: object): Promise<unknown> {
   const token = currentToken()
@@ -33,7 +33,7 @@ async function call(op: 'encrypt' | 'decrypt', body: object): Promise<unknown> {
 }
 
 /**
- * The seam `readState.ts` takes.
+ * The seam `@estiva-app/conversation`'s read state takes.
  *
  * `decrypt` returns `undefined` for anything unreadable rather than throwing: a
  * blob written under a rotated key is the realistic cause, and it should cost
