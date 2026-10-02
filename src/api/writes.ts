@@ -26,14 +26,13 @@ import { store } from './store'
  *
  * Which Folder an event carries is the one thing easy to get wrong:
  * - an issue's events go to the issue's own Folder (`issue.folder`), which
- *   is not necessarily its project's current one after a re-link;
- * - a project's record changes go to the Folder the record names
- *   (`project.originFolder`);
- * - a project's conversation and its new issues go to its content Folder
- *   (`project.contentFolder`).
+ *   is not necessarily its project's;
+ * - a project's record changes, its conversation and its new issues go to
+ *   the Folder the record names (`project.contentFolder`).
  *
  * Getting it wrong does **not** fail. Measured against production on
- * 2026-08-29: a project change published against the content Folder instead
+ * 2026-08-29, when a re-pointed project's content Folder could differ from its
+ * record's: a project change published against the content Folder instead
  * of the record's is accepted by the relay, `ok: true`, no reason given. The
  * fold keys changes by target address, so `foldFolder` over the whole
  * workspace applies it and the app looks correct — but `loadFolder` and
@@ -41,7 +40,7 @@ import { store } from './store'
  * never sees it. The edit exists for one reader and not for another,
  * permanently, with nothing anywhere reporting a problem.
  *
- * The three lines above are load-bearing for that reason, not because
+ * The two rules above are load-bearing for that reason, not because
  * something downstream would catch a mistake. It would not.
  */
 export type WriteResult = { ok: true } | { ok: false; reason: string }
@@ -98,7 +97,7 @@ export function setProjectField(project: Project, field: 'title' | 'description'
     §13.4 says a body's format is on the event and is never guessed.
   */
   const body = field === 'description' ? { value, contentFormat } : { value, contentFormat: undefined }
-  return publish(() => store.setField({ folder: project.originFolder, target: project.addr, field, ...body, note }))
+  return publish(() => store.setField({ folder: project.contentFolder, target: project.addr, field, ...body, note }))
 }
 
 /**
@@ -107,7 +106,7 @@ export function setProjectField(project: Project, field: 'title' | 'description'
  * first when it is opened (FOL-46).
  */
 export function archiveProject(project: Project, archived: boolean, resolution?: string): Promise<WriteResult> {
-  return publish(() => store.archiveProject({ recordFolder: project.originFolder, project: project.addr, archived, resolution }))
+  return publish(() => store.archiveProject({ recordFolder: project.contentFolder, project: project.addr, archived, resolution }))
 }
 
 /** Archive one issue, or restore it — the project's rule, one level down (FOL-46). */
@@ -169,7 +168,7 @@ export async function deleteProject(
     const read = listing(held).length > 0 || own(held) ? held : await readFolders()
     const lists = listing(read)
     const unlistFrom = lists.length > 0 ? lists : [{ folder: project.contentFolder, hasState: own(read)?.hasState ?? false }]
-    const { result, unlisted } = await store.deleteProject({ recordFolder: project.originFolder, project: project.addr, folders: unlistFrom })
+    const { result, unlisted } = await store.deleteProject({ recordFolder: project.contentFolder, project: project.addr, folders: unlistFrom })
     if (!result.ok) return refused(result.reason)
     if (unlisted && !unlisted.ok) return { ok: true, stillListed: unlisted.reason ?? 'no reason given' }
     return { ok: true }

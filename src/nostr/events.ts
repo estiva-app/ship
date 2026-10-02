@@ -65,11 +65,9 @@ export function assertFolderId(folder: string): void {
  * Pairing with an existing Peek topic is therefore just *creating the project
  * in that topic's Folder*. No linking step, no second container.
  *
- * `folder` is written as a foldable **field** only when a project is later
- * re-pointed at a different Folder (`store.linkProjectFolder`). An event cannot
- * change its own `h`, so that override is the only way to express "this project
- * now lives in that topic" after the fact — and the reader takes the union, so
- * issues already filed do not disappear.
+ * There is no `folder` field. One used to re-point an existing project at
+ * another Folder; it is neither written nor read since MAN-5, and moving a
+ * project changes only the Folder listings (FOL-7).
  *
  * ## The record is global; its contents are not (REW-11)
  *

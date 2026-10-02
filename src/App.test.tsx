@@ -54,7 +54,7 @@ const MINE = D('03')
 
 // `archived` and the field it is folded from, together, as the fold writes them (FOL-46 reads the field).
 const project = (d: string, title: string, archived = false) => ({
-  addr: `30850:x:${d}`, id: d, author: OTHER, createdAt: 1, title, description: '', descriptionFormat: 'marker' as const, contentFolder: 'f', originFolder: 'f', status: 'planned', archived,
+  addr: `30850:x:${d}`, id: d, author: OTHER, createdAt: 1, title, description: '', descriptionFormat: 'marker' as const, contentFolder: 'f', status: 'planned', archived,
   fields: (archived ? { archived: { value: 'true', by: OTHER, at: 1, format: 'marker' as const } } : {}) as WorkspaceState['projects'][number]['fields'],
 })
 const issue = (d: string, projectAddr: string | undefined, status: string) => ({

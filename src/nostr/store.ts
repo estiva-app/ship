@@ -28,7 +28,7 @@ import {
 } from './events'
 import { findNaddrs, naddrToAddr, buildReaction, buildEdit, buildDeletion as buildEventDeletion } from '@estiva-app/protocol'
 import { planArchiveFolder, planCreateFolder, planMoveFile, planPlaceFile, planRenameFolder, planUnlistFile, type FolderRef, type MoveRefusal } from '@estiva-app/interop'
-import { foldFolder, projectFolders, type FolderState } from './fold'
+import { foldFolder, type FolderState } from './fold'
 import { decorationsOf, foldAttachments, foldEdits, type Decorations, type EditFold, type QueryFn } from '@estiva-app/conversation'
 import { anchorIndex, type AnchorIndex } from './references'
 import { directoryFrom, type Directory } from './profiles'
@@ -277,7 +277,7 @@ export class Store {
    * `project-…` channel (`ensureFolder`) or a pasted Peek topic. A project
    * belongs to a team now, and its issues, changes and conversation carry the
    * team's `h` — the record's `buzz-channel` names the team, so `contentFolder`
-   * and `originFolder` both fold to it and nothing downstream changes meaning.
+   * folds to it and nothing downstream changes meaning.
    *
    * **Then it is listed in the team**, which the record alone never does. A
    * Folder with state lists only what its `kind:30890` names, and filing by `h`
@@ -576,76 +576,6 @@ export class Store {
     )
   }
 
-  /**
-   * Re-point an existing project at a different Folder.
-   *
-   * Only needed after the fact. Creating the project in the topic's Folder is
-   * the normal way to pair them; this exists because an event cannot change its
-   * own `h`, so a project that already exists elsewhere has no other way to say
-   * "my work happens over there now".
-   *
-   * A change event rather than an edit, so somebody who is not the project's
-   * author can do it — which matters here more than anywhere, since the person
-   * who owns the Peek topic is frequently not the person who made the project.
-   *
-   * Issues already filed under the old Folder keep their `h` and do not move.
-   * Readers take the union of every Folder a project has pointed at
-   * (`projectFolders`) rather than pretending the history did not happen.
-   */
-  async linkProjectFolder(args: {
-    /** The Folder the project *record* lives in — its own `h`. */
-    recordFolder: string
-    project: string
-    folder: string
-  }): Promise<PublishResult & { announced: boolean; announceReason?: string }> {
-    assertFolderId(args.folder)
-    const note = `linked to Folder ${args.folder.slice(0, 8)}…`
-
-    // The change that decides the pairing. It goes where the record lives,
-    // because that is the Folder every reader of this project already loads.
-    const linked = await this.setField({
-      folder: args.recordFolder,
-      target: args.project,
-      field: 'folder',
-      value: args.folder,
-      note,
-    })
-    if (!linked.ok) return { ...linked, announced: false }
-    if (args.folder === args.recordFolder) return { ...linked, announced: true }
-
-    // The same statement again, published *into* the Folder being paired.
-    //
-    // Without it that Folder contains no trace of the pairing at all: the
-    // project record keeps the `h` it was born with, and so does the change
-    // above, so an app reading the new Folder sees nothing naming the project.
-    // Peek shipped a reader that infers it from the issues instead
-    // (estiva-app/peek#54) — which works, and stops working for a Folder paired
-    // before any issue is filed in it. Inference was the only option because
-    // nothing here said it out loud; this is Ship saying it out loud.
-    //
-    // Deliberately the identical field and value, not a new vocabulary. It
-    // folds to the same state, so a reader that already understands `folder`
-    // needs no change, and one that loads both Folders sees the statement twice
-    // and folds it once — last-write-wins is idempotent for a repeated value.
-    const announced = await this.setField({
-      folder: args.folder,
-      target: args.project,
-      field: 'folder',
-      value: args.folder,
-      note,
-    })
-
-    // The pairing itself succeeded either way, so this is not a failure to
-    // report as one. It is a real caveat though — a Folder that refused the
-    // write is a Folder other apps may not find the project in — so it is
-    // returned rather than swallowed, and the caller says so.
-    return {
-      ...linked,
-      announced: announced.ok,
-      announceReason: announced.ok ? undefined : announced.reason,
-    }
-  }
-
   async createIssue(args: {
     folder: string
     title: string
@@ -907,7 +837,7 @@ export class Store {
    *
    * That unscoped first query is also why this method needs no change for
    * REW-11: a global project record comes back from exactly the same filter,
-   * and `projectFolders` reads its `buzz-channel` where it used to read `h`.
+   * and `contentFolder` reads its `buzz-channel` where it used to read `h`.
    *
    * **Issues are discovered directly as well as through their projects** — see
    * SHI-7 and the note inside. Reaching them only through a parent loses every
@@ -918,7 +848,7 @@ export class Store {
    * query's `#h` list *is* the answer to the discovery one.
    *
    * Folded as a single stream at the end rather than per Folder. Not an
-   * optimisation — a re-linked project's record and its older issues sit in
+   * optimisation — a project's record and its older issues can sit in
    * different Folders, and folding those separately would drop changes.
    */
   async loadAll(): Promise<WorkspaceState> {
@@ -978,26 +908,22 @@ export class Store {
     /**
      * Widen until no new Folder appears.
      *
-     * Not a loop for elegance — a re-linked project genuinely cannot be resolved
-     * in one pass. The discovery query asks for `kind:30850` only, so it cannot
-     * contain the `kind:1851` that re-points a project at a Peek topic; that
-     * change lives in the Folder the *record* is in, which is only learned in
-     * the first pass. Reading once therefore finds the project, misses the
-     * re-link, and never queries the topic — so issues filed after pairing are
-     * written correctly and then never read back, which looks exactly like
-     * "creating a ticket is broken".
+     * Every project's own Folder and every issue's. A Folder read can turn up
+     * an object the discovery query did not — one named by a reference, or a
+     * project only a Folder's events reach — so it repeats until nothing new
+     * appears. The bound is four, so a pathological chain degrades to a
+     * partial read rather than an unbounded fan-out.
      *
-     * Two passes settle the normal case and the re-linked one. The bound is
-     * four, so a pathological chain of re-links degrades to a partial read
-     * rather than an unbounded fan-out.
+     * Threads anchored at a project but filed elsewhere — in the Folder a
+     * retired `folder` change used to point at (MAN-5) — are reached because
+     * each such Folder holds that project's issues. Measured on production
+     * on 2026-10-02: 0 of the 24 formerly re-pointed Folders would go unread.
      */
     for (let pass = 0; pass < 4; pass++) {
       const state = foldFolder(events, referencedAddresses)
       const wanted = new Set<string>()
       for (const project of state.projects) {
-        for (const folder of projectFolders(project, state.activity)) {
-          if (!fetched.has(folder)) wanted.add(folder)
-        }
+        if (project.contentFolder && !fetched.has(project.contentFolder)) wanted.add(project.contentFolder)
       }
       /*
         An issue's own Folder, which is NOT reachable from its project when the

@@ -21,7 +21,7 @@ export { foldWorkspace } from '../nostr/store'
 export type { Directory, Profile } from '../nostr/profiles'
 export { initials } from '../nostr/profiles'
 export { ISSUE_STATUSES, PROJECT_STATUSES, lookupStatus, type VocabEntry } from '../nostr/kinds'
-export { conversationsAbout, projectFolders } from '../nostr/fold'
+export { conversationsAbout } from '../nostr/fold'
 /*
   The two lists, and the rule that separates them — SPEC §6.4, CON-7.
 

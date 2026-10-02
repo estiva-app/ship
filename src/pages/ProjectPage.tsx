@@ -31,7 +31,6 @@ import {
   commentsOn,
   mentionsOf,
   commentsOnAny,
-  projectFolders,
   type DirectoryView,
   type FolderState,
   type WorkspaceState,
@@ -382,11 +381,11 @@ export function ProjectPage({
     () => (project ? subFileThreads(state, new Set(state.issues.filter((issue) => issue.projectAddr === project.addr).map((issue) => issue.addr))) : new Set<string>()),
     [project, state],
   )
-  const record = recordChannel(project?.originFolder, teams)
+  const record = recordChannel(project?.contentFolder, teams)
   const conversations = useMemo(
     () =>
       project
-        ? ownConversations(state.conversations, { addr: project.addr, originFolder: record ?? '', folders: projectFolders(project, state.activity) }, state.anchors).filter((c) => !rolledUp.has(c.id))
+        ? ownConversations(state.conversations, { addr: project.addr, recordFolder: record ?? '' }, state.anchors).filter((c) => !rolledUp.has(c.id))
         : [],
     [project, state, rolledUp, record],
   )
@@ -398,11 +397,10 @@ export function ProjectPage({
      before FOL-16 their roots answered to the channel marker, so this line
      silently read every issue in the project.
 
-     The channel is the **record** channel, not the content Folder (FOL-1): that
-     is the only Folder whose chat this page draws. For a project pointing at a
-     team, marking the content Folder would advance the team's chat, which is
-     not on this page. For a project never relinked the two are the same. A
-     project filed into a team (FOL-2) has no record channel, only a team. */
+     The channel is the **record** channel (FOL-1): the only Folder whose chat
+     this page draws. A project filed into a team (FOL-2) has no record
+     channel, only a team, and marking the team would advance the team's chat,
+     which is not on this page. */
   useMarkRead([channelContext(record), fileContext(project?.addr)])
   const threads = useMemo(
     () => conversations.map((c) => threadFor(c, directory, project ? { value: project.description, format: project.descriptionFormat } : undefined, project?.addr, state.edits, state.attachments)),
