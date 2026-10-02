@@ -1,4 +1,4 @@
-import { Fragment, Suspense, lazy, useMemo, useState, type ComponentProps } from 'react'
+import { Fragment, Suspense, lazy, useCallback, useMemo, useState, type ComponentProps } from 'react'
 import { IconDotsVertical, IconMessage2, IconMoodPlus } from '@tabler/icons-react'
 import type { Imeta } from '@estiva-app/protocol'
 import { Avatar, Button, Card, EmptyState, IconButton, Menu, MenuItem, Popover, ReactionPicker, WithTooltip } from '@estiva-app/ui'
@@ -18,6 +18,8 @@ import { ConfirmDeleteMessage, NewSinceHere, useThreadReactions, useThreadRefere
 import type { ActivityProps } from '@/components/Activity'
 import { MESSAGE_FORMAT, PLACE_ICON, RELATION, Time, meaningLabel, standaloneReferencesOf, type MentionListViewProps, type ThreadListViewProps } from './shared'
 import { MessageBoxShell } from './writingBox'
+import type { Picks } from './MessageBox'
+import { referenceItems } from '@/components/editing/mentionables'
 
 /*
   The writing box is its own chunk: its editor is ProseMirror, which a reader
@@ -207,7 +209,9 @@ function RepliesButton({ count, open, newCount, onToggle }: { count: number; ope
 
 interface ThreadProps {
   thread: ThreadData
-  onReply: (threadId: string, text: string, files: readonly Imeta[]) => Promise<boolean | void> | boolean | void
+  /** Every thread on the page: what the reply box's `[` offers (CON-25). */
+  pageThreads: readonly ThreadData[]
+  onReply: (threadId: string, text: string, files: readonly Imeta[], picks?: Picks) => Promise<boolean | void> | boolean | void
   disabledReason?: string
   unreadFrom?: string
   resolved?: Record<string, ForeignObjectData | null | undefined>
@@ -225,7 +229,8 @@ interface ThreadProps {
 /** Replies hang one step in, behind today's left rule. */
 const REPLY_RULE = 'ml-2.5 border-l-2 border-border-default pl-3'
 
-function Thread({ thread, onReply, disabledReason, unreadFrom, resolved, resolving, nameOf, reactionsBy, onReact, onDeleteMessage, onEditMessage, upload, drafts, viewer }: ThreadProps) {
+function Thread({ thread, pageThreads, onReply, disabledReason, unreadFrom, resolved, resolving, nameOf, reactionsBy, onReact, onDeleteMessage, onEditMessage, upload, drafts, viewer }: ThreadProps) {
+  const references = useCallback(() => referenceItems(pageThreads, thread.id, nameOf), [pageThreads, thread.id, nameOf])
   const unreadIndex = thread.replies.findIndex((r) => r.id === unreadFrom)
   const newCount = unreadIndex < 0 ? 0 : thread.replies.length - unreadIndex
   const [open, setOpen] = useState(newCount > 0)
@@ -268,7 +273,8 @@ function Thread({ thread, onReply, disabledReason, unreadFrom, resolved, resolvi
             upload={upload}
             nameOf={nameOf}
             className="ml-2.5"
-            onSubmit={(text, files) => onReply(thread.id, text, files)}
+            references={references}
+            onSubmit={(text, files, picks) => onReply(thread.id, text, files, picks)}
             onCancel={() => (setOpen(false), setFocusReply(false))}
           />
         </div>
@@ -295,14 +301,15 @@ const threadProps = (p: ThreadListViewProps | MentionListViewProps) => ({
 /** The drawing, with the reads handed in — for a story, or a caller that has them. */
 export function ThreadListView(props: ThreadListViewProps) {
   const { threads, onStart, disabledReason, className, unread, nameOf, about, omitted = 0, reactionsCut = false, upload, drafts } = props
+  const references = useCallback(() => referenceItems(threads, undefined, nameOf), [threads, nameOf])
   return (
     <div className={cn('flex flex-col gap-3', className)}>
-      <MessageBox kind="conversation" onSubmit={onStart} disabledReason={disabledReason} draftKey={about && draftKeys.object(about)} drafts={drafts} upload={upload} nameOf={nameOf} />
+      <MessageBox kind="conversation" onSubmit={onStart} references={references} disabledReason={disabledReason} draftKey={about && draftKeys.object(about)} drafts={drafts} upload={upload} nameOf={nameOf} />
       {threads.length ? (
         <ol className="flex flex-col gap-3">
           {threads.map((thread) => (
             <li key={thread.id}>
-              <Thread thread={thread} unreadFrom={unread?.[thread.id]} {...threadProps(props)} />
+              <Thread thread={thread} pageThreads={threads} unreadFrom={unread?.[thread.id]} {...threadProps(props)} />
             </li>
           ))}
         </ol>
@@ -322,6 +329,7 @@ export function ThreadListView(props: ThreadListViewProps) {
 /** "Mentioned in": conversations elsewhere that name this object, each with where it lives. */
 export function MentionListView(props: MentionListViewProps) {
   const { items, truncated = 0, className } = props
+  const pageThreads = useMemo(() => items.map((item) => item.thread), [items])
   if (!items.length) return <EmptyState scope="section" className={className} message="No related conversations yet." />
   return (
     <div className={cn('flex flex-col gap-3', className)}>
@@ -342,7 +350,7 @@ export function MentionListView(props: MentionListViewProps) {
                   <span>{relation.label}</span>
                 )}
               </p>
-              <Thread thread={item.thread} {...threadProps(props)} />
+              <Thread thread={item.thread} pageThreads={pageThreads} {...threadProps(props)} />
             </li>
           )
         })}

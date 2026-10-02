@@ -23,6 +23,7 @@ import { ID_CONFIG, RELAY_URL } from './config'
 import { beginSignIn, beginSignOut, signInAvailable, signedIn } from './auth/estivaId'
 import { identifierFromRef, type FolderSummary } from '@estiva-app/interop'
 import { archivesOf, type Archives } from '@/lib/archive'
+import { MentionPeopleProvider, mentionPeople } from '@/components/editing/mentionables'
 import { go, href, replace, useRoute, type Route } from './router'
 
 /**
@@ -93,6 +94,7 @@ function Shell() {
   // Names and faces for everyone in the snapshot; re-read in full on navigation.
   const people = useMemo(() => (state ? peopleIn(state, me) : [me]), [state])
   const directory = useDirectory(people, href(route))
+  const mentionable = useMemo(() => mentionPeople(people, directory), [people, directory])
 
   useCanonicalPath(route)
   useInbound(route, say)
@@ -172,7 +174,10 @@ function Shell() {
         />
       }
     >
-      <Page route={route} state={state} loading={loading} directory={directory} teams={teams} folders={folders} archives={archives} say={say} refresh={refresh} />
+      {/* Everyone `@` and `!@` offer in any message box on the page (CON-25). */}
+      <MentionPeopleProvider value={mentionable}>
+        <Page route={route} state={state} loading={loading} directory={directory} teams={teams} folders={folders} archives={archives} say={say} refresh={refresh} />
+      </MentionPeopleProvider>
       {movingProject && teams && <MoveProject project={movingProject} teams={teams} say={say} onClose={() => setMoving(null)} />}
       {creatingFolder && <NewFolderDialog onCreate={newFolder} onClose={() => setCreatingFolder(false)} />}
     </AppShell>

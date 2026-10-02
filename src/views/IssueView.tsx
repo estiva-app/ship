@@ -4,6 +4,7 @@ import { Breadcrumb, type Crumb } from '@/components/ui/Breadcrumb'
 import { ScrollArea } from '@/components/ui/ScrollArea'
 import { linkTo, type IssueTab } from '@/router'
 import type { ContentFormat, Imeta } from '@estiva-app/protocol'
+import type { Picks } from '@/components/conversations/MessageBox'
 import { Divider } from '@/components/ui/Divider'
 import { Tabs } from '@/components/ui/Tabs'
 import { History, type HistoryEntry } from '@/components/History'
@@ -57,14 +58,15 @@ export interface IssueViewProps {
   /** Thread id → first unread message id. Drives the "new since" line (CRO-13). */
   unread?: Record<string, string>
   /**
-   * `files` are attachments already on the relay — SHI-2. `blockId` is set when
-   * a comment is about one block of the description — SPEC §13.6; supplied by
-   * whoever built that affordance.
+   * `files` are attachments already on the relay — SHI-2. `picks` are the
+   * composer's urgent mentions (CON-25). `blockId` is set when a comment is
+   * about one block of the description — SPEC §13.6; supplied by whoever built
+   * that affordance.
    */
-  onStartConversation: (text: string, files: readonly Imeta[], blockId?: string) => Promise<boolean | void> | boolean | void
-  onReply: (threadId: string, text: string, files: readonly Imeta[]) => Promise<boolean | void> | boolean | void
+  onStartConversation: (text: string, files: readonly Imeta[], picks?: Picks, blockId?: string) => Promise<boolean | void> | boolean | void
+  onReply: (threadId: string, text: string, files: readonly Imeta[], picks?: Picks) => Promise<boolean | void> | boolean | void
   /** Reply into a thread that belongs to another file — its own Folder, never this issue's (CON-9). */
-  onReplyInActivity: (threadId: string, text: string, files: readonly Imeta[]) => Promise<boolean | void> | boolean | void
+  onReplyInActivity: (threadId: string, text: string, files: readonly Imeta[], picks?: Picks) => Promise<boolean | void> | boolean | void
   history: HistoryEntry[]
   rail: Omit<IssueRailProps, 'className'>
   /** This object's address, so an unsent message is kept against it — CON-10. */

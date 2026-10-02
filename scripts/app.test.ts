@@ -23,7 +23,8 @@ import { buildChange, buildConversationMessage, buildIssue, buildProject } from 
 import { buildManifest } from '../src/nostr/manifest'
 import { KIND } from '../src/nostr/kinds'
 import { foldFolder } from '../src/nostr/fold'
-import { foldAttachments } from '@estiva-app/conversation'
+import { foldAttachments, messageReference } from '@estiva-app/conversation'
+import { addrToNaddr, encodeNpub } from '@estiva-app/protocol'
 import { directoryFrom, initials, parseProfile } from '../src/nostr/profiles'
 import type { SignedEvent } from '@estiva-app/protocol'
 import { actionProblems } from '@estiva-app/interop'
@@ -437,6 +438,26 @@ const standIn = buildConversationMessage(PK, Date.now(), {
   replyToComment: { id: 'c1', anchor: ISSUE_ADDR2 },
 })
 check('  …no p when the comment’s author is not known', tag(standIn, 'p') === undefined)
+
+// What the body earns — CON-25: a `p` per person, an `urgent` per urgent one,
+// an `a` per other address, a `q` per message, on all three paths.
+const BOB = 'b'.repeat(64)
+const MSG = 'd'.repeat(64)
+const ADDR_ELSEWHERE = `30851:${PK}:i2`
+const earning = `nostr:${encodeNpub(BOB)} see ${messageReference(MSG, 9)} and nostr:${addrToNaddr(ADDR_ELSEWHERE)}`
+const values = (event: { tags: string[][] }, name: string) => event.tags.filter((t) => t[0] === name).map((t) => t[1])
+const chatEarns = buildConversationMessage(PK, Date.now(), { folder: CONTENT, body: earning, urgent: [BOB, OTHER] })
+check('a chat message names who it mentions as p (§13.1)', JSON.stringify(values(chatEarns, 'p')) === JSON.stringify([BOB]))
+check('  …urgent only for an urgent pick its body names', JSON.stringify(values(chatEarns, 'urgent')) === JSON.stringify([BOB]))
+check('  …an a for the address it names, a q for the message it references', JSON.stringify(values(chatEarns, 'a')) === JSON.stringify([ADDR_ELSEWHERE]) && JSON.stringify(values(chatEarns, 'q')) === JSON.stringify([MSG]))
+const commentEarns = buildConversationMessage(PK, Date.now(), { folder: CONTENT, body: earning, about: ISSUE_ADDR2, urgent: [BOB] })
+check('a comment keeps the object’s p first, then the people its body names', JSON.stringify(values(commentEarns, 'p')) === JSON.stringify([PK, BOB]))
+check('  …its own a, then every other address the body names (§6.4)', JSON.stringify(values(commentEarns, 'a')) === JSON.stringify([ISSUE_ADDR2, ADDR_ELSEWHERE]))
+check('  …and a q and an urgent, as chat does', JSON.stringify(values(commentEarns, 'q')) === JSON.stringify([MSG]) && JSON.stringify(values(commentEarns, 'urgent')) === JSON.stringify([BOB]))
+const replyEarns = buildConversationMessage(PK, Date.now(), { folder: CONTENT, body: earning, replyToComment: { id: MSG, anchor: ISSUE_ADDR2, author: OTHER } })
+check('a reply does not quote the comment it answers: that is its e', values(replyEarns, 'q').length === 0 && tag(replyEarns, 'e') === MSG)
+check('  …and still names the people and the other address', values(replyEarns, 'p').includes(BOB) && JSON.stringify(values(replyEarns, 'a')) === JSON.stringify([ADDR_ELSEWHERE]))
+check('a message that names nothing earns nothing', ['q', 'urgent', 'a'].every((name) => values(plain, name).length === 0) && values(plain, 'p').length === 0)
 
 // The round trip: the reply folds into the comment's thread, and the comment
 // carries the anchor the reply was built from.

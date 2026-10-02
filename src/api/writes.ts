@@ -321,7 +321,7 @@ export function setIssueField(issue: Issue, field: 'title' | 'description' | 'st
  * widget above the message; about a project, the message is already in the
  * topic it belongs to and a reference would be noise.
  */
-export function startConversation(args: { folder: string; about: string; withReference: boolean; body: string; blockId?: string; files?: readonly Imeta[] }): Promise<WriteResult> {
+export function startConversation(args: { folder: string; about: string; withReference: boolean; body: string; blockId?: string; files?: readonly Imeta[]; urgent?: readonly string[] }): Promise<WriteResult> {
   return publish(() =>
     store.postMessage({
       folder: args.folder,
@@ -334,6 +334,7 @@ export function startConversation(args: { folder: string; about: string; withRef
       // resolve before the composer would submit, because ingest refuses a
       // message naming a blob it does not hold.
       files: args.files,
+      urgent: args.urgent,
     }),
   )
 }
@@ -345,7 +346,7 @@ export function startConversation(args: { folder: string; about: string; withRef
  * (SHI-28); a chat thread gets a `kind:9`. The root's `anchor` is what tells
  * them apart — only a NIP-22 comment carries one.
  */
-export function reply(conversation: Conversation, fallbackFolder: string, body: string, files?: readonly Imeta[]): Promise<WriteResult> {
+export function reply(conversation: Conversation, fallbackFolder: string, body: string, files?: readonly Imeta[], urgent?: readonly string[]): Promise<WriteResult> {
   const { root } = conversation
   return publish(() =>
     store.postMessage({
@@ -362,6 +363,7 @@ export function reply(conversation: Conversation, fallbackFolder: string, body: 
           }
         : { replyTo: { rootId: conversation.id, parentId: conversation.id } }),
       files,
+      urgent,
     }),
   )
 }

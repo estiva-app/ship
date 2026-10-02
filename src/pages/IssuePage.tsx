@@ -144,11 +144,11 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
         unread={unread}
         // Threads about an issue carry a reference in the body so Peek renders
         // the issue's widget above them (withReference: true), as the old app has it.
-        onStartConversation={(body, files, blockId) => act('Message', () => startConversation({ folder: issue.folder, about: issue.addr, withReference: true, body, blockId, files }), say, () => refresh([issue.folder]))}
-        onReply={(threadId, body, files) => {
+        onStartConversation={(body, files, picks, blockId) => act('Message', () => startConversation({ folder: issue.folder, about: issue.addr, withReference: true, body, blockId, files, urgent: picks?.urgent }), say, () => refresh([issue.folder]))}
+        onReply={(threadId, body, files, picks) => {
           const conversation = conversations.find((c) => c.id === threadId)
           if (!conversation) return false
-          return act('Reply', () => reply(conversation, issue.folder, body, files), say, () => refresh([issue.folder]))
+          return act('Reply', () => reply(conversation, issue.folder, body, files, picks?.urgent), say, () => refresh([issue.folder]))
         }}
         activity={activity.items}
         activityTruncated={activity.truncated}
@@ -221,10 +221,10 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
           }
           return act('Edit', () => editMessage(folder, messageId, body), say, () => refresh([folder]))
         }}
-        onReplyInActivity={(threadId, body, files) => {
+        onReplyInActivity={(threadId, body, files, picks) => {
           const conversation = state.conversations.find((c) => c.id === threadId)
           if (!conversation?.root.folder) return false
-          return act('Reply', () => reply(conversation, conversation.root.folder, body, files), say, () => refresh([conversation.root.folder]))
+          return act('Reply', () => reply(conversation, conversation.root.folder, body, files, picks?.urgent), say, () => refresh([conversation.root.folder]))
         }}
         history={history}
         rail={{

@@ -133,6 +133,8 @@ export function threadFor(
     const edit = edits?.[m.id]
     return {
       id: m.id,
+      // A NIP-22 comment, or a reply to one, carries an `A`; chat does not (fold.ts).
+      kind: m.anchor ? 1111 : 9,
       author: directory.personOf(m.author),
       at: m.createdAt,
       // The edited text, if there is one — an edit changes the body and its
@@ -510,12 +512,12 @@ export function ProjectPage({
         unread={unread}
         // A project conversation is already in the topic it belongs to, so a
         // reference would be noise (withReference: false), as the old app has it.
-        onStartConversation={(body, files) => act('Message', async () => startConversation({ folder: await workFolder(project, teams), about: project.addr, withReference: false, body, files }), say, () => refresh([listedIn ?? project.contentFolder]))}
-        onReply={(threadId, body, files) => {
+        onStartConversation={(body, files, picks) => act('Message', async () => startConversation({ folder: await workFolder(project, teams), about: project.addr, withReference: false, body, files, urgent: picks?.urgent }), say, () => refresh([listedIn ?? project.contentFolder]))}
+        onReply={(threadId, body, files, picks) => {
           const conversation = conversations.find((c) => c.id === threadId)
           if (!conversation) return false
           // The reply goes to the thread's own Folder, which need not be the project's.
-          return act('Reply', () => reply(conversation, project.contentFolder, body, files), say, () => refresh([conversation.root.folder || project.contentFolder]))
+          return act('Reply', () => reply(conversation, project.contentFolder, body, files, picks?.urgent), say, () => refresh([conversation.root.folder || project.contentFolder]))
         }}
         activity={activity.items}
         activityTruncated={activity.truncated}
@@ -583,10 +585,10 @@ export function ProjectPage({
           }
           return act('Edit', () => editMessage(folder, messageId, body), say, () => refresh([folder]))
         }}
-        onReplyInActivity={(threadId, body, files) => {
+        onReplyInActivity={(threadId, body, files, picks) => {
           const conversation = state.conversations.find((c) => c.id === threadId)
           if (!conversation?.root.folder) return false
-          return act('Reply', () => reply(conversation, conversation.root.folder, body, files), say, () => refresh([conversation.root.folder]))
+          return act('Reply', () => reply(conversation, conversation.root.folder, body, files, picks?.urgent), say, () => refresh([conversation.root.folder]))
         }}
         rail={{
           status: project.status,
