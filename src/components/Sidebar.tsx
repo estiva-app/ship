@@ -243,7 +243,7 @@ export function Sidebar({ openIssues, issuesHref, projectsHref, projects, folder
             (2026-09-29), so this fold is usually absent.
           */}
           {unfiled.length > 0 && (
-            <CollapsibleSection title="Not in a team" storageKey={STORAGE.unfiled} className="mt-2 shrink-0" contentClassName="gap-px">
+            <CollapsibleSection title="Not in a Folder" storageKey={STORAGE.unfiled} className="mt-2 shrink-0" contentClassName="gap-px">
               {unfiled.map(row)}
             </CollapsibleSection>
           )}

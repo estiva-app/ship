@@ -64,7 +64,7 @@ export const Empty: Story = { args: { openIssues: 0, projects: [] } }
 
 /**
  * With teams (SHI-25): one fold per top-level Folder, the projects its state
- * lists as the rows (FOL-5), and a project in no team under "Not in a team"
+ * lists as the rows (FOL-5), and a project in no Folder under "Not in a Folder"
  * after them — not a fold named like a Folder, because it is not one. A
  * team carries **no count**, unlike every other row here — a Folder holds
  * files from apps Ship does not own, so any number would be Ship's records

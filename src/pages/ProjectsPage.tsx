@@ -73,7 +73,7 @@ export function ProjectsPage({ state, directory, teams, archives, archived, say,
               return false
             }
             await refresh()
-            if (result.unlisted) say(`Project created, but not listed in its team, so Peek will not show it there — ${result.unlisted}`, 'error')
+            if (result.unlisted) say(`Project created, but not listed in its Folder, so Peek will not show it there — ${result.unlisted}`, 'error')
             else say('Project created')
             return true
           }}

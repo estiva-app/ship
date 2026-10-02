@@ -80,17 +80,17 @@ export function NewProjectDialog({ teams, onClose, onCreate }: NewProjectDialogP
           <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description (optional)" className="h-[80px]" />
         </Field>
         <Field
-          label="Team"
+          label="Folder"
           required
-          helper={teams?.length === 0 ? 'No teams to file into — the relay did not answer, or there are none yet.' : "Its issues and conversation live in the team's Folder."}
+          helper={teams?.length === 0 ? 'No Folders to file into — the relay did not answer, or there are none yet.' : 'Its issues and conversation live in this Folder.'}
         >
           <Select
             value={teamId}
             onChange={setTeamId}
             options={(teams ?? []).map((candidate) => ({ value: candidate.id, label: candidate.name }))}
-            placeholder="Choose a team"
+            placeholder="Choose a Folder"
             disabled={!teams?.length}
-            disabledReason={teams === undefined ? 'Reading the teams…' : teams.length === 0 ? 'No teams to file into' : undefined}
+            disabledReason={teams === undefined ? 'Reading the Folders…' : teams.length === 0 ? 'No Folders to file into' : undefined}
           />
         </Field>
       </Form>

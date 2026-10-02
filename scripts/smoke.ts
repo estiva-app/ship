@@ -364,7 +364,7 @@ async function main() {
   await projectDialog
     .getByPlaceholder('Description (optional)')
     .fill('Stripe Checkout for workspace billing.')
-  await pick('Team', 'Smoke team')
+  await pick('Folder', 'Smoke team')
   await page.getByRole('button', { name: 'Create project' }).click()
   await page.getByRole('link', { name: /Payment integration/ }).first().waitFor()
   check('the modal closes once the project is created', (await projectDialog.count()) === 0)
