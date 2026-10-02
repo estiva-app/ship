@@ -44,11 +44,15 @@ function tags(event: SignedEvent, name: string): string[] {
  * which matters because under the honour-system model nothing else is
  * validating these writes (RFC_UPDATES.md §3).
  *
- * ±1 second of slack, not zero, so an implementation that rounds rather than
- * floors still gets the finer resolution.
+ * **Exactly that second** — SPEC §6.2, clarified 2026-09-29 (CON-5), and
+ * `@estiva-app/conversation`'s `orderingMs`, which every other fold uses. This
+ * allowed ±1 s until PER-21, which let a `ts` claim the neighbouring second —
+ * the one thing the rule exists to prevent. Every writer floors, so the strict
+ * reading changes no fold on production. Kept local only because the fold
+ * orders parsed changes rather than events.
  */
 function orderingMs(event: { createdAt: number; ts?: number }): number {
-  if (event.ts !== undefined && Math.abs(Math.floor(event.ts / 1000) - event.createdAt) <= 1) {
+  if (event.ts !== undefined && Math.floor(event.ts / 1000) === event.createdAt) {
     return event.ts
   }
   return event.createdAt * 1000
@@ -64,10 +68,13 @@ interface Ordered {
 /**
  * Does `a` win over `b`?
  *
- * Later effective time wins. On a tie the lower event id wins — NIP-01's own
- * tie-break for replaceable events, reused here so the two rules never
- * disagree. With millisecond resolution a genuine tie now means two people
- * acting in the same millisecond, which is the case §7.4 actually had in mind.
+ * Later effective time wins. On a tie the **higher** event id wins: SPEC §6.3
+ * replays oldest-first by id and the last write wins, which is what
+ * `@estiva-app/interop`'s change fold and conversation's edit fold do (Miky,
+ * 2026-10-02, PER-21). This picked the lower id — NIP-01's rule for replaceable
+ * events — until then, so a Ship reader and a manifest reader could fold one
+ * object two ways. With millisecond resolution a genuine tie means two people
+ * acting in the same millisecond; production has none.
  *
  * The property that matters: this is a total order over events, so every client
  * folds to the same answer without talking to any other client.
@@ -75,7 +82,7 @@ interface Ordered {
 function wins(a: Ordered, b: Ordered): boolean {
   const [at, bt] = [orderingMs(a), orderingMs(b)]
   if (at !== bt) return at > bt
-  return a.id < b.id
+  return a.id > b.id
 }
 
 /** Compare in the same total order `wins` defines, oldest first. */
@@ -222,8 +229,10 @@ function latestPerAddress(events: SignedEvent[], kind: number): Map<string, Sign
     if (d === undefined) continue // addressable events without `d` are not addressable
     const address = `${kind}:${event.pubkey}:${d}`
     const held = byAddr.get(address)
-    const candidate = { createdAt: event.created_at, id: event.id }
-    if (!held || wins(candidate, { createdAt: held.created_at, id: held.id })) {
+    // NIP-01's replaceable-event rule, which the relay applies on ingest: later
+    // `created_at`, and on a tie the *lower* id. Not `wins` — that is §6.3's
+    // change order, which breaks a tie the other way (PER-21).
+    if (!held || event.created_at > held.created_at || (event.created_at === held.created_at && event.id < held.id)) {
       byAddr.set(address, event)
     }
   }

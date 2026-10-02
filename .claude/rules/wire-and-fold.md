@@ -46,6 +46,17 @@ shape of event nobody had recorded before, and then the fixture *and* the
 `EVENTS_SHA256` constant have to land in both repositories. The generator lives
 in `estiva-agent`.
 
+When the fold's rules change **on purpose**, re-record only `expected` with
+`npx tsx scripts/refresh-expected.ts conformance/fold-fixture.json` — it checks
+the events stayed byte-identical — and land the same file in `estiva-agent`.
+PER-21 did that once: a same-millisecond tie now goes to the higher id and a
+`ts` is trusted only inside its own second (SPEC §6.2–6.3), the rules
+`@estiva-app/interop` folds by for every manifest reader. PER-21's agent PR
+moves the agent to folding the fixture through interop, not a copy of this
+fold — until it merges, the copy and `diff -r` above still apply — so the
+manifest has to say everything the fold does — an issue title the slot did not
+`fold` was the first thing that check found.
+
 Worth knowing why the fixture contains synthetic events at all: recorded from
 production alone, it passed unchanged when the `ts` trust window in
 `orderingMs` was widened from one second to five. Every recorded change carried

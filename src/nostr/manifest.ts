@@ -216,8 +216,8 @@ export function manifestContent(): ManifestContent {
       order: ['ts', 'created_at', 'id'],
       rule: 'last-write-wins-per-field',
       orderingTrust:
-        'Honour `ts` (epoch ms) only when Math.floor(ts/1000) is within 1s of created_at; ' +
-        'otherwise use created_at*1000. Ties broken by lowest event id. ' +
+        'Honour `ts` (epoch ms) only when Math.floor(ts/1000) equals created_at exactly; ' +
+        'otherwise use created_at*1000. On a tie the highest event id wins (replay oldest first by id, last write wins). ' +
         'The relay validates created_at, so a ts pinned inside that second inherits that check ' +
         'and cannot move an event outside it.',
       /**
@@ -342,7 +342,14 @@ export function manifestContent(): ManifestContent {
         widget: 'row',
         noun: 'issue',
         slots: {
-          title: { tag: 'title' },
+          /*
+            Folded, seeded from the tag — the project's shape. `rename-issue`
+            writes a `title` change and `fold.ts` reads it over the tag, but
+            this slot said only `tag`, so every manifest reader showed a renamed
+            issue's first title: 30 of 171 issues in the conformance fixture
+            (PER-21, found folding it through interop).
+          */
+          title: { fold: 'title', tag: 'title' },
           // No `subtitle` — same reason as the project above (PRO-8). Peek's
           // current widget never rendered this one anyway: a `row` is a single
           // line by definition, so it reads `subtitle` only for a `card`. That

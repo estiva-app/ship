@@ -173,6 +173,37 @@ const refOnRoot = buildIssue(PK, Date.now(), {
 const rootOnly = foldFolder([sign(project, 's1'), sign(refOnRoot, 's2')])
 check('  …while a ref written on the root still reads, as every existing issue does', rootOnly.issues[0]?.ref === 'PAY-1')
 
+// ── The order two changes to one field are replayed in ──────────────────────
+
+/*
+  SPEC §6.2–6.3, as `@estiva-app/interop` folds the same changes for every
+  manifest reader (PER-21). Two rules this fold used to read differently: a `ts`
+  is trusted only inside its own `created_at` second — not ±1 s — and a tie goes
+  to the higher id, because replay is oldest first and the last write wins.
+*/
+console.log('\n# two changes to one field, ordered as every reader orders them\n')
+
+const T = 1_790_000_000_000
+const titleTo = (value: string, id: string, atMs: number, createdAt = Math.floor(atMs / 1000)) =>
+  sign({ ...buildChange(PK, atMs, { target: `30851:${PK}:i2`, field: 'title', value, folder: CONTENT }), created_at: createdAt }, id)
+const titleOf = (...changes: SignedEvent[]) => foldFolder([sign(project, 'o1'), sign(unreffed, 'o2'), ...changes]).issues[0]?.title
+
+check('a same-millisecond tie goes to the higher id', titleOf(titleTo('low', 'a1', T), titleTo('high', 'f9', T)) === 'high')
+check('  …whichever order they arrive in', titleOf(titleTo('high', 'f9', T), titleTo('low', 'a1', T)) === 'high')
+check(
+  'a ts claiming the next second is ignored, so created_at decides',
+  // `early` claims T+1999 ms from inside second T; `late` is honestly at T+1000.
+  titleOf(titleTo('early', 'b1', T + 1999, T / 1000), titleTo('late', 'b2', T + 1000)) === 'late',
+)
+check('  …while a ts inside its own second still orders within it', titleOf(titleTo('second', 'c1', T + 900), titleTo('first', 'c2', T + 100)) === 'second')
+
+// Two versions of one *root* are a replaceable event, not a change: NIP-01 and
+// the relay keep the lower id on a created_at tie, and so must the fold.
+const rootTitled = (title: string, id: string) => sign({ ...unreffed, created_at: 1_790_000_000, tags: unreffed.tags.map((t: string[]) => (t[0] === 'title' ? ['title', title] : t)) }, id)
+const rootTie = (...roots: SignedEvent[]) => foldFolder([sign(project, 'o1'), ...roots]).issues[0]?.title
+check('two versions of one root at the same second keep the lower id, as the relay does', rootTie(rootTitled('kept', 'a1'), rootTitled('dropped', 'f9')) === 'kept')
+check('  …whichever order they arrive in', rootTie(rootTitled('dropped', 'f9'), rootTitled('kept', 'a1')) === 'kept')
+
 // ── Two project wire shapes, read together ──────────────────────────────────
 
 /*
@@ -599,7 +630,7 @@ check('no action sets `ref`', declared.actions.every((a) => a.emits.field !== 'r
 console.log('\n# the manifest projects both title spellings\n')
 
 const manifestJson = JSON.parse(buildManifest(PK, Date.now()).content) as {
-  projections: Record<string, { slots: Record<string, { tag?: string | string[] }> }>
+  projections: Record<string, { slots: Record<string, { tag?: string | string[]; fold?: string }> }>
 }
 const projectTitle = manifestJson.projections['30850'].slots.title
 const issueTitle = manifestJson.projections['30851'].slots.title
@@ -607,6 +638,9 @@ const issueTitle = manifestJson.projections['30851'].slots.title
 check('the project title slot names the new spelling first', Array.isArray(projectTitle.tag) && projectTitle.tag[0] === 'name')
 check('  …and keeps the old one behind it, for records that predate REW-11', Array.isArray(projectTitle.tag) && projectTitle.tag.includes('title'))
 check('the issue title slot is untouched — REW-11 renamed nothing there', issueTitle.tag === 'title')
+// rename-issue writes a `title` change; a slot that only reads the tag shows a
+// manifest reader the first title for ever (PER-21: 30 of 171 fixture issues).
+check('both title slots fold the `title` change a rename writes', projectTitle.fold === 'title' && issueTitle.fold === 'title')
 
 // What the builder actually writes has to match what the projection looks for,
 // or the manifest is describing an app that does not exist.
