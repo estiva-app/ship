@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { blockDocumentToMarkerText, encodeNpub, fromEditorDocument, type EditorDocument } from '@estiva-app/protocol'
 import { messageReference } from '@estiva-app/conversation'
 import { chipsAsReferences } from './composerTriggers'
-import { referenceItems, snippetOf } from './mentionables'
+import { mentionPeople, referenceItems, snippetOf } from './mentionables'
 import { mentionableIn, rosterOf } from '@/api/people'
 
 const BOB = 'b'.repeat(64)
@@ -44,6 +44,12 @@ describe('who @ offers', () => {
     expect(roster).toEqual([ME, BOB])
     expect(mentionableIn(roster, [MSG], ME)).toEqual([BOB])
     expect(mentionableIn(rosterOf([]), [ME, MSG], ME)).toEqual([MSG])
+  })
+
+  it('only somebody with a profile: a key the roster lists that is no person is left out, as Peek leaves it', () => {
+    const profile = (pubkey: string) => (pubkey === BOB ? { name: 'Bob' } : undefined)
+    const people = mentionPeople([BOB, MSG], { nameOf: (p) => profile(p)?.name ?? 'short…', personOf: (p) => ({ name: profile(p)?.name }), profileOf: profile as never })
+    expect(people.map((p) => p.name)).toEqual(['Bob'])
   })
 })
 
