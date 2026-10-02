@@ -1,6 +1,7 @@
 import { IconLock } from '@tabler/icons-react'
 import { Avatar, Card, EmptyState, Link } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
+import { thisObject, typeLabelOf } from '@/lib/typeLabel'
 import { pickWidget, type ForeignObject, type ResolvedSlot } from '@/api/foreign'
 import type { RelatedState } from '@/api/useRelated'
 
@@ -52,7 +53,7 @@ function Row({ object, count }: { object: ForeignObject; count?: number }) {
         <span className="flex items-center gap-2 text-body-2 text-text-muted">
           <IconLock size={14} stroke={1.5} className="shrink-0" />
           <span className="truncate">
-            You may not have access to this{object.appName ? ` ${object.appName}` : ''} object.
+            You may not have access to {thisObject(object)}.
             {object.openUrl && (
               <>
                 {' '}
@@ -85,7 +86,7 @@ function Row({ object, count }: { object: ForeignObject; count?: number }) {
             </div>
           )}
         </div>
-        {object.appName && <span className="shrink-0 text-caption text-text-muted">{object.appName}</span>}
+        {typeLabelOf(object) && <span className="shrink-0 text-caption text-text-muted">{typeLabelOf(object)}</span>}
       </Card>
     )
   }
@@ -96,7 +97,7 @@ function Row({ object, count }: { object: ForeignObject; count?: number }) {
       <span className="flex min-w-0 flex-col gap-0.5">
         <span className="flex min-w-0 items-baseline gap-2">
           <span className="truncate text-body-2 text-text-primary">{slots.title?.value ?? 'Untitled'}</span>
-          {object.appName && <span className="shrink-0 text-caption text-text-muted">{object.appName}</span>}
+          {typeLabelOf(object) && <span className="shrink-0 text-caption text-text-muted">{typeLabelOf(object)}</span>}
         </span>
         {second && (
           <span className="flex min-w-0 items-center gap-1.5 text-caption text-text-muted">

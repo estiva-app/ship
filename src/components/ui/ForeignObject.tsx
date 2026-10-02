@@ -1,5 +1,6 @@
 import { Card, Link } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
+import { thisObject, typeLabelOf } from '@/lib/typeLabel'
 import { Avatar } from './Avatar'
 import { Chip } from './Chip'
 import { ConversationCount } from './ConversationCount'
@@ -99,7 +100,7 @@ export function ForeignObject({ object, conversations, className }: ForeignObjec
       >
         {/* The words' look on a box inside the card: Card draws the frame only (UIG-9). */}
         <div className="text-body-2 text-text-muted">
-          You may not have access to this{object.appName ? ` ${object.appName}` : ''} object.
+          You may not have access to {thisObject(object)}.
           {object.openUrl && (
             <>
               {' '}
@@ -181,7 +182,7 @@ function ForeignCard({ object, row, conversations, className }: ForeignObjectPro
         */}
         <span className="flex shrink-0 items-center gap-2">
           {conversations !== undefined && <ConversationCount count={conversations} unit="comment" />}
-          {object.appName && <Chip label={object.appName} />}
+          {typeLabelOf(object) && <Chip label={typeLabelOf(object)!} />}
         </span>
       </div>
       {slots.subtitle && (

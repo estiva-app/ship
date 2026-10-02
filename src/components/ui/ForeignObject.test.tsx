@@ -79,6 +79,18 @@ describe('ForeignObject', () => {
     expect(screen.getByText(/nothing in it yet/i)).toBeInTheDocument()
   })
 
+  it('labels the object by its type, and by its app only when it declares none (PRO-24)', () => {
+    const { rerender } = render(<ForeignObject object={base({ noun: 'topic' })} />)
+    expect(screen.getByText('Topic')).toBeInTheDocument()
+    expect(screen.queryByText('Peek')).toBeNull()
+
+    rerender(<ForeignObject object={base()} />)
+    expect(screen.getByText('Peek')).toBeInTheDocument()
+
+    rerender(<ForeignObject object={base({ noun: 'topic', unreachable: true })} />)
+    expect(screen.getByText(/may not have access to this topic\./i)).toBeInTheDocument()
+  })
+
   it('says nothing about a list that was never declared', () => {
     render(<ForeignObject object={base({ children: undefined })} />)
     expect(screen.queryByText(/nothing in it yet/i)).toBeNull()
