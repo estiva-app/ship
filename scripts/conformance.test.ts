@@ -1,22 +1,14 @@
 /**
- * Two repos, one fold. This file is identical in `estiva-agent` and `estiva-ship`
- * but for the `foldFolder` import: Ship's data layer is `src/nostr/` since
- * PER-19, and the agent's copy is still `src/` until PER-21.
+ * Two repos, one recorded answer. This file folds the fixture with Ship's own
+ * `foldFolder`; `estiva-agent`'s `scripts/conformance.test.ts` runs the same
+ * events through the agent's real read path — Ship's published manifest,
+ * folded by `@estiva-app/interop` — and both must equal `expected`.
  *
- * The agent's tooling was extracted out of Ship (PEEK-155), and the honest cost
- * of that was a duplicated protocol layer — `lib/nostr/` and `src/` existed in
- * both repositories, byte for byte, and `diff -r` was what kept them honest.
- *
- * **Half of that is now gone.** SHA-3 moved the wire format into
- * `@estiva-app/protocol`, so both repos import one implementation of the bytes
- * rather than holding two copies of it. What is still duplicated is `src/` — the
- * kinds, the fold, the store, the vocabularies — and that is deliberate: how an
- * app folds events into current truth is where apps are *supposed* to differ, and
- * the package's own rule is that it contains no interpretation.
- *
- * So this file matters more than it did, not less. The duplication it guards is
- * now the duplication nobody intends to remove. Ship's CLAUDE.md names the
- * specific form of drift that matters:
+ * Until PER-21 (estiva-agent#68) the agent held a copy of this fold, and the
+ * two copies were what this file compared. The copy is gone; what is compared
+ * now is what Ship does against what Ship's manifest says it does, which is
+ * what every other reader — Peek included — goes by. Ship's CLAUDE.md names
+ * the drift that matters:
  *
  *   > reimplementing any of it would make the CLI disagree with the app, which
  *   > is the one thing it must not do
@@ -28,19 +20,22 @@
  * hex string. Nothing failed. Both were self-consistent. It surfaced only when a
  * person read the two outputs side by side.
  *
- * A repository boundary makes that harder to notice, not easier. So the two
- * copies are held to a recorded agreement: the same production events, folded by
- * each repo's own `foldFolder`, must produce the same state.
+ * A repository boundary makes that harder to notice, not easier — and so did
+ * the manifest, until the agent's side read through it: an issue title the
+ * manifest did not fold was found that way (ship#231).
  *
  *   npx tsx scripts/conformance.test.ts
  *
- * Offline. The fixture was recorded from production by
- * `scripts/make-conformance-fixture.ts` in `estiva-agent`.
+ * Offline. The fixture was recorded from production by the agent's former
+ * `scripts/make-conformance-fixture.ts` (see `.claude/rules/wire-and-fold.md`).
  *
  * ## When this fails
  *
- * It means the two repositories disagree about what the workspace says. Find out
- * which one changed and why. **Do not regenerate the fixture to make it pass** —
+ * Ship's fold no longer gives the recorded answer. If the change was on
+ * purpose, re-record `expected` with `scripts/refresh-expected.ts`, make the
+ * manifest say the same thing, and land the file in `estiva-agent` too.
+ *
+ * **Do not regenerate the fixture to make it pass** —
  * that erases the finding rather than fixing it. Regenerating is correct only
  * when the fold needs to cover a shape of event nobody had recorded before, and
  * then the new fixture and the checksum below have to land in both repos.
@@ -117,8 +112,8 @@ function firstDifference(a: unknown, b: unknown, path = ''): string | null {
 
 /*
   Compared as a whole rather than field by field. A fold that got the statuses
-  right and the activity order wrong is still a fold the two repos disagree
-  about, and enumerating the fields worth checking is how the next omission gets
+  right and the activity order wrong is still a fold that disagrees with the
+  recorded answer, and enumerating the fields worth checking is how the next omission gets
   in — PEEK-165 was precisely a field nobody thought to check.
 */
 const difference = firstDifference(JSON.parse(JSON.stringify(actual)), fixture.expected)
@@ -133,6 +128,6 @@ check('conversations', state.conversations.length === fixture.counts.conversatio
 console.log(
   failures === 0
     ? '\nThis repo agrees with the recorded fold.'
-    : `\n${failures} failed — the two repositories disagree about the workspace.`,
+    : `\n${failures} failed — Ship's fold no longer gives the recorded answer. On purpose? Re-record expected (scripts/refresh-expected.ts) and make the manifest say the same.`,
 )
 process.exit(failures === 0 ? 0 : 1)
