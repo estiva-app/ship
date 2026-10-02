@@ -13,49 +13,43 @@ Reading this workspace from Claude Desktop, Claude Code or a terminal is
 [`estiva-app/estiva-agent`](https://github.com/estiva-app/estiva-agent), not
 this repository.
 
-Nothing in this repository depends on it. It depends on this one, by copy.
+Nothing in this repository depends on it, and since PER-21 (estiva-agent#68,
+2026-10-02) it holds no copy of this one either. It reads Ship the way Peek
+does: **Ship's published manifest** (`src/nostr/manifest.ts`, republished as
+`31990:88ac6aae…:estiva-ship`), folded by `@estiva-app/interop`, with every
+write one of the manifest's declared actions.
 
-## The copies that must not drift
+## So the manifest is the contract
 
-`estiva-agent` vendors Ship's data layer, `src/nostr/`. Since PER-19 it no
-longer sits at the same path in both repos: the agent still keeps it as `src/`
-plus `lib/nostr/signer.ts`, until PER-21 replaces the copy altogether
-(conversations from `@estiva-app/conversation`, PER-20; Ship's objects through
-its manifest and `@estiva-app/interop`). Until then the check is:
+What the agent and Peek show about a project or an issue is what the manifest
+declares, not what `fold.ts` does. A rule the fold applies and the manifest does
+not state is a rule only Ship follows — an issue title the slot did not `fold`
+showed every renamed issue by its first title in Peek until ship#231. When the
+fold changes, the manifest changes in the same PR, and is **republished** after
+it merges (`npm run manifest`); the agent re-records its copy of the
+event with its `scripts/record-ship-manifest.ts`.
 
-```bash
-diff -r -x signer.ts src/nostr ../estiva-agent/src
-diff src/nostr/signer.ts ../estiva-agent/lib/nostr/signer.ts
-```
+**`scripts/conformance.test.ts` runs in both repositories over the same
+`conformance/fold-fixture.json`.** Here it folds the events with `foldFolder`;
+in `estiva-agent` the same events go through the agent's real read path —
+the recorded manifest and interop — and both must equal the fixture's
+`expected`. A failure there means the manifest and this fold disagree.
 
-`scripts/conformance.test.ts` differs by one import line for the same reason.
-
-Do not assume they match: on 2026-09-24, `attachments.ts`, `edits.ts`,
-`events.ts` and `store.ts` differed between the two `main` branches — the
-agent's copy predates CON-5, FOL-30, FOL-2 and PER-17.
-
-Duplication is the deliberate choice — the same argument `README.md` already
-makes for duplicating the protocol library rather than sharing a package. What
-it risks is this app and the agent disagreeing about what the workspace says,
-which is the one thing neither may do.
-
-**If `scripts/conformance.test.ts` fails, do not regenerate the fixture.** A
-failure means the two repos disagree, and regenerating erases the finding
+**If it fails, do not regenerate the fixture.** Regenerating erases the finding
 rather than fixing it. Regenerating is correct only when the fold must cover a
 shape of event nobody had recorded before, and then the fixture *and* the
-`EVENTS_SHA256` constant have to land in both repositories. The generator lives
-in `estiva-agent`.
+`EVENTS_SHA256` constant land in both repositories. The generator is not in
+either tree: it was the agent's `scripts/make-conformance-fixture.ts`, deleted
+with the copy (`git -C ../estiva-agent show d5e39b7:scripts/make-conformance-fixture.ts`).
+It records production through a `Store` and an agent credential, so reviving it
+means pointing it at this repo's `src/nostr/` and a credential.
 
 When the fold's rules change **on purpose**, re-record only `expected` with
 `npx tsx scripts/refresh-expected.ts conformance/fold-fixture.json` — it checks
 the events stayed byte-identical — and land the same file in `estiva-agent`.
 PER-21 did that once: a same-millisecond tie now goes to the higher id and a
 `ts` is trusted only inside its own second (SPEC §6.2–6.3), the rules
-`@estiva-app/interop` folds by for every manifest reader. PER-21's agent PR
-moves the agent to folding the fixture through interop, not a copy of this
-fold — until it merges, the copy and `diff -r` above still apply — so the
-manifest has to say everything the fold does — an issue title the slot did not
-`fold` was the first thing that check found.
+`@estiva-app/interop` folds by for every manifest reader.
 
 Worth knowing why the fixture contains synthetic events at all: recorded from
 production alone, it passed unchanged when the `ts` trust window in

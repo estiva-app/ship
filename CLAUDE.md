@@ -53,7 +53,8 @@ finish.
   smoke test's selectors.
 - **`.claude/rules/wire-and-fold.md`** — loads when you open a file under
   `src/nostr/`, `conformance/` or `scripts/conformance.test.ts`: the
-  copies `estiva-agent` keeps, the conformance fixture, how `loadAll` reads.
+  manifest as the contract `estiva-agent` and Peek read by, the conformance
+  fixture, how `loadAll` reads.
 - **`.claude/skills/verify/`** — when you check a change by looking:
   Storybook on `:6007`, measuring against the package, `npm run smoke`.
 - **The lint** holds the rest, and each message says what to use. All of it
