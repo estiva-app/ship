@@ -16,8 +16,11 @@ this repository.
 Nothing in this repository depends on it, and since PER-21 (estiva-agent#68,
 2026-10-02) it holds no copy of this one either. It reads Ship the way Peek
 does: **Ship's published manifest** (`src/nostr/manifest.ts`, republished as
-`31990:88ac6aae…:estiva-ship`), folded by `@estiva-app/interop`, with every
-write one of the manifest's declared actions.
+`31990:88ac6aae…:estiva-ship`), folded by `@estiva-app/interop`. Every write
+to a project or an issue is one of the manifest's declared actions; moving a
+project between Folders (interop's `planMoveFile`) and editing a comment
+(`@estiva-app/conversation`) are the two that are not, because neither is a
+Ship action.
 
 ## So the manifest is the contract
 
@@ -26,8 +29,18 @@ declares, not what `fold.ts` does. A rule the fold applies and the manifest does
 not state is a rule only Ship follows — an issue title the slot did not `fold`
 showed every renamed issue by its first title in Peek until ship#231. When the
 fold changes, the manifest changes in the same PR, and is **republished** after
-it merges (`npm run manifest`); the agent re-records its copy of the
-event with its `scripts/record-ship-manifest.ts`.
+it merges; the agent re-records its copy of the event with its
+`scripts/record-ship-manifest.ts`.
+
+**A republish signs with the live manifest key, and only when Miky asks for it
+in words.** `npm run manifest` does not check the key against
+`src/nostr/manifest-address.ts` — given a missing or malformed `.manifest-key`
+it mints a new one, writes it through any symlink, and rewrites the address. So:
+run it from an `origin/main` worktree with `~/estiva/estiva-ship/.manifest-key`
+linked in, check that key's format and pubkey against `manifest-address.ts`
+first, run `--dry-run` first (the only path that compares them), and set
+`APP_URL` and `RELAY_URL`. Then read the relay back: exactly one
+`estiva-ship` manifest, under `88ac6aae…`.
 
 **`scripts/conformance.test.ts` runs in both repositories over the same
 `conformance/fold-fixture.json`.** Here it folds the events with `foldFolder`;
