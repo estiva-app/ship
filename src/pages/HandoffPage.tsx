@@ -57,7 +57,7 @@ export function HandoffPage({ word, fileRef, query }: { word: string; fileRef: s
   return (
     <div data-surface="handoff" className="flex flex-1 flex-col items-center justify-center px-6 py-5">
       <div className="flex w-full max-w-prose flex-col gap-3">
-        {/* The app the link goes to names the card too: the projection calls a bare topic "File". */}
+        {/* The card's chip is the object's type ("Topic", PRO-24); where it names an app, it is the one the link goes to. */}
         <ForeignObject object={{ ...object, appName: app ?? object.appName }} />
         {/* An unreachable card already says where to open it. */}
         {openUrl && !object.unreachable && (

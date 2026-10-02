@@ -74,8 +74,9 @@ export function lookupFor(word: string, ref: string, manifests: readonly Manifes
  * manifest whose template the URL was built from, and when none matches the
  * page names no app.
  *
- * Not the projection's `appName` either: on production a Peek topic is drawn
- * as a bare file and resolves as "File" — "Open in File" is not a hand-off.
+ * Not the projection's `appName` either. Since interop 0.44.0 (PRO-24) that
+ * is a bare file's opener too, but it is chosen by interop's own sweep, not
+ * from the manifest this page built its link from.
  */
 export function manifestOfLink<M extends Manifest>(url: string, manifests: readonly M[]): M | undefined {
   return manifests.find((m) =>
