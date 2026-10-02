@@ -195,7 +195,7 @@ npm test              # the app: components, pages, router, auth boot
 npm run build         # tsc -b && vite build → dist/ship
 npm run probe      # does the relay accept our kinds?
 npm run verify     # full round trip against the relay, two identities
-npm run manifest   # publish the NIP-89 manifest and check it is satisfiable
+npm run manifest   # publish the NIP-89 manifest and check it is satisfiable (live .manifest-key only)
 npm run smoke      # drive the UI in chromium against an in-memory relay
 ```
 

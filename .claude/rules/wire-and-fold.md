@@ -33,14 +33,14 @@ it merges; the agent re-records its copy of the event with its
 `scripts/record-ship-manifest.ts`.
 
 **A republish signs with the live manifest key, and only when Miky asks for it
-in words.** `npm run manifest` does not check the key against
-`src/nostr/manifest-address.ts` — given a missing or malformed `.manifest-key`
-it mints a new one, writes it through any symlink, and rewrites the address. So:
-run it from an `origin/main` worktree with `~/estiva/estiva-ship/.manifest-key`
-linked in, check that key's format and pubkey against `manifest-address.ts`
-first, run `--dry-run` first (the only path that compares them), and set
-`APP_URL` and `RELAY_URL`. Then read the relay back: exactly one
-`estiva-ship` manifest, under `88ac6aae…`.
+in words.** `npm run manifest` publishes only with the key of
+`src/nostr/manifest-address.ts` and refuses anything else — missing, malformed
+or another pubkey — before it touches the relay; it never writes the key or the
+address (`scripts/publish-manifest.test.ts`). So: run it from an `origin/main`
+worktree with `MANIFEST_KEY_FILE=~/estiva/estiva-ship/.manifest-key` (or that
+file linked in), run `--dry-run` first, and set `APP_URL` and `RELAY_URL`. Then
+read the relay back: exactly one `estiva-ship` manifest, under `88ac6aae…`.
+Moving to a new key is a hand edit of `manifest-address.ts`, in its own PR.
 
 **`scripts/conformance.test.ts` runs in both repositories over the same
 `conformance/fold-fixture.json`.** Here it folds the events with `foldFolder`;

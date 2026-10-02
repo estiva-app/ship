@@ -12,8 +12,10 @@
  *
  *   npx tsx scripts/publish-manifest.ts
  *
- * Identity: reuses `.manifest-key` so republishing replaces the same
- * addressable event rather than creating a second competing manifest.
+ * Identity: signs with `.manifest-key` (or `MANIFEST_KEY_FILE`), and refuses
+ * unless it is the key of the committed `src/nostr/manifest-address.ts`, so
+ * republishing replaces the live addressable event rather than creating a
+ * second competing manifest. It never writes the key or the address.
  *
  * **Before anything is signed it reads every other `kind:31990`** and refuses
  * if one declares one of Ship's type words for a different kind — RFC 0.5
@@ -31,10 +33,9 @@
  * `--allow-collision` publishes anyway, printing what collides — for when
  * another member's manifest is the cause and Ship's fix cannot wait.
  */
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { Relay } from '@estiva-app/protocol'
 import { secretKeySigner } from '../src/nostr/signer'
-import { publicKeyFromSecret, signEvent } from '@estiva-app/protocol'
+import { signEvent } from '@estiva-app/protocol'
 import {
   buildManifest,
   DEFAULT_APP_URL,
@@ -50,9 +51,10 @@ import { KIND } from '../src/nostr/kinds'
 import { widgetChainProblem, CLOSED_WIDGETS } from '@estiva-app/interop'
 import { MANIFEST_ADDRESS } from '../src/nostr/manifest-address'
 import { wordCollisions } from '../src/lib/typeWords'
+import { readManifestKey, type ManifestKey } from './manifest-key'
 
 const RELAY_URL = process.env.RELAY_URL ?? 'http://localhost:3000'
-const KEY_FILE = new URL('../.manifest-key', import.meta.url).pathname
+const KEY_FILE = process.env.MANIFEST_KEY_FILE ?? new URL('../.manifest-key', import.meta.url).pathname
 const DRY_RUN = process.argv.includes('--dry-run')
 
 /** `--try-urls '<pattern>=<kind>'`, each as the `urls` tag it would be. */
@@ -71,21 +73,26 @@ function triedUrls(argv: string[]): string[][] {
 }
 
 /**
- * A stable identity for the manifest.
+ * The manifest's identity: the key of the committed `MANIFEST_ADDRESS`, or exit.
  *
- * NIP-33 addresses are `(pubkey, kind, d)`, so a fresh key every run would
- * publish a *new* manifest each time rather than replacing the old one, and a
- * consumer filtering on `#k` would find several and have to pick. Keeping the
- * key on disk is what makes "publish again" mean "update".
+ * NIP-33 addresses are `(pubkey, kind, d)`, so any other key publishes a *new*
+ * manifest rather than replacing the live one, and a consumer filtering on `#k`
+ * finds two and has to pick. A missing or malformed key file used to get a fresh
+ * key written into it — through any symlink, so over the only copy of
+ * the live one — and the address rewritten to match. Both paths, publish and
+ * `--dry-run`, now go through this, before anything touches the relay.
  */
-function manifestIdentity() {
-  let secretKeyHex = existsSync(KEY_FILE) ? readFileSync(KEY_FILE, 'utf8').trim() : ''
-  if (!/^[0-9a-f]{64}$/.test(secretKeyHex)) {
-    secretKeyHex = Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('hex')
-    writeFileSync(KEY_FILE, `${secretKeyHex}\n`, { mode: 0o600 })
-    console.log('generated a new manifest key → .manifest-key (gitignored)')
+function manifestIdentity(mode: string): ManifestKey {
+  const key = readManifestKey(KEY_FILE, MANIFEST_ADDRESS, MANIFEST_D_TAG)
+  if ('refused' in key) {
+    console.error(
+      `\n✋ Refusing to ${mode}: ${key.refused}.\n` +
+        `   Nothing was written. Point MANIFEST_KEY_FILE at the live key, or link it in:\n` +
+        `     ln -s <checkout>/.manifest-key .manifest-key\n`,
+    )
+    process.exit(1)
   }
-  return { secretKeyHex, pubkey: publicKeyFromSecret(secretKeyHex) }
+  return key
 }
 
 let failures = 0
@@ -192,24 +199,13 @@ async function assertNoWordCollision(relay: Relay, own: { pubkey: string; tags: 
 /**
  * The checks that need no signature, against the relay, publishing nothing.
  *
- * Reads `.manifest-key` and never writes it — it is the only copy of the live
- * manifest's key, and `manifestIdentity` replaces a malformed one. The relay
- * answers reads only to a member, and a throwaway key is refused
+ * The relay answers reads only to a member, and a throwaway key is refused
  * (`relay_membership_required`), so the reads are signed with the manifest's
- * own key; nothing else is. The pubkey is the committed address's, and a key
- * that is not that address's is refused rather than checked against.
+ * own key; nothing else is.
  */
 async function dryRun() {
-  const pubkey = MANIFEST_ADDRESS.split(':')[1]
-  const key = existsSync(KEY_FILE) ? readFileSync(KEY_FILE, 'utf8').trim() : ''
-  if (!/^[0-9a-f]{64}$/.test(key) || publicKeyFromSecret(key) !== pubkey) {
-    console.error(
-      `\n✋ A dry run reads the relay as the manifest's key, and ${existsSync(KEY_FILE) ? '.manifest-key is not the key of' : 'there is no .manifest-key for'} ${MANIFEST_ADDRESS}.\n` +
-        `   Link the live one in (ln -s <checkout>/.manifest-key .manifest-key); the dry run never writes it.\n`,
-    )
-    process.exit(1)
-  }
-  const relay = new Relay(RELAY_URL, secretKeySigner(key))
+  const { secretKeyHex, pubkey } = manifestIdentity('dry-run')
+  const relay = new Relay(RELAY_URL, secretKeySigner(secretKeyHex))
   console.log(`relay    ${RELAY_URL}`)
   console.log(`dry run  31990:${pubkey.slice(0, 16)}…:${MANIFEST_D_TAG} — nothing is signed or published\n`)
   assertUrlsAgree(RELAY_URL, process.env.APP_URL ?? DEFAULT_APP_URL)
@@ -254,7 +250,7 @@ async function main() {
     console.error('--try-urls is for a --dry-run; add the shape to src/nostr/manifest.ts to publish it.')
     process.exit(1)
   }
-  const identity = manifestIdentity()
+  const identity = manifestIdentity('publish')
   const relay = new Relay(RELAY_URL, secretKeySigner(identity.secretKeyHex))
 
   console.log(`relay    ${RELAY_URL}`)
@@ -270,15 +266,6 @@ async function main() {
   const published = await relay.publish(signEvent(event, identity.secretKeyHex))
   check('the relay accepts kind:31990', published.ok, published.reason ?? '')
   if (!published.ok) process.exit(1)
-
-  // The browser app has to know its own manifest address in order to recommend
-  // it (kind:31989), and it cannot read `.manifest-key`. Written out as a
-  // committed generated module so the built bundle carries it.
-  writeFileSync(
-    new URL('../src/nostr/manifest-address.ts', import.meta.url).pathname,
-    `/**\n * Generated by \`npm run manifest\`. Do not edit by hand.\n *\n * The address of the manifest this build recommends. Ship publishes a\n * kind:31989 pointing here on the user's behalf, which is how a consumer picks\n * this manifest over any other claiming the same kinds.\n */\nexport const MANIFEST_ADDRESS = '31990:${identity.pubkey}:${MANIFEST_D_TAG}'\n`,
-  )
-  console.log('   wrote src/manifest-address.ts')
 
   // ── Resolve it the way a consumer will ────────────────────────────────────
   // Peek will not know Ship's pubkey. It will hold an object of some
