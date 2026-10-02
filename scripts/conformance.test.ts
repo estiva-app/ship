@@ -112,8 +112,8 @@ function firstDifference(a: unknown, b: unknown, path = ''): string | null {
 
 /*
   Compared as a whole rather than field by field. A fold that got the statuses
-  right and the activity order wrong is still a fold the two repos disagree
-  about, and enumerating the fields worth checking is how the next omission gets
+  right and the activity order wrong is still a fold that disagrees with the
+  recorded answer, and enumerating the fields worth checking is how the next omission gets
   in — PEEK-165 was precisely a field nobody thought to check.
 */
 const difference = firstDifference(JSON.parse(JSON.stringify(actual)), fixture.expected)
@@ -128,6 +128,6 @@ check('conversations', state.conversations.length === fixture.counts.conversatio
 console.log(
   failures === 0
     ? '\nThis repo agrees with the recorded fold.'
-    : `\n${failures} failed — the two repositories disagree about the workspace.`,
+    : `\n${failures} failed — Ship's fold no longer gives the recorded answer. On purpose? Re-record expected (scripts/refresh-expected.ts) and make the manifest say the same.`,
 )
 process.exit(failures === 0 ? 0 : 1)
