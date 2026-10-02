@@ -197,6 +197,13 @@ check(
 )
 check('  …while a ts inside its own second still orders within it', titleOf(titleTo('second', 'c1', T + 900), titleTo('first', 'c2', T + 100)) === 'second')
 
+// Two versions of one *root* are a replaceable event, not a change: NIP-01 and
+// the relay keep the lower id on a created_at tie, and so must the fold.
+const rootTitled = (title: string, id: string) => sign({ ...unreffed, created_at: 1_790_000_000, tags: unreffed.tags.map((t: string[]) => (t[0] === 'title' ? ['title', title] : t)) }, id)
+const rootTie = (...roots: SignedEvent[]) => foldFolder([sign(project, 'o1'), ...roots]).issues[0]?.title
+check('two versions of one root at the same second keep the lower id, as the relay does', rootTie(rootTitled('kept', 'a1'), rootTitled('dropped', 'f9')) === 'kept')
+check('  …whichever order they arrive in', rootTie(rootTitled('dropped', 'f9'), rootTitled('kept', 'a1')) === 'kept')
+
 // ── Two project wire shapes, read together ──────────────────────────────────
 
 /*

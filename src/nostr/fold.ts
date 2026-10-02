@@ -229,8 +229,10 @@ function latestPerAddress(events: SignedEvent[], kind: number): Map<string, Sign
     if (d === undefined) continue // addressable events without `d` are not addressable
     const address = `${kind}:${event.pubkey}:${d}`
     const held = byAddr.get(address)
-    const candidate = { createdAt: event.created_at, id: event.id }
-    if (!held || wins(candidate, { createdAt: held.created_at, id: held.id })) {
+    // NIP-01's replaceable-event rule, which the relay applies on ingest: later
+    // `created_at`, and on a tie the *lower* id. Not `wins` — that is §6.3's
+    // change order, which breaks a tie the other way (PER-21).
+    if (!held || event.created_at > held.created_at || (event.created_at === held.created_at && event.id < held.id)) {
       byAddr.set(address, event)
     }
   }

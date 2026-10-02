@@ -51,8 +51,9 @@ When the fold's rules change **on purpose**, re-record only `expected` with
 the events stayed byte-identical — and land the same file in `estiva-agent`.
 PER-21 did that once: a same-millisecond tie now goes to the higher id and a
 `ts` is trusted only inside its own second (SPEC §6.2–6.3), the rules
-`@estiva-app/interop` folds by for every manifest reader. Since PER-21 the
-agent folds the fixture through interop, not a copy of this fold, so the
+`@estiva-app/interop` folds by for every manifest reader. PER-21's agent PR
+moves the agent to folding the fixture through interop, not a copy of this
+fold — until it merges, the copy and `diff -r` above still apply — so the
 manifest has to say everything the fold does — an issue title the slot did not
 `fold` was the first thing that check found.
 
