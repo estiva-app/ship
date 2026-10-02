@@ -76,6 +76,7 @@ export {
   setIssueField,
   setProjectField,
   startConversation,
+  workFolder,
   type CreateResult,
   type WriteResult,
 } from './writes'

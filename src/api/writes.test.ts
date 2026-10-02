@@ -19,7 +19,7 @@ vi.mock('./foreign', () => ({ readFolders: vi.fn() }))
 import { clockProblem } from './clock'
 import { readFolders } from './foreign'
 import { store } from './store'
-import { archiveProject, createFolder, createIssue, createProject, deleteProject, moveProject, renameFolder, reply, setIssueField, setProjectField, startConversation } from './writes'
+import { archiveProject, createFolder, createIssue, createProject, deleteProject, moveProject, renameFolder, reply, setIssueField, setProjectField, startConversation, workFolder } from './writes'
 
 const s = store as unknown as Record<string, ReturnType<typeof vi.fn>>
 const PK = 'ab'.repeat(32)
@@ -141,6 +141,18 @@ describe('deleting a project unlists it from its team (FOL-48)', () => {
     const result = await createIssue(PROJECT, [ISSUE, { ...ISSUE, ref: 'REL-7' }, { ...ISSUE, ref: 'DES-9' }], { title: 'New', description: 'd' })
     expect(s.createIssue).toHaveBeenCalledWith({ folder: 'content-folder', title: 'New', description: 'd', projectAddr: PROJECT.addr, ref: 'REL-8' })
     expect(result).toEqual({ ok: true, addr: '30851:me:new' })
+  })
+
+  it('a new issue goes to the Folder that lists the project when that is another one (MAN-5)', async () => {
+    vi.mocked(readFolders).mockResolvedValue([{ id: 'team', hasState: true, addresses: [PROJECT.addr] }] as never)
+    s.createIssue.mockResolvedValue({ result: { ok: true }, addr: '30851:me:new', id: 'new' })
+    await createIssue(PROJECT, [], { title: 'New', description: 'd' })
+    expect(s.createIssue).toHaveBeenCalledWith(expect.objectContaining({ folder: 'team' }))
+  })
+
+  it("workFolder falls back to the record's Folder when the listing cannot be read", async () => {
+    vi.mocked(readFolders).mockRejectedValue(new Error('rate limited'))
+    expect(await workFolder(PROJECT)).toBe('content-folder')
   })
 })
 

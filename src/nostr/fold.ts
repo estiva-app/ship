@@ -133,9 +133,10 @@ export interface Project {
    * The Folder the project record names: `buzz-channel` on a global record,
    * `h` on a channel-scoped one — the same answer interop's `folderOf` gives.
    *
-   * Where a new issue is filed, a new project comment is written, and a
-   * `kind:1851` about the project is addressed, since changes stay
-   * channel-scoped whatever the record does. Nothing overrides it: the
+   * Where a `kind:1851` about the project is addressed, since changes stay
+   * channel-scoped whatever the record does. New issues and comments go to
+   * the Folder that lists the project instead (`workFolder` in
+   * `api/writes.ts`). Nothing overrides this one: the
    * `folder` field that used to re-point a project is no longer read (MAN-5),
    * and a move changes only the Folder listings (FOL-7). Older issues and
    * threads may sit in other Folders; they are found by their parent and
