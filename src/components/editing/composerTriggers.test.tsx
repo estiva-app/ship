@@ -3,6 +3,7 @@ import { blockDocumentToMarkerText, encodeNpub, fromEditorDocument, type EditorD
 import { messageReference } from '@estiva-app/conversation'
 import { chipsAsReferences } from './composerTriggers'
 import { referenceItems, snippetOf } from './mentionables'
+import { mentionableIn, rosterOf } from '@/api/people'
 
 const BOB = 'b'.repeat(64)
 const MSG = 'd'.repeat(64)
@@ -36,6 +37,16 @@ describe('the chips, as the message box sends them (CON-25)', () => {
   })
 })
 
+describe('who @ offers', () => {
+  const ME = 'a'.repeat(64)
+  it('the roster’s members, never the viewer; the snapshot’s people on a relay with no roster', () => {
+    const roster = rosterOf([{ kind: 13534, created_at: 1, tags: [['-'], ['member', ME], ['member', BOB], ['member', 'not-a-key']] }])
+    expect(roster).toEqual([ME, BOB])
+    expect(mentionableIn(roster, [MSG], ME)).toEqual([BOB])
+    expect(mentionableIn(rosterOf([]), [ME, MSG], ME)).toEqual([MSG])
+  })
+})
+
 describe('what [ offers', () => {
   const message = (id: string, body: string, kind?: number) => ({ id, kind, body, at: 0, author: { name: 'Bob' } })
   it('lists the page’s messages, the thread being replied to last, and skips what is not an event', () => {
@@ -47,7 +58,14 @@ describe('what [ offers', () => {
     expect(items[1].uri).toBe(messageReference(MSG, 9))
   })
 
+  it('offers the newest messages: oldest first, as the package keeps the last six, though the page draws newest first', () => {
+    const at = (n: number) => ({ id: String(n).repeat(64).slice(0, 64), root: { ...message(String(n).repeat(64).slice(0, 64), `m${n}`), at: n }, replies: [] })
+    const items = referenceItems([at(3), at(2), at(1)])
+    expect(items.map((item) => item.snippet)).toEqual(['m1', 'm2', 'm3'])
+  })
+
   it('captions a message by its words: marks stripped, a person by name', () => {
     expect(snippetOf(`**Ship** it, nostr:${encodeNpub(BOB)}`, () => 'Bob')).toBe('Ship it, @Bob')
+    expect(snippetOf(`# Plan\n- 2026 budget is 40k, ask nostr:${encodeNpub(BOB).toUpperCase()}`, () => 'Bob')).toBe('Plan 2026 budget is 40k, ask @Bob')
   })
 })

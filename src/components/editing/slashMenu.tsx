@@ -41,7 +41,16 @@ export function slashSections({ onFile, table = false, triggers = false }: Inser
     ...(onFile ? [{ key: 'insert-file', row: { label: 'File' }, run: onFile }] : []),
     ...(triggers ? [trigger('Mention', '@', 'Mention a person'), trigger('Urgent', '!@', 'Urgent mention'), trigger('Reference', '[', 'Reference a message')] : []),
   ]
-  return [formatSection('block'), ...(insert.length ? [{ label: 'Insert', commands: insert }] : [])]
+  return [codeAsBlock(formatSection('block')), ...(insert.length ? [{ label: 'Insert', commands: insert }] : [])]
+}
+
+/*
+  The package draws Code's hint as `` ` `` whichever kind it makes, and typing
+  `` ` `` makes inline code; the row here makes a block, which ```` ``` ```` makes.
+  Until the package says so itself (filed on CON-25's project), the hint is set here.
+*/
+function codeAsBlock(section: SlashSection): SlashSection {
+  return { ...section, commands: section.commands.map((c) => (c.key === 'format-code' ? { ...c, row: { ...c.row, shortcut: '```' } } : c)) }
 }
 
 /** `/` for one editor: `ShipSlashMenu(slashSections({ … }))`. */

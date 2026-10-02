@@ -24,6 +24,8 @@ import { beginSignIn, beginSignOut, signInAvailable, signedIn } from './auth/est
 import { identifierFromRef, type FolderSummary } from '@estiva-app/interop'
 import { archivesOf, type Archives } from '@/lib/archive'
 import { MentionPeopleProvider, mentionPeople } from '@/components/editing/mentionables'
+import { mentionableIn } from '@/api/people'
+import { useRoster } from '@/api/useRoster'
 import { go, href, replace, useRoute, type Route } from './router'
 
 /**
@@ -93,8 +95,14 @@ function Shell() {
 
   // Names and faces for everyone in the snapshot; re-read in full on navigation.
   const people = useMemo(() => (state ? peopleIn(state, me) : [me]), [state])
-  const directory = useDirectory(people, href(route))
-  const mentionable = useMemo(() => mentionPeople(people, directory), [people, directory])
+  // `@` offers the workspace's members, so their names are looked up too (CON-25).
+  const roster = useRoster()
+  const mentionKeys = useMemo(() => mentionableIn(roster ?? null, people, me), [roster, people])
+  const named = useMemo(() => [...new Set([...people, ...mentionKeys])], [people, mentionKeys])
+  const directory = useDirectory(named, href(route))
+  // By its two lookups, which change only when a profile arrives: the view itself is a new object every render.
+  const { nameOf, personOf } = directory
+  const mentionable = useMemo(() => mentionPeople(mentionKeys, { nameOf, personOf }), [mentionKeys, nameOf, personOf])
 
   useCanonicalPath(route)
   useInbound(route, say)
