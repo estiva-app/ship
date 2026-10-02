@@ -25,7 +25,8 @@ export const useMentionPeople = () => useContext(MentionPeopleContext)
  */
 export function mentionPeople(pubkeys: readonly string[], directory: Pick<DirectoryView, 'nameOf' | 'personOf' | 'profileOf'>): MentionPerson[] {
   return pubkeys
-    .filter((pubkey) => directory.profileOf(pubkey) !== undefined)
+    // A profile with no name is still a shortened key on screen; Peek drops it too.
+    .filter((pubkey) => directory.profileOf(pubkey)?.name !== undefined)
     .map((pubkey) => {
       const name = directory.nameOf(pubkey)
       return { id: pubkey, name, pubkey, avatar: <Avatar size={32} src={directory.personOf(pubkey).picture} name={name} /> }
