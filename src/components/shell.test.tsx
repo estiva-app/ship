@@ -75,7 +75,7 @@ describe('Sidebar', () => {
       <Sidebar openIssues={5} issuesHref="#/" projectsHref="#/projects" projects={filed} folders={listed} current="issues" />,
     )
     const rowsOf = (id: string) =>
-      [...container.querySelectorAll(`[data-sidebar-team="${id}"] a`)].map((a) => a.textContent)
+      [...container.querySelectorAll(`[data-nav-group="${id}"] a`)].map((a) => a.textContent)
     expect(rowsOf('hq')).toEqual(['One2'])
     expect(rowsOf('peek')).toEqual(['Two'])
     expect(screen.queryByRole('button', { name: 'Not in a Folder' })).not.toBeInTheDocument()
@@ -91,7 +91,7 @@ describe('Sidebar', () => {
     const { container } = render(
       <Sidebar openIssues={5} issuesHref="#/" projectsHref="#/projects" projects={filed} folders={listed} current="issues" />,
     )
-    expect([...container.querySelectorAll('[data-sidebar-team="peek"] a')].map((a) => a.textContent)).toEqual(['One2'])
+    expect([...container.querySelectorAll('[data-nav-group="peek"] a')].map((a) => a.textContent)).toEqual(['One2'])
   })
 
   it('a project in no Folder is under "Not in a Folder", not a fold named like one', () => {
@@ -163,12 +163,12 @@ describe('Sidebar', () => {
     // The projects are known and the teams are not: still the placeholder,
     // rather than a flat list that regroups itself a moment later.
     expect(withProjects.querySelectorAll('[aria-hidden="true"].animate-skeleton-in')).toHaveLength(1)
-    expect(withProjects.querySelector('[data-sidebar-team]')).toBeNull()
+    expect(withProjects.querySelector('[data-nav-group]')).toBeNull()
   })
 
   it('draws no team fold when there are none', () => {
     render(<Sidebar openIssues={0} issuesHref="#/" projectsHref="#/projects" projects={[]} current="issues" />)
-    expect(document.querySelector('[data-sidebar-team]')).toBeNull()
+    expect(document.querySelector('[data-nav-group]')).toBeNull()
   })
 
   it('draws no Projects heading when there are none', () => {
