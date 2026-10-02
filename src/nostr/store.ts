@@ -11,6 +11,7 @@ import type { Imeta, PublishResult, Relay } from '@estiva-app/protocol'
 import type { Signer } from './signer'
 import {
   buildCreateChannel,
+  buildDeleteChannel,
   type SignedEvent,
   type ThreadRef,
   type UnsignedEvent,
@@ -417,6 +418,21 @@ export class Store {
     assertFolderId(args.folder)
     const [change] = planArchiveFolder(this.signer.pubkey, Date.now(), args)
     return this.publish(change)
+  }
+
+  /**
+   * Delete a Folder for good — a `kind:9008`, SHI-27. Not a person's action:
+   * people archive (above), because a 9008 hides everything under its `h` and
+   * no app can undo it.
+   *
+   * For a Folder this key made and has emptied: the relay admits a 9008 only
+   * from the channel's owner (its creator) or a community steward, and refuses
+   * it while any file is still live under the `h` (buzz#16, #17) — so delete the
+   * files first, and report a refusal rather than retry it.
+   */
+  async deleteFolder(folder: string): Promise<PublishResult> {
+    assertFolderId(folder)
+    return this.publish(buildDeleteChannel(this.signer.pubkey, Date.now(), { channelUuid: folder }))
   }
 
   /**

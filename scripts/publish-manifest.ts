@@ -350,7 +350,8 @@ async function main() {
   const store = new Store(relay, secretKeySigner(identity.secretKeyHex))
   // A project is filed into a team (FOL-2); a bare channel stands in for one here.
   const team = crypto.randomUUID()
-  await store.ensureFolder(team, `team-${team.slice(0, 8)}`)
+  const teamCreated = await store.ensureFolder(team, `team-${team.slice(0, 8)}`)
+  if (!teamCreated.ok) throw new Error(`the relay refused the fixture Folder team-${team.slice(0, 8)}: ${teamCreated.reason ?? 'no reason given'} — nothing else was published`)
   const project = await store.createProject({ title: 'Payment integration', description: 'Stripe Checkout.', team: { folder: team, hasState: false } })
   const folder = project.folder
   const issue = await store.createIssue({ folder, title: 'Billing entry', description: 'Settings entry point.', projectAddr: project.addr, ref: 'PAY-1' })
@@ -524,10 +525,25 @@ async function main() {
     const r = await relay.publish(signEvent(buildEventDeletion(identity.pubkey, Date.now(), { targetEventId: e.id }), identity.secretKeyHex))
     removed.push(r.ok)
   }
+  /*
+    And the team Folder the fixture project was filed into, last (SHI-27).
+
+    Every run used to leave its `team-…` channel behind, empty and listed in
+    every reader's Folders: 7 of them by 2026-10-02, and 19 `project-…` ones
+    from before FOL-2. Last, because the relay refuses a `kind:9008` while a
+    file is still live under the `h` (buzz#16) — and it is this key's own
+    channel, so the owner rule admits it.
+  */
+  const teamRemoved = await store.deleteFolder(team)
   console.log(
     removed.every(Boolean)
       ? `\n   removed ${removed.length} verification fixture(s)`
       : `\n   ⚠ ${removed.filter((x) => !x).length} of ${removed.length} fixture(s) could not be removed — check the workspace for stray "Payment integration" projects`,
+  )
+  console.log(
+    teamRemoved.ok
+      ? `   removed its Folder team-${team.slice(0, 8)}`
+      : `   ⚠ its Folder team-${team.slice(0, 8)} (${team}) was not removed${teamRemoved.reason ? ` — ${teamRemoved.reason}` : ''}; it stays listed in every Folder list until a kind:9008 from this key removes it`,
   )
 
   console.log(

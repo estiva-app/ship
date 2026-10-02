@@ -8,7 +8,8 @@
  * `kind:1852 add` naming the Folder and listing nothing — Peek's
  * `createFolderAsViewer` — so it has state from birth; a refused channel sends
  * nothing more; a rename is `kind:9002` plus `kind:1852 add + name` only when
- * the Folder has state, and never a command against one without.
+ * the Folder has state, and never a command against one without. A delete
+ * (SHI-27) is one `kind:9008` and nothing else.
  */
 import type { PublishResult, Relay, SignedEvent, UnsignedEvent } from '@estiva-app/protocol'
 import { Store } from '../src/nostr/store'
@@ -92,6 +93,24 @@ try {
   threw = true
 }
 check('a rename of something that is not a Folder id sends nothing', threw && sent.length === 0)
+
+// 8. Delete (SHI-27): one kind:9008 on the Folder named, and the relay's refusal comes back as it was.
+reset()
+const deleted = await store.deleteFolder(FOLDER)
+check('a delete is one kind:9008 on the Folder named', sent.length === 1 && sent[0]?.kind === 9008 && tag(sent[0], 'h') === FOLDER, shape().join(' | '))
+check('…and nothing else rides on it', JSON.stringify(sent[0]?.tags) === JSON.stringify([['h', FOLDER]]))
+check('…accepted', deleted.ok)
+reset(9008)
+const refusedDelete = await store.deleteFolder(FOLDER)
+check('a refused delete reports the relay’s reason', !refusedDelete.ok && refusedDelete.reason === 'restricted: not an admin')
+reset()
+threw = false
+try {
+  await store.deleteFolder('not-a-uuid')
+} catch {
+  threw = true
+}
+check('a delete of something that is not a Folder id sends nothing', threw && sent.length === 0)
 
 if (failures > 0) {
   console.log(`\n${failures} failed`)
