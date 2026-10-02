@@ -29,7 +29,7 @@ const file = (over: Partial<ForeignObject>): ForeignObject =>
 
 const FILES: ForeignObject[] = [
   file({ ref: 'p', kind: 30850, appName: 'Estiva Ship', slots: { title: { value: 'Payment integration' } } }),
-  file({ ref: 't', kind: 30840, appName: 'File', slots: { title: { value: 'Onboarding' } } }),
+  file({ ref: 't', kind: 30840, appName: 'Peek', noun: 'topic', slots: { title: { value: 'Onboarding' } } }),
   file({ ref: 'x', kind: 30911, appName: 'Tide table', widget: ['tideboard', 'card'], slots: { title: { value: 'Spring tides' } } }),
   file({ ref: 'i', kind: 30851, appName: 'Estiva Ship', widget: 'row', slots: { title: { value: 'Refund webhook retries' }, status: { value: 'In Progress', colour: 'blue' } } }),
 ]
@@ -61,7 +61,7 @@ export const ThreeApps: Story = {}
 export const OnlyOtherApps: Story = {
   args: {
     folder: folder({
-      files: [1, 2, 3, 4].map((n) => file({ ref: `t${n}`, kind: 30840, appName: 'File', slots: { title: { value: `Topic ${n}` } } })),
+      files: [1, 2, 3, 4].map((n) => file({ ref: `t${n}`, kind: 30840, appName: 'Peek', noun: 'topic', slots: { title: { value: `Topic ${n}` } } })),
     }),
   },
 }
