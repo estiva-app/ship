@@ -130,28 +130,19 @@ export interface Project {
    */
   descriptionFormat: ContentFormat
   /**
-   * The Folder this project *is* — where its issues and conversation live.
+   * The Folder the project record names: `buzz-channel` on a global record,
+   * `h` on a channel-scoped one — the same answer interop's `folderOf` gives.
    *
-   * Normally the Folder the record names: `buzz-channel` on a global record,
-   * `h` on a channel-scoped one. A `kind:1851` on the `folder` field overrides
-   * it, which is the only way to re-point a project at an existing Peek topic
-   * after creation: an event cannot change its own `h`.
+   * Where a `kind:1851` about the project is addressed, since changes stay
+   * channel-scoped whatever the record does. New issues and comments go to
+   * the Folder that lists the project instead (`workFolder` in
+   * `api/writes.ts`). Nothing overrides this one: the
+   * `folder` field that used to re-point a project is no longer read (MAN-5),
+   * and a move changes only the Folder listings (FOL-7). Older issues and
+   * threads may sit in other Folders; they are found by their parent and
+   * anchor, not by this.
    */
   contentFolder: string
-  /**
-   * The Folder the project record *names as its own* — before any re-link.
-   *
-   * Kept separately from `contentFolder` because a re-link overrides the latter,
-   * and this one is where the project's older issues still live. It is also the
-   * Folder a `kind:1851` about this project has to be addressed to, since
-   * changes stay channel-scoped whatever the record does.
-   *
-   * Under the old shape it is literally where the record was written (its `h`).
-   * Under the REW-11 shape the record is global and lives in no Folder at all,
-   * so it is the `buzz-channel` the record points at. Same value, same use; only
-   * the record's own location changed.
-   */
-  originFolder: string
   lead?: string
   status: string
   /**
@@ -460,31 +451,6 @@ export function conversationsAbout(
   return conversations.filter((conversation) => conversation.about.includes(address))
 }
 
-/**
- * Every Folder a project has ever pointed at, oldest first.
- *
- * Not just the current one. Re-linking a project to a different Folder — say,
- * to the Peek topic it should have been paired with from the start — does not
- * move the issues already filed under the old `h`; nothing can, because an
- * event is immutable. Reading the union is the difference between "the issues
- * are still there" and "the issues vanished when we linked the topic".
- *
- * Takes the change stream rather than querying, so it stays pure and the caller
- * decides how much history it has.
- */
-export function projectFolders(project: Project, activity: Change[]): string[] {
-  const seen: string[] = []
-  const add = (value?: string) => {
-    if (value && !seen.includes(value)) seen.push(value)
-  }
-  add(project.originFolder)
-  for (const change of activity) {
-    if (change.target === project.addr && change.field === 'folder') add(change.value)
-  }
-  add(project.contentFolder)
-  return seen
-}
-
 /** The whole readable state of one Folder. */
 export interface FolderState {
   projects: Project[]
@@ -602,12 +568,9 @@ export function foldFolder(
       title: fields.title?.value ?? projectName(event) ?? '(untitled project)',
       description: fields.description?.value ?? recordDescription(event),
       descriptionFormat: fields.description?.format ?? contentFormatOf(event),
-      // The project's Folder is the one its record names — the Folder *is* the
-      // project. A change may re-point it at an existing Peek topic; that
-      // override wins, but the original still has to be read
-      // (see `projectFolders`).
-      contentFolder: fields.folder?.value ?? projectFolder(event) ?? '',
-      originFolder: projectFolder(event) ?? '',
+      // The Folder the record names, and only that. A `folder` change is not
+      // read: re-pointing a project is gone (MAN-5).
+      contentFolder: projectFolder(event) ?? '',
       lead: fields.lead?.value ?? tag(event, 'lead'),
       status: fields.status?.value ?? DEFAULT_PROJECT_STATUS,
       // Any non-empty value means archived; unarchiving writes an empty string

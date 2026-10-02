@@ -4,7 +4,7 @@
  *
  * What is pinned: a project pointing at its team's Folder shows neither the
  * team's chat nor a sibling project's comments; its own comments show from
- * every Folder it has had; a legacy project keeps its record channel's talk
+ * whichever Folder they were filed in (MAN-5); a legacy project keeps its record channel's talk
  * that names nothing; and the rule reads the root's tags, not a reply's and not
  * the body.
  */
@@ -19,10 +19,10 @@ const SIBLING = '30850:pk:sibling'
 const TOPIC = '30840:pk:topic'
 const ISSUE = '30851:pk:issue'
 
-/** Never relinked: record channel and content Folder are one. */
-const legacy: ConversationHome = { addr: PROJECT, originFolder: RECORD, folders: [RECORD] }
-/** Relinked to its team: `projectFolders` gives the record channel first, then the team. */
-const underTeam: ConversationHome = { addr: PROJECT, originFolder: RECORD, folders: [RECORD, TEAM] }
+/** A legacy project: its record names a channel of its own. */
+const legacy: ConversationHome = { addr: PROJECT, recordFolder: RECORD }
+/** The same project once it is listed in a team, whose Folder holds threads too. */
+const underTeam: ConversationHome = { addr: PROJECT, recordFolder: RECORD }
 
 const message = (id: string, over: Partial<Message> = {}): Message => ({ id, author: 'a', createdAt: 1, body: id, folder: RECORD, about: [], ...over })
 const thread = (root: Message, replies: Message[] = []): Conversation => ({ id: root.id, root, replies, about: [], createdAt: 1, lastAt: 1 })
@@ -68,7 +68,7 @@ describe('ownConversations — a project under its team', () => {
 
 describe('ownConversations — a project filed into its team (FOL-2)', () => {
   /** Its record names the team: no record channel of its own. */
-  const filed: ConversationHome = { addr: PROJECT, originFolder: recordChannel(TEAM, [{ id: TEAM }]) ?? '', folders: [TEAM] }
+  const filed: ConversationHome = { addr: PROJECT, recordFolder: recordChannel(TEAM, [{ id: TEAM }]) ?? '' }
 
   it('has no record channel — its origin Folder is a team', () => {
     expect(recordChannel(TEAM, [{ id: TEAM }])).toBeUndefined()
@@ -103,13 +103,13 @@ describe('ownConversations — a legacy project', () => {
 })
 
 describe('ownConversations — what bounds it', () => {
-  it('a Folder the project never pointed at is not read, anchored or not', () => {
-    expect(ownConversations([elsewhere, onProjectElsewhere], underTeam, anchors)).toHaveLength(0)
+  it("another Folder's talk is not read, but a thread anchored at the project is, wherever it was filed", () => {
+    expect(ids(ownConversations([elsewhere, onProjectElsewhere], underTeam, anchors))).toEqual(['project-elsewhere'])
   })
 
   it('a record with no Folder does not claim roots that carried no `h`', () => {
     const noH = thread(message('no-h', { folder: '' }))
-    expect(ownConversations([noH], { addr: PROJECT, originFolder: '', folders: [TEAM] }, anchors)).toHaveLength(0)
+    expect(ownConversations([noH], { addr: PROJECT, recordFolder: '' }, anchors)).toHaveLength(0)
   })
 
   it('a root naming the project and another file is not the project’s own', () => {

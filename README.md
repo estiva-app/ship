@@ -105,11 +105,10 @@ Two consequences worth knowing:
 - **A project is filed into a top-level Folder, and that is the whole
   placement** (FOL-2, FOL-3). Its issues and conversation live in that Folder,
   and the Folder's state lists it, which is what both apps draw it under.
-  There is no pairing step and no control for one. `store.linkProjectFolder`
-  survives only to repair a record that points at the wrong Folder — an event
-  cannot change its own `h` — and readers take the union of every Folder a
-  project has pointed at, so the projects re-linked before this still list
-  every issue.
+  There is no pairing step and no control for one, and no `folder` field
+  that re-points a project (MAN-5). A project's older issues and threads
+  may sit in another Folder; readers find them by parent and anchor, so the
+  projects re-pointed before this still list every issue and comment.
 - **An issue cannot exist without a project**, because the only Folders in this
   app are projects and every event needs an `h`.
 

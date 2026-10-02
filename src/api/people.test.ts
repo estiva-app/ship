@@ -5,7 +5,7 @@ import { peopleIn, short } from './people'
 const key = (c: string) => c.repeat(64)
 
 const state: FolderState = {
-  projects: [{ addr: 'p', id: 'p', author: key('a'), createdAt: 1, title: 'P', description: '', descriptionFormat: 'marker' as const, contentFolder: 'f', originFolder: 'f', lead: key('b'), status: 'planned', archived: false, fields: {} }],
+  projects: [{ addr: 'p', id: 'p', author: key('a'), createdAt: 1, title: 'P', description: '', descriptionFormat: 'marker' as const, contentFolder: 'f', lead: key('b'), status: 'planned', archived: false, fields: {} }],
   issues: [{ addr: 'i', id: 'i', author: key('c'), createdAt: 1, title: 'I', description: '', descriptionFormat: 'marker' as const, folder: 'f', status: 'todo', assignee: key('d'), fields: {} }],
   activity: [
     { id: 'x', author: key('e'), createdAt: 1, target: 'i', field: 'assignee', value: key('f'), note: '', format: 'marker' as const },

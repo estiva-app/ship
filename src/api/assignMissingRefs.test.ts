@@ -18,7 +18,7 @@ vi.mock('./clock', () => ({ clockProblem: async () => undefined }))
 import type { Issue, Project } from '../nostr/fold'
 import { assignMissingRefs } from './writes'
 
-const project = { addr: '30850:a:p1', title: 'Payment integration', originFolder: 'f', contentFolder: 'f' } as Project
+const project = { addr: '30850:a:p1', title: 'Payment integration', contentFolder: 'f' } as Project
 const issue = (d: string, ref?: string, createdAt = 1) =>
   ({ addr: `30851:a:${d}`, folder: 'f', ref, createdAt } as Issue)
 

@@ -10,7 +10,6 @@ vi.mock('./store', () => ({
     moveProject: vi.fn(),
     createFolder: vi.fn(),
     renameFolder: vi.fn(),
-    linkProjectFolder: vi.fn(),
     postMessage: vi.fn(),
   },
 }))
@@ -20,11 +19,11 @@ vi.mock('./foreign', () => ({ readFolders: vi.fn() }))
 import { clockProblem } from './clock'
 import { readFolders } from './foreign'
 import { store } from './store'
-import { archiveProject, createFolder, createIssue, createProject, deleteProject, moveProject, renameFolder, reply, setIssueField, setProjectField, startConversation } from './writes'
+import { archiveProject, createFolder, createIssue, createProject, deleteProject, moveProject, renameFolder, reply, setIssueField, setProjectField, startConversation, workFolder } from './writes'
 
 const s = store as unknown as Record<string, ReturnType<typeof vi.fn>>
 const PK = 'ab'.repeat(32)
-const PROJECT = { addr: `30850:${PK}:1`, id: '1', author: PK, createdAt: 1, title: 'Relay Migration', description: '', descriptionFormat: 'marker' as const, contentFolder: 'content-folder', originFolder: 'origin-folder', status: 'planned', archived: false, fields: {} }
+const PROJECT = { addr: `30850:${PK}:1`, id: '1', author: PK, createdAt: 1, title: 'Relay Migration', description: '', descriptionFormat: 'marker' as const, contentFolder: 'content-folder', status: 'planned', archived: false, fields: {} }
 const TEAM = { folder: '3167adea-877f-43c4-96fb-517a2b2d5d24', hasState: true }
 const ISSUE = { addr: `30851:${PK}:2`, id: '2', author: PK, createdAt: 1, title: 'I', description: '', descriptionFormat: 'marker' as const, folder: 'issue-folder', projectAddr: PROJECT.addr, ref: 'REL-2', status: 'todo', fields: {} }
 
@@ -75,11 +74,11 @@ describe('which Folder each write goes to', () => {
     s.archiveProject.mockResolvedValue({ ok: true })
     s.deleteProject.mockResolvedValue({ result: { ok: true } })
     await setProjectField(PROJECT, 'lead', 'k', 'Assign project')
-    expect(s.setField).toHaveBeenCalledWith({ folder: 'origin-folder', target: PROJECT.addr, field: 'lead', value: 'k', note: 'Assign project' })
+    expect(s.setField).toHaveBeenCalledWith({ folder: 'content-folder', target: PROJECT.addr, field: 'lead', value: 'k', note: 'Assign project' })
     await archiveProject(PROJECT, true)
-    expect(s.archiveProject).toHaveBeenCalledWith({ recordFolder: 'origin-folder', project: PROJECT.addr, archived: true })
+    expect(s.archiveProject).toHaveBeenCalledWith({ recordFolder: 'content-folder', project: PROJECT.addr, archived: true })
     await deleteProject(PROJECT, [{ id: 'content-folder', hasState: true }])
-    expect(s.deleteProject).toHaveBeenCalledWith({ recordFolder: 'origin-folder', project: PROJECT.addr, folders: [{ folder: 'content-folder', hasState: true }] })
+    expect(s.deleteProject).toHaveBeenCalledWith({ recordFolder: 'content-folder', project: PROJECT.addr, folders: [{ folder: 'content-folder', hasState: true }] })
   })
 })
 
@@ -142,6 +141,18 @@ describe('deleting a project unlists it from its team (FOL-48)', () => {
     const result = await createIssue(PROJECT, [ISSUE, { ...ISSUE, ref: 'REL-7' }, { ...ISSUE, ref: 'DES-9' }], { title: 'New', description: 'd' })
     expect(s.createIssue).toHaveBeenCalledWith({ folder: 'content-folder', title: 'New', description: 'd', projectAddr: PROJECT.addr, ref: 'REL-8' })
     expect(result).toEqual({ ok: true, addr: '30851:me:new' })
+  })
+
+  it('a new issue goes to the Folder that lists the project when that is another one (MAN-5)', async () => {
+    vi.mocked(readFolders).mockResolvedValue([{ id: 'team', hasState: true, addresses: [PROJECT.addr] }] as never)
+    s.createIssue.mockResolvedValue({ result: { ok: true }, addr: '30851:me:new', id: 'new' })
+    await createIssue(PROJECT, [], { title: 'New', description: 'd' })
+    expect(s.createIssue).toHaveBeenCalledWith(expect.objectContaining({ folder: 'team' }))
+  })
+
+  it("workFolder falls back to the record's Folder when the listing cannot be read", async () => {
+    vi.mocked(readFolders).mockRejectedValue(new Error('rate limited'))
+    expect(await workFolder(PROJECT)).toBe('content-folder')
   })
 })
 

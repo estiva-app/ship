@@ -22,7 +22,7 @@
 import { buildChange, buildConversationMessage, buildIssue, buildProject } from '../src/nostr/events'
 import { buildManifest } from '../src/nostr/manifest'
 import { KIND } from '../src/nostr/kinds'
-import { foldFolder, projectFolders, type Change, type Project } from '../src/nostr/fold'
+import { foldFolder } from '../src/nostr/fold'
 import { foldAttachments } from '@estiva-app/conversation'
 import { directoryFrom, initials, parseProfile } from '../src/nostr/profiles'
 import type { SignedEvent } from '@estiva-app/protocol'
@@ -215,7 +215,6 @@ check('both shapes fold', bothShapes.projects.length === 2)
 check('the global record keeps its name', global_?.title === 'Payment integration')
 check('  …reads its description from the tag', global_?.description === 'Take card payments')
 check('  …resolves buzz-channel as its Folder', global_?.contentFolder === CONTENT)
-check('  …and as the Folder its changes address', global_?.originFolder === CONTENT)
 check('  …and still reports its lead', global_?.lead === PK)
 check('the h-shaped record is unaffected', legacy?.contentFolder === CONTENT)
 check('  …and still reads title, not name', legacy?.title === 'Payment integration')
@@ -234,7 +233,7 @@ const transitional = sign(
 )
 check(
   'a record carrying both tags is read as channel-scoped',
-  foldFolder([transitional]).projects[0]?.originFolder === CONTENT,
+  foldFolder([transitional]).projects[0]?.contentFolder === CONTENT,
 )
 
 // An empty description tag is a statement, not an absence — otherwise clearing
@@ -617,36 +616,14 @@ check(
   tag(projForManifest, 'name') === 'Named',
 )
 
-// ── Re-linking a project to a Peek topic ────────────────────────────────────
+// ── The retired `folder` field ──────────────────────────────────────────────
 
-console.log('\n# re-linking a project to an existing Peek topic\n')
+console.log('\n# a `folder` change no longer re-points a project (MAN-5)\n')
 
-const relink: Change = {
-  id: 'e5',
-  author: PK,
-  createdAt: Math.floor(Date.now() / 1000),
-  target: `30850:${PK}:p1`,
-  field: 'folder',
-  value: TOPIC,
-  format: 'marker',
-  note: '',
-}
-const relinked: Project = { ...folded.projects[0], contentFolder: TOPIC }
-
+const repoint = buildChange(PK, Date.now(), { target: `30850:${PK}:p1`, field: 'folder', value: TOPIC, folder: CONTENT })
 check(
-  'the project now points at the topic',
-  projectFolders(relinked, [relink]).at(-1) === TOPIC,
-)
-// The wrinkle that would otherwise lose data: events already written cannot
-// move, so the reader has to keep asking the old container too.
-check(
-  'the original Folder is still read',
-  projectFolders(relinked, [relink]).includes(CONTENT),
-  projectFolders(relinked, [relink]).map((f) => f.slice(0, 4)).join(' → '),
-)
-check(
-  'and the union is ordered oldest first',
-  projectFolders(relinked, [relink])[0] === CONTENT,
+  'the project keeps the Folder its record names',
+  foldFolder([sign(project, 'e1'), sign(repoint, 'e5')]).projects[0]?.contentFolder === CONTENT,
 )
 
 // ── Profiles ────────────────────────────────────────────────────────────────

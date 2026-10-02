@@ -28,7 +28,7 @@ import { Relay } from '@estiva-app/protocol'
 import { secretKeySigner } from '../src/nostr/signer'
 import { addrToNaddr } from '@estiva-app/protocol'
 import { Store } from '../src/nostr/store'
-import { conversationsAbout, foldFolder, projectFolders } from '../src/nostr/fold'
+import { conversationsAbout, foldFolder } from '../src/nostr/fold'
 import { KIND } from '../src/nostr/kinds'
 
 const RELAY_URL = process.env.RELAY_URL ?? 'http://localhost:3000'
@@ -162,10 +162,6 @@ async function main() {
 
   const foldedProject = state.projects.find((p) => p.addr === project.addr)
   check('the project reports that Folder as its own', foldedProject?.contentFolder === folder)
-  check(
-    'a reader can find the issues from the project alone',
-    projectFolders(foldedProject!, state.activity).includes(folder),
-  )
 
   const folded = state.issues.find((issue) => issue.addr === billing.addr)
   check('PAY-1 folds back', !!folded)
@@ -342,47 +338,38 @@ async function main() {
     recommended,
   )
 
-  // ── 7. Re-linking a project to an existing Peek topic ─────────────────────
-  // The regression guard for a bug that looked like "creating a ticket is
-  // broken". Discovery asks for kind:30850 only, so it cannot contain the
-  // kind:1851 that re-points a project — a single-pass read finds the project,
-  // misses the re-link, and never queries the topic. Writes landed correctly
-  // and were then never read back.
+  // ── 7. A project's work filed in another Folder ───────────────────────────
+  // Nothing re-points a project any more (MAN-5), but its older issues and
+  // threads can sit in a Folder other than the one its record names — the
+  // Folder a retired `folder` change pointed at. They are found by parent and
+  // anchor: the issue's own Folder is widened into, and its threads come with it.
   const topic = randomUUID()
   await must('A Peek-style topic Folder exists', () =>
     ana.store.ensureFolder(topic, `topic-${topic.slice(0, 8)}`),
   )
-  await must('Ravi pairs Ana\'s project with it', () =>
-    ravi.store.linkProjectFolder({ recordFolder: folder, project: project.addr, folder: topic }),
-  )
-  await must('an issue filed after pairing goes to the topic', async () => {
+  await must('an issue of the project is filed in it', async () => {
     const { result } = await ana.store.createIssue({
       folder: topic,
-      title: 'Filed after pairing',
+      title: 'Filed elsewhere',
       projectAddr: project.addr,
     })
     return result
   })
-  await must('and a conversation on the project goes there too', () =>
-    ana.store.postMessage({ folder: topic, about: project.addr, body: 'After pairing' }),
+  await must('and a conversation on the project too', () =>
+    ana.store.postMessage({ folder: topic, about: project.addr, body: 'Talked about elsewhere' }),
   )
 
-  const relinked = await ravi.store.loadAll()
-  const relinkedProject = relinked.projects.find((p) => p.addr === project.addr)
-  check('the project now reports the topic as its Folder', relinkedProject?.contentFolder === topic)
+  const elsewhere = await ravi.store.loadAll()
+  check('the project still reports its own Folder', elsewhere.projects.find((p) => p.addr === project.addr)?.contentFolder === folder)
   check(
-    'an issue filed after pairing is read back',
-    relinked.issues.some((issue) => issue.title === 'Filed after pairing'),
+    'the issue filed elsewhere is read back',
+    elsewhere.issues.some((issue) => issue.title === 'Filed elsewhere'),
   )
   check(
-    'a conversation started after pairing is read back',
-    conversationsAbout(relinked.conversations, project.addr).some(
-      (c) => c.root.body === 'After pairing',
+    'the conversation filed elsewhere is read back',
+    conversationsAbout(elsewhere.conversations, project.addr).some(
+      (c) => c.root.body === 'Talked about elsewhere',
     ),
-  )
-  check(
-    '  …and the issues filed BEFORE pairing did not disappear',
-    relinked.issues.some((issue) => issue.addr === billing.addr),
   )
 
   // ── 8. Archive and delete ─────────────────────────────────────────────────

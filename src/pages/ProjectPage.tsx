@@ -23,6 +23,7 @@ import {
   assignMissingRefs,
   setProjectField,
   startConversation,
+  workFolder,
   channelContext,
   fileContext,
   useMergedReadState,
@@ -31,7 +32,6 @@ import {
   commentsOn,
   mentionsOf,
   commentsOnAny,
-  projectFolders,
   type DirectoryView,
   type FolderState,
   type WorkspaceState,
@@ -382,11 +382,11 @@ export function ProjectPage({
     () => (project ? subFileThreads(state, new Set(state.issues.filter((issue) => issue.projectAddr === project.addr).map((issue) => issue.addr))) : new Set<string>()),
     [project, state],
   )
-  const record = recordChannel(project?.originFolder, teams)
+  const record = recordChannel(project?.contentFolder, teams)
   const conversations = useMemo(
     () =>
       project
-        ? ownConversations(state.conversations, { addr: project.addr, originFolder: record ?? '', folders: projectFolders(project, state.activity) }, state.anchors).filter((c) => !rolledUp.has(c.id))
+        ? ownConversations(state.conversations, { addr: project.addr, recordFolder: record ?? '' }, state.anchors).filter((c) => !rolledUp.has(c.id))
         : [],
     [project, state, rolledUp, record],
   )
@@ -398,11 +398,10 @@ export function ProjectPage({
      before FOL-16 their roots answered to the channel marker, so this line
      silently read every issue in the project.
 
-     The channel is the **record** channel, not the content Folder (FOL-1): that
-     is the only Folder whose chat this page draws. For a project pointing at a
-     team, marking the content Folder would advance the team's chat, which is
-     not on this page. For a project never relinked the two are the same. A
-     project filed into a team (FOL-2) has no record channel, only a team. */
+     The channel is the **record** channel (FOL-1): the only Folder whose chat
+     this page draws. A project filed into a team (FOL-2) has no record
+     channel, only a team, and marking the team would advance the team's chat,
+     which is not on this page. */
   useMarkRead([channelContext(record), fileContext(project?.addr)])
   const threads = useMemo(
     () => conversations.map((c) => threadFor(c, directory, project ? { value: project.description, format: project.descriptionFormat } : undefined, project?.addr, state.edits, state.attachments)),
@@ -428,7 +427,11 @@ export function ProjectPage({
     person is looking at, and that Folder lists the project. Not the fold — the
     fold is Ship's kinds, and these are by definition not.
   */
-  const related = useRelated(project?.contentFolder, project?.addr)
+  // The Folder that lists the project, which is not its record's for a project
+  // a retired `folder` change once pointed at a team (MAN-5) or one moved since
+  // (FOL-7). The record's own Folder until the listings are read.
+  const listedIn = project && teams ? placedIn({ addr: project.addr, folder: project.contentFolder }, teams)[0]?.id : undefined
+  const related = useRelated(listedIn ?? project?.contentFolder, project?.addr)
 
   if (!project) {
     return <EmptyState icon={<IconLinkOff size={16} stroke={1.5} />} message="That project is not in this workspace, or is in a Folder you cannot read." />
@@ -507,11 +510,12 @@ export function ProjectPage({
         unread={unread}
         // A project conversation is already in the topic it belongs to, so a
         // reference would be noise (withReference: false), as the old app has it.
-        onStartConversation={(body, files) => act('Message', () => startConversation({ folder: project.contentFolder, about: project.addr, withReference: false, body, files }), say, () => refresh([project.contentFolder]))}
+        onStartConversation={(body, files) => act('Message', async () => startConversation({ folder: await workFolder(project, teams), about: project.addr, withReference: false, body, files }), say, () => refresh([listedIn ?? project.contentFolder]))}
         onReply={(threadId, body, files) => {
           const conversation = conversations.find((c) => c.id === threadId)
           if (!conversation) return false
-          return act('Reply', () => reply(conversation, project.contentFolder, body, files), say, () => refresh([project.contentFolder]))
+          // The reply goes to the thread's own Folder, which need not be the project's.
+          return act('Reply', () => reply(conversation, project.contentFolder, body, files), say, () => refresh([conversation.root.folder || project.contentFolder]))
         }}
         activity={activity.items}
         activityTruncated={activity.truncated}

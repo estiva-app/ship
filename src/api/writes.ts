@@ -5,6 +5,7 @@ import { nextRef, refPrefix } from '../nostr/store'
 import { RELAY_URL } from '../config'
 import { clockProblem } from './clock'
 import { readFolders } from './foreign'
+import { placedIn } from '../lib/placement'
 import { store } from './store'
 
 /**
@@ -26,14 +27,15 @@ import { store } from './store'
  *
  * Which Folder an event carries is the one thing easy to get wrong:
  * - an issue's events go to the issue's own Folder (`issue.folder`), which
- *   is not necessarily its project's current one after a re-link;
+ *   is not necessarily its project's;
  * - a project's record changes go to the Folder the record names
- *   (`project.originFolder`);
- * - a project's conversation and its new issues go to its content Folder
- *   (`project.contentFolder`).
+ *   (`project.contentFolder`);
+ * - its new comments and new issues go to the Folder that lists it
+ *   (`workFolder`), which differs for a project once re-pointed or moved.
  *
  * Getting it wrong does **not** fail. Measured against production on
- * 2026-08-29: a project change published against the content Folder instead
+ * 2026-08-29, when a re-pointed project's content Folder could differ from its
+ * record's: a project change published against the content Folder instead
  * of the record's is accepted by the relay, `ok: true`, no reason given. The
  * fold keys changes by target address, so `foldFolder` over the whole
  * workspace applies it and the app looks correct — but `loadFolder` and
@@ -41,7 +43,7 @@ import { store } from './store'
  * never sees it. The edit exists for one reader and not for another,
  * permanently, with nothing anywhere reporting a problem.
  *
- * The three lines above are load-bearing for that reason, not because
+ * The rules above are load-bearing for that reason, not because
  * something downstream would catch a mistake. It would not.
  */
 export type WriteResult = { ok: true } | { ok: false; reason: string }
@@ -98,7 +100,7 @@ export function setProjectField(project: Project, field: 'title' | 'description'
     §13.4 says a body's format is on the event and is never guessed.
   */
   const body = field === 'description' ? { value, contentFormat } : { value, contentFormat: undefined }
-  return publish(() => store.setField({ folder: project.originFolder, target: project.addr, field, ...body, note }))
+  return publish(() => store.setField({ folder: project.contentFolder, target: project.addr, field, ...body, note }))
 }
 
 /**
@@ -107,7 +109,7 @@ export function setProjectField(project: Project, field: 'title' | 'description'
  * first when it is opened (FOL-46).
  */
 export function archiveProject(project: Project, archived: boolean, resolution?: string): Promise<WriteResult> {
-  return publish(() => store.archiveProject({ recordFolder: project.originFolder, project: project.addr, archived, resolution }))
+  return publish(() => store.archiveProject({ recordFolder: project.contentFolder, project: project.addr, archived, resolution }))
 }
 
 /** Archive one issue, or restore it — the project's rule, one level down (FOL-46). */
@@ -169,7 +171,7 @@ export async function deleteProject(
     const read = listing(held).length > 0 || own(held) ? held : await readFolders()
     const lists = listing(read)
     const unlistFrom = lists.length > 0 ? lists : [{ folder: project.contentFolder, hasState: own(read)?.hasState ?? false }]
-    const { result, unlisted } = await store.deleteProject({ recordFolder: project.originFolder, project: project.addr, folders: unlistFrom })
+    const { result, unlisted } = await store.deleteProject({ recordFolder: project.contentFolder, project: project.addr, folders: unlistFrom })
     if (!result.ok) return refused(result.reason)
     if (unlisted && !unlisted.ok) return { ok: true, stillListed: unlisted.reason ?? 'no reason given' }
     return { ok: true }
@@ -264,7 +266,22 @@ export function deleteIssue(issue: Issue): Promise<WriteResult> {
 // ── Issues ──────────────────────────────────────────────────────────────────
 
 /**
- * Create an issue in a project's content Folder, with a display ref derived
+ * Where a project's new issues and new comments go: the Folder that lists it,
+ * which is the one both apps draw it under and the one its people get unread
+ * signals from — Miky's ruling on MAN-5. The record's own Folder only when
+ * nothing lists it, or the listing cannot be read; either way the write is
+ * found again by its parent or anchor, not by its Folder.
+ */
+export async function workFolder(project: Project, folders?: readonly { id: string; addresses?: readonly string[] }[]): Promise<string> {
+  try {
+    return placedIn({ addr: project.addr, folder: project.contentFolder }, folders ?? (await readFolders()))[0]?.id ?? project.contentFolder
+  } catch {
+    return project.contentFolder
+  }
+}
+
+/**
+ * Create an issue in the Folder that lists its project (`workFolder`), with a display ref derived
  * from what is currently visible (`nextRef(refPrefix(title), siblings)`) —
  * so it can collide across projects, as the old app's does. The address is
  * the identity; the ref is decoration, generated the same way, never
@@ -275,7 +292,7 @@ export async function createIssue(project: Project, existing: Issue[], draft: { 
   if (clock) return { ok: false, reason: clock }
   try {
     const { result, addr } = await store.createIssue({
-      folder: project.contentFolder,
+      folder: await workFolder(project),
       title: draft.title,
       description: draft.description,
       projectAddr: project.addr,

@@ -5,31 +5,29 @@ import type { AnchorIndex } from '../nostr/references'
 export interface ConversationHome {
   /** The project's address — what its own comments name as their root scope. */
   addr: string
-  /** The record channel: the Folder the project was created with (`projectFolders`' first entry). */
-  originFolder: string
-  /** Every Folder the project has pointed at — `projectFolders(project, activity)`. */
-  folders: readonly string[]
+  /** The record channel — `recordChannel(project.contentFolder, teams)`, or `''` when it has none. */
+  recordFolder: string
 }
 
 /**
  * A project's record channel — the one Folder whose chat is the project's
  * even where it names nothing — or `undefined` when it has none.
  *
- * Its `originFolder`, unless that is a team. A project created since FOL-2
+ * Its `contentFolder`, unless that is a team. A project created since FOL-2
  * names its team there: it has no channel of its own, and the team's chat is
  * the team's, so neither drawing it nor marking it read belongs on the page.
  * Until the teams are read that cannot be told, and it is `undefined` — a
  * legacy project's unanchored chat arrives a moment late, rather than a
  * team's appearing on every project filed in it.
  */
-export function recordChannel(originFolder: string | undefined, teams: readonly { id: string }[] | undefined): string | undefined {
-  if (!originFolder || !teams) return undefined
-  return teams.some((team) => team.id === originFolder) ? undefined : originFolder
+export function recordChannel(contentFolder: string | undefined, teams: readonly { id: string }[] | undefined): string | undefined {
+  if (!contentFolder || !teams) return undefined
+  return teams.some((team) => team.id === contentFolder) ? undefined : contentFolder
 }
 
 /**
  * A project's own conversation: the threads whose root is a comment on the
- * project, wherever in its Folders they were filed — plus the legacy record
+ * project, wherever they were filed — plus the legacy record
  * channel's talk that names nothing (FOL-1).
  *
  * **The anchor decides, not the Folder.** It used to be the other way round: a
@@ -42,11 +40,13 @@ export function recordChannel(originFolder: string | undefined, teams: readonly 
  * `kind:1111` that is its `A` tag, the §6.4 per-tag rule `anchorIndex` already
  * applies — and names nothing else.
  *
- * **Read across every Folder the project has had**, because a relinked
- * project's comments stay under the `h` they were written in; nothing can move
- * them. Measured on production before the change (2026-09-24): of the eleven
- * projects pointing at a team, the pages showed 2 threads between them, while
- * 36 threads anchored at those projects sat in their earlier Folders.
+ * **Read in every Folder the workspace read holds**, because a comment stays
+ * under the `h` it was written in; nothing can move it. Until MAN-5 this was
+ * the union of the Folders a `folder` change had pointed the project at; that
+ * field is no longer read, and the anchor alone says whose a thread is.
+ * Measured on production on 2026-10-02: 13 threads anchored at the 24 formerly
+ * re-pointed projects sit outside their record Folder, each in a Folder the
+ * read already fetches because it holds that project's issues.
  *
  * **The "names nothing" rule survives for the record channel only.** That
  * Folder was the project's alone, so its bare chat really is the project's —
@@ -62,7 +62,7 @@ export function ownConversations(conversations: readonly Conversation[], home: C
   return conversations.filter((c) => {
     const named = anchors[c.root.id] ?? []
     // A record with no Folder has no record channel; `''` must not match a root that carried no `h`.
-    if (named.length === 0) return home.originFolder !== '' && c.root.folder === home.originFolder
-    return home.folders.includes(c.root.folder) && named.every((address) => address === home.addr)
+    if (named.length === 0) return home.recordFolder !== '' && c.root.folder === home.recordFolder
+    return named.every((address) => address === home.addr)
   })
 }
