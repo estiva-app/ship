@@ -14,6 +14,7 @@ import { IssueRail, type IssueRailProps } from '@/components/IssueRail'
 import { Related, hasRelated } from '@/components/Related'
 import { LiveHeader } from '@/components/editing/LiveHeader'
 import { MentionList, ThreadList } from '@/components/conversations/ThreadList'
+import { useBlockComment } from '@/components/conversations/useBlockComment'
 import type { RelatedState } from '@/api/useRelated'
 import { AppSection, Centred } from '@/components/layout/ReadingColumn'
 
@@ -97,6 +98,7 @@ export function IssueView({ crumbs, tab, onTab, title, description, descriptionF
   // The box before the project's name says it is a project, as the sidebar's entry does (Katerina, 2026-09-09).
   if (crumbs.project) items.push({ label: crumbs.project.title, icon: <IconBox size={16} stroke={1.5} />, ...linkTo(crumbs.project.href) })
   if (crumbs.ref) items.push({ label: crumbs.ref, mono: true })
+  const comment = useBlockComment(description, descriptionFormat, onTab, onStartConversation)
 
   return (
     // `data-surface` and `data-tab` are the smoke test's waypoints — see IssuesView. A page that scrolls inside
@@ -114,7 +116,7 @@ export function IssueView({ crumbs, tab, onTab, title, description, descriptionF
         {tab === 'overview' && (
           <Centred>
             {archivedNotice}
-            <LiveHeader title={title} titlePlaceholder="Untitled issue" onRename={onRename} description={description} format={descriptionFormat} onDescribe={onDescribe} nameOf={nameOf} readOnly={!!readOnlyReason} upload={upload} />
+            <LiveHeader title={title} titlePlaceholder="Untitled issue" onRename={onRename} description={description} format={descriptionFormat} onDescribe={onDescribe} nameOf={nameOf} readOnly={!!readOnlyReason} upload={upload} onCommentOnBlock={comment.start} />
             {/* Nesting is by intent (RFC 0.5 §10.7): what somebody placed under this issue, from whichever app owns it. */}
             {hasRelated(related) && (
               <>
@@ -131,7 +133,7 @@ export function IssueView({ crumbs, tab, onTab, title, description, descriptionF
           <Centred>
             {archivedNotice}
             <AppSection title="Conversations">
-              <ThreadList threads={threads} unread={unread} onStart={onStartConversation} onReply={onReply} disabledReason={readOnlyReason} nameOf={nameOf} onReact={onReact} onDeleteMessage={onDeleteMessage} onEditMessage={onEditMessage} about={about} upload={upload} />
+              <ThreadList threads={threads} unread={unread} onStart={comment.post} anchor={comment.anchor} onDropAnchor={comment.drop} onReply={onReply} disabledReason={readOnlyReason} nameOf={nameOf} onReact={onReact} onDeleteMessage={onDeleteMessage} onEditMessage={onEditMessage} about={about} upload={upload} />
             </AppSection>
             <AppSection title="Mentioned in">
               <MentionList items={activity} truncated={activityTruncated} onReply={onReplyInActivity} disabledReason={readOnlyReason} nameOf={nameOf} onReact={onReact} onDeleteMessage={onDeleteMessage} onEditMessage={onEditMessage} upload={upload} />

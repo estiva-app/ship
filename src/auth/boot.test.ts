@@ -94,20 +94,22 @@ describe('a cold load with nothing', () => {
     expect(url.searchParams.get('client_id')).toBe('estiva-ship')
   })
 
-  it('carries the path route, and never a fragment', async () => {
+  it('carries the path route, and a block link’s fragment with it', async () => {
     /*
       This asserted `returnTo === '#/p/abc'` until the redirect-URI fix, which is
       what REW-2 built and REW-3/4/5 invalidated by moving `web/` to real paths.
-      A fragment is not carried because it cannot be: it is dropped at the first
-      navigation to `/authorize` and nothing brings it back.
+      Then it asserted the fragment was dropped. It need not be: the browser drops
+      it at the navigation to `/authorize`, but `returnTo` waits in this tab's
+      storage, not in that URL — and a block link (RIC-18) is the page plus
+      `#block-<id>`, which must land on the block after signing in.
     */
-    window.history.replaceState({}, '', '/p/abc#ignored')
+    window.history.replaceState({}, '', '/p/abc#block-b1')
     const { bootAuth } = await freshBootWithNav()
     await bootAuth()
     const url = new URL(navigated[0])
     // Exact-string compared upstream, and fixed rather than the current path.
     expect(url.searchParams.get('redirect_uri')).toBe(`${ORIGIN}/`)
-    expect(sessionStorage.getItem('ship.estiva-id.returnTo')).toBe('/p/abc')
+    expect(sessionStorage.getItem('ship.estiva-id.returnTo')).toBe('/p/abc#block-b1')
   })
 
   it('marks the guard, so a second cold load does not probe again', async () => {

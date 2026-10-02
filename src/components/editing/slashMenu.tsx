@@ -1,5 +1,6 @@
 import type { Editor } from '@tiptap/core'
-import { SlashCommands, formatSection, typeTrigger, type SlashCommand, type SlashSection } from '@estiva-app/ui/editor'
+import type { Node as ProseMirrorNode } from '@tiptap/pm/model'
+import { FORMATS, SlashCommands, applyFormat, formatSection, typeTrigger, type BlockTurnInto, type FormatId, type SlashCommand, type SlashSection } from '@estiva-app/ui/editor'
 
 /**
  * The `/` menu of the description and the message box: the package's shared
@@ -52,6 +53,22 @@ export function slashSections({ onFile, table = false, triggers = false }: Inser
 function codeAsBlock(section: SlashSection): SlashSection {
   return { ...section, commands: section.commands.map((c) => (c.key === 'format-code' ? { ...c, row: { ...c.row, shortcut: '```' } } : c)) }
 }
+
+/** Whether a block of text already is what a Format row makes — the row drawn as selected. */
+function isFormat(node: ProseMirrorNode, id: FormatId): boolean {
+  if (id === 'paragraph') return node.type.name === 'paragraph'
+  if (id === 'heading') return node.type.name === 'heading' && node.attrs.level === 1
+  if (id === 'subheading') return node.type.name === 'heading' && node.attrs.level === 2
+  if (id === 'code') return node.type.name === 'codeBlock'
+  return false
+}
+
+/** The block menu's Turn into (RIC-18): the `/` menu's Format rows, code as a block, run on the block the caret is in. */
+export const TURN_INTO: BlockTurnInto[] = FORMATS.map((format) => ({
+  label: format.label,
+  run: (editor) => void applyFormat(editor, format.id, 'block'),
+  active: (node) => isFormat(node, format.id),
+}))
 
 /** `/` for one editor: `ShipSlashMenu(slashSections({ … }))`. */
 export const ShipSlashMenu = (sections: readonly SlashSection[]) => SlashCommands.configure({ sections })

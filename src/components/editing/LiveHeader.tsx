@@ -1,5 +1,8 @@
-import { Suspense, lazy } from 'react'
-import { referencesIn, standaloneReference, toRenderTree, type ContentFormat, type Imeta } from '@estiva-app/protocol'
+import { Suspense, lazy, useEffect, useState } from 'react'
+import { referencesIn, resolveBlockAnchor, standaloneReference, toRenderTree, type ContentFormat, type Imeta } from '@estiva-app/protocol'
+import { BlockHandle } from '@estiva-app/ui'
+import { Banner } from '@/components/Banner'
+import { blockRows, linkedBlock } from './blockRows'
 import { ForeignObject } from '@/components/ui/ForeignObject'
 import { RichText } from '@/components/ui/RichText'
 import { SkeletonBar } from '@/components/ui/Skeleton'
@@ -27,6 +30,36 @@ export interface LiveHeaderProps {
   readOnly?: boolean
   /** The upload behind `/` File. Injected so a story needs no relay. */
   upload?: (file: File) => Promise<Imeta>
+  /** The block menu's Comment — offered to a reader too. Without it the row is not offered (RIC-18). */
+  onCommentOnBlock?: (blockId: string) => void
+}
+
+/**
+ * Opened from a block link (RIC-18): the block scrolled into view, or — when
+ * that block is gone from the description — a notice saying so, as §13.6 asks
+ * of a detached anchor. Once, for the description the page opened with.
+ */
+function useLinkedBlock(description: string, format: ContentFormat): [gone: boolean, dismiss: () => void] {
+  const [gone, setGone] = useState(false)
+  useEffect(() => {
+    const id = linkedBlock()
+    if (!id) return
+    if (resolveBlockAnchor(id, description, format).state !== 'resolved') {
+      setGone(true)
+      return
+    }
+    // The reading surface draws first and the editor replaces it, pixel for pixel; either holds the block.
+    let tries = 0
+    const timer = setInterval(() => {
+      const element = document.querySelector(`[data-description] [data-block-id="${CSS.escape(id)}"]`)
+      if (!element && ++tries < 30) return
+      clearInterval(timer)
+      element?.scrollIntoView({ block: 'center' })
+    }, 100)
+    return () => clearInterval(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the description the link was opened on; a later edit is not a new arrival
+  }, [])
+  return [gone, () => setGone(false)]
 }
 
 /**
@@ -50,9 +83,16 @@ export function LiveHeader(props: LiveHeaderProps) {
   const resolved = byReference(references, objects)
   const cards = attached.map((r) => resolved[r]).filter((o): o is ForeignObjectData => !!o)
 
+  const [gone, dismiss] = useLinkedBlock(description, format)
+
   const reading = <ReadingHeader {...props} resolved={resolved} />
   return (
     <div className="flex flex-col gap-4">
+      {gone && (
+        <Banner tone="info" onDismiss={dismiss}>
+          That part of the description was removed.
+        </Banner>
+      )}
       {readOnly ? (
         reading
       ) : (
@@ -77,14 +117,21 @@ export function LiveHeader(props: LiveHeaderProps) {
  * the moment before the editor arrives. Laid out exactly as the editors are,
  * so nothing moves when they replace it.
  */
-function ReadingHeader({ title, titlePlaceholder, description, format, nameOf, readOnly, resolved }: LiveHeaderProps & { resolved: Record<string, ForeignObjectData | null | undefined> }) {
+function ReadingHeader({ title, titlePlaceholder, description, format, nameOf, readOnly, resolved, onCommentOnBlock }: LiveHeaderProps & { resolved: Record<string, ForeignObjectData | null | undefined> }) {
   const empty = description.trim() === ''
   return (
     <div className="flex flex-col gap-4">
       {/* No "Archived" chip beside the title: the Archived notice above it says so in words (Katerina, 30 September). */}
       <h1 className={title ? '-mx-2 px-2 py-1 text-h2 text-text-primary' : '-mx-2 px-2 py-1 text-h2 text-text-muted'}>{title || titlePlaceholder}</h1>
-      <div className="-mx-2 px-2 py-1">
-        {empty ? <span className="text-body-2 text-text-muted">{readOnly ? '' : 'Add a description…'}</span> : <RichText value={description} format={format} nameOf={nameOf} resolved={resolved} hideStandalone />}
+      <div className="-mx-2 px-2 py-1" data-description="reading">
+        {empty ? (
+          <span className="text-body-2 text-text-muted">{readOnly ? '' : 'Add a description…'}</span>
+        ) : (
+          // A reader gets the handle too, with Copy link and Comment (Miky, RIC-18 kickoff); the editing rows need the editor.
+          <BlockHandle actions={blockRows(onCommentOnBlock)}>
+            <RichText value={description} format={format} nameOf={nameOf} resolved={resolved} hideStandalone />
+          </BlockHandle>
+        )}
       </div>
     </div>
   )

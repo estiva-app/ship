@@ -222,8 +222,15 @@ export interface ConversationsProps {
   threads: ThreadData[]
   /** Thread id → the id of its first unread message. Omitted threads have nothing new. */
   unread?: Record<string, string>
-  /** The text and the files already on the relay — SHI-2. See `Composer`. */
-  onStart: (text: string, files: readonly Imeta[], picks?: Picks) => Promise<boolean | void> | boolean | void
+  /** The text and the files already on the relay — SHI-2. See `Composer`. `blockId` when it starts from a block's menu — RIC-18. */
+  onStart: (text: string, files: readonly Imeta[], picks?: Picks, blockId?: string) => Promise<boolean | void> | boolean | void
+  /**
+   * The block the next conversation is about — chosen from a block's menu
+   * (RIC-18). Drawn above the composer, as the comment will show it; posting
+   * sends its id, and `onDropAnchor` takes it away.
+   */
+  anchor?: BlockAnchor
+  onDropAnchor?: () => void
   onReply: (threadId: string, text: string, files: readonly Imeta[], picks?: Picks) => Promise<boolean | void> | boolean | void
   /** Why nothing can be posted right now — every composer here is disabled with it. */
   disabledReason?: string

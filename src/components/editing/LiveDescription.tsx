@@ -12,12 +12,13 @@ import {
   type Imeta,
 } from '@estiva-app/protocol'
 import { FieldLine, FilePicker, richTextClassName } from '@estiva-app/ui'
-import { SelectionToolbar } from '@estiva-app/ui/editor'
+import { EditorBlockHandle, SelectionToolbar, blockDropCursor } from '@estiva-app/ui/editor'
 import { uploadAttachment } from '@/api/blobs'
 import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
 import { AttachmentNode, BlockId, ReferenceNode, ReferenceProvider, UnknownBlock } from '@/components/ui/editorSchema'
 import { LinkDecoration } from './linkDecoration'
-import { ShipSlashMenu, slashSections } from './slashMenu'
+import { blockRows } from './blockRows'
+import { ShipSlashMenu, TURN_INTO, slashSections } from './slashMenu'
 
 /**
  * The description as one surface that is always an editor (Katerina,
@@ -51,6 +52,7 @@ export function LiveDescription({
   resolved = {},
   onEditor,
   upload = uploadAttachment,
+  onCommentOnBlock,
 }: {
   value: string
   format: ContentFormat
@@ -61,6 +63,8 @@ export function LiveDescription({
   /** Hands the editor up, so the title's Enter can move the caret here. */
   onEditor?: (editor: Editor | null) => void
   upload?: (file: File) => Promise<Imeta>
+  /** The block menu's Comment: start a conversation anchored to that block. Without it the row is not offered. */
+  onCommentOnBlock?: (blockId: string) => void
 }) {
   const [failed, setFailed] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
@@ -88,10 +92,16 @@ export function LiveDescription({
   // The text as last typed. Saving on the way out reads this, not the editor,
   // which may already be torn down by then.
   const typed = useRef<EditorDocument | null>(null)
+  const again = useRef(false)
 
   const save = useCallback(
     async (doc: EditorDocument | null) => {
-      if (committing.current || !doc) return
+      if (!doc) return
+      // A change made while a save is out — a block menu's Delete right after the press that blurred the field — goes next, not nowhere.
+      if (committing.current) {
+        again.current = true
+        return
+      }
       const next = publishableFromEditor(doc)
       if (next.value === saved.current) return
       committing.current = true
@@ -101,6 +111,10 @@ export function LiveDescription({
         if (ok) saved.current = next.value
       } finally {
         committing.current = false
+      }
+      if (again.current) {
+        again.current = false
+        void latestSave.current(typed.current)
       }
     },
     [onCommit],
@@ -118,7 +132,8 @@ export function LiveDescription({
   const editor = useEditor(
     {
       extensions: [
-        StarterKit.configure({ link: false, strike: false, heading: { levels: [1, 2, 3] } }),
+        // The drop line in the accent, where a dragged block will land (RIC-18, Katerina's review).
+        StarterKit.configure({ link: false, strike: false, heading: { levels: [1, 2, 3] }, dropcursor: blockDropCursor }),
         TableKit.configure({ table: { resizable: false } }),
         BlockId,
         ReferenceNode,
@@ -192,11 +207,12 @@ export function LiveDescription({
     <ReferenceProvider value={{ resolved, nameOf }}>
       <div className="flex flex-col gap-1">
         {/* The reading surface's own `-mx-2 px-2 py-1`, so nothing moves. The text cursor is the only sign it is editable. */}
-        <div className="relative">
+        {/* The handle sits in the gutter left of the text, so nothing moves (RIC-18). */}
+        <EditorBlockHandle editor={editor} turnInto={TURN_INTO} actions={blockRows(onCommentOnBlock)}>
           <EditorContent editor={editor} className="-mx-2 cursor-text px-2 py-1" data-description="editing" />
           {/* Peek's composer pattern: muted words over an empty editor. */}
           {empty && <span aria-hidden className="pointer-events-none absolute left-0 top-1 text-body-2 text-text-muted">Add a description…</span>}
-        </div>
+        </EditorBlockHandle>
         <SelectionToolbar editor={editor} marks={['bold', 'italic', 'underline', 'code']} />
         <FilePicker ref={picker} multiple onPick={(files) => void attach(files)} />
         {uploadError && <FieldLine tone="error">{uploadError}</FieldLine>}
