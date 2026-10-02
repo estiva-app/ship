@@ -101,8 +101,8 @@ function Shell() {
   const named = useMemo(() => [...new Set([...people, ...mentionKeys])], [people, mentionKeys])
   const directory = useDirectory(named, href(route))
   // By its two lookups, which change only when a profile arrives: the view itself is a new object every render.
-  const { nameOf, personOf } = directory
-  const mentionable = useMemo(() => mentionPeople(mentionKeys, { nameOf, personOf }), [mentionKeys, nameOf, personOf])
+  const { nameOf, personOf, profileOf } = directory
+  const mentionable = useMemo(() => mentionPeople(mentionKeys, { nameOf, personOf, profileOf }), [mentionKeys, nameOf, personOf, profileOf])
 
   useCanonicalPath(route)
   useInbound(route, say)

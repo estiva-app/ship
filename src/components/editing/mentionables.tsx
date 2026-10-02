@@ -17,9 +17,16 @@ const MentionPeopleContext = createContext<readonly MentionPerson[]>([])
 export const MentionPeopleProvider = MentionPeopleContext.Provider
 export const useMentionPeople = () => useContext(MentionPeopleContext)
 
-/** The people as the package's list draws them: a name, a face, and the key the body is written with. */
-export function mentionPeople(pubkeys: readonly string[], directory: Pick<DirectoryView, 'nameOf' | 'personOf'>): MentionPerson[] {
+/**
+ * The people as the package's list draws them: a name, a face, and the key the
+ * body is written with. Only those with a profile, as Peek's `mentionablePeopleOf`:
+ * the roster also lists keys that are not people (an app's manifest key), and a
+ * shortened key is nobody a person can pick.
+ */
+export function mentionPeople(pubkeys: readonly string[], directory: Pick<DirectoryView, 'nameOf' | 'personOf' | 'profileOf'>): MentionPerson[] {
   return pubkeys
+    // A profile with no name is still a shortened key on screen; Peek drops it too.
+    .filter((pubkey) => directory.profileOf(pubkey)?.name !== undefined)
     .map((pubkey) => {
       const name = directory.nameOf(pubkey)
       return { id: pubkey, name, pubkey, avatar: <Avatar size={32} src={directory.personOf(pubkey).picture} name={name} /> }
