@@ -20,8 +20,9 @@ vi.mock('@/api', async (importOriginal) => {
     archiveProject: vi.fn(),
     deleteProject: vi.fn(),
     deleteIssue: vi.fn(),
-    pairProjectFolder: vi.fn(),
     startConversation: vi.fn(),
+    // The listing read is the relay's; here the project lists in its own Folder.
+    workFolder: vi.fn(async (project: { contentFolder: string }) => project.contentFolder),
     reply: vi.fn(),
   }
 })
