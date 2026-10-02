@@ -19,7 +19,7 @@ import {
   type ThreadRef,
   type UnsignedEvent,
 } from '@estiva-app/protocol'
-import { buildComment, buildReply, type CommentRef } from '@estiva-app/conversation'
+import { buildComment, buildReply, mentionTagsFor, quoteTagsFor, referenceTagsFor, urgentTagsFor, type CommentRef } from '@estiva-app/conversation'
 import { KIND } from './kinds'
 import { attachmentsInDocument } from './attachments'
 
@@ -354,9 +354,24 @@ export function buildConversationMessage(
      * than a preference — see `uploadAttachment` in `src/api/blobs.ts`.
      */
     files?: readonly Imeta[]
+    /** The people the composer's urgent picks name, by pubkey — SPEC §13.1, CON-25. */
+    urgent?: readonly string[]
   },
 ): UnsignedEvent {
   assertFolderId(args.folder)
+
+  /*
+    The tags the body earns (CON-25), the ones Peek appends: a `p` per person it
+    names, an `urgent` beside each urgent one, an `a` per other address it names
+    (§6.4), and a `q` per message it references (§13.1). Until CON-25 Ship wrote
+    none, so a mention notified nobody and a file named in a Ship comment was
+    missing from that file's Mentioned in.
+  */
+  const earned = (own: { address?: string; event?: string }): NostrTag[] => [
+    ...urgentTagsFor(args.body, args.urgent),
+    ...referenceTagsFor(args.body, own.address),
+    ...quoteTagsFor(args.body, own.event),
+  ]
 
   // A comment, or a reply to one, is a NIP-22 `kind:1111`; chat — a message in
   // the Folder or a reply in its thread — stays a `kind:9` (SPEC §6.4).
@@ -366,6 +381,7 @@ export function buildConversationMessage(
       body: args.body,
       comment: args.replyToComment,
       files: args.files,
+      tags: [...mentionTagsFor(args.body), ...earned({ address: args.replyToComment.anchor, event: args.replyToComment.id })],
     })
   }
   if (args.about && !args.replyTo) {
@@ -375,16 +391,19 @@ export function buildConversationMessage(
       about: args.about,
       blockId: args.blockId,
       files: args.files,
+      tags: [...mentionTagsFor(args.body), ...earned({ address: args.about })],
     })
   }
 
   const event = buildMessage(pubkey, createdAtMs, {
     channelUuid: args.folder,
     content: args.body,
+    mentions: mentionTagsFor(args.body).map((tag) => tag[1]),
   })
   const tags: NostrTag[] = [...event.tags]
   if (args.replyTo) tags.push(...threadTags(args.replyTo))
   if (args.about) tags.push(['a', args.about])
+  tags.push(...earned({ address: args.about, event: args.replyTo?.parentId }))
   // Same `ts` as a change event, for the same reason and found the same way:
   // `created_at` is seconds, two messages posted in one second sorted by event
   // id, and the thread read back in the wrong order. A conversation is the one

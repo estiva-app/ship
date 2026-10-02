@@ -13,13 +13,15 @@ import {
   type Imeta,
 } from '@estiva-app/protocol'
 import { AttachmentCard, Avatar, Button, FieldLine, FilePicker, IconButton, Kbd, Toolbar, ToolbarButton, richTextClassName } from '@estiva-app/ui'
-import { SelectionToolbar, isSuggestionActive } from '@estiva-app/ui/editor'
+import { SelectionToolbar, isSuggestionActive, urgentPubkeys, type CaptionedItem } from '@estiva-app/ui/editor'
 import { cn } from '@/lib/cn'
 import { browserDrafts, type DraftStore } from '@/lib/drafts'
 import { uploadAttachment } from '@/api/blobs'
 import { ReferenceNode, ReferenceProvider } from '@/components/ui/editorSchema'
 import { LinkDecoration } from '@/components/editing/linkDecoration'
-import { DescriptionSlashMenu } from '@/components/editing/slashMenu'
+import { ShipSlashMenu, slashSections } from '@/components/editing/slashMenu'
+import { chipsAsReferences, composerTriggers } from '@/components/editing/composerTriggers'
+import { useMentionPeople } from '@/components/editing/mentionables'
 import { WRITING_BOX } from './writingBox'
 
 
@@ -34,12 +36,24 @@ const DEFAULT_DRAFTS = browserDrafts()
 const fileName = (file: Imeta) => file.filename ?? file.alt ?? 'attachment'
 
 const editorDocFor = (text: string) => toEditorDocument(documentForEditing(text, 'marker'))
-const markerOf = (editor: Editor) => blockDocumentToMarkerText(fromEditorDocument(editor.getJSON() as EditorDocument))
+// The chips first: the bridge drops an inline node it does not know (CON-25). A document with no blocks at all — an
+// edit of a message that is only files starts as one — is no text; the bridge would throw on it.
+const markerOf = (editor: Editor) => {
+  const doc = editor.getJSON()
+  return doc.content ? blockDocumentToMarkerText(fromEditorDocument(chipsAsReferences(doc as never) as EditorDocument)) : ''
+}
+
+/** What the text alone cannot say: which of the people it names were mentioned urgently (SPEC §13.1). */
+export interface Picks {
+  urgent?: readonly string[]
+}
 
 export interface MessageBoxProps {
   kind?: MessageBoxKind
-  /** The trimmed marker text and the files already on the relay. Resolve `false` to keep them. */
-  onSubmit: (text: string, files: readonly Imeta[]) => Promise<boolean | void> | boolean | void
+  /** The trimmed marker text, the files already on the relay, and the urgent picks. Resolve `false` to keep them. */
+  onSubmit: (text: string, files: readonly Imeta[], picks: Picks) => Promise<boolean | void> | boolean | void
+  /** What `[` offers — the messages on the page (CON-25), asked when the list opens. Omitted, `[` opens nothing. */
+  references?: () => readonly CaptionedItem[]
   /** Edit: the text as it stands. */
   initial?: string
   /** Edit: leave without saving. Reply: Escape in an empty box. */
@@ -72,6 +86,9 @@ export interface MessageBoxProps {
  *   underline, code, headings, lists, quotes and a pasted reference survive, and
  *   an edit starts from the same text (`markerTextToBlockDocument`). `/` offers
  *   no Table: marker text has none.
+ * - **`@`, `!@`, `[` and `/` are the package's** (CON-25): a person writes their
+ *   `nostr:npub…`, a message its `nostr:nevent…`. The tags those earn are the
+ *   caller's to add, from the text and the urgent picks `onSubmit` is handed.
  * - **A file uploads when it is picked**, one after another, and waits as the
  *   package's `AttachmentCard` with its ✕. A refusal shows in the relay's words
  *   under the box. Send waits while a file is uploading.
@@ -89,7 +106,7 @@ export interface MessageBoxProps {
  * A new conversation is Peek's tall box, the tools on a row under the text; a
  * reply is one short line with the tools at its end (Katerina, 30 September).
  */
-export function MessageBox({ kind = 'conversation', onSubmit, initial = '', onCancel, autoFocus = false, disabledReason, draftKey, drafts = DEFAULT_DRAFTS, upload = uploadAttachment, nameOf, look = 'box', me, className }: MessageBoxProps) {
+export function MessageBox({ kind = 'conversation', onSubmit, references, initial = '', onCancel, autoFocus = false, disabledReason, draftKey, drafts = DEFAULT_DRAFTS, upload = uploadAttachment, nameOf, look = 'box', me, className }: MessageBoxProps) {
   const [text, setText] = useState(initial)
   const [files, setFiles] = useState<readonly Imeta[]>([])
   const [busy, setBusy] = useState(false)
@@ -100,6 +117,12 @@ export function MessageBox({ kind = 'conversation', onSubmit, initial = '', onCa
   store.current = drafts
   const key = useRef(draftKey)
   key.current = draftKey
+  // The lists are asked each time they open; the editor is built once, so they read the latest through refs.
+  const mentionable = useMentionPeople()
+  const people = useRef(mentionable)
+  people.current = mentionable
+  const offered = useRef(references)
+  offered.current = references
 
   const unchanged = kind === 'edit' && text.trim() === initial.trim()
   const canSubmit = (text.trim().length > 0 || (kind !== 'edit' && files.length > 0)) && !unchanged && !busy && !uploading && !disabledReason
@@ -154,7 +177,9 @@ export function MessageBox({ kind = 'conversation', onSubmit, initial = '', onCa
         StarterKit.configure({ link: false, strike: false, heading: { levels: [1, 2] }, trailingNode: false }),
         ReferenceNode,
         LinkDecoration,
-        DescriptionSlashMenu.configure({ onFile: () => picker.current?.click(), without: kind === 'edit' ? ['table', 'file'] : ['table'] }),
+        ...composerTriggers({ people: () => people.current, references: () => offered.current?.() ?? [] }),
+        // No Table: marker text has none (§13.2). No File in an edit, which keeps the message's files as they are.
+        ShipSlashMenu(slashSections({ onFile: kind === 'edit' ? undefined : () => picker.current?.click(), triggers: true })),
         keys,
       ],
       content: editorDocFor(initial),
@@ -211,7 +236,7 @@ export function MessageBox({ kind = 'conversation', onSubmit, initial = '', onCa
     if (!canSubmit || !editor) return
     setBusy(true)
     try {
-      const ok = await onSubmit(text.trim(), files)
+      const ok = await onSubmit(text.trim(), files, { urgent: urgentPubkeys(editor) })
       if (ok !== false) {
         if (kind === 'edit') return onCancel?.()
         editor.commands.clearContent()

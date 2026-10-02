@@ -7,6 +7,7 @@ import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
 import { byReference, useForeignObjects } from '@/api/useForeignObjects'
 import { useReactions } from '@/api'
 import type { Reaction } from '@/api'
+import type { Picks } from '@/components/conversations/MessageBox'
 
 /**
  * Conversations as production shows them: a composer to start one, then
@@ -45,6 +46,8 @@ import type { Reaction } from '@/api'
  */
 export interface MessageData {
   id: string
+  /** `9` for chat, `1111` for a comment — what a `[` reference to it carries (CON-25). */
+  kind?: number
   /**
    * Which block of the object this comment is about, already resolved against
    * the description as it is now — SPEC §13.6. Resolved by the caller because
@@ -220,8 +223,8 @@ export interface ConversationsProps {
   /** Thread id → the id of its first unread message. Omitted threads have nothing new. */
   unread?: Record<string, string>
   /** The text and the files already on the relay — SHI-2. See `Composer`. */
-  onStart: (text: string, files: readonly Imeta[]) => Promise<boolean | void> | boolean | void
-  onReply: (threadId: string, text: string, files: readonly Imeta[]) => Promise<boolean | void> | boolean | void
+  onStart: (text: string, files: readonly Imeta[], picks?: Picks) => Promise<boolean | void> | boolean | void
+  onReply: (threadId: string, text: string, files: readonly Imeta[], picks?: Picks) => Promise<boolean | void> | boolean | void
   /** Why nothing can be posted right now — every composer here is disabled with it. */
   disabledReason?: string
   /**

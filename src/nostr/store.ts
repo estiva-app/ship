@@ -632,6 +632,8 @@ export class Store {
     aboutRef?: string
     /** Files already uploaded to the relay — SHI-2. See `buildConversationMessage`. */
     files?: readonly Imeta[]
+    /** Who the composer's urgent picks name — CON-25. */
+    urgent?: readonly string[]
   }): Promise<PublishResult> {
     const body = args.aboutRef ? `${args.body}\n\n${args.aboutRef}` : args.body
     return this.publish(
@@ -643,6 +645,7 @@ export class Store {
         about: args.about,
         blockId: args.blockId,
         files: args.files,
+        urgent: args.urgent,
       }),
     )
   }

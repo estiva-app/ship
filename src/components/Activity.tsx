@@ -1,5 +1,6 @@
 import type { Imeta } from '@estiva-app/protocol'
 import type { ThreadData } from './ConversationThread'
+import type { Picks } from './conversations/MessageBox'
 
 /**
  * **Activity: the conversations of files *related* to this one** — CON-9.
@@ -71,7 +72,7 @@ export interface ActivityProps {
   items: ActivityItem[]
   /** The viewer's pubkey, for §6.5's Edit and Delete rule — see `ConversationsProps.viewer`. */
   viewer?: string
-  onReply: (threadId: string, text: string, files: readonly Imeta[]) => Promise<boolean | void> | boolean | void
+  onReply: (threadId: string, text: string, files: readonly Imeta[], picks?: Picks) => Promise<boolean | void> | boolean | void
   /** Why nothing can be posted right now — every composer here is disabled with it. */
   disabledReason?: string
   /** Resolve a mentioned key to a name — SPEC §13.1. */

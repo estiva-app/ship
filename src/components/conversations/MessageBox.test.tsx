@@ -50,7 +50,7 @@ describe('MessageBox', () => {
     type(input, '  hello  ')
     expect(pressable(send())).toBe(true)
     fireEvent.keyDown(input, { key: 'Enter' })
-    expect(onSubmit).toHaveBeenCalledWith('hello', [])
+    expect(onSubmit).toHaveBeenCalledWith('hello', [], { urgent: undefined })
     await waitFor(() => expect(input).toHaveTextContent(/^$/))
   })
 
@@ -94,7 +94,7 @@ describe('MessageBox', () => {
 
     type(box('Start a conversation…'), 'look')
     fireEvent.click(send())
-    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith('look', [meta]))
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith('look', [meta], { urgent: undefined }))
     // Posted files do not carry over into the next message.
     await waitFor(() => expect(screen.queryByText('shot.png')).not.toBeInTheDocument())
   })
@@ -108,7 +108,7 @@ describe('MessageBox', () => {
     pick(container)
     await waitFor(() => expect(pressable(send())).toBe(true))
     fireEvent.click(send())
-    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith('', [meta]))
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith('', [meta], { urgent: undefined }))
   })
 
   it('says why an upload was refused, and attaches nothing', async () => {
@@ -126,7 +126,7 @@ describe('MessageBox', () => {
     fireEvent.click(send())
     // The message still goes, carrying no file. A refused upload costs the
     // attachment and nothing else.
-    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith('anyway', []))
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith('anyway', [], { urgent: undefined }))
   })
 
   it('keeps an attachment when the post is refused, so a retry costs no upload', async () => {

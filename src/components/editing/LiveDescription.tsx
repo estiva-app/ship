@@ -17,7 +17,7 @@ import { uploadAttachment } from '@/api/blobs'
 import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
 import { AttachmentNode, BlockId, ReferenceNode, ReferenceProvider, UnknownBlock } from '@/components/ui/editorSchema'
 import { LinkDecoration } from './linkDecoration'
-import { DescriptionSlashMenu } from './slashMenu'
+import { ShipSlashMenu, slashSections } from './slashMenu'
 
 /**
  * The description as one surface that is always an editor (Katerina,
@@ -125,7 +125,7 @@ export function LiveDescription({
         UnknownBlock,
         AttachmentNode,
         LinkDecoration.configure({ openOnClick: true }),
-        DescriptionSlashMenu.configure({ onFile: () => openPicker() }),
+        ShipSlashMenu(slashSections({ table: true, onFile: () => openPicker() })),
       ],
       // Built once. A value coming back must not rebuild the editor under the caret; see the effect below.
       content: toEditorDocument(documentForEditing(value, format)),

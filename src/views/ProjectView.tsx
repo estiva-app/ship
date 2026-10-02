@@ -1,5 +1,6 @@
 import { IconBox, IconLayoutKanban, IconTable } from '@tabler/icons-react'
 import type { ContentFormat, Imeta } from '@estiva-app/protocol'
+import type { Picks } from '@/components/conversations/MessageBox'
 import type { ReactNode } from 'react'
 import { Breadcrumb } from '@/components/ui/Breadcrumb'
 import { ScrollArea } from '@/components/ui/ScrollArea'
@@ -55,15 +56,15 @@ export interface ProjectViewProps {
   threads: ThreadData[]
   /** Thread id → first unread message id. Drives the "new since" line (CRO-13). */
   unread?: Record<string, string>
-  /** `files` are attachments already on the relay — SHI-2. */
-  onStartConversation: (text: string, files: readonly Imeta[]) => Promise<boolean | void> | boolean | void
-  onReply: (threadId: string, text: string, files: readonly Imeta[]) => Promise<boolean | void> | boolean | void
+  /** `files` are attachments already on the relay — SHI-2; `picks` the composer's urgent mentions (CON-25). */
+  onStartConversation: (text: string, files: readonly Imeta[], picks?: Picks) => Promise<boolean | void> | boolean | void
+  onReply: (threadId: string, text: string, files: readonly Imeta[], picks?: Picks) => Promise<boolean | void> | boolean | void
   /** Threads elsewhere that mention this project — CON-9. */
   activity: ActivityItem[]
   /** How many the horizon left out — `ACTIVITY_HORIZON`. Said on screen, never implied. */
   activityTruncated?: number
   /** Reply into a thread belonging to another file: its own Folder, never this project's. */
-  onReplyInActivity: (threadId: string, text: string, files: readonly Imeta[]) => Promise<boolean | void> | boolean | void
+  onReplyInActivity: (threadId: string, text: string, files: readonly Imeta[], picks?: Picks) => Promise<boolean | void> | boolean | void
   rail: {
     status: string
     statuses: StatusEntry[]
