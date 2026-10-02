@@ -20,6 +20,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { publicKeyFromSecret } from '@estiva-app/protocol'
 import { MANIFEST_ADDRESS } from '../src/nostr/manifest-address'
+import { MANIFEST_D_TAG } from '../src/nostr/manifest'
 import { readManifestKey } from './manifest-key'
 
 let failures = 0
@@ -67,6 +68,7 @@ const cases: Array<[string, string, () => void]> = [
   ['empty', join(dir, 'empty'), () => writeFileSync(join(dir, 'empty'), '')],
   ['malformed', join(dir, 'malformed'), () => writeFileSync(join(dir, 'malformed'), 'deadbeef\n')],
   ['uppercase hex', join(dir, 'upper'), () => writeFileSync(join(dir, 'upper'), `${otherKey.toUpperCase()}\n`)],
+  ['out-of-range hex', join(dir, 'zero'), () => writeFileSync(join(dir, 'zero'), `${'0'.repeat(64)}\n`)],
   ['another pubkey', join(dir, 'wrong'), () => writeFileSync(join(dir, 'wrong'), `${otherKey}\n`)],
   ['a symlink to a malformed file', join(dir, 'link'), () => symlinkSync(malformedTarget, join(dir, 'link'))],
   ['a dangling symlink', join(dir, 'dangling'), () => symlinkSync(join(dir, 'nowhere'), join(dir, 'dangling'))],
@@ -94,9 +96,14 @@ check('a dangling symlink still dangles', !existsSync(join(dir, 'nowhere')))
 const goodFile = join(dir, 'good')
 writeFileSync(goodFile, `${otherKey}\n`)
 const otherAddress = `31990:${publicKeyFromSecret(otherKey)}:estiva-ship`
-const accepted = readManifestKey(goodFile, otherAddress)
+const accepted = readManifestKey(goodFile, otherAddress, MANIFEST_D_TAG)
 check('the key of the address is accepted, trimmed', 'secretKeyHex' in accepted && accepted.secretKeyHex === otherKey)
-check('and refused against the live address', 'refused' in readManifestKey(goodFile, MANIFEST_ADDRESS))
+check('and refused against the live address', 'refused' in readManifestKey(goodFile, MANIFEST_ADDRESS, MANIFEST_D_TAG))
+check(
+  'and refused when the address names another d than the one published',
+  'refused' in readManifestKey(goodFile, otherAddress, `${MANIFEST_D_TAG}-next`),
+)
+check('the committed address names what is published', MANIFEST_ADDRESS.endsWith(`:${MANIFEST_D_TAG}`) && MANIFEST_ADDRESS.startsWith('31990:'))
 
 rmSync(dir, { recursive: true, force: true })
 console.log(failures === 0 ? '\nAll checks passed.' : `\n${failures} check(s) FAILED.`)

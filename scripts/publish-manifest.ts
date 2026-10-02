@@ -83,7 +83,7 @@ function triedUrls(argv: string[]): string[][] {
  * `--dry-run`, now go through this, before anything touches the relay.
  */
 function manifestIdentity(mode: string): ManifestKey {
-  const key = readManifestKey(KEY_FILE, MANIFEST_ADDRESS)
+  const key = readManifestKey(KEY_FILE, MANIFEST_ADDRESS, MANIFEST_D_TAG)
   if ('refused' in key) {
     console.error(
       `\n✋ Refusing to ${mode}: ${key.refused}.\n` +

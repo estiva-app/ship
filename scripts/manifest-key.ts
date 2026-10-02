@@ -16,15 +16,24 @@ import { publicKeyFromSecret } from '@estiva-app/protocol'
 
 export type ManifestKey = { secretKeyHex: string; pubkey: string }
 
-export function readManifestKey(keyFile: string, address: string): ManifestKey | { refused: string } {
-  const pubkey = address.split(':')[1]
+export function readManifestKey(keyFile: string, address: string, dTag: string): ManifestKey | { refused: string } {
+  const [kind, pubkey, d] = address.split(':')
+  // The address is no longer rewritten after a publish, so it has to already
+  // name what the publish will produce.
+  if (kind !== '31990' || d !== dTag) {
+    return { refused: `${address} is not 31990:<pubkey>:${dTag}, which is what would be published` }
+  }
   if (!existsSync(keyFile)) return { refused: `there is no ${keyFile} for ${address}` }
   const secretKeyHex = readFileSync(keyFile, 'utf8').trim()
   if (!/^[0-9a-f]{64}$/.test(secretKeyHex)) {
     return { refused: `${keyFile} is not a 64-character hex key, so it cannot be the key of ${address}` }
   }
-  if (publicKeyFromSecret(secretKeyHex) !== pubkey) {
-    return { refused: `${keyFile} is not the key of ${address}` }
+  let derived: string
+  try {
+    derived = publicKeyFromSecret(secretKeyHex)
+  } catch {
+    return { refused: `${keyFile} is not a valid secret key, so it cannot be the key of ${address}` }
   }
+  if (derived !== pubkey) return { refused: `${keyFile} is not the key of ${address}` }
   return { secretKeyHex, pubkey }
 }
