@@ -33694,7 +33694,7 @@
         "projectAddr": "30850:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:254a0dee-b709-4c55-98ca-6871f3da4177",
         "ref": "FIXTURE-9",
         "status": "cancelled",
-        "assignee": "4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa",
+        "assignee": "",
         "fields": {
           "status": {
             "value": "cancelled",
@@ -33703,7 +33703,7 @@
             "format": "marker"
           },
           "assignee": {
-            "value": "4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa",
+            "value": "",
             "by": "4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa",
             "at": 1700000001,
             "format": "marker"
