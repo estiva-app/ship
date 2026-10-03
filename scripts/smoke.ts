@@ -1192,8 +1192,9 @@ async function main() {
   )
 
   // ── New folder, and rename it (FOL-8) ─────────────────────────────────────
-  // Peek's two writes, event for event: 9007 then 1852 add naming it; then
-  // 9002 and 1852 add with the new name, because the Folder has state.
+  // Peek's two writes, event for event: 9007 with the name, then a 1852 add
+  // naming and listing nothing; a rename is the 9002 alone — the title is the
+  // channel's (SPEC §3.2, MAN-17).
   const beforeCreate = stored.length
   await sidebar().getByRole('button', { name: 'New folder' }).click()
   const folderDialog = page.getByRole('dialog', { name: 'New folder' })
@@ -1204,16 +1205,18 @@ async function main() {
   const createWrites = stored.slice(beforeCreate).filter((e) => e.kind === 9007 || e.kind === 1852)
   const newFolderId = (createWrites[0] && tagValue(createWrites[0], 'h')) ?? ''
   check(
-    '"New folder" publishes a kind:9007, then a kind:1852 add naming it on the same id',
+    '"New folder" publishes a kind:9007 with the name, then a kind:1852 add with none, on the same id',
     createWrites.map((e) => `${e.kind} ${tagValue(e, 'op') ?? '-'} ${tagValue(e, 'name')} ${tagValue(e, 'h') === newFolderId}`).join(' | ') ===
-      '9007 - Smoke folder true | 1852 add Smoke folder true',
+      '9007 - Smoke folder true | 1852 add undefined true',
     createWrites.map((e) => `${e.kind} ${tagValue(e, 'op') ?? '-'} ${tagValue(e, 'name')}`).join(' | ') || 'nothing published',
   )
   check('  …and opens the new Folder', !!newFolderId && page.url().endsWith(`/folder/${newFolderId}`), page.url())
 
   // The stub does not derive a channel or state from commands; write them as the relay would have.
   seed({ kind: 39000, tags: [['d', newFolderId], ['name', 'Smoke folder']] })
-  seed({ kind: 30890, tags: [['d', newFolderId], ['name', 'Smoke folder']] })
+  seed({ kind: 30890, tags: [['d', newFolderId]] })
+  // The creator is the channel's owner, which is who is offered the rename (MAN-17).
+  seed({ kind: 39001, tags: [['d', newFolderId], ['p', createWrites[0]?.pubkey ?? '', 'owner']] })
   // A fresh load, so the page reads what was just seeded.
   await page.goto(`http://localhost:${PORT}/#/folder/${newFolderId}`)
   await page.waitForSelector(`[data-folder="${newFolderId}"]`)
@@ -1225,9 +1228,9 @@ async function main() {
   await nameField.waitFor({ state: 'detached' })
   const renameWrites = stored.slice(beforeRename).filter((e) => e.kind === 9002 || e.kind === 1852)
   check(
-    'renaming it from its title publishes a kind:9002, then a kind:1852 add with the new name',
+    'renaming it from its title publishes the kind:9002 alone, with the new name',
     renameWrites.map((e) => `${e.kind} ${tagValue(e, 'op') ?? '-'} ${tagValue(e, 'name')} ${tagValue(e, 'h') === newFolderId}`).join(' | ') ===
-      '9002 - Smoke folder renamed true | 1852 add Smoke folder renamed true',
+      '9002 - Smoke folder renamed true',
     renameWrites.map((e) => `${e.kind} ${tagValue(e, 'op') ?? '-'} ${tagValue(e, 'name')}`).join(' | ') || 'nothing published',
   )
 
