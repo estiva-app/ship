@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { archiveFolder, renameFolder } from '@/api'
+import { archiveFolder, me, renameFolder } from '@/api'
 import { folderArchiveImpact, readFolder, type FolderContents, type FolderSummary } from '@/api/foreign'
 import { ArchiveDialog } from '@/components/ArchiveDialog'
 import { ArchivedNotice } from '@/components/ArchivedNotice'
@@ -66,16 +66,8 @@ export function FolderPage({ id, folders, nameOf = (pubkey) => `${pubkey.slice(0
         say('A folder needs a name.', 'error')
         return false
       }
-      /*
-        `hasState` read again now, not taken from when the page opened: another
-        app may have listed something here since, and a rename that believed
-        there was no state would write only the channel's name, which the
-        state's shadows. A failed read falls back to the page's: short of
-        deleting the Folder nothing takes state away, so an old `true` is
-        still true, and an old `false` only risks the lesser failure above.
-      */
-      const hasState = await readFolder(contents.id).then((fresh) => fresh.hasState, () => contents.hasState)
-      return act('Rename', () => renameFolder({ id: contents.id, hasState }, name), say, async () => {
+      // The channel's name is the title and its only home (SPEC §3.2), so there is nothing to read first.
+      return act('Rename', () => renameFolder({ id: contents.id }, name), say, async () => {
         const [next] = await Promise.allSettled([readFolder(contents.id), reloadFolders()])
         if (next.status === 'fulfilled') {
           if (next.value.id === shown.current) setContents(next.value)
@@ -94,6 +86,9 @@ export function FolderPage({ id, folders, nameOf = (pubkey) => `${pubkey.slice(0
     Folder lists, and what stays visible elsewhere — made when the person asks,
     not on every page load.
   */
+  // Only the Folder's owners and admins: the relay refuses their rename (9002) from anybody else, and every reader ignores their archive (SPEC §3.2).
+  const isFolderAdmin = !!contents?.admins?.includes(me)
+  const canArchive = !!contents?.channel && isFolderAdmin
   const reread = useCallback(async () => {
     const [next] = await Promise.allSettled([readFolder(id), reloadFolders()])
     if (next.status === 'fulfilled' && next.value.id === shown.current) setContents(next.value)
@@ -136,14 +131,14 @@ export function FolderPage({ id, folders, nameOf = (pubkey) => `${pubkey.slice(0
     <>
       <FolderView
         folder={contents}
-        onRename={rename}
-        {...(contents.channel && !contents.archived ? { onArchive: () => void askToArchive() } : {})}
+        {...(isFolderAdmin ? { onRename: rename } : {})}
+        {...(canArchive && !contents.archived ? { onArchive: () => void askToArchive() } : {})}
         archivedNotice={
           contents.archived && (
             <ArchivedNotice
               archive={{ by: contents.archived.by, at: contents.archived.at, resolution: contents.archived.resolution }}
               nameOf={nameOf}
-              onUnarchive={() => void setArchived(false)}
+              {...(canArchive ? { onUnarchive: () => void setArchived(false) } : {})}
             />
           )
         }

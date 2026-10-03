@@ -18,7 +18,7 @@ import { FolderPage } from './FolderPage'
 // The rename's write and the sidebar's listing: what is under test is which Folder, which name and which `hasState` they get.
 const renameFolder = vi.fn()
 const reloadFolders = vi.fn(async () => {})
-vi.mock('@/api', () => ({ renameFolder: (...args: unknown[]) => renameFolder(...args) }))
+vi.mock('@/api', () => ({ renameFolder: (...args: unknown[]) => renameFolder(...args), me: 'a'.repeat(64) }))
 vi.mock('@/api/useFolders', () => ({ reloadFolders: () => reloadFolders() }))
 const say = vi.fn()
 
@@ -53,6 +53,8 @@ const folder = (over: Partial<Record<string, unknown>> = {}) => ({
   id: 'f1',
   name: 'Onboarding',
   hasState: true,
+  // The viewer administers it, so it is offered the rename and Archive (MAN-17).
+  admins: ['a'.repeat(64)],
   source: 'state',
   files: [file()],
   ...over,
@@ -157,39 +159,22 @@ describe('FolderPage renames its Folder (FOL-8)', () => {
     fireEvent.keyDown(field, { key: 'Enter' })
   }
 
-  it('writes the new name with the hasState its own read found, then shows what the relay holds', async () => {
-    readFolder.mockResolvedValueOnce(folder()).mockResolvedValueOnce(folder()).mockResolvedValueOnce(folder({ name: 'Onboarding 2' }))
+  it('writes the new name, then shows what the relay holds', async () => {
+    readFolder.mockResolvedValueOnce(folder()).mockResolvedValueOnce(folder({ name: 'Onboarding 2' }))
     renameFolder.mockResolvedValue({ ok: true })
     render(<FolderPage id="f1" say={say} />)
     expect(await screen.findByRole('heading', { name: 'Onboarding' })).toBeInTheDocument()
     await rename('Onboarding 2')
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Onboarding 2' })).toBeInTheDocument())
-    expect(renameFolder).toHaveBeenCalledWith({ id: 'f1', hasState: true }, 'Onboarding 2')
-    // Read again, not assumed: before the write for `hasState`, after it for the name, and the sidebar's listing.
-    expect(readFolder).toHaveBeenCalledTimes(3)
+    // The channel's name is the title's only home (SPEC §3.2, MAN-17): nothing to read before the write.
+    expect(renameFolder).toHaveBeenCalledWith({ id: 'f1' }, 'Onboarding 2')
+    // Read again after it, for the name, and the sidebar's listing.
+    expect(readFolder).toHaveBeenCalledTimes(2)
     expect(reloadFolders).toHaveBeenCalledTimes(1)
-  })
-
-  it('a Folder with no state is renamed as one — a command would empty it', async () => {
-    readFolder.mockResolvedValue(folder({ hasState: false, source: 'channel' }))
-    renameFolder.mockResolvedValue({ ok: true })
-    render(<FolderPage id="f1" say={say} />)
-    await rename('Renamed')
-    await waitFor(() => expect(renameFolder).toHaveBeenCalledWith({ id: 'f1', hasState: false }, 'Renamed'))
-  })
-
-  it('hasState is read at the rename, not taken from when the page opened', async () => {
-    // Opened with none; another app has given it state since.
-    readFolder.mockResolvedValueOnce(folder({ hasState: false, source: 'channel' })).mockResolvedValue(folder())
-    renameFolder.mockResolvedValue({ ok: true })
-    render(<FolderPage id="f1" say={say} />)
-    await rename('Renamed')
-    await waitFor(() => expect(renameFolder).toHaveBeenCalledWith({ id: 'f1', hasState: true }, 'Renamed'))
   })
 
   it('an accepted rename that cannot be read back says so rather than showing the old name as though nothing happened', async () => {
     readFolder
-      .mockResolvedValueOnce(folder())
       .mockResolvedValueOnce(folder())
       .mockImplementationOnce(() => new Promise((_resolve, reject) => setTimeout(() => reject(new Error('rate-limited')), 0)))
     renameFolder.mockResolvedValue({ ok: true })
@@ -214,5 +199,25 @@ describe('FolderPage renames its Folder (FOL-8)', () => {
     await rename('   ')
     await waitFor(() => expect(say).toHaveBeenCalledWith('A folder needs a name.', 'error'))
     expect(renameFolder).not.toHaveBeenCalled()
+  })
+})
+
+// SPEC §3.2: every reader ignores an archive from anybody but the Folder's owners and admins (MAN-17).
+describe('FolderPage offers Archive only to the Folder’s owners and admins', () => {
+  const channel = `39000:${'f'.repeat(64)}:f1`
+
+  it('not to a member', async () => {
+    readFolder.mockResolvedValue(folder({ channel, admins: ['b'.repeat(64)] }))
+    render(<FolderPage id="f1" say={say} />)
+    expect(await screen.findByRole('heading', { name: 'Onboarding' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Archive folder' })).not.toBeInTheDocument()
+    // The relay refuses a member's rename too, so the title is not editable.
+    expect(screen.queryByRole('button', { name: 'Edit folder name' })).not.toBeInTheDocument()
+  })
+
+  it('to an admin', async () => {
+    readFolder.mockResolvedValue(folder({ channel, admins: ['a'.repeat(64)] }))
+    render(<FolderPage id="f1" say={say} />)
+    expect(await screen.findByRole('button', { name: 'Archive folder' })).toBeInTheDocument()
   })
 })
