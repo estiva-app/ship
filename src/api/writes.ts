@@ -212,7 +212,7 @@ export async function moveProject(
     const { refused: unsafe, added, removed } = await store.moveProject({ project: project.addr, from, to, listings })
     if (unsafe === 'source-has-no-state') return refused('the Folder it is in has no list of its own, so taking it out would empty that Folder')
     if (unsafe === 'target-has-no-state') return refused('that Folder has no list of its own, so adding to it would hide what is already there')
-    if (unsafe === 'target-is-private') return refused('that Folder is private, and everyone who can read this project now still could')
+    if (unsafe === 'target-is-private') return refused('that Folder is private, and this project would stay readable by the whole workspace')
     if (added && !added.ok) return refused(added.reason)
     const stillIn = removed.filter(({ result }) => !result.ok).map(({ folder, result }) => ({ folder, reason: result.reason ?? 'no reason given' }))
     return stillIn.length > 0 ? { ok: true, stillIn } : { ok: true }
