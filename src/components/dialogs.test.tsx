@@ -57,7 +57,7 @@ describe('NewProjectDialog', () => {
     { id: OTHER, name: 'Peek', hasState: true },
   ]
   const chooseTeam = async (name: string) => {
-    fireEvent.click(screen.getByRole('combobox', { name: 'Team' }))
+    fireEvent.click(screen.getByRole('combobox', { name: 'Folder' }))
     await userEvent.click(await screen.findByRole('option', { name }))
   }
 
@@ -87,7 +87,7 @@ describe('NewProjectDialog', () => {
     fireEvent.change(screen.getByPlaceholderText('New project title'), { target: { value: 'X' } })
     expect(screen.getByRole('button', { name: 'Create project' })).toBeDisabled()
     rerender(<NewProjectDialog teams={[]} onClose={vi.fn()} onCreate={vi.fn()} />)
-    expect(screen.getByText(/No teams to file into/)).toBeInTheDocument()
+    expect(screen.getByText(/No Folders to file into/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Create project' })).toBeDisabled()
   })
 

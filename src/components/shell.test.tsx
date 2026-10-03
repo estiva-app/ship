@@ -78,7 +78,7 @@ describe('Sidebar', () => {
       [...container.querySelectorAll(`[data-sidebar-team="${id}"] a`)].map((a) => a.textContent)
     expect(rowsOf('hq')).toEqual(['One2'])
     expect(rowsOf('peek')).toEqual(['Two'])
-    expect(screen.queryByRole('button', { name: 'Not in a team' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Not in a Folder' })).not.toBeInTheDocument()
   })
 
   it('a project no state lists falls back to its own Folder when that is a team', () => {
@@ -94,7 +94,7 @@ describe('Sidebar', () => {
     expect([...container.querySelectorAll('[data-sidebar-team="peek"] a')].map((a) => a.textContent)).toEqual(['One2'])
   })
 
-  it('a project in no team is under "Not in a team", not a fold named like a Folder', () => {
+  it('a project in no Folder is under "Not in a Folder", not a fold named like one', () => {
     render(
       <Sidebar
         openIssues={5}
@@ -106,7 +106,7 @@ describe('Sidebar', () => {
       />,
     )
     const folds = screen.getAllByRole('button').map((b) => b.textContent)
-    expect(folds).toEqual(['Estiva HQ', 'Peek', 'Not in a team'])
+    expect(folds).toEqual(['Estiva HQ', 'Peek', 'Not in a Folder'])
     const labels = screen.getAllByRole('link').map((a) => a.textContent)
     expect(labels).toEqual(['Issues5', 'Projects3', 'One2', 'Two', 'Three1'])
   })

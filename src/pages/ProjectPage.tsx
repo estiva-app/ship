@@ -663,7 +663,7 @@ export function ProjectPage({
               say(`Delete rejected — ${result.reason}`, 'error')
               return false
             }
-            if (result.stillListed) say(`Project deleted, but its team refused to unlist it: ${result.stillListed}. Peek may keep showing a row for it.`, 'error')
+            if (result.stillListed) say(`Project deleted, but its Folder refused to unlist it: ${result.stillListed}. Peek may keep showing a row for it.`, 'error')
             else say('Project deleted')
             // Nothing left to render here.
             go({ name: 'projects', archived: false })
