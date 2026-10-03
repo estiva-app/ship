@@ -14,10 +14,10 @@ vi.mock('./store', () => ({
   },
 }))
 vi.mock('./clock', () => ({ clockProblem: vi.fn() }))
-vi.mock('./foreign', () => ({ readFolders: vi.fn() }))
+vi.mock('./foreign', () => ({ readFolders: vi.fn(), readFolder: vi.fn() }))
 
 import { clockProblem } from './clock'
-import { readFolders } from './foreign'
+import { readFolder, readFolders } from './foreign'
 import { store } from './store'
 import { archiveProject, createFolder, createIssue, createProject, deleteProject, moveProject, renameFolder, reply, setIssueField, setProjectField, startConversation, workFolder } from './writes'
 
@@ -31,6 +31,7 @@ beforeEach(() => {
   vi.mocked(clockProblem).mockResolvedValue(null)
   for (const fn of Object.values(s)) fn.mockReset()
   vi.mocked(readFolders).mockReset().mockResolvedValue([])
+  vi.mocked(readFolder).mockReset().mockResolvedValue({ files: [] } as never)
 })
 
 describe('the clock is checked before anything is signed', () => {
@@ -208,10 +209,24 @@ describe('moving a project', () => {
   const FROM = { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', hasState: true }
   const TO = { id: TEAM.folder, hasState: true }
 
-  it('moves by address, from the Folders that list it, to the one chosen', async () => {
+  it('moves by address, from the Folders that list it, to the one chosen, with what each lists', async () => {
+    const sub = { ref: 'sub', address: '30840:x:sub', parentRef: PROJECT.addr }
+    vi.mocked(readFolder).mockResolvedValue({ files: [sub] } as never)
     s.moveProject.mockResolvedValue({ added: { ok: true }, removed: [{ folder: FROM.id, result: { ok: true } }] })
     expect(await moveProject(PROJECT, [FROM], TO)).toEqual({ ok: true })
-    expect(s.moveProject).toHaveBeenCalledWith({ project: PROJECT.addr, from: [FROM], to: TO })
+    // The source's listing, read at the move, with the project in it even when its card did not resolve (SPEC §3.3).
+    expect(readFolder).toHaveBeenCalledWith(FROM.id)
+    expect(s.moveProject).toHaveBeenCalledWith({
+      project: PROJECT.addr,
+      from: [FROM],
+      to: TO,
+      listings: new Map([[FROM.id, [{ ref: PROJECT.addr, address: PROJECT.addr }, sub]]]),
+    })
+  })
+
+  it('a move into a private Folder is refused, saying why', async () => {
+    s.moveProject.mockResolvedValue({ refused: 'target-is-private', removed: [] })
+    expect(await moveProject(PROJECT, [FROM], { ...TO, private: true })).toEqual({ ok: false, reason: expect.stringMatching(/private/) })
   })
 
   it('a move planned as unsafe is refused, saying why', async () => {
@@ -248,16 +263,14 @@ describe('createFolder and renameFolder say what the relay did (FOL-8)', () => {
     expect(await createFolder('New')).toEqual({ ok: true, id: FOLDER.id, unlisted: 'rate limited' })
   })
 
-  it('a rename passes the Folder, the name and its hasState through', async () => {
-    s.renameFolder.mockResolvedValue({ result: { ok: true } })
+  it('a rename passes the Folder and the name through — the channel is the only home (MAN-17)', async () => {
+    s.renameFolder.mockResolvedValue({ ok: true })
     expect(await renameFolder(FOLDER, 'Renamed')).toEqual({ ok: true })
-    expect(s.renameFolder).toHaveBeenCalledWith({ folder: FOLDER.id, name: 'Renamed', hasState: true })
+    expect(s.renameFolder).toHaveBeenCalledWith({ folder: FOLDER.id, name: 'Renamed' })
   })
 
-  it('a refused channel rename is the relay’s reason; a refused command says the name did not change', async () => {
-    s.renameFolder.mockResolvedValue({ refusedAt: 0, result: { ok: false, reason: 'restricted' } })
+  it('a refused rename is the relay’s reason', async () => {
+    s.renameFolder.mockResolvedValue({ ok: false, reason: 'restricted' })
     expect(await renameFolder(FOLDER, 'Renamed')).toEqual({ ok: false, reason: 'restricted' })
-    s.renameFolder.mockResolvedValue({ refusedAt: 1, result: { ok: false, reason: 'rate limited' } })
-    expect(await renameFolder(FOLDER, 'Renamed')).toEqual({ ok: false, reason: "the channel was renamed but the folder's own name was not (rate limited)" })
   })
 })

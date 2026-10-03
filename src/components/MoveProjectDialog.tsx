@@ -24,6 +24,8 @@ export interface MoveProjectFolder {
   name: string
   /** From the Folder read — a move into or out of a Folder without state is refused. */
   hasState: boolean
+  /** The Folder's `kind:39000` is private — a project, readable by the whole workspace, is refused there. */
+  private?: boolean
 }
 
 export interface MoveProjectDialogProps {

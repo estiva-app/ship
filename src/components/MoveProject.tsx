@@ -24,11 +24,11 @@ export function MoveProject({
   onClose,
 }: {
   project: Project
-  teams: readonly { id: string; name?: string; hasState: boolean; addresses?: readonly string[] }[]
+  teams: readonly { id: string; name?: string; hasState: boolean; private?: boolean; addresses?: readonly string[] }[]
   say: Say
   onClose: () => void
 }) {
-  const folders: MoveProjectFolder[] = teams.map((team) => ({ id: team.id, name: team.name ?? 'Untitled Folder', hasState: team.hasState }))
+  const folders: MoveProjectFolder[] = teams.map((team) => ({ id: team.id, name: team.name ?? 'Untitled Folder', hasState: team.hasState, ...(team.private ? { private: true } : {}) }))
   const here = new Set(placedIn({ addr: project.addr, folder: project.contentFolder }, teams).map((team) => team.id))
   const current = folders.filter((folder) => here.has(folder.id))
   const nameOf = (id: string) => folders.find((folder) => folder.id === id)?.name ?? 'Untitled Folder'

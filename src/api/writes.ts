@@ -4,7 +4,7 @@ import type { Conversation, Issue, Project } from '../nostr/fold'
 import { nextRef, refPrefix } from '../nostr/store'
 import { RELAY_URL } from '../config'
 import { clockProblem } from './clock'
-import { readFolders } from './foreign'
+import { readFolder, readFolders } from './foreign'
 import { placedIn } from '../lib/placement'
 import { store } from './store'
 
@@ -193,14 +193,26 @@ export async function deleteProject(
 export async function moveProject(
   project: Project,
   from: readonly { id: string; hasState: boolean }[],
-  to: { id: string; hasState: boolean },
+  to: { id: string; hasState: boolean; private?: boolean },
 ): Promise<WriteResult & { stillIn?: { folder: string; reason: string }[] }> {
   const clock = await clockProblem()
   if (clock) return refused(clock)
   try {
-    const { refused: unsafe, added, removed } = await store.moveProject({ project: project.addr, from, to })
+    // What each source lists beneath the project moves with it (SPEC §3.3): one read per source, at the moment of the move.
+    const listings = new Map(
+      await Promise.all(
+        from.filter((folder) => folder.id !== to.id && folder.hasState).map(async (folder) => {
+          const files = (await readFolder(folder.id)).files
+          // The project itself, even when its card did not resolve: it is what is being moved.
+          const listing = files.some((file) => file.address === project.addr) ? files : [{ ref: project.addr, address: project.addr }, ...files]
+          return [folder.id, listing] as const
+        }),
+      ),
+    )
+    const { refused: unsafe, added, removed } = await store.moveProject({ project: project.addr, from, to, listings })
     if (unsafe === 'source-has-no-state') return refused('the Folder it is in has no list of its own, so taking it out would empty that Folder')
     if (unsafe === 'target-has-no-state') return refused('that Folder has no list of its own, so adding to it would hide what is already there')
+    if (unsafe === 'target-is-private') return refused('that Folder is private, and everyone who can read this project now still could')
     if (added && !added.ok) return refused(added.reason)
     const stillIn = removed.filter(({ result }) => !result.ok).map(({ folder, result }) => ({ folder, reason: result.reason ?? 'no reason given' }))
     return stillIn.length > 0 ? { ok: true, stillIn } : { ok: true }
@@ -233,19 +245,15 @@ export async function createFolder(name: string): Promise<{ ok: true; id: string
 }
 
 /**
- * Rename a Folder (FOL-8): its channel, and its state's name when it has
- * state. `hasState` is from the caller's read of that Folder, never a guess
- * (`Store.renameFolder`).
+ * Rename a Folder (FOL-8): its channel's name, the title's only home
+ * (`Store.renameFolder`, SPEC §3.2).
  */
-export async function renameFolder(folder: { id: string; hasState: boolean }, name: string): Promise<WriteResult> {
+export async function renameFolder(folder: { id: string }, name: string): Promise<WriteResult> {
   const clock = await clockProblem()
   if (clock) return refused(clock)
   try {
-    const { refusedAt, result } = await store.renameFolder({ folder: folder.id, name, hasState: folder.hasState })
-    if (refusedAt === undefined) return { ok: true }
-    // The channel took the new name and the state did not: the state's shadows it, so the old one is still what both apps show.
-    if (refusedAt === 1) return refused(`the channel was renamed but the folder's own name was not (${result.reason ?? 'no reason given'})`)
-    return refused(result.reason)
+    const result = await store.renameFolder({ folder: folder.id, name })
+    return result.ok ? { ok: true } : refused(result.reason)
   } catch (error) {
     return refused(error instanceof Error ? error.message : String(error))
   }

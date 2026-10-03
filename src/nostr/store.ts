@@ -11,7 +11,6 @@ import type { Imeta, PublishResult, Relay } from '@estiva-app/protocol'
 import type { Signer } from './signer'
 import {
   buildCreateChannel,
-  buildDeleteChannel,
   type SignedEvent,
   type ThreadRef,
   type UnsignedEvent,
@@ -28,7 +27,7 @@ import {
   type CommentRef,
 } from './events'
 import { findNaddrs, naddrToAddr, buildReaction, buildEdit, buildDeletion as buildEventDeletion } from '@estiva-app/protocol'
-import { planArchiveFolder, planCreateFolder, planMoveFile, planPlaceFile, planRenameFolder, planUnlistFile, type FolderRef, type MoveRefusal } from '@estiva-app/interop'
+import { planArchiveFolder, planCreateFolder, planDeleteFolder, planMoveFile, planPlaceFile, planRenameFolder, planUnlistFile, type FolderRef, type MovableFile, type MoveRefusal } from '@estiva-app/interop'
 import { foldFolder, type FolderState } from './fold'
 import { decorationsOf, foldAttachments, foldEdits, type Decorations, type EditFold, type QueryFn } from '@estiva-app/conversation'
 import { anchorIndex, type AnchorIndex } from './references'
@@ -250,15 +249,15 @@ export class Store {
   }
 
   /**
-   * Rename a Folder — FOL-8: `kind:9002`, and `kind:1852 add + name` when it
-   * has state, planned by `planRenameFolder` as Peek's `renameFolderAsViewer`
-   * does. A Folder's name has two homes and the state's shadows the channel's,
-   * so both are written; `hasState` is from a read, because a command against a
-   * Folder with none would empty it.
+   * Rename a Folder — FOL-8: the `kind:9002` alone, planned by
+   * `planRenameFolder` as Peek's `renameFolderAsViewer` does. The title is the
+   * channel's name and only that (SPEC §3.2); the relay refuses it to anybody
+   * but the channel's owners and admins.
    */
-  async renameFolder(args: { folder: string; name: string; hasState: boolean }): Promise<{ refusedAt?: number; result: PublishResult }> {
+  async renameFolder(args: { folder: string; name: string }): Promise<PublishResult> {
     assertFolderId(args.folder)
-    return this.publishInOrder(planRenameFolder(this.signer.pubkey, Date.now(), args))
+    const [rename] = planRenameFolder(this.signer.pubkey, Date.now(), args)
+    return this.publish(rename)
   }
 
   /** Publish a Folder plan in order, stopping at the first refusal — each later event assumes the earlier ones were accepted. */
@@ -333,17 +332,25 @@ export class Store {
    * left in two (below) is taken out of both by moving it again. Empty for a
    * project no Folder lists, which is then only added.
    *
+   * **What is listed beneath it moves with it** (SPEC §3.3): `listings` holds
+   * each source Folder's files, and `planMoveFile` names the project and every
+   * file under it — a topic started under the project — in one `add` and one
+   * `remove`. A source with no listing moves the project alone.
+   *
    * **Add first, and nothing at all if either side has no state** — the
    * planner's rules. A refused `remove` leaves the project listed in both,
    * which is visible and fixed by moving again; `removed` says which Folders
    * still list it. `refused` is a move planned as unsafe, before anything was
-   * sent.
+   * sent — `target-is-private` included: a project's root carries no `h`, so it
+   * is readable by the whole workspace wherever it is listed.
    */
   async moveProject(args: {
     project: string
     /** The Folders that list it now, each with `hasState` from a read. The target, if among them, is ignored. */
     from: readonly FolderRef[]
     to: FolderRef
+    /** Each source Folder's files (`FolderContents.files`), by Folder id. */
+    listings?: ReadonlyMap<string, readonly MovableFile[]>
   }): Promise<{ refused?: MoveRefusal; added?: PublishResult; removed: { folder: string; result: PublishResult }[] }> {
     assertFolderId(args.to.id)
     const sources = args.from.filter((folder) => folder.id !== args.to.id)
@@ -351,17 +358,27 @@ export class Store {
     if (sources.length === 0 && args.from.length > 0) return { removed: [] }
     if (!args.to.hasState) return { refused: 'target-has-no-state', removed: [] }
     const now = Date.now()
-    const plans = sources.map((from) => planMoveFile(this.signer.pubkey, now, { address: args.project, from, to: args.to }))
+    const file = { ref: args.project, address: args.project }
+    const plans = sources.map((from) =>
+      planMoveFile(this.signer.pubkey, now, { file, from, to: args.to, listing: args.listings?.get(from.id) ?? null }),
+    )
     const unsafe = plans.find((plan) => !plan.ok)
     if (unsafe && !unsafe.ok) return { refused: unsafe.reason, removed: [] }
-    // Each plan is `[add to target, remove from source]`: one add, then every remove.
+    if (args.to.private && sources.length === 0) return { refused: 'target-is-private', removed: [] }
+    // Each plan is `[add to target, remove from source]`: every add, then every remove.
     const events = plans.map((plan) => (plan.ok ? plan.events : []))
-    const add = events[0]?.[0] ?? planPlaceFile(this.signer.pubkey, now, { folder: args.to.id, address: args.project, hasState: true })[0]
-    const added = await this.publish(add)
+    // One add per distinct set: a project listed in two Folders moves the same set out of each.
+    const named = (event: UnsignedEvent) => JSON.stringify(event.tags.filter((t) => t[0] === 'a'))
+    const adds = [...new Map(events.flatMap((planned) => planned.slice(0, 1)).map((add) => [named(add), add])).values()]
+    if (!adds.length) adds.push(...planPlaceFile(this.signer.pubkey, now, { folder: args.to.id, address: args.project, hasState: true }))
     const removed: { folder: string; result: PublishResult }[] = []
-    if (!added.ok) return { added, removed }
+    let added: PublishResult | undefined
+    for (const add of adds) {
+      added = await this.publish(add)
+      if (!added.ok) return { added, removed }
+    }
     for (const [i, source] of sources.entries()) {
-      removed.push({ folder: source.id, result: await this.publish(events[i][1]) })
+      if (events[i][1]) removed.push({ folder: source.id, result: await this.publish(events[i][1]) })
     }
     return { added, removed }
   }
@@ -432,7 +449,8 @@ export class Store {
    */
   async deleteFolder(folder: string): Promise<PublishResult> {
     assertFolderId(folder)
-    return this.publish(buildDeleteChannel(this.signer.pubkey, Date.now(), { channelUuid: folder }))
+    const [remove] = planDeleteFolder(this.signer.pubkey, Date.now(), { folder })
+    return this.publish(remove)
   }
 
   /**

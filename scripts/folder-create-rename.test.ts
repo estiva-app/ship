@@ -5,10 +5,10 @@
  *
  * Offline, against a fake relay that records what it was sent and refuses the
  * kind a case tells it to. The claims: a create is `kind:9007` then
- * `kind:1852 add` naming the Folder and listing nothing — Peek's
+ * `kind:1852 add` naming and listing nothing — Peek's
  * `createFolderAsViewer` — so it has state from birth; a refused channel sends
- * nothing more; a rename is `kind:9002` plus `kind:1852 add + name` only when
- * the Folder has state, and never a command against one without. A delete
+ * nothing more; a rename is `kind:9002` alone (SPEC §3.2, MAN-17): no
+ * command carries a name. A delete
  * (SHI-27) is one `kind:9008` and nothing else.
  */
 import type { PublishResult, Relay, SignedEvent, UnsignedEvent } from '@estiva-app/protocol'
@@ -48,7 +48,7 @@ function reset(refusal?: number) {
 // 1. Create: the channel, then its state, both on the new id.
 reset()
 const created = await store.createFolder('FOL-8 check')
-check('a create is kind:9007, then kind:1852 add with the name', JSON.stringify(shape()) === JSON.stringify(['9007 - FOL-8 check', '1852 add FOL-8 check']), shape().join(' | '))
+check('a create is kind:9007 with the name, then kind:1852 add with none (MAN-17)', JSON.stringify(shape()) === JSON.stringify(['9007 - FOL-8 check', '1852 add -']), shape().join(' | '))
 check('…both on the id it returns', sent.every((event) => tag(event, 'h') === created.id), sent.map((event) => tag(event, 'h')).join(' '))
 check('…the command lists nothing', !sent[1]?.tags.some((t) => t[0] === 'a'))
 check('…open, as Peek makes it: no visibility on the channel', !sent[0]?.tags.some((t) => t[0] === 'private' || t[0] === 'visibility'))
@@ -66,29 +66,23 @@ reset(1852)
 const unlisted = await store.createFolder('FOL-8 check')
 check('a refused command is reported at index 1', unlisted.refusedAt === 1 && sent.length === 2)
 
-// 4. Rename with state: both homes of the name.
+// 4. Rename: the channel's name, the title's only home (SPEC §3.2, MAN-17) — never a command.
 reset()
-const renamed = await store.renameFolder({ folder: FOLDER, name: 'Renamed', hasState: true })
-check('a rename with state is kind:9002, then kind:1852 add with the name', JSON.stringify(shape()) === JSON.stringify(['9002 - Renamed', '1852 add Renamed']), shape().join(' | '))
-check('…the command lists nothing, so the contents are kept', !sent[1]?.tags.some((t) => t[0] === 'a'))
+const renamed = await store.renameFolder({ folder: FOLDER, name: 'Renamed' })
+check('a rename is kind:9002 alone, whatever the Folder holds', JSON.stringify(shape()) === JSON.stringify(['9002 - Renamed']), shape().join(' | '))
 check('…on the Folder named', sent.every((event) => tag(event, 'h') === FOLDER))
-check('…and nothing was refused', renamed.refusedAt === undefined)
+check('…and nothing was refused', renamed.ok)
 
-// 5. Rename without state: the channel only, never a command.
-reset()
-await store.renameFolder({ folder: FOLDER, name: 'Renamed', hasState: false })
-check('a rename without state is kind:9002 alone — a command would empty it', JSON.stringify(shape()) === JSON.stringify(['9002 - Renamed']), shape().join(' | '))
-
-// 6. A refused channel rename sends no command.
+// 5. A refused rename says the relay's reason.
 reset(9002)
-const refusedRename = await store.renameFolder({ folder: FOLDER, name: 'Renamed', hasState: true })
-check('a refused kind:9002 is not followed by a command', sent.length === 1 && refusedRename.refusedAt === 0)
+const refusedRename = await store.renameFolder({ folder: FOLDER, name: 'Renamed' })
+check('a refused kind:9002 comes back refused', sent.length === 1 && !refusedRename.ok && refusedRename.reason === 'restricted: not an admin')
 
 // 7. Not a Folder id: refused before anything is signed.
 reset()
 let threw = false
 try {
-  await store.renameFolder({ folder: 'not-a-uuid', name: 'x', hasState: true })
+  await store.renameFolder({ folder: 'not-a-uuid', name: 'x' })
 } catch {
   threw = true
 }
