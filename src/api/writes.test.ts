@@ -14,10 +14,10 @@ vi.mock('./store', () => ({
   },
 }))
 vi.mock('./clock', () => ({ clockProblem: vi.fn() }))
-vi.mock('./foreign', () => ({ readFolders: vi.fn(), readFolder: vi.fn() }))
+vi.mock('./foreign', () => ({ readFolders: vi.fn(), readFolderListing: vi.fn() }))
 
 import { clockProblem } from './clock'
-import { readFolder, readFolders } from './foreign'
+import { readFolderListing, readFolders } from './foreign'
 import { store } from './store'
 import { archiveProject, createFolder, createIssue, createProject, deleteProject, moveProject, renameFolder, reply, setIssueField, setProjectField, startConversation, workFolder } from './writes'
 
@@ -31,7 +31,7 @@ beforeEach(() => {
   vi.mocked(clockProblem).mockResolvedValue(null)
   for (const fn of Object.values(s)) fn.mockReset()
   vi.mocked(readFolders).mockReset().mockResolvedValue([])
-  vi.mocked(readFolder).mockReset().mockResolvedValue({ files: [] } as never)
+  vi.mocked(readFolderListing).mockReset().mockResolvedValue([])
 })
 
 describe('the clock is checked before anything is signed', () => {
@@ -211,17 +211,23 @@ describe('moving a project', () => {
 
   it('moves by address, from the Folders that list it, to the one chosen, with what each lists', async () => {
     const sub = { ref: 'sub', address: '30840:x:sub', parentRef: PROJECT.addr }
-    vi.mocked(readFolder).mockResolvedValue({ files: [sub] } as never)
+    vi.mocked(readFolderListing).mockResolvedValue([sub] as never)
     s.moveProject.mockResolvedValue({ added: { ok: true }, removed: [{ folder: FROM.id, result: { ok: true } }] })
     expect(await moveProject(PROJECT, [FROM], TO)).toEqual({ ok: true })
     // The source's listing, read at the move, with the project in it even when its card did not resolve (SPEC §3.3).
-    expect(readFolder).toHaveBeenCalledWith(FROM.id)
+    expect(readFolderListing).toHaveBeenCalledWith(FROM.id)
     expect(s.moveProject).toHaveBeenCalledWith({
       project: PROJECT.addr,
       from: [FROM],
       to: TO,
       listings: new Map([[FROM.id, [{ ref: PROJECT.addr, address: PROJECT.addr }, sub]]]),
     })
+  })
+
+  it('sends nothing when a source cannot be read — what is under the project would be left behind', async () => {
+    vi.mocked(readFolderListing).mockRejectedValue(new Error('rate-limited'))
+    expect(await moveProject(PROJECT, [FROM], TO)).toEqual({ ok: false, reason: expect.stringMatching(/could not be read/) })
+    expect(s.moveProject).not.toHaveBeenCalled()
   })
 
   it('a move into a private Folder is refused, saying why', async () => {

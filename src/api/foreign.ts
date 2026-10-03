@@ -146,6 +146,14 @@ export function readFolder(id: string): Promise<FolderContents> {
   return resolveFolderContents(id, query, profiles.viaRelay(query), manifests)
 }
 
+/**
+ * A Folder's files for a move to plan from (SPEC §3.3) — what lists what
+ * beneath it, and nothing a person reads, so no profiles are asked for.
+ */
+export async function readFolderListing(id: string): Promise<FolderContents['files']> {
+  return (await resolveFolderContents(id, query, async () => ({}), manifests)).files
+}
+
 /** The foreign files placed under one of Ship's objects, with their conversation counts. */
 export interface RelatedFiles {
   /** One level, in the Folder's order — see `relatedTo`. */

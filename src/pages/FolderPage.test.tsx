@@ -53,6 +53,8 @@ const folder = (over: Partial<Record<string, unknown>> = {}) => ({
   id: 'f1',
   name: 'Onboarding',
   hasState: true,
+  // The viewer administers it, so it is offered the rename and Archive (MAN-17).
+  admins: ['a'.repeat(64)],
   source: 'state',
   files: [file()],
   ...over,
@@ -209,6 +211,8 @@ describe('FolderPage offers Archive only to the Folder’s owners and admins', (
     render(<FolderPage id="f1" say={say} />)
     expect(await screen.findByRole('heading', { name: 'Onboarding' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Archive folder' })).not.toBeInTheDocument()
+    // The relay refuses a member's rename too, so the title is not editable.
+    expect(screen.queryByRole('button', { name: 'Edit folder name' })).not.toBeInTheDocument()
   })
 
   it('to an admin', async () => {

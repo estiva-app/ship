@@ -86,8 +86,9 @@ export function FolderPage({ id, folders, nameOf = (pubkey) => `${pubkey.slice(0
     Folder lists, and what stays visible elsewhere — made when the person asks,
     not on every page load.
   */
-  // Only the Folder's owners and admins: every reader ignores an archive from anybody else (SPEC §3.2).
-  const canArchive = !!contents?.channel && !!contents.admins?.includes(me)
+  // Only the Folder's owners and admins: the relay refuses their rename (9002) from anybody else, and every reader ignores their archive (SPEC §3.2).
+  const isFolderAdmin = !!contents?.admins?.includes(me)
+  const canArchive = !!contents?.channel && isFolderAdmin
   const reread = useCallback(async () => {
     const [next] = await Promise.allSettled([readFolder(id), reloadFolders()])
     if (next.status === 'fulfilled' && next.value.id === shown.current) setContents(next.value)
@@ -130,7 +131,7 @@ export function FolderPage({ id, folders, nameOf = (pubkey) => `${pubkey.slice(0
     <>
       <FolderView
         folder={contents}
-        onRename={rename}
+        {...(isFolderAdmin ? { onRename: rename } : {})}
         {...(canArchive && !contents.archived ? { onArchive: () => void askToArchive() } : {})}
         archivedNotice={
           contents.archived && (

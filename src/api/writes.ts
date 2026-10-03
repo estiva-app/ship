@@ -4,7 +4,7 @@ import type { Conversation, Issue, Project } from '../nostr/fold'
 import { nextRef, refPrefix } from '../nostr/store'
 import { RELAY_URL } from '../config'
 import { clockProblem } from './clock'
-import { readFolder, readFolders } from './foreign'
+import { readFolderListing, readFolders } from './foreign'
 import { placedIn } from '../lib/placement'
 import { store } from './store'
 
@@ -199,10 +199,14 @@ export async function moveProject(
   if (clock) return refused(clock)
   try {
     // What each source lists beneath the project moves with it (SPEC §3.3): one read per source, at the moment of the move.
+    // Unread, a move would leave what is under the project behind, so nothing is sent.
+    const sources = from.filter((folder) => folder.id !== to.id && folder.hasState)
+    const read = await Promise.all(sources.map((folder) => readFolderListing(folder.id).catch(() => null)))
+    if (read.some((files) => files === null)) return refused('the Folder it is in could not be read, so nothing was moved. Try again')
     const listings = new Map(
       await Promise.all(
-        from.filter((folder) => folder.id !== to.id && folder.hasState).map(async (folder) => {
-          const files = (await readFolder(folder.id)).files
+        sources.map(async (folder, i) => {
+          const files = read[i]!
           // The project itself, even when its card did not resolve: it is what is being moved.
           const listing = files.some((file) => file.address === project.addr) ? files : [{ ref: project.addr, address: project.addr }, ...files]
           return [folder.id, listing] as const
