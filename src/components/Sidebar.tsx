@@ -1,8 +1,8 @@
 import { IconArrowUpRight, IconBox, IconListDetails, IconPlus } from '@tabler/icons-react'
-import { CollapsibleSection, SectionHeader, Sidebar as SidebarShell } from '@estiva-app/ui'
+import { NavTree, Sidebar as SidebarShell, type NavTreeGroup, type NavTreeNode } from '@estiva-app/ui'
 import { MenuItem } from '@/components/ui/Menu'
-import { SkeletonBar } from '@/components/ui/Skeleton'
 import { placedIn } from '@/lib/placement'
+import { linkTo } from '@/router'
 import { NavItem } from './NavItem'
 
 /**
@@ -49,7 +49,9 @@ import { NavItem } from './NavItem'
  *
  * Desktop only: the narrow-screen drawer is parked (ruling A5).
  */
-const STORAGE = { unfiled: 'ship.sidebar.unfiled', team: (id: string) => `ship.sidebar.team.${id}` }
+/** Each team's fold is remembered under this key and its id (`ship.sidebar.team.<id>`); "Not in a Folder" under `.unfiled`. */
+const STORAGE_KEY = 'ship.sidebar.team'
+const UNFILED = 'unfiled'
 
 export interface SidebarProject {
   /** The identity — refs and titles collide, addresses do not. */
@@ -119,31 +121,6 @@ export interface SidebarProps {
   className?: string
 }
 
-/**
- * The project rows before they arrive.
- *
- * Built here from `SkeletonBar` rather than taken as `SkeletonList`, because
- * the shared list draws a 16px square for a row that has a face or an icon and
- * a project row has neither — the package's own note keeps app-shaped
- * placeholders in the app. The row is `NavItem`'s: 32px, `px-2`.
- *
- * `animate-skeleton-in` holds it back 150ms, so a fast read never flashes a
- * placeholder on the way past.
- */
-const PLACEHOLDER_WIDTHS = [104, 78, 122, 90]
-
-function SkeletonProjects() {
-  return (
-    <div className="flex flex-col gap-0.5 animate-skeleton-in" aria-hidden>
-      {PLACEHOLDER_WIDTHS.map((width, i) => (
-        <div key={i} className="flex h-8 shrink-0 items-center px-2">
-          <SkeletonBar className="h-3.5" style={{ width }} />
-        </div>
-      ))}
-    </div>
-  )
-}
-
 export function Sidebar({ openIssues, issuesHref, projectsHref, projects, folders = [], onOpenFolder, onMoveProject, onNewFolder, current, loading = false, foldersLoading = false, className }: SidebarProps) {
   /*
     Both branches of `current` are objects now, so `typeof current === 'object'`
@@ -166,20 +143,39 @@ export function Sidebar({ openIssues, issuesHref, projectsHref, projects, folder
   const placed = new Map(projects.map((project) => [project.addr, placedIn(project, teams)]))
   const under = (team: SidebarFolder) => projects.filter((project) => placed.get(project.addr)!.includes(team))
   const unfiled = projects.filter((project) => placed.get(project.addr)!.length === 0)
-  const row = (project: SidebarProject) => (
-    <NavItem
-      key={project.addr}
-      label={project.title}
-      href={project.href}
-      count={project.openCount}
-      countLabel={`${project.openCount} open`}
-      active={isProject && current.projectAddr === project.addr}
-      /* The row's menu (FOL-7) is the row's own now (UIG-44): the ⋮ shows
-         while the row is pointed at or focused, in the count's place. */
-      {...(onMoveProject ? { menu: <MenuItem label="Move to Folder…" onClick={() => onMoveProject(project)} /> } : {})}
-    />
-  )
+  const node = (project: SidebarProject): NavTreeNode => ({
+    id: project.addr,
+    label: project.title,
+    href: project.href,
+    count: project.openCount,
+    countLabel: `${project.openCount} open`,
+    /* The row's menu (FOL-7) is the row's own (UIG-44): the ⋮ shows while the
+       row is pointed at or focused, in the count's place. */
+    menu: onMoveProject ? <MenuItem label="Move to Folder…" onClick={() => onMoveProject(project)} /> : undefined,
+  })
   const pending = (projects.length === 0 && loading) || (folders.length === 0 && foldersLoading)
+  /*
+    The teams as the package's tree (Katerina, 2 October): each team a group,
+    open unless the reader closed it, its projects lightly indented under its
+    name, the arrow on hover opening the Folder page. A project no team lists
+    and whose own Folder is no team is under "Not in a Folder" — nothing is
+    dropped for being unfiled; on production every active project is in
+    exactly one team's state since FOL-6 (2026-09-29), so it is usually absent.
+  */
+  const groups: NavTreeGroup[] | null = pending
+    ? null
+    : [
+        ...teams.map((team) => ({
+          id: team.id,
+          title: team.name ?? team.id,
+          defaultOpen: true,
+          actions: onOpenFolder
+            ? [{ icon: <IconArrowUpRight size={16} stroke={1.5} />, tooltip: 'Open folder', onClick: () => onOpenFolder(team) }]
+            : undefined,
+          nodes: under(team).map(node),
+        })),
+        ...(unfiled.length > 0 ? [{ id: UNFILED, title: 'Not in a Folder', defaultOpen: true, nodes: unfiled.map(node) }] : []),
+      ]
   return (
     <SidebarShell className={className}>
       <NavItem
@@ -198,57 +194,19 @@ export function Sidebar({ openIssues, issuesHref, projectsHref, projects, folder
         countLabel={`${projects.length} active`}
         active={current === 'projects'}
       />
-      {pending ? (
-        /* No title: which teams are coming is exactly what is not known yet,
-           and a heading here would be one more section named like a Folder. */
-        <div className="mt-2 shrink-0">
-          <SkeletonProjects />
-        </div>
-      ) : (
-        <>
-          {/*
-            A quiet "Folders" label, its + on the right for a new top-level
-            Folder (FOL-8), over the folders in the package's own group look —
-            white, small, the small chevron, the Sidebar's standard (Katerina,
-            30 September: never a look of Ship's own). The label is grey and
-            regular, the folders white and medium, so it never reads as one.
-          */}
-          <SectionHeader
-            title="Folders"
-            look="quiet"
-            showActions="always"
-            className="mt-4"
-            actions={onNewFolder ? [{ icon: <IconPlus size={16} stroke={1.5} />, tooltip: 'New folder', onClick: onNewFolder }] : []}
-          />
-          {teams.map((team) => (
-            <div key={team.id} data-sidebar-team={team.id} className="mt-2 shrink-0">
-              <CollapsibleSection
-                title={team.name ?? team.id}
-                storageKey={STORAGE.team(team.id)}
-                contentClassName="gap-px"
-                actions={
-                  onOpenFolder
-                    ? [{ icon: <IconArrowUpRight size={16} stroke={1.5} />, tooltip: 'Open folder', onClick: () => onOpenFolder(team) }]
-                    : []
-                }
-              >
-                {under(team).map(row)}
-              </CollapsibleSection>
-            </div>
-          ))}
-          {/*
-            A project no team lists and whose own Folder is no team. Nothing
-            is dropped from the navigation for being unfiled; on production
-            every active project is in exactly one team's state since FOL-6
-            (2026-09-29), so this fold is usually absent.
-          */}
-          {unfiled.length > 0 && (
-            <CollapsibleSection title="Not in a Folder" storageKey={STORAGE.unfiled} className="mt-2 shrink-0" contentClassName="gap-px">
-              {unfiled.map(row)}
-            </CollapsibleSection>
-          )}
-        </>
-      )}
+      {/*
+        A quiet "Folders" label, its + on the right for a new top-level Folder
+        (FOL-8), over the teams. No label while the first reads are out: which
+        teams are coming is exactly what is not known yet.
+      */}
+      <NavTree
+        title={pending ? undefined : 'Folders'}
+        titleActions={onNewFolder ? [{ icon: <IconPlus size={16} stroke={1.5} />, tooltip: 'New folder', onClick: onNewFolder }] : undefined}
+        groups={groups}
+        selected={isProject ? current.projectAddr : undefined}
+        onSelect={(selected, event) => linkTo(selected.href).onClick(event)}
+        storageKey={STORAGE_KEY}
+      />
     </SidebarShell>
   )
 }
