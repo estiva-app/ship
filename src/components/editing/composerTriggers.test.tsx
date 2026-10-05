@@ -1,4 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+
+// `[`'s search tier asks the relay once two letters are typed; these tests read no relay.
+vi.mock('@/api/foreign', () => ({ searchFiles: vi.fn(async () => []), fileCandidatesOf: vi.fn(async () => []) }))
 import { blockDocumentToMarkerText, encodeNpub, fromEditorDocument, type EditorDocument } from '@estiva-app/protocol'
 import { messageReference } from '@estiva-app/conversation'
 import { chipsAsReferences } from './composerTriggers'

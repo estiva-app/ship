@@ -65,22 +65,33 @@ export function subscribeReferences(listener: () => void): () => void {
   }
 }
 
+// `[` asks on every keystroke, for every message in scope; a message's row is built once (per tier).
+const BUILT = new WeakMap<MessageData, ReferenceCandidate>()
+
+function messageCandidate(message: MessageData, tier: number, nameOf?: (pubkey: string) => string): ReferenceCandidate {
+  const known = BUILT.get(message)
+  if (known) return known.tier === tier ? known : { ...known, tier }
+  const built = {
+    id: message.id,
+    // The kind rides in the pointer so a reader fetches the manifest and the event together.
+    uri: messageReference(message.id, message.kind ?? CHAT_KIND),
+    type: 'message' as const,
+    kind: message.kind ?? CHAT_KIND,
+    title: message.author.name ?? 'Someone',
+    caption: snippetOf(message.body, nameOf),
+    search: message.body,
+    tier,
+    at: message.at,
+  }
+  BUILT.set(message, built)
+  return built
+}
+
 const messagesOf = (threads: readonly ThreadData[], tier: number, nameOf?: (pubkey: string) => string): ReferenceCandidate[] =>
   threads
     .flatMap((thread) => [thread.root, ...thread.replies])
     .filter((message) => EVENT_ID.test(message.id))
-    .map((message: MessageData) => ({
-      id: message.id,
-      // The kind rides in the pointer so a reader fetches the manifest and the event together.
-      uri: messageReference(message.id, message.kind ?? CHAT_KIND),
-      type: 'message' as const,
-      kind: message.kind ?? CHAT_KIND,
-      title: message.author.name ?? 'Someone',
-      caption: snippetOf(message.body, nameOf),
-      search: message.body,
-      tier,
-      at: message.at,
-    }))
+    .map((message) => messageCandidate(message, tier, nameOf))
 
 function itemOf(candidate: ReferenceCandidate): CaptionedItem {
   if (candidate.type === 'message') {
@@ -147,6 +158,7 @@ export function useReferencePage({
     }
   }, [address, parent])
 
+  // A refresh of the same Folder keeps its rows until the new answer lands; leaving the page takes them back.
   useEffect(() => {
     if (!folder) return
     let live = true
@@ -159,10 +171,15 @@ export function useReferencePage({
       .catch(() => {})
     return () => {
       live = false
-      folderFiles = []
-      notify()
     }
   }, [folder])
+  useEffect(
+    () => () => {
+      folderFiles = []
+      notify()
+    },
+    [address],
+  )
 
   const recent = Object.entries(readState)
     .filter(([context]) => ADDRESS_RE.test(context))
@@ -172,7 +189,11 @@ export function useReferencePage({
   const key = recent.map(([context]) => context).join('\n')
 
   useEffect(() => {
-    if (!key) return
+    if (!key) {
+      recentFiles = []
+      notify()
+      return
+    }
     let live = true
     const at = new Map(recent)
     fileCandidatesOf({ addresses: [...at.keys()], at }, FILE_TIER.recent)
