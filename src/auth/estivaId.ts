@@ -207,10 +207,11 @@ export function beginSignOut(): void {
   client?.beginSignOut()
 }
 
-export const { clearSession, stashShellReason, takeShellReason } = client ?? {
+export const { clearSession, stashShellReason, takeShellReason, takeReturnTo } = client ?? {
   clearSession: () => {},
   stashShellReason: () => {},
   takeShellReason: () => null,
+  takeReturnTo: () => null,
 }
 
 /**
