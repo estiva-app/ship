@@ -27,7 +27,7 @@ import {
   type CommentRef,
 } from './events'
 import { findNaddrs, naddrToAddr, buildReaction, buildEdit, buildDeletion as buildEventDeletion } from '@estiva-app/protocol'
-import { planArchiveFolder, planCreateFolder, planDeleteFolder, planMoveFile, planPlaceFile, planRenameFolder, planUnlistFile, type FolderRef, type MovableFile, type MoveRefusal } from '@estiva-app/interop'
+import { planArchiveFolder, planCreateFolder, planDeleteFolder, planMoveFromFolders, planPlaceFile, planRenameFolder, planUnlistFile, type FolderRef, type MovableFile, type MoveRefusal } from '@estiva-app/interop'
 import { foldFolder, type FolderState } from './fold'
 import { decorationsOf, foldAttachments, foldEdits, type Decorations, type EditFold, type QueryFn } from '@estiva-app/conversation'
 import { anchorIndex, type AnchorIndex } from './references'
@@ -321,7 +321,8 @@ export class Store {
    * Move a project to another top-level Folder — FOL-7, RFC 0.4 §2.
    *
    * **Only the listings change.** One `kind:1852 add` to `to`, then one
-   * `kind:1852 remove` from each Folder in `from`, planned by `planMoveFile`.
+   * `kind:1852 remove` from each Folder in `from`, planned by interop's
+   * `planMoveFromFolders` — the planner Peek and the agent move by too.
    * No `kind:1851` and no `buzz-channel` change: what is already written stays
    * where it is, and new comments follow the listing (`workFolder`, MAN-5);
    * both apps find a project's threads by anchor, not by Folder. The old "Pair with another Folder…" wrote the
@@ -333,9 +334,10 @@ export class Store {
    * project no Folder lists, which is then only added.
    *
    * **What is listed beneath it moves with it** (SPEC §3.3): `listings` holds
-   * each source Folder's files, and `planMoveFile` names the project and every
-   * file under it — a topic started under the project — in one `add` and one
-   * `remove`. A source with no listing moves the project alone.
+   * each source Folder's files, archived ones included, and the one `add`
+   * names the project and every file under it in any source — a topic started
+   * under the project. So the add lands whole or not at all (SHI-37). A source
+   * with no listing moves the project alone.
    *
    * **Add first, and nothing at all if either side has no state** — the
    * planner's rules. A refused `remove` leaves the project listed in both,
@@ -346,40 +348,26 @@ export class Store {
    */
   async moveProject(args: {
     project: string
-    /** The Folders that list it now, each with `hasState` from a read. The target, if among them, is ignored. */
+    /** The Folders that list it now, each with `hasState` and `addresses` from a read. The target, if among them, is ignored. */
     from: readonly FolderRef[]
     to: FolderRef
-    /** Each source Folder's files (`FolderContents.files`), by Folder id. */
+    /** Each source Folder's files (`FolderContents.files`, archived included), by Folder id. */
     listings?: ReadonlyMap<string, readonly MovableFile[]>
   }): Promise<{ refused?: MoveRefusal; added?: PublishResult; removed: { folder: string; result: PublishResult }[] }> {
     assertFolderId(args.to.id)
-    const sources = args.from.filter((folder) => folder.id !== args.to.id)
-    // Already there and nowhere else: nothing to write, as the planner says of a move to the same Folder.
-    if (sources.length === 0 && args.from.length > 0) return { removed: [] }
-    if (!args.to.hasState) return { refused: 'target-has-no-state', removed: [] }
-    const now = Date.now()
-    const file = { ref: args.project, address: args.project }
-    const plans = sources.map((from) =>
-      planMoveFile(this.signer.pubkey, now, { file, from, to: args.to, listing: args.listings?.get(from.id) ?? null }),
-    )
-    const unsafe = plans.find((plan) => !plan.ok)
-    if (unsafe && !unsafe.ok) return { refused: unsafe.reason, removed: [] }
-    if (args.to.private && sources.length === 0) return { refused: 'target-is-private', removed: [] }
-    // Each plan is `[add to target, remove from source]`: every add, then every remove.
-    const events = plans.map((plan) => (plan.ok ? plan.events : []))
-    // One add per distinct set: a project listed in two Folders moves the same set out of each.
-    const named = (event: UnsignedEvent) => JSON.stringify(event.tags.filter((t) => t[0] === 'a'))
-    const adds = [...new Map(events.flatMap((planned) => planned.slice(0, 1)).map((add) => [named(add), add])).values()]
-    if (!adds.length) adds.push(...planPlaceFile(this.signer.pubkey, now, { folder: args.to.id, address: args.project, hasState: true }))
+    // One add naming everything every source lists beneath it, then a remove from each (SHI-37).
+    const plan = planMoveFromFolders(this.signer.pubkey, Date.now(), {
+      file: { ref: args.project, address: args.project },
+      from: args.from,
+      to: args.to,
+      listings: args.listings ?? new Map(),
+    })
+    if (!plan.ok) return { refused: plan.reason, removed: [] }
+    if (!plan.add) return { removed: [] }
+    const added = await this.publish(plan.add)
+    if (!added.ok) return { added, removed: [] }
     const removed: { folder: string; result: PublishResult }[] = []
-    let added: PublishResult | undefined
-    for (const add of adds) {
-      added = await this.publish(add)
-      if (!added.ok) return { added, removed }
-    }
-    for (const [i, source] of sources.entries()) {
-      if (events[i][1]) removed.push({ folder: source.id, result: await this.publish(events[i][1]) })
-    }
+    for (const { folder, event } of plan.removes) removed.push({ folder, result: await this.publish(event) })
     return { added, removed }
   }
 

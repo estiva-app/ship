@@ -192,7 +192,8 @@ export async function deleteProject(
  */
 export async function moveProject(
   project: Project,
-  from: readonly { id: string; hasState: boolean }[],
+  /** With `addresses`, what each one's state lists: the project moves out of one that names it even when its card did not resolve. */
+  from: readonly { id: string; hasState: boolean; addresses?: readonly string[] }[],
   to: { id: string; hasState: boolean; private?: boolean },
 ): Promise<WriteResult & { stillIn?: { folder: string; reason: string }[] }> {
   const clock = await clockProblem()
@@ -203,16 +204,7 @@ export async function moveProject(
     const sources = from.filter((folder) => folder.id !== to.id && folder.hasState)
     const read = await Promise.all(sources.map((folder) => readFolderListing(folder.id).catch(() => null)))
     if (read.some((files) => files === null)) return refused('the Folder it is in could not be read, so nothing was moved. Try again')
-    const listings = new Map(
-      await Promise.all(
-        sources.map(async (folder, i) => {
-          const files = read[i]!
-          // The project itself, even when its card did not resolve: it is what is being moved.
-          const listing = files.some((file) => file.address === project.addr) ? files : [{ ref: project.addr, address: project.addr }, ...files]
-          return [folder.id, listing] as const
-        }),
-      ),
-    )
+    const listings = new Map(sources.map((folder, i) => [folder.id, read[i]!] as const))
     const { refused: unsafe, added, removed } = await store.moveProject({ project: project.addr, from, to, listings })
     if (unsafe === 'source-has-no-state') return refused('the Folder it is in has no list of its own, so taking it out would empty that Folder')
     if (unsafe === 'target-has-no-state') return refused('that Folder has no list of its own, so adding to it would hide what is already there')
