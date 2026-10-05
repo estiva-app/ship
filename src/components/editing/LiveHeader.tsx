@@ -41,7 +41,7 @@ export interface LiveHeaderProps {
  * that block is gone from the description — a notice saying so, as §13.6 asks
  * of a detached anchor. Once, for the description the page opened with.
  */
-function useLinkedBlock(description: string, format: ContentFormat): [missing: 'detached' | 'unaddressable' | null, dismiss: () => void] {
+function useLinkedBlock(description: string, format: ContentFormat, readOnly: boolean): [missing: 'detached' | 'unaddressable' | null, dismiss: () => void] {
   const [missing, setMissing] = useState<'detached' | 'unaddressable' | null>(null)
   useEffect(() => {
     const id = linkedBlock()
@@ -52,13 +52,19 @@ function useLinkedBlock(description: string, format: ContentFormat): [missing: '
       setMissing(state)
       return
     }
-    // The reading surface draws first and the editor replaces it, pixel for pixel; either holds the block.
+    // The reading surface draws first and the editor replaces it, and the swap drops the scroll (measured on production:
+    // scrolled on the reading surface, back at the top once the editor held the block). So each new copy of the block is
+    // scrolled to, until the surface that stays — the editor, or the reading one for a reader — has it.
+    const last = readOnly ? 'reading' : 'editing'
     let tries = 0
+    let scrolled: Element | null = null
     const timer = setInterval(() => {
       const element = document.querySelector(`[data-description] [data-block-id="${CSS.escape(id)}"]`)
-      if (!element && ++tries < 30) return
-      clearInterval(timer)
-      element?.scrollIntoView({ block: 'center' })
+      if (element && element !== scrolled) {
+        element.scrollIntoView({ block: 'center' })
+        scrolled = element
+      }
+      if (element?.closest(`[data-description="${last}"]`) || ++tries >= 50) clearInterval(timer)
     }, 100)
     return () => clearInterval(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the description the link was opened on; a later edit is not a new arrival
@@ -87,7 +93,7 @@ export function LiveHeader(props: LiveHeaderProps) {
   const resolved = byReference(references, objects)
   const cards = attached.map((r) => resolved[r]).filter((o): o is ForeignObjectData => !!o)
 
-  const [missing, dismiss] = useLinkedBlock(description, format)
+  const [missing, dismiss] = useLinkedBlock(description, format, readOnly)
 
   const reading = <ReadingHeader {...props} resolved={resolved} />
   return (

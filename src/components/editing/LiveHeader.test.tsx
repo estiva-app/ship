@@ -213,3 +213,31 @@ describe('LiveHeader, the placeholder (from ProjectHeader.test.tsx)', () => {
     expect(render(header('', 'marker', false)).container.textContent).toContain('Add a description…')
   })
 })
+
+describe('LiveHeader, a block link (RIC-18)', () => {
+  const doc = JSON.stringify({
+    type: 'doc',
+    content: [
+      { type: 'paragraph', id: 'b1', content: [{ type: 'text', text: 'First' }] },
+      { type: 'paragraph', id: 'b2', content: [{ type: 'text', text: 'Linked' }] },
+    ],
+  })
+
+  it('scrolls to the block once the editor holds it, not only on the reading surface the editor replaces', async () => {
+    // Production, 5 October: the link scrolled the reading surface, the editor's arrival dropped the scroll, and the
+    // block was off screen. The scroll has to land on the surface that stays.
+    window.history.replaceState(null, '', '/p/abc#block-b2')
+    const scrolled: string[] = []
+    const original = Element.prototype.scrollIntoView
+    Element.prototype.scrollIntoView = function (this: Element) {
+      if (this.getAttribute('data-block-id') === 'b2') scrolled.push(this.closest('[data-description]')?.getAttribute('data-description') ?? '')
+    }
+    try {
+      await write(doc, 'blocks')
+      await waitFor(() => expect(scrolled.at(-1)).toBe('editing'), { timeout: 5000 })
+    } finally {
+      Element.prototype.scrollIntoView = original
+      window.history.replaceState(null, '', '/')
+    }
+  })
+})
