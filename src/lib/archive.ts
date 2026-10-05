@@ -66,6 +66,19 @@ export function ownArchive(file: Archivable, activity: readonly ChangeLike[]): A
   }
 }
 
+/**
+ * Why an archived file's own fields cannot change: its title, description and
+ * rail stay shut until it is unarchived, while comments, Archive and Delete stay
+ * open (Miky, SHI-36). Ship's courtesy, not the relay's rule — the relay does not
+ * know an archive and accepts the write from any other app.
+ */
+export function lockedReason(archive: ArchiveState | undefined): string | undefined {
+  if (!archive) return undefined
+  if (archive.with?.kind === 'project') return 'Unarchive its project to edit'
+  if (archive.with?.kind === 'folder') return 'Unarchive its Folder to edit'
+  return 'Unarchive to edit'
+}
+
 export interface Archives {
   /** The project's archive: its own, or its team's when every team listing it is archived. */
   ofProject: (addr: string) => ArchiveState | undefined

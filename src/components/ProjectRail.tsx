@@ -61,6 +61,8 @@ export interface ProjectRailProps {
   onDelete: () => void
   /** Why writes are unavailable: disables the selects and the write buttons, as a tooltip. The Folder link stays. */
   readOnlyReason?: string
+  /** Why the project's fields and Move are shut while Archive and Delete stay open — an archived project (SHI-36): unarchiving is the way back. */
+  lockedReason?: string
   className?: string
 }
 
@@ -91,16 +93,18 @@ export function ProjectRail({
   onArchive,
   onDelete,
   readOnlyReason,
+  lockedReason,
   className,
 }: ProjectRailProps) {
+  const fieldsShut = readOnlyReason ?? lockedReason
   return (
     <aside className={cn('flex w-[250px] shrink-0 flex-col gap-4', className)}>
       {/* A locked select says why, as the buttons below do (UIG-14): held shut, reachable by Tab, the reason as its tooltip. */}
       <Property layout="stacked" label="Status">
-        <Select value={status} onChange={onStatusChange} options={statuses} ariaLabel="Status" disabledReason={readOnlyReason} />
+        <Select value={status} onChange={onStatusChange} options={statuses} ariaLabel="Status" disabledReason={fieldsShut} />
       </Property>
       <Property layout="stacked" label="Assignee">
-        <Select value={lead} onChange={onLeadChange} options={peopleOptions(people)} ariaLabel="Assignee" disabledReason={readOnlyReason} />
+        <Select value={lead} onChange={onLeadChange} options={peopleOptions(people)} ariaLabel="Assignee" disabledReason={fieldsShut} />
       </Property>
       <Property layout="stacked" label="Progress">
         <div className="flex flex-col gap-2">
@@ -130,7 +134,7 @@ export function ProjectRail({
               ))
             )}
             {onMove && (
-              <Button size="small" variant="muted" onClick={onMove} disabledReason={readOnlyReason}>
+              <Button size="small" variant="muted" onClick={onMove} disabledReason={fieldsShut}>
                 Move to Folder…
               </Button>
             )}

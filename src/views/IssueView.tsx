@@ -84,6 +84,8 @@ export interface IssueViewProps {
   onEditMessage?: (messageId: string, body: string) => Promise<boolean | void> | boolean | void
   /** Why writes are unavailable — every write control on the page is disabled with it. */
   readOnlyReason?: string
+  /** Why this issue's own title, description and rail are shut while it can still be discussed, archived or deleted — an archived issue (SHI-36). */
+  lockedReason?: string
   /** The upload behind attach. Injected so a story needs no relay; the app's by default. */
   upload?: (file: File) => Promise<Imeta>
   /** The `ArchivedNotice` of an archived issue, or one archived with its project: the first thing on every tab (FOL-46). */
@@ -96,7 +98,7 @@ const TABS: { id: IssueTab; label: string }[] = [
 ]
 
 /** One issue's page, in tabs: Overview and Activity, with the rail on every tab. */
-export function IssueView({ crumbs, tab, onTab, title, description, descriptionFormat, nameOf, onRename, onCopyBlockLink, onDescribe, related, threads, unread, onThreadShown, onStartConversation, onReply, activity, activityTruncated, onReplyInActivity, history, rail, about, onReact, onDeleteMessage, onEditMessage, readOnlyReason, upload, archivedNotice }: IssueViewProps) {
+export function IssueView({ crumbs, tab, onTab, title, description, descriptionFormat, nameOf, onRename, onCopyBlockLink, onDescribe, related, threads, unread, onThreadShown, onStartConversation, onReply, activity, activityTruncated, onReplyInActivity, history, rail, about, onReact, onDeleteMessage, onEditMessage, readOnlyReason, lockedReason, upload, archivedNotice }: IssueViewProps) {
   // `linkTo` on each crumb (S15, 0.10.0): the breadcrumbs were the last links in Ship that reloaded the app (SHI-20).
   const items: Crumb[] = [{ label: 'Issues', ...linkTo(crumbs.issuesHref) }]
   // The box before the project's name says it is a project, as the sidebar's entry does (Katerina, 2026-09-09).
@@ -120,7 +122,7 @@ export function IssueView({ crumbs, tab, onTab, title, description, descriptionF
         {tab === 'overview' && (
           <Centred>
             {archivedNotice}
-            <LiveHeader title={title} titlePlaceholder="Untitled issue" onRename={onRename} description={description} format={descriptionFormat} onDescribe={onDescribe} nameOf={nameOf} readOnly={!!readOnlyReason} upload={upload} onCommentOnBlock={comment.start} onCopyBlockLink={onCopyBlockLink} />
+            <LiveHeader title={title} titlePlaceholder="Untitled issue" onRename={onRename} description={description} format={descriptionFormat} onDescribe={onDescribe} nameOf={nameOf} readOnly={!!(readOnlyReason ?? lockedReason)} upload={upload} onCommentOnBlock={comment.start} onCopyBlockLink={onCopyBlockLink} />
             {/* Nesting is by intent (RFC 0.5 §10.7): what somebody placed under this issue, from whichever app owns it. */}
             {hasRelated(related) && (
               <>
@@ -152,7 +154,7 @@ export function IssueView({ crumbs, tab, onTab, title, description, descriptionF
       <Divider orientation="vertical" className="col-start-2 row-span-3 row-start-1" />
       {/* The rail on every tab, starting level with the tab row and never moving (Katerina, 29 September). */}
       <ScrollArea className="col-start-3 row-span-2 row-start-2 min-h-0" contentClassName="px-6 pb-5">
-        <IssueRail {...rail} readOnlyReason={readOnlyReason} />
+        <IssueRail {...rail} readOnlyReason={readOnlyReason} lockedReason={lockedReason} />
       </ScrollArea>
     </div>
   )

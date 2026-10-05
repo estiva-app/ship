@@ -171,3 +171,72 @@ describe('a write control that cannot succeed says why', () => {
     expect(onDelete).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('an archived file’s rail: its fields shut, Unarchive and Delete open (SHI-36)', () => {
+  const LOCKED = 'Unarchive to edit'
+
+  it('shuts the issue rail’s three selects and leaves Unarchive and Delete working', () => {
+    const onArchive = vi.fn()
+    const onDelete = vi.fn()
+    render(
+      <IssueRail
+        status="planned"
+        statuses={STATUSES}
+        onStatusChange={vi.fn()}
+        assignee=""
+        people={PEOPLE}
+        onAssigneeChange={vi.fn()}
+        project=""
+        projects={[{ value: '', label: 'No project' }]}
+        onProjectChange={vi.fn()}
+        openedBy={{}}
+        openedAt={Math.floor(Date.now() / 1000)}
+        onCopyReference={vi.fn()}
+        archived
+        onArchive={onArchive}
+        onDelete={onDelete}
+        lockedReason={LOCKED}
+      />,
+    )
+    for (const name of ['Status', 'Assignee', 'Project']) expect(screen.getByRole('combobox', { name }).getAttribute('aria-disabled')).toBe('true')
+    for (const name of ['Unarchive issue', 'Delete issue']) {
+      const button = screen.getByRole('button', { name })
+      expect(button.getAttribute('aria-disabled')).toBe(null)
+      fireEvent.click(button)
+    }
+    expect(onArchive).toHaveBeenCalledTimes(1)
+    expect(onDelete).toHaveBeenCalledTimes(1)
+  })
+
+  it('shuts the project rail’s selects and Move, and leaves Unarchive and Delete working', () => {
+    const onArchive = vi.fn()
+    const onDelete = vi.fn()
+    const onMove = vi.fn()
+    render(
+      <ProjectRail
+        status="in_progress"
+        statuses={STATUSES}
+        onStatusChange={vi.fn()}
+        lead="ana"
+        people={PEOPLE}
+        onLeadChange={vi.fn()}
+        done={10}
+        total={14}
+        folders={[{ name: 'Ship', href: `/app/folder/${FOLDER}` }]}
+        onMove={onMove}
+        archived
+        onArchive={onArchive}
+        onDelete={onDelete}
+        lockedReason={LOCKED}
+      />,
+    )
+    for (const name of ['Status', 'Assignee']) expect(screen.getByRole('combobox', { name }).getAttribute('aria-disabled')).toBe('true')
+    const move = screen.getByRole('button', { name: 'Move to Folder…' })
+    expect(move.getAttribute('aria-disabled')).toBe('true')
+    fireEvent.click(move)
+    expect(onMove).not.toHaveBeenCalled()
+    for (const name of ['Unarchive project', 'Delete project']) fireEvent.click(screen.getByRole('button', { name }))
+    expect(onArchive).toHaveBeenCalledTimes(1)
+    expect(onDelete).toHaveBeenCalledTimes(1)
+  })
+})

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { archivesOf, ownArchive } from './archive'
+import { archivesOf, lockedReason, ownArchive } from './archive'
 
 const A = 'a'.repeat(64)
 const B = 'b'.repeat(64)
@@ -87,5 +87,17 @@ describe('archivesOf — the cascade is read, never written', () => {
   it('a project no state lists is placed by its own Folder, as the sidebar places it', () => {
     const own = { id: 'own', archived: { by: A, at: 30 } }
     expect(archivesOf({ projects: [project(PROJECT)], issues: [], activity: [] }, [own]).ofProject(PROJECT)?.with?.id).toBe('own')
+  })
+})
+
+describe('lockedReason — an archived file is read until it is unarchived (SHI-36)', () => {
+  it('locks nothing that is not archived', () => {
+    expect(lockedReason(undefined)).toBeUndefined()
+  })
+
+  it('names what to unarchive: the file itself, its project, or its Folder', () => {
+    expect(lockedReason({ by: A, at: 10 })).toBe('Unarchive to edit')
+    expect(lockedReason({ by: A, at: 10, with: { kind: 'project', addr: PROJECT, title: 'Hive' } })).toBe('Unarchive its project to edit')
+    expect(lockedReason({ by: A, at: 10, with: { kind: 'folder', addr: 'f', id: 'f', title: 'Steer' } })).toBe('Unarchive its Folder to edit')
   })
 })
