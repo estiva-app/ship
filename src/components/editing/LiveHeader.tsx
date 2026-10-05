@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useState } from 'react'
+import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import { referencesIn, resolveBlockAnchor, standaloneReference, toRenderTree, type ContentFormat, type Imeta } from '@estiva-app/protocol'
 import { BlockHandle } from '@estiva-app/ui'
 import { Banner } from '@/components/Banner'
@@ -41,8 +41,16 @@ export interface LiveHeaderProps {
  * that block is gone from the description — a notice saying so, as §13.6 asks
  * of a detached anchor. Once, for the description the page opened with.
  */
+/** What a person does that means they have taken the page over from a block link's scroll. */
+const PERSON = ['wheel', 'touchmove', 'keydown', 'pointerdown'] as const
+
 function useLinkedBlock(description: string, format: ContentFormat, readOnly: boolean): [missing: 'detached' | 'unaddressable' | null, dismiss: () => void] {
   const [missing, setMissing] = useState<'detached' | 'unaddressable' | null>(null)
+  // Read at each tick, not at mount: whether this person may write can settle after the header has drawn.
+  const writer = useRef(!readOnly)
+  useEffect(() => {
+    writer.current = !readOnly
+  }, [readOnly])
   useEffect(() => {
     const id = linkedBlock()
     if (!id) return
@@ -54,19 +62,24 @@ function useLinkedBlock(description: string, format: ContentFormat, readOnly: bo
     }
     // The reading surface draws first and the editor replaces it, and the swap drops the scroll (measured on production:
     // scrolled on the reading surface, back at the top once the editor held the block). So each new copy of the block is
-    // scrolled to, until the surface that stays — the editor, or the reading one for a reader — has it.
-    const last = readOnly ? 'reading' : 'editing'
+    // scrolled to, until the surface that stays — the editor, or the reading one for a reader — has it. Ten seconds, for
+    // the editor's chunk on a slow first visit; and never after the person has scrolled or typed themselves.
     let tries = 0
     let scrolled: Element | null = null
+    const stop = () => {
+      clearInterval(timer)
+      for (const type of PERSON) window.removeEventListener(type, stop, true)
+    }
     const timer = setInterval(() => {
       const element = document.querySelector(`[data-description] [data-block-id="${CSS.escape(id)}"]`)
       if (element && element !== scrolled) {
         element.scrollIntoView({ block: 'center' })
         scrolled = element
       }
-      if (element?.closest(`[data-description="${last}"]`) || ++tries >= 50) clearInterval(timer)
+      if (element?.closest(`[data-description="${writer.current ? 'editing' : 'reading'}"]`) || ++tries >= 100) stop()
     }, 100)
-    return () => clearInterval(timer)
+    for (const type of PERSON) window.addEventListener(type, stop, { capture: true, passive: true })
+    return stop
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the description the link was opened on; a later edit is not a new arrival
   }, [])
   return [missing, () => setMissing(null)]
