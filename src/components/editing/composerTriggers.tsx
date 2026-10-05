@@ -1,6 +1,7 @@
 import { IconMessage } from '@tabler/icons-react'
 import { mentionText } from '@estiva-app/conversation'
-import { CaptionedReference, PersonMention, ReferenceTrigger, UrgentPersonMention, type CaptionedItem, type MentionPerson } from '@estiva-app/ui/editor'
+import { CaptionedReference, PersonMention, ReferenceTrigger, UrgentPersonMention, type MentionPerson } from '@estiva-app/ui/editor'
+import { REFERENCE_COPY, type ReferenceSection } from '@/api/references'
 
 /**
  * `@`, `!@` and `[` in Ship's message box — CON-25. The triggers, the lists and
@@ -12,13 +13,28 @@ import { CaptionedReference, PersonMention, ReferenceTrigger, UrgentPersonMentio
 
 const REFERENCE_ICON = <IconMessage size={16} stroke={1.5} className="text-text-secondary" />
 
-/** The extensions, reading the latest people and messages each time a list opens. */
-export function composerTriggers(read: { people: () => readonly MentionPerson[]; references: () => readonly CaptionedItem[] }) {
+/**
+ * The extensions, reading the latest people and `[` sections each time a list
+ * opens: Messages then Files (PEE-21), drawn again when a search answer lands.
+ */
+export function composerTriggers(read: {
+  people: () => readonly MentionPerson[]
+  references: (query: string) => readonly ReferenceSection[]
+  subscribe?: (listener: () => void) => () => void
+}) {
   return [
     PersonMention.configure({ people: read.people }),
     UrgentPersonMention.configure({ people: read.people }),
     CaptionedReference.configure({ icon: REFERENCE_ICON }),
-    ReferenceTrigger.configure({ items: read.references, nodeName: 'captionedReference', ariaLabel: 'Messages', sectionLabel: 'Messages', icon: REFERENCE_ICON }),
+    ReferenceTrigger.configure({
+      items: () => [],
+      sections: read.references,
+      subscribe: read.subscribe,
+      nodeName: 'captionedReference',
+      ariaLabel: REFERENCE_COPY.ariaLabel,
+      sectionLabel: REFERENCE_COPY.messages,
+      icon: REFERENCE_ICON,
+    }),
   ]
 }
 

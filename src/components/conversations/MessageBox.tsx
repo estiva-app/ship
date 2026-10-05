@@ -13,7 +13,8 @@ import {
   type Imeta,
 } from '@estiva-app/protocol'
 import { AttachmentCard, Avatar, Button, FieldLine, FilePicker, IconButton, Kbd, Toolbar, ToolbarButton, richTextClassName } from '@estiva-app/ui'
-import { SelectionToolbar, isSuggestionActive, urgentPubkeys, type CaptionedItem } from '@estiva-app/ui/editor'
+import { SelectionToolbar, isSuggestionActive, urgentPubkeys } from '@estiva-app/ui/editor'
+import { subscribeReferences, type ReferenceSection } from '@/api/references'
 import { cn } from '@/lib/cn'
 import { browserDrafts, type DraftStore } from '@/lib/drafts'
 import { uploadAttachment } from '@/api/blobs'
@@ -52,8 +53,8 @@ export interface MessageBoxProps {
   kind?: MessageBoxKind
   /** The trimmed marker text, the files already on the relay, and the urgent picks. Resolve `false` to keep them. */
   onSubmit: (text: string, files: readonly Imeta[], picks: Picks) => Promise<boolean | void> | boolean | void
-  /** What `[` offers — the messages on the page (CON-25), asked when the list opens. Omitted, `[` opens nothing. */
-  references?: () => readonly CaptionedItem[]
+  /** What `[` offers for what was typed — Messages then Files (PEE-21), asked as the query changes. Omitted, `[` opens nothing. */
+  references?: (query: string) => readonly ReferenceSection[]
   /** Edit: the text as it stands. */
   initial?: string
   /** Edit: leave without saving. Reply: Escape in an empty box. */
@@ -177,7 +178,7 @@ export function MessageBox({ kind = 'conversation', onSubmit, references, initia
         StarterKit.configure({ link: false, strike: false, heading: { levels: [1, 2] }, trailingNode: false }),
         ReferenceNode,
         LinkDecoration,
-        ...composerTriggers({ people: () => people.current, references: () => offered.current?.() ?? [] }),
+        ...composerTriggers({ people: () => people.current, references: (query) => offered.current?.(query) ?? [], subscribe: subscribeReferences }),
         // No Table: marker text has none (§13.2). No File in an edit, which keeps the message's files as they are.
         ShipSlashMenu(slashSections({ onFile: kind === 'edit' ? undefined : () => picker.current?.click(), triggers: true })),
         keys,

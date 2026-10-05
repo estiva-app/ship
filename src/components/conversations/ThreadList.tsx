@@ -19,7 +19,7 @@ import type { ActivityProps } from '@/components/Activity'
 import { MESSAGE_FORMAT, PLACE_ICON, RELATION, Time, meaningLabel, standaloneReferencesOf, type MentionListViewProps, type ThreadListViewProps } from './shared'
 import { MessageBoxShell } from './writingBox'
 import type { Picks } from './MessageBox'
-import { referenceItems } from '@/components/editing/mentionables'
+import { messageScope, referenceSections } from '@/api/references'
 
 /*
   The writing box is its own chunk: its editor is ProseMirror, which a reader
@@ -231,7 +231,7 @@ interface ThreadProps {
 const REPLY_RULE = 'ml-2.5 border-l-2 border-border-default pl-3'
 
 function Thread({ thread, pageThreads, onReply, disabledReason, unreadFrom, resolved, resolving, nameOf, reactionsBy, onReact, onDeleteMessage, onEditMessage, upload, drafts, viewer, onShown }: ThreadProps) {
-  const references = useCallback(() => referenceItems(pageThreads, thread.id, nameOf), [pageThreads, thread.id, nameOf])
+  const references = useCallback((query: string) => referenceSections(messageScope(pageThreads, thread.id), query, nameOf), [pageThreads, thread.id, nameOf])
   const unreadIndex = thread.replies.findIndex((r) => r.id === unreadFrom)
   const newCount = unreadIndex < 0 ? 0 : thread.replies.length - unreadIndex
   const [open, setOpen] = useState(newCount > 0)
@@ -307,7 +307,7 @@ const threadProps = (p: ThreadListViewProps | MentionListViewProps) => ({
 /** The drawing, with the reads handed in — for a story, or a caller that has them. */
 export function ThreadListView(props: ThreadListViewProps) {
   const { threads, onStart, disabledReason, className, unread, nameOf, about, omitted = 0, reactionsCut = false, upload, drafts, anchor, onDropAnchor } = props
-  const references = useCallback(() => referenceItems(threads, undefined, nameOf), [threads, nameOf])
+  const references = useCallback((query: string) => referenceSections(messageScope(threads), query, nameOf), [threads, nameOf])
   const blockId = anchor && anchor.state !== 'unanchored' ? anchor.id : undefined
   return (
     <div className={cn('flex flex-col gap-3', className)}>
