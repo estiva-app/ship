@@ -117,6 +117,36 @@ let inFlight: Promise<void> = Promise.resolve()
 let lastAttempt: { at: number; outcome: string; detail?: string; contexts?: number } | undefined
 /** The last merged frontier this tab fetched, so the diagnostic need not re-fetch. */
 let lastMerged: Record<string, number> = {}
+/**
+ * What the screen judges against: every frontier this tab fetched and every
+ * mark it recorded, each context at its latest (SHI-38). Markers only grow
+ * (§11.4), so nothing here can be older than the truth. Without it a mark
+ * reached the screen only after the publish debounce and the next 30 s
+ * re-read, and a re-read whose own slot would not decrypt (a 429 on
+ * `/nip44/decrypt`) replaced the frontier with one missing your markers —
+ * relighting everything you had read.
+ */
+let shown: Record<string, number> = {}
+/** The mounted `useMergedReadState`s, told when `shown` moves. */
+const shownListeners = new Set<() => void>()
+
+/** `into` with each of `from`'s contexts raised to the later value; `into` itself when nothing moved. */
+function laterOf(into: Record<string, number>, from: Readonly<Record<string, number>>): Record<string, number> {
+  let out = into
+  for (const [context, at] of Object.entries(from)) {
+    if (out[context] !== undefined && out[context] >= at) continue
+    if (out === into) out = { ...into }
+    out[context] = at
+  }
+  return out
+}
+
+function show(from: Readonly<Record<string, number>>): void {
+  const next = laterOf(shown, from)
+  if (next === shown) return
+  shown = next
+  for (const listener of shownListeners) listener()
+}
 
 function noteAttempt(outcome: string, detail?: string, contexts?: number): void {
   lastAttempt = { at: Date.now(), outcome, ...(detail ? { detail } : {}), ...(contexts !== undefined ? { contexts } : {}) }
@@ -281,6 +311,8 @@ function record(context: string | undefined, atMs: number): void {
   // identical blob.
   if (advanced[context] === known[context]) return
   known = advanced
+  // On this screen at once, not after the publish and the next re-read.
+  show({ [context]: seconds })
   pending = advanceContexts(pending, { [context]: seconds })
   if (timer !== undefined) clearTimeout(timer)
   timer = setTimeout(() => {
@@ -313,6 +345,7 @@ export function resetReadStateForTests(): void {
   retryMs = 0
   lastAttempt = undefined
   lastMerged = {}
+  shown = {}
   hydrating = undefined
   inFlight = Promise.resolve()
 }
@@ -345,17 +378,26 @@ export function useMergedReadState(): Record<string, number> {
   // The tab's last frontier, so a page opened after the first read does not
   // judge everything against nothing: an empty frontier lights every reply
   // since you joined, which opens those threads, and an open thread is read (CON-34).
-  const [merged, setMerged] = useState<Record<string, number>>(() => lastMerged)
+  // `shown` rather than the raw fetch, so this tab's own marks count at once.
+  const [merged, setMerged] = useState<Record<string, number>>(() => shown)
+  useEffect(() => {
+    const listener = () => setMerged(shown)
+    shownListeners.add(listener)
+    listener()
+    return () => void shownListeners.delete(listener)
+  }, [])
 
   const load = useCallback(async () => {
     if (!signedIn()) return
     try {
       const state = await loadReadState()
       // Unreachable is not empty — keep the last good frontier rather than
-      // blanking every divider because one fetch failed.
+      // blanking every divider because one fetch failed. A reachable fetch
+      // only raises it: one missing a slot it could not decrypt is not
+      // evidence that anything became unread.
       if (state.reachable) {
-        setMerged(state.merged)
         lastMerged = state.merged
+        show(state.merged)
       }
     } catch (error) {
       console.warn('[read-state] could not read the merged frontier:', error)
@@ -399,6 +441,7 @@ export function useMergedReadState(): Record<string, number> {
  * __readState.flush()                publish now instead of waiting for the debounce
  * __readState.refresh()              re-read the merged frontier from the relay
  * __readState.marker('<context>')    one context's merged value, as a date
+ * __readState.shown('<context>')     the same, as the screen judges it
  * ```
  */
 export interface ReadStateDiagnostic {
@@ -417,6 +460,8 @@ export interface ReadStateDiagnostic {
   lastAttempt: typeof lastAttempt
   /** The merged frontier as of the last fetch. */
   merged: Record<string, number>
+  /** What the screen judges against: every fetch and every mark here, each context at its latest. */
+  shown: Record<string, number>
 }
 
 function snapshot(): ReadStateDiagnostic {
@@ -431,6 +476,7 @@ function snapshot(): ReadStateDiagnostic {
     retryInS: Math.round(retryMs / 1000),
     lastAttempt,
     merged: { ...lastMerged },
+    shown: { ...shown },
   }
 }
 
@@ -452,11 +498,18 @@ export function installReadStateDiagnostic(): void {
     const seam = signedIn()
     if (!seam) return 'no session'
     const state = await loadReadState()
-    if (state.reachable) lastMerged = state.merged
+    if (state.reachable) {
+      lastMerged = state.merged
+      show(state.merged)
+    }
     return { reachable: state.reachable, ownUndecryptable: state.ownUndecryptable, contexts: Object.keys(state.merged).length }
   }
   fn.marker = (context: string) => {
     const at = lastMerged[context]
+    return at === undefined ? 'absent' : `${at}  ${new Date(at * 1000).toISOString()}`
+  }
+  fn.shown = (context: string) => {
+    const at = shown[context]
     return at === undefined ? 'absent' : `${at}  ${new Date(at * 1000).toISOString()}`
   }
   ;(window as unknown as Record<string, unknown>).__readState = fn

@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { act, renderHook, waitFor } from '@testing-library/react'
 import type { FetchedReadState } from '@estiva-app/conversation'
 
 /**
@@ -316,4 +317,39 @@ describe('the reply floor survives hydration (CON-34)', () => {
     expect(contexts[OURS]).toBe(1000)
     // Filling a 64 KB budget one marker at a time caps on every one: about a second alone, more under a full run.
   }, 20_000)
+})
+
+// Katerina, 2026-10-05: "new replies won't leave after reading". On production the
+// count stayed 28 s with the thread open, then a re-read relit the divider.
+describe('what the screen judges against only moves forward (SHI-38)', () => {
+  beforeEach(async () => {
+    vi.clearAllMocks()
+    const { resetReadStateForTests } = await import('./readStateSync')
+    resetReadStateForTests()
+  })
+
+  it('shows a mark at once, before any publish or re-read', async () => {
+    const { markRead, useMergedReadState } = await import('./readStateSync')
+    fetchReadState.mockResolvedValue({ reachable: true, merged: { [THEIRS]: 5000 }, own: undefined })
+    const { result } = renderHook(() => useMergedReadState())
+    await waitFor(() => expect(result.current[THEIRS]).toBe(5000))
+
+    act(() => markRead([NEW], 7_000_000))
+    expect(result.current[NEW]).toBe(7000)
+    expect(publishReadState).not.toHaveBeenCalled()
+  })
+
+  it('keeps a marker that a later fetch is missing', async () => {
+    const { useMergedReadState } = await import('./readStateSync')
+    fetchReadState.mockResolvedValue({ reachable: true, merged: { [OURS]: 1000, [THEIRS]: 5000 }, own: undefined })
+    const first = renderHook(() => useMergedReadState())
+    await waitFor(() => expect(first.result.current[OURS]).toBe(1000))
+    first.unmount()
+
+    // Our slot would not decrypt this time (a 429 on /nip44/decrypt): the merge lacks it.
+    fetchReadState.mockResolvedValue({ reachable: true, merged: { [THEIRS]: 6000 }, own: undefined, ownUndecryptable: true })
+    const second = renderHook(() => useMergedReadState())
+    await waitFor(() => expect(second.result.current[THEIRS]).toBe(6000))
+    expect(second.result.current[OURS]).toBe(1000)
+  })
 })

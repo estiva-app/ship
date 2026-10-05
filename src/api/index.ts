@@ -54,7 +54,7 @@ import { installReadStateDiagnostic } from './readStateSync'
 /* `window.__readState()` — see readStateSync.ts. Installed at module scope so it
    is there before anything asks, including on a page loaded straight from a URL. */
 installReadStateDiagnostic()
-export { firstUnreadByThread } from './unreadFeed'
+export { unreadByThread } from './unreadFeed'
 export { useFeedJudges, type FeedFile } from './useFeedJudges'
 export {
   archiveProject,

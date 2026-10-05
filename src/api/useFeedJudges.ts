@@ -145,7 +145,7 @@ export async function readFeedFacts(
   return { membership, muted: mutedCache.keys }
 }
 
-/** The judges a feed asks `firstUnreadByThread` with: one for the file's stream and one for the record channel's. */
+/** The judges a feed asks `unreadByThread` with: one for the file's stream and one for the record channel's. */
 export interface FeedJudges {
   file?: StreamJudge
   channel?: StreamJudge

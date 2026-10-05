@@ -60,8 +60,11 @@ function judgable(message: Message): Judgable {
 }
 
 /**
- * The id of the first unread message of each thread, as the map the renderer
- * wants.
+ * The unread messages of each thread, oldest first, as the map the renderer
+ * wants: the divider goes above the first, and a thread's "N new" is how many
+ * of its replies are in the list. The list is the package's verdict, not a
+ * position — counting every reply after the first unread one counted your own
+ * replies as new, and none at all when the root was the first (SHI-38).
  *
  * `judgeOf` names the stream a thread answers to and who is judging it
  * (see {@link StreamJudge}); `undefined` lights nothing for that thread, which
@@ -72,11 +75,11 @@ function judgable(message: Message): Judgable {
  * Threads with nothing new are omitted rather than mapped to `undefined`, so a
  * caller can ask `Object.keys(...).length` for "is anything new here".
  */
-export function firstUnreadByThread(
+export function unreadByThread(
   conversations: readonly Conversation[],
   merged: Readonly<Record<string, number>>,
   judgeOf: (conversation: Conversation) => StreamJudge | undefined,
-): Record<string, string> {
+): Record<string, string[]> {
   const byJudge = new Map<StreamJudge, Judgable[]>()
   const threadOf = new Map<string, string>()
   for (const conversation of conversations) {
@@ -90,13 +93,13 @@ export function firstUnreadByThread(
     byJudge.set(judge, events)
   }
 
-  const out: Record<string, string> = {}
+  const out: Record<string, string[]> = {}
   for (const [judge, events] of byJudge) {
-    // `unreadIn` answers oldest first within a thread, so the first message
-    // seen for a thread is the one the divider goes above.
+    // `unreadIn` answers oldest first within a thread, so each list's first
+    // id is the message the divider goes above.
     for (const message of unreadIn(events, merged, judge)) {
       const thread = threadOf.get(message.id)
-      if (thread !== undefined && !(thread in out)) out[thread] = message.id
+      if (thread !== undefined) (out[thread] ??= []).push(message.id)
     }
   }
   return out

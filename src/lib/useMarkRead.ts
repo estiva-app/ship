@@ -13,17 +13,61 @@ import { markRead, READ_DWELL_MS } from '@/api'
  * a caller can hand in an object that has no protocol identity yet without
  * branching. Building them stays in `@estiva-app/conversation`'s context helpers, so no page can accidentally
  * pass an issue where a container belongs and mark a whole project read.
+ *
+ * `newestAt` is the newest message drawn for those contexts (unix seconds).
+ * When it moves the dwell runs again, so a message that arrives while they are
+ * on screen — somebody's reply, or your own — is read too, as in Peek (PEE-44).
+ * Before SHI-38 the mark was stamped once, and a reply that came in later
+ * stayed new until the page was opened again.
  */
-export function useMarkRead(contexts: (string | undefined)[]): void {
+export function useMarkRead(contexts: (string | undefined)[], newestAt?: number): void {
   // Joined so the effect re-runs when the *set* changes rather than on every
   // render — a new array literal each render would restart the dwell forever
   // and nothing would ever be marked read.
   const key = contexts.filter(Boolean).sort().join('|')
   useEffect(() => {
     if (key.length === 0) return
-    const t = setTimeout(() => markRead(key.split('|')), READ_DWELL_MS)
-    return () => clearTimeout(t)
-  }, [key])
+    let t: ReturnType<typeof setTimeout> | undefined
+    // Up to the newest message drawn, never past the clock — as Peek's
+    // `useDwell`: the relay may hold one the 5 s poll has not drawn yet, and a
+    // marker is grow-only. A message ahead of the clock is read once the clock
+    // gets there, if still on screen. Without a `newestAt`, the clock, as before.
+    const fire = () => {
+      const now = Math.floor(Date.now() / 1000)
+      markRead(key.split('|'), newestAt === undefined ? Date.now() : Math.min(newestAt, now) * 1000)
+      if (newestAt !== undefined && newestAt > now) t = setTimeout(fire, (newestAt - now) * 1000)
+    }
+    // A page in a background tab is not being read: arm only while it is shown,
+    // and again when it comes back (Peek's `useDwell`).
+    const arm = () => {
+      clearTimeout(t)
+      if (!document.hidden) t = setTimeout(fire, READ_DWELL_MS)
+    }
+    arm()
+    document.addEventListener('visibilitychange', arm)
+    return () => {
+      clearTimeout(t)
+      document.removeEventListener('visibilitychange', arm)
+    }
+  }, [key, newestAt])
+}
+
+/** The newest root of a feed, and the newest reply of the threads in `open` — what each `useMarkRead` of a page re-arms on. */
+export function newestDrawn(
+  conversations: readonly { id: string; root: { createdAt: number }; replies: readonly { createdAt: number }[] }[],
+  open: readonly string[],
+): { rootsAt: number | undefined; repliesAt: number | undefined } {
+  return {
+    rootsAt: newestMessageAt(conversations.map((c) => c.root)),
+    repliesAt: newestMessageAt(...conversations.filter((c) => open.includes(c.id)).map((c) => c.replies)),
+  }
+}
+
+/** The latest `createdAt` (unix seconds) across the lists, or undefined when there are none. */
+export function newestMessageAt(...lists: readonly (readonly { createdAt: number }[])[]): number | undefined {
+  let newest: number | undefined
+  for (const list of lists) for (const message of list) if (newest === undefined || message.createdAt > newest) newest = message.createdAt
+  return newest
 }
 
 /**
