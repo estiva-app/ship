@@ -1,4 +1,4 @@
-import { Fragment, Suspense, lazy, useCallback, useMemo, useState, type ComponentProps } from 'react'
+import { Fragment, Suspense, lazy, useCallback, useEffect, useMemo, useState, type ComponentProps } from 'react'
 import { IconDotsVertical, IconMessage2, IconMoodPlus, IconX } from '@tabler/icons-react'
 import type { Imeta } from '@estiva-app/protocol'
 import { Avatar, Button, Card, EmptyState, IconButton, Menu, MenuItem, Popover, ReactionPicker, WithTooltip } from '@estiva-app/ui'
@@ -224,16 +224,22 @@ interface ThreadProps {
   upload?: (file: File) => Promise<Imeta>
   drafts?: DraftStore
   viewer?: string
+  onShown?: (threadId: string, open: boolean) => void
 }
 
 /** Replies hang one step in, behind today's left rule. */
 const REPLY_RULE = 'ml-2.5 border-l-2 border-border-default pl-3'
 
-function Thread({ thread, pageThreads, onReply, disabledReason, unreadFrom, resolved, resolving, nameOf, reactionsBy, onReact, onDeleteMessage, onEditMessage, upload, drafts, viewer }: ThreadProps) {
+function Thread({ thread, pageThreads, onReply, disabledReason, unreadFrom, resolved, resolving, nameOf, reactionsBy, onReact, onDeleteMessage, onEditMessage, upload, drafts, viewer, onShown }: ThreadProps) {
   const references = useCallback(() => referenceItems(pageThreads, thread.id, nameOf), [pageThreads, thread.id, nameOf])
   const unreadIndex = thread.replies.findIndex((r) => r.id === unreadFrom)
   const newCount = unreadIndex < 0 ? 0 : thread.replies.length - unreadIndex
   const [open, setOpen] = useState(newCount > 0)
+  useEffect(() => {
+    if (!open || !onShown) return
+    onShown(thread.id, true)
+    return () => onShown(thread.id, false)
+  }, [open, thread.id, onShown])
   const [focusReply, setFocusReply] = useState(false)
   const toggle = () => {
     setFocusReply(!open)
@@ -331,7 +337,7 @@ export function ThreadListView(props: ThreadListViewProps) {
         <ol className="flex flex-col gap-3">
           {threads.map((thread) => (
             <li key={thread.id}>
-              <Thread thread={thread} pageThreads={threads} unreadFrom={unread?.[thread.id]} {...threadProps(props)} />
+              <Thread thread={thread} pageThreads={threads} unreadFrom={unread?.[thread.id]} onShown={props.onThreadShown} {...threadProps(props)} />
             </li>
           ))}
         </ol>

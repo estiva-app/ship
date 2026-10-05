@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { markRead, READ_DWELL_MS } from '@/api'
 
 /**
@@ -24,4 +24,22 @@ export function useMarkRead(contexts: (string | undefined)[]): void {
     const t = setTimeout(() => markRead(key.split('|')), READ_DWELL_MS)
     return () => clearTimeout(t)
   }, [key])
+}
+
+/**
+ * The threads whose replies are drawn right now, as `ThreadList`'s
+ * `onThreadShown` reports them (CON-34). Under SPEC §11.3's thread rule a
+ * reply is read only by drawing it, so a page marks these `thread:` contexts
+ * and not every thread it holds: a collapsed thread, or one on a tab that is
+ * not showing, has not been seen.
+ */
+export function useShownThreads(): [readonly string[], (threadId: string, open: boolean) => void] {
+  const [shown, setShown] = useState<readonly string[]>([])
+  const onShown = useCallback((threadId: string, open: boolean) => {
+    setShown((prev) => {
+      if (open) return prev.includes(threadId) ? prev : [...prev, threadId]
+      return prev.includes(threadId) ? prev.filter((id) => id !== threadId) : prev
+    })
+  }, [])
+  return [shown, onShown]
 }

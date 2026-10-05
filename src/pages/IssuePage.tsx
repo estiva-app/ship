@@ -1,5 +1,5 @@
 import { IconLinkOff } from '@tabler/icons-react'
-import { useMarkRead } from '@/lib/useMarkRead'
+import { useMarkRead, useShownThreads } from '@/lib/useMarkRead'
 import { useMemo, useState } from 'react'
 import { ArchiveDialog } from '@/components/ArchiveDialog'
 import { ArchivedNotice } from '@/components/ArchivedNotice'
@@ -63,8 +63,13 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
      other way would make reading one issue mark the whole project read. Before
      FOL-16 only the threads moved, and the roots answered to the project's
      marker, so a new top-level comment stayed new until the project page was
-     opened and opening the project page read every issue's roots. */
-  useMarkRead(useMemo(() => [fileContext(issue?.addr), ...conversations.map((c) => threadContext(c.id))], [issue, conversations]))
+     opened and opening the project page read every issue's roots.
+
+     A `thread:` context advances only while its replies are drawn, on the
+     Activity tab (CON-34): under §11.3's thread rule that is what reads them. */
+  useMarkRead(useMemo(() => [fileContext(issue?.addr)], [issue]))
+  const [shownThreads, onThreadShown] = useShownThreads()
+  useMarkRead(tab === 'activity' ? shownThreads.map(threadContext) : [])
   const threads = useMemo(
     () => conversations.map((c) => threadFor(c, directory, issue ? { value: issue.description, format: issue.descriptionFormat } : undefined, issue?.addr, state.edits, state.attachments)),
     [conversations, directory, issue],
@@ -143,6 +148,7 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
         related={related}
         threads={threads}
         unread={unread}
+        onThreadShown={onThreadShown}
         // Threads about an issue carry a reference in the body so Peek renders
         // the issue's widget above them (withReference: true), as the old app has it.
         onStartConversation={(body, files, picks, blockId) => act('Message', () => startConversation({ folder: issue.folder, about: issue.addr, withReference: true, body, blockId, files, urgent: picks?.urgent }), say, () => refresh([issue.folder]))}

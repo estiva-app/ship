@@ -232,6 +232,8 @@ export interface ConversationsProps {
   anchor?: BlockAnchor
   onDropAnchor?: () => void
   onReply: (threadId: string, text: string, files: readonly Imeta[], picks?: Picks) => Promise<boolean | void> | boolean | void
+  /** A thread's replies were drawn (`open`) or hidden: drawing them is what reads them, SPEC §11.2 (CON-34). */
+  onThreadShown?: (threadId: string, open: boolean) => void
   /** Why nothing can be posted right now — every composer here is disabled with it. */
   disabledReason?: string
   /**

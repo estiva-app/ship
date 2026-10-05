@@ -29,6 +29,7 @@ import { nip44 } from './nip44'
 import { signedIn } from '../auth/estivaId'
 import {
   READ_STATE_HORIZON_DAYS,
+  REPLY_FLOOR_CONTEXT,
   advanceContexts as advance,
   fetchReadState,
   loadSlotIdentity as loadSlot,
@@ -181,7 +182,11 @@ async function hydrate(): Promise<void> {
        * A slot is this installation's account of what *it* read. The union is
        * what the merge is for, and it is computed at read time.
        */
-      known = advanceContexts(state.own?.contexts ?? {}, known)
+      // The tab's own reply floor goes in as `current`: `advanceContexts` refuses one among the updates (CON-34).
+      const own = state.own?.contexts ?? {}
+      const { [REPLY_FLOOR_CONTEXT]: floor, ...recorded } = known
+      const held = floor === undefined ? own : { ...own, [REPLY_FLOOR_CONTEXT]: Math.max(floor, own[REPLY_FLOOR_CONTEXT] ?? 0) }
+      known = advanceContexts(held, recorded)
       published = state.own?.contexts ?? {}
       hydrated = true
     })().finally(() => {
@@ -337,7 +342,10 @@ export function installReadStateFlush(): () => void {
  * flashes a divider onto every thread and then takes it away.
  */
 export function useMergedReadState(): Record<string, number> {
-  const [merged, setMerged] = useState<Record<string, number>>({})
+  // The tab's last frontier, so a page opened after the first read does not
+  // judge everything against nothing: an empty frontier lights every reply
+  // since you joined, which opens those threads, and an open thread is read (CON-34).
+  const [merged, setMerged] = useState<Record<string, number>>(() => lastMerged)
 
   const load = useCallback(async () => {
     if (!signedIn()) return
