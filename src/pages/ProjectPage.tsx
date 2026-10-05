@@ -38,6 +38,7 @@ import {
   type WorkspaceState,
 } from '@/api'
 import { useRelated } from '@/api/useRelated'
+import { useReferencePage } from '@/api/references'
 import type { ThreadData } from '@/components/ConversationThread'
 import type { ActivityItem } from '@/components/Activity'
 import type { IssuesTableRow } from '@/components/IssuesTable'
@@ -442,6 +443,9 @@ export function ProjectPage({
   // (FOL-7). The record's own Folder until the listings are read.
   const listedIn = project && teams ? placedIn({ addr: project.addr, folder: project.contentFolder }, teams)[0]?.id : undefined
   const related = useRelated(listedIn ?? project?.contentFolder, project?.addr)
+  /* What `[` offers here (PEE-21): this project's messages; the Folder that
+     lists it, then the files you read recently. The project is never offered. */
+  useReferencePage({ address: project?.addr, folder: typeof related === 'object' ? related.all : undefined, readState: merged })
 
   if (!project) {
     return <EmptyState icon={<IconLinkOff size={16} stroke={1.5} />} message="That project is not in this workspace, or is in a Folder you cannot read." />

@@ -10,7 +10,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import type { Editor } from '@tiptap/react'
 import { encodeNpub } from '@estiva-app/protocol'
-import { messageReference } from '@estiva-app/conversation'
+import { fileReference, messageReference } from '@estiva-app/conversation'
 import { MentionPeopleProvider } from '@/components/editing/mentionables'
 import { MessageBox } from './MessageBox'
 
@@ -28,12 +28,16 @@ const BOB = 'b'.repeat(64)
 const MSG = 'd'.repeat(64)
 const PEOPLE = [{ id: BOB, name: 'Bob', pubkey: BOB }, { id: 'ann', name: 'Ann', pubkey: null }]
 const REFERENCES = [{ id: MSG, label: 'Bob', snippet: 'the numbers', uri: messageReference(MSG, 1111) }]
+const ISSUE = `30851:${BOB}:i1`
+const FILES = [{ id: ISSUE, label: 'Issue', snippet: 'Relay search', description: 'CON-33 · Conversation standard', uri: fileReference(ISSUE) }]
+// Messages with nothing typed; once something is typed, Files — as `referenceSections` answers.
+const sections = (query: string) => (query ? [{ label: 'Files', items: FILES }] : [{ label: 'Messages', items: REFERENCES }])
 
 type EditorBox = HTMLElement & { editor: Editor }
 async function compose(onSubmit: ComponentProps<typeof MessageBox>['onSubmit'], kind: 'conversation' | 'edit' = 'conversation') {
   render(
     <MentionPeopleProvider value={PEOPLE}>
-      <MessageBox kind={kind} onSubmit={onSubmit} references={() => REFERENCES} />
+      <MessageBox kind={kind} onSubmit={onSubmit} references={sections} />
     </MentionPeopleProvider>,
   )
   const target = screen.getByRole('textbox', { name: kind === 'edit' ? 'Edit message' : 'Start a conversation…' }) as EditorBox
@@ -87,11 +91,22 @@ describe('the message box’s triggers (CON-25)', () => {
     const onSubmit = vi.fn().mockResolvedValue(true)
     const box = await compose(onSubmit)
     await type(box, '[')
-    expect(rows('Messages')).toEqual(['Bob: the numbers'])
+    expect(rows('Messages and files')).toEqual(['Bob: the numbers'])
     await enter(box)
     await sleep(150)
     await enter(box)
     expect(onSubmit).toHaveBeenCalledWith(messageReference(MSG, 1111), [], { urgent: undefined })
+  })
+
+  it('[ then a ref finds the issue under Files and sends it as the naddr a paste carries (PEE-21)', async () => {
+    const onSubmit = vi.fn().mockResolvedValue(true)
+    const box = await compose(onSubmit)
+    await type(box, '[CON-33')
+    expect(rows('Messages and files')).toEqual([expect.stringContaining('Relay search')])
+    await enter(box)
+    await sleep(150)
+    await enter(box)
+    expect(onSubmit).toHaveBeenCalledWith(fileReference(ISSUE), [], { urgent: undefined })
   })
 
   it('/ opens Format, then Insert with File and the three triggers — no Table in a message', async () => {

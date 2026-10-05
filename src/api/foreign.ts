@@ -25,6 +25,9 @@ import {
   resolveFolderContents,
   resolveForeignEvent,
   resolveForeignObject,
+  resolveForeignRoots,
+  fileCandidates,
+  searchFileReferences,
   type FolderContents,
   type FolderSummary,
   type ForeignObject,
@@ -32,6 +35,7 @@ import {
 
 /** Chain-walking, from the runtime — one implementation, not one per consumer. */
 export { pickWidget } from '@estiva-app/interop'
+import type { ReferenceCandidate } from '@estiva-app/conversation'
 import { relatedTo } from '@/lib/ownKinds'
 import { relay } from './store'
 
@@ -156,8 +160,34 @@ export async function readFolderListing(id: string): Promise<FolderContents['fil
   return (await resolveFolderContents(id, query, async () => ({}), manifests, { includeArchived: true })).files
 }
 
+/**
+ * `[`'s search tier (PEE-21): the files whose current title or ref holds
+ * `text`, as this identity can read them. Rejects on a refused read, which
+ * `referenceSearch` answers as no hits for a while.
+ */
+export function searchFiles(text: string): Promise<ReferenceCandidate[]> {
+  return searchFileReferences(text, query, { cache: manifests })
+}
+
+/**
+ * `[`'s rows for files already in hand — a Folder's listing — or known only by
+ * address — the files read recently, `at` each one's read marker (PEE-21).
+ * Addresses are read as roots and changes alone: what a file is called now,
+ * never its conversation.
+ */
+export async function fileCandidatesOf(
+  files: readonly ForeignObject[] | { addresses: readonly string[]; at: ReadonlyMap<string, number> },
+  tier: number,
+): Promise<ReferenceCandidate[]> {
+  if (!('addresses' in files)) return fileCandidates(files, tier, query, { cache: manifests })
+  const objects = await resolveForeignRoots(files.addresses, query, manifests)
+  return fileCandidates(objects, tier, query, { cache: manifests, at: files.at })
+}
+
 /** The foreign files placed under one of Ship's objects, with their conversation counts. */
 export interface RelatedFiles {
+  /** Everything the Folder lists, whichever app owns it: `[`'s first Files tier (PEE-21). Absent before the read. */
+  all?: ForeignObject[]
   /** One level, in the Folder's order — see `relatedTo`. */
   files: ForeignObject[]
   /**
@@ -207,7 +237,7 @@ export async function readRelated(folder: string, address: string): Promise<Rela
   }
   const counted = [...files, ...below]
   const counts = counted.length > 0 ? await conversationCountsOf(counted, query, manifests) : {}
-  return { files, inside, counts }
+  return { all: contents.files, files, inside, counts }
 }
 
 /** Every Folder this identity can see, for the sidebar. */

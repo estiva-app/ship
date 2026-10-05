@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { blockDocumentToMarkerText, encodeNpub, fromEditorDocument, type EditorDocument } from '@estiva-app/protocol'
 import { messageReference } from '@estiva-app/conversation'
 import { chipsAsReferences } from './composerTriggers'
-import { mentionPeople, referenceItems, snippetOf } from './mentionables'
+import { mentionPeople, snippetOf } from './mentionables'
+import { messageScope, referenceSections } from '@/api/references'
 import { mentionableIn, rosterOf } from '@/api/people'
 
 const BOB = 'b'.repeat(64)
@@ -55,19 +56,22 @@ describe('who @ offers', () => {
 
 describe('what [ offers', () => {
   const message = (id: string, body: string, kind?: number) => ({ id, kind, body, at: 0, author: { name: 'Bob' } })
-  it('lists the page’s messages, the thread being replied to last, and skips what is not an event', () => {
+  it('Messages: the thread being replied to first, then the rest of the page; skips what is not an event', () => {
     const a = { id: 'a'.repeat(64), root: message('a'.repeat(64), 'first', 1111), replies: [message('not-an-id', 'fixture')] }
     const b = { id: MSG, root: message(MSG, 'second'), replies: [] }
-    const items = referenceItems([b, a], MSG)
-    expect(items.map((item) => item.id)).toEqual(['a'.repeat(64), MSG])
-    expect(items[0].uri).toBe(messageReference('a'.repeat(64), 1111))
-    expect(items[1].uri).toBe(messageReference(MSG, 9))
+    const [messages, files] = referenceSections(messageScope([b, a], MSG), '')
+    expect(messages.label).toBe('Messages')
+    expect(messages.items.map((item) => item.id)).toEqual([MSG, 'a'.repeat(64)])
+    expect(messages.items[0].uri).toBe(messageReference(MSG, 9))
+    expect(messages.items[1].uri).toBe(messageReference('a'.repeat(64), 1111))
+    expect(files.label).toBe('Files')
   })
 
-  it('offers the newest messages: oldest first, as the package keeps the last six, though the page draws newest first', () => {
+  it('Messages: newest first within a tier, four at most, and typing narrows them', () => {
     const at = (n: number) => ({ id: String(n).repeat(64).slice(0, 64), root: { ...message(String(n).repeat(64).slice(0, 64), `m${n}`), at: n }, replies: [] })
-    const items = referenceItems([at(3), at(2), at(1)])
-    expect(items.map((item) => item.snippet)).toEqual(['m1', 'm2', 'm3'])
+    const page = [1, 2, 3, 4, 5].map(at)
+    expect(referenceSections(messageScope(page), '')[0].items.map((item) => item.snippet)).toEqual(['m5', 'm4', 'm3', 'm2'])
+    expect(referenceSections(messageScope(page), 'm2')[0].items.map((item) => item.snippet)).toEqual(['m2'])
   })
 
   it('captions a message by its words: marks stripped, a person by name', () => {

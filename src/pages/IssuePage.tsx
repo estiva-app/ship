@@ -13,6 +13,7 @@ import { IssueView } from '@/views/IssueView'
 import { go, href, type IssueTab } from '../router'
 import { act, type Say } from './act'
 import { activityFor, copyText, folderOfMessage, railPeople, threadFor } from './ProjectPage'
+import { useReferencePage } from '@/api/references'
 
 /**
  * This issue's slice of the change stream, in words, newest first — the old
@@ -98,6 +99,14 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
      Read from the issue's own Folder, the one a file placed under it is
      written into; see the same line on ProjectPage. */
   const related = useRelated(issue?.folder, issue?.addr)
+  /* What `[` offers here (PEE-21): this issue's messages, then its project's
+     (Miky, 2026-10-03); this Folder's files from the Related read, then the
+     ones you read recently. This issue is never offered under Files. */
+  const projectThreads = useMemo(
+    () => (project ? commentsOn(state.conversations, project.addr, state.anchors).map((c) => threadFor(c, directory, undefined, project.addr, state.edits, state.attachments)) : []),
+    [project, state, directory],
+  )
+  useReferencePage({ address: issue?.addr, parent: projectThreads, folder: typeof related === 'object' ? related.all : undefined, readState: merged })
 
   if (!issue) {
     return (
