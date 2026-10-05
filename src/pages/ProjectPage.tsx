@@ -26,6 +26,7 @@ import {
   workFolder,
   channelContext,
   fileContext,
+  threadContext,
   useMergedReadState,
   useFeedJudges,
   firstUnreadByThread,
@@ -403,8 +404,18 @@ export function ProjectPage({
      The channel is the **record** channel (FOL-1): the only Folder whose chat
      this page draws. A project filed into a team (FOL-2) has no record
      channel, only a team, and marking the team would advance the team's chat,
-     which is not on this page. */
-  useMarkRead([channelContext(record), fileContext(project?.addr)])
+     which is not on this page.
+
+     Every thread in the feed is drawn inline, so each one's `thread:` context
+     advances too (CON-34, Miky 2026-10-05): under §11.3's thread rule reading
+     the streams no longer reads their replies. The issues' threads rolled up
+     above are not drawn here and are not marked. */
+  useMarkRead(
+    useMemo(
+      () => [channelContext(record), fileContext(project?.addr), ...conversations.map((c) => threadContext(c.id))],
+      [record, project, conversations],
+    ),
+  )
   const threads = useMemo(
     () => conversations.map((c) => threadFor(c, directory, project ? { value: project.description, format: project.descriptionFormat } : undefined, project?.addr, state.edits, state.attachments)),
     [conversations, directory, project],
