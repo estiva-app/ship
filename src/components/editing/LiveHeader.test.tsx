@@ -213,3 +213,63 @@ describe('LiveHeader, the placeholder (from ProjectHeader.test.tsx)', () => {
     expect(render(header('', 'marker', false)).container.textContent).toContain('Add a description…')
   })
 })
+
+describe('LiveHeader, a block link (RIC-18)', () => {
+  const doc = JSON.stringify({
+    type: 'doc',
+    content: [
+      { type: 'paragraph', id: 'b1', content: [{ type: 'text', text: 'First' }] },
+      { type: 'paragraph', id: 'b2', content: [{ type: 'text', text: 'Linked' }] },
+    ],
+  })
+
+  /** Opens the page at `#block-b2` and returns, for each scroll to `b2`, the surface it was on. */
+  async function opened(run: () => Promise<unknown> | unknown, check: (scrolled: string[]) => Promise<void> | void) {
+    window.history.replaceState(null, '', '/p/abc#block-b2')
+    const scrolled: string[] = []
+    const original = Element.prototype.scrollIntoView
+    Element.prototype.scrollIntoView = function (this: Element) {
+      if (this.getAttribute('data-block-id') === 'b2') scrolled.push(this.closest('[data-description]')?.getAttribute('data-description') ?? '')
+    }
+    try {
+      await run()
+      await check(scrolled)
+    } finally {
+      Element.prototype.scrollIntoView = original
+      window.history.replaceState(null, '', '/')
+    }
+  }
+
+  it('scrolls to the block once the editor holds it, not only on the reading surface the editor replaces', async () => {
+    // Production, 5 October: the link scrolled the reading surface, the editor's arrival dropped the scroll, and the
+    // block was off screen. The scroll has to land on the surface that stays.
+    await opened(
+      () => write(doc, 'blocks'),
+      (scrolled) => waitFor(() => expect(scrolled.at(-1)).toBe('editing'), { timeout: 5000 }),
+    )
+  })
+
+  it('scrolls a reader once, on the reading surface, and stops', async () => {
+    await opened(
+      () => render(header(doc, 'blocks', true)),
+      async (scrolled) => {
+        await waitFor(() => expect(scrolled).toEqual(['reading']))
+        await new Promise((r) => setTimeout(r, 300))
+        expect(scrolled).toEqual(['reading'])
+      },
+    )
+  })
+
+  it('leaves the page alone once the person has scrolled it themselves', async () => {
+    await opened(
+      async () => {
+        // Scrolled before the first tick: the link does nothing, on either surface.
+        render(header(doc, 'blocks', false))
+        window.dispatchEvent(new Event('wheel'))
+        await screen.findByRole('textbox', { name: 'Description' }, { timeout: 5000 })
+        await new Promise((r) => setTimeout(r, 300))
+      },
+      (scrolled) => expect(scrolled).toEqual([]),
+    )
+  })
+})
