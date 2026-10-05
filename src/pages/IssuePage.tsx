@@ -3,7 +3,7 @@ import { useMarkRead, useShownThreads } from '@/lib/useMarkRead'
 import { useMemo, useState } from 'react'
 import { ArchiveDialog } from '@/components/ArchiveDialog'
 import { ArchivedNotice } from '@/components/ArchivedNotice'
-import { ownArchive, type Archives } from '@/lib/archive'
+import { lockedReason, ownArchive, type Archives } from '@/lib/archive'
 import { ISSUE_STATUSES, archiveIssue, commentsOn, deleteIssue, deleteMessage, editMessage, react, referenceFor, reply, setIssueField, unreact, startConversation, type DirectoryView, type FolderState, type WorkspaceState, threadContext, fileContext, useMergedReadState, useFeedJudges, firstUnreadByThread } from '@/api'
 import { useRelated } from '@/api/useRelated'
 import type { HistoryEntry } from '@/components/History'
@@ -142,6 +142,8 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
             />
           )
         }
+        // Archived, its own fields stay shut until it is unarchived; comments stay open (SHI-36).
+        lockedReason={lockedReason(archive)}
         crumbs={{
           issuesHref: href({ name: 'issues' }),
           project: project ? { title: project.title, href: href({ name: 'project', d: project.id, slug: project.title, view: 'table' }) } : undefined,

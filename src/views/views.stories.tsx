@@ -168,6 +168,7 @@ const projectPage = (startTab: ProjectTab, startView: 'table' | 'board' = 'table
           readOnlyReason={readOnlyReason}
           upload={pretendUpload}
           archivedNotice={archived && archivedNotice()}
+          lockedReason={archived ? 'Unarchive to edit' : undefined}
           rail={{
             status,
             statuses: PROJECT_STATUSES,
@@ -229,6 +230,7 @@ const issuePage = (startTab: IssueTab, archivedWithProject = false): Story => ({
           history={ACTIVITY}
           upload={pretendUpload}
           archivedNotice={archivedWithProject && archivedNotice(true)}
+          lockedReason={archivedWithProject ? 'Unarchive its project to edit' : undefined}
           rail={{
             status,
             statuses: ISSUE_STATUSES,

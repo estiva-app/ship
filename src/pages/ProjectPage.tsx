@@ -54,7 +54,7 @@ import { hrefForIssue, rowFor } from './IssuesPage'
 import { MoveProject } from '@/components/MoveProject'
 import { ArchiveDialog } from '@/components/ArchiveDialog'
 import { ArchivedNotice } from '@/components/ArchivedNotice'
-import { ownArchive, type Archives } from '@/lib/archive'
+import { lockedReason, ownArchive, type Archives } from '@/lib/archive'
 
 export type { Say } from './act'
 
@@ -501,6 +501,8 @@ export function ProjectPage({
             />
           )
         }
+        // Archived, its own fields stay shut until it is unarchived; comments stay open (SHI-36).
+        lockedReason={lockedReason(archive)}
         crumbs={{ projectsHref: href({ name: 'projects', archived: false }), title: project.title }}
         header={{
           title: project.title,

@@ -99,6 +99,8 @@ export interface ProjectViewProps {
   onEditMessage?: (messageId: string, body: string) => Promise<boolean | void> | boolean | void
   /** Why writes are unavailable — every write control on the page is disabled with it. */
   readOnlyReason?: string
+  /** Why this project's own title, description, rail and Add issue are shut while it can still be discussed, archived or deleted — an archived project (SHI-36). */
+  lockedReason?: string
   /** The upload behind attach. Injected so a story needs no relay; the app's by default. */
   upload?: (file: File) => Promise<Imeta>
   /** The `ArchivedNotice` of an archived project: the first thing on every tab (FOL-46). */
@@ -112,7 +114,7 @@ const TABS: { id: ProjectTab; label: string }[] = [
 ]
 
 /** One project's page, in tabs: Overview, Activity and Issues, with the rail on every tab. */
-export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onView, issues, issueStatuses, hrefFor, related, threads, unread, onThreadShown, onStartConversation, onReply, onCopyBlockLink, activity, activityTruncated, onReplyInActivity, rail, about, onReact, onDeleteMessage, onEditMessage, readOnlyReason, upload, archivedNotice }: ProjectViewProps) {
+export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onView, issues, issueStatuses, hrefFor, related, threads, unread, onThreadShown, onStartConversation, onReply, onCopyBlockLink, activity, activityTruncated, onReplyInActivity, rail, about, onReact, onDeleteMessage, onEditMessage, readOnlyReason, lockedReason, upload, archivedNotice }: ProjectViewProps) {
   const comment = useBlockComment(header.description, header.descriptionFormat, onTab, onStartConversation)
   return (
     // `data-surface`, `data-view` and `data-tab` are the smoke test's waypoints — see IssuesView. The Table/Board
@@ -138,7 +140,7 @@ export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onVi
             size="small"
           />
         )}
-        <Button variant="primary" onClick={onAddIssue} disabledReason={readOnlyReason}>
+        <Button variant="primary" onClick={onAddIssue} disabledReason={readOnlyReason ?? lockedReason}>
           Add issue
         </Button>
       </div>
@@ -148,7 +150,7 @@ export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onVi
         {tab === 'overview' && (
           <Centred>
             {archivedNotice}
-            <LiveHeader title={header.title} titlePlaceholder="Untitled project" onRename={header.onRename} description={header.description} format={header.descriptionFormat} onDescribe={header.onDescribe} nameOf={header.nameOf} readOnly={!!readOnlyReason} upload={upload} onCommentOnBlock={comment.start} onCopyBlockLink={onCopyBlockLink} />
+            <LiveHeader title={header.title} titlePlaceholder="Untitled project" onRename={header.onRename} description={header.description} format={header.descriptionFormat} onDescribe={header.onDescribe} nameOf={header.nameOf} readOnly={!!(readOnlyReason ?? lockedReason)} upload={upload} onCommentOnBlock={comment.start} onCopyBlockLink={onCopyBlockLink} />
             {/* Nesting is by intent (RFC 0.5 §10.7): what somebody placed under this project, whatever app it belongs
                 to. A line first, so the list the app adds never reads as part of the description someone typed. */}
             {hasRelated(related) && (
@@ -188,7 +190,7 @@ export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onVi
       <Divider orientation="vertical" className="col-start-2 row-span-3 row-start-1" />
       {/* The rail on every tab, starting level with the tab row and never moving (Katerina, 29 September). */}
       <ScrollArea className="col-start-3 row-span-2 row-start-2 min-h-0" contentClassName="px-6 pb-5">
-        <ProjectRail {...rail} archived={rail.archived ?? header.archived} readOnlyReason={readOnlyReason} />
+        <ProjectRail {...rail} archived={rail.archived ?? header.archived} readOnlyReason={readOnlyReason} lockedReason={lockedReason} />
       </ScrollArea>
     </div>
   )

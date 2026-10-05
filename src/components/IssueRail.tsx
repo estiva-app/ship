@@ -37,6 +37,8 @@ export interface IssueRailProps {
   onDelete: () => void
   /** Why writes are unavailable: holds the three selects shut and says why on hover and on keyboard focus. Copy stays. */
   readOnlyReason?: string
+  /** Why the issue's fields are shut while Archive and Delete stay open — an archived issue (SHI-36): unarchiving is the way back. */
+  lockedReason?: string
   className?: string
 }
 
@@ -57,19 +59,21 @@ export function IssueRail({
   onArchive,
   onDelete,
   readOnlyReason,
+  lockedReason,
   className,
 }: IssueRailProps) {
+  const fieldsShut = readOnlyReason ?? lockedReason
   return (
     <aside className={cn('flex w-[250px] shrink-0 flex-col gap-4', className)}>
       {/* A locked select says why, as Delete does (UIG-14): held shut, reachable by Tab, the reason as its tooltip. */}
       <Property layout="stacked" label="Status">
-        <Select value={status} onChange={onStatusChange} options={statuses} ariaLabel="Status" disabledReason={readOnlyReason} />
+        <Select value={status} onChange={onStatusChange} options={statuses} ariaLabel="Status" disabledReason={fieldsShut} />
       </Property>
       <Property layout="stacked" label="Assignee">
-        <Select value={assignee} onChange={onAssigneeChange} options={peopleOptions(people)} ariaLabel="Assignee" disabledReason={readOnlyReason} />
+        <Select value={assignee} onChange={onAssigneeChange} options={peopleOptions(people)} ariaLabel="Assignee" disabledReason={fieldsShut} />
       </Property>
       <Property layout="stacked" label="Project">
-        <Select value={project} onChange={onProjectChange} options={projects} ariaLabel="Project" disabledReason={readOnlyReason} />
+        <Select value={project} onChange={onProjectChange} options={projects} ariaLabel="Project" disabledReason={fieldsShut} />
       </Property>
       <Divider className="mx-0" />
       {/* The same shape as the three above (Katerina, 2026-09-08): the label
@@ -90,7 +94,8 @@ export function IssueRail({
       {/* The project rail's pair (FOL-46): archive, the reversible one, first. */}
       <div className="flex flex-col items-start gap-1">
         {onArchive && (
-          <Button size="small" variant="muted" onClick={onArchive} disabledReason={readOnlyReason}>
+          // Locked only by its project's archive, archiving it again is an edit; unarchiving its own never is.
+          <Button size="small" variant="muted" onClick={onArchive} disabledReason={archived ? readOnlyReason : fieldsShut}>
             {archived ? 'Unarchive issue' : 'Archive issue'}
           </Button>
         )}
