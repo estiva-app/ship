@@ -30,7 +30,30 @@ describe('a message drawn while the page is open is read too', () => {
     expect(markRead).toHaveBeenCalledTimes(1)
     vi.advanceTimersByTime(1)
     expect(markRead).toHaveBeenCalledTimes(2)
-    expect(markRead).toHaveBeenLastCalledWith(['thread:a'])
+    // Up to the newest drawn, not the clock: a reply the poll has not drawn yet stays new.
+    expect(markRead).toHaveBeenLastCalledWith(['thread:a'], 1_010_000)
+  })
+
+  it('marks nothing while the tab is hidden, and reads it once shown', () => {
+    const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(true)
+    renderHook(() => useMarkRead(['thread:a'], 1000))
+    vi.advanceTimersByTime(5000)
+    expect(markRead).not.toHaveBeenCalled()
+    hidden.mockReturnValue(false)
+    document.dispatchEvent(new Event('visibilitychange'))
+    vi.advanceTimersByTime(1500)
+    expect(markRead).toHaveBeenCalledTimes(1)
+    hidden.mockRestore()
+  })
+
+  it('reads a message from a clock running ahead once the clock gets there', () => {
+    const ahead = Math.floor(Date.now() / 1000) + 20
+    renderHook(() => useMarkRead(['thread:a'], ahead))
+    vi.advanceTimersByTime(1500)
+    expect(markRead).toHaveBeenCalledTimes(1)
+    expect(markRead.mock.calls[0][1]).toBeLessThan(ahead * 1000)
+    vi.advanceTimersByTime(20_000)
+    expect(markRead).toHaveBeenLastCalledWith(['thread:a'], ahead * 1000)
   })
 })
 

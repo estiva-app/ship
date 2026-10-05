@@ -27,8 +27,28 @@ export function useMarkRead(contexts: (string | undefined)[], newestAt?: number)
   const key = contexts.filter(Boolean).sort().join('|')
   useEffect(() => {
     if (key.length === 0) return
-    const t = setTimeout(() => markRead(key.split('|')), READ_DWELL_MS)
-    return () => clearTimeout(t)
+    let t: ReturnType<typeof setTimeout> | undefined
+    // Up to the newest message drawn, never past the clock — as Peek's
+    // `useDwell`: the relay may hold one the 5 s poll has not drawn yet, and a
+    // marker is grow-only. A message ahead of the clock is read once the clock
+    // gets there, if still on screen. Without a `newestAt`, the clock, as before.
+    const fire = () => {
+      const now = Math.floor(Date.now() / 1000)
+      markRead(key.split('|'), newestAt === undefined ? Date.now() : Math.min(newestAt, now) * 1000)
+      if (newestAt !== undefined && newestAt > now) t = setTimeout(fire, (newestAt - now) * 1000)
+    }
+    // A page in a background tab is not being read: arm only while it is shown,
+    // and again when it comes back (Peek's `useDwell`).
+    const arm = () => {
+      clearTimeout(t)
+      if (!document.hidden) t = setTimeout(fire, READ_DWELL_MS)
+    }
+    arm()
+    document.addEventListener('visibilitychange', arm)
+    return () => {
+      clearTimeout(t)
+      document.removeEventListener('visibilitychange', arm)
+    }
   }, [key, newestAt])
 }
 

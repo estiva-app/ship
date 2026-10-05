@@ -413,7 +413,7 @@ export function ProjectPage({
      issues' threads rolled up above are not drawn here and are not marked. */
   const [shownThreads, onThreadShown] = useShownThreads()
   const drawn = useMemo(() => newestDrawn(conversations, shownThreads), [conversations, shownThreads])
-  useMarkRead(useMemo(() => [channelContext(record), fileContext(project?.addr)], [record, project]), drawn.rootsAt)
+  useMarkRead(useMemo(() => [channelContext(record), fileContext(project?.addr)], [record, project]), tab === 'activity' ? drawn.rootsAt : undefined)
   useMarkRead(tab === 'activity' ? shownThreads.map(threadContext) : [], drawn.repliesAt)
   const threads = useMemo(
     () => conversations.map((c) => threadFor(c, directory, project ? { value: project.description, format: project.descriptionFormat } : undefined, project?.addr, state.edits, state.attachments)),

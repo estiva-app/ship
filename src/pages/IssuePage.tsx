@@ -70,7 +70,8 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
      Activity tab (CON-34): under §11.3's thread rule that is what reads them. */
   const [shownThreads, onThreadShown] = useShownThreads()
   const drawn = useMemo(() => newestDrawn(conversations, shownThreads), [conversations, shownThreads])
-  useMarkRead(useMemo(() => [fileContext(issue?.addr)], [issue]), drawn.rootsAt)
+  // Re-armed by a new root only where roots are drawn: Overview still marks once on opening (66b31c4b).
+  useMarkRead(useMemo(() => [fileContext(issue?.addr)], [issue]), tab === 'activity' ? drawn.rootsAt : undefined)
   useMarkRead(tab === 'activity' ? shownThreads.map(threadContext) : [], drawn.repliesAt)
   const threads = useMemo(
     () => conversations.map((c) => threadFor(c, directory, issue ? { value: issue.description, format: issue.descriptionFormat } : undefined, issue?.addr, state.edits, state.attachments)),
