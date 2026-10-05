@@ -513,6 +513,7 @@ export function ProjectPage({
         // A project conversation is already in the topic it belongs to, so a
         // reference would be noise (withReference: false), as the old app has it.
         onStartConversation={(body, files, picks, blockId) => act('Message', async () => startConversation({ folder: await workFolder(project, teams), about: project.addr, withReference: false, body, blockId, files, urgent: picks?.urgent }), say, () => refresh([listedIn ?? project.contentFolder]))}
+        onCopyBlockLink={(link) => void copyText(link, 'Link copied', 'Copy this link:', say)}
         onReply={(threadId, body, files, picks) => {
           const conversation = conversations.find((c) => c.id === threadId)
           if (!conversation) return false

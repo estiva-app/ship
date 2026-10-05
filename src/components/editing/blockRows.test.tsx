@@ -36,6 +36,8 @@ describe('a block link', () => {
     expect(linkedBlock(new URL(link).hash)).toBe('b2')
     expect(linkedBlock('#something-else')).toBeUndefined()
     expect(linkedBlock('')).toBeUndefined()
+    // Cut mid-escape when pasted: the page opens anyway.
+    expect(linkedBlock('#block-%E0')).toBeUndefined()
   })
 
   it('to a block that was removed says so above the description', () => {
@@ -94,7 +96,7 @@ describe('a comment from a block’s menu', () => {
     const onDrop = vi.fn()
     render(<ThreadListView threads={[]} onStart={() => true} onReply={() => true} anchor={{ state: 'resolved', id: 'b1', block: { type: 'paragraph', id: 'b1', content: [{ type: 'text', text: 'first part' }] } } as never} onDropAnchor={onDrop} />)
     expect(document.querySelector('[data-pending-anchor="b1"]')?.textContent).toContain('first part')
-    await userEvent.setup().click(screen.getByRole('button', { name: 'About the whole page instead' }))
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Remove' }))
     expect(onDrop).toHaveBeenCalled()
   })
 })

@@ -53,6 +53,7 @@ export function LiveDescription({
   onEditor,
   upload = uploadAttachment,
   onCommentOnBlock,
+  onCopyBlockLink,
 }: {
   value: string
   format: ContentFormat
@@ -65,6 +66,8 @@ export function LiveDescription({
   upload?: (file: File) => Promise<Imeta>
   /** The block menu's Comment: start a conversation anchored to that block. Without it the row is not offered. */
   onCommentOnBlock?: (blockId: string) => void
+  /** The block menu's Copy link: the page's copy, which confirms it. */
+  onCopyBlockLink?: (link: string) => void
 }) {
   const [failed, setFailed] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
@@ -111,10 +114,11 @@ export function LiveDescription({
         if (ok) saved.current = next.value
       } finally {
         committing.current = false
-      }
-      if (again.current) {
-        again.current = false
-        void latestSave.current(typed.current)
+        // In `finally`, so a commit that throws still hands on the change waiting behind it.
+        if (again.current) {
+          again.current = false
+          void latestSave.current(typed.current)
+        }
       }
     },
     [onCommit],
@@ -208,7 +212,7 @@ export function LiveDescription({
       <div className="flex flex-col gap-1">
         {/* The reading surface's own `-mx-2 px-2 py-1`, so nothing moves. The text cursor is the only sign it is editable. */}
         {/* The handle sits in the gutter left of the text, so nothing moves (RIC-18). */}
-        <EditorBlockHandle editor={editor} turnInto={TURN_INTO} actions={blockRows(onCommentOnBlock)}>
+        <EditorBlockHandle editor={editor} turnInto={TURN_INTO} actions={blockRows(onCommentOnBlock, onCopyBlockLink)}>
           <EditorContent editor={editor} className="-mx-2 cursor-text px-2 py-1" data-description="editing" />
           {/* Peek's composer pattern: muted words over an empty editor. */}
           {empty && <span aria-hidden className="pointer-events-none absolute left-0 top-1 text-body-2 text-text-muted">Add a description…</span>}

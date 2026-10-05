@@ -70,6 +70,14 @@ describe('parse, at the edges', () => {
     expect(parse('').name).toBe('issues')
   })
 
+  it('opens a block link on its own page, and still reads an old #/ link from its hash (RIC-18)', () => {
+    // A block link is the page plus `#block-<id>`. Read as a route, the fragment sent it to the issue list.
+    expect(parse(`/issue/${UUID}#block-b2`)).toEqual({ name: 'issue', d: UUID })
+    expect(parse(`/project/${UUID}#block-b2`)).toMatchObject({ name: 'project', d: UUID })
+    expect(parse(`/#/issue/${UUID}`)).toEqual({ name: 'issue', d: UUID })
+    expect(hashRedirect(`/issue/${UUID}#block-b2`)).toBeNull()
+  })
+
   it('recognises an inbound naddr', () => {
     // The route Peek's "open in Ship" links carry. It cannot be rendered
     // directly — an naddr has no Folder — so being *recognised* is the whole job.

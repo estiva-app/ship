@@ -9,12 +9,18 @@ import { MenuItem, type HandleBlock } from '@estiva-app/ui'
 const PREFIX = '#block-'
 
 export function blockLink(id: string, at: Location = window.location): string {
-  return `${at.origin}${at.pathname}${PREFIX}${id}`
+  return `${at.origin}${at.pathname}${PREFIX}${encodeURIComponent(id)}`
 }
 
 /** The block a link opened this page at, if it did. */
 export function linkedBlock(hash: string = window.location.hash): string | undefined {
-  return hash.startsWith(PREFIX) && hash.length > PREFIX.length ? decodeURIComponent(hash.slice(PREFIX.length)) : undefined
+  if (!hash.startsWith(PREFIX) || hash.length === PREFIX.length) return undefined
+  // A pasted link cut mid-escape must open the page, not take it down.
+  try {
+    return decodeURIComponent(hash.slice(PREFIX.length))
+  } catch {
+    return undefined
+  }
 }
 
 /**
@@ -24,13 +30,15 @@ export function linkedBlock(hash: string = window.location.hash): string | undef
  * cannot edit too. A block without an id yet has nothing to address, so it
  * gets neither.
  */
-export function blockRows(onComment?: (blockId: string) => void) {
+export function blockRows(onComment?: (blockId: string) => void, onCopyLink?: (link: string) => void) {
   return (block: HandleBlock) => {
     const id = block.id
     if (!id) return null
+    // The page's own copy, which says "Link copied" and falls back to a prompt; a story without one copies silently.
+    const copy = onCopyLink ?? ((link: string) => void navigator.clipboard?.writeText(link))
     return (
       <>
-        <MenuItem label="Copy link" leading={<IconLink size={16} stroke={1.5} className="text-text-secondary" />} onClick={() => void navigator.clipboard?.writeText(blockLink(id))} />
+        <MenuItem label="Copy link" leading={<IconLink size={16} stroke={1.5} className="text-text-secondary" />} onClick={() => copy(blockLink(id))} />
         {onComment && <MenuItem label="Comment" leading={<IconMessage size={16} stroke={1.5} className="text-text-secondary" />} onClick={() => onComment(id)} />}
       </>
     )

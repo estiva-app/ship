@@ -310,7 +310,7 @@ export function ThreadListView(props: ThreadListViewProps) {
         <div className="flex items-start gap-2" data-pending-anchor={blockId}>
           <BlockAnchorNote anchor={anchor} className="min-w-0 flex-1" />
           {onDropAnchor && (
-            <IconButton aria-label="About the whole page instead" tooltip="About the whole page instead" onClick={onDropAnchor}>
+            <IconButton aria-label="Remove" tooltip="Remove" onClick={onDropAnchor}>
               <IconX size={16} stroke={1.5} />
             </IconButton>
           )}

@@ -32,6 +32,8 @@ export interface LiveHeaderProps {
   upload?: (file: File) => Promise<Imeta>
   /** The block menu's Comment — offered to a reader too. Without it the row is not offered (RIC-18). */
   onCommentOnBlock?: (blockId: string) => void
+  /** The block menu's Copy link: the page's copy, which confirms it. */
+  onCopyBlockLink?: (link: string) => void
 }
 
 /**
@@ -39,13 +41,15 @@ export interface LiveHeaderProps {
  * that block is gone from the description — a notice saying so, as §13.6 asks
  * of a detached anchor. Once, for the description the page opened with.
  */
-function useLinkedBlock(description: string, format: ContentFormat): [gone: boolean, dismiss: () => void] {
-  const [gone, setGone] = useState(false)
+function useLinkedBlock(description: string, format: ContentFormat): [missing: 'detached' | 'unaddressable' | null, dismiss: () => void] {
+  const [missing, setMissing] = useState<'detached' | 'unaddressable' | null>(null)
   useEffect(() => {
     const id = linkedBlock()
     if (!id) return
-    if (resolveBlockAnchor(id, description, format).state !== 'resolved') {
-      setGone(true)
+    const state = resolveBlockAnchor(id, description, format).state
+    // A removed block and a description with no parts are different facts (§13.6), so they are said differently.
+    if (state === 'detached' || state === 'unaddressable') {
+      setMissing(state)
       return
     }
     // The reading surface draws first and the editor replaces it, pixel for pixel; either holds the block.
@@ -59,7 +63,7 @@ function useLinkedBlock(description: string, format: ContentFormat): [gone: bool
     return () => clearInterval(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the description the link was opened on; a later edit is not a new arrival
   }, [])
-  return [gone, () => setGone(false)]
+  return [missing, () => setMissing(null)]
 }
 
 /**
@@ -83,14 +87,14 @@ export function LiveHeader(props: LiveHeaderProps) {
   const resolved = byReference(references, objects)
   const cards = attached.map((r) => resolved[r]).filter((o): o is ForeignObjectData => !!o)
 
-  const [gone, dismiss] = useLinkedBlock(description, format)
+  const [missing, dismiss] = useLinkedBlock(description, format)
 
   const reading = <ReadingHeader {...props} resolved={resolved} />
   return (
     <div className="flex flex-col gap-4">
-      {gone && (
+      {missing && (
         <Banner tone="info" onDismiss={dismiss}>
-          That part of the description was removed.
+          {missing === 'detached' ? 'That part of the description was removed.' : 'That link is to a part of the description, which is no longer written in parts.'}
         </Banner>
       )}
       {readOnly ? (
@@ -117,7 +121,7 @@ export function LiveHeader(props: LiveHeaderProps) {
  * the moment before the editor arrives. Laid out exactly as the editors are,
  * so nothing moves when they replace it.
  */
-function ReadingHeader({ title, titlePlaceholder, description, format, nameOf, readOnly, resolved, onCommentOnBlock }: LiveHeaderProps & { resolved: Record<string, ForeignObjectData | null | undefined> }) {
+function ReadingHeader({ title, titlePlaceholder, description, format, nameOf, readOnly, resolved, onCommentOnBlock, onCopyBlockLink }: LiveHeaderProps & { resolved: Record<string, ForeignObjectData | null | undefined> }) {
   const empty = description.trim() === ''
   return (
     <div className="flex flex-col gap-4">
@@ -128,7 +132,7 @@ function ReadingHeader({ title, titlePlaceholder, description, format, nameOf, r
           <span className="text-body-2 text-text-muted">{readOnly ? '' : 'Add a description…'}</span>
         ) : (
           // A reader gets the handle too, with Copy link and Comment (Miky, RIC-18 kickoff); the editing rows need the editor.
-          <BlockHandle actions={blockRows(onCommentOnBlock)}>
+          <BlockHandle actions={blockRows(onCommentOnBlock, onCopyBlockLink)}>
             <RichText value={description} format={format} nameOf={nameOf} resolved={resolved} hideStandalone />
           </BlockHandle>
         )}

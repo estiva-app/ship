@@ -138,6 +138,7 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
         descriptionFormat={issue.descriptionFormat}
         nameOf={directory.nameOf}
         onRename={(value) => set('title', value, 'Rename')}
+        onCopyBlockLink={(link) => void copyText(link, 'Link copied', 'Copy this link:', say)}
         onDescribe={(value, contentFormat) => set('description', value, 'Description', contentFormat)}
         related={related}
         threads={threads}
