@@ -192,7 +192,8 @@ export async function renew(): Promise<string | null> {
  * the ticket about not doing that).
  */
 export async function beginSignIn(options: { silent?: boolean } = {}): Promise<void> {
-  await client?.beginSignIn(`${window.location.pathname}${window.location.search}`, options)
+  // The hash too: a block link (RIC-18) is the page plus `#block-<id>`, and signing in must land on that block.
+  await client?.beginSignIn(`${window.location.pathname}${window.location.search}${window.location.hash}`, options)
 }
 
 /**

@@ -19,6 +19,7 @@ import { ProjectRail, type RailFolder, type RailPerson } from '@/components/Proj
 import { Related, hasRelated } from '@/components/Related'
 import { LiveHeader } from '@/components/editing/LiveHeader'
 import { MentionList, ThreadList } from '@/components/conversations/ThreadList'
+import { useBlockComment } from '@/components/conversations/useBlockComment'
 import { AppSection, Centred } from '@/components/layout/ReadingColumn'
 import type { RelatedState } from '@/api/useRelated'
 
@@ -56,9 +57,14 @@ export interface ProjectViewProps {
   threads: ThreadData[]
   /** Thread id → first unread message id. Drives the "new since" line (CRO-13). */
   unread?: Record<string, string>
-  /** `files` are attachments already on the relay — SHI-2; `picks` the composer's urgent mentions (CON-25). */
-  onStartConversation: (text: string, files: readonly Imeta[], picks?: Picks) => Promise<boolean | void> | boolean | void
+  /**
+   * `files` are attachments already on the relay — SHI-2; `picks` the composer's urgent mentions (CON-25);
+   * `blockId` when it starts from a block's menu, a comment anchored to that block — SPEC §13.6, RIC-18.
+   */
+  onStartConversation: (text: string, files: readonly Imeta[], picks?: Picks, blockId?: string) => Promise<boolean | void> | boolean | void
   onReply: (threadId: string, text: string, files: readonly Imeta[], picks?: Picks) => Promise<boolean | void> | boolean | void
+  /** The block menu's Copy link (RIC-18): copies and says so. */
+  onCopyBlockLink?: (link: string) => void
   /** Threads elsewhere that mention this project — CON-9. */
   activity: ActivityItem[]
   /** How many the horizon left out — `ACTIVITY_HORIZON`. Said on screen, never implied. */
@@ -104,7 +110,8 @@ const TABS: { id: ProjectTab; label: string }[] = [
 ]
 
 /** One project's page, in tabs: Overview, Activity and Issues, with the rail on every tab. */
-export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onView, issues, issueStatuses, hrefFor, related, threads, unread, onStartConversation, onReply, activity, activityTruncated, onReplyInActivity, rail, about, onReact, onDeleteMessage, onEditMessage, readOnlyReason, upload, archivedNotice }: ProjectViewProps) {
+export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onView, issues, issueStatuses, hrefFor, related, threads, unread, onStartConversation, onReply, onCopyBlockLink, activity, activityTruncated, onReplyInActivity, rail, about, onReact, onDeleteMessage, onEditMessage, readOnlyReason, upload, archivedNotice }: ProjectViewProps) {
+  const comment = useBlockComment(header.description, header.descriptionFormat, onTab, onStartConversation)
   return (
     // `data-surface`, `data-view` and `data-tab` are the smoke test's waypoints — see IssuesView. The Table/Board
     // toggle and the tabs swap content in place on the same route, so without them a test cannot tell "it
@@ -139,7 +146,7 @@ export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onVi
         {tab === 'overview' && (
           <Centred>
             {archivedNotice}
-            <LiveHeader title={header.title} titlePlaceholder="Untitled project" onRename={header.onRename} description={header.description} format={header.descriptionFormat} onDescribe={header.onDescribe} nameOf={header.nameOf} readOnly={!!readOnlyReason} upload={upload} />
+            <LiveHeader title={header.title} titlePlaceholder="Untitled project" onRename={header.onRename} description={header.description} format={header.descriptionFormat} onDescribe={header.onDescribe} nameOf={header.nameOf} readOnly={!!readOnlyReason} upload={upload} onCommentOnBlock={comment.start} onCopyBlockLink={onCopyBlockLink} />
             {/* Nesting is by intent (RFC 0.5 §10.7): what somebody placed under this project, whatever app it belongs
                 to. A line first, so the list the app adds never reads as part of the description someone typed. */}
             {hasRelated(related) && (
@@ -157,7 +164,7 @@ export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onVi
           <Centred>
             {archivedNotice}
             <AppSection title="Conversations">
-              <ThreadList threads={threads} unread={unread} onStart={onStartConversation} onReply={onReply} disabledReason={readOnlyReason} nameOf={header.nameOf} onReact={onReact} onDeleteMessage={onDeleteMessage} onEditMessage={onEditMessage} about={about} upload={upload} />
+              <ThreadList threads={threads} unread={unread} onStart={comment.post} anchor={comment.anchor} onDropAnchor={comment.drop} onReply={onReply} disabledReason={readOnlyReason} nameOf={header.nameOf} onReact={onReact} onDeleteMessage={onDeleteMessage} onEditMessage={onEditMessage} about={about} upload={upload} />
             </AppSection>
             <AppSection title="Mentioned in">
               <MentionList items={activity} truncated={activityTruncated} onReply={onReplyInActivity} disabledReason={readOnlyReason} nameOf={header.nameOf} onReact={onReact} onDeleteMessage={onDeleteMessage} onEditMessage={onEditMessage} upload={upload} />

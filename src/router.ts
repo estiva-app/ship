@@ -164,7 +164,10 @@ export function href(route: Route): string {
  * ignoring a slug.
  */
 export function parse(location: string): Route {
-  const raw = location.includes('#') ? location.slice(location.indexOf('#') + 1) : location
+  // Only an old `#/…` link carries its route in the hash. Any other fragment — a block link's `#block-<id>`
+  // (RIC-18) — belongs to the page the path names.
+  const at = location.indexOf('#')
+  const raw = at !== -1 && location[at + 1] === '/' ? location.slice(at + 1) : at !== -1 ? location.slice(0, at) : location
   const [path, query] = raw.replace(/^\/?/, '').split('?')
   const parts = path.split('/').filter(Boolean).map(decodeURIComponent)
 

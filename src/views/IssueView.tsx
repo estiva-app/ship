@@ -14,6 +14,7 @@ import { IssueRail, type IssueRailProps } from '@/components/IssueRail'
 import { Related, hasRelated } from '@/components/Related'
 import { LiveHeader } from '@/components/editing/LiveHeader'
 import { MentionList, ThreadList } from '@/components/conversations/ThreadList'
+import { useBlockComment } from '@/components/conversations/useBlockComment'
 import type { RelatedState } from '@/api/useRelated'
 import { AppSection, Centred } from '@/components/layout/ReadingColumn'
 
@@ -45,6 +46,8 @@ export interface IssueViewProps {
   /** Resolve a mentioned key to a name — SPEC §13.1. */
   nameOf?: (pubkey: string) => string
   onRename: (v: string) => Promise<boolean> | boolean
+  /** The block menu's Copy link (RIC-18): copies and says so. */
+  onCopyBlockLink?: (link: string) => void
   /** The body, and the format tag the editor built it in — RIC-14. */
   onDescribe: (v: string, contentFormat?: string) => Promise<boolean> | boolean
   /** Foreign files placed under this issue — RFC 0.5 §10.7. Drawn only when there is something to say. */
@@ -91,12 +94,13 @@ const TABS: { id: IssueTab; label: string }[] = [
 ]
 
 /** One issue's page, in tabs: Overview and Activity, with the rail on every tab. */
-export function IssueView({ crumbs, tab, onTab, title, description, descriptionFormat, nameOf, onRename, onDescribe, related, threads, unread, onStartConversation, onReply, activity, activityTruncated, onReplyInActivity, history, rail, about, onReact, onDeleteMessage, onEditMessage, readOnlyReason, upload, archivedNotice }: IssueViewProps) {
+export function IssueView({ crumbs, tab, onTab, title, description, descriptionFormat, nameOf, onRename, onCopyBlockLink, onDescribe, related, threads, unread, onStartConversation, onReply, activity, activityTruncated, onReplyInActivity, history, rail, about, onReact, onDeleteMessage, onEditMessage, readOnlyReason, upload, archivedNotice }: IssueViewProps) {
   // `linkTo` on each crumb (S15, 0.10.0): the breadcrumbs were the last links in Ship that reloaded the app (SHI-20).
   const items: Crumb[] = [{ label: 'Issues', ...linkTo(crumbs.issuesHref) }]
   // The box before the project's name says it is a project, as the sidebar's entry does (Katerina, 2026-09-09).
   if (crumbs.project) items.push({ label: crumbs.project.title, icon: <IconBox size={16} stroke={1.5} />, ...linkTo(crumbs.project.href) })
   if (crumbs.ref) items.push({ label: crumbs.ref, mono: true })
+  const comment = useBlockComment(description, descriptionFormat, onTab, onStartConversation)
 
   return (
     // `data-surface` and `data-tab` are the smoke test's waypoints — see IssuesView. A page that scrolls inside
@@ -114,7 +118,7 @@ export function IssueView({ crumbs, tab, onTab, title, description, descriptionF
         {tab === 'overview' && (
           <Centred>
             {archivedNotice}
-            <LiveHeader title={title} titlePlaceholder="Untitled issue" onRename={onRename} description={description} format={descriptionFormat} onDescribe={onDescribe} nameOf={nameOf} readOnly={!!readOnlyReason} upload={upload} />
+            <LiveHeader title={title} titlePlaceholder="Untitled issue" onRename={onRename} description={description} format={descriptionFormat} onDescribe={onDescribe} nameOf={nameOf} readOnly={!!readOnlyReason} upload={upload} onCommentOnBlock={comment.start} onCopyBlockLink={onCopyBlockLink} />
             {/* Nesting is by intent (RFC 0.5 §10.7): what somebody placed under this issue, from whichever app owns it. */}
             {hasRelated(related) && (
               <>
@@ -131,7 +135,7 @@ export function IssueView({ crumbs, tab, onTab, title, description, descriptionF
           <Centred>
             {archivedNotice}
             <AppSection title="Conversations">
-              <ThreadList threads={threads} unread={unread} onStart={onStartConversation} onReply={onReply} disabledReason={readOnlyReason} nameOf={nameOf} onReact={onReact} onDeleteMessage={onDeleteMessage} onEditMessage={onEditMessage} about={about} upload={upload} />
+              <ThreadList threads={threads} unread={unread} onStart={comment.post} anchor={comment.anchor} onDropAnchor={comment.drop} onReply={onReply} disabledReason={readOnlyReason} nameOf={nameOf} onReact={onReact} onDeleteMessage={onDeleteMessage} onEditMessage={onEditMessage} about={about} upload={upload} />
             </AppSection>
             <AppSection title="Mentioned in">
               <MentionList items={activity} truncated={activityTruncated} onReply={onReplyInActivity} disabledReason={readOnlyReason} nameOf={nameOf} onReact={onReact} onDeleteMessage={onDeleteMessage} onEditMessage={onEditMessage} upload={upload} />

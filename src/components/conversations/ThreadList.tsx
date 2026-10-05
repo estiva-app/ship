@@ -1,5 +1,5 @@
 import { Fragment, Suspense, lazy, useCallback, useMemo, useState, type ComponentProps } from 'react'
-import { IconDotsVertical, IconMessage2, IconMoodPlus } from '@tabler/icons-react'
+import { IconDotsVertical, IconMessage2, IconMoodPlus, IconX } from '@tabler/icons-react'
 import type { Imeta } from '@estiva-app/protocol'
 import { Avatar, Button, Card, EmptyState, IconButton, Menu, MenuItem, Popover, ReactionPicker, WithTooltip } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
@@ -300,11 +300,33 @@ const threadProps = (p: ThreadListViewProps | MentionListViewProps) => ({
 
 /** The drawing, with the reads handed in — for a story, or a caller that has them. */
 export function ThreadListView(props: ThreadListViewProps) {
-  const { threads, onStart, disabledReason, className, unread, nameOf, about, omitted = 0, reactionsCut = false, upload, drafts } = props
+  const { threads, onStart, disabledReason, className, unread, nameOf, about, omitted = 0, reactionsCut = false, upload, drafts, anchor, onDropAnchor } = props
   const references = useCallback(() => referenceItems(threads, undefined, nameOf), [threads, nameOf])
+  const blockId = anchor && anchor.state !== 'unanchored' ? anchor.id : undefined
   return (
     <div className={cn('flex flex-col gap-3', className)}>
-      <MessageBox kind="conversation" onSubmit={onStart} references={references} disabledReason={disabledReason} draftKey={about && draftKeys.object(about)} drafts={drafts} upload={upload} nameOf={nameOf} />
+      {/* From a block's menu (RIC-18): the part this conversation will be about, as the posted comment shows it. */}
+      {blockId && (
+        <div className="flex items-start gap-2" data-pending-anchor={blockId}>
+          <BlockAnchorNote anchor={anchor} className="min-w-0 flex-1" />
+          {onDropAnchor && (
+            <IconButton aria-label="Remove" tooltip="Remove" onClick={onDropAnchor}>
+              <IconX size={16} stroke={1.5} />
+            </IconButton>
+          )}
+        </div>
+      )}
+      <MessageBox
+        kind="conversation"
+        onSubmit={(text, files, picks) => onStart(text, files, picks, blockId)}
+        references={references}
+        autoFocus={!!blockId}
+        disabledReason={disabledReason}
+        draftKey={about && draftKeys.object(about)}
+        drafts={drafts}
+        upload={upload}
+        nameOf={nameOf}
+      />
       {threads.length ? (
         <ol className="flex flex-col gap-3">
           {threads.map((thread) => (
