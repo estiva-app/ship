@@ -136,6 +136,26 @@ describe('coming back from a silent probe with no session', () => {
     if (result.kind === 'shell') expect(result.state.phase).toBe('failed')
     expect(navigated).toEqual([])
   })
+
+  it('puts the person back on the link they opened, block and all, so trying again starts from it (c13b0096)', async () => {
+    // Production, 5 October: a block link opened signed out came back on `/?error=login_required`, and "Try again"
+    // started from there — signing in landed on the home page.
+    window.history.replaceState({}, '', '/project/abc#block-b1')
+    const { bootAuth: probe } = await freshBootWithNav()
+    expect((await probe()).kind).toBe('leaving')
+    setLocation('?error=login_required&state=s')
+    const { bootAuth } = await freshBootWithNav()
+    expect((await bootAuth()).kind).toBe('shell')
+    expect(window.location.pathname + window.location.search + window.location.hash).toBe('/project/abc#block-b1')
+  })
+
+  it('stays on the root when the refusal carries no stashed link', async () => {
+    sessionStorage.setItem('estiva.authShell.silentAttempt', String(Date.now()))
+    setLocation('?error=login_required')
+    const { bootAuth } = await freshBootWithNav()
+    expect((await bootAuth()).kind).toBe('shell')
+    expect(window.location.pathname + window.location.search).toBe('/')
+  })
 })
 
 describe('coming back with a code', () => {

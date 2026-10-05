@@ -34,6 +34,7 @@ import {
   startRenewal,
   signInAvailable,
   stashShellReason,
+  takeReturnTo,
   takeShellReason,
 } from './estivaId'
 
@@ -100,6 +101,14 @@ export async function bootAuth(): Promise<BootResult> {
       }
 
     case 'prompt_passkey':
+      // A refused silent probe lands on `/?error=…`, but it was started from the link the person opened. Put that link
+      // back before the shell draws, so "Try again" starts from it and signing in lands there, a block's
+      // `#block-…` included (as Peek does since PEEK-123; c13b0096).
+      if (callback?.error) {
+        const back = takeReturnTo()
+        clearQuery()
+        if (back) restoreRoute(back)
+      }
       // A reason stashed by a previous load is more specific than the one the
       // decision inferred — it was observed rather than deduced.
       return shell(takeShellReason() ?? action.reason)
