@@ -89,6 +89,23 @@ reset()
 result = await store.moveProject({ project: PROJECT, from: [B], to: B })
 check('a move to where it already is, and only there, sends nothing', sent.length === 0 && result.refused === undefined)
 
+// 9. Listed in two, a different topic under it in each (SHI-37): one add naming all of it, so it lands whole or not at all.
+const T1 = `30840:${ME}:t1`
+const T2 = `30840:${ME}:t2`
+const listings = new Map([
+  [A.id, [{ ref: PROJECT, address: PROJECT }, { ref: T1, address: T1, parentRef: PROJECT }]],
+  [C.id, [{ ref: PROJECT, address: PROJECT }, { ref: T2, address: T2, parentRef: PROJECT }]],
+])
+const named = (event: UnsignedEvent) => event.tags.filter((t) => t[0] === 'a').map((t) => t[1])
+reset()
+result = await store.moveProject({ project: PROJECT, from: [A, C], to: B, listings })
+const adds = sent.filter((event) => tag(event, 'op') === 'add')
+check('in A and C with a topic each: one add naming the project and both topics', adds.length === 1 && JSON.stringify(named(adds[0])) === JSON.stringify([PROJECT, T1, T2]), adds.map(named).join(' | '))
+check('…then a remove from each, naming what that Folder lists', JSON.stringify(sent.slice(1).map(named)) === JSON.stringify([[PROJECT, T1], [PROJECT, T2]]))
+reset({ op: 'add', h: B.id })
+result = await store.moveProject({ project: PROJECT, from: [A, C], to: B, listings })
+check('…and that add refused leaves nothing in the target and sends no remove', result.added?.ok === false && sent.length === 1 && result.removed.length === 0)
+
 if (failures) {
   console.log(`\n${failures} failed`)
   process.exit(1)

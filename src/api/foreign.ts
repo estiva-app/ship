@@ -149,9 +149,11 @@ export function readFolder(id: string): Promise<FolderContents> {
 /**
  * A Folder's files for a move to plan from (SPEC §3.3) — what lists what
  * beneath it, and nothing a person reads, so no profiles are asked for.
+ * Archived files included: a topic archived under a project, or every file
+ * under an archived project, moves with it (SHI-37).
  */
 export async function readFolderListing(id: string): Promise<FolderContents['files']> {
-  return (await resolveFolderContents(id, query, async () => ({}), manifests)).files
+  return (await resolveFolderContents(id, query, async () => ({}), manifests, { includeArchived: true })).files
 }
 
 /** The foreign files placed under one of Ship's objects, with their conversation counts. */

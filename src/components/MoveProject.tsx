@@ -31,6 +31,8 @@ export function MoveProject({
   const folders: MoveProjectFolder[] = teams.map((team) => ({ id: team.id, name: team.name ?? 'Untitled Folder', hasState: team.hasState, ...(team.private ? { private: true } : {}) }))
   const here = new Set(placedIn({ addr: project.addr, folder: project.contentFolder }, teams).map((team) => team.id))
   const current = folders.filter((folder) => here.has(folder.id))
+  // With what each one's state lists, so the move takes the project out of one whose card for it did not resolve.
+  const sources = teams.filter((team) => here.has(team.id)).map((team) => ({ id: team.id, hasState: team.hasState, addresses: team.addresses ?? [] }))
   const nameOf = (id: string) => folders.find((folder) => folder.id === id)?.name ?? 'Untitled Folder'
 
   return (
@@ -44,7 +46,7 @@ export function MoveProject({
         const ok = await act(
           'Move',
           async () => {
-            const result = await moveProject(project, current, to)
+            const result = await moveProject(project, sources, to)
             if (result.ok) stillIn = result.stillIn
             return result
           },
@@ -54,7 +56,7 @@ export function MoveProject({
         if (!ok) return false
         if (stillIn) {
           const names = stillIn.map(({ folder }) => nameOf(folder)).join(' and ')
-          say(`Moved to ${to.name}, but ${names} refused to let it go, so it is listed in both — ${stillIn[0].reason}. Press Move to try again.`, 'error')
+          say(`Moved to ${to.name}, but ${names} refused to let it go, so it is still listed there too — ${stillIn[0].reason}. Press Move to try again.`, 'error')
           return false
         }
         say(`Moved to ${to.name}`)

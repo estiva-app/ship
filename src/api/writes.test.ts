@@ -214,13 +214,13 @@ describe('moving a project', () => {
     vi.mocked(readFolderListing).mockResolvedValue([sub] as never)
     s.moveProject.mockResolvedValue({ added: { ok: true }, removed: [{ folder: FROM.id, result: { ok: true } }] })
     expect(await moveProject(PROJECT, [FROM], TO)).toEqual({ ok: true })
-    // The source's listing, read at the move, with the project in it even when its card did not resolve (SPEC §3.3).
+    // The source's listing, read at the move (SPEC §3.3); the planner puts the project in it when its card did not resolve.
     expect(readFolderListing).toHaveBeenCalledWith(FROM.id)
     expect(s.moveProject).toHaveBeenCalledWith({
       project: PROJECT.addr,
       from: [FROM],
       to: TO,
-      listings: new Map([[FROM.id, [{ ref: PROJECT.addr, address: PROJECT.addr }, sub]]]),
+      listings: new Map([[FROM.id, [sub]]]),
     })
   })
 
