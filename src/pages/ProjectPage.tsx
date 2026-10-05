@@ -1,5 +1,5 @@
 import { IconLinkOff } from '@tabler/icons-react'
-import { useMarkRead } from '@/lib/useMarkRead'
+import { useMarkRead, useShownThreads } from '@/lib/useMarkRead'
 import { ownConversations, recordChannel } from '@/lib/ownConversation'
 import { pointerToAddress, referenceToPointer, resolveBlockAnchor, type ContentFormat } from '@estiva-app/protocol'
 import type { AttachmentIndex, EditIndex } from '@/api'
@@ -406,16 +406,13 @@ export function ProjectPage({
      channel, only a team, and marking the team would advance the team's chat,
      which is not on this page.
 
-     Every thread in the feed is drawn inline, so each one's `thread:` context
-     advances too (CON-34, Miky 2026-10-05): under §11.3's thread rule reading
-     the streams no longer reads their replies. The issues' threads rolled up
-     above are not drawn here and are not marked. */
-  useMarkRead(
-    useMemo(
-      () => [channelContext(record), fileContext(project?.addr), ...conversations.map((c) => threadContext(c.id))],
-      [record, project, conversations],
-    ),
-  )
+     A thread in the feed whose replies are drawn, on the Activity tab,
+     advances its `thread:` context too (CON-34, Miky 2026-10-05): under
+     §11.3's thread rule reading the streams no longer reads their replies. The
+     issues' threads rolled up above are not drawn here and are not marked. */
+  useMarkRead(useMemo(() => [channelContext(record), fileContext(project?.addr)], [record, project]))
+  const [shownThreads, onThreadShown] = useShownThreads()
+  useMarkRead(tab === 'activity' ? shownThreads.map(threadContext) : [])
   const threads = useMemo(
     () => conversations.map((c) => threadFor(c, directory, project ? { value: project.description, format: project.descriptionFormat } : undefined, project?.addr, state.edits, state.attachments)),
     [conversations, directory, project],
@@ -521,6 +518,7 @@ export function ProjectPage({
         related={related}
         threads={threads}
         unread={unread}
+        onThreadShown={onThreadShown}
         // A project conversation is already in the topic it belongs to, so a
         // reference would be noise (withReference: false), as the old app has it.
         onStartConversation={(body, files, picks, blockId) => act('Message', async () => startConversation({ folder: await workFolder(project, teams), about: project.addr, withReference: false, body, blockId, files, urgent: picks?.urgent }), say, () => refresh([listedIn ?? project.contentFolder]))}

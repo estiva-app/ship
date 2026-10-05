@@ -289,3 +289,30 @@ describe("Ship's slot is the one it already had (CON-19)", () => {
     expect(JSON.parse(localStorage.getItem('ship.readstate.slot') ?? '{}').slotId).toBe(identity.slotId)
   })
 })
+
+describe('the reply floor survives hydration (CON-34)', () => {
+  beforeEach(async () => {
+    vi.clearAllMocks()
+    const { resetReadStateForTests } = await import('./readStateSync')
+    resetReadStateForTests()
+  })
+
+  // `advanceContexts` refuses a floor among its updates, and hydration hands it
+  // what this tab recorded as updates: a floor the cap raised before the first
+  // publish was dropped there, and every reply under it lit up again.
+  it('keeps a floor the cap raised before the first publish', async () => {
+    const { markRead, flushReadState } = await import('./readStateSync')
+    const { MAX_CONTEXTS_BYTES, REPLY_FLOOR_CONTEXT, threadContext } = await import('@estiva-app/conversation')
+    fetchReadState.mockResolvedValue({ reachable: true, merged: {}, own: { v: 1, client_id: 'ship-a', contexts: { [OURS]: 1000 } } })
+
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    // A `thread:` entry costs 85 bytes, so this is a few dozen past the budget.
+    const threads = Array.from({ length: Math.ceil(MAX_CONTEXTS_BYTES / 80) }, (_, i) => threadContext(i.toString(16).padStart(64, '0')))
+    threads.forEach((context, i) => markRead([context], 1_700_000_000_000 + i * 1000))
+    await flushReadState()
+
+    const contexts = publishReadState.mock.calls[0][3] as unknown as Record<string, number>
+    expect(contexts[REPLY_FLOOR_CONTEXT]).toBeGreaterThan(1000)
+    expect(contexts[OURS]).toBe(1000)
+  })
+})
