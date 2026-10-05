@@ -106,6 +106,12 @@ reset({ op: 'add', h: B.id })
 result = await store.moveProject({ project: PROJECT, from: [A, C], to: B, listings })
 check('…and that add refused leaves nothing in the target and sends no remove', result.added?.ok === false && sent.length === 1 && result.removed.length === 0)
 
+// 10. Held by its own Folder by containment, a topic under it listed there (`placedIn`'s fallback): MoveProject names the project
+//     in each source, so the two move together rather than the topic alone.
+reset()
+result = await store.moveProject({ project: PROJECT, from: [{ ...A, addresses: [PROJECT] }], to: B, listings: new Map([[A.id, [{ ref: T1, address: T1, parentRef: PROJECT }]]]) })
+check('a project its Folder holds by containment moves with the topic listed under it', JSON.stringify(sent.map(named)) === JSON.stringify([[PROJECT, T1], [PROJECT, T1]]), sent.map(named).join(' | '))
+
 if (failures) {
   console.log(`\n${failures} failed`)
   process.exit(1)

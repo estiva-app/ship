@@ -31,8 +31,9 @@ export function MoveProject({
   const folders: MoveProjectFolder[] = teams.map((team) => ({ id: team.id, name: team.name ?? 'Untitled Folder', hasState: team.hasState, ...(team.private ? { private: true } : {}) }))
   const here = new Set(placedIn({ addr: project.addr, folder: project.contentFolder }, teams).map((team) => team.id))
   const current = folders.filter((folder) => here.has(folder.id))
-  // With what each one's state lists, so the move takes the project out of one whose card for it did not resolve.
-  const sources = teams.filter((team) => here.has(team.id)).map((team) => ({ id: team.id, hasState: team.hasState, addresses: team.addresses ?? [] }))
+  // Each one names the project: it is what is being moved, including out of its own Folder, where it may be held by containment
+  // while a topic under it is listed (`placedIn`'s fallback) — the planner then moves the two together.
+  const sources = teams.filter((team) => here.has(team.id)).map((team) => ({ id: team.id, hasState: team.hasState, addresses: [project.addr] }))
   const nameOf = (id: string) => folders.find((folder) => folder.id === id)?.name ?? 'Untitled Folder'
 
   return (
