@@ -186,7 +186,10 @@ export function useReferencePage({
     .sort((a, b) => b[1] - a[1])
     .slice(0, RECENT_LIMIT)
   // The addresses alone: a marker's time moving does not re-read the files.
-  const key = recent.map(([context]) => context).join('\n')
+  const key = recent
+    .map(([context]) => context)
+    .sort()
+    .join('\n')
 
   useEffect(() => {
     if (!key) {
