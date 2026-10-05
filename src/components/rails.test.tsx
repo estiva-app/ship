@@ -208,6 +208,35 @@ describe('an archived file’s rail: its fields shut, Unarchive and Delete open 
     expect(onDelete).toHaveBeenCalledTimes(1)
   })
 
+  it('shuts Archive on an issue locked only by its project’s archive — archiving it again would be an edit', () => {
+    const onArchive = vi.fn()
+    render(
+      <IssueRail
+        status="planned"
+        statuses={STATUSES}
+        onStatusChange={vi.fn()}
+        assignee=""
+        people={PEOPLE}
+        onAssigneeChange={vi.fn()}
+        project=""
+        projects={[{ value: '', label: 'No project' }]}
+        onProjectChange={vi.fn()}
+        openedBy={{}}
+        openedAt={Math.floor(Date.now() / 1000)}
+        onCopyReference={vi.fn()}
+        archived={false}
+        onArchive={onArchive}
+        onDelete={vi.fn()}
+        lockedReason="Unarchive its project to edit"
+      />,
+    )
+    const archive = screen.getByRole('button', { name: 'Archive issue' })
+    expect(archive.getAttribute('aria-disabled')).toBe('true')
+    fireEvent.click(archive)
+    expect(onArchive).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'Delete issue' }).getAttribute('aria-disabled')).toBe(null)
+  })
+
   it('shuts the project rail’s selects and Move, and leaves Unarchive and Delete working', () => {
     const onArchive = vi.fn()
     const onDelete = vi.fn()

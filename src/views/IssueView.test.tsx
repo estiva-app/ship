@@ -9,6 +9,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { IssueView, type IssueViewProps } from './IssueView'
+import { ProjectView, type ProjectViewProps } from './ProjectView'
 
 const view = (tab: 'overview' | 'activity', extra: Partial<IssueViewProps>) => (
   <IssueView
@@ -72,5 +73,42 @@ describe('IssueView, archived (SHI-36)', () => {
     render(view('activity', { readOnlyReason: 'Sign in to reply.' }))
     expect(screen.getByText('Sign in to reply.')).toBeInTheDocument()
     expect(screen.queryByText('Start a conversation or type')).toBeNull()
+  })
+})
+
+const projectView = (tab: 'overview' | 'activity', extra: Partial<ProjectViewProps>) => (
+  <ProjectView
+    crumbs={{ projectsHref: '/projects', title: 'Relay Migration' }}
+    header={{ title: 'Relay Migration', description: 'Move every Folder to the new relay.', descriptionFormat: 'marker', archived: true, onRename: vi.fn(), onDescribe: vi.fn() }}
+    onAddIssue={vi.fn()}
+    tab={tab}
+    onTab={vi.fn()}
+    view="table"
+    onView={vi.fn()}
+    issues={[]}
+    issueStatuses={[]}
+    hrefFor={() => '#'}
+    threads={[]}
+    onStartConversation={vi.fn()}
+    onReply={vi.fn()}
+    activity={[]}
+    onReplyInActivity={vi.fn()}
+    rail={{ status: 'planned', statuses: [{ value: 'planned', label: 'Planned' }], onStatusChange: vi.fn(), lead: '', people: [], onLeadChange: vi.fn(), done: 0, total: 0, folders: [], archived: true, onArchive: vi.fn(), onDelete: vi.fn() }}
+    {...extra}
+  />
+)
+
+describe('ProjectView, archived (SHI-36)', () => {
+  it('draws the description without an editor and shuts Add issue, leaving Unarchive and Delete', () => {
+    render(projectView('overview', { lockedReason: 'Unarchive to edit' }))
+    expect(screen.getByText(/Move every Folder to the new relay/)).toBeInTheDocument()
+    expect(screen.queryByRole('textbox', { name: 'Description' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Add issue' }).getAttribute('aria-disabled')).toBe('true')
+    for (const name of ['Unarchive project', 'Delete project']) expect(screen.getByRole('button', { name }).getAttribute('aria-disabled')).toBe(null)
+  })
+
+  it('keeps the composer open', () => {
+    render(projectView('activity', { lockedReason: 'Unarchive to edit' }))
+    expect(screen.getByText('Start a conversation or type')).toBeInTheDocument()
   })
 })

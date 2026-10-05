@@ -94,7 +94,8 @@ export function IssueRail({
       {/* The project rail's pair (FOL-46): archive, the reversible one, first. */}
       <div className="flex flex-col items-start gap-1">
         {onArchive && (
-          <Button size="small" variant="muted" onClick={onArchive} disabledReason={readOnlyReason}>
+          // Locked only by its project's archive, archiving it again is an edit; unarchiving its own never is.
+          <Button size="small" variant="muted" onClick={onArchive} disabledReason={archived ? readOnlyReason : fieldsShut}>
             {archived ? 'Unarchive issue' : 'Archive issue'}
           </Button>
         )}

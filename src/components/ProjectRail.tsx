@@ -143,7 +143,8 @@ export function ProjectRail({
       </Property>
       <Divider className="mx-0" />
       <div className="flex flex-col items-start gap-1">
-        <Button size="small" variant="muted" onClick={onArchive} disabledReason={readOnlyReason}>
+        {/* Locked only by its Folder's archive, archiving it again is an edit; unarchiving its own never is. */}
+        <Button size="small" variant="muted" onClick={onArchive} disabledReason={archived ? readOnlyReason : fieldsShut}>
           {archived ? 'Unarchive project' : 'Archive project'}
         </Button>
         <Button size="small" variant="destructive" onClick={onDelete} disabledReason={readOnlyReason}>
