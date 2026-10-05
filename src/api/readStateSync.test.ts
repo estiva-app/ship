@@ -314,5 +314,6 @@ describe('the reply floor survives hydration (CON-34)', () => {
     const contexts = publishReadState.mock.calls[0][3] as unknown as Record<string, number>
     expect(contexts[REPLY_FLOOR_CONTEXT]).toBeGreaterThan(1000)
     expect(contexts[OURS]).toBe(1000)
-  })
+    // Filling a 64 KB budget one marker at a time caps on every one: about a second alone, more under a full run.
+  }, 20_000)
 })
