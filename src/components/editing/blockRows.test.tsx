@@ -78,15 +78,15 @@ describe('a comment from a block’s menu', () => {
     act(() => result.current.start('b1'))
     expect(onTab).toHaveBeenCalledWith('activity')
     expect(result.current.anchor).toMatchObject({ state: 'resolved', id: 'b1' })
-    await act(() => result.current.post('about this', [], 'b1'))
-    expect(onStart).toHaveBeenCalledWith('about this', [], 'b1')
+    await act(() => result.current.post('about this', [], undefined, 'b1'))
+    expect(onStart).toHaveBeenCalledWith('about this', [], undefined, 'b1')
     expect(result.current.anchor).toBeUndefined()
   })
 
   it('keeps the anchor when the post is refused, so nothing typed loses its subject', async () => {
     const { result } = renderHook(() => useBlockComment(DESCRIPTION, 'blocks', () => {}, async () => false))
     act(() => result.current.start('b1'))
-    await act(() => result.current.post('about this', [], 'b1'))
+    await act(() => result.current.post('about this', [], undefined, 'b1'))
     expect(result.current.anchor).toMatchObject({ id: 'b1' })
   })
 
