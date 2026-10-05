@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { encodeNpub } from '@estiva-app/protocol'
 import type { StreamJudge } from '@estiva-app/conversation'
 import type { Conversation, Message } from '../nostr/fold'
-import { firstUnreadByThread } from './unreadFeed'
+import { unreadByThread } from './unreadFeed'
 
 const CHANNEL = 'b7c1e0a4-2f3d-4a86-9c15-8d0e6f2a4b91'
 const OWNER = 'e'.repeat(64)
@@ -35,8 +35,11 @@ const conversation = (rootId: string, rootAt: number, replies: [string, number, 
 /** A file you joined at second 1000. */
 const member: StreamJudge = { stream: FILE, me: ME, member: true, since: 1000 }
 const asMember = (extra: Partial<StreamJudge> = {}): StreamJudge => ({ ...member, ...extra })
+/** Each thread's first unread message: where the divider goes, which is what most of these pin. */
+const first = (byThread: Record<string, string[]>): Record<string, string> =>
+  Object.fromEntries(Object.entries(byThread).map(([thread, ids]) => [thread, ids[0]]))
 const unread = (conversations: Conversation[], merged: Record<string, number>, judge: StreamJudge | undefined) =>
-  firstUnreadByThread(conversations, merged, () => judge)
+  first(unreadByThread(conversations, merged, () => judge))
 
 describe('membership is the gate (SPEC §11.8)', () => {
   it('lights a message from the second you joined, with no marker at all', () => {
@@ -95,6 +98,13 @@ describe("the effective marker (SPEC §11.3) over a file's stream", () => {
     expect(unread([t], { [FILE]: 1500 }, member)).toEqual({ [ROOT]: 'r2' })
   })
 
+  // What "N new" counts (SHI-38): the unread ones, not every reply after the first.
+  it('lists every unread message of the thread, oldest first, never your own', () => {
+    const t = conversation(ROOT, 1100, [['r1', 2000], ['mine', 2050, ME], ['r2', 2100]])
+    expect(unreadByThread([t], { [FILE]: 1500 }, () => member)).toEqual({ [ROOT]: ['r1', 'r2'] })
+    expect(unreadByThread([conversation(ROOT, 2000, [['r1', 2100]])], {}, () => member)).toEqual({ [ROOT]: [ROOT, 'r1'] })
+  })
+
   it("does not let the channel's marker reach a file's stream", () => {
     expect(unread([conversation(ROOT, 2000)], { [CHANNEL]: 9000 }, member)).toEqual({ [ROOT]: ROOT })
   })
@@ -120,11 +130,11 @@ describe("a Folder's chat on the project page", () => {
     const aboutFile = conversation(ROOT, 2000)
     const inChannel = conversation('b'.repeat(64), 2000)
     const merged = { [FILE]: 1500, [CHANNEL]: 1500 }
-    const result = firstUnreadByThread([aboutFile, inChannel], merged, (c) => (c === aboutFile ? member : channel))
-    expect(result).toEqual({ [ROOT]: ROOT, ['b'.repeat(64)]: 'b'.repeat(64) })
+    const result = unreadByThread([aboutFile, inChannel], merged, (c) => (c === aboutFile ? member : channel))
+    expect(result).toEqual({ [ROOT]: [ROOT], ['b'.repeat(64)]: ['b'.repeat(64)] })
     // The file's marker is the file's alone.
-    const other = firstUnreadByThread([aboutFile, inChannel], { [FILE]: 9000, [CHANNEL]: 1500 }, (c) => (c === aboutFile ? member : channel))
-    expect(other).toEqual({ ['b'.repeat(64)]: 'b'.repeat(64) })
+    const other = unreadByThread([aboutFile, inChannel], { [FILE]: 9000, [CHANNEL]: 1500 }, (c) => (c === aboutFile ? member : channel))
+    expect(other).toEqual({ ['b'.repeat(64)]: ['b'.repeat(64)] })
   })
 
   it('judges a different file by its own marker', () => {

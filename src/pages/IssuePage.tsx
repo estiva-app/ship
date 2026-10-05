@@ -1,10 +1,10 @@
 import { IconLinkOff } from '@tabler/icons-react'
-import { useMarkRead, useShownThreads } from '@/lib/useMarkRead'
+import { newestDrawn, useMarkRead, useShownThreads } from '@/lib/useMarkRead'
 import { useMemo, useState } from 'react'
 import { ArchiveDialog } from '@/components/ArchiveDialog'
 import { ArchivedNotice } from '@/components/ArchivedNotice'
 import { lockedReason, ownArchive, type Archives } from '@/lib/archive'
-import { ISSUE_STATUSES, archiveIssue, commentsOn, deleteIssue, deleteMessage, editMessage, react, referenceFor, reply, setIssueField, unreact, startConversation, type DirectoryView, type FolderState, type WorkspaceState, threadContext, fileContext, useMergedReadState, useFeedJudges, firstUnreadByThread } from '@/api'
+import { ISSUE_STATUSES, archiveIssue, commentsOn, deleteIssue, deleteMessage, editMessage, react, referenceFor, reply, setIssueField, unreact, startConversation, type DirectoryView, type FolderState, type WorkspaceState, threadContext, fileContext, useMergedReadState, useFeedJudges, unreadByThread } from '@/api'
 import { useRelated } from '@/api/useRelated'
 import type { HistoryEntry } from '@/components/History'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
@@ -68,9 +68,10 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
 
      A `thread:` context advances only while its replies are drawn, on the
      Activity tab (CON-34): under §11.3's thread rule that is what reads them. */
-  useMarkRead(useMemo(() => [fileContext(issue?.addr)], [issue]))
   const [shownThreads, onThreadShown] = useShownThreads()
-  useMarkRead(tab === 'activity' ? shownThreads.map(threadContext) : [])
+  const drawn = useMemo(() => newestDrawn(conversations, shownThreads), [conversations, shownThreads])
+  useMarkRead(useMemo(() => [fileContext(issue?.addr)], [issue]), drawn.rootsAt)
+  useMarkRead(tab === 'activity' ? shownThreads.map(threadContext) : [], drawn.repliesAt)
   const threads = useMemo(
     () => conversations.map((c) => threadFor(c, directory, issue ? { value: issue.description, format: issue.descriptionFormat } : undefined, issue?.addr, state.edits, state.attachments)),
     [conversations, directory, issue],
@@ -84,7 +85,7 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
   const merged = useMergedReadState()
   const judges = useFeedJudges(issue ? { addr: issue.addr, createdAt: issue.createdAt } : undefined, undefined)
   const unread = useMemo(
-    () => firstUnreadByThread(conversations, merged, () => judges.file),
+    () => unreadByThread(conversations, merged, () => judges.file),
     [conversations, merged, judges],
   )
   const history = useMemo(() => (issue ? historyFor(issue.addr, state, directory) : []), [issue, state, directory])

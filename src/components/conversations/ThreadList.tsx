@@ -213,7 +213,8 @@ interface ThreadProps {
   pageThreads: readonly ThreadData[]
   onReply: (threadId: string, text: string, files: readonly Imeta[], picks?: Picks) => Promise<boolean | void> | boolean | void
   disabledReason?: string
-  unreadFrom?: string
+  /** This thread's unread message ids, oldest first. */
+  unread?: readonly string[]
   resolved?: Record<string, ForeignObjectData | null | undefined>
   resolving?: boolean
   nameOf?: (pubkey: string) => string
@@ -230,10 +231,13 @@ interface ThreadProps {
 /** Replies hang one step in, behind today's left rule. */
 const REPLY_RULE = 'ml-2.5 border-l-2 border-border-default pl-3'
 
-function Thread({ thread, pageThreads, onReply, disabledReason, unreadFrom, resolved, resolving, nameOf, reactionsBy, onReact, onDeleteMessage, onEditMessage, upload, drafts, viewer, onShown }: ThreadProps) {
+function Thread({ thread, pageThreads, onReply, disabledReason, unread, resolved, resolving, nameOf, reactionsBy, onReact, onDeleteMessage, onEditMessage, upload, drafts, viewer, onShown }: ThreadProps) {
   const references = useCallback((query: string) => referenceSections(messageScope(pageThreads, thread.id), query, nameOf), [pageThreads, thread.id, nameOf])
-  const unreadIndex = thread.replies.findIndex((r) => r.id === unreadFrom)
-  const newCount = unreadIndex < 0 ? 0 : thread.replies.length - unreadIndex
+  const unreadFrom = unread?.[0]
+  // The replies that are new to you, not every reply after the first new one:
+  // your own reply below it is never new, and an unread root leaves its
+  // replies to their own verdict (SHI-38).
+  const newCount = unread ? thread.replies.filter((reply) => unread.includes(reply.id)).length : 0
   const [open, setOpen] = useState(newCount > 0)
   useEffect(() => {
     if (!open || !onShown) return
@@ -337,7 +341,7 @@ export function ThreadListView(props: ThreadListViewProps) {
         <ol className="flex flex-col gap-3">
           {threads.map((thread) => (
             <li key={thread.id}>
-              <Thread thread={thread} pageThreads={threads} unreadFrom={unread?.[thread.id]} onShown={props.onThreadShown} {...threadProps(props)} />
+              <Thread thread={thread} pageThreads={threads} unread={unread?.[thread.id]} onShown={props.onThreadShown} {...threadProps(props)} />
             </li>
           ))}
         </ol>

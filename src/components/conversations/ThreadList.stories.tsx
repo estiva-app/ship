@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
+import type { UnreadByThread } from '@/components/ConversationThread'
 import { useFakeRelay } from '@/fixtures/fakeRelay'
 import { MentionListView, ThreadListView } from './ThreadList'
 import { STORY_ME, STORY_MENTIONS, STORY_PEOPLE, STORY_REACTIONS, STORY_THREADS } from './stories.fixtures'
@@ -10,7 +11,7 @@ import { STORY_ME, STORY_MENTIONS, STORY_PEOPLE, STORY_REACTIONS, STORY_THREADS 
  * against a pretend relay (`fakeRelay`). Type "refuse" to see the relay say
  * no: the text stays. A file over 5 MB is refused in the relay's words.
  */
-function Conversations({ empty = false, signedOut = false, unread }: { empty?: boolean; signedOut?: boolean; unread?: Record<string, string> }) {
+function Conversations({ empty = false, signedOut = false, unread }: { empty?: boolean; signedOut?: boolean; unread?: UnreadByThread }) {
   const relay = useFakeRelay({ threads: empty ? [] : STORY_THREADS, mentioned: STORY_MENTIONS, people: STORY_PEOPLE, me: STORY_ME, reactions: STORY_REACTIONS, unread, signedOut })
   return <ThreadListView {...relay.conversations} />
 }
@@ -54,7 +55,7 @@ export const Empty: Story = { args: { empty: true } }
  * itself, and its replies button says how many are new — and above a whole new
  * conversation.
  */
-export const Unread: Story = { args: { unread: { t1: 'm3', t2: 'm4' } } }
+export const Unread: Story = { args: { unread: { t1: ['m3'], t2: ['m4'] } } }
 
 /** Signed out: the boxes say why, nothing can be pressed, and reactions still show. */
 export const SignedOut: Story = { args: { signedOut: true } }

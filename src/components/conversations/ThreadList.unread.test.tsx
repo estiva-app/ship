@@ -29,7 +29,7 @@ describe('the new-since-you-looked divider', () => {
   })
 
   it('appears above the root when the whole thread is new', () => {
-    render(<ThreadList threads={[thread('t1')]} unread={{ t1: 't1' }} onStart={noop} onReply={noop} />)
+    render(<ThreadList threads={[thread('t1')]} unread={{ t1: ['t1'] }} onStart={noop} onReply={noop} />)
     expect(screen.getAllByText(LABEL)).toHaveLength(1)
   })
 
@@ -37,7 +37,7 @@ describe('the new-since-you-looked divider', () => {
   // puts the divider on screen here without a click. The replies button says how many are new.
   it('appears above the first unread reply, not the root', () => {
     render(
-      <ThreadList threads={[thread('t1', ['r1', 'r2'])]} unread={{ t1: 'r2' }} onStart={noop} onReply={noop} />,
+      <ThreadList threads={[thread('t1', ['r1', 'r2'])]} unread={{ t1: ['r2'] }} onStart={noop} onReply={noop} />,
     )
     expect(screen.getByRole('button', { name: '2 replies, 1 new' })).toHaveAttribute('aria-expanded', 'true')
     const nodes = screen.getAllByText(LABEL)
@@ -52,11 +52,26 @@ describe('the new-since-you-looked divider', () => {
     render(
       <ThreadList
         threads={[thread('t1'), thread('t2')]}
-        unread={{ t2: 't2' }}
+        unread={{ t2: ['t2'] }}
         onStart={noop}
         onReply={noop}
       />,
     )
+    expect(screen.getAllByText(LABEL)).toHaveLength(1)
+  })
+})
+
+// Katerina, 2026-10-05: "keeps counting my replies". Production showed "3 replies, 2 new" become "4 replies, 3 new" when the reader replied.
+describe('"N new" counts what is new to you (SHI-38)', () => {
+  it('does not count your own reply below a new one', () => {
+    render(<ThreadList threads={[thread('t1', ['r1', 'r2', 'mine'])]} unread={{ t1: ['r1', 'r2'] }} onStart={noop} onReply={noop} />)
+    expect(screen.getByRole('button', { name: '3 replies, 2 new' })).toBeInTheDocument()
+  })
+
+  it('counts the new replies under a root that is new too', () => {
+    render(<ThreadList threads={[thread('t1', ['r1', 'r2'])]} unread={{ t1: ['t1', 'r2'] }} onStart={noop} onReply={noop} />)
+    expect(screen.getByRole('button', { name: '2 replies, 1 new' })).toHaveAttribute('aria-expanded', 'true')
+    // One divider, above the root: everything from there down is where the new starts.
     expect(screen.getAllByText(LABEL)).toHaveLength(1)
   })
 })
@@ -66,7 +81,7 @@ describe('which threads have their replies drawn (CON-34)', () => {
   it('reports a thread open by itself and one opened by a click, and not a folded one', () => {
     const shown = vi.fn()
     render(
-      <ThreadList threads={[thread('t1', ['r1']), thread('t2', ['r2'])]} unread={{ t1: 'r1' }} onThreadShown={shown} onStart={noop} onReply={noop} />,
+      <ThreadList threads={[thread('t1', ['r1']), thread('t2', ['r2'])]} unread={{ t1: ['r1'] }} onThreadShown={shown} onStart={noop} onReply={noop} />,
     )
     expect(shown.mock.calls).toEqual([['t1', true]])
 

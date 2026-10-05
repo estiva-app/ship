@@ -218,10 +218,13 @@ export function NewSinceHere() {
   return <Divider label="New since you last read this" tone="warning" className="mx-0 py-1" />
 }
 
+/** Thread id → the ids of its unread messages, oldest first. Omitted threads have nothing new. */
+export type UnreadByThread = Readonly<Record<string, readonly string[]>>
+
 export interface ConversationsProps {
   threads: ThreadData[]
-  /** Thread id → the id of its first unread message. Omitted threads have nothing new. */
-  unread?: Record<string, string>
+  /** Which messages are new to the reader: the divider goes above each thread's first, and "N new" counts its replies (SHI-38). */
+  unread?: UnreadByThread
   /** The text and the files already on the relay — SHI-2. See `Composer`. `blockId` when it starts from a block's menu — RIC-18. */
   onStart: (text: string, files: readonly Imeta[], picks?: Picks, blockId?: string) => Promise<boolean | void> | boolean | void
   /**

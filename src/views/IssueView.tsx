@@ -9,7 +9,7 @@ import { Divider } from '@/components/ui/Divider'
 import { Tabs } from '@/components/ui/Tabs'
 import { History, type HistoryEntry } from '@/components/History'
 import type { ActivityItem } from '@/components/Activity'
-import type { ThreadData } from '@/components/ConversationThread'
+import type { ThreadData, UnreadByThread } from '@/components/ConversationThread'
 import { IssueRail, type IssueRailProps } from '@/components/IssueRail'
 import { Related, hasRelated } from '@/components/Related'
 import { LiveHeader } from '@/components/editing/LiveHeader'
@@ -58,8 +58,8 @@ export interface IssueViewProps {
   activity: ActivityItem[]
   /** How many the horizon left out — `ACTIVITY_HORIZON`. Said on screen, never implied. */
   activityTruncated?: number
-  /** Thread id → first unread message id. Drives the "new since" line (CRO-13). */
-  unread?: Record<string, string>
+  /** Thread id → its unread message ids. Drives the "new since" line (CRO-13) and "N new" (SHI-38). */
+  unread?: UnreadByThread
   /** A thread's replies drawn or hidden — the page marks the drawn ones read (CON-34). */
   onThreadShown?: (threadId: string, open: boolean) => void
   /**

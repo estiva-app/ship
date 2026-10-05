@@ -11,7 +11,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { Tabs } from '@/components/ui/Tabs'
 import type { StatusEntry } from '@/lib/issues'
 import { Board } from '@/components/Board'
-import type { ThreadData } from '@/components/ConversationThread'
+import type { ThreadData, UnreadByThread } from '@/components/ConversationThread'
 import type { ActivityItem } from '@/components/Activity'
 import type { IssueRowData } from '@/components/IssueRow'
 import { IssuesTable, type IssuesTableRow } from '@/components/IssuesTable'
@@ -55,8 +55,8 @@ export interface ProjectViewProps {
   /** Foreign files placed under this project — RFC 0.5 §10.7. Drawn only when there is something to say; see `hasRelated`. */
   related?: RelatedState
   threads: ThreadData[]
-  /** Thread id → first unread message id. Drives the "new since" line (CRO-13). */
-  unread?: Record<string, string>
+  /** Thread id → its unread message ids. Drives the "new since" line (CRO-13) and "N new" (SHI-38). */
+  unread?: UnreadByThread
   /** A thread's replies drawn or hidden — the page marks the drawn ones read (CON-34). */
   onThreadShown?: (threadId: string, open: boolean) => void
   /**

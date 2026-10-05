@@ -13,8 +13,14 @@ import { markRead, READ_DWELL_MS } from '@/api'
  * a caller can hand in an object that has no protocol identity yet without
  * branching. Building them stays in `@estiva-app/conversation`'s context helpers, so no page can accidentally
  * pass an issue where a container belongs and mark a whole project read.
+ *
+ * `newestAt` is the newest message drawn for those contexts (unix seconds).
+ * When it moves the dwell runs again, so a message that arrives while they are
+ * on screen — somebody's reply, or your own — is read too, as in Peek (PEE-44).
+ * Before SHI-38 the mark was stamped once, and a reply that came in later
+ * stayed new until the page was opened again.
  */
-export function useMarkRead(contexts: (string | undefined)[]): void {
+export function useMarkRead(contexts: (string | undefined)[], newestAt?: number): void {
   // Joined so the effect re-runs when the *set* changes rather than on every
   // render — a new array literal each render would restart the dwell forever
   // and nothing would ever be marked read.
@@ -23,7 +29,25 @@ export function useMarkRead(contexts: (string | undefined)[]): void {
     if (key.length === 0) return
     const t = setTimeout(() => markRead(key.split('|')), READ_DWELL_MS)
     return () => clearTimeout(t)
-  }, [key])
+  }, [key, newestAt])
+}
+
+/** The newest root of a feed, and the newest reply of the threads in `open` — what each `useMarkRead` of a page re-arms on. */
+export function newestDrawn(
+  conversations: readonly { id: string; root: { createdAt: number }; replies: readonly { createdAt: number }[] }[],
+  open: readonly string[],
+): { rootsAt: number | undefined; repliesAt: number | undefined } {
+  return {
+    rootsAt: newestMessageAt(conversations.map((c) => c.root)),
+    repliesAt: newestMessageAt(...conversations.filter((c) => open.includes(c.id)).map((c) => c.replies)),
+  }
+}
+
+/** The latest `createdAt` (unix seconds) across the lists, or undefined when there are none. */
+export function newestMessageAt(...lists: readonly (readonly { createdAt: number }[])[]): number | undefined {
+  let newest: number | undefined
+  for (const list of lists) for (const message of list) if (newest === undefined || message.createdAt > newest) newest = message.createdAt
+  return newest
 }
 
 /**

@@ -1,5 +1,5 @@
 import { IconLinkOff } from '@tabler/icons-react'
-import { useMarkRead, useShownThreads } from '@/lib/useMarkRead'
+import { newestDrawn, useMarkRead, useShownThreads } from '@/lib/useMarkRead'
 import { ownConversations, recordChannel } from '@/lib/ownConversation'
 import { pointerToAddress, referenceToPointer, resolveBlockAnchor, type ContentFormat } from '@estiva-app/protocol'
 import type { AttachmentIndex, EditIndex } from '@/api'
@@ -29,7 +29,7 @@ import {
   threadContext,
   useMergedReadState,
   useFeedJudges,
-  firstUnreadByThread,
+  unreadByThread,
   commentsOn,
   mentionsOf,
   commentsOnAny,
@@ -411,9 +411,10 @@ export function ProjectPage({
      advances its `thread:` context too (CON-34, Miky 2026-10-05): under
      §11.3's thread rule reading the streams no longer reads their replies. The
      issues' threads rolled up above are not drawn here and are not marked. */
-  useMarkRead(useMemo(() => [channelContext(record), fileContext(project?.addr)], [record, project]))
   const [shownThreads, onThreadShown] = useShownThreads()
-  useMarkRead(tab === 'activity' ? shownThreads.map(threadContext) : [])
+  const drawn = useMemo(() => newestDrawn(conversations, shownThreads), [conversations, shownThreads])
+  useMarkRead(useMemo(() => [channelContext(record), fileContext(project?.addr)], [record, project]), drawn.rootsAt)
+  useMarkRead(tab === 'activity' ? shownThreads.map(threadContext) : [], drawn.repliesAt)
   const threads = useMemo(
     () => conversations.map((c) => threadFor(c, directory, project ? { value: project.description, format: project.descriptionFormat } : undefined, project?.addr, state.edits, state.attachments)),
     [conversations, directory, project],
@@ -427,7 +428,7 @@ export function ProjectPage({
   const judges = useFeedJudges(project ? { addr: project.addr, createdAt: project.createdAt } : undefined, channelContext(record))
   const unread = useMemo(() => {
     const aboutProject = new Set(conversations.filter((c) => project && (state.anchors[c.root.id] ?? []).includes(project.addr)).map((c) => c.id))
-    return firstUnreadByThread(conversations, merged, (conversation) => (aboutProject.has(conversation.id) ? judges.file : judges.channel))
+    return unreadByThread(conversations, merged, (conversation) => (aboutProject.has(conversation.id) ? judges.file : judges.channel))
   }, [merged, judges, project, conversations, state.anchors])
   const people = useMemo(() => railPeople(state, directory), [state, directory])
   /*

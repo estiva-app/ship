@@ -3,7 +3,7 @@ import type { Imeta } from '@estiva-app/protocol'
 import type { Reaction } from '@/api'
 import type { ForeignObject } from '@/api/foreign'
 import type { ActivityItem } from '@/components/Activity'
-import { referencesInMessages, type MessageData, type ThreadData } from '@/components/ConversationThread'
+import { referencesInMessages, type MessageData, type ThreadData, type UnreadByThread } from '@/components/ConversationThread'
 import type { MentionListViewProps, ThreadListViewProps } from '@/components/conversations/shared'
 
 /**
@@ -109,7 +109,7 @@ export interface FakeRelayOptions {
   people: Record<string, string>
   me: MessageData['author']
   reactions?: Record<string, Reaction[]>
-  unread?: Record<string, string>
+  unread?: UnreadByThread
   signedOut?: boolean
   upload?: (file: File) => Promise<Imeta>
 }
