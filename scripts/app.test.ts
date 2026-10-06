@@ -105,6 +105,8 @@ for (const action of personActions) {
 const led = buildProject(PK, Date.now(), { projectId: 'p2', title: 'Led', folder: CONTENT, lead: WHO.toUpperCase() })
 check('a project created with a lead names them as p on its root (SPEC §7.3)', tag(led, 'p') === WHO && tag(led, 'lead') === WHO)
 check('  …and one created without a lead names nobody', tag(project, 'p') === undefined)
+const npubLead = buildProject(PK, Date.now(), { projectId: 'p3', title: 'Npub', folder: CONTENT, lead: 'npub1notakey' })
+check('  …nor one whose lead is not a key', tag(npubLead, 'p') === undefined)
 check('  …and the fixed four keep their order ahead of it', assign.tags.slice(0, 4).map((t) => t[0]).join(',') === 'a,field,value,h')
 
 // A move names its new parent where a relay indexes it: `A`, never a second `a` (SPEC §7.2, FOL-45).

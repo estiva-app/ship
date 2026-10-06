@@ -129,9 +129,11 @@ export function buildProject(
   if (args.lead) {
     // A lead set when the project is made is named as `p` too, as a change
     // setting it later is — SPEC §7.3: a creation tags each person a `pubkey`
-    // property names, and that `p` is what makes them a member (SHA-28).
+    // property names, and that `p` is what makes them a member (SHA-28). Only
+    // a key: a `p` no `#p` matches names nobody, as in `buildChange`.
     const lead = args.lead.toLowerCase()
-    tags.push(['lead', lead], ['p', lead])
+    tags.push(['lead', lead])
+    if (/^[0-9a-f]{64}$/.test(lead)) tags.push(['p', lead])
   }
   return {
     pubkey,
