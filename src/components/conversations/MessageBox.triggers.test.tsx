@@ -100,6 +100,36 @@ describe('the message box’s triggers (CON-25)', () => {
     expect(onSubmit).not.toHaveBeenCalled()
   })
 
+  it('a list left by a click ends, so Escape in the reply box beside it is the reply box’s (71a4577b)', async () => {
+    const onCancel = vi.fn()
+    render(
+      <MentionPeopleProvider value={PEOPLE}>
+        <MessageBox kind="conversation" onSubmit={vi.fn()} references={sections} />
+        <MessageBox kind="reply" onSubmit={vi.fn()} onCancel={onCancel} references={sections} />
+      </MentionPeopleProvider>,
+    )
+    const box = screen.getByRole('textbox', { name: 'Start a conversation…' }) as EditorBox
+    const reply = screen.getByRole('textbox', { name: 'Reply…' }) as EditorBox
+    await waitFor(() => expect(box.editor?.view && reply.editor?.view).toBeTruthy())
+    // jsdom does not treat a contenteditable as focusable: each box gets a tab stop.
+    box.tabIndex = reply.tabIndex = -1
+    await type(box, '[')
+    // The caret is in the box before it leaves (the focus command waits a frame).
+    act(() => box.editor.view.focus())
+    expect(rows('Messages and files')).toHaveLength(1)
+    expect(document.activeElement).toBe(box)
+    act(() => reply.editor.view.focus())
+    expect(document.activeElement).toBe(reply)
+    await sleep(0)
+    expect(screen.queryByRole('listbox')).toBeNull()
+    // An empty reply's Escape closes it — not swallowed by the other box's list.
+    await act(() => void fireEvent.keyDown(reply, { key: 'Escape' }))
+    expect(onCancel).toHaveBeenCalledTimes(1)
+    // Back in the first box there is no list: the `[` is text now (Miky, 2026-10-06).
+    act(() => box.editor.view.focus())
+    expect(screen.queryByRole('listbox')).toBeNull()
+  })
+
   it('[ lists the page’s messages and sends the one picked as its nevent', async () => {
     const onSubmit = vi.fn().mockResolvedValue(true)
     const box = await compose(onSubmit)
