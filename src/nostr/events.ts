@@ -22,6 +22,7 @@ import {
 import { buildComment, buildReply, mentionTagsFor, quoteTagsFor, referenceTagsFor, urgentTagsFor, type CommentRef } from '@estiva-app/conversation'
 import { KIND } from './kinds'
 import { attachmentsInDocument } from './attachments'
+import { manifestContent } from './manifest'
 
 /*
   A comment and a reply to one are `@estiva-app/conversation`'s builders
@@ -125,7 +126,13 @@ export function buildProject(
   ]
   if (args.description) tags.push(['description', args.description])
   tags.push(['buzz-channel', args.folder])
-  if (args.lead) tags.push(['lead', args.lead.toLowerCase()])
+  if (args.lead) {
+    // A lead set when the project is made is named as `p` too, as a change
+    // setting it later is — SPEC §7.3: a creation tags each person a `pubkey`
+    // property names, and that `p` is what makes them a member (SHA-28).
+    const lead = args.lead.toLowerCase()
+    tags.push(['lead', lead], ['p', lead])
+  }
   return {
     pubkey,
     created_at: toNostrSeconds(createdAtMs),
@@ -281,7 +288,7 @@ export function buildChange(
         Only a value that is a key: clearing an assignment carries an empty
         value and names nobody.
       */
-      ...(PLACEMENT_FIELDS.has(args.field) && /^[0-9a-f]{64}$/.test(args.value) ? [['p', args.value]] : []),
+      ...(namesPerson(args.target, args.field) && /^[0-9a-f]{64}$/.test(args.value) ? [['p', args.value]] : []),
       /*
         A move names its new parent again, as `A` — SPEC §7.2 (FOL-45). The
         manifest declares an issue's `project` as what moves it (`movedBy`), and
@@ -301,8 +308,19 @@ export function buildChange(
 const isMove = (target: string, field: string) => field === 'project' && target.startsWith(`${KIND.ISSUE}:`)
 const PROJECT_ADDRESS = new RegExp(`^${KIND.PROJECT}:[0-9a-f]{64}:.+`)
 
-/** The fields whose value is a person being placed on the object — see `buildChange`. */
-const PLACEMENT_FIELDS = new Set(['assignee', 'lead'])
+/**
+ * The fields whose value is a person being placed on the object, as
+ * `<kind>:<field>` — see `buildChange`. Read from the manifest's own actions
+ * that take `input.type: "pubkey"`, the rule interop writes by (SPEC §7.3,
+ * SHA-28), so a person field Ship declares later names its person here without
+ * a second list to keep in step.
+ */
+const PERSON_FIELDS: ReadonlySet<string> = new Set(
+  (manifestContent().actions as { appliesTo?: string; emits?: { field?: string }; input?: { type?: string } }[])
+    .filter((action) => action.input?.type === 'pubkey' && action.emits?.field)
+    .map((action) => `${action.appliesTo}:${action.emits?.field}`),
+)
+const namesPerson = (target: string, field: string) => PERSON_FIELDS.has(`${target.split(':')[0]}:${field}`)
 
 /**
  * kind:9 conversation message — the same kind Peek writes for a topic message.
