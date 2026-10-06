@@ -19,6 +19,12 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Since `publish` refuses a commit that is no longer main's tip (80d55134),
+  # re-running an old run cannot redeploy main when its own push never produced
+  # a run — GitHub dropped one for Peek (PEE-38, 2026-09-29). As Peek's:
+  # `gh workflow run deploy.yml -R estiva-app/ship --ref main` deploys main as
+  # it stands; from any other ref it only checks, like a pull request.
+  workflow_dispatch:
 
 # `concurrency` orders runs by when they were requested, not by commit, and a
 # re-run is a new request. On 2026-10-05 a re-run of 2cd7bf1's deploy finished
@@ -162,7 +168,7 @@ jobs:
     # `gate` too (UIG-6): the rules stopped a deploy while they were a step, and
     # moving them into a job of their own must not change that.
     needs: [check, build, test, gate]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
 
     permissions:
