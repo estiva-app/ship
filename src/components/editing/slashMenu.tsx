@@ -9,8 +9,8 @@ import { FORMATS, SlashCommands, applyFormat, formatSection, typeTrigger, type B
  * The trigger and the list are `@estiva-app/ui/editor`'s `SlashCommands`
  * (CON-27); this says only which Insert rows each editor can perform.
  *
- * "Code" makes a code block (`formatSection('block')`), as Notion's `/code`
- * does in a document; Peek's makes inline code, which in a message is the more
+ * "Code" makes a code block (`formatSection('block')`, hinted ```` ``` ````),
+ * as Notion's `/code` does in a document; Peek's makes inline code, which in a message is the more
  * common need (Katerina, 29 September).
  */
 
@@ -42,16 +42,7 @@ export function slashSections({ onFile, table = false, triggers = false }: Inser
     ...(onFile ? [{ key: 'insert-file', row: { label: 'File' }, run: onFile }] : []),
     ...(triggers ? [trigger('Mention', '@', 'Mention a person'), trigger('Urgent', '!@', 'Urgent mention'), trigger('Reference', '[', 'Reference a message')] : []),
   ]
-  return [codeAsBlock(formatSection('block')), ...(insert.length ? [{ label: 'Insert', commands: insert }] : [])]
-}
-
-/*
-  The package draws Code's hint as `` ` `` whichever kind it makes, and typing
-  `` ` `` makes inline code; the row here makes a block, which ```` ``` ```` makes.
-  Until the package says so itself (filed on CON-25's project), the hint is set here.
-*/
-function codeAsBlock(section: SlashSection): SlashSection {
-  return { ...section, commands: section.commands.map((c) => (c.key === 'format-code' ? { ...c, row: { ...c.row, shortcut: '```' } } : c)) }
+  return [formatSection('block'), ...(insert.length ? [{ label: 'Insert', commands: insert }] : [])]
 }
 
 /** Whether a block of text already is what a Format row makes — the row drawn as selected. */
