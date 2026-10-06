@@ -122,6 +122,8 @@ export function MessageBox({ kind = 'conversation', onSubmit, references, initia
   const mentionable = useMentionPeople()
   const people = useRef(mentionable)
   people.current = mentionable
+  const names = useRef(nameOf)
+  names.current = nameOf
   const offered = useRef(references)
   offered.current = references
 
@@ -206,7 +208,8 @@ export function MessageBox({ kind = 'conversation', onSubmit, references, initia
       const kept = draftKey ? store.current.readDraft(draftKey) : undefined
       const draft = kept?.text ?? ''
       // The urgent chips come back urgent: the text alone gives every person back as an ordinary reference (CON-31).
-      const labelOf = (pubkey: string) => people.current.find((p) => p.pubkey === pubkey)?.name ?? `${pubkey.slice(0, 8)}…`
+      // An urgent chip's label is fixed when it is drawn; the directory, then the names the references draw by.
+      const labelOf = (pubkey: string) => people.current.find((p) => p.pubkey === pubkey)?.name ?? names.current?.(pubkey) ?? `${pubkey.slice(0, 8)}…`
       const doc = urgentChipsFrom(editorDocFor(draft) as never, kept?.urgent, labelOf)
       editor.commands.setContent(doc as never, { emitUpdate: false })
       // A caret at the end, not the whole text selected: loading a draft left the line selected, and the formatting
