@@ -17,8 +17,10 @@
  * accept, which on this workspace is where the conversation is: 425 of 583
  * messages on 2026-09-06 were written by a single agent identity.
  *
- * Hence: the control is offered on every message, the write is attempted, and
- * a refusal is the relay's answer rather than an application error.
+ * That was offered to everyone, and then on agents' messages (CON-5). Since
+ * SHI-29 (Miky, 2026-10-06) it is the viewer's own message only: everybody but
+ * the owner met a Delete the relay always refused. A refusal is still the
+ * relay's answer rather than an application error.
  */
 import { describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
@@ -36,10 +38,13 @@ const thread: ThreadData = {
   ],
 }
 
+/** The same thread with the viewer, the agent, writing both messages: both are its own to delete. */
+const own: ThreadData = { ...thread, replies: [{ ...thread.replies[0], author: thread.root.author, by: AGENT }] }
+
 // Changed on purpose: replies are folded behind the replies button, so the thread is opened to reach the reply's menu.
-function open(onDeleteMessage?: (id: string) => Promise<boolean | void> | boolean | void) {
+function open(onDeleteMessage?: (id: string) => Promise<boolean | void> | boolean | void, threads = [own], viewer = AGENT) {
   const view = render(
-    <ThreadListView threads={[thread]} onStart={() => true} onReply={() => true} onDeleteMessage={onDeleteMessage} />,
+    <ThreadListView threads={threads} onStart={() => true} onReply={() => true} onDeleteMessage={onDeleteMessage} viewer={viewer} />,
   )
   fireEvent.click(screen.getByRole('button', { name: '1 reply' }))
   return view
@@ -49,10 +54,15 @@ function open(onDeleteMessage?: (id: string) => Promise<boolean | void> | boolea
 const actions = () => screen.getAllByRole('button', { name: 'Message actions' })
 
 describe('the delete control', () => {
-  it('is offered when the author’s profile could not be read — the relay decides (SPEC §6.5)', () => {
-    open(vi.fn())
-    // Two messages, two menus — neither gated on who wrote it.
-    expect(actions()).toHaveLength(2)
+  it('is offered only on the viewer’s own message — not on an agent’s (SPEC §6.5, SHI-29)', () => {
+    open(vi.fn(), [thread], ANA)
+    // Two messages, one menu: Ana's reply, not the agent's opening line.
+    expect(actions()).toHaveLength(1)
+  })
+
+  it('is offered on nothing when nobody is signed in', () => {
+    render(<ThreadListView threads={[own]} onStart={() => true} onReply={() => true} onDeleteMessage={vi.fn()} />)
+    expect(screen.queryAllByRole('button', { name: 'Message actions' })).toHaveLength(0)
   })
 
   it('is absent, not disabled, where nobody may write at all', () => {

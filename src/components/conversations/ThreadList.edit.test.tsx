@@ -7,10 +7,10 @@
  *
  * The relay takes an edit from the target's effective author or the NIP-OA
  * owner of an authoring agent (`validate_edit_ownership`), and no client can
- * evaluate the second half. SPEC §6.5 as decided 2026-09-29 (CON-5): offered
- * on the viewer's own message and on a `bot: true` author's, and on one whose
- * profile could not be read; not on another human's, which the relay refuses
- * every time. `offersEditAndDelete` in `@estiva-app/conversation` is the rule.
+ * evaluate the second half. SPEC §6.5 as decided 2026-10-06 (SHI-29): offered
+ * only on the viewer's own message — not on another person's or an agent's,
+ * where everybody but the owner met an Edit the relay refused.
+ * `offersEditAndDelete` in `@estiva-app/conversation` is the rule.
  */
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
@@ -40,8 +40,9 @@ const thread: ThreadData = {
   replies: [],
 }
 
+/** The agent viewing its own message. */
 function open(props: Partial<ThreadListViewProps> = {}) {
-  return render(<ThreadListView threads={[thread]} onStart={() => true} onReply={() => true} {...props} />)
+  return render(<ThreadListView threads={[thread]} onStart={() => true} onReply={() => true} viewer={AGENT} {...props} />)
 }
 
 type EditorBox = HTMLElement & { editor: Editor }
@@ -66,9 +67,9 @@ describe('the edit control', () => {
   const as = (author: ThreadData['root']['author'], by: string): ThreadData => ({ ...thread, root: { ...thread.root, author, by } })
   const menuOffered = () => screen.queryAllByRole('button', { name: 'Message actions' }).length > 0
 
-  it('is offered on an agent’s message — the viewer may be its owner', () => {
+  it('is not offered on an agent’s message, even to a viewer who may own it (SHI-29)', () => {
     render(<ThreadListView threads={[as({ name: 'Claude', bot: true }, AGENT)]} onStart={() => true} onReply={() => true} viewer={HUMAN} onEditMessage={vi.fn()} onDeleteMessage={vi.fn()} />)
-    expect(menuOffered()).toBe(true)
+    expect(menuOffered()).toBe(false)
   })
 
   it('is not offered on another human’s message, which the relay refuses every time', () => {
@@ -81,11 +82,9 @@ describe('the edit control', () => {
     expect(menuOffered()).toBe(true)
   })
 
-  it('is offered when the author’s profile could not be read, because the relay decides', () => {
-    open({ onEditMessage: vi.fn() })
-    expect(screen.getAllByRole('button', { name: 'Message actions' })).toHaveLength(1)
-    fireEvent.click(screen.getAllByRole('button', { name: 'Message actions' })[0])
-    expect(screen.getByRole('menuitem', { name: 'Edit message' })).toBeTruthy()
+  it('is offered on nothing when nobody is signed in', () => {
+    open({ onEditMessage: vi.fn(), viewer: undefined })
+    expect(menuOffered()).toBe(false)
   })
 
   it('is absent, not disabled, where nobody may write', () => {

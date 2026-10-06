@@ -25,9 +25,8 @@ export interface Profile {
   nip05?: string
   about?: string
   /**
-   * NIP-24's `bot: true` — an agent. What decides whether Edit and Delete are
-   * offered on its messages (SPEC §6.5, CON-5): the viewer may be its owner.
-   * `false` or absent for a profile that does not say so.
+   * NIP-24's `bot: true` — an agent. `false` or absent for a profile that does
+   * not say so.
    */
   bot?: boolean
   /** `created_at`, kept so a later profile can replace an earlier one. */

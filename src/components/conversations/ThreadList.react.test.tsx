@@ -23,7 +23,7 @@ const thread: ThreadData = {
 }
 
 const show = (props: Partial<ThreadListViewProps> = {}) =>
-  render(<ThreadListView threads={[thread]} onStart={() => true} onReply={() => true} {...props} />)
+  render(<ThreadListView threads={[thread]} onStart={() => true} onReply={() => true} viewer="bob" {...props} />)
 
 describe('the message tools', () => {
   it.todo(

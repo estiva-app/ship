@@ -29,7 +29,7 @@
     "seed:peek": "tsx scripts/seed-for-peek.ts"
   },
   "dependencies": {
-    "@estiva-app/conversation": "^0.9.0",
+    "@estiva-app/conversation": "^0.10.0",
     "@estiva-app/identity": "^0.2.2",
     "@estiva-app/interop": "^0.50.0",
     "@estiva-app/platform": "^0.4.0",
