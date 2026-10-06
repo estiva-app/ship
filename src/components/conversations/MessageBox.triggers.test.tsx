@@ -87,6 +87,19 @@ describe('the message box’s triggers (CON-25)', () => {
     expect(onSubmit).toHaveBeenCalledWith('@Ann', [], { urgent: undefined })
   })
 
+  it('[ takes a title with spaces, and Escape closes its list without leaving the box (f586437a)', async () => {
+    const onSubmit = vi.fn().mockResolvedValue(true)
+    const box = await compose(onSubmit)
+    await type(box, '[relay search')
+    expect(rows('Messages and files')).toEqual(['Issue: Relay searchCON-33 · Conversation standard'])
+    await act(() => void fireEvent.keyDown(box, { key: 'Escape' }))
+    expect(screen.queryByRole('listbox')).toBeNull()
+    // The box's own Escape (blur) waits for the second press.
+    expect(box.contains(document.activeElement)).toBe(true)
+    expect(box.editor.getText()).toBe('[relay search')
+    expect(onSubmit).not.toHaveBeenCalled()
+  })
+
   it('[ lists the page’s messages and sends the one picked as its nevent', async () => {
     const onSubmit = vi.fn().mockResolvedValue(true)
     const box = await compose(onSubmit)
