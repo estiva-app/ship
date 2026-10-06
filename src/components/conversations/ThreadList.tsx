@@ -251,7 +251,7 @@ function Thread({ thread, pageThreads, onReply, disabledReason, unread, resolved
   }
   const common = { resolved, resolving, nameOf, disabledReason, drafts }
   const toolsFor = (message: MessageData) => {
-    const offered = offersEditAndDelete({ viewer, authorIsBot: message.author.bot, author: message.by ?? '' })
+    const offered = offersEditAndDelete({ viewer, author: message.by ?? '' })
     return {
       reactions: reactionsBy?.[message.id],
       onToggleReaction: onReact && ((emoji: string, mine?: string) => onReact(message.id, emoji, mine)),
