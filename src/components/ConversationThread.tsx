@@ -240,10 +240,9 @@ export interface ConversationsProps {
   /** Why nothing can be posted right now — every composer here is disabled with it. */
   disabledReason?: string
   /**
-   * The viewer's pubkey. Edit and Delete are offered on the viewer's own
-   * messages and on a `bot: true` author's, not on another human's, which the
-   * relay refuses every time (SPEC §6.5, CON-5). Omitted, only the second half
-   * applies.
+   * The viewer's pubkey. Edit and Delete are offered only on the viewer's own
+   * messages — not on another person's or an agent's (SPEC §6.5, SHI-29).
+   * Omitted, they are offered on nothing.
    */
   viewer?: string
 
