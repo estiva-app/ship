@@ -89,4 +89,13 @@ describe('no History row prints a wire value (564ee489)', () => {
     expect(texts).toEqual(['restored it', 'archived it'])
     expect(texts.join(' ')).not.toMatch(/true|\(none\)/)
   })
+
+  it('says a reference, and a field it has no words for, without "(none)"', () => {
+    expect(rows([change('ref', 'SHI-4'), change('ref', ''), change('priority', 'high'), change('priority', '')])).toEqual([
+      'cleared priority',
+      'set priority to high',
+      'removed its reference',
+      'gave it the reference SHI-4',
+    ])
+  })
 })
