@@ -1,5 +1,6 @@
 import { IconMessage } from '@tabler/icons-react'
 import { mentionText } from '@estiva-app/conversation'
+import { decodeNpub } from '@estiva-app/protocol'
 import { CaptionedReference, PersonMention, ReferenceTrigger, UrgentPersonMention, type MentionPerson } from '@estiva-app/ui/editor'
 import { REFERENCE_COPY, type ReferenceSection } from '@/api/references'
 
@@ -59,4 +60,29 @@ export function chipsAsReferences(node: EditorNode): EditorNode {
     return uri ? reference(uri) : text(String(node.attrs?.label ?? ''))
   }
   return node.content ? { ...node, content: node.content.map(chipsAsReferences) } : node
+}
+
+/**
+ * The other way, for the people a draft named urgently — CON-31. Marker text
+ * gives back a person as the `reference` its `nostr:npub…` names, urgent or
+ * not (§13.1 puts the urgency in a tag); a draft keeps whom it named urgently
+ * beside the text, and those references become urgent chips again.
+ */
+export function urgentChipsFrom(node: EditorNode, urgent: readonly string[] | undefined, label: (pubkey: string) => string): EditorNode {
+  if (!urgent || urgent.length === 0) return node
+  const keys = new Set(urgent)
+  const walk = (n: EditorNode): EditorNode => {
+    const uri = n.type === 'reference' && typeof n.attrs?.uri === 'string' ? n.attrs.uri : ''
+    if (/^nostr:npub1/i.test(uri)) {
+      let pubkey: string | null = null
+      try {
+        pubkey = decodeNpub(uri)
+      } catch {
+        pubkey = null
+      }
+      if (pubkey && keys.has(pubkey)) return { type: 'urgentMention', attrs: { id: pubkey, label: label(pubkey), pubkey } }
+    }
+    return n.content ? { ...n, content: n.content.map(walk) } : n
+  }
+  return walk(node)
 }

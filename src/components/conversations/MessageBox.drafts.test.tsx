@@ -12,6 +12,9 @@ import { act, fireEvent, render, screen } from '@testing-library/react'
 import type { Editor } from '@tiptap/react'
 import { MessageBox } from './MessageBox'
 import { createDraftStore, draftKeys } from '@/lib/drafts'
+import { encodeNpub } from '@estiva-app/protocol'
+import type { MentionPerson } from '@estiva-app/ui/editor'
+import { MentionPeopleProvider } from '@/components/editing/mentionables'
 
 /* jsdom implements neither `getClientRects` nor `getBoundingClientRect` on text
    nodes, and ProseMirror calls them when it scrolls the caret into view. */
@@ -59,6 +62,46 @@ describe('a writing box with a draft key', () => {
     render(<MessageBox onSubmit={() => {}} draftKey={key} drafts={drafts} />)
     // The editor is seeded from the draft once it exists, a tick after the first render.
     await vi.waitFor(() => expect(textbox()).toHaveTextContent('half a thought'))
+  })
+
+  /*
+    CON-31: `!@Bob please sign`, left and come back to. The marker text of an
+    urgent mention with a key is the same `nostr:npub…` as an ordinary one —
+    the urgency is a tag (§13.1) — so the draft keeps whom it named urgently.
+  */
+  it('keeps an urgent mention urgent: typed, left, restored and sent', async () => {
+    const BOB = 'b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0'
+    const drafts = createDraftStore(memoryStorage())
+    const key = draftKeys.thread('t1')
+    const { unmount } = render(<MessageBox onSubmit={() => {}} draftKey={key} drafts={drafts} />)
+    await ready()
+    act(() => void textbox().editor.commands.insertContent([{ type: 'urgentMention', attrs: { id: 'bob', label: 'Bob', pubkey: BOB } }, { type: 'text', text: ' please sign' }]))
+    expect(drafts.readDraft(key)?.urgent).toEqual([BOB])
+    unmount()
+
+    const onSubmit = vi.fn(() => true)
+    const { container } = render(<MessageBox onSubmit={onSubmit} draftKey={key} drafts={drafts} />)
+    await vi.waitFor(() => expect(textbox()).toHaveTextContent('please sign'))
+    expect(container.querySelector('[data-urgent-mention]')).not.toBeNull()
+    submit()
+    await vi.waitFor(() => expect(onSubmit).toHaveBeenCalled())
+    expect(onSubmit.mock.calls[0]).toEqual([expect.any(String), [], { urgent: [BOB] }])
+  })
+
+  it('names a restored urgent chip once the directory arrives, not by a piece of its key', async () => {
+    const BOB = 'b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0'
+    const drafts = createDraftStore(memoryStorage())
+    const key = draftKeys.thread('t1')
+    drafts.write(key, `nostr:${encodeNpub(BOB)} please sign`, [BOB])
+    const box = (people: MentionPerson[]) => (
+      <MentionPeopleProvider value={people}>
+        <MessageBox onSubmit={() => {}} draftKey={key} drafts={drafts} />
+      </MentionPeopleProvider>
+    )
+    const { container, rerender } = render(box([]))
+    await vi.waitFor(() => expect(container.querySelector('[data-urgent-mention]')).not.toBeNull())
+    rerender(box([{ id: 'bob', name: 'Bob', pubkey: BOB }]))
+    await vi.waitFor(() => expect(container.querySelector('[data-urgent-mention]')).toHaveTextContent('@Bob'))
   })
 
   /*
