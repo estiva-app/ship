@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 import { ArchiveDialog } from '@/components/ArchiveDialog'
 import { ArchivedNotice } from '@/components/ArchivedNotice'
 import { lockedReason, ownArchive, type Archives } from '@/lib/archive'
-import { ISSUE_STATUSES, archiveIssue, commentsOn, deleteIssue, deleteMessage, editMessage, react, referenceFor, reply, setIssueField, unreact, startConversation, type DirectoryView, type FolderState, type WorkspaceState, threadContext, fileContext, useMergedReadState, useFeedJudges, unreadByThread } from '@/api'
+import { ISSUE_STATUSES, lookupStatus, archiveIssue, commentsOn, deleteIssue, deleteMessage, editMessage, react, referenceFor, reply, setIssueField, unreact, startConversation, type DirectoryView, type FolderState, type WorkspaceState, threadContext, fileContext, useMergedReadState, useFeedJudges, unreadByThread } from '@/api'
 import { useRelated } from '@/api/useRelated'
 import type { HistoryEntry } from '@/components/History'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
@@ -17,25 +17,57 @@ import { useReferencePage } from '@/api/references'
 
 /**
  * This issue's slice of the change stream, in words, newest first — the old
- * app's `activity`: "<who> set <field> to <value>", a pubkey in the value
- * shown as the person's name, an empty value as "(none)". Read off the
- * fold's list in the fold's order, then reversed for reading.
+ * app's `activity`, in the design's verbs (fixtures/projects.ts `ACTIVITY`).
+ * Read off the fold's list in the fold's order, then reversed for reading.
  *
  * A description is the exception: its value is a whole document (a block
  * tree since RIC-8, marker text before), written by other people and other
  * apps, and the body is already on the page. So every description change
  * reads "edited the description", whatever its format or value (RIC-15).
+ *
+ * No row prints a wire value (564ee489, History.tsx's contract): a status by
+ * its label, a move by the project's current title — "a project you can't
+ * see" when it is not in your state, never its address — an archive as a
+ * verb, a person by name. An unassign and a rename name what came before only
+ * when an earlier change in this stream says it; the root's own values are
+ * not here (Miky, 2026-10-06).
  */
 export function historyFor(issueAddr: string, state: FolderState, directory: DirectoryView): HistoryEntry[] {
+  const before = new Map<string, string>()
   return state.activity
     .filter((change) => change.target === issueAddr)
-    .map((change) => ({
-      id: change.id,
-      by: directory.personOf(change.author),
-      at: change.createdAt,
-      text: change.field === 'description' ? 'edited the description' : `set ${change.field} to ${change.value === '' ? '(none)' : /^[0-9a-f]{64}$/.test(change.value) ? directory.nameOf(change.value) : change.value}`,
-    }))
+    .map((change) => {
+      const previous = before.get(change.field)
+      before.set(change.field, change.value)
+      return { id: change.id, by: directory.personOf(change.author), at: change.createdAt, text: changeInWords(change.field, change.value, previous, state, directory) }
+    })
     .reverse()
+}
+
+function changeInWords(field: string, value: string, previous: string | undefined, state: FolderState, directory: DirectoryView): string {
+  const person = (pubkey: string) => (/^[0-9a-f]{64}$/.test(pubkey) ? directory.nameOf(pubkey) : pubkey)
+  switch (field) {
+    case 'description':
+      return 'edited the description'
+    case 'status':
+      return `set status to ${lookupStatus(ISSUE_STATUSES, value).label}`
+    case 'assignee':
+      if (value) return `assigned ${person(value)}`
+      return previous ? `unassigned ${person(previous)}` : 'removed the assignee'
+    case 'title':
+      return previous ? `renamed it from "${previous}" to "${value}"` : `renamed it to "${value}"`
+    case 'project': {
+      if (!value) return 'removed it from its project'
+      const project = state.projects.find((candidate) => candidate.addr === value)
+      return project ? `moved it to ${project.title}` : "moved it to a project you can't see"
+    }
+    case 'archived':
+      return value ? 'archived it' : 'restored it'
+    case 'ref':
+      return value ? `gave it the reference ${value}` : 'removed its reference'
+    default:
+      return value ? `set ${field} to ${person(value)}` : `cleared ${field}`
+  }
 }
 
 /**

@@ -3,7 +3,8 @@
  * An issue's History says a description was edited, never what it was set to
  * — RIC-15. A description's value is a whole document (a block tree since
  * RIC-8, marker text before) and printing it put several hundred characters
- * of JSON in a list meant to be skimmed. Every other field keeps its words.
+ * of JSON in a list meant to be skimmed. And no row prints a wire value: a
+ * status by its label, a move by the project's title (564ee489).
  */
 import { describe, expect, it } from 'vitest'
 import type { ContentFormat } from '@estiva-app/protocol'
@@ -50,11 +51,51 @@ describe("an issue's History (RIC-15)", () => {
     ])
   })
 
-  it('keeps every other field in words, newest first', () => {
-    expect(texts([change('status', 'done'), change('assignee', ASSIGNEE), change('assignee', '')])).toEqual([
-      'set assignee to (none)',
-      'set assignee to name:cccc',
-      'set status to done',
+})
+
+describe('no History row prints a wire value (564ee489)', () => {
+  const PROJECT = `30850:${'d'.repeat(64)}:the-project`
+  const projects = [{ addr: PROJECT, title: 'Rich text and blocks' }]
+  const rows = (activity: Change[]) =>
+    historyFor(ISSUE, { activity, projects } as unknown as FolderState, directory).map((entry) => entry.text)
+
+  it('says a status by its label', () => {
+    expect(rows([change('status', 'in_progress'), change('status', 'done')])).toEqual(['set status to Done', 'set status to In Progress'])
+  })
+
+  it('names the project a move went to, and says a detach and a hidden target in words', () => {
+    const texts = rows([change('project', PROJECT), change('project', ''), change('project', `30850:${'e'.repeat(64)}:elsewhere`)])
+    expect(texts).toEqual(["moved it to a project you can't see", 'removed it from its project', 'moved it to Rich text and blocks'])
+    expect(texts.join(' ')).not.toContain('30850:')
+  })
+
+  it('assigns and unassigns by name, and says an unassign with no earlier assignee', () => {
+    expect(rows([change('assignee', ''), change('assignee', ASSIGNEE), change('assignee', '')])).toEqual([
+      'unassigned name:cccc',
+      'assigned name:cccc',
+      'removed the assignee',
+    ])
+  })
+
+  it('renames from the earlier title when the stream has one', () => {
+    expect(rows([change('title', 'Board loses order'), change('title', 'Board columns lose order')])).toEqual([
+      'renamed it from "Board loses order" to "Board columns lose order"',
+      'renamed it to "Board loses order"',
+    ])
+  })
+
+  it('archives and restores as verbs', () => {
+    const texts = rows([change('archived', 'true'), change('archived', '')])
+    expect(texts).toEqual(['restored it', 'archived it'])
+    expect(texts.join(' ')).not.toMatch(/true|\(none\)/)
+  })
+
+  it('says a reference, and a field it has no words for, without "(none)"', () => {
+    expect(rows([change('ref', 'SHI-4'), change('ref', ''), change('priority', 'high'), change('priority', '')])).toEqual([
+      'cleared priority',
+      'set priority to high',
+      'removed its reference',
+      'gave it the reference SHI-4',
     ])
   })
 })
