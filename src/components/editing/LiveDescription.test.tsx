@@ -231,6 +231,16 @@ describe('a description whose save is refused', () => {
     await act(() => void fireEvent.keyDown(box, { key: 'Escape' }))
     expect(document.activeElement).not.toBe(box)
   })
+
+  it('leaves on the first Escape when / matches nothing, so no list is showing', async () => {
+    render(<LiveDescription value="" format="marker" onCommit={vi.fn(async () => true)} resolved={{}} />)
+    const box = await ready()
+    box.tabIndex = -1
+    await type(box, '/zzzz')
+    expect(screen.queryByRole('option')).toBeNull()
+    await act(() => void fireEvent.keyDown(box, { key: 'Escape' }))
+    expect(document.activeElement).not.toBe(box)
+  })
 })
 
 /*
