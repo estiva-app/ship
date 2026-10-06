@@ -20,7 +20,10 @@ vi.mock('./store', () => ({
   relay: {},
   signer: { pubkey: 'me', sign: async (e: unknown) => e },
 }))
-vi.mock('./nip44', () => ({ nip44: { encrypt: async (p: string) => p, decrypt: async () => undefined } }))
+vi.mock('./nip44', () => ({
+  nip44: { encrypt: async (p: string) => p, decrypt: async () => undefined },
+  nip44UnlessRefused: { decrypt: async () => undefined },
+}))
 const signedIn = vi.fn(() => true)
 vi.mock('../auth/estivaId', () => ({ signedIn: () => signedIn() }))
 vi.mock('@estiva-app/conversation', async (importOriginal) => ({
