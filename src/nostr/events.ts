@@ -129,11 +129,11 @@ export function buildProject(
   if (args.lead) {
     // A lead set when the project is made is named as `p` too, as a change
     // setting it later is — SPEC §7.3: a creation tags each person a `pubkey`
-    // property names, and that `p` is what makes them a member (SHA-28). Only
-    // a key: a `p` no `#p` matches names nobody, as in `buildChange`.
-    const lead = args.lead.toLowerCase()
-    tags.push(['lead', lead])
-    if (/^[0-9a-f]{64}$/.test(lead)) tags.push(['p', lead])
+    // property names, and that `p` is what makes them a member (SHA-28).
+    // Anything but a lower-case hex key is refused, not converted (§7.3): a
+    // `p` no `#p` matches names nobody, and the root cannot be rewritten later.
+    if (!/^[0-9a-f]{64}$/.test(args.lead)) throw new Error(`A project's lead must be a 64-character lower-case hex key, not "${args.lead}".`)
+    tags.push(['lead', args.lead], ['p', args.lead])
   }
   return {
     pubkey,
@@ -318,9 +318,10 @@ const PROJECT_ADDRESS = new RegExp(`^${KIND.PROJECT}:[0-9a-f]{64}:.+`)
  * a second list to keep in step.
  */
 const PERSON_FIELDS: ReadonlySet<string> = new Set(
-  (manifestContent().actions as { appliesTo?: string; emits?: { field?: string }; input?: { type?: string } }[])
+  (manifestContent().actions as { appliesTo?: string | string[]; emits?: { field?: string }; input?: { type?: string } }[])
     .filter((action) => action.input?.type === 'pubkey' && action.emits?.field)
-    .map((action) => `${action.appliesTo}:${action.emits?.field}`),
+    // `appliesTo` is one kind or several (`comment` declares both).
+    .flatMap((action) => ([] as string[]).concat(action.appliesTo ?? []).map((kind) => `${kind}:${action.emits?.field}`)),
 )
 const namesPerson = (target: string, field: string) => PERSON_FIELDS.has(`${target.split(':')[0]}:${field}`)
 

@@ -94,19 +94,29 @@ check('  …while clearing an assignment names nobody', tag(unassign, 'p') === u
 // Every person field the manifest declares, not a list kept beside it (SHI-35):
 // interop names the person for any `input.type: "pubkey"` action (SPEC §7.3),
 // so Ship writing the same change must too.
-const personActions = (manifestContent().actions as { id: string; appliesTo: string; emits: { field?: string }; input?: { type?: string } }[])
+const personActions = (manifestContent().actions as { id: string; appliesTo: string | string[]; emits: { field?: string }; input?: { type?: string } }[])
   .filter((action) => action.input?.type === 'pubkey' && action.emits.field)
 check('the manifest declares person fields to check', personActions.length >= 2, String(personActions.length))
 for (const action of personActions) {
-  const change = buildChange(PK, Date.now(), { target: `${action.appliesTo}:${PK}:x1`, field: action.emits.field!, value: WHO, folder: CONTENT })
-  check(`  …${action.id} names the person as p`, tag(change, 'p') === WHO)
+  // One target per kind the action applies to, whichever way it declares them.
+  for (const kind of ([] as string[]).concat(action.appliesTo)) {
+    const change = buildChange(PK, Date.now(), { target: `${kind}:${PK}:x1`, field: action.emits.field!, value: WHO, folder: CONTENT })
+    check(`  …${action.id} on ${kind} names the person as p`, tag(change, 'p') === WHO)
+  }
 }
 
-const led = buildProject(PK, Date.now(), { projectId: 'p2', title: 'Led', folder: CONTENT, lead: WHO.toUpperCase() })
+const led = buildProject(PK, Date.now(), { projectId: 'p2', title: 'Led', folder: CONTENT, lead: WHO })
 check('a project created with a lead names them as p on its root (SPEC §7.3)', tag(led, 'p') === WHO && tag(led, 'lead') === WHO)
 check('  …and one created without a lead names nobody', tag(project, 'p') === undefined)
-const npubLead = buildProject(PK, Date.now(), { projectId: 'p3', title: 'Npub', folder: CONTENT, lead: 'npub1notakey' })
-check('  …nor one whose lead is not a key', tag(npubLead, 'p') === undefined)
+for (const notAKey of ['npub1notakey', WHO.toUpperCase()]) {
+  let refused = false
+  try {
+    buildProject(PK, Date.now(), { projectId: 'p3', title: 'Bad lead', folder: CONTENT, lead: notAKey })
+  } catch {
+    refused = true
+  }
+  check(`  …and a lead that is not a lower-case key is refused (${notAKey.slice(0, 8)}…)`, refused)
+}
 check('  …and the fixed four keep their order ahead of it', assign.tags.slice(0, 4).map((t) => t[0]).join(',') === 'a,field,value,h')
 
 // A move names its new parent where a relay indexes it: `A`, never a second `a` (SPEC §7.2, FOL-45).
