@@ -401,9 +401,9 @@ export function ProjectPage({
   )
   /* This feed is two streams drawn as one — SPEC §11.1 (FOL-16): the record
      channel's chat, which answers to its bare channel uuid, and the project's
-     own comments, which answer to the project's address. Looking at the page
-     advances both, because both are on it — §11.2, "exactly the streams you are
-     showing". Its issues' comments are other files' streams and are untouched;
+     own comments, which answer to the project's address. Looking at the
+     Activity tab advances both, because both are on it — §11.2, "exactly the
+     streams you are showing" — and Overview and Issues draw neither. Its issues' comments are other files' streams and are untouched;
      before FOL-16 their roots answered to the channel marker, so this line
      silently read every issue in the project.
 
@@ -418,7 +418,9 @@ export function ProjectPage({
      issues' threads rolled up above are not drawn here and are not marked. */
   const [shownThreads, onThreadShown] = useShownThreads()
   const drawn = useMemo(() => newestDrawn(conversations, shownThreads), [conversations, shownThreads])
-  useMarkRead(useMemo(() => [channelContext(record), fileContext(project?.addr)], [record, project]), tab === 'activity' ? drawn.rootsAt : undefined)
+  // Only on Activity, where the feed is drawn: Overview and Issues read nothing (66b31c4b, Miky 2026-10-06).
+  const streams = useMemo(() => (tab === 'activity' ? [channelContext(record), fileContext(project?.addr)] : []), [record, project, tab])
+  useMarkRead(streams, drawn.rootsAt)
   useMarkRead(tab === 'activity' ? shownThreads.map(threadContext) : [], drawn.repliesAt)
   const threads = useMemo(
     () => conversations.map((c) => threadFor(c, directory, project ? { value: project.description, format: project.descriptionFormat } : undefined, project?.addr, state.edits, state.attachments, state.urgent)),

@@ -112,3 +112,21 @@ describe('ProjectView, archived (SHI-36)', () => {
     expect(screen.getByText('Start a conversation or type')).toBeInTheDocument()
   })
 })
+
+describe('the Activity tab says when its conversation has something new (66b31c4b)', () => {
+  /* Overview does not read the conversation any more, so it is the tab that tells you. */
+  it('lights Activity on an issue with an unread thread, and not without one', () => {
+    const { unmount } = render(view('overview', { unread: { t1: ['m1'] } }))
+    expect(screen.getByRole('tab', { name: /^Activity.*new$/ }).querySelector('[data-unread]')).not.toBeNull()
+    expect(screen.getByRole('tab', { name: 'Overview' }).querySelector('[data-unread]')).toBeNull()
+    unmount()
+    render(view('overview', { unread: {} }))
+    expect(screen.getByRole('tab', { name: 'Activity' }).querySelector('[data-unread]')).toBeNull()
+  })
+
+  it('lights Activity on a project the same way, and never Issues', () => {
+    render(projectView('overview', { unread: { t1: ['m1'] } }))
+    expect(screen.getByRole('tab', { name: /^Activity.*new$/ }).querySelector('[data-unread]')).not.toBeNull()
+    expect(screen.getByRole('tab', { name: /^Issues/ }).querySelector('[data-unread]')).toBeNull()
+  })
+})

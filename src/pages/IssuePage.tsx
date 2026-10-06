@@ -104,12 +104,15 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
      marker, so a new top-level comment stayed new until the project page was
      opened and opening the project page read every issue's roots.
 
-     A `thread:` context advances only while its replies are drawn, on the
-     Activity tab (CON-34): under §11.3's thread rule that is what reads them. */
+     Both advance only on the Activity tab, where the conversation is drawn:
+     a `thread:` context while its replies are shown (CON-34, under §11.3's
+     thread rule), the issue's own stream whenever the tab is open (66b31c4b,
+     Miky 2026-10-06). Opening an issue lands on Overview, which draws none of
+     it, so marking there cleared Peek's dot for comments nobody had seen. */
   const [shownThreads, onThreadShown] = useShownThreads()
   const drawn = useMemo(() => newestDrawn(conversations, shownThreads), [conversations, shownThreads])
-  // Re-armed by a new root only where roots are drawn: Overview still marks once on opening (66b31c4b).
-  useMarkRead(useMemo(() => [fileContext(issue?.addr)], [issue]), tab === 'activity' ? drawn.rootsAt : undefined)
+  const fileContexts = useMemo(() => (tab === 'activity' ? [fileContext(issue?.addr)] : []), [issue, tab])
+  useMarkRead(fileContexts, drawn.rootsAt)
   useMarkRead(tab === 'activity' ? shownThreads.map(threadContext) : [], drawn.repliesAt)
   const threads = useMemo(
     () => conversations.map((c) => threadFor(c, directory, issue ? { value: issue.description, format: issue.descriptionFormat } : undefined, issue?.addr, state.edits, state.attachments, state.urgent)),

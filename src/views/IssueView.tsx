@@ -117,7 +117,8 @@ export function IssueView({ crumbs, tab, onTab, title, description, descriptionF
       </div>
       {/* The tab row is its own grid row, level with the rail's top, so the rail starts where it always has. */}
       <div className="col-start-1 row-start-2 flex min-h-8 items-center px-6">
-        <Tabs tabs={TABS} active={tab} onChange={onTab} />
+        {/* Overview does not read the conversation (66b31c4b), so Activity says when something there is new. */}
+        <Tabs tabs={TABS.map((t) => (t.id === 'activity' ? { ...t, unread: Object.keys(unread ?? {}).length > 0 } : t))} active={tab} onChange={onTab} />
       </div>
 
       <ScrollArea className="col-start-1 row-start-3 min-h-0 min-w-0" contentClassName="flex flex-col gap-6 px-6 pb-5">
