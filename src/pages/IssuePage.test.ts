@@ -6,7 +6,9 @@
  * of JSON in a list meant to be skimmed. Every other field keeps its words.
  */
 import { describe, expect, it } from 'vitest'
+import type { ContentFormat } from '@estiva-app/protocol'
 import type { DirectoryView, FolderState } from '@/api'
+import type { Change } from '../nostr/fold'
 import { historyFor } from './IssuePage'
 
 const ISSUE = `30851:${'a'.repeat(64)}:the-issue`
@@ -15,7 +17,7 @@ const ASSIGNEE = 'c'.repeat(64)
 const BLOCKS = JSON.stringify({ type: 'doc', content: [{ type: 'paragraph', id: '5f95b36d0ab3', content: [{ type: 'text', text: 'What we agreed' }] }] })
 
 let seq = 0
-const change = (field: string, value: string, format?: 'blocks' | 'markdown') => ({
+const change = (field: string, value: string, format: ContentFormat = 'marker'): Change => ({
   id: `change-${++seq}`,
   author: AUTHOR,
   createdAt: 1_700_000_000 + seq,
@@ -31,7 +33,7 @@ const directory = {
   personOf: (pubkey: string) => ({ name: pubkey.slice(0, 8) }),
 } as unknown as DirectoryView
 
-const texts = (activity: ReturnType<typeof change>[]) =>
+const texts = (activity: Change[]) =>
   historyFor(ISSUE, { activity } as unknown as FolderState, directory).map((entry) => entry.text)
 
 describe("an issue's History (RIC-15)", () => {
@@ -42,7 +44,7 @@ describe("an issue's History (RIC-15)", () => {
   })
 
   it('reads a marker-text description and a cleared one the same way', () => {
-    expect(texts([change('description', 'What we agreed\n\n- one', 'markdown'), change('description', '')])).toEqual([
+    expect(texts([change('description', 'What we agreed\n\n- one', 'marker'), change('description', '')])).toEqual([
       'edited the description',
       'edited the description',
     ])
