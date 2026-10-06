@@ -25,12 +25,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useRefresh } from '@/lib/useRefresh'
 import { relay, signer } from './store'
-import { nip44 } from './nip44'
+import { nip44, nip44UnlessRefused } from './nip44'
 import { signedIn } from '../auth/estivaId'
 import {
   READ_STATE_HORIZON_DAYS,
   REPLY_FLOOR_CONTEXT,
   advanceContexts as advance,
+  createSlotCache,
   fetchReadState,
   loadSlotIdentity as loadSlot,
   publishReadState,
@@ -73,9 +74,16 @@ export function loadSlotIdentity(storage: Storage | undefined = safeStorage()): 
 /** The relay, as the package's reads take it. */
 const query: QueryFn = (filters) => relay.query(filters as never)
 
-/** Everything the relay holds of the person's read state, merged. Ship keeps no cache behind it. */
+/**
+ * What every slot last decrypted to, for the life of the tab: a refresh
+ * decrypts only the slots that changed, and a slot refused with a 429 keeps
+ * its last markers (Peek 23130326). Resets on a new pubkey.
+ */
+let slotCache = createSlotCache()
+
+/** Everything the relay holds of the person's read state, merged. */
 function loadReadState(): Promise<FetchedReadState> {
-  return fetchReadState(query, signer.pubkey, nip44, currentIdentity(), Date.now(), READ_STATE_HORIZON_DAYS)
+  return fetchReadState(query, signer.pubkey, nip44UnlessRefused, currentIdentity(), Date.now(), READ_STATE_HORIZON_DAYS, slotCache)
 }
 
 /** Apply markers, taking the later of each, and cap to the byte ceiling. What the cap evicted is reported. */
@@ -338,6 +346,7 @@ export function resetReadStateForTests(): void {
   if (timer !== undefined) clearTimeout(timer)
   timer = undefined
   identity = undefined
+  slotCache = createSlotCache()
   known = {}
   pending = {}
   published = undefined
@@ -409,9 +418,9 @@ export function useMergedReadState(): Record<string, number> {
   }, [load])
   /*
    * Slower than Ship's 5s workspace poll, deliberately. Each pass costs a
-   * `/sign`, a `/query` and one `/nip44/decrypt` **per slot** — at 5s that is
-   * a request every few hundred milliseconds and it walks into the 120-per-
-   * minute limit on `/nip44/*`, whose failure mode is an undecryptable own slot.
+   * `/sign`, a `/query` and one `/nip44/decrypt` per slot that changed since
+   * the last pass — before the slot cache, per slot, which walked into the
+   * 120-per-minute limit on `/nip44/*`, whose failure mode is an undecryptable own slot.
    * Read state moves at human speed; 30s matches what Peek settled on.
    */
   useRefresh(load, { intervalMs: READ_STATE_REFRESH_MS })

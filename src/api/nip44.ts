@@ -27,9 +27,47 @@ async function call(op: 'encrypt' | 'decrypt', body: object): Promise<unknown> {
     // 429 is real: the endpoint allows 120 operations per minute per app per
     // person, shared between encrypt and decrypt. Read-state writes are
     // debounced, so single digits per minute is the expected shape.
-    throw new Error(`POST /nip44/${op} failed: ${response.status} ${await response.text()}`)
+    throw new Nip44Error(`POST /nip44/${op} failed: ${response.status} ${await response.text()}`, response.status)
   }
   return response.json()
+}
+
+/** `/nip44/*` answered, and not with 200. */
+class Nip44Error extends Error {
+  readonly status: number
+  constructor(message: string, status: number) {
+    super(message)
+    this.status = status
+  }
+}
+
+/**
+ * Whether a failed call may succeed if asked again: a 429, an expired or
+ * renewing token, the service down, no session, or no answer at all. Anything
+ * else is a ciphertext that will never decrypt — a rotated key.
+ */
+function refusedForNow(error: unknown): boolean {
+  if (!(error instanceof Nip44Error)) return true
+  // 422 is a policy refusal for the whole app, not for this ciphertext.
+  return [401, 403, 408, 422, 429].includes(error.status) || error.status >= 500
+}
+
+/**
+ * The read-state seam: like {@link nip44}'s `decrypt`, but a refusal that may
+ * pass — a 429 above all — throws instead of answering `undefined`, so the
+ * package keeps that slot's last markers rather than dropping them as a
+ * rotated key (`Nip44.decrypt`, Peek 23130326).
+ */
+export const nip44UnlessRefused: Pick<Nip44, 'decrypt'> = {
+  async decrypt(ciphertext) {
+    try {
+      const { plaintext } = (await call('decrypt', { ciphertext })) as { plaintext: string }
+      return plaintext
+    } catch (error) {
+      if (refusedForNow(error)) throw error
+      return undefined
+    }
+  },
 }
 
 /**
