@@ -13,7 +13,7 @@ import {
   type Imeta,
 } from '@estiva-app/protocol'
 import { AttachmentCard, Avatar, Button, FieldLine, FilePicker, IconButton, Kbd, Toolbar, ToolbarButton, richTextClassName } from '@estiva-app/ui'
-import { SelectionToolbar, isSuggestionActive, urgentPubkeys } from '@estiva-app/ui/editor'
+import { SelectionToolbar, isSuggestionActive, isSuggestionOpen, urgentPubkeys } from '@estiva-app/ui/editor'
 import { subscribeReferences, type ReferenceSection } from '@/api/references'
 import { cn } from '@/lib/cn'
 import { browserDrafts, type DraftStore } from '@/lib/drafts'
@@ -253,6 +253,8 @@ export function MessageBox({ kind = 'conversation', onSubmit, references, initia
   }
   submitRef.current = () => void submit()
   escapeRef.current = () => {
+    // An open `@`, `[` or `/` list takes the first Escape and closes; this keymap runs before it (f586437a).
+    if (isSuggestionOpen()) return false
     if (kind === 'edit') return (onCancel?.(), true)
     if (kind === 'reply' && !text.trim() && !files.length) return (onCancel?.(), true)
     editor?.commands.blur()
