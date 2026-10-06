@@ -12,6 +12,9 @@ import { act, fireEvent, render, screen } from '@testing-library/react'
 import type { Editor } from '@tiptap/react'
 import { MessageBox } from './MessageBox'
 import { createDraftStore, draftKeys } from '@/lib/drafts'
+import { encodeNpub } from '@estiva-app/protocol'
+import type { MentionPerson } from '@estiva-app/ui/editor'
+import { MentionPeopleProvider } from '@/components/editing/mentionables'
 
 /* jsdom implements neither `getClientRects` nor `getBoundingClientRect` on text
    nodes, and ProseMirror calls them when it scrolls the caret into view. */
@@ -83,6 +86,22 @@ describe('a writing box with a draft key', () => {
     submit()
     await vi.waitFor(() => expect(onSubmit).toHaveBeenCalled())
     expect(onSubmit.mock.calls[0]).toEqual([expect.any(String), [], { urgent: [BOB] }])
+  })
+
+  it('names a restored urgent chip once the directory arrives, not by a piece of its key', async () => {
+    const BOB = 'b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0'
+    const drafts = createDraftStore(memoryStorage())
+    const key = draftKeys.thread('t1')
+    drafts.write(key, `nostr:${encodeNpub(BOB)} please sign`, [BOB])
+    const box = (people: MentionPerson[]) => (
+      <MentionPeopleProvider value={people}>
+        <MessageBox onSubmit={() => {}} draftKey={key} drafts={drafts} />
+      </MentionPeopleProvider>
+    )
+    const { container, rerender } = render(box([]))
+    await vi.waitFor(() => expect(container.querySelector('[data-urgent-mention]')).not.toBeNull())
+    rerender(box([{ id: 'bob', name: 'Bob', pubkey: BOB }]))
+    await vi.waitFor(() => expect(container.querySelector('[data-urgent-mention]')).toHaveTextContent('@Bob'))
   })
 
   /*

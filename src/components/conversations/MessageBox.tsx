@@ -225,6 +225,18 @@ export function MessageBox({ kind = 'conversation', onSubmit, references, initia
     return () => void editor.off('create', seed)
   }, [editor, draftKey, kind])
 
+  // A restored urgent chip is labelled once, when the draft seeds; if the directory arrives later, name it then (CON-31).
+  useEffect(() => {
+    if (!editor || editor.isDestroyed || !editor.isInitialized) return
+    const tr = editor.state.tr
+    editor.state.doc.descendants((node, pos) => {
+      if (node.type.name !== 'urgentMention' || typeof node.attrs.pubkey !== 'string') return
+      const name = mentionable.find((p) => p.pubkey === node.attrs.pubkey)?.name
+      if (name && name !== node.attrs.label) tr.setNodeMarkup(pos, undefined, { ...node.attrs, label: name })
+    })
+    if (tr.docChanged) editor.view.dispatch(tr.setMeta('addToHistory', false))
+  }, [editor, mentionable])
+
   // Locked while sending, which takes the caret away; after a send it goes back, ready for the next one.
   const sent = useRef(false)
   useEffect(() => {
