@@ -62,6 +62,30 @@ describe('a writing box with a draft key', () => {
   })
 
   /*
+    CON-31: `!@Bob please sign`, left and come back to. The marker text of an
+    urgent mention with a key is the same `nostr:npub…` as an ordinary one —
+    the urgency is a tag (§13.1) — so the draft keeps whom it named urgently.
+  */
+  it('keeps an urgent mention urgent: typed, left, restored and sent', async () => {
+    const BOB = 'b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0'
+    const drafts = createDraftStore(memoryStorage())
+    const key = draftKeys.thread('t1')
+    const { unmount } = render(<MessageBox onSubmit={() => {}} draftKey={key} drafts={drafts} />)
+    await ready()
+    act(() => void textbox().editor.commands.insertContent([{ type: 'urgentMention', attrs: { id: 'bob', label: 'Bob', pubkey: BOB } }, { type: 'text', text: ' please sign' }]))
+    expect(drafts.readDraft(key)?.urgent).toEqual([BOB])
+    unmount()
+
+    const onSubmit = vi.fn(() => true)
+    const { container } = render(<MessageBox onSubmit={onSubmit} draftKey={key} drafts={drafts} />)
+    await vi.waitFor(() => expect(textbox()).toHaveTextContent('please sign'))
+    expect(container.querySelector('[data-urgent-mention]')).not.toBeNull()
+    submit()
+    await vi.waitFor(() => expect(onSubmit).toHaveBeenCalled())
+    expect(onSubmit.mock.calls[0]).toEqual([expect.any(String), [], { urgent: [BOB] }])
+  })
+
+  /*
     PEE-7's first symptom: "you start typing and you switch to a different
     topic, the text is kept there, which is weird". The component is reused as a
     list re-renders, so the destination changing is a prop change, not a mount.

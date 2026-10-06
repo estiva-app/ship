@@ -2,6 +2,7 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import type { Editor } from '@tiptap/react'
+import { NO_DRAFTS } from '@estiva-app/conversation'
 import { MessageBox } from './MessageBox'
 
 /* jsdom implements neither `getClientRects` nor `getBoundingClientRect` on text
@@ -158,13 +159,13 @@ describe('MessageBox', () => {
 // Found by Katerina, 30 September.
 describe('the box as it opens and grows', () => {
   it('opens with a caret, not the line selected — so the formatting strip does not show', async () => {
-    render(<MessageBox kind="reply" autoFocus onSubmit={() => true} drafts={{ read: () => undefined, write: () => {}, clear: () => {} }} />)
+    render(<MessageBox kind="reply" autoFocus onSubmit={() => true} drafts={NO_DRAFTS} />)
     const target = await ready('Reply…')
     await waitFor(() => expect(target.editor.state.selection.empty).toBe(true))
   })
 
   it('keeps no empty line after a list, so a bullet is no taller than a line of text', async () => {
-    render(<MessageBox kind="conversation" onSubmit={() => true} drafts={{ read: () => undefined, write: () => {}, clear: () => {} }} />)
+    render(<MessageBox kind="conversation" onSubmit={() => true} drafts={NO_DRAFTS} />)
     const target = await ready('Start a conversation…')
     type(target, 'a')
     act(() => void target.editor.commands.toggleBulletList())

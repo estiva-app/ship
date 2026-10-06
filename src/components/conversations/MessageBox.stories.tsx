@@ -3,12 +3,13 @@ import type { Imeta } from '@estiva-app/protocol'
 import { fn } from 'storybook/test'
 import { installFakeRelay } from '@/fixtures/fakeRelay'
 import { uploadAttachment } from '@/api/blobs'
+import { NO_DRAFTS } from '@estiva-app/conversation'
 import { MessageBox } from './MessageBox'
 
 installFakeRelay()
 
 /** Nothing is kept between visits to a story. */
-const noDrafts = { read: () => undefined, write: () => {}, clear: () => {} }
+const noDrafts = NO_DRAFTS
 
 /**
  * The writing box for conversations: Peek's box, on production's rules. What

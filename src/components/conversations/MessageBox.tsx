@@ -21,7 +21,7 @@ import { uploadAttachment } from '@/api/blobs'
 import { ReferenceNode, ReferenceProvider } from '@/components/ui/editorSchema'
 import { LinkDecoration } from '@/components/editing/linkDecoration'
 import { ShipSlashMenu, slashSections } from '@/components/editing/slashMenu'
-import { chipsAsReferences, composerTriggers } from '@/components/editing/composerTriggers'
+import { chipsAsReferences, composerTriggers, urgentChipsFrom } from '@/components/editing/composerTriggers'
 import { useMentionPeople } from '@/components/editing/mentionables'
 import { WRITING_BOX } from './writingBox'
 
@@ -192,7 +192,8 @@ export function MessageBox({ kind = 'conversation', onSubmit, references, initia
       onUpdate: ({ editor: e }) => {
         const next = markerOf(e)
         setText(next)
-        if (key.current) store.current.write(key.current, next)
+        // With whom it names urgently, which the text cannot say (CON-31).
+        if (key.current) store.current.write(key.current, next, urgentPubkeys(e))
       },
     },
     [],
@@ -202,8 +203,12 @@ export function MessageBox({ kind = 'conversation', onSubmit, references, initia
   useEffect(() => {
     if (!editor || editor.isDestroyed || kind === 'edit') return
     const seed = () => {
-      const draft = draftKey ? (store.current.read(draftKey) ?? '') : ''
-      editor.commands.setContent(editorDocFor(draft), { emitUpdate: false })
+      const kept = draftKey ? store.current.readDraft(draftKey) : undefined
+      const draft = kept?.text ?? ''
+      // The urgent chips come back urgent: the text alone gives every person back as an ordinary reference (CON-31).
+      const labelOf = (pubkey: string) => people.current.find((p) => p.pubkey === pubkey)?.name ?? `${pubkey.slice(0, 8)}…`
+      const doc = urgentChipsFrom(editorDocFor(draft) as never, kept?.urgent, labelOf)
+      editor.commands.setContent(doc as never, { emitUpdate: false })
       // A caret at the end, not the whole text selected: loading a draft left the line selected, and the formatting
       // strip showed on every reply box that opened (Katerina, 30 September).
       editor.view.dispatch(editor.state.tr.setSelection(Selection.atEnd(editor.state.doc)))
