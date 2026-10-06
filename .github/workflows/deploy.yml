@@ -24,7 +24,7 @@ on:
 # re-run is a new request. On 2026-10-05 a re-run of 2cd7bf1's deploy finished
 # after df29607's and put the older bundle back on ship.estiva.app with every run
 # green (80d55134). So a re-run never cancels a run in progress — it could be
-# the tip's own deploy — and `publish` waits on `tip` below.
+# the tip's own deploy — and `publish` checks it is still main's tip first.
 concurrency:
   group: deploy-ship-${{ github.ref }}
   cancel-in-progress: ${{ github.run_attempt == 1 }}
@@ -156,23 +156,33 @@ jobs:
           path: .smoke/
           include-hidden-files: true
 
-  # Whether this run's commit is still main's tip. A re-run builds the commit it
-  # was first run for, so re-running an old deploy would publish an old bundle
-  # over a newer one (80d55134). Asked of the API, not of the checkout, which
-  # only knows the commit it was given.
-  tip:
+  publish:
+    # The box pulls `:main` from a systemd timer with nobody watching, so a
+    # publish is a deploy: every check that can stop a broken bundle stops this.
+    # `gate` too (UIG-6): the rules stopped a deploy while they were a step, and
+    # moving them into a job of their own must not change that.
+    needs: [check, build, test, gate]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
+
     permissions:
       contents: read
-    outputs:
-      current: ${{ steps.tip.outputs.current }}
+      packages: write
+
     steps:
+      # Whether this run's commit is still main's tip. A re-run builds the
+      # commit it was first run for, so re-running an old deploy would publish
+      # an old bundle over a newer one (80d55134). A step of this job, not a job
+      # of its own: `gh run rerun --failed` re-runs only failed jobs and reuses
+      # the outputs of the ones that passed, so a separate check would answer
+      # for the first attempt. Asked of the API, not of the checkout, which only
+      # knows the commit it was given. Every later step waits on it.
       - id: tip
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          tip=$(gh api "repos/${{ github.repository }}/commits/main" --jq .sha)
+          tip=$(gh api "repos/${{ github.repository }}/git/ref/heads/main" --jq .object.sha) \
+            || { echo "::error title=publish stopped::could not read main's tip, so this run cannot tell whether it is current"; exit 1; }
           if [ "$tip" = "${{ github.sha }}" ]; then
             echo "current=true" >> "$GITHUB_OUTPUT"
           else
@@ -182,24 +192,11 @@ jobs:
             echo "current=false" >> "$GITHUB_OUTPUT"
           fi
 
-  publish:
-    # The box pulls `:main` from a systemd timer with nobody watching, so a
-    # publish is a deploy: every check that can stop a broken bundle stops this.
-    # `gate` too (UIG-6): the rules stopped a deploy while they were a step, and
-    # moving them into a job of their own must not change that. `tip` says why
-    # when it skips this.
-    needs: [check, build, test, gate, tip]
-    if: needs.tip.outputs.current == 'true'
-    runs-on: ubuntu-latest
+      - if: steps.tip.outputs.current == 'true'
+        uses: actions/checkout@v4
 
-    permissions:
-      contents: read
-      packages: write
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: estiva-app/estiva-foundation/.github/actions/install@ci-v1
+      - if: steps.tip.outputs.current == 'true'
+        uses: estiva-app/estiva-foundation/.github/actions/install@ci-v1
 
       # The image is an envelope for dist/ship since PER-16, as Peek's is for
       # dist/. The relay URL is the workspace, so it is baked into the bundle
@@ -207,21 +204,25 @@ jobs:
       # design. CLIENT_ID must match a `client_id` seeded in Estiva ID, or /sign
       # refuses every request as an unknown app.
       - name: Build
+        if: steps.tip.outputs.current == 'true'
         run: npm run build
         env:
           RELAY_URL: https://estiva.estiva.app
           ID_BASE: https://id.estiva.app
           CLIENT_ID: estiva-ship
 
-      - uses: docker/setup-buildx-action@v3
+      - if: steps.tip.outputs.current == 'true'
+        uses: docker/setup-buildx-action@v3
 
-      - uses: docker/login-action@v3
+      - if: steps.tip.outputs.current == 'true'
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push
+        if: steps.tip.outputs.current == 'true'
         uses: docker/build-push-action@v6
         with:
           context: .
