@@ -12,7 +12,7 @@ import {
   type Imeta,
 } from '@estiva-app/protocol'
 import { FieldLine, FilePicker, richTextClassName } from '@estiva-app/ui'
-import { EditorBlockHandle, SelectionToolbar, blockDropCursor } from '@estiva-app/ui/editor'
+import { EditorBlockHandle, SelectionToolbar, blockDropCursor, isSuggestionOpen } from '@estiva-app/ui/editor'
 import { uploadAttachment } from '@/api/blobs'
 import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
 import { AttachmentNode, BlockId, ReferenceNode, ReferenceProvider, UnknownBlock } from '@/components/ui/editorSchema'
@@ -152,6 +152,8 @@ export function LiveDescription({
         attributes: { 'aria-label': 'Description', role: 'textbox', 'aria-multiline': 'true', class: richTextClassName('default', 'outline-none') },
         handleKeyDown: (view, event) => {
           if (event.key !== 'Escape') return false
+          // An open `/` list closes first; the next Escape leaves (e33e9a4f, as the message box since f586437a).
+          if (isSuggestionOpen()) return false
           const { selection, tr } = view.state
           // Words selected: the first Escape lets go of them, which also closes
           // the formatting strip. Blurring with the strip open does not work —

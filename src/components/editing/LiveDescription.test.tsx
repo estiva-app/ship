@@ -216,6 +216,21 @@ describe('a description whose save is refused', () => {
     await waitFor(() => expect(onCommit).toHaveBeenCalledTimes(2))
     expect(textbox).toHaveTextContent('a description and more')
   })
+
+  it('closes an open / list on the first Escape and stays in the field; the second leaves (e33e9a4f)', async () => {
+    const onCommit = vi.fn(async () => true)
+    render(<LiveDescription value="" format="marker" onCommit={onCommit} resolved={{}} />)
+    const box = await ready()
+    box.tabIndex = -1
+    await type(box, '/')
+    expect(screen.getByRole('listbox')).toBeInTheDocument()
+    expect(document.activeElement).toBe(box)
+    await act(() => void fireEvent.keyDown(box, { key: 'Escape' }))
+    expect(screen.queryByRole('listbox')).toBeNull()
+    expect(document.activeElement).toBe(box)
+    await act(() => void fireEvent.keyDown(box, { key: 'Escape' }))
+    expect(document.activeElement).not.toBe(box)
+  })
 })
 
 /*
