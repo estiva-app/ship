@@ -94,6 +94,13 @@ describe("a file's members, read from public events", () => {
     expect((await facts([added, join(ME, 'false', ME, 1700)])).membership).toEqual({ member: false })
     expect((await facts([added, join(ME, 'false', ELSE, 1700)])).membership).toEqual({ member: true, since: 1600 })
   })
+
+  /* SHI-31: the Members dialog's roster comes from the same read, and the same fold. */
+  it('lists every member — the owner, whoever commented or was added — and nobody who left', async () => {
+    const { members } = await facts([comment(ELSE, 1500), join(ME, 'true', ELSE, 1600), join(ME, 'false', ME, 1700)])
+    expect([...members.keys()].sort()).toEqual([ELSE, OWNER].sort())
+    expect(members.get(ELSE)).toEqual({ member: true, since: 1500 })
+  })
 })
 
 describe('the mute list is read, not written', () => {

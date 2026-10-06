@@ -59,6 +59,17 @@ describe('no History row prints a wire value (564ee489)', () => {
   const rows = (activity: Change[]) =>
     historyFor(ISSUE, { activity, projects } as unknown as FolderState, directory).map((entry) => entry.text)
 
+  /* SHI-31: a membership change names the person, never the `member:<key>` field. */
+  it('says joined, left and added, and leaves out a leave somebody else signed', () => {
+    const by = (author: string, field: string, value: string) => ({ ...change(field, value), author })
+    expect(rows([
+      by(AUTHOR, `member:${AUTHOR}`, 'true'),
+      by(AUTHOR, `member:${ASSIGNEE}`, 'true'),
+      by(AUTHOR, `member:${ASSIGNEE}`, 'false'),
+      by(AUTHOR, `member:${AUTHOR}`, 'false'),
+    ])).toEqual(['left', `added name:${ASSIGNEE.slice(0, 4)}`, 'joined'])
+  })
+
   it('says a status by its label', () => {
     expect(rows([change('status', 'in_progress'), change('status', 'done')])).toEqual(['set status to Done', 'set status to In Progress'])
   })

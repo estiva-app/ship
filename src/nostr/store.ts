@@ -29,7 +29,7 @@ import {
 import { findNaddrs, naddrToAddr, buildReaction, buildEdit, buildDeletion as buildEventDeletion } from '@estiva-app/protocol'
 import { planArchiveFolder, planCreateFolder, planDeleteFolder, planMoveFromFolders, planPlaceFile, planRenameFolder, planUnlistFile, type FolderRef, type MovableFile, type MoveRefusal } from '@estiva-app/interop'
 import { foldFolder, type FolderState } from './fold'
-import { decorationsOf, foldAttachments, foldEdits, URGENT_TAG, type Decorations, type EditFold, type QueryFn } from '@estiva-app/conversation'
+import { buildMembershipChange, decorationsOf, foldAttachments, foldEdits, URGENT_TAG, type Decorations, type EditFold, type QueryFn } from '@estiva-app/conversation'
 import { anchorIndex, type AnchorIndex } from './references'
 import { directoryFrom, type Directory } from './profiles'
 import { KIND } from './kinds'
@@ -824,6 +824,16 @@ export class Store {
     contentFormat?: string
   }): Promise<PublishResult> {
     return this.publish(buildChange(this.signer.pubkey, Date.now(), args))
+  }
+
+  /**
+   * Join, leave, or add somebody to a file (SPEC §11.8 *The membership
+   * change*): one `kind:1851` with `field: member:<person>`, the one Peek
+   * publishes. A leave counts only when the person signs it, so `member: false`
+   * is for oneself; `true` may name anyone. Signed only on a person's click.
+   */
+  setMembership(args: { folder: string; file: string; person: string; member: boolean }): Promise<PublishResult> {
+    return this.publish(buildMembershipChange(this.signer.pubkey, Date.now(), args))
   }
 
   /**

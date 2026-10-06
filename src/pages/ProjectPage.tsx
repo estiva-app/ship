@@ -39,6 +39,8 @@ import {
   type WorkspaceState,
 } from '@/api'
 import { useRelated } from '@/api/useRelated'
+import { Members } from '@/components/Members'
+import { membershipActions } from './membership'
 import { useReferencePage } from '@/api/references'
 import type { ThreadData } from '@/components/ConversationThread'
 import type { ActivityItem } from '@/components/Activity'
@@ -512,6 +514,21 @@ export function ProjectPage({
         }
         // Archived, its own fields stay shut until it is unarchived; comments stay open (SHI-36).
         lockedReason={lockedReason(archive)}
+        members={
+          <Members
+            members={judges.members}
+            me={me}
+            people={people}
+            nameOf={directory.nameOf}
+            pictureOf={(pubkey) => directory.personOf(pubkey).picture}
+            roles={[{ pubkey: project.author, role: 'Author' }, ...(project.lead ? [{ pubkey: project.lead, role: 'Lead' }] : [])]}
+            // Membership is per file: leaving the project leaves its issues as they are (Miky, 2026-10-06).
+            note="Your issues here still notify you."
+            {...membershipActions({ kind: 'project', project }, say, async () => {
+              await Promise.all([judges.reload(), refresh([project.contentFolder])])
+            })}
+          />
+        }
         crumbs={{ projectsHref: href({ name: 'projects', archived: false }), title: project.title }}
         header={{
           title: project.title,
