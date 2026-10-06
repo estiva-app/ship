@@ -20,6 +20,11 @@ import { useReferencePage } from '@/api/references'
  * app's `activity`: "<who> set <field> to <value>", a pubkey in the value
  * shown as the person's name, an empty value as "(none)". Read off the
  * fold's list in the fold's order, then reversed for reading.
+ *
+ * A description is the exception: its value is a whole document (a block
+ * tree since RIC-8, marker text before), written by other people and other
+ * apps, and the body is already on the page. So every description change
+ * reads "edited the description", whatever its format or value (RIC-15).
  */
 export function historyFor(issueAddr: string, state: FolderState, directory: DirectoryView): HistoryEntry[] {
   return state.activity
@@ -28,7 +33,7 @@ export function historyFor(issueAddr: string, state: FolderState, directory: Dir
       id: change.id,
       by: directory.personOf(change.author),
       at: change.createdAt,
-      text: `set ${change.field} to ${change.value === '' ? '(none)' : /^[0-9a-f]{64}$/.test(change.value) ? directory.nameOf(change.value) : change.value}`,
+      text: change.field === 'description' ? 'edited the description' : `set ${change.field} to ${change.value === '' ? '(none)' : /^[0-9a-f]{64}$/.test(change.value) ? directory.nameOf(change.value) : change.value}`,
     }))
     .reverse()
 }
