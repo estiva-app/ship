@@ -130,6 +130,8 @@ export function threadFor(
     conversation and the index is folded once per workspace read.
   */
   attachments?: AttachmentIndex,
+  /** Whom each message names urgently, beside the fold for the same reason (CON-24). */
+  urgent?: Record<string, string[]>,
 ): ThreadData {
   const message = (m: FolderState['conversations'][number]['root']) => {
     const edit = edits?.[m.id]
@@ -153,6 +155,8 @@ export function threadFor(
       // Files, read off `imeta` beside the fold — CON-12. Undefined for the
       // messages that carry none, which is nearly all of them.
       files: attachments?.[m.id],
+      // The urgent keys of the message as sent: an edit carries none, so an edited message keeps them (CON-24).
+      urgent: urgent?.[m.id],
     }
   }
   return { id: conversation.id, root: message(conversation.root), replies: conversation.replies.map(message) }
@@ -236,7 +240,7 @@ export function activityFor(
   directory: DirectoryView,
 ): { items: ActivityItem[]; truncated: number } {
   const mentions: ActivityItem[] = mentionsOf(state.conversations, addr, state.anchors).map((conversation) => ({
-    thread: threadFor(conversation, directory, undefined, addr, state.edits, state.attachments),
+    thread: threadFor(conversation, directory, undefined, addr, state.edits, state.attachments, state.urgent),
     relation: 'mention' as const,
     ...placeOf(conversation.root.folder, state),
   }))
@@ -416,7 +420,7 @@ export function ProjectPage({
   useMarkRead(useMemo(() => [channelContext(record), fileContext(project?.addr)], [record, project]), tab === 'activity' ? drawn.rootsAt : undefined)
   useMarkRead(tab === 'activity' ? shownThreads.map(threadContext) : [], drawn.repliesAt)
   const threads = useMemo(
-    () => conversations.map((c) => threadFor(c, directory, project ? { value: project.description, format: project.descriptionFormat } : undefined, project?.addr, state.edits, state.attachments)),
+    () => conversations.map((c) => threadFor(c, directory, project ? { value: project.description, format: project.descriptionFormat } : undefined, project?.addr, state.edits, state.attachments, state.urgent)),
     [conversations, directory, project],
   )
   /* The divider in the feed (CRO-13). A root about the project — its own `a`

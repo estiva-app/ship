@@ -31,6 +31,7 @@ export function RichText({
   size,
   nameOf,
   resolved,
+  urgent,
   hideStandalone,
 }: {
   value: string
@@ -46,6 +47,8 @@ export function RichText({
    * cannot be drawn in two states on one screen.
    */
   resolved?: Record<string, ForeignObject | null | undefined>
+  /** A message's urgent keys, which draw their person chips urgent — SPEC §13.1, CON-24. */
+  urgent?: readonly string[]
   /**
    * Skip a block that is nothing but one reference.
    *
@@ -77,7 +80,7 @@ export function RichText({
     <PackageRichText
       blocks={blocks}
       size={size}
-      renderReference={(reference) => <Reference uri={reference} object={resolved?.[reference]} nameOf={nameOf} />}
+      renderReference={(reference) => <Reference uri={reference} object={resolved?.[reference]} nameOf={nameOf} urgent={urgent} />}
       renderBlock={drawAttachment}
     />
   )

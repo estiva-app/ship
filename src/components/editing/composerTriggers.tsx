@@ -22,10 +22,17 @@ export function composerTriggers(read: {
   people: () => readonly MentionPerson[]
   references: (query: string) => readonly ReferenceSection[]
   subscribe?: (listener: () => void) => () => void
+  /**
+   * Whether `!@` offers an urgent pick. `false` in a box that edits a sent
+   * message: an edit carries no tags, so a new pick could never be sent. The
+   * chip itself stays, so the message's own urgent mentions load urgent
+   * (Miky, CON-24 kickoff, 2026-10-07).
+   */
+  urgent?: boolean
 }) {
   return [
     PersonMention.configure({ people: read.people }),
-    UrgentPersonMention.configure({ people: read.people }),
+    UrgentPersonMention.configure({ people: read.people, ...(read.urgent === false ? { suggestion: { allow: () => false } } : {}) }),
     CaptionedReference.configure({ icon: REFERENCE_ICON }),
     ReferenceTrigger.configure({
       items: () => [],

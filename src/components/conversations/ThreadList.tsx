@@ -147,11 +147,11 @@ function Message({ message, resolved, resolving, nameOf, reactions, onToggleReac
         )}
       </div>
       {editing && onEdit ? (
-        <MessageBox kind="edit" autoFocus initial={message.body} nameOf={nameOf} drafts={drafts} onSubmit={(body) => onEdit(body)} onCancel={() => setEditing(false)} />
+        <MessageBox kind="edit" autoFocus initial={message.body} initialUrgent={message.urgent} nameOf={nameOf} drafts={drafts} onSubmit={(body) => onEdit(body)} onCancel={() => setEditing(false)} />
       ) : (
         <>
           <div className="break-words">
-            <RichText value={message.body} format={MESSAGE_FORMAT} hideStandalone={(reference) => resolved?.[reference] !== null} nameOf={nameOf} resolved={resolved} />
+            <RichText value={message.body} format={MESSAGE_FORMAT} hideStandalone={(reference) => resolved?.[reference] !== null} nameOf={nameOf} resolved={resolved} urgent={message.urgent} />
           </div>
           <FileAttachments files={message.files} />
           {attached.length > 0 && resolving && <SkeletonBar className="h-16 w-full" data-foreign-references="loading" />}

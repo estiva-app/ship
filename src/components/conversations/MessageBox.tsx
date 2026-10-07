@@ -57,6 +57,8 @@ export interface MessageBoxProps {
   references?: (query: string) => readonly ReferenceSection[]
   /** Edit: the text as it stands. */
   initial?: string
+  /** Edit: whom the message names urgently, its `urgent` tags — those chips load urgent (CON-24). */
+  initialUrgent?: readonly string[]
   /** Edit: leave without saving. Reply: Escape in an empty box. */
   onCancel?: () => void
   autoFocus?: boolean
@@ -107,7 +109,7 @@ export interface MessageBoxProps {
  * A new conversation is Peek's tall box, the tools on a row under the text; a
  * reply is one short line with the tools at its end (Katerina, 30 September).
  */
-export function MessageBox({ kind = 'conversation', onSubmit, references, initial = '', onCancel, autoFocus = false, disabledReason, draftKey, drafts = DEFAULT_DRAFTS, upload = uploadAttachment, nameOf, look = 'box', me, className }: MessageBoxProps) {
+export function MessageBox({ kind = 'conversation', onSubmit, references, initial = '', initialUrgent, onCancel, autoFocus = false, disabledReason, draftKey, drafts = DEFAULT_DRAFTS, upload = uploadAttachment, nameOf, look = 'box', me, className }: MessageBoxProps) {
   const [text, setText] = useState(initial)
   const [files, setFiles] = useState<readonly Imeta[]>([])
   const [busy, setBusy] = useState(false)
@@ -126,6 +128,8 @@ export function MessageBox({ kind = 'conversation', onSubmit, references, initia
   names.current = nameOf
   const offered = useRef(references)
   offered.current = references
+  // An urgent chip's label is fixed when it is drawn; the directory, then the names the references draw by.
+  const labelOf = (pubkey: string) => people.current.find((p) => p.pubkey === pubkey)?.name ?? names.current?.(pubkey) ?? `${pubkey.slice(0, 8)}…`
 
   const unchanged = kind === 'edit' && text.trim() === initial.trim()
   const canSubmit = (text.trim().length > 0 || (kind !== 'edit' && files.length > 0)) && !unchanged && !busy && !uploading && !disabledReason
@@ -180,12 +184,14 @@ export function MessageBox({ kind = 'conversation', onSubmit, references, initia
         StarterKit.configure({ link: false, strike: false, heading: { levels: [1, 2] }, trailingNode: false }),
         ReferenceNode,
         LinkDecoration,
-        ...composerTriggers({ people: () => people.current, references: (query) => offered.current?.(query) ?? [], subscribe: subscribeReferences }),
+        // No new urgent pick in an edit, which carries no tags (CON-24); its own urgent chips still load.
+        ...composerTriggers({ people: () => people.current, references: (query) => offered.current?.(query) ?? [], subscribe: subscribeReferences, urgent: kind !== 'edit' }),
         // No Table: marker text has none (§13.2). No File in an edit, which keeps the message's files as they are.
-        ShipSlashMenu(slashSections({ onFile: kind === 'edit' ? undefined : () => picker.current?.click(), triggers: true })),
+        ShipSlashMenu(slashSections({ onFile: kind === 'edit' ? undefined : () => picker.current?.click(), triggers: true, urgent: kind !== 'edit' })),
         keys,
       ],
-      content: editorDocFor(initial),
+      // The text gives every person back as an ordinary reference; the message's urgent ones come back urgent (CON-24).
+      content: urgentChipsFrom(editorDocFor(initial) as never, initialUrgent, labelOf) as never,
       editable: !disabledReason,
       autofocus: autoFocus ? 'end' : false,
       editorProps: {
@@ -208,8 +214,6 @@ export function MessageBox({ kind = 'conversation', onSubmit, references, initia
       const kept = draftKey ? store.current.readDraft(draftKey) : undefined
       const draft = kept?.text ?? ''
       // The urgent chips come back urgent: the text alone gives every person back as an ordinary reference (CON-31).
-      // An urgent chip's label is fixed when it is drawn; the directory, then the names the references draw by.
-      const labelOf = (pubkey: string) => people.current.find((p) => p.pubkey === pubkey)?.name ?? names.current?.(pubkey) ?? `${pubkey.slice(0, 8)}…`
       const doc = urgentChipsFrom(editorDocFor(draft) as never, kept?.urgent, labelOf)
       editor.commands.setContent(doc as never, { emitUpdate: false })
       // A caret at the end, not the whole text selected: loading a draft left the line selected, and the formatting

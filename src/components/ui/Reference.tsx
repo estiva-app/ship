@@ -67,6 +67,7 @@ export function Reference({
   uri,
   object,
   nameOf,
+  urgent,
   className,
 }: {
   uri: string
@@ -82,6 +83,12 @@ export function Reference({
   object?: ForeignObject | null
   /** The workspace directory, for a person. */
   nameOf?: (pubkey: string) => string
+  /**
+   * The keys the message names urgently — its `["urgent", <pubkey>]` tags
+   * (SPEC §13.1). A person chip for one of them wears the urgent tone, for
+   * every reader, as it did in the box it was written in (CON-24).
+   */
+  urgent?: readonly string[]
   className?: string
 }) {
   const short = `${uri.replace(/^nostr:/, '').slice(0, 12)}…`
@@ -100,7 +107,7 @@ export function Reference({
     const named = !!name && !pubkey?.startsWith(name.replace('…', ''))
     const chip = (
       <InlineChip
-        tone={named ? 'person' : 'quiet'}
+        tone={named ? (pubkey && urgent?.includes(pubkey) ? 'urgent' : 'person') : 'quiet'}
         data-reference="person"
         data-mention={pubkey ?? undefined}
         data-resolved={named ? 'true' : 'false'}
