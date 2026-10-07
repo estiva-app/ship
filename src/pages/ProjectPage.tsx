@@ -1,5 +1,6 @@
 import { IconLinkOff } from '@tabler/icons-react'
 import { newestDrawn, useMarkRead, useShownThreads } from '@/lib/useMarkRead'
+import { useNewSince } from '@/lib/useNewSince'
 import { ownConversations, recordChannel } from '@/lib/ownConversation'
 import { pointerToAddress, referenceToPointer, resolveBlockAnchor, type ContentFormat } from '@estiva-app/protocol'
 import type { AttachmentIndex, EditIndex } from '@/api'
@@ -426,10 +427,13 @@ export function ProjectPage({
      cases. */
   const merged = useMergedReadState()
   const judges = useFeedJudges(project ? { addr: project.addr, createdAt: project.createdAt } : undefined, channelContext(record))
-  const unread = useMemo(() => {
+  const verdictAt = useMemo(() => {
+    if (!judges.file) return () => undefined
     const aboutProject = new Set(conversations.filter((c) => project && (state.anchors[c.root.id] ?? []).includes(project.addr)).map((c) => c.id))
-    return unreadByThread(conversations, merged, (conversation) => (aboutProject.has(conversation.id) ? judges.file : judges.channel))
-  }, [merged, judges, project, conversations, state.anchors])
+    return (frontier: Readonly<Record<string, number>>) => unreadByThread(conversations, frontier, (conversation) => (aboutProject.has(conversation.id) ? judges.file : judges.channel))
+  }, [judges, project, conversations, state.anchors])
+  // Judged against the frontier this visit opened on, so the divider outlives the page's own marks (99557309).
+  const { unread, stillUnread } = useNewSince(project?.addr, merged, verdictAt)
   const people = useMemo(() => railPeople(state, directory), [state, directory])
   /*
     What somebody placed under this project from another app — RFC 0.5 §10.7.
@@ -525,6 +529,7 @@ export function ProjectPage({
         related={related}
         threads={threads}
         unread={unread}
+        stillUnread={stillUnread}
         onThreadShown={onThreadShown}
         // A project conversation is already in the topic it belongs to, so a
         // reference would be noise (withReference: false), as the old app has it.

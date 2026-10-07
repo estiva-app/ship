@@ -213,8 +213,12 @@ interface ThreadProps {
   pageThreads: readonly ThreadData[]
   onReply: (threadId: string, text: string, files: readonly Imeta[], picks?: Picks) => Promise<boolean | void> | boolean | void
   disabledReason?: string
-  /** This thread's unread message ids, oldest first. */
+  /** This thread's message ids that were new when the page opened, oldest first: the divider and opening by itself. */
   unread?: readonly string[]
+  /** This thread's message ids still unread now, for "N new" (SHI-38). */
+  stillUnread?: readonly string[]
+  /** False while read state is loading: a thread drawn then opens by itself once it knows (99557309). */
+  judged?: boolean
   resolved?: Record<string, ForeignObjectData | null | undefined>
   resolving?: boolean
   nameOf?: (pubkey: string) => string
@@ -231,14 +235,22 @@ interface ThreadProps {
 /** Replies hang one step in, behind today's left rule. */
 const REPLY_RULE = 'ml-2.5 border-l-2 border-border-default pl-3'
 
-function Thread({ thread, pageThreads, onReply, disabledReason, unread, resolved, resolving, nameOf, reactionsBy, onReact, onDeleteMessage, onEditMessage, upload, drafts, viewer, onShown }: ThreadProps) {
+function Thread({ thread, pageThreads, onReply, disabledReason, unread, stillUnread, judged = true, resolved, resolving, nameOf, reactionsBy, onReact, onDeleteMessage, onEditMessage, upload, drafts, viewer, onShown }: ThreadProps) {
   const references = useCallback((query: string) => referenceSections(messageScope(pageThreads, thread.id), query, nameOf), [pageThreads, thread.id, nameOf])
   const unreadFrom = unread?.[0]
   // The replies that are new to you, not every reply after the first new one:
   // your own reply below it is never new, and an unread root leaves its
   // replies to their own verdict (SHI-38).
-  const newCount = unread ? thread.replies.filter((reply) => unread.includes(reply.id)).length : 0
-  const [open, setOpen] = useState(newCount > 0)
+  const newIn = (ids: readonly string[] | undefined) => (ids ? thread.replies.filter((reply) => ids.includes(reply.id)).length : 0)
+  const newCount = newIn(stillUnread)
+  const [open, setOpen] = useState(newIn(unread) > 0)
+  // Drawn before read state loaded: open once the verdict comes, and only then —
+  // a reply arriving later lights "N new" and leaves the thread as it is.
+  const [judgedYet, setJudgedYet] = useState(judged)
+  if (judged && !judgedYet) {
+    setJudgedYet(true)
+    if (newIn(unread) > 0) setOpen(true)
+  }
   useEffect(() => {
     if (!open || !onShown) return
     onShown(thread.id, true)
@@ -341,7 +353,7 @@ export function ThreadListView(props: ThreadListViewProps) {
         <ol className="flex flex-col gap-3">
           {threads.map((thread) => (
             <li key={thread.id}>
-              <Thread thread={thread} pageThreads={threads} unread={unread?.[thread.id]} onShown={props.onThreadShown} {...threadProps(props)} />
+              <Thread thread={thread} pageThreads={threads} unread={unread?.[thread.id]} stillUnread={(props.stillUnread ?? unread)?.[thread.id]} judged={unread !== undefined} onShown={props.onThreadShown} {...threadProps(props)} />
             </li>
           ))}
         </ol>

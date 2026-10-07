@@ -16,13 +16,15 @@ const fetchReadState = vi.fn<() => Promise<Pick<FetchedReadState, 'reachable' | 
 /** Typed loosely on purpose: the assertion is about argument 4, the blob. */
 const publishReadState = vi.fn<(...args: unknown[]) => Promise<{ ok: boolean }>>(async () => ({ ok: true }))
 
+const decryptUnlessRefused = vi.fn<(ciphertext: string) => Promise<string | undefined>>(async () => undefined)
+
 vi.mock('./store', () => ({
   relay: {},
   signer: { pubkey: 'me', sign: async (e: unknown) => e },
 }))
 vi.mock('./nip44', () => ({
   nip44: { encrypt: async (p: string) => p, decrypt: async () => undefined },
-  nip44UnlessRefused: { decrypt: async () => undefined },
+  nip44UnlessRefused: { decrypt: (ciphertext: string) => decryptUnlessRefused(ciphertext) },
 }))
 const signedIn = vi.fn(() => true)
 vi.mock('../auth/estivaId', () => ({ signedIn: () => signedIn() }))
@@ -354,5 +356,87 @@ describe('what the screen judges against only moves forward (SHI-38)', () => {
     const second = renderHook(() => useMergedReadState())
     await waitFor(() => expect(second.result.current[THEIRS]).toBe(6000))
     expect(second.result.current[OURS]).toBe(1000)
+  })
+})
+
+// 99557309: the divider was judged against the page's own marks, so it went
+// about a second after it was drawn; and before the first fetch, every thread
+// since the join was new.
+describe('the frontier a visit opened on stays put (99557309)', () => {
+  beforeEach(async () => {
+    vi.clearAllMocks()
+    const { resetReadStateForTests } = await import('./readStateSync')
+    resetReadStateForTests()
+  })
+
+  const page = async () => {
+    const { useMergedReadState, useOpeningReadState } = await import('./readStateSync')
+    return ({ visit }: { visit: string | undefined }) => ({ merged: useMergedReadState(), opening: useOpeningReadState(visit) })
+  }
+
+  it('is undefined until the first fetch lands, not empty', async () => {
+    let land: (value: { reachable: true; merged: Record<string, number> }) => void = () => {}
+    fetchReadState.mockReturnValue(new Promise((resolve) => (land = resolve)))
+    const { result } = renderHook(await page(), { initialProps: { visit: 'issue' } })
+    expect(result.current.opening).toBeUndefined()
+
+    await act(async () => land({ reachable: true, merged: { [THEIRS]: 5000 } }))
+    expect(result.current.opening).toEqual({ [THEIRS]: 5000 })
+  })
+
+  it("leaves out the visit's own marks, while the live frontier takes them at once", async () => {
+    const { markRead } = await import('./readStateSync')
+    fetchReadState.mockResolvedValue({ reachable: true, merged: { [THEIRS]: 5000 }, own: undefined })
+    const { result } = renderHook(await page(), { initialProps: { visit: 'issue' } })
+    await waitFor(() => expect(result.current.opening).toEqual({ [THEIRS]: 5000 }))
+
+    act(() => markRead([THEIRS], 7_000_000))
+    expect(result.current.merged[THEIRS]).toBe(7000)
+    expect(result.current.opening).toEqual({ [THEIRS]: 5000 })
+  })
+
+  it('leaves out a mark made before the first fetch landed, and keeps one made before the visit', async () => {
+    const { markRead } = await import('./readStateSync')
+    act(() => markRead([OURS], 3_000_000))
+    let land: (value: { reachable: true; merged: Record<string, number> }) => void = () => {}
+    fetchReadState.mockReturnValue(new Promise((resolve) => (land = resolve)))
+    const { result } = renderHook(await page(), { initialProps: { visit: 'issue' } })
+
+    // The dwell fires before a slow first fetch (7.7 s on production, 7 Oct).
+    act(() => markRead([THEIRS], 7_000_000))
+    await act(async () => land({ reachable: true, merged: { [THEIRS]: 5000 } }))
+    expect(result.current.opening).toEqual({ [THEIRS]: 5000, [OURS]: 3000 })
+  })
+
+  it('opens on a whole frontier only: not on a fetch whose decrypts were refused', async () => {
+    const { useMergedReadState } = await import('./readStateSync')
+    // The package asks the seam, which a 429 makes throw; it keeps going without the slot.
+    fetchReadState.mockImplementationOnce((async (_query: unknown, _pubkey: unknown, nip44: { decrypt: (c: string) => Promise<unknown> }) => {
+      await nip44.decrypt('slot').catch(() => undefined)
+      return { reachable: true, merged: { [THEIRS]: 5000 }, own: undefined }
+    }) as never)
+    decryptUnlessRefused.mockRejectedValueOnce(new Error('429'))
+    const { result } = renderHook(await page(), { initialProps: { visit: 'issue' } })
+    await waitFor(() => expect(result.current.merged[THEIRS]).toBe(5000))
+    expect(result.current.opening).toBeUndefined()
+
+    // The next pass decrypts everything.
+    fetchReadState.mockResolvedValue({ reachable: true, merged: { [THEIRS]: 5000, [OURS]: 6000 }, own: undefined })
+    renderHook(() => useMergedReadState())
+    await waitFor(() => expect(result.current.opening).toEqual({ [THEIRS]: 5000, [OURS]: 6000 }))
+  })
+
+  it('takes a new frontier, marks and all, when the visit changes', async () => {
+    const { markRead } = await import('./readStateSync')
+    fetchReadState.mockResolvedValue({ reachable: true, merged: { [THEIRS]: 5000 }, own: undefined })
+    const { result, rerender } = renderHook(await page(), { initialProps: { visit: 'issue' } })
+    await waitFor(() => expect(result.current.opening).toBeDefined())
+    act(() => markRead([THEIRS], 7_000_000))
+    expect(result.current.opening?.[THEIRS]).toBe(5000)
+
+    rerender({ visit: 'project' })
+    expect(result.current.opening?.[THEIRS]).toBe(7000)
+    rerender({ visit: 'issue' })
+    expect(result.current.opening?.[THEIRS]).toBe(7000)
   })
 })

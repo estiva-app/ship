@@ -223,8 +223,15 @@ export type UnreadByThread = Readonly<Record<string, readonly string[]>>
 
 export interface ConversationsProps {
   threads: ThreadData[]
-  /** Which messages are new to the reader: the divider goes above each thread's first, and "N new" counts its replies (SHI-38). */
+  /**
+   * Which messages were new to the reader when the page opened: the divider goes
+   * above each thread's first, and a thread holding a new reply opens by itself.
+   * Held for the visit, so the divider stays while it is read (99557309).
+   * Undefined while read state loads: nothing is new yet.
+   */
   unread?: UnreadByThread
+  /** Which are still unread now: "N new" counts these, and leaves once they are read (SHI-38). Defaults to `unread`. */
+  stillUnread?: UnreadByThread
   /** The text and the files already on the relay — SHI-2. See `Composer`. `blockId` when it starts from a block's menu — RIC-18. */
   onStart: (text: string, files: readonly Imeta[], picks?: Picks, blockId?: string) => Promise<boolean | void> | boolean | void
   /**

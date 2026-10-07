@@ -22,7 +22,7 @@
  * because the cross-slot merge is grow-only the loss stays invisible until this
  * is the last slot standing.
  */
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRefresh } from '@/lib/useRefresh'
 import { relay, signer } from './store'
 import { nip44, nip44UnlessRefused } from './nip44'
@@ -39,6 +39,7 @@ import {
   rotateSlotId,
   toContextSeconds,
   type FetchedReadState,
+  type Nip44,
   type QueryFn,
   type SlotIdentity,
 } from '@estiva-app/conversation'
@@ -81,9 +82,25 @@ const query: QueryFn = (filters) => relay.query(filters as never)
  */
 let slotCache = createSlotCache()
 
-/** Everything the relay holds of the person's read state, merged. */
-function loadReadState(): Promise<FetchedReadState> {
-  return fetchReadState(query, signer.pubkey, nip44UnlessRefused, currentIdentity(), Date.now(), READ_STATE_HORIZON_DAYS, slotCache)
+/**
+ * Everything the relay holds of the person's read state, merged.
+ *
+ * `complete` is false when a decrypt was refused (a 429 above all): the package
+ * then asks nothing more that round, and a slot this tab has not decrypted
+ * before is missing from `merged` altogether — on a cold tab, most of them
+ * (99557309, 7 Oct: four probes in a minute, five dividers).
+ */
+async function loadReadState(): Promise<FetchedReadState & { complete: boolean }> {
+  let complete = true
+  const decrypt: Pick<Nip44, 'decrypt'> = {
+    decrypt: (ciphertext) =>
+      nip44UnlessRefused.decrypt(ciphertext).catch((error: unknown) => {
+        complete = false
+        throw error
+      }),
+  }
+  const state = await fetchReadState(query, signer.pubkey, decrypt, currentIdentity(), Date.now(), READ_STATE_HORIZON_DAYS, slotCache)
+  return { ...state, complete }
 }
 
 /** Apply markers, taking the later of each, and cap to the byte ceiling. What the cap evicted is reported. */
@@ -106,6 +123,9 @@ export const READ_DWELL_MS = 1500
 
 /** How often the merged frontier is re-read. Deliberately not the 5s poll. */
 export const READ_STATE_REFRESH_MS = 30_000
+
+/** How soon a tab with no whole frontier yet asks again after a refused decrypt: long enough for `/nip44/*`'s per-minute quota to give some back. */
+export const INCOMPLETE_RETRY_MS = 10_000
 
 let identity: SlotIdentity | undefined
 /** Everything this slot knows: hydrated from the relay, plus what was recorded. */
@@ -137,6 +157,10 @@ let lastMerged: Record<string, number> = {}
 let shown: Record<string, number> = {}
 /** The mounted `useMergedReadState`s, told when `shown` moves. */
 const shownListeners = new Set<() => void>()
+/** Every frontier this tab fetched, each context at its latest; undefined until the first reachable fetch (99557309). */
+let fetched: Record<string, number> | undefined
+/** Every mark this tab recorded, each context at its latest — what `useOpeningReadState` leaves out of a visit that is still going. */
+let marked: Record<string, number> = {}
 
 /** `into` with each of `from`'s contexts raised to the later value; `into` itself when nothing moved. */
 function laterOf(into: Record<string, number>, from: Readonly<Record<string, number>>): Record<string, number> {
@@ -319,6 +343,7 @@ function record(context: string | undefined, atMs: number): void {
   // identical blob.
   if (advanced[context] === known[context]) return
   known = advanced
+  marked = laterOf(marked, { [context]: seconds })
   // On this screen at once, not after the publish and the next re-read.
   show({ [context]: seconds })
   pending = advanceContexts(pending, { [context]: seconds })
@@ -355,6 +380,8 @@ export function resetReadStateForTests(): void {
   lastAttempt = undefined
   lastMerged = {}
   shown = {}
+  fetched = undefined
+  marked = {}
   hydrating = undefined
   inFlight = Promise.resolve()
 }
@@ -396,6 +423,7 @@ export function useMergedReadState(): Record<string, number> {
     return () => void shownListeners.delete(listener)
   }, [])
 
+  const retry = useRef<ReturnType<typeof setTimeout>>(undefined)
   const load = useCallback(async () => {
     if (!signedIn()) return
     try {
@@ -407,6 +435,19 @@ export function useMergedReadState(): Record<string, number> {
       if (state.reachable) {
         lastMerged = state.merged
         show(state.merged)
+        // What a visit opens on (`useOpeningReadState`) is only ever a whole
+        // frontier: one missing slots would hold every divider they cover for
+        // the visit. Until there is one, ask again sooner than the cadence —
+        // the slot cache keeps what decrypted, so each pass asks for less.
+        if (state.complete) {
+          const first = fetched === undefined
+          fetched = laterOf(fetched ?? {}, state.merged)
+          // The first is news even when it raised nothing: a page waiting to judge can now judge.
+          if (first) for (const listener of shownListeners) listener()
+        } else if (fetched === undefined) {
+          clearTimeout(retry.current)
+          retry.current = setTimeout(() => void load(), INCOMPLETE_RETRY_MS)
+        }
       }
     } catch (error) {
       console.warn('[read-state] could not read the merged frontier:', error)
@@ -415,6 +456,7 @@ export function useMergedReadState(): Record<string, number> {
 
   useEffect(() => {
     void load()
+    return () => clearTimeout(retry.current)
   }, [load])
   /*
    * Slower than Ship's 5s workspace poll, deliberately. Each pass costs a
@@ -426,6 +468,42 @@ export function useMergedReadState(): Record<string, number> {
   useRefresh(load, { intervalMs: READ_STATE_REFRESH_MS })
 
   return merged
+}
+
+/**
+ * The frontier a page visit opened on, held until the visit ends (99557309).
+ *
+ * `visit` names the visit — the address of the issue or project on screen —
+ * and a new one takes a new frontier. What the screen judged against
+ * `useMergedReadState` lost its divider as soon as it was drawn: the page's own
+ * dwell marked what it drew, `shown` takes a mark at once, and the verdict
+ * flipped about a second after the divider appeared. This answers the question
+ * the divider asks instead, "new since you last read this", with "last" meaning
+ * before this visit: every fetched frontier and every mark recorded before the
+ * visit began, and none of the marks it made since.
+ *
+ * Undefined until the tab's first fetch lands, so a cold tab judges nothing
+ * rather than everything since you joined (four dividers, gone a second later).
+ * It does not fetch: the page's `useMergedReadState` does.
+ */
+export function useOpeningReadState(visit: string | undefined): Readonly<Record<string, number>> | undefined {
+  const [, rerender] = useState(0)
+  useEffect(() => {
+    const listener = () => rerender((n) => n + 1)
+    shownListeners.add(listener)
+    listener()
+    return () => void shownListeners.delete(listener)
+  }, [])
+  const [opening, setOpening] = useState<{ visit: string | undefined; before: Record<string, number>; frontier?: Record<string, number> }>(() => ({
+    visit,
+    before: marked,
+    frontier: fetched && laterOf(fetched, marked),
+  }))
+  let current = opening
+  if (current.visit !== visit) current = { visit, before: marked, frontier: fetched && laterOf(fetched, marked) }
+  else if (!current.frontier && fetched) current = { ...current, frontier: laterOf(fetched, current.before) }
+  if (current !== opening) setOpening(current)
+  return visit === undefined ? undefined : current.frontier
 }
 
 // ---------------------------------------------------------------------------

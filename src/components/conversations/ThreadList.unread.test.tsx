@@ -76,6 +76,33 @@ describe('"N new" counts what is new to you (SHI-38)', () => {
   })
 })
 
+// 99557309: the divider went a second after it was drawn, because the page's own dwell marked what it drew.
+describe('the divider stays for the visit, "N new" does not (99557309)', () => {
+  it('keeps the divider once the replies are read, and drops "N new"', () => {
+    render(<ThreadList threads={[thread('t1', ['r1', 'r2'])]} unread={{ t1: ['r2'] }} stillUnread={{}} onStart={noop} onReply={noop} />)
+    expect(screen.getByRole('button', { name: '2 replies' })).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getAllByText(LABEL)).toHaveLength(1)
+  })
+
+  it('draws nothing while read state loads, then opens a thread with a new reply once it knows', () => {
+    const threads = [thread('t1', ['r1', 'r2'])]
+    const { rerender } = render(<ThreadList threads={threads} onStart={noop} onReply={noop} />)
+    expect(screen.getByRole('button', { name: '2 replies' })).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByText(LABEL)).toBeNull()
+
+    rerender(<ThreadList threads={threads} unread={{ t1: ['r2'] }} onStart={noop} onReply={noop} />)
+    expect(screen.getByRole('button', { name: '2 replies, 1 new' })).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getAllByText(LABEL)).toHaveLength(1)
+  })
+
+  it('leaves a thread closed when a reply arrives after the verdict', () => {
+    const threads = [thread('t1', ['r1', 'r2'])]
+    const { rerender } = render(<ThreadList threads={threads} unread={{}} onStart={noop} onReply={noop} />)
+    rerender(<ThreadList threads={threads} unread={{ t1: ['r2'] }} onStart={noop} onReply={noop} />)
+    expect(screen.getByRole('button', { name: '2 replies, 1 new' })).toHaveAttribute('aria-expanded', 'false')
+  })
+})
+
 // Under SPEC §11.3's thread rule drawing a thread's replies is what reads them, so the page marks only what this reports.
 describe('which threads have their replies drawn (CON-34)', () => {
   it('reports a thread open by itself and one opened by a click, and not a folded one', () => {
