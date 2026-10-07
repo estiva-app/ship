@@ -7,7 +7,7 @@ import { ArchivedNotice } from '@/components/ArchivedNotice'
 import { lockedReason, ownArchive, type Archives } from '@/lib/archive'
 import { ISSUE_STATUSES, lookupStatus, archiveIssue, commentsOn, deleteIssue, deleteMessage, editMessage, react, referenceFor, reply, setIssueField, unreact, startConversation, type DirectoryView, type FolderState, type WorkspaceState, threadContext, fileContext, useMergedReadState, useFeedJudges, unreadByThread } from '@/api'
 import { me } from '@/api'
-import { memberOfField } from '@estiva-app/conversation'
+import { MEMBER_FIELD_PREFIX, memberOfField } from '@estiva-app/conversation'
 import { useRelated } from '@/api/useRelated'
 import { Members } from '@/components/Members'
 import { membershipActions } from './membership'
@@ -59,6 +59,8 @@ function changeInWords(field: string, value: string, previous: string | undefine
     if (member === author) return value === 'true' ? 'joined' : 'left'
     return `added ${person(member)}`
   }
+  // A `member:` field naming no valid key is still about who follows it — never print it raw.
+  if (field.startsWith(MEMBER_FIELD_PREFIX)) return 'changed who follows it'
   switch (field) {
     case 'description':
       return 'edited the description'
@@ -200,13 +202,15 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
         lockedReason={lockedReason(archive)}
         members={
           <Members
+            // A new issue is a new dialog: an open one must not carry over to the next page.
+            key={issue.addr}
             members={judges.members}
             me={me}
             people={people}
             nameOf={directory.nameOf}
             pictureOf={(pubkey) => directory.personOf(pubkey).picture}
             roles={[{ pubkey: issue.author, role: 'Author' }, ...(issue.assignee ? [{ pubkey: issue.assignee, role: 'Assignee' }] : [])]}
-            {...membershipActions({ kind: 'issue', issue }, say, async () => {
+            {...membershipActions({ kind: 'issue', issue }, issue.title, directory.nameOf, say, async () => {
               await Promise.all([judges.reload(), refresh([issue.folder])])
             })}
           />

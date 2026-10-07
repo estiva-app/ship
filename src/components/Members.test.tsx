@@ -57,6 +57,18 @@ describe('Members', () => {
     expect(within(await open(user)).getByText('Assignee · not following')).toBeTruthy()
   })
 
+  it('offers somebody with a part who left under Add members, to be added back', async () => {
+    const user = userEvent.setup()
+    const onAdd = vi.fn(async () => true)
+    render(fixture({ roles: [{ pubkey: RAVI, role: 'Assignee' }], onAdd }))
+    await open(user)
+    await user.click(screen.getByRole('button', { name: 'Add members' }))
+    await user.type(await screen.findByRole('combobox'), 'Ravi')
+    await user.click(await screen.findByRole('option', { name: /Ravi Mehta/ }))
+    await user.click(screen.getByRole('button', { name: 'Invite' }))
+    expect(onAdd).toHaveBeenCalledExactlyOnceWith([RAVI])
+  })
+
   it('offers Leave to a member and sends false, once', async () => {
     const user = userEvent.setup()
     const onSetMine = vi.fn(async () => true)

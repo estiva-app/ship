@@ -48,7 +48,8 @@ export function Members({ members, me, people, nameOf, pictureOf, roles, note, r
   const left = [...new Set(roles.map((r) => r.pubkey))].filter((pubkey) => !members.has(pubkey)).sort((a, b) => named(a).localeCompare(named(b)))
   const rows: MembersDialogMember[] = [
     ...keys.map((pubkey) => ({ id: pubkey, name: named(pubkey), picture: person(pubkey).picture, caption: rolesOf(pubkey).join(' · ') || undefined })),
-    ...left.map((pubkey) => ({ id: pubkey, name: named(pubkey), picture: person(pubkey).picture, caption: `${rolesOf(pubkey).join(' · ')} · not following` })),
+    // Their own id, so the picker (which leaves out rows by id) still offers them: anyone may add back somebody who left (Miky, 2026-10-07).
+    ...left.map((pubkey) => ({ id: `left:${pubkey}`, name: named(pubkey), picture: person(pubkey).picture, caption: `${rolesOf(pubkey).join(' · ')} · not following` })),
   ]
   const candidates: MembersDialogCandidate[] = people.map((p) => ({ id: p.value, label: p.value === me ? 'You' : p.name, picture: p.picture }))
   const isMember = members.has(me)
