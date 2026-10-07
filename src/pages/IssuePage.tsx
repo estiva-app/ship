@@ -6,7 +6,11 @@ import { ArchiveDialog } from '@/components/ArchiveDialog'
 import { ArchivedNotice } from '@/components/ArchivedNotice'
 import { lockedReason, ownArchive, type Archives } from '@/lib/archive'
 import { ISSUE_STATUSES, lookupStatus, archiveIssue, commentsOn, deleteIssue, deleteMessage, editMessage, react, referenceFor, reply, setIssueField, unreact, startConversation, type DirectoryView, type FolderState, type WorkspaceState, threadContext, fileContext, useMergedReadState, useFeedJudges, unreadByThread } from '@/api'
+import { me } from '@/api'
+import { MEMBER_FIELD_PREFIX, memberOfField } from '@estiva-app/conversation'
 import { useRelated } from '@/api/useRelated'
+import { Members } from '@/components/Members'
+import { membershipActions } from './membership'
 import type { HistoryEntry } from '@/components/History'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -37,16 +41,26 @@ export function historyFor(issueAddr: string, state: FolderState, directory: Dir
   const before = new Map<string, string>()
   return state.activity
     .filter((change) => change.target === issueAddr)
+    // Somebody else's "false" on your membership is not a leave (§11.8): the fold ignores it, and so does the history.
+    .filter((change) => { const member = memberOfField(change.field); return member === undefined || change.value !== 'false' || change.author === member })
     .map((change) => {
       const previous = before.get(change.field)
       before.set(change.field, change.value)
-      return { id: change.id, by: directory.personOf(change.author), at: change.createdAt, text: changeInWords(change.field, change.value, previous, state, directory) }
+      return { id: change.id, by: directory.personOf(change.author), at: change.createdAt, text: changeInWords(change.field, change.value, previous, state, directory, change.author) }
     })
     .reverse()
 }
 
-function changeInWords(field: string, value: string, previous: string | undefined, state: FolderState, directory: DirectoryView): string {
+function changeInWords(field: string, value: string, previous: string | undefined, state: FolderState, directory: DirectoryView, author: string): string {
   const person = (pubkey: string) => (/^[0-9a-f]{64}$/.test(pubkey) ? directory.nameOf(pubkey) : pubkey)
+  // A membership change (SHI-31): the person is in the field, `member:<key>`.
+  const member = memberOfField(field)
+  if (member !== undefined) {
+    if (member === author) return value === 'true' ? 'joined' : 'left'
+    return `added ${person(member)}`
+  }
+  // A `member:` field naming no valid key is still about who follows it — never print it raw.
+  if (field.startsWith(MEMBER_FIELD_PREFIX)) return 'changed who follows it'
   switch (field) {
     case 'description':
       return 'edited the description'
@@ -189,6 +203,21 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
         }
         // Archived, its own fields stay shut until it is unarchived; comments stay open (SHI-36).
         lockedReason={lockedReason(archive)}
+        members={
+          <Members
+            // A new issue is a new dialog: an open one must not carry over to the next page.
+            key={issue.addr}
+            members={judges.members}
+            me={me}
+            people={people}
+            nameOf={directory.nameOf}
+            pictureOf={(pubkey) => directory.personOf(pubkey).picture}
+            roles={[{ pubkey: issue.author, role: 'Author' }, ...(issue.assignee ? [{ pubkey: issue.assignee, role: 'Assignee' }] : [])]}
+            {...membershipActions({ kind: 'issue', issue }, issue.title, directory.nameOf, say, async () => {
+              await Promise.all([judges.reload(), refresh([issue.folder])])
+            })}
+          />
+        }
         crumbs={{
           issuesHref: href({ name: 'issues' }),
           project: project ? { title: project.title, href: href({ name: 'project', d: project.id, slug: project.title, view: 'table' }) } : undefined,

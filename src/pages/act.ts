@@ -34,6 +34,8 @@ export async function act(
   say: Say,
   /** Omitted when nothing in the fold can have changed — see above. */
   refresh?: () => Promise<void>,
+  /** The words for a refusal, where the default "<what> rejected — <reason>" is not what the person should read. */
+  refused?: (reason: string) => string,
 ): Promise<boolean> {
   const result = await write()
   if (!result.ok) {
@@ -49,7 +51,7 @@ export async function act(
       say(wait ? `Too busy right now — try again in ${Math.ceil(wait / 1000)}s.` : 'Too busy right now — try again shortly.', 'error')
       return false
     }
-    say(`${what} rejected — ${result.reason}`, 'error')
+    say(refused ? refused(result.reason) : `${what} rejected — ${result.reason}`, 'error')
     return false
   }
   await refresh?.()

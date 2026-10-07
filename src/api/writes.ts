@@ -66,6 +66,16 @@ async function publish(action: () => Promise<PublishResult>): Promise<WriteResul
 // ── Projects ────────────────────────────────────────────────────────────────
 
 /**
+ * Join or leave an issue or a project yourself, or add somebody to it (SHI-31,
+ * SPEC §11.8). It is a change to the object's record, so it goes to the
+ * record's Folder: an issue's own, a project's `contentFolder`.
+ */
+export function setMembership(target: { kind: 'issue'; issue: Issue } | { kind: 'project'; project: Project }, person: string, member: boolean): Promise<WriteResult> {
+  const [file, folder] = target.kind === 'issue' ? [target.issue.addr, target.issue.folder] : [target.project.addr, target.project.contentFolder]
+  return publish(() => store.setMembership({ folder, file, person, member }))
+}
+
+/**
  * Create a project in a team (FOL-2): the record, then its listing in the
  * team. A refused listing is still a created project — Ship shows it under
  * the team — so it comes back `ok` with `unlisted` saying why Peek will not.

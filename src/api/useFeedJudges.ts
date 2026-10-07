@@ -33,6 +33,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   MUTED_D_TAG,
+  membersOf,
   membershipOf,
   mutedFilter,
   parseMutedBlob,
@@ -121,34 +122,45 @@ export async function readFeedFacts(
   decrypt: (ciphertext: string) => Promise<string | undefined>,
   file: FeedFile,
   me: string,
-): Promise<{ membership: Membership; muted: ReadonlySet<string> | undefined }> {
+): Promise<{ membership: Membership; members: ReadonlyMap<string, Membership>; muted: ReadonlySet<string> | undefined }> {
   // The same comment can answer two of the filters; the fold counts events, so each is held once.
   const events = [...new Map((await query(feedFactsFilters(file.addr, me))).map((e) => [e.id, e])).values()]
-  const membership = membershipOf(file.addr, me, [rootOf(file), ...events])
+  const folded = [rootOf(file), ...events]
+  const membership = membershipOf(file.addr, me, folded)
+  // Everyone's, from the same events: the Members dialog's roster (SHI-31).
+  const members = membersOf(file.addr, folded)
 
   const list = newestMuted(events, me)
   if (!list) {
     mutedCache = undefined
     mutedFailed = undefined
-    return { membership, muted: NO_MUTES }
+    return { membership, members, muted: NO_MUTES }
   }
   if (mutedCache?.eventId !== list.id) {
-    if (mutedFailed?.eventId === list.id && Date.now() - mutedFailed.at < MUTED_RETRY_MS) return { membership, muted: undefined }
+    if (mutedFailed?.eventId === list.id && Date.now() - mutedFailed.at < MUTED_RETRY_MS) return { membership, members, muted: undefined }
     const parsed = parseMutedBlob((await decrypt(list.content)) ?? '')
     if (!parsed) {
       mutedFailed = { eventId: list.id, at: Date.now() }
-      return { membership, muted: undefined }
+      return { membership, members, muted: undefined }
     }
     mutedFailed = undefined
     mutedCache = { eventId: list.id, keys: new Set(parsed.keys) }
   }
-  return { membership, muted: mutedCache.keys }
+  return { membership, members, muted: mutedCache.keys }
 }
 
 /** The judges a feed asks `unreadByThread` with: one for the file's stream and one for the record channel's. */
 export interface FeedJudges {
   file?: StreamJudge
   channel?: StreamJudge
+  /**
+   * Who is a member of the file, and since when — from the same read as the
+   * judges, but not held back by an unreadable mute list. `undefined` until the
+   * first read has come back.
+   */
+  members?: ReadonlyMap<string, Membership>
+  /** Read again now — after this page has joined, left or added somebody. */
+  reload: () => Promise<void>
 }
 
 /**
@@ -161,6 +173,7 @@ export function useFeedJudges(file: FeedFile | undefined, channel: string | unde
   const addr = file?.addr
   const createdAt = file?.createdAt
   const [facts, setFacts] = useState<{ addr: string; membership: Membership; muted: ReadonlySet<string> }>()
+  const [roster, setRoster] = useState<{ addr: string; members: ReadonlyMap<string, Membership> }>()
   /* The file the page is about now: a read for the one it just left must not replace the new one's facts. */
   const current = useRef(addr)
   useEffect(() => {
@@ -172,6 +185,7 @@ export function useFeedJudges(file: FeedFile | undefined, channel: string | unde
     try {
       const read = await readFeedFacts((filters) => relay.queryAll(filters), (c) => nip44.decrypt(c), { addr, createdAt }, signer.pubkey)
       if (current.current !== addr) return
+      setRoster({ addr, members: read.members })
       const { muted } = read
       // An unreadable mute list keeps the mutes this file was last judged with, and with none yet the page holds back its verdict.
       setFacts((held) => {
@@ -190,13 +204,16 @@ export function useFeedJudges(file: FeedFile | undefined, channel: string | unde
   useRefresh(load, { intervalMs: FEED_FACTS_REFRESH_MS })
 
   return useMemo(() => {
-    if (!facts || facts.addr !== addr) return {}
+    const members = roster && roster.addr === addr ? roster.members : undefined
+    if (!facts || facts.addr !== addr) return { members, reload: load }
     const me = signer.pubkey
     return {
       file: { stream: facts.addr, me, member: facts.membership.member, since: facts.membership.since, muted: facts.muted.has(facts.addr) },
       channel: channel
         ? { stream: channel, me, member: false, muted: facts.muted.has(channel), floor: Number.MAX_SAFE_INTEGER }
         : undefined,
+      members,
+      reload: load,
     }
-  }, [facts, addr, channel])
+  }, [facts, roster, addr, channel, load])
 }

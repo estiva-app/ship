@@ -39,6 +39,9 @@ import {
   type WorkspaceState,
 } from '@/api'
 import { useRelated } from '@/api/useRelated'
+import { MEMBER_FIELD_PREFIX } from '@estiva-app/conversation'
+import { Members } from '@/components/Members'
+import { membershipActions } from './membership'
 import { useReferencePage } from '@/api/references'
 import type { ThreadData } from '@/components/ConversationThread'
 import type { ActivityItem } from '@/components/Activity'
@@ -361,7 +364,8 @@ export function ProjectPage({
         return issue.projectAddr === project.addr && (!archive || !!archive.with)
       })
       .map((issue) => {
-        const touched = state.activity.filter((change) => change.target === issue.addr).at(-1)
+        // Who follows an issue is not an update to it (SHI-31): a Join or an Add does not move it up the table.
+        const touched = state.activity.filter((change) => change.target === issue.addr && !change.field.startsWith(MEMBER_FIELD_PREFIX)).at(-1)
         return { ...rowFor(issue, state, directory), openedBy: directory.personOf(issue.author), at: touched?.createdAt ?? issue.createdAt }
       })
   }, [project, state, directory, archives])
@@ -515,6 +519,22 @@ export function ProjectPage({
         }
         // Archived, its own fields stay shut until it is unarchived; comments stay open (SHI-36).
         lockedReason={lockedReason(archive)}
+        members={
+          <Members
+            key={project.addr}
+            members={judges.members}
+            me={me}
+            people={people}
+            nameOf={directory.nameOf}
+            pictureOf={(pubkey) => directory.personOf(pubkey).picture}
+            roles={[{ pubkey: project.author, role: 'Author' }, ...(project.lead ? [{ pubkey: project.lead, role: 'Lead' }] : [])]}
+            // Membership is per file: leaving the project leaves its issues as they are (Miky, 2026-10-06).
+            note="Your issues here still notify you."
+            {...membershipActions({ kind: 'project', project }, project.title, directory.nameOf, say, async () => {
+              await Promise.all([judges.reload(), refresh([project.contentFolder])])
+            })}
+          />
+        }
         crumbs={{ projectsHref: href({ name: 'projects', archived: false }), title: project.title }}
         header={{
           title: project.title,

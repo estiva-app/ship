@@ -74,6 +74,7 @@ export {
   reply,
   assignMissingRefs,
   setIssueField,
+  setMembership,
   setProjectField,
   startConversation,
   workFolder,

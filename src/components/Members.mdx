@@ -1,0 +1,48 @@
+import { Meta } from '@storybook/addon-docs/blocks'
+import * as MembersStories from './Members.stories'
+
+<Meta of={MembersStories} />
+
+# Members
+
+Who follows an issue or a project (SHI-31): the package's **MembersPill** at
+the end of the page's breadcrumb row, opening its **MembersDialog** with Join or
+Leave for you and Add members for a member. It is the old Peek design (Miky,
+2026-10-06). Ship decides which people are listed, what their second line says,
+and what each press writes.
+
+## When
+
+- In `IssueView`'s and `ProjectView`'s `members` slot, with the file's members
+  from `useFeedJudges` and the writes from `membershipActions`.
+
+## When not
+
+- Not for picking an assignee or a lead: those are the rail's **Select**s.
+- Not in a list row: a glance at a group's faces without a list is **AvatarGroup**.
+
+## How
+
+```tsx
+import { Members } from '@/components/Members'
+
+<Members
+  key={issue.addr}
+  members={judges.members}
+  me={me}
+  people={people}
+  nameOf={directory.nameOf}
+  pictureOf={(pubkey) => directory.personOf(pubkey).picture}
+  roles={[{ pubkey: issue.author, role: 'Author' }]}
+  {...membershipActions({ kind: 'issue', issue }, issue.title, directory.nameOf, say, reload)}
+/>
+```
+
+## What it owns
+
+- **Who is listed.** You first as "You", then everyone else by name, with their
+  part ("Author", "Assignee", "Lead") underneath. Somebody with a part who left
+  stays listed as "… · not following", and can be added back.
+- **The count.** The pill and the dialog's chip count members only.
+- **Nothing before the read.** No pill until the membership read has come back.
+- **No control where membership cannot change** (`readOnlyReason`).

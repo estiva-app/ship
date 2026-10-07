@@ -107,6 +107,8 @@ export interface ProjectViewProps {
   upload?: (file: File) => Promise<Imeta>
   /** The `ArchivedNotice` of an archived project: the first thing on every tab (FOL-46). */
   archivedNotice?: ReactNode
+  /** The members pill, at the end of the breadcrumb row (SHI-31). */
+  members?: ReactNode
 }
 
 const TABS: { id: ProjectTab; label: string }[] = [
@@ -116,16 +118,17 @@ const TABS: { id: ProjectTab; label: string }[] = [
 ]
 
 /** One project's page, in tabs: Overview, Activity and Issues, with the rail on every tab. */
-export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onView, issues, issueStatuses, hrefFor, related, threads, unread, stillUnread, onThreadShown, onStartConversation, onReply, onCopyBlockLink, activity, activityTruncated, onReplyInActivity, rail, about, onReact, onDeleteMessage, onEditMessage, readOnlyReason, lockedReason, upload, archivedNotice }: ProjectViewProps) {
+export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onView, issues, issueStatuses, hrefFor, related, threads, unread, stillUnread, onThreadShown, onStartConversation, onReply, onCopyBlockLink, activity, activityTruncated, onReplyInActivity, rail, about, onReact, onDeleteMessage, onEditMessage, readOnlyReason, lockedReason, upload, archivedNotice, members }: ProjectViewProps) {
   const comment = useBlockComment(header.description, header.descriptionFormat, onTab, onStartConversation)
   return (
     // `data-surface`, `data-view` and `data-tab` are the smoke test's waypoints — see IssuesView. The Table/Board
     // toggle and the tabs swap content in place on the same route, so without them a test cannot tell "it
     // rendered" from "the click did nothing". A page that scrolls inside itself — see IssueView.
     <div data-surface="project" data-view={view} data-tab={tab} className="grid min-h-0 flex-1 [contain:size] grid-cols-[minmax(0,1fr)_1px_auto] grid-rows-[auto_auto_minmax(0,1fr)] gap-y-4">
-      <div className="col-start-1 row-start-1 pl-6 pt-5">
+      <div className="col-start-1 row-start-1 flex min-h-8 items-center justify-between gap-4 px-6 pt-5">
         {/* The box before the name says it is a project — the sidebar's icon for one (Katerina, 2026-09-09). */}
         <Breadcrumb items={[{ label: 'Projects', ...linkTo(crumbs.projectsHref) }, { label: crumbs.title, icon: <IconBox size={16} stroke={1.5} /> }]} />
+        {members}
       </div>
       {/* The tab row is its own grid row, level with the rail's top, so the rail starts where it always has. */}
       <div className="col-start-1 row-start-2 flex min-h-8 items-center gap-3 px-6">
