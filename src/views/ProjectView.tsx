@@ -130,7 +130,7 @@ export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onVi
       {/* The tab row is its own grid row, level with the rail's top, so the rail starts where it always has. */}
       <div className="col-start-1 row-start-2 flex min-h-8 items-center gap-3 px-6">
         {/* Overview and Issues do not read the conversation (66b31c4b), so Activity says when something there is new. */}
-        <Tabs tabs={TABS.map((t) => (t.id === 'activity' ? { ...t, unread: Object.keys(unread ?? {}).length > 0 } : t))} active={tab} onChange={onTab} />
+        <Tabs tabs={TABS.map((t) => (t.id === 'activity' ? { ...t, unread: Object.keys(stillUnread ?? {}).length > 0 } : t))} active={tab} onChange={onTab} />
         <div className="flex-1" />
         {tab === 'issues' && (
           <Tabs

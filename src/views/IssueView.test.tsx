@@ -116,16 +116,23 @@ describe('ProjectView, archived (SHI-36)', () => {
 describe('the Activity tab says when its conversation has something new (66b31c4b)', () => {
   /* Overview does not read the conversation any more, so it is the tab that tells you. */
   it('lights Activity on an issue with an unread thread, and not without one', () => {
-    const { unmount } = render(view('overview', { unread: { t1: ['m1'] } }))
+    const { unmount } = render(view('overview', { unread: { t1: ['m1'] }, stillUnread: { t1: ['m1'] } }))
     expect(screen.getByRole('tab', { name: /^Activity.*new$/ }).querySelector('[data-unread]')).not.toBeNull()
     expect(screen.getByRole('tab', { name: 'Overview' }).querySelector('[data-unread]')).toBeNull()
     unmount()
-    render(view('overview', { unread: {} }))
+    render(view('overview', { unread: {}, stillUnread: {} }))
+    expect(screen.getByRole('tab', { name: 'Activity' }).querySelector('[data-unread]')).toBeNull()
+  })
+
+  /* `unread` is held for the visit so the "new since" line stays while you read
+     (99557309); the dot answers to what is unread now, so it goes once read. */
+  it('puts the dot out once the dwell has read it, though the divider stays', () => {
+    render(view('activity', { unread: { t1: ['m1'] }, stillUnread: {} }))
     expect(screen.getByRole('tab', { name: 'Activity' }).querySelector('[data-unread]')).toBeNull()
   })
 
   it('lights Activity on a project the same way, and never Issues', () => {
-    render(projectView('overview', { unread: { t1: ['m1'] } }))
+    render(projectView('overview', { unread: { t1: ['m1'] }, stillUnread: { t1: ['m1'] } }))
     expect(screen.getByRole('tab', { name: /^Activity.*new$/ }).querySelector('[data-unread]')).not.toBeNull()
     expect(screen.getByRole('tab', { name: /^Issues/ }).querySelector('[data-unread]')).toBeNull()
   })
