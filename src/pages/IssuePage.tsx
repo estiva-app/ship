@@ -1,6 +1,7 @@
 import { IconLinkOff } from '@tabler/icons-react'
 import { newestDrawn, useMarkRead, useShownThreads } from '@/lib/useMarkRead'
-import { useMemo, useState } from 'react'
+import { useNewSince } from '@/lib/useNewSince'
+import { useCallback, useMemo, useState } from 'react'
 import { ArchiveDialog } from '@/components/ArchiveDialog'
 import { ArchivedNotice } from '@/components/ArchivedNotice'
 import { lockedReason, ownArchive, type Archives } from '@/lib/archive'
@@ -122,10 +123,12 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
      for a message that names you. */
   const merged = useMergedReadState()
   const judges = useFeedJudges(issue ? { addr: issue.addr, createdAt: issue.createdAt } : undefined, undefined)
-  const unread = useMemo(
-    () => unreadByThread(conversations, merged, () => judges.file),
-    [conversations, merged, judges],
+  const verdictAt = useCallback(
+    (frontier: Readonly<Record<string, number>>) => (judges.file ? unreadByThread(conversations, frontier, () => judges.file) : undefined),
+    [conversations, judges],
   )
+  // Judged against the frontier this visit opened on, so the divider outlives the page's own marks (99557309).
+  const { unread, stillUnread } = useNewSince(issue?.addr, merged, verdictAt)
   const history = useMemo(() => (issue ? historyFor(issue.addr, state, directory) : []), [issue, state, directory])
   const people = useMemo(() => railPeople(state, directory), [state, directory])
   const projects = useMemo(
@@ -198,6 +201,7 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
         related={related}
         threads={threads}
         unread={unread}
+        stillUnread={stillUnread}
         onThreadShown={onThreadShown}
         // Threads about an issue carry a reference in the body so Peek renders
         // the issue's widget above them (withReference: true), as the old app has it.
