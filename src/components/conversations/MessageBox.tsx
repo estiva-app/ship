@@ -21,7 +21,7 @@ import { uploadAttachment } from '@/api/blobs'
 import { ReferenceNode, ReferenceProvider } from '@/components/ui/editorSchema'
 import { LinkDecoration } from '@/components/editing/linkDecoration'
 import { ShipSlashMenu, slashSections } from '@/components/editing/slashMenu'
-import { chipsAsReferences, composerTriggers, urgentChipsFrom } from '@/components/editing/composerTriggers'
+import { chipsAsReferences, composerTriggers, urgentChipsFrom, withoutNewUrgency } from '@/components/editing/composerTriggers'
 import { useMentionPeople } from '@/components/editing/mentionables'
 import { WRITING_BOX } from './writingBox'
 
@@ -261,7 +261,9 @@ export function MessageBox({ kind = 'conversation', onSubmit, references, initia
     if (!canSubmit || !editor) return
     setBusy(true)
     try {
-      const ok = await onSubmit(text.trim(), files, { urgent: urgentPubkeys(editor) })
+      // An edit makes nobody urgent: a typed `!@Name` is saved as an ordinary mention (CON-24).
+      const body = kind === 'edit' ? withoutNewUrgency(text.trim(), initial) : text.trim()
+      const ok = await onSubmit(body, files, { urgent: urgentPubkeys(editor) })
       if (ok !== false) {
         if (kind === 'edit') return onCancel?.()
         editor.commands.clearContent()

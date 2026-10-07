@@ -83,6 +83,16 @@ describe('the edit box', () => {
     expect(screen.queryByRole('listbox', { name: 'Urgent mention' })).toBeNull()
   })
 
+  it('saves a hand-typed !@Name as an ordinary mention, since an edit pages nobody', async () => {
+    const onSubmit = vi.fn().mockResolvedValue(true)
+    const { box } = await edit(onSubmit)
+    await act(() => void box.editor.chain().focus('end').insertContent(' and !@Ann').run())
+    await sleep(150)
+    await act(() => void box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })))
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled())
+    expect(onSubmit.mock.calls[0][0]).toBe(`${BODY} and @Ann`)
+  })
+
   it('offers no Urgent row on /', async () => {
     const { box } = await edit()
     await type(box, ' /')

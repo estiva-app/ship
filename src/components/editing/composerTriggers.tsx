@@ -70,6 +70,16 @@ export function chipsAsReferences(node: EditorNode): EditorNode {
 }
 
 /**
+ * An edit's text with any `!@Name` the message did not already hold written as
+ * an ordinary `@Name` — CON-24. An edit carries no tags, so it makes nobody
+ * urgent (Miky, kickoff, 2026-10-07); a hand-typed `!@Name` is the old urgent
+ * text, which Peek still draws urgent while it pages nobody.
+ */
+export function withoutNewUrgency(text: string, original: string): string {
+  return text.replace(/!@([^\s!@]+)/g, (whole, name: string) => (original.includes(whole) ? whole : `@${name}`))
+}
+
+/**
  * The other way, for the people a draft named urgently — CON-31. Marker text
  * gives back a person as the `reference` its `nostr:npub…` names, urgent or
  * not (§13.1 puts the urgency in a tag); a draft keeps whom it named urgently
