@@ -424,6 +424,7 @@ export function useMergedReadState(): Record<string, number> {
   }, [])
 
   const retry = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const mounted = useRef(false)
   const load = useCallback(async () => {
     if (!signedIn()) return
     try {
@@ -444,7 +445,8 @@ export function useMergedReadState(): Record<string, number> {
           fetched = laterOf(fetched ?? {}, state.merged)
           // The first is news even when it raised nothing: a page waiting to judge can now judge.
           if (first) for (const listener of shownListeners) listener()
-        } else if (fetched === undefined) {
+        } else if (fetched === undefined && mounted.current) {
+          // Not once the page has gone: a fetch that lands after the cleanup would otherwise retry for ever.
           clearTimeout(retry.current)
           retry.current = setTimeout(() => void load(), INCOMPLETE_RETRY_MS)
         }
@@ -455,8 +457,12 @@ export function useMergedReadState(): Record<string, number> {
   }, [])
 
   useEffect(() => {
+    mounted.current = true
     void load()
-    return () => clearTimeout(retry.current)
+    return () => {
+      mounted.current = false
+      clearTimeout(retry.current)
+    }
   }, [load])
   /*
    * Slower than Ship's 5s workspace poll, deliberately. Each pass costs a
