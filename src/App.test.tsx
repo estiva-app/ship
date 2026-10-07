@@ -88,6 +88,7 @@ const STATE: WorkspaceState = {
   // Nor attachments: `scripts/attachments.test.ts` covers the fold and
   // `ui/Attachment.test.tsx` the drawing (CON-12).
   attachments: {},
+  urgent: {},
   folders: [],
 }
 

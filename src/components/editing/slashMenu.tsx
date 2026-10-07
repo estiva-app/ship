@@ -24,6 +24,8 @@ export interface InsertRows {
    * finds the triggers from `/` (Miky, CON-25 kickoff). Only where they open a list.
    */
   triggers?: boolean
+  /** With `triggers`, the Urgent row. `false` in an edit, which cannot carry urgency (CON-24). */
+  urgent?: boolean
 }
 
 // The hint is what you would type, as the Format rows show theirs.
@@ -35,12 +37,12 @@ const trigger = (label: string, input: string, description: string): SlashComman
 })
 
 /** Format, then Insert with what this editor can do. */
-export function slashSections({ onFile, table = false, triggers = false }: InsertRows): SlashSection[] {
+export function slashSections({ onFile, table = false, triggers = false, urgent = true }: InsertRows): SlashSection[] {
   const insert: SlashCommand[] = [
     // Three by three with a header row: the shape the old table button made.
     ...(table ? [{ key: 'insert-table', row: { label: 'Table' }, run: (editor: Editor) => void editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run() }] : []),
     ...(onFile ? [{ key: 'insert-file', row: { label: 'File' }, run: onFile }] : []),
-    ...(triggers ? [trigger('Mention', '@', 'Mention a person'), trigger('Urgent', '!@', 'Urgent mention'), trigger('Reference', '[', 'Reference a message')] : []),
+    ...(triggers ? [trigger('Mention', '@', 'Mention a person'), ...(urgent ? [trigger('Urgent', '!@', 'Urgent mention')] : []), trigger('Reference', '[', 'Reference a message')] : []),
   ]
   return [formatSection('block'), ...(insert.length ? [{ label: 'Insert', commands: insert }] : [])]
 }

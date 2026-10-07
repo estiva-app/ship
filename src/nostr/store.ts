@@ -29,7 +29,7 @@ import {
 import { findNaddrs, naddrToAddr, buildReaction, buildEdit, buildDeletion as buildEventDeletion } from '@estiva-app/protocol'
 import { planArchiveFolder, planCreateFolder, planDeleteFolder, planMoveFromFolders, planPlaceFile, planRenameFolder, planUnlistFile, type FolderRef, type MovableFile, type MoveRefusal } from '@estiva-app/interop'
 import { foldFolder, type FolderState } from './fold'
-import { decorationsOf, foldAttachments, foldEdits, type Decorations, type EditFold, type QueryFn } from '@estiva-app/conversation'
+import { decorationsOf, foldAttachments, foldEdits, URGENT_TAG, type Decorations, type EditFold, type QueryFn } from '@estiva-app/conversation'
 import { anchorIndex, type AnchorIndex } from './references'
 import { directoryFrom, type Directory } from './profiles'
 import { KIND } from './kinds'
@@ -113,6 +113,15 @@ export interface WorkspaceState extends FolderState {
    */
   attachments: Record<string, Imeta[]>
   /**
+   * Message id → whom it names urgently: its `["urgent", <pubkey>]` tags
+   * (SPEC §13.1, CON-24). The text holds the same `nostr:npub…` for an urgent
+   * mention as for an ordinary one, so the chip's tone can come only from here.
+   * Absent for a message with none, which is nearly all of them.
+   *
+   * Beside the fold for the same reason as `edits` and `attachments`.
+   */
+  urgent: Record<string, string[]>
+  /**
    * Every Folder this read actually fetched (PER-3).
    *
    * Beside the fold, like the three above, and for the same reason: `foldFolder`
@@ -132,12 +141,23 @@ export interface WorkspaceState extends FolderState {
  * Fold a set of events, and read off the same set the two things `foldFolder`
  * deliberately does not carry: tag-vs-body provenance, edits, and attachments.
  */
+/** `WorkspaceState.urgent`: every event's `urgent` tag keys, by event id. An edit carries none (§6.6), so none is read off one. */
+export function urgentIndex(events: readonly SignedEvent[]): Record<string, string[]> {
+  const out: Record<string, string[]> = {}
+  for (const event of events) {
+    const keys = [...new Set(event.tags.filter((t) => t[0] === URGENT_TAG && t[1]).map((t) => t[1]))]
+    if (keys.length > 0) out[event.id] = keys
+  }
+  return out
+}
+
 function read(events: SignedEvent[], folders: string[]): WorkspaceState {
   return {
     ...foldFolder(events, referencedAddresses),
     anchors: anchorIndex(events),
     edits: foldEdits(events),
     attachments: foldAttachments(events),
+    urgent: urgentIndex(events),
     // A parameter rather than derived from the events: the set that was
     // *asked for* is not the set that came back. A Folder holding nothing this
     // reader may see yields no events and would vanish from a derived list,

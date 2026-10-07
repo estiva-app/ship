@@ -22,10 +22,17 @@ export function composerTriggers(read: {
   people: () => readonly MentionPerson[]
   references: (query: string) => readonly ReferenceSection[]
   subscribe?: (listener: () => void) => () => void
+  /**
+   * Whether `!@` offers an urgent pick. `false` in a box that edits a sent
+   * message: an edit carries no tags, so a new pick could never be sent. The
+   * chip itself stays, so the message's own urgent mentions load urgent
+   * (Miky, CON-24 kickoff, 2026-10-07).
+   */
+  urgent?: boolean
 }) {
   return [
     PersonMention.configure({ people: read.people }),
-    UrgentPersonMention.configure({ people: read.people }),
+    UrgentPersonMention.configure({ people: read.people, ...(read.urgent === false ? { suggestion: { allow: () => false } } : {}) }),
     CaptionedReference.configure({ icon: REFERENCE_ICON }),
     ReferenceTrigger.configure({
       items: () => [],
@@ -60,6 +67,16 @@ export function chipsAsReferences(node: EditorNode): EditorNode {
     return uri ? reference(uri) : text(String(node.attrs?.label ?? ''))
   }
   return node.content ? { ...node, content: node.content.map(chipsAsReferences) } : node
+}
+
+/**
+ * An edit's text with any `!@Name` the message did not already hold written as
+ * an ordinary `@Name` — CON-24. An edit carries no tags, so it makes nobody
+ * urgent (Miky, kickoff, 2026-10-07); a hand-typed `!@Name` is the old urgent
+ * text, which Peek still draws urgent while it pages nobody.
+ */
+export function withoutNewUrgency(text: string, original: string): string {
+  return text.replace(/!@([^\s!@]+)/g, (whole, name: string) => (original.includes(whole) ? whole : `@${name}`))
 }
 
 /**

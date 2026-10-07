@@ -89,6 +89,11 @@ export interface MessageData {
    * field on `Message` turns both repos red. `threadFor` supplies it.
    */
   files?: Imeta[]
+  /**
+   * Whom the body names urgently, by pubkey — the message's `urgent` tags
+   * (SPEC §13.1, CON-24), read beside the fold for the same reason as `files`.
+   */
+  urgent?: string[]
 }
 
 /** Messages are marker text (SPEC §13.2); only a rich text *field* is a block document. */
