@@ -403,7 +403,8 @@ export function ProjectPage({
      channel's chat, which answers to its bare channel uuid, and the project's
      own comments, which answer to the project's address. Looking at the
      Activity tab advances both, because both are on it — §11.2, "exactly the
-     streams you are showing" — and Overview and Issues draw neither. Its issues' comments are other files' streams and are untouched;
+     streams you are showing" — and Overview and Issues draw neither. Its
+     issues' comments are other files' streams and are untouched;
      before FOL-16 their roots answered to the channel marker, so this line
      silently read every issue in the project.
 
