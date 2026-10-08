@@ -66,7 +66,7 @@ export function Members({ members, me, people, nameOf, pictureOf, roles, note, r
         <MembersDialog
           members={rows}
           count={members.size}
-          self={canChange ? { action: isMember ? 'leave' : 'join', onToggle: () => onSetMine(!isMember) } : undefined}
+          self={canChange ? { action: isMember ? 'leave' : 'join', onToggle: () => onSetMine(!isMember), id: me } : undefined}
           candidates={candidates}
           onAdd={canChange && isMember ? async (chosen) => onAdd(chosen.map((c) => c.id)) : undefined}
           note={note}
