@@ -12,7 +12,7 @@ import {
   type Imeta,
 } from '@estiva-app/protocol'
 import { FieldLine, FilePicker, richTextClassName } from '@estiva-app/ui'
-import { EditorBlockHandle, PastedImages, SelectionToolbar, blockDropCursor, isSuggestionOpen } from '@estiva-app/ui/editor'
+import { CodeBlockColours, EditorBlockHandle, PastedImages, SelectionToolbar, blockDropCursor, isSuggestionOpen } from '@estiva-app/ui/editor'
 import { uploadAttachment } from '@/api/blobs'
 import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
 import { AttachmentNode, BlockId, ReferenceNode, ReferenceProvider, UnknownBlock } from '@/components/ui/editorSchema'
@@ -139,7 +139,9 @@ export function LiveDescription({
     {
       extensions: [
         // The drop line in the accent, where a dragged block will land (RIC-18, Katerina's review).
-        StarterKit.configure({ link: false, strike: false, heading: { levels: [1, 2, 3] }, dropcursor: blockDropCursor }),
+        // The code block is the package's, coloured by language as it is when read (estiva-ui 0.64.0).
+        StarterKit.configure({ link: false, strike: false, heading: { levels: [1, 2, 3] }, dropcursor: blockDropCursor, codeBlock: false }),
+        CodeBlockColours,
         TableKit.configure({ table: { resizable: false } }),
         BlockId,
         ReferenceNode,
