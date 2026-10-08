@@ -13,7 +13,7 @@ import {
   type Imeta,
 } from '@estiva-app/protocol'
 import { AttachmentCard, Avatar, Button, FieldLine, FilePicker, IconButton, Kbd, Toolbar, ToolbarButton, richTextClassName } from '@estiva-app/ui'
-import { SelectionToolbar, isSuggestionActive, isSuggestionOpen, urgentPubkeys } from '@estiva-app/ui/editor'
+import { PastedImages, SelectionToolbar, isSuggestionActive, isSuggestionOpen, urgentPubkeys } from '@estiva-app/ui/editor'
 import { subscribeReferences, type ReferenceSection } from '@/api/references'
 import { cn } from '@/lib/cn'
 import { browserDrafts, type DraftStore } from '@/lib/drafts'
@@ -128,6 +128,8 @@ export function MessageBox({ kind = 'conversation', onSubmit, references, initia
   names.current = nameOf
   const offered = useRef(references)
   offered.current = references
+  // Where a pasted picture goes: the paperclip's upload, or nowhere in a box that takes no files. Set below, once `choose` exists.
+  const pasteTo = useRef<((files: File[]) => Promise<void>) | null>(null)
   // An urgent chip's label is fixed when it is drawn; the directory, then the names the references draw by.
   const labelOf = (pubkey: string) => people.current.find((p) => p.pubkey === pubkey)?.name ?? names.current?.(pubkey) ?? `${pubkey.slice(0, 8)}…`
 
@@ -188,6 +190,15 @@ export function MessageBox({ kind = 'conversation', onSubmit, references, initia
         ...composerTriggers({ people: () => people.current, references: (query) => offered.current?.(query) ?? [], subscribe: subscribeReferences, urgent: kind !== 'edit' }),
         // No Table: marker text has none (§13.2). No File in an edit, which keeps the message's files as they are.
         ShipSlashMenu(slashSections({ onFile: kind === 'edit' ? undefined : () => picker.current?.click(), triggers: true, urgent: kind !== 'edit' })),
+        // A pasted picture attaches as the paperclip would (Katerina, 8 October); text on the clipboard stays text.
+        PastedImages.configure({
+          onImages: (pasted) => {
+            const take = pasteTo.current
+            if (!take) return false
+            void take(pasted)
+            return true
+          },
+        }),
         keys,
       ],
       // The text gives every person back as an ordinary reference; the message's urgent ones come back urgent (CON-24).
@@ -303,6 +314,8 @@ export function MessageBox({ kind = 'conversation', onSubmit, references, initia
       editor?.commands.focus()
     }
   }
+  // An edit keeps the message's files as they are, and a closed box takes nothing.
+  pasteTo.current = kind === 'edit' || disabledReason ? null : choose
 
   const field = (
     // A reply's first line is 24px, the buttons' height: 2px above and below the text, so the two sit level. A fixed

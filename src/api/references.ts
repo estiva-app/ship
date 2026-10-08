@@ -23,7 +23,6 @@ import {
   rankReferences,
   referenceSearch,
   type ReferenceCandidate,
-  type ReferenceType,
 } from '@estiva-app/conversation'
 import type { CaptionedItem, ReferenceTriggerOptions } from '@estiva-app/ui/editor'
 import { snippetOf } from '@/components/editing/mentionables'
@@ -35,9 +34,6 @@ export type ReferenceSection = ReturnType<NonNullable<ReferenceTriggerOptions['s
 
 /** The section headings, Messages above Files. */
 export const REFERENCE_COPY = { ariaLabel: 'Messages and files', messages: 'Messages', files: 'Files' }
-
-/** The type word a file row wears (label objects by type). */
-const TYPE_WORDS: Record<ReferenceType, string> = { message: 'Message', issue: 'Issue', project: 'Project', topic: 'Topic' }
 
 /** How many recently read files are looked up — a few more than the section shows. */
 const RECENT_LIMIT = 12
@@ -97,7 +93,8 @@ function itemOf(candidate: ReferenceCandidate): CaptionedItem {
   if (candidate.type === 'message') {
     return { id: candidate.id, label: candidate.title, snippet: candidate.caption, uri: candidate.uri, search: candidate.search }
   }
-  return { id: candidate.id, label: TYPE_WORDS[candidate.type], snippet: candidate.title, uri: candidate.uri, description: candidate.caption || undefined }
+  // The title alone: the row's icon says what it is (Katerina, 8 October), as in Peek, so "Project:" before it said it twice.
+  return { id: candidate.id, label: candidate.title, snippet: '', uri: candidate.uri, description: candidate.caption || undefined }
 }
 
 /**
