@@ -13,7 +13,7 @@ import {
   type Imeta,
 } from '@estiva-app/protocol'
 import { AttachmentCard, Avatar, Button, FieldLine, FilePicker, IconButton, Kbd, Toolbar, ToolbarButton, richTextClassName } from '@estiva-app/ui'
-import { PastedImages, SelectionToolbar, isSuggestionActive, isSuggestionOpen, urgentPubkeys } from '@estiva-app/ui/editor'
+import { CodeBlockColours, PastedImages, SelectionToolbar, isSuggestionActive, isSuggestionOpen, urgentPubkeys } from '@estiva-app/ui/editor'
 import { subscribeReferences, type ReferenceSection } from '@/api/references'
 import { cn } from '@/lib/cn'
 import { browserDrafts, type DraftStore } from '@/lib/drafts'
@@ -183,7 +183,9 @@ export function MessageBox({ kind = 'conversation', onSubmit, references, initia
       extensions: [
         // No trailing empty line after a list or a quote: in a document it lets you type below them, in a message it
         // made the box a line taller the moment a bullet appeared (Katerina, 30 September). Shift+Enter leaves a list.
-        StarterKit.configure({ link: false, strike: false, heading: { levels: [1, 2] }, trailingNode: false }),
+        // The code block is the package's, coloured by language as it is when read (estiva-ui 0.64.0).
+        StarterKit.configure({ link: false, strike: false, heading: { levels: [1, 2] }, trailingNode: false, codeBlock: false }),
+        CodeBlockColours,
         ReferenceNode,
         LinkDecoration,
         // No new urgent pick in an edit, which carries no tags (CON-24); its own urgent chips still load.
