@@ -7,7 +7,7 @@ import { ConversationCount } from './ConversationCount'
 import { EmptyState } from './EmptyState'
 import { Person } from './Person'
 import { StatusLabel } from './StatusLabel'
-import { RichText } from './RichText'
+import { ShipRichText } from './ShipRichText'
 import { pickWidget } from '@/api/foreign'
 import type { ForeignObject as ForeignObjectData, ResolvedSlot } from '@/api/foreign'
 
@@ -152,7 +152,7 @@ function ForeignMessage({ object, className }: ForeignObjectProps) {
           stays, as a chip.
         */}
         {object.slots.body && (
-          <RichText value={object.slots.body.value} format={object.slots.body.format ?? 'marker'} size="small" hideStandalone />
+          <ShipRichText value={object.slots.body.value} format={object.slots.body.format ?? 'marker'} size="small" hideStandalone />
         )}
       </div>
     </div>

@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { addrToNaddr } from '@estiva-app/protocol'
 import type { ForeignObject } from '@/api/foreign'
-import { RichText } from './RichText'
+import { ShipRichText } from './ShipRichText'
 
 /*
   The block vocabulary, in both content models — SPEC §13.
@@ -40,11 +40,11 @@ const MARKER = [
 ].join('\n')
 
 const meta = {
-  title: 'Primitives/RichText',
-  component: RichText,
+  title: 'Primitives/ShipRichText',
+  component: ShipRichText,
   args: { nameOf: (key: string) => (key === ADA ? 'Ada Lovelace' : `${key.slice(0, 8)}…`), resolved: { [NADDR]: issue } },
   decorators: [(Story) => <div className="w-[560px]"><Story /></div>],
-} satisfies Meta<typeof RichText>
+} satisfies Meta<typeof ShipRichText>
 
 export default meta
 type Story = StoryObj<typeof meta>

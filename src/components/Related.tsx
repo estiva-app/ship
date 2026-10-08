@@ -7,7 +7,7 @@ import type { RelatedState } from '@/api/useRelated'
 
 import { ConversationCount } from '@/components/ui/ConversationCount'
 import { Person } from '@/components/ui/Person'
-import { RichText } from '@/components/ui/RichText'
+import { ShipRichText } from '@/components/ui/ShipRichText'
 import { StatusLabel } from '@/components/ui/StatusLabel'
 
 
@@ -82,7 +82,7 @@ function Row({ object, count }: { object: ForeignObject; count?: number }) {
           <span className={cn('text-body-2-strong', profile?.displayName ? 'text-text-primary' : 'text-text-muted')}>{profile?.displayName ?? '—'}</span>
           {slots.body && (
             <div className="line-clamp-2">
-              <RichText value={slots.body.value} format={slots.body.format ?? 'marker'} size="small" hideStandalone />
+              <ShipRichText value={slots.body.value} format={slots.body.format ?? 'marker'} size="small" hideStandalone />
             </div>
           )}
         </div>

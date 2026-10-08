@@ -16,14 +16,14 @@ import { render, screen } from '@testing-library/react'
 const blobObjectUrl = vi.fn<(url: string) => Promise<string>>()
 vi.mock('@/api/blobs', () => ({ blobObjectUrl: (url: string) => blobObjectUrl(url) }))
 
-import { RichText } from './RichText'
+import { ShipRichText } from './ShipRichText'
 
 const SHA = 'f'.repeat(64)
 const FILE = { url: `/media/${SHA}.png`, m: 'image/png', x: SHA, size: 4096, filename: 'diagram.png' }
 
 const doc = (...blocks: unknown[]) => JSON.stringify({ type: 'doc', content: blocks })
 const attachment = (attrs: Record<string, unknown>) => ({ type: 'attachment', id: 'b2', attrs })
-const show = (value: string) => render(<RichText value={value} format="blocks" />).container
+const show = (value: string) => render(<ShipRichText value={value} format="blocks" />).container
 
 beforeEach(() => {
   blobObjectUrl.mockReset()

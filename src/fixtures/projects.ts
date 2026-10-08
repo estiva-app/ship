@@ -1,6 +1,6 @@
 import type { ProjectCardProps } from '@/components/ProjectCard'
 import type { HistoryEntry } from '@/components/History'
-import type { SidebarProject } from '@/components/Sidebar'
+import type { SidebarProject } from '@/components/ShipSidebar'
 import { ANA, MARA, RAVI } from './issues'
 
 /** Invented projects — nothing real. */

@@ -1,16 +1,16 @@
 import { Meta, Canvas, Controls } from '@storybook/addon-docs/blocks'
-import * as RichTextStories from './RichText.stories'
+import * as ShipRichTextStories from './ShipRichText.stories'
 
-<Meta of={RichTextStories} />
+<Meta of={ShipRichTextStories} />
 
-# RichText
+# ShipRichText
 
 A body, drawn — every block and mark SPEC §13 defines, in both content models,
 through the package's RichText. Every string reaches the DOM as a React child,
 so a body written by somebody else on a shared relay is safe by construction
 rather than by care.
 
-<Canvas of={RichTextStories.MarkerBody} />
+<Canvas of={ShipRichTextStories.MarkerBody} />
 
 ## When
 
@@ -34,9 +34,9 @@ rather than by care.
 ## How
 
 ```tsx
-import { RichText } from '@/components/ui/RichText'
+import { ShipRichText } from '@/components/ui/ShipRichText'
 
-<RichText value={body} format={format} resolved={resolved} nameOf={nameOf} hideStandalone />
+<ShipRichText value={body} format={format} resolved={resolved} nameOf={nameOf} hideStandalone />
 ```
 
 - `resolved` is keyed by URI and resolved once for the whole body, so an object
@@ -58,4 +58,4 @@ import { RichText } from '@/components/ui/RichText'
 
 ## Props
 
-<Controls of={RichTextStories.MarkerBody} />
+<Controls of={ShipRichTextStories.MarkerBody} />

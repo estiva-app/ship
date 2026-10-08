@@ -4,13 +4,13 @@
 import { describe, expect, it } from 'vitest'
 import { render } from '@testing-library/react'
 import { encodeNpub } from '@estiva-app/protocol'
-import { RichText } from './RichText'
+import { ShipRichText } from './ShipRichText'
 
 const ADA = 'b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46'
 const nameOf = (pubkey: string) => (pubkey === ADA ? 'Ada Lovelace' : `${pubkey.slice(0, 8)}…`)
 
 const show = (value: string) =>
-  render(<RichText value={value} format="marker" nameOf={nameOf} />).container
+  render(<ShipRichText value={value} format="marker" nameOf={nameOf} />).container
 
 describe('a mention inside a description', () => {
   it('resolves a key Peek wrote', () => {

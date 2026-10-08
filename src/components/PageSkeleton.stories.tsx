@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite'
 import { fn } from 'storybook/test'
 import { AppShell } from '@/components/AppShell'
 import { IdentityMenu } from '@/components/IdentityMenu'
-import { Sidebar } from '@/components/Sidebar'
+import { ShipSidebar } from '@/components/ShipSidebar'
 import { ANA } from '@/fixtures/issues'
 import { PageSkeleton, type PageSkeletonShape } from './PageSkeleton'
 
@@ -17,7 +17,7 @@ function Loading({ shape, current }: { shape: PageSkeletonShape; current: 'issue
       <AppShell
         logo="Estiva Ship"
         identity={<IdentityMenu me={ANA} signedIn idBase="https://id.estiva.app" relayUrl="http://localhost:3000" onCopyKey={fn()} onSignOut={fn()} />}
-        nav={<Sidebar openIssues={0} issuesHref="#/issues" projectsHref="#/projects" projects={[]} current={current} loading />}
+        nav={<ShipSidebar openIssues={0} issuesHref="#/issues" projectsHref="#/projects" projects={[]} current={current} loading />}
       >
         <PageSkeleton shape={shape} />
       </AppShell>

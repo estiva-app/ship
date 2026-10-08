@@ -11,7 +11,7 @@ import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
 import { Attachments as FileAttachments } from '@/components/ui/Attachment'
 import { BlockAnchorNote } from '@/components/ui/BlockAnchorNote'
 import { ForeignObject } from '@/components/ui/ForeignObject'
-import { RichText } from '@/components/ui/RichText'
+import { ShipRichText } from '@/components/ui/ShipRichText'
 import { SkeletonBar } from '@/components/ui/Skeleton'
 import { REACTION_OPTIONS, Reactions } from '@/components/Reactions'
 import { ConfirmDeleteMessage, NewSinceHere, useThreadReactions, useThreadReferences, type ConversationsProps, type MessageData, type ThreadData } from '@/components/ConversationThread'
@@ -151,7 +151,7 @@ function Message({ message, resolved, resolving, nameOf, reactions, onToggleReac
       ) : (
         <>
           <div className="break-words">
-            <RichText value={message.body} format={MESSAGE_FORMAT} hideStandalone={(reference) => resolved?.[reference] !== null} nameOf={nameOf} resolved={resolved} urgent={message.urgent} />
+            <ShipRichText value={message.body} format={MESSAGE_FORMAT} hideStandalone={(reference) => resolved?.[reference] !== null} nameOf={nameOf} resolved={resolved} urgent={message.urgent} />
           </div>
           <FileAttachments files={message.files} />
           {attached.length > 0 && resolving && <SkeletonBar className="h-16 w-full" data-foreign-references="loading" />}

@@ -1,5 +1,6 @@
 import { IconLink } from '@tabler/icons-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { AppProvider } from '@estiva-app/ui'
 import { createFolder, me, peopleIn, resolveInbound, useDirectory, useWorkspace, type DirectoryView, type FolderState, type WorkspaceState, installReadStateFlush } from '@/api'
 import { AppShell } from '@/components/AppShell'
 import { Banner } from '@/components/Banner'
@@ -7,7 +8,7 @@ import { ToastProvider, useToast, type ToastOptions } from '@/components/ui/Toas
 import { TooltipProvider } from '@/components/ui/Tooltip'
 import { PageSkeleton, type PageSkeletonShape } from '@/components/PageSkeleton'
 import { IdentityMenu } from '@/components/IdentityMenu'
-import { Sidebar, type SidebarFolder, type SidebarProject } from '@/components/Sidebar'
+import { ShipSidebar, type SidebarFolder, type SidebarProject } from '@/components/ShipSidebar'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { reloadFolders, topLevelFolders, useFolders } from '@/api/useFolders'
 import { NewFolderDialog } from '@/components/NewFolderDialog'
@@ -26,7 +27,7 @@ import { archivesOf, type Archives } from '@/lib/archive'
 import { MentionPeopleProvider, mentionPeople } from '@/components/editing/mentionables'
 import { mentionableIn } from '@/api/people'
 import { useRoster } from '@/api/useRoster'
-import { go, href, replace, useRoute, type Route } from './router'
+import { go, href, navigateTo, replace, useRoute, type Route } from './router'
 
 /**
  * The app: the shell around whichever page the hash names, fed from the
@@ -37,16 +38,20 @@ import { go, href, replace, useRoute, type Route } from './router'
 export default function App() {
   return (
     /*
-      Two providers the package asks for (0.10.0), outside everything else:
-      tooltips share one delay across a row (B6, D23), and the toast has one
-      place to live (D35). Here rather than in main.tsx so that a test which
-      renders <App /> gets them too.
+      The providers the package asks for, outside everything else: tooltips
+      share one delay across a row (B6, D23), the toast has one place to live
+      (D35), and every link changes page through Ship's router rather than
+      reloading (AppProvider, 0.60.0 — Ship's own NavItem existed only for
+      that). Here rather than in main.tsx so that a test which renders <App />
+      gets them too.
     */
-    <TooltipProvider>
-      <ToastProvider>
-        <Shell />
-      </ToastProvider>
-    </TooltipProvider>
+    <AppProvider navigate={navigateTo}>
+      <TooltipProvider>
+        <ToastProvider>
+          <Shell />
+        </ToastProvider>
+      </TooltipProvider>
+    </AppProvider>
   )
 }
 
@@ -167,7 +172,7 @@ function Shell() {
          not gate `loading`: the folder list arrives on its own schedule and an
          empty one is not the workspace still coming. */
       nav={
-        <Sidebar
+        <ShipSidebar
           {...sidebarProps(
             state,
             route,
