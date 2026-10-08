@@ -12,7 +12,7 @@ import {
   type Imeta,
 } from '@estiva-app/protocol'
 import { FieldLine, FilePicker, richTextClassName } from '@estiva-app/ui'
-import { EditorBlockHandle, SelectionToolbar, blockDropCursor, isSuggestionOpen } from '@estiva-app/ui/editor'
+import { EditorBlockHandle, PastedImages, SelectionToolbar, blockDropCursor, isSuggestionOpen } from '@estiva-app/ui/editor'
 import { uploadAttachment } from '@/api/blobs'
 import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
 import { AttachmentNode, BlockId, ReferenceNode, ReferenceProvider, UnknownBlock } from '@/components/ui/editorSchema'
@@ -78,6 +78,8 @@ export function LiveDescription({
     (SHI-2, DescriptionEditing's own guard).
   */
   const picking = useRef(false)
+  // Where a pasted picture goes: `attach`, set below once it exists.
+  const pasteTo = useRef<((files: File[]) => Promise<void>) | null>(null)
   const openPicker = () => {
     picking.current = true
     const released = () => {
@@ -145,6 +147,15 @@ export function LiveDescription({
         AttachmentNode,
         LinkDecoration.configure({ openOnClick: true }),
         ShipSlashMenu(slashSections({ table: true, onFile: () => openPicker() })),
+        // A pasted picture is placed as `/` File places one (Katerina, 8 October); text on the clipboard stays text.
+        PastedImages.configure({
+          onImages: (pasted) => {
+            const take = pasteTo.current
+            if (!take) return false
+            void take(pasted)
+            return true
+          },
+        }),
       ],
       // Built once. A value coming back must not rebuild the editor under the caret; see the effect below.
       content: toEditorDocument(documentForEditing(value, format)),
@@ -200,6 +211,7 @@ export function LiveDescription({
       setUploadError(error instanceof Error ? error.message : String(error))
     }
   }
+  pasteTo.current = attach
 
   useEffect(() => {
     onEditor?.(editor)

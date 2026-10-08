@@ -1,7 +1,9 @@
 import { IconMessage } from '@tabler/icons-react'
 import { mentionText } from '@estiva-app/conversation'
 import { decodeNpub } from '@estiva-app/protocol'
+import { KindIcon } from '@estiva-app/ui'
 import { CaptionedReference, PersonMention, ReferenceTrigger, UrgentPersonMention, type MentionPerson } from '@estiva-app/ui/editor'
+import { thingKindOfUri } from '@/lib/thingKind'
 import { REFERENCE_COPY, type ReferenceSection } from '@/api/references'
 
 /**
@@ -13,6 +15,20 @@ import { REFERENCE_COPY, type ReferenceSection } from '@/api/references'
  */
 
 const REFERENCE_ICON = <IconMessage size={16} stroke={1.5} className="text-text-secondary" />
+
+/*
+  What each row and chip points at, as its icon — a topic, a project, an
+  issue, a file, a message — the same icons Peek's give (Katerina, 8 October).
+  A pointer this cannot name keeps the speech bubble above.
+*/
+const rowIcon = (uri: string) => {
+  const kind = thingKindOfUri(uri)
+  return kind ? <KindIcon kind={kind} /> : undefined
+}
+const chipIcon = (uri: string | null) => {
+  const kind = thingKindOfUri(uri)
+  return kind ? <KindIcon kind={kind} size={14} tone="inherit" /> : undefined
+}
 
 /**
  * The extensions, reading the latest people and `[` sections each time a list
@@ -33,7 +49,7 @@ export function composerTriggers(read: {
   return [
     PersonMention.configure({ people: read.people }),
     UrgentPersonMention.configure({ people: read.people, ...(read.urgent === false ? { suggestion: { allow: () => false } } : {}) }),
-    CaptionedReference.configure({ icon: REFERENCE_ICON }),
+    CaptionedReference.configure({ icon: REFERENCE_ICON, iconFor: chipIcon }),
     ReferenceTrigger.configure({
       items: () => [],
       sections: read.references,
@@ -42,6 +58,7 @@ export function composerTriggers(read: {
       ariaLabel: REFERENCE_COPY.ariaLabel,
       sectionLabel: REFERENCE_COPY.messages,
       icon: REFERENCE_ICON,
+      iconFor: rowIcon,
     }),
   ]
 }

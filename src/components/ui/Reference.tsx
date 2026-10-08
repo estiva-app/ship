@@ -1,6 +1,6 @@
 import type { MouseEvent, ReactNode } from 'react'
 import { decodeNpub, stripNaddrs } from '@estiva-app/protocol'
-import { InlineChip, WithTooltip } from '@estiva-app/ui'
+import { InlineChip, KindIcon, WithTooltip, thingKindOf } from '@estiva-app/ui'
 import type { ForeignObject } from '@/api/foreign'
 import { StatusLabel } from './StatusLabel'
 import { referenceLink } from '@/lib/referenceLink'
@@ -126,6 +126,8 @@ export function Reference({
     const link = referenceLink(object)
     const chip = {
       tone: 'neutral' as const,
+      // What it is, before its name: a topic, a project, an issue, a file or a message (Katerina, 8 October), as in Peek.
+      icon: <KindIcon kind={thingKindOf(object.kind)} size={14} tone="inherit" />,
       'data-reference': 'object',
       'data-object': object.ref,
       className,
