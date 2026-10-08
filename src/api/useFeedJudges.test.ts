@@ -101,6 +101,19 @@ describe("a file's members, read from public events", () => {
     expect([...members.keys()].sort()).toEqual([ELSE, OWNER].sort())
     expect(members.get(ELSE)).toEqual({ member: true, since: 1500 })
   })
+
+  /* The members pill needs no mutes, so it does not wait for `/nip44/decrypt` (Katerina, 2026-10-08). */
+  it('hands over the members before the mute list is decrypted', async () => {
+    let release: (plain: string | undefined) => void = () => {}
+    const slow = vi.fn(() => new Promise<string | undefined>((resolve) => (release = resolve)))
+    const heard = vi.fn()
+    const read = readFeedFacts(async () => [comment(ELSE, 1500), mutedList([FILE])], slow, file, ME, heard)
+    await vi.waitFor(() => expect(slow).toHaveBeenCalledTimes(1))
+    expect(heard).toHaveBeenCalledTimes(1)
+    expect([...heard.mock.calls[0][0].keys()].sort()).toEqual([ELSE, OWNER].sort())
+    release(serializeMutedBlob([FILE], 5000))
+    expect((await read).muted?.has(FILE)).toBe(true)
+  })
 })
 
 describe('the mute list is read, not written', () => {
