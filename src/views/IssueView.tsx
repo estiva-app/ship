@@ -114,7 +114,8 @@ export function IssueView({ crumbs, tab, onTab, title, description, descriptionF
     // `data-surface` and `data-tab` are the smoke test's waypoints — see IssuesView. A page that scrolls inside
     // itself: `flex-1 min-h-0 [contain:size]` takes exactly the frame's height, so its columns scroll and the frame does not.
     <div data-surface="issue" data-tab={tab} className="grid min-h-0 flex-1 [contain:size] grid-cols-[minmax(0,1fr)_1px_auto] grid-rows-[auto_auto_minmax(0,1fr)] gap-y-4">
-      <div className="col-start-1 row-start-1 flex min-h-8 items-center justify-between gap-4 px-6 pt-5">
+      {/* `mt-5`, not `pt-5`: `min-h-8` counts padding, so with `pt-5` the row was 40px without the members pill and 52px with it, and the page dropped 12px when it arrived. */}
+      <div className="col-start-1 row-start-1 mt-5 flex min-h-8 items-center justify-between gap-4 px-6">
         <Breadcrumb items={items} />
         {members}
       </div>

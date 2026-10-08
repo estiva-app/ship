@@ -125,7 +125,8 @@ export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onVi
     // toggle and the tabs swap content in place on the same route, so without them a test cannot tell "it
     // rendered" from "the click did nothing". A page that scrolls inside itself — see IssueView.
     <div data-surface="project" data-view={view} data-tab={tab} className="grid min-h-0 flex-1 [contain:size] grid-cols-[minmax(0,1fr)_1px_auto] grid-rows-[auto_auto_minmax(0,1fr)] gap-y-4">
-      <div className="col-start-1 row-start-1 flex min-h-8 items-center justify-between gap-4 px-6 pt-5">
+      {/* `mt-5`, not `pt-5`, so the members pill arriving does not move the page — see IssueView. */}
+      <div className="col-start-1 row-start-1 mt-5 flex min-h-8 items-center justify-between gap-4 px-6">
         {/* The box before the name says it is a project — the sidebar's icon for one (Katerina, 2026-09-09). */}
         <Breadcrumb items={[{ label: 'Projects', ...linkTo(crumbs.projectsHref) }, { label: crumbs.title, icon: <IconBox size={16} stroke={1.5} /> }]} />
         {members}
