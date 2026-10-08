@@ -279,10 +279,19 @@ export function linkTo(url: string): {
       if (event.defaultPrevented) return
       if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
       event.preventDefault()
-      history.pushState(null, '', url)
-      dispatchEvent(new PopStateEvent('popstate'))
+      navigateTo(url)
     },
   }
+}
+
+/**
+ * Change page in place: the new address, then the route listener. What a link's
+ * plain click does — `linkTo`'s, and every estiva-ui link's through `AppProvider`
+ * (0.60.0), which already leaves the modified clicks to the browser.
+ */
+export function navigateTo(url: string): void {
+  history.pushState(null, '', url)
+  dispatchEvent(new PopStateEvent('popstate'))
 }
 
 /**

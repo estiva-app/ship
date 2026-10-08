@@ -12,7 +12,7 @@ import { beforeAll, describe, expect, it, vi } from 'vitest'
 import type { Editor } from '@tiptap/react'
 import { encodeNpub, type SignedEvent } from '@estiva-app/protocol'
 import { MentionPeopleProvider } from '@/components/editing/mentionables'
-import { RichText } from '@/components/ui/RichText'
+import { ShipRichText } from '@/components/ui/ShipRichText'
 import { urgentIndex } from '@/nostr/store'
 import { MESSAGE_FORMAT } from './shared'
 import { MessageBox } from './MessageBox'
@@ -53,12 +53,12 @@ describe('a sent urgent mention', () => {
   })
 
   it('draws its chip urgent when the message names the person urgently', () => {
-    const { container } = render(<RichText value={BODY} format={MESSAGE_FORMAT} nameOf={nameOf} urgent={[BOB]} />)
+    const { container } = render(<ShipRichText value={BODY} format={MESSAGE_FORMAT} nameOf={nameOf} urgent={[BOB]} />)
     expect(container.querySelector(`[data-mention="${BOB}"]`)?.className).toContain('bg-warning-muted')
   })
 
   it('draws the same text as an ordinary mention without the tag', () => {
-    const { container } = render(<RichText value={BODY} format={MESSAGE_FORMAT} nameOf={nameOf} />)
+    const { container } = render(<ShipRichText value={BODY} format={MESSAGE_FORMAT} nameOf={nameOf} />)
     const chip = container.querySelector(`[data-mention="${BOB}"]`)
     expect(chip).not.toBeNull()
     expect(chip?.className).not.toContain('bg-warning-muted')

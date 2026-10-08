@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { Sidebar, type SidebarFolder, type SidebarProject } from './Sidebar'
+import { ShipSidebar, type SidebarFolder, type SidebarProject } from './ShipSidebar'
 
 /** Shaped like the local sandbox — invented projects, nothing real. */
 const PROJECTS: SidebarProject[] = [
@@ -29,8 +29,8 @@ const FILED: SidebarProject[] = [
 ]
 
 const meta = {
-  title: 'Navigation/Sidebar',
-  component: Sidebar,
+  title: 'Navigation/ShipSidebar',
+  component: ShipSidebar,
   args: {
     openIssues: 18,
     issuesHref: '#/',
@@ -46,7 +46,7 @@ const meta = {
       </div>
     ),
   ],
-} satisfies Meta<typeof Sidebar>
+} satisfies Meta<typeof ShipSidebar>
 
 export default meta
 type Story = StoryObj<typeof meta>

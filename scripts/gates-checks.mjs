@@ -76,6 +76,13 @@ export default function define(h) {
       { what: "Ship's mentions are the package's InlineChip", run: () => h.contains("src/components/ui/Reference.tsx", /\bInlineChip\b/, "Reference.tsx draws InlineChip") },
       { what: "Ship's files are the package's AttachmentCard", run: () => h.contains("src/components/ui/Attachment.tsx", /\bAttachmentCard\b/, "Attachment.tsx draws AttachmentCard") },
     ] },
+    // Katerina, 8 October: one copy of each part. Ship's NavItem only stopped a reload, which the
+    // package does through AppProvider (0.60.0); Ship's sidebar and body are Ship's own, under Ship's names.
+    { ref: "UIG-49", title: "An app part with an estiva-ui part's name fails the gate unless its reason is written", checks: [
+      { what: "Ship's own NavItem is gone", run: () => h.exists("src/components/NavItem.tsx") ? h.FAIL("src/components/NavItem.tsx is back: use the package's NavItem, under AppProvider") : h.PASS("src/components/NavItem.tsx is gone") },
+      { what: "every link changes page through Ship's router: AppProvider takes navigateTo", run: () => h.contains("src/App.tsx", /<AppProvider navigate=\{navigateTo\}>/, "App.tsx gives AppProvider Ship's router") },
+      { what: "Ship's sidebar and body go by Ship's names", run: () => (h.exists("src/components/Sidebar.tsx") || h.exists("src/components/ui/RichText.tsx") ? h.FAIL("Sidebar.tsx or ui/RichText.tsx is back under the package's name") : h.PASS("ShipSidebar and ShipRichText")) },
+    ] },
   ];
 
   // Ship's own checks join the package's row for the same ticket, or make a row of their own.

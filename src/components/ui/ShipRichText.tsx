@@ -25,7 +25,7 @@ import { standaloneReference, toRenderTree, type ContentFormat } from '@estiva-a
  * Ship's is what a word points at — a person or an item (`Reference`) and a
  * file (`Attachment`) — and which standalone pointers leave the text.
  */
-export function RichText({
+export function ShipRichText({
   value,
   format,
   size,

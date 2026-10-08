@@ -1,9 +1,8 @@
 import { IconArrowUpRight, IconBox, IconListDetails, IconPlus } from '@tabler/icons-react'
-import { NavTree, Sidebar as SidebarShell, type NavTreeGroup, type NavTreeNode } from '@estiva-app/ui'
+import { NavItem, NavTree, Sidebar as SidebarShell, type NavTreeGroup, type NavTreeNode } from '@estiva-app/ui'
 import { MenuItem } from '@/components/ui/Menu'
 import { placedIn } from '@/lib/placement'
 import { linkTo } from '@/router'
-import { NavItem } from './NavItem'
 
 /**
  * The sidebar: Issues, Projects, then the active projects **under their
@@ -80,7 +79,7 @@ export interface SidebarFolder {
   addresses?: string[]
 }
 
-export interface SidebarProps {
+export interface ShipSidebarProps {
   /** Open issues across the workspace, minus archived projects — as today. */
   openIssues: number
   issuesHref: string
@@ -121,7 +120,7 @@ export interface SidebarProps {
   className?: string
 }
 
-export function Sidebar({ openIssues, issuesHref, projectsHref, projects, folders = [], onOpenFolder, onMoveProject, onNewFolder, current, loading = false, foldersLoading = false, className }: SidebarProps) {
+export function ShipSidebar({ openIssues, issuesHref, projectsHref, projects, folders = [], onOpenFolder, onMoveProject, onNewFolder, current, loading = false, foldersLoading = false, className }: ShipSidebarProps) {
   /*
     Both branches of `current` are objects now, so `typeof current === 'object'`
     no longer distinguishes them — it was correct while a project route was the

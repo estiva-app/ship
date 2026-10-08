@@ -8,10 +8,10 @@
  */
 import { describe, it, expect } from 'vitest'
 import { render } from '@testing-library/react'
-import { RichText } from './RichText'
+import { ShipRichText } from './ShipRichText'
 
 const show = (value: string, format: 'marker' | 'blocks' | 'unknown' = 'marker') =>
-  render(<RichText value={value} format={format} />).container
+  render(<ShipRichText value={value} format={format} />).container
 
 describe('marker descriptions, which is all 157 of them today', () => {
   it('draws headings, lists, quotes and fences as elements', () => {

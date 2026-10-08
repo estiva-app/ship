@@ -4,7 +4,7 @@ import { BlockHandle } from '@estiva-app/ui'
 import { Banner } from '@/components/Banner'
 import { blockRows, linkedBlock } from './blockRows'
 import { ForeignObject } from '@/components/ui/ForeignObject'
-import { RichText } from '@/components/ui/RichText'
+import { ShipRichText } from '@/components/ui/ShipRichText'
 import { SkeletonBar } from '@/components/ui/Skeleton'
 import { byReference, useForeignObjects } from '@/api/useForeignObjects'
 import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
@@ -152,7 +152,7 @@ function ReadingHeader({ title, titlePlaceholder, description, format, nameOf, r
         ) : (
           // A reader gets the handle too, with Copy link and Comment (Miky, RIC-18 kickoff); the editing rows need the editor.
           <BlockHandle actions={blockRows(onCommentOnBlock, onCopyBlockLink)}>
-            <RichText value={description} format={format} nameOf={nameOf} resolved={resolved} hideStandalone />
+            <ShipRichText value={description} format={format} nameOf={nameOf} resolved={resolved} hideStandalone />
           </BlockHandle>
         )}
       </div>
