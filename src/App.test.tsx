@@ -89,6 +89,7 @@ const STATE: WorkspaceState = {
   // `ui/Attachment.test.tsx` the drawing (CON-12).
   attachments: {},
   urgent: {},
+  parts: {},
   folders: [],
 }
 

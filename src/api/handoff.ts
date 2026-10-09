@@ -41,7 +41,7 @@ export type Handoff =
  * hand-off in the tab say "Nothing found" until a reload.
  */
 let manifests: Promise<SignedEvent[]> | null = null
-function declaredManifests(): Promise<SignedEvent[]> {
+export function declaredManifests(): Promise<SignedEvent[]> {
   manifests ??= relay.query([{ kinds: [31990], limit: 500 }] as never).then(
     (found) => {
       if (found.length === 0) manifests = null

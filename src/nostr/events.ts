@@ -377,6 +377,12 @@ export function buildConversationMessage(
     files?: readonly Imeta[]
     /** The people the composer's urgent picks name, by pubkey — SPEC §13.1, CON-25. */
     urgent?: readonly string[]
+    /**
+     * The `part` tags (and their `a`) for the block links pasted into the body —
+     * SPEC §13.6.1, COM-2. Resolved before this is called (`partTagsFor`),
+     * because a link names a `d` and the address needs the relay.
+     */
+    partTags?: readonly NostrTag[]
   },
 ): UnsignedEvent {
   assertFolderId(args.folder)
@@ -388,11 +394,17 @@ export function buildConversationMessage(
     none, so a mention notified nobody and a file named in a Ship comment was
     missing from that file's Mentioned in.
   */
-  const earned = (own: { address?: string; event?: string }): NostrTag[] => [
-    ...urgentTagsFor(args.body, args.urgent),
-    ...referenceTagsFor(args.body, own.address),
-    ...quoteTagsFor(args.body, own.event),
-  ]
+  const earned = (own: { address?: string; event?: string }): NostrTag[] => {
+    const references = referenceTagsFor(args.body, own.address)
+    const named = new Set(references.filter((t) => t[0] === 'a').map((t) => t[1]))
+    return [
+      ...urgentTagsFor(args.body, args.urgent),
+      ...references,
+      ...quoteTagsFor(args.body, own.event),
+      // A block link's `a`, unless a `nostr:` pointer in the body already earned it.
+      ...(args.partTags ?? []).filter((t) => t[0] !== 'a' || (t[1] !== own.address && !named.has(t[1]))),
+    ]
+  }
 
   // A comment, or a reply to one, is a NIP-22 `kind:1111`; chat — a message in
   // the Folder or a reply in its thread — stays a `kind:9` (SPEC §6.4).

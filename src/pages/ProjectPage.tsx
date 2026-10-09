@@ -2,7 +2,7 @@ import { IconLinkOff } from '@tabler/icons-react'
 import { newestDrawn, useMarkRead, useShownThreads } from '@/lib/useMarkRead'
 import { useNewSince } from '@/lib/useNewSince'
 import { ownConversations, recordChannel } from '@/lib/ownConversation'
-import { pointerToAddress, referenceToPointer, resolveBlockAnchor, type ContentFormat } from '@estiva-app/protocol'
+import { pointerToAddress, referenceToPointer, resolveBlockAnchor, type ContentFormat, type PartPointer } from '@estiva-app/protocol'
 import type { AttachmentIndex, EditIndex } from '@/api'
 import { signedIn } from '@/auth/estivaId'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -136,6 +136,8 @@ export function threadFor(
   attachments?: AttachmentIndex,
   /** Whom each message names urgently, beside the fold for the same reason (CON-24). */
   urgent?: Record<string, string[]>,
+  /** The blocks each message shows, beside the fold for the same reason (COM-2). */
+  parts?: Record<string, PartPointer[]>,
 ): ThreadData {
   const message = (m: FolderState['conversations'][number]['root']) => {
     const edit = edits?.[m.id]
@@ -161,6 +163,8 @@ export function threadFor(
       files: attachments?.[m.id],
       // The urgent keys of the message as sent: an edit carries none, so an edited message keeps them (CON-24).
       urgent: urgent?.[m.id],
+      // Its `part` tags as sent: an edit carries none, so an edited message keeps them (COM-2).
+      parts: parts?.[m.id],
     }
   }
   return { id: conversation.id, root: message(conversation.root), replies: conversation.replies.map(message) }
@@ -244,7 +248,7 @@ export function activityFor(
   directory: DirectoryView,
 ): { items: ActivityItem[]; truncated: number } {
   const mentions: ActivityItem[] = mentionsOf(state.conversations, addr, state.anchors).map((conversation) => ({
-    thread: threadFor(conversation, directory, undefined, addr, state.edits, state.attachments, state.urgent),
+    thread: threadFor(conversation, directory, undefined, addr, state.edits, state.attachments, state.urgent, state.parts),
     relation: 'mention' as const,
     ...placeOf(conversation.root.folder, state),
   }))
@@ -428,7 +432,7 @@ export function ProjectPage({
   useMarkRead(streams, drawn.rootsAt)
   useMarkRead(tab === 'activity' ? shownThreads.map(threadContext) : [], drawn.repliesAt)
   const threads = useMemo(
-    () => conversations.map((c) => threadFor(c, directory, project ? { value: project.description, format: project.descriptionFormat } : undefined, project?.addr, state.edits, state.attachments, state.urgent)),
+    () => conversations.map((c) => threadFor(c, directory, project ? { value: project.description, format: project.descriptionFormat } : undefined, project?.addr, state.edits, state.attachments, state.urgent, state.parts)),
     [conversations, directory, project],
   )
   /* The divider in the feed (CRO-13). A root about the project — its own `a`
