@@ -19,6 +19,7 @@ import { blockUrlOf, matchObjectUrl, urlPatternsOf } from '@estiva-app/interop'
 import { pausedForMs } from '@/lib/relayBudget'
 import { resolveForeign, type ForeignObject } from './foreign'
 import { declaredManifests } from './handoff'
+import { safeLink } from '@/lib/handoff'
 import { relay } from './store'
 
 /**
@@ -73,6 +74,24 @@ function blockLinkOf(address: string, title: string | undefined, block: string):
   return link
 }
 
+/**
+ * The link Open follows: the block's, only when it is `https:` and on the host
+ * the projection opens the object on; the object's own otherwise. The block
+ * link is built from any manifest's `urls`, and any member can publish one, so
+ * a `javascript:` or foreign-host shape must never reach `window.open` under
+ * "Open in Ship" (COM-2 security review).
+ */
+export function openLinkOf(blockLink: string | undefined, openUrl: string | undefined): string | undefined {
+  const object = safeLink(openUrl)
+  const block = safeLink(blockLink)
+  if (!block) return object
+  try {
+    return object && new URL(block).origin === new URL(object).origin ? block : object
+  } catch {
+    return object
+  }
+}
+
 /** Read one part once, as the signed-in viewer. */
 export async function readPart(pointer: PartPointer): Promise<PartView> {
   const object = await resolveForeign(pointer.address)
@@ -82,7 +101,13 @@ export async function readPart(pointer: PartPointer): Promise<PartView> {
     // A Folder the viewer is not in is skipped silently, so the empty answer
     // cannot say why; a deletion somebody was entitled to make is the one thing
     // that can. None found also covers an address that never existed.
-    const deletions = await query([{ kinds: [5], '#a': [pointer.address], limit: 20 }])
+    // The author's own deletions asked for apart: the relay checks only a
+    // deletion's first `a`, so anybody's could otherwise fill the window.
+    const author = pointer.address.split(':')[1] ?? ''
+    const deletions = await query([
+      { kinds: [5], authors: [author], '#a': [pointer.address], limit: 20 },
+      { kinds: [5], '#a': [pointer.address], limit: 20 },
+    ])
     return absenceOf(pointer.address, deletions) === 'deleted' ? { state: 'deleted' } : { state: 'unreadable' }
   }
   const body = object.slots.body
@@ -94,7 +119,7 @@ export async function readPart(pointer: PartPointer): Promise<PartView> {
   if (part.state === 'deleted' || part.state === 'unreadable') return { state: 'unreadable' }
   // A title that is somebody's key is not a slug (the card shows none either).
   const title = object.slots.title?.isPubkey ? undefined : object.slots.title?.value
-  const link = (await blockLinkOf(pointer.address, title, pointer.block)) ?? object.openUrl
+  const link = openLinkOf(await blockLinkOf(pointer.address, title, pointer.block), object.openUrl)
   return part.state === 'resolved' ? { state: 'resolved', block: part.block, object, link } : { state: part.state, object, link }
 }
 
@@ -114,16 +139,28 @@ export function usePart(pointer: PartPointer): PartView {
 interface Poll {
   listeners: Set<(view: PartView) => void>
   last?: PartView
+  /** Whether it re-reads on the interval; otherwise only when the tab comes back. */
+  live: boolean
   stop: () => void
 }
 const polls = new Map<string, Poll>()
+
+/**
+ * At most this many parts re-read on the interval in one tab; the rest read
+ * once and again when the tab comes back. Any member can post links, and
+ * without a ceiling sixty cards on one page would spend most of the reader's
+ * `/query` quota and pause the whole app (COM-2 security review).
+ */
+export const MAX_LIVE_PARTS = 12
 
 function watchPart(pointer: PartPointer, listener: (view: PartView) => void): () => void {
   const key = `${pointer.address}\u0000${pointer.block}`
   let poll = polls.get(key)
   if (!poll) {
-    const created: Poll = { listeners: new Set(), stop: () => undefined }
+    const live = [...polls.values()].filter((p) => p.live).length < MAX_LIVE_PARTS
+    const created: Poll = { listeners: new Set(), live, stop: () => undefined }
     let retry: ReturnType<typeof setTimeout> | undefined
+    let timer: ReturnType<typeof setInterval> | undefined
     const read = () => {
       if (document.visibilityState === 'hidden') return
       const paused = pausedForMs()
@@ -135,6 +172,13 @@ function watchPart(pointer: PartPointer, listener: (view: PartView) => void): ()
       readPart(pointer)
         .then((next) => {
           created.last = next
+          // Gone, or never ours to read: nothing will change on a tick, so stop
+          // ticking — a made-up address must not cost a read every 30 s.
+          if ((next.state === 'deleted' || next.state === 'unreadable') && timer) {
+            clearInterval(timer)
+            timer = undefined
+            created.live = false
+          }
           for (const notify of created.listeners) notify(next)
         })
         // A failed read keeps what was shown: a network blip is not a deletion.
@@ -143,11 +187,11 @@ function watchPart(pointer: PartPointer, listener: (view: PartView) => void): ()
           if (!created.last && !retry && polls.get(key) === created) retry = setTimeout(() => ((retry = undefined), read()), FIRST_RETRY_MS)
         })
     }
-    const timer = setInterval(read, PART_REFRESH_MS)
+    if (live) timer = setInterval(read, PART_REFRESH_MS)
     const onVisible = () => document.visibilityState === 'visible' && read()
     document.addEventListener('visibilitychange', onVisible)
     created.stop = () => {
-      clearInterval(timer)
+      if (timer) clearInterval(timer)
       if (retry) clearTimeout(retry)
       document.removeEventListener('visibilitychange', onVisible)
     }

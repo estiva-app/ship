@@ -20,7 +20,7 @@ vi.mock('./handoff', () => ({
   declaredManifests: async () => [{ ...buildManifest('8'.repeat(64), 0, 'https://ship.estiva.app'), id: 'm', sig: '' }],
 }))
 
-import { partTagsFor, readPart, resetParts, shownParts, urlNames, usePart } from './part'
+import { openLinkOf, partTagsFor, readPart, resetParts, shownParts, urlNames, usePart } from './part'
 
 const AUTHOR = 'f'.repeat(64)
 const D = 'b4ea696a-d4a2-4833-8f2a-6aa1e2f3c4d5'
@@ -136,6 +136,20 @@ describe('readPart — five states, none collapsed', () => {
     const other = `30851:${'b'.repeat(64)}:mine`
     query.mockResolvedValue([{ id: 'x', sig: '', pubkey: 'b'.repeat(64), kind: 5, created_at: 2, tags: [['a', other], ['a', ADDRESS]], content: '' }])
     expect((await readPart({ address: ADDRESS, block: 'p1' })).state).toBe('unreadable')
+  })
+})
+
+describe('openLinkOf — Open never follows a planted manifest shape', () => {
+  const OPEN = `https://ship.estiva.app/o/naddr1x`
+  it('takes the block link on the object host', () => {
+    expect(openLinkOf(LINK, OPEN)).toBe(LINK)
+  })
+  it('refuses javascript:, and another host, for the object link', () => {
+    expect(openLinkOf(`javascript:alert(1)//x-${D}#block-p1`, OPEN)).toBe(OPEN)
+    expect(openLinkOf(`https://evil.example/issue/x-${D}#block-p1`, OPEN)).toBe(OPEN)
+  })
+  it('has no link at all when neither is https', () => {
+    expect(openLinkOf('javascript:alert(1)', 'javascript:alert(2)')).toBeUndefined()
   })
 })
 
