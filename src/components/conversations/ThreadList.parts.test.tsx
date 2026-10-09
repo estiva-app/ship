@@ -52,6 +52,14 @@ describe('a pasted block link', () => {
     expect(card?.textContent).toContain('Open in Ship')
   })
 
+  it('says only "Open" for a block of Ship itself (Miky, 2026-10-09)', () => {
+    const here = `${window.location.origin}/issue/plan-the-launch-${D}#block-p1`
+    const c = show(`Have a look ${LINK}`, { state: 'resolved', object, link: here, block: { type: 'paragraph', id: 'p1', content: [{ type: 'text', text: 'x' }] } as never })
+    const button = [...c.querySelectorAll('[data-part="resolved"] button')].map((b) => b.textContent)
+    expect(button).toContain('Open')
+    expect(button).not.toContain('Open in Ship')
+  })
+
   it('says a deleted block was deleted, under its title', () => {
     const c = show(LINK, { state: 'detached', object })
     expect(c.querySelector('[data-part="detached"]')?.textContent).toContain('This part was deleted')

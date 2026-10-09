@@ -82,7 +82,8 @@ export function PartCardView({ view, address, block, nameOf }: { view: PartView;
   // an action, level with Show more at the right of its row.
   const openIn = link ? (
     <Button size="small" leadingIcon={<IconExternalLink stroke={1.5} className="size-3.5" />} onClick={() => (here ? navigateTo(new URL(link).pathname + new URL(link).hash) : window.open(link, '_blank', 'noopener,noreferrer'))}>
-      Open in {view.object.appName ?? 'app'}
+      {/* "Open" when it stays in Ship; "in <app>" only when it takes you elsewhere (Miky, 2026-10-09). */}
+      {here ? 'Open' : `Open in ${view.object.appName ?? 'app'}`}
     </Button>
   ) : undefined
   return (
