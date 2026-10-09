@@ -74,6 +74,17 @@ describe('a pasted block link', () => {
     expect(card?.className).not.toBe(show(LINK, { state: 'deleted' }).querySelector('[data-part="deleted"]')?.className)
   })
 
+  it("draws a comment's anchored block with the same card, above the text (Decided 2026-10-07)", () => {
+    views.set(ADDRESS, { state: 'detached', object })
+    const t: ThreadData = { id: 't2', root: { id: 't2', author: { name: 'Ann' }, at: 1000, body: 'About this paragraph', by: 'ann', anchorPart: { address: ADDRESS, block: 'p1' } }, replies: [] }
+    const c = render(<ThreadList threads={[t]} onStart={() => {}} onReply={() => {}} />).container
+    const card = c.querySelector('[data-part="detached"]')
+    expect(card?.textContent).toContain('This part was deleted')
+    expect(c.querySelector('[data-anchor]')).toBeNull()
+    // Above the text, as the subject of the remark.
+    expect(card!.compareDocumentPosition(c.querySelector('[data-message] .break-words')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
   it('draws nothing once an edit took the link out', () => {
     const c = show('never mind', { state: 'unreadable' })
     expect(c.querySelector('[data-part]')).toBeNull()

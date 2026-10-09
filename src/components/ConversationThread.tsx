@@ -99,6 +99,12 @@ export interface MessageData {
    * COM-2), read beside the fold for the same reason as `files`.
    */
   parts?: PartPointer[]
+  /**
+   * The block of its own object a comment is anchored to (SPEC §13.6), drawn
+   * above the text with the same card as a part — Decided 2026-10-07, as Peek
+   * draws it. Undefined for a comment about the whole object.
+   */
+  anchorPart?: PartPointer
 }
 
 /** Messages are marker text (SPEC §13.2); only a rich text *field* is a block document. */

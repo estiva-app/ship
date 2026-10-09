@@ -134,12 +134,13 @@ function Message({ message, resolved, resolving, nameOf, reactions, onToggleReac
   const parts = shownParts(message.parts, message.body, namedAddresses(message.body))
   const objects = attached
     .map((r) => resolved?.[r])
-    .filter((o): o is ForeignObjectData => !!o && !parts.some((part) => addressOf(o.ref) === part.address))
+    .filter((o): o is ForeignObjectData => !!o && !parts.some((part) => o.address === part.address))
   const react = onToggleReaction && ((emoji: string) => onToggleReaction(emoji, reactions?.find((r) => r.emoji === emoji)?.mine))
 
   return (
     <article className="flex flex-col gap-2" data-message={message.id}>
-      <BlockAnchorNote anchor={message.anchor} />
+      {/* What a comment is about, above it: the anchored block, live, with the same card as a part (COM-2). */}
+      {message.anchorPart ? <PartCard address={message.anchorPart.address} block={message.anchorPart.block} nameOf={nameOf} /> : <BlockAnchorNote anchor={message.anchor} />}
       <div className="flex min-h-6 items-center gap-2">
         <Avatar size={20} src={message.author.picture} name={message.author.name} />
         <span className={cn('truncate text-body-2-strong', message.author.name ? 'text-text-primary' : 'text-text-muted')}>{message.author.name ?? '—'}</span>

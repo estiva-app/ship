@@ -58,7 +58,16 @@ function blockLinkOf(address: string, title: string | undefined, block: string):
   let link = links.get(key)
   if (!link) {
     const [kind, , d] = address.split(':')
-    link = d ? urlShapes().then((shapes) => blockUrlOf(shapes, { kind: Number(kind), d, title, block }), () => undefined) : Promise.resolve(undefined)
+    link = d
+      ? urlShapes().then(
+          (shapes) => blockUrlOf(shapes, { kind: Number(kind), d, title, block }),
+          // A failed read is not the answer: the next tick asks again.
+          () => {
+            links.delete(key)
+            return undefined
+          },
+        )
+      : Promise.resolve(undefined)
     links.set(key, link)
   }
   return link
@@ -83,7 +92,9 @@ export async function readPart(pointer: PartPointer): Promise<PartView> {
     : ({ state: 'unaddressable' } as const)
   // `resolvePart` only says deleted or unreadable when told so, and it was not.
   if (part.state === 'deleted' || part.state === 'unreadable') return { state: 'unreadable' }
-  const link = (await blockLinkOf(pointer.address, object.slots.title?.value, pointer.block)) ?? object.openUrl
+  // A title that is somebody's key is not a slug (the card shows none either).
+  const title = object.slots.title?.isPubkey ? undefined : object.slots.title?.value
+  const link = (await blockLinkOf(pointer.address, title, pointer.block)) ?? object.openUrl
   return part.state === 'resolved' ? { state: 'resolved', block: part.block, object, link } : { state: part.state, object, link }
 }
 
@@ -115,7 +126,12 @@ function watchPart(pointer: PartPointer, listener: (view: PartView) => void): ()
     let retry: ReturnType<typeof setTimeout> | undefined
     const read = () => {
       if (document.visibilityState === 'hidden') return
-      if (pausedForMs() > 0) return
+      const paused = pausedForMs()
+      if (paused > 0) {
+        // Nothing shown yet: read when the pause ends, not a whole interval later.
+        if (!created.last && !retry) retry = setTimeout(() => ((retry = undefined), read()), paused)
+        return
+      }
       readPart(pointer)
         .then((next) => {
           created.last = next
@@ -124,7 +140,7 @@ function watchPart(pointer: PartPointer, listener: (view: PartView) => void): ()
         // A failed read keeps what was shown: a network blip is not a deletion.
         // Nothing shown yet means a skeleton, so try again soon rather than in a full interval.
         .catch(() => {
-          if (!created.last && polls.get(key) === created) retry = setTimeout(read, FIRST_RETRY_MS)
+          if (!created.last && !retry && polls.get(key) === created) retry = setTimeout(() => ((retry = undefined), read()), FIRST_RETRY_MS)
         })
     }
     const timer = setInterval(read, PART_REFRESH_MS)
@@ -209,16 +225,27 @@ export async function partTagsFor(body: string, own?: string): Promise<NostrTag[
   } catch {
     return []
   }
-  const hits = urls.map((url) => matchObjectUrl(url, shapes)).filter((hit) => !!hit && hit.by === 'd' && hit.block !== undefined)
-  const parts = new Map<string, string>()
-  for (const hit of hits) {
-    if (!hit) continue
-    const filter: Record<string, unknown> = { '#d': [hit.identifier], limit: 1 }
-    if (hit.kind !== undefined) filter.kinds = [hit.kind]
-    const [found] = await query([filter]).catch(() => [] as SignedEvent[])
-    if (!found) continue
-    const address = `${found.kind}:${found.pubkey}:${hit.identifier}`
-    if (!parts.has(address)) parts.set(address, hit.block!)
+  // The first link's block per object, so one read per object, all at once.
+  const first = new Map<string, { kind?: number; identifier: string; block: string }>()
+  for (const url of urls) {
+    const hit = matchObjectUrl(url, shapes)
+    if (!hit || hit.by !== 'd' || hit.block === undefined) continue
+    const key = `${hit.kind ?? ''}:${hit.identifier}`
+    if (!first.has(key)) first.set(key, { kind: hit.kind, identifier: hit.identifier, block: hit.block })
   }
+  const found = await Promise.all(
+    [...first.values()].map(async (hit) => {
+      const filter: Record<string, unknown> = { '#d': [hit.identifier], limit: 10 }
+      if (hit.kind !== undefined) filter.kinds = [hit.kind]
+      const events = await query([filter]).catch(() => [] as SignedEvent[])
+      // A link names a `d`, not who wrote it. When two authors hold that `d`,
+      // anyone could have published the second, so the link earns nothing
+      // rather than pointing every reader at whichever one came back.
+      const authors = new Set(events.map((e) => `${e.kind}:${e.pubkey}`))
+      return authors.size === 1 ? { address: `${[...authors][0]}:${hit.identifier}`, block: hit.block } : undefined
+    }),
+  )
+  const parts = new Map<string, string>()
+  for (const part of found) if (part && !parts.has(part.address)) parts.set(part.address, part.block)
   return [...parts].flatMap(([address, block]) => (address === own ? [partTag(address, block)] : [['a', address], partTag(address, block)]))
 }

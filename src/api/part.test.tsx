@@ -55,7 +55,12 @@ describe('partTagsFor — a pasted block link earns its tags', () => {
       ['a', ADDRESS],
       ['part', ADDRESS, 'p1'],
     ])
-    expect(query).toHaveBeenCalledWith([{ '#d': [D], kinds: [30851], limit: 1 }])
+    expect(query).toHaveBeenCalledWith([{ '#d': [D], kinds: [30851], limit: 10 }])
+  })
+
+  it('earns nothing when two authors hold that d: the link cannot say which', async () => {
+    query.mockResolvedValue([issueEvent, { ...issueEvent, id: 'x', pubkey: 'b'.repeat(64) }])
+    expect(await partTagsFor(LINK)).toEqual([])
   })
 
   it('keeps only `part` when the message is on that object, whose `a` it already carries', async () => {

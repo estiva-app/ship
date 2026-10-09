@@ -165,6 +165,8 @@ export function threadFor(
       urgent: urgent?.[m.id],
       // Its `part` tags as sent: an edit carries none, so an edited message keeps them (COM-2).
       parts: parts?.[m.id],
+      // The anchored block, read live from its object like any part (COM-2).
+      anchorPart: m.blockId && m.anchor ? { address: m.anchor, block: m.blockId } : undefined,
     }
   }
   return { id: conversation.id, root: message(conversation.root), replies: conversation.replies.map(message) }
