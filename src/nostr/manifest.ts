@@ -853,9 +853,14 @@ export function buildManifest(
       before SHI-16 is `#/issue/<kind>:<pubkey>:<d>`, those are in other
       people's messages, and a consumer matching only the current shape would
       render them as plain links for ever.
+
+      `#block-<block>` (SPEC §7.7, COM-2): the block menu's Copy link names one
+      block of the description, and a consumer reading this fragment draws that
+      block where the link was pasted. The fragment is optional to the matcher,
+      so a link without it still names the whole object.
     */
-    ['urls', `${appUrl.replace(/\/+$/, '')}/project/<slug>-<d>`, String(KIND.PROJECT)],
-    ['urls', `${appUrl.replace(/\/+$/, '')}/issue/<slug>-<d>`, String(KIND.ISSUE)],
+    ['urls', `${appUrl.replace(/\/+$/, '')}/project/<slug>-<d>#block-<block>`, String(KIND.PROJECT)],
+    ['urls', `${appUrl.replace(/\/+$/, '')}/issue/<slug>-<d>#block-<block>`, String(KIND.ISSUE)],
     ['urls', `${appUrl.replace(/\/+$/, '')}/#/project/<d>`, String(KIND.PROJECT)],
     ['urls', `${appUrl.replace(/\/+$/, '')}/#/issue/<d>`, String(KIND.ISSUE)],
   ]

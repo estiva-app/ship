@@ -52,18 +52,46 @@ export function blobObjectUrl(mediaUrl: string): Promise<string> {
   const held = cache.get(mediaUrl)
   if (held) return held
 
+  /*
+    Only this workspace's relay is sent a signed authorization (COM-2, as Peek
+    since peek#457). A media URL comes from somebody else's event — an `imeta`,
+    or an attachment block in a description another member wrote, which a part
+    now draws in any conversation — and nothing on the relay checks its host,
+    so any other origin would receive the viewer's replayable get-token for the
+    asking.
+  */
+  if (!sameOriginAs(mediaUrl, RELAY_URL)) return Promise.reject(new Error(`not this relay's media: ${mediaUrl}`))
+
   const pending = fetchBlob({
     relayUrl: RELAY_URL,
     url: mediaUrl,
     sign: (unsigned) => signer.sign(unsigned),
     pubkey: signer.pubkey,
-  }).then(({ bytes, contentType }) => URL.createObjectURL(new Blob([bytes], { type: contentType })))
+    // The type is the server's say-so, and a blob: URL opens in Ship's origin:
+    // `text/html` from anywhere would run as Ship. Pictures and PDFs keep their
+    // type so they preview; anything else downloads as bytes.
+  }).then(({ bytes, contentType }) => URL.createObjectURL(new Blob([bytes], { type: safeBlobType(contentType) })))
 
   // A failure is not cached: the usual cause is an expired token, and the next
   // render is exactly when a renewed one would work.
   pending.catch(() => cache.delete(mediaUrl))
   if (cache.size < CACHE_LIMIT) cache.set(mediaUrl, pending)
   return pending
+}
+
+function sameOriginAs(url: string, base: string): boolean {
+  try {
+    return !!base && new URL(url).origin === new URL(base.replace(/^ws/, 'http')).origin
+  } catch {
+    return false
+  }
+}
+
+/** A served type a blob: URL may carry: a raster or video picture, or a PDF; otherwise opaque bytes. Peek's rule. */
+export function safeBlobType(contentType: string | undefined): string {
+  const type = (contentType ?? '').split(';')[0].trim().toLowerCase()
+  if (/^(image\/(png|jpe?g|gif|webp|avif)|video\/(mp4|webm)|application\/pdf)$/.test(type)) return type
+  return 'application/octet-stream'
 }
 
 /** Test seam — the cache is module state and a suite must not inherit it. */

@@ -163,14 +163,14 @@ describe('conversations', () => {
     await startConversation({ folder: 'issue-folder', about: ISSUE.addr, withReference: true, body: 'hi' })
     expect(s.postMessage).toHaveBeenLastCalledWith(expect.objectContaining({ folder: 'issue-folder', body: 'hi', about: ISSUE.addr, aboutRef: expect.stringMatching(/^nostr:naddr1/) }))
     await startConversation({ folder: 'content-folder', about: PROJECT.addr, withReference: false, body: 'hi' })
-    expect(s.postMessage).toHaveBeenLastCalledWith({ folder: 'content-folder', body: 'hi', about: PROJECT.addr, aboutRef: undefined })
+    expect(s.postMessage).toHaveBeenLastCalledWith({ folder: 'content-folder', body: 'hi', about: PROJECT.addr, aboutRef: undefined, partTags: [] })
   })
 
   it("a reply goes to the thread's own Folder, anchored to its root", async () => {
     s.postMessage.mockResolvedValue({ ok: true })
     const conversation = { id: 'root-id', root: { id: 'root-id', author: 'a', createdAt: 1, body: 'x', folder: 'thread-folder', about: [] }, replies: [], about: [], createdAt: 1, lastAt: 1 }
     await reply(conversation, 'fallback', 'yes')
-    expect(s.postMessage).toHaveBeenCalledWith({ folder: 'thread-folder', body: 'yes', replyTo: { rootId: 'root-id', parentId: 'root-id' } })
+    expect(s.postMessage).toHaveBeenCalledWith({ folder: 'thread-folder', body: 'yes', replyTo: { rootId: 'root-id', parentId: 'root-id' }, partTags: [] })
     await reply({ ...conversation, root: { ...conversation.root, folder: '' } }, 'fallback', 'yes')
     expect(s.postMessage).toHaveBeenLastCalledWith(expect.objectContaining({ folder: 'fallback' }))
   })
@@ -180,7 +180,7 @@ describe('conversations', () => {
     const root = { id: 'root-id', author: 'a', createdAt: 1, body: 'x', folder: 'thread-folder', about: [ISSUE.addr], anchor: ISSUE.addr }
     const conversation = { id: 'root-id', root, replies: [], about: [ISSUE.addr], createdAt: 1, lastAt: 1 }
     await reply(conversation, 'fallback', 'yes')
-    expect(s.postMessage).toHaveBeenLastCalledWith({ folder: 'thread-folder', body: 'yes', replyToComment: { id: 'root-id', anchor: ISSUE.addr, author: 'a' } })
+    expect(s.postMessage).toHaveBeenLastCalledWith({ folder: 'thread-folder', body: 'yes', replyToComment: { id: 'root-id', anchor: ISSUE.addr, author: 'a' }, partTags: [] })
     // The comment is outside the read and a reply stands in: its author is not the comment's.
     await reply({ ...conversation, root: { ...root, id: 'stand-in', author: 'b' } }, 'fallback', 'yes')
     expect(s.postMessage).toHaveBeenLastCalledWith(expect.objectContaining({ replyToComment: { id: 'root-id', anchor: ISSUE.addr, author: undefined } }))

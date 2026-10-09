@@ -1,6 +1,6 @@
 import { Fragment, Suspense, lazy, useCallback, useEffect, useMemo, useState, type ComponentProps } from 'react'
 import { IconDotsVertical, IconMessage2, IconMoodPlus, IconX } from '@tabler/icons-react'
-import type { Imeta } from '@estiva-app/protocol'
+import { findNaddrs, pointerToAddress, referenceToPointer, type Imeta } from '@estiva-app/protocol'
 import { Avatar, Button, Card, EmptyState, IconButton, Menu, MenuItem, Popover, ReactionPicker, WithTooltip } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
 import { ago } from '@/lib/time'
@@ -20,6 +20,22 @@ import { MESSAGE_FORMAT, PLACE_ICON, RELATION, Time, meaningLabel, standaloneRef
 import { MessageBoxShell } from './writingBox'
 import type { Picks } from './MessageBox'
 import { messageScope, referenceSections } from '@/api/references'
+import { shownParts } from '@/api/part'
+import { PartCard } from '@/components/ui/PartCard'
+
+/** The address a `nostr:` pointer names, or undefined for an event or a malformed one. */
+function addressOf(reference: string): string | undefined {
+  try {
+    return pointerToAddress(referenceToPointer(reference))
+  } catch {
+    return undefined
+  }
+}
+
+/** The objects a body names by a `nostr:` pointer, as addresses — one of the two ways it keeps a part shown. */
+function namedAddresses(body: string): Set<string> {
+  return new Set(findNaddrs(body).map(addressOf).filter((a): a is string => !!a))
+}
 
 /*
   The writing box is its own chunk: its editor is ProseMirror, which a reader
@@ -114,12 +130,17 @@ function Message({ message, resolved, resolving, nameOf, reactions, onToggleReac
   const [editing, setEditing] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const attached = standaloneReferencesOf(message.body)
-  const objects = attached.map((r) => resolved?.[r]).filter((o): o is ForeignObjectData => !!o)
+  // A block of another object, live (SPEC §13.6.1, COM-2). Its card stands for the object, so its plain widget is not drawn too.
+  const parts = shownParts(message.parts, message.body, namedAddresses(message.body))
+  const objects = attached
+    .map((r) => resolved?.[r])
+    .filter((o): o is ForeignObjectData => !!o && !parts.some((part) => o.address === part.address))
   const react = onToggleReaction && ((emoji: string) => onToggleReaction(emoji, reactions?.find((r) => r.emoji === emoji)?.mine))
 
   return (
     <article className="flex flex-col gap-2" data-message={message.id}>
-      <BlockAnchorNote anchor={message.anchor} />
+      {/* What a comment is about, above it: the anchored block, live, with the same card as a part (COM-2). */}
+      {message.anchorPart ? <PartCard address={message.anchorPart.address} block={message.anchorPart.block} nameOf={nameOf} /> : <BlockAnchorNote anchor={message.anchor} />}
       <div className="flex min-h-6 items-center gap-2">
         <Avatar size={20} src={message.author.picture} name={message.author.name} />
         <span className={cn('truncate text-body-2-strong', message.author.name ? 'text-text-primary' : 'text-text-muted')}>{message.author.name ?? '—'}</span>
@@ -162,6 +183,9 @@ function Message({ message, resolved, resolving, nameOf, reactions, onToggleReac
               ))}
             </div>
           )}
+          {parts.map((part) => (
+            <PartCard key={part.address} address={part.address} block={part.block} nameOf={nameOf} />
+          ))}
           {/* Row one: the pills, then the add-reaction button (her note 4, Linear's order). Signed out, no button. */}
           {(react || !!reactions?.length) && (
             <div className="flex flex-wrap items-center gap-1">

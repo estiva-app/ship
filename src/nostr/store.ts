@@ -7,7 +7,8 @@
  * of the state, "two apps agree on the data" would be measuring Ship's
  * cache rather than the shared record.
  */
-import type { Imeta, PublishResult, Relay } from '@estiva-app/protocol'
+import type { Imeta, NostrTag, PartPointer, PublishResult, Relay } from '@estiva-app/protocol'
+import { partsOf } from '@estiva-app/protocol'
 import type { Signer } from './signer'
 import {
   buildCreateChannel,
@@ -122,6 +123,14 @@ export interface WorkspaceState extends FolderState {
    */
   urgent: Record<string, string[]>
   /**
+   * Message id → the blocks of other objects it shows: its `part` tags (SPEC
+   * §13.6.1, COM-2). An edit carries none, so an edited message keeps the
+   * original's. Absent for a message with none.
+   *
+   * Beside the fold for the same reason as `edits`, `attachments` and `urgent`.
+   */
+  parts: Record<string, PartPointer[]>
+  /**
    * Every Folder this read actually fetched (PER-3).
    *
    * Beside the fold, like the three above, and for the same reason: `foldFolder`
@@ -151,6 +160,16 @@ export function urgentIndex(events: readonly SignedEvent[]): Record<string, stri
   return out
 }
 
+/** `WorkspaceState.parts`: every event's `part` tags, by event id (SPEC §13.6.1). */
+export function partsIndex(events: readonly SignedEvent[]): Record<string, PartPointer[]> {
+  const out: Record<string, PartPointer[]> = {}
+  for (const event of events) {
+    const parts = partsOf(event)
+    if (parts.length > 0) out[event.id] = parts
+  }
+  return out
+}
+
 function read(events: SignedEvent[], folders: string[]): WorkspaceState {
   return {
     ...foldFolder(events, referencedAddresses),
@@ -158,6 +177,7 @@ function read(events: SignedEvent[], folders: string[]): WorkspaceState {
     edits: foldEdits(events),
     attachments: foldAttachments(events),
     urgent: urgentIndex(events),
+    parts: partsIndex(events),
     // A parameter rather than derived from the events: the set that was
     // *asked for* is not the set that came back. A Folder holding nothing this
     // reader may see yields no events and would vanish from a derived list,
@@ -660,6 +680,8 @@ export class Store {
     files?: readonly Imeta[]
     /** Who the composer's urgent picks name — CON-25. */
     urgent?: readonly string[]
+    /** The block links' `part` tags, already resolved — COM-2. See `buildConversationMessage`. */
+    partTags?: readonly NostrTag[]
   }): Promise<PublishResult> {
     const body = args.aboutRef ? `${args.body}\n\n${args.aboutRef}` : args.body
     return this.publish(
@@ -672,6 +694,7 @@ export class Store {
         blockId: args.blockId,
         files: args.files,
         urgent: args.urgent,
+        partTags: args.partTags,
       }),
     )
   }

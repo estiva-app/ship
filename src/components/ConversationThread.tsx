@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import type { BlockAnchor, Imeta } from '@estiva-app/protocol'
+import type { BlockAnchor, Imeta, PartPointer } from '@estiva-app/protocol'
 import { referencesIn, toRenderTree } from '@estiva-app/protocol'
 import { ConfirmDialog } from './ui/ConfirmDialog'
 import { Divider } from './ui/Divider'
@@ -94,6 +94,17 @@ export interface MessageData {
    * (SPEC §13.1, CON-24), read beside the fold for the same reason as `files`.
    */
   urgent?: string[]
+  /**
+   * The blocks of other objects it shows — its `part` tags (SPEC §13.6.1,
+   * COM-2), read beside the fold for the same reason as `files`.
+   */
+  parts?: PartPointer[]
+  /**
+   * The block of its own object a comment is anchored to (SPEC §13.6), drawn
+   * above the text with the same card as a part — Decided 2026-10-07, as Peek
+   * draws it. Undefined for a comment about the whole object.
+   */
+  anchorPart?: PartPointer
 }
 
 /** Messages are marker text (SPEC §13.2); only a rich text *field* is a block document. */

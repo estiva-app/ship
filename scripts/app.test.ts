@@ -466,6 +466,23 @@ const standIn = buildConversationMessage(PK, Date.now(), {
 })
 check('  …no p when the comment’s author is not known', tag(standIn, 'p') === undefined)
 
+// A pasted block link's tags — COM-2, SPEC §13.6.1: `part` always, its `a`
+// only when no other tag already names that object.
+const PARTED = `30851:${PK}:p9`
+const partTags = [['a', PARTED], ['part', PARTED, 'b1']]
+const partChat = buildConversationMessage(PK, Date.now(), { folder: CONTENT, body: 'see link', partTags })
+check('a block link carries its part', JSON.stringify(partChat.tags.filter((t) => t[0] === 'part')) === JSON.stringify([['part', PARTED, 'b1']]))
+check('  …and its a', partChat.tags.filter((t) => t[0] === 'a' && t[1] === PARTED).length === 1)
+const partOnOwn = buildConversationMessage(PK, Date.now(), {
+  folder: CONTENT,
+  body: 'see link',
+  replyToComment: { id: 'c1', anchor: PARTED },
+  partTags: [['part', PARTED, 'b1']],
+})
+check('  …a reply about that object keeps no lowercase a', tag(partOnOwn, 'a') === undefined && tag(partOnOwn, 'part') === PARTED)
+const partNamedTwice = buildConversationMessage(PK, Date.now(), { folder: CONTENT, body: 'see link', about: PARTED, partTags })
+check('  …and one a, not two, when the message is about it', partNamedTwice.tags.filter((t) => t[0] === 'a' && t[1] === PARTED).length === 1)
+
 // What the body earns — CON-25: a `p` per person, an `urgent` per urgent one,
 // an `a` per other address, a `q` per message, on all three paths.
 const BOB = 'b'.repeat(64)
