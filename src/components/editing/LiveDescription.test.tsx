@@ -244,6 +244,40 @@ describe('a description whose save is refused', () => {
 })
 
 /*
+  Tab on a list item put it in a list inside the item above, and the save
+  dropped that list, text and all (MAN-13). §13.3 now keeps the list flat and
+  marks the item's depth. The whole of what a person does: Tab, leave, open it
+  again.
+*/
+describe('a list item indented with Tab', () => {
+  type Saved = { content: { type: string; content: { id: string; attrs?: { indent?: number }; content: { text: string }[] }[] }[] }
+
+  it('is saved with its text and its depth, and opens indented again', async () => {
+    const onCommit = vi.fn<(value: string, format?: string) => boolean>(() => true)
+    const { unmount } = render(<LiveDescription value={'- intro\n- after'} format="marker" onCommit={onCommit} resolved={{}} />)
+    const box = await ready()
+    act(() => void box.editor.commands.focus('end'))
+    await act(() => void fireEvent.keyDown(box, { key: 'Tab' }))
+    fireEvent.blur(box)
+    await waitFor(() => expect(onCommit).toHaveBeenCalled())
+
+    const [value, format] = onCommit.mock.calls.at(-1)!
+    expect(format).toBe('estiva-blocks-1')
+    const items = (JSON.parse(value) as Saved).content[0].content
+    expect(items.map((item) => [item.content[0]?.text, item.attrs?.indent])).toEqual([
+      ['intro', undefined],
+      ['after', 1],
+    ])
+
+    unmount()
+    render(<LiveDescription value={value} format="blocks" onCommit={vi.fn(() => true)} resolved={{}} />)
+    const reopened = await ready()
+    expect(reopened.querySelector('li > ul > li')).toHaveTextContent('after')
+    expect(reopened.querySelector('li > ul > li')?.getAttribute('data-block-id')).toBe(items[1].id)
+  })
+})
+
+/*
   A page hands `onCommit` in as an inline arrow (`IssuePage`'s `onDescribe`), so
   every render of the page is a new one. The unmount save was keyed on it, and
   published the half-typed text each time the page re-rendered (MAN-9).
