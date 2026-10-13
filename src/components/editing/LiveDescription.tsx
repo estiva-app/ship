@@ -12,7 +12,7 @@ import {
   type Imeta,
 } from '@estiva-app/protocol'
 import { FieldLine, FilePicker, richTextClassName } from '@estiva-app/ui'
-import { CodeBlockColours, EditorBlockHandle, PastedImages, SelectionToolbar, blockDropCursor, isSuggestionOpen } from '@estiva-app/ui/editor'
+import { Callout, Checklist, CodeBlockColours, EditorBlockHandle, PastedImages, SelectionToolbar, blockDropCursor, isChecklistTick, isSuggestionOpen } from '@estiva-app/ui/editor'
 import { uploadAttachment } from '@/api/blobs'
 import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
 import { AttachmentNode, BlockId, ReferenceNode, ReferenceProvider, UnknownBlock } from '@/components/ui/editorSchema'
@@ -144,6 +144,9 @@ export function LiveDescription({
         CodeBlockColours,
         TableKit.configure({ table: { resizable: false } }),
         BlockId,
+        // A checklist item and a callout (RIC-19); without them a save drops the tick and the tone.
+        Checklist,
+        Callout,
         ReferenceNode,
         UnknownBlock,
         AttachmentNode,
@@ -179,9 +182,11 @@ export function LiveDescription({
           return true
         },
       },
-      onUpdate: ({ editor: e }) => {
+      onUpdate: ({ editor: e, transaction }) => {
         typed.current = e.getJSON() as EditorDocument
         setEmpty(e.isEmpty)
+        // A click on a box does not focus the field, so no blur will save it: one click ticks, and is saved (RIC-19, Miky 2026-10-13).
+        if (isChecklistTick(transaction)) void latestSave.current(typed.current)
       },
       onBlur: () => {
         if (picking.current) return
