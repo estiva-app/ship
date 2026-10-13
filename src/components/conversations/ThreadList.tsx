@@ -16,7 +16,7 @@ import { SkeletonBar } from '@/components/ui/Skeleton'
 import { REACTION_OPTIONS, Reactions } from '@/components/Reactions'
 import { ConfirmDeleteMessage, NewSinceHere, useThreadReactions, useThreadReferences, type ConversationsProps, type MessageData, type ThreadData } from '@/components/ConversationThread'
 import type { ActivityProps } from '@/components/Activity'
-import { MESSAGE_FORMAT, PLACE_ICON, RELATION, Time, cardsOf, meaningLabel, standaloneReferencesOf, valueOfReference, type MentionListViewProps, type ThreadListViewProps } from './shared'
+import { MESSAGE_FORMAT, PLACE_ICON, RELATION, Time, cardsOf, linkResolverFor, meaningLabel, standaloneReferencesOf, valueOfReference, type MentionListViewProps, type ThreadListViewProps } from './shared'
 import { MessageBoxShell } from './writingBox'
 import type { Picks } from './MessageBox'
 import { messageScope, referenceSections } from '@/api/references'
@@ -135,7 +135,7 @@ function Message({ message, resolved, resolving, nameOf, reactions, onToggleReac
   // The cards its author asked for (SPEC §13.6.2, OPT-16). A value with an `embed` is the author's call: its
   // lone-line card gives way to the chosen layout, and `none` leaves only the chip.
   // A link on words names its card by §7.7, from what the surface has asked (OPT-17).
-  const cards = cardsOf(message.body, message.embeds, parts, knownLinkValue)
+  const cards = cardsOf(message.body, message.embeds, parts, linkResolverFor(message.body, knownLinkValue))
   const chosen = new Set(cards.map((card) => card.value))
   const isChosen = (reference: string) => chosen.has(valueOfReference(reference) ?? '')
   const shownCards = cards.flatMap((card) => {

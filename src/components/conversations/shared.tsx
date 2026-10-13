@@ -54,12 +54,37 @@ export function cardsOf(body: string, embeds: readonly Embed[] | undefined, part
   })
 }
 
-/** The app links a message's cards depend on: what `cardsIn` asks a resolver about. None for a message with no `embed`. */
+/** The app links a message's cards depend on: what `cardsIn` asks a resolver about, that may name one. None for a message with no `embed`. */
 export function linksAskedFor(body: string, embeds: readonly Embed[] | undefined, parts: readonly PartPointer[] = []): string[] {
   if (!embeds?.length) return []
+  const named = linksNamingCards(body)
   const asked: string[] = []
-  cardsIn(embeds, toRenderTree(body, MESSAGE_FORMAT), parts, (url) => void asked.push(url))
+  cardsIn(embeds, toRenderTree(body, MESSAGE_FORMAT), parts, (url) => void (named.has(url) && asked.push(url)))
   return asked
+}
+
+const MARKER_LINK = /\[[^\]]*\]\(([^)\s]+)\)/g
+const BARE_URL = /https?:\/\/[^\s<>"'`]+/g
+const TRAILING = /[.,;:!?)\]]+$/
+
+/**
+ * The URLs that may name a card: each link's target and each bare URL, never a
+ * URL written in a link's label. The package's tree has no link mark, so
+ * `cardsIn` sees a label's text too, and `[https://ship…/issue/x](https://elsewhere)`
+ * would put that issue's card under a link that goes elsewhere (OPT-17's
+ * security review). Peek's `findUrls` answers the same.
+ */
+export function linksNamingCards(body: string): Set<string> {
+  const out = new Set<string>()
+  for (const match of body.matchAll(MARKER_LINK)) if (/^https?:/i.test(match[1])) out.add(match[1])
+  for (const url of body.replace(MARKER_LINK, ' ').match(BARE_URL) ?? []) out.add(url.replace(TRAILING, ''))
+  return out
+}
+
+/** A `LinkResolver` for one message: what `known` says, for a URL that may name a card in its body. */
+export function linkResolverFor(body: string, known: LinkResolver): LinkResolver {
+  const named = linksNamingCards(body)
+  return (url) => (named.has(url) ? known(url) : undefined)
 }
 
 /** The `nostr:` reference for an `embed` value — how a link's card resolves. Peek's `referenceOfValue`. */

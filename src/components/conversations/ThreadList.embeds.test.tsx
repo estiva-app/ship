@@ -108,6 +108,12 @@ describe('a link on words that asks for a card (OPT-17)', () => {
     expect(c.textContent).toContain('these words')
   })
 
+  it('a URL written in a link’s label names nothing: the link goes elsewhere', async () => {
+    const c = show(thread(`see [${ISSUE_URL}](https://evil.example/login)`, [{ value: ISSUE, layout: 'detailed' }]))
+    await new Promise((r) => setTimeout(r, 50))
+    expect(cards(c)).toEqual([])
+  })
+
   it('draws nothing for none, and nothing for a link §7.7 does not resolve', async () => {
     const none = show(thread(body, [{ value: ISSUE, layout: 'none' }]))
     const lookalike = show(thread(`see [this](https://evil.example/issue/x-${ISSUE.split(':')[2]})`, [{ value: ISSUE, layout: 'detailed' }]))
