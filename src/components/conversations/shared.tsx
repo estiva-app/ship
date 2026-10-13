@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { IconBox, IconListDetails } from '@tabler/icons-react'
-import { standaloneReference, toRenderTree, type Imeta } from '@estiva-app/protocol'
+import { addrToNaddr, cardsIn, decodeNevent, encodeNevent, pointerToAddress, referencesIn, referenceToPointer, standaloneReference, toRenderTree, type Embed, type Imeta, type PartPointer } from '@estiva-app/protocol'
 import { WithTooltip } from '@estiva-app/ui'
 import { ago } from '@/lib/time'
 import type { DraftStore } from '@/lib/drafts'
@@ -23,6 +23,46 @@ export function standaloneReferencesOf(body: string): string[] {
   return toRenderTree(body, MESSAGE_FORMAT)
     .map(standaloneReference)
     .filter((r): r is string => !!r)
+}
+
+/** One card a message asks for, with the `nostr:` reference its object is resolved under. */
+export interface MessageCard extends Embed {
+  reference: string
+}
+
+/**
+ * The cards a message asks for — SPEC §13.6.2, OPT-16 — in body order, `none`
+ * included (it draws nothing, but it overrides the lone-line card for its
+ * value). The package's rule (`cardsIn`), so Peek reaches the same answer.
+ *
+ * Each is keyed by the reference the body wrote, so it resolves with the chip
+ * and the lone-line card it may replace; a value named only by an app link
+ * gets a `nostr:` reference of its own.
+ */
+export function cardsOf(body: string, embeds: readonly Embed[] | undefined, parts: readonly PartPointer[] = []): MessageCard[] {
+  if (!embeds?.length) return []
+  const blocks = toRenderTree(body, MESSAGE_FORMAT)
+  const written = new Map<string, string>()
+  for (const reference of referencesIn(blocks)) {
+    const value = valueOfReference(reference)
+    if (value && !written.has(value)) written.set(value, reference)
+  }
+  return cardsIn(embeds, blocks, parts).map((card) => ({ ...card, reference: written.get(card.value) ?? referenceFor(card.value) }))
+}
+
+/** The address or event id a `nostr:` reference names — what an `embed` carries for it. */
+export function valueOfReference(reference: string): string | undefined {
+  try {
+    if (/^nostr:nevent1/i.test(reference)) return decodeNevent(reference).id.toLowerCase()
+    if (/^nostr:naddr1/i.test(reference)) return pointerToAddress(referenceToPointer(reference))
+  } catch {
+    return undefined
+  }
+  return undefined
+}
+
+function referenceFor(value: string): string {
+  return /^[0-9a-f]{64}$/.test(value) ? `nostr:${encodeNevent({ id: value, relays: [] })}` : `nostr:${addrToNaddr(value)}`
 }
 
 /** The time as "3h ago", and the date and time on hover (Katerina, 29 September). */

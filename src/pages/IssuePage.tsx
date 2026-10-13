@@ -129,7 +129,7 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
   useMarkRead(fileContexts, drawn.rootsAt)
   useMarkRead(tab === 'activity' ? shownThreads.map(threadContext) : [], drawn.repliesAt)
   const threads = useMemo(
-    () => conversations.map((c) => threadFor(c, directory, issue ? { value: issue.description, format: issue.descriptionFormat } : undefined, issue?.addr, state.edits, state.attachments, state.urgent, state.parts)),
+    () => conversations.map((c) => threadFor(c, directory, issue ? { value: issue.description, format: issue.descriptionFormat } : undefined, issue?.addr, state.edits, state.attachments, state.urgent, state.parts, state.embeds)),
     [conversations, directory, issue],
   )
   /* The divider in the feed (CRO-13, CON-19). Every root here is about the
@@ -162,7 +162,7 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
      (Miky, 2026-10-03); this Folder's files from the Related read, then the
      ones you read recently. This issue is never offered under Files. */
   const projectThreads = useMemo(
-    () => (project ? commentsOn(state.conversations, project.addr, state.anchors).map((c) => threadFor(c, directory, undefined, project.addr, state.edits, state.attachments, state.urgent, state.parts)) : []),
+    () => (project ? commentsOn(state.conversations, project.addr, state.anchors).map((c) => threadFor(c, directory, undefined, project.addr, state.edits, state.attachments, state.urgent, state.parts, state.embeds)) : []),
     [project, state, directory],
   )
   useReferencePage({ address: issue?.addr, parent: projectThreads, folder: typeof related === 'object' ? related.all : undefined, readState: merged })

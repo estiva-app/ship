@@ -90,6 +90,7 @@ const STATE: WorkspaceState = {
   attachments: {},
   urgent: {},
   parts: {},
+  embeds: {},
   folders: [],
 }
 
