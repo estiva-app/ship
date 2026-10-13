@@ -33,6 +33,18 @@ vi.mock(import('@/api/foreign'), async (importOriginal) => ({
   ),
 }))
 
+// §7.7 as `api/linkCards` answers it, with its own test: Ship's link names the issue, nothing else names anything.
+const ISSUE_URL = `https://ship.estiva.app/issue/the-probe-issue-${ISSUE.split(':')[2]}`
+vi.mock('@/api/linkCards', () => {
+  // Hoisted above the constants, so spelled out again.
+  const url = 'https://ship.estiva.app/issue/the-probe-issue-f78c3b96-2a3b-4d92-910a-ac25aba672cd'
+  const issue = '30851:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:f78c3b96-2a3b-4d92-910a-ac25aba672cd'
+  return {
+    knownLinkValue: (asked: string) => (asked === url ? issue : undefined),
+    useLinkValues: (urls: readonly string[]) => new Map(urls.filter((asked) => asked === url).map((asked) => [asked, issue])),
+  }
+})
+
 import { ThreadList } from './ThreadList'
 import type { ThreadData } from '@/components/ConversationThread'
 
@@ -84,5 +96,23 @@ describe('a message that asks for a card', () => {
     const compact = show(thread(ISSUE_REF, [{ value: ISSUE, layout: 'compact' }]))
     await waitFor(() => expect(cards(compact)).toEqual([[ISSUE_REF, 'row']]))
     expect(compact.querySelectorAll('[data-foreign-object]').length).toBe(1)
+  })
+})
+
+describe('a link on words that asks for a card (OPT-17)', () => {
+  const body = `the plan is [these words](${ISSUE_URL}) for now`
+
+  it('draws the card of the object the link names, resolved under the reference its value spells', async () => {
+    const c = show(thread(body, [{ value: ISSUE, layout: 'detailed' }]))
+    await waitFor(() => expect(cards(c)).toEqual([[ISSUE_REF, 'card']]))
+    expect(c.textContent).toContain('these words')
+  })
+
+  it('draws nothing for none, and nothing for a link §7.7 does not resolve', async () => {
+    const none = show(thread(body, [{ value: ISSUE, layout: 'none' }]))
+    const lookalike = show(thread(`see [this](https://evil.example/issue/x-${ISSUE.split(':')[2]})`, [{ value: ISSUE, layout: 'detailed' }]))
+    await new Promise((r) => setTimeout(r, 50))
+    expect(cards(none)).toEqual([])
+    expect(cards(lookalike)).toEqual([])
   })
 })

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { IconBox, IconListDetails } from '@tabler/icons-react'
-import { bech32Decode, cardsIn, convertBits, decodeNevent, pointerToAddress, referencesIn, referenceToPointer, standaloneReference, toRenderTree, type Embed, type Imeta, type PartPointer } from '@estiva-app/protocol'
+import { addressToPointer, bech32Decode, cardsIn, convertBits, decodeNevent, encodeNaddr, encodeNevent, pointerToAddress, referencesIn, referenceToPointer, standaloneReference, toRenderTree, type Embed, type Imeta, type LinkResolver, type PartPointer } from '@estiva-app/protocol'
 import { WithTooltip } from '@estiva-app/ui'
 import { ago } from '@/lib/time'
 import type { DraftStore } from '@/lib/drafts'
@@ -36,10 +36,11 @@ export interface MessageCard extends Embed {
  * value). The package's rule (`cardsIn`), so Peek reaches the same answer.
  *
  * Each is keyed by the reference the body wrote, so it resolves with the chip
- * and the lone-line card it may replace. No app link names a card here: that
- * needs a §7.7 resolver passed to `cardsIn` (the Widgets project's Later list).
+ * and the lone-line card it may replace. An app link names a card too once
+ * `resolveLink` says what it names by §7.7 (OPT-17, `api/linkCards`); its card
+ * resolves under the reference its value spells, since the body wrote only the URL.
  */
-export function cardsOf(body: string, embeds: readonly Embed[] | undefined, parts: readonly PartPointer[] = []): MessageCard[] {
+export function cardsOf(body: string, embeds: readonly Embed[] | undefined, parts: readonly PartPointer[] = [], resolveLink?: LinkResolver): MessageCard[] {
   if (!embeds?.length) return []
   const blocks = toRenderTree(body, MESSAGE_FORMAT)
   const written = new Map<string, string>()
@@ -47,10 +48,28 @@ export function cardsOf(body: string, embeds: readonly Embed[] | undefined, part
     const value = valueOfReference(reference)
     if (value && !written.has(value)) written.set(value, reference)
   }
-  return cardsIn(embeds, blocks, parts).flatMap((card) => {
-    const reference = written.get(card.value)
+  return cardsIn(embeds, blocks, parts, resolveLink).flatMap((card) => {
+    const reference = written.get(card.value) ?? referenceOfValue(card.value)
     return reference ? [{ ...card, reference }] : []
   })
+}
+
+/** The app links a message's cards depend on: what `cardsIn` asks a resolver about. None for a message with no `embed`. */
+export function linksAskedFor(body: string, embeds: readonly Embed[] | undefined, parts: readonly PartPointer[] = []): string[] {
+  if (!embeds?.length) return []
+  const asked: string[] = []
+  cardsIn(embeds, toRenderTree(body, MESSAGE_FORMAT), parts, (url) => void asked.push(url))
+  return asked
+}
+
+/** The `nostr:` reference for an `embed` value — how a link's card resolves. Peek's `referenceOfValue`. */
+export function referenceOfValue(value: string): string | undefined {
+  if (/^[0-9a-f]{64}$/.test(value)) return `nostr:${encodeNevent({ id: value, relays: [] })}`
+  try {
+    return `nostr:${encodeNaddr(addressToPointer(value))}`
+  } catch {
+    return undefined
+  }
 }
 
 /** The address or event id a `nostr:` reference names — what an `embed` carries for it. */

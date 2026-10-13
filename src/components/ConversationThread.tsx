@@ -5,6 +5,8 @@ import { ConfirmDialog } from './ui/ConfirmDialog'
 import { Divider } from './ui/Divider'
 import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
 import { byReference, useForeignObjects } from '@/api/useForeignObjects'
+import { useLinkValues } from '@/api/linkCards'
+import { linksAskedFor, referenceOfValue } from '@/components/conversations/shared'
 import { useReactions } from '@/api'
 import type { Reaction } from '@/api'
 import type { Picks } from '@/components/conversations/MessageBox'
@@ -144,10 +146,21 @@ export function useThreadReferences(threads: readonly ThreadData[]): {
   resolved: Record<string, ForeignObjectData | null | undefined>
   resolving: boolean
 } {
-  const references = useMemo(
-    () => referencesInMessages(threads.flatMap((thread) => [thread.root, ...thread.replies])),
-    [threads],
-  )
+  const messages = useMemo(() => threads.flatMap((thread) => [thread.root, ...thread.replies]), [threads])
+  /*
+    A link on words can carry a card (SPEC §13.6.2, OPT-17): what each link a
+    card depends on names is asked once (`useLinkValues`), and the objects
+    named are resolved with the rest, under the reference their value spells.
+    Only messages carrying an `embed` ask, so an ordinary link costs nothing.
+  */
+  const links = useMemo(() => [...new Set(messages.flatMap((message) => linksAskedFor(message.body, message.embeds)))], [messages])
+  const linked = useLinkValues(links)
+  const linkedKey = [...new Set(linked.values())].join('\n')
+  const references = useMemo(() => {
+    const written = referencesInMessages(messages)
+    const extra = linkedKey ? linkedKey.split('\n').flatMap((value) => referenceOfValue(value) ?? []) : []
+    return [...new Set([...written, ...extra])]
+  }, [messages, linkedKey])
   const objects = useForeignObjects(references)
   return { resolved: byReference(references, objects), resolving: objects === undefined }
 }

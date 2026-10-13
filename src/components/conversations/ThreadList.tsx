@@ -21,6 +21,7 @@ import { MessageBoxShell } from './writingBox'
 import type { Picks } from './MessageBox'
 import { messageScope, referenceSections } from '@/api/references'
 import { shownParts } from '@/api/part'
+import { knownLinkValue } from '@/api/linkCards'
 import { PartCard } from '@/components/ui/PartCard'
 
 /** The address a `nostr:` pointer names, or undefined for an event or a malformed one. */
@@ -133,7 +134,8 @@ function Message({ message, resolved, resolving, nameOf, reactions, onToggleReac
   const parts = shownParts(message.parts, message.body, namedAddresses(message.body))
   // The cards its author asked for (SPEC §13.6.2, OPT-16). A value with an `embed` is the author's call: its
   // lone-line card gives way to the chosen layout, and `none` leaves only the chip.
-  const cards = cardsOf(message.body, message.embeds, parts)
+  // A link on words names its card by §7.7, from what the surface has asked (OPT-17).
+  const cards = cardsOf(message.body, message.embeds, parts, knownLinkValue)
   const chosen = new Set(cards.map((card) => card.value))
   const isChosen = (reference: string) => chosen.has(valueOfReference(reference) ?? '')
   const shownCards = cards.flatMap((card) => {
