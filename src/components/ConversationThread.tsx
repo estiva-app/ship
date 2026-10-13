@@ -8,7 +8,6 @@ import { byReference, useForeignObjects } from '@/api/useForeignObjects'
 import { useReactions } from '@/api'
 import type { Reaction } from '@/api'
 import type { Picks } from '@/components/conversations/MessageBox'
-import { cardsOf } from '@/components/conversations/shared'
 
 /**
  * Conversations as production shows them: a composer to start one, then
@@ -118,14 +117,13 @@ const MESSAGE_FORMAT = 'marker' as const
 
 /**
  * Every `nostr:` pointer in a set of messages, deduplicated, in the order they
- * appear — and the reference of each card a message asks for (SPEC §13.6.2),
- * which is a new one only for an object named by an app link alone.
+ * appear. A card (SPEC §13.6.2) resolves under the reference the body wrote, so
+ * these are its objects too.
  */
 export function referencesInMessages(messages: readonly MessageData[]): string[] {
   const seen = new Set<string>()
   for (const message of messages) {
     for (const reference of referencesIn(toRenderTree(message.body, MESSAGE_FORMAT))) seen.add(reference)
-    for (const card of cardsOf(message.body, message.embeds)) if (card.layout !== 'none') seen.add(card.reference)
   }
   return [...seen]
 }
