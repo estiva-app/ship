@@ -69,8 +69,8 @@ export function IssuesTable({ issues, statuses, hrefFor, className }: IssuesTabl
                 once `px-3` was paid, and "PEE-27" at 12px Geist Mono needs 43 —
                 five characters fit, six broke onto a second line. A key is now
                 up to six letters (SHI-4), so 96px leaves 72px: six letters, a
-                dash and three digits. The Issues page's list row holds the same
-                ten characters, so the two surfaces line up. */}
+                dash and three digits. The Issues page's list row gives its ref
+                the same 72px (`w-20 pr-2`), so the two surfaces line up. */}
             <th className={cn(TH_CLASSES, 'relative w-24')}>
               <span className="sr-only">Ref</span>
             </th>

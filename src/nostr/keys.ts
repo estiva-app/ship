@@ -75,10 +75,14 @@ export function suggestKey(title: string, taken: ReadonlySet<string>): string {
   return candidates.find((key) => KEY_PATTERN.test(key) && !taken.has(key)) ?? candidates[0]
 }
 
-/** The folded `key` field, when it is a key at all. */
-function explicitKey(project: Project): string | undefined {
+/**
+ * The folded `key` field, when it is a key at all. Another client may have
+ * written anything there; SPEC §6.1 says a reader shows such a value but does
+ * not number from it, so the project counts as keyless here.
+ */
+export function explicitKey(project: Pick<Project, 'key'>): string | undefined {
   const value = project.key?.trim()
-  return value || undefined
+  return value && KEY_PATTERN.test(value) ? value : undefined
 }
 
 /**
@@ -113,24 +117,21 @@ export function projectKeys(projects: readonly Project[], issues: readonly Issue
     .filter((project) => !keys.has(project.addr) && !project.archived)
     .sort((a, b) => a.createdAt - b.createdAt || (a.addr < b.addr ? -1 : 1))
 
-  // Step 2: a prefix goes to the keyless project holding the most refs under it.
-  const best = new Map<string, { addr: string; count: number }>()
-  for (const project of keyless) {
-    for (const [prefix, count] of held.get(project.addr) ?? []) {
-      if (taken.has(prefix) || !KEY_PATTERN.test(prefix)) continue
-      const current = best.get(prefix)
-      if (!current || count > current.count) best.set(prefix, { addr: project.addr, count })
-    }
-  }
-  for (const project of keyless) {
-    // Of the prefixes it won, the one it holds most refs under.
-    const won = [...(held.get(project.addr) ?? [])]
-      .filter(([prefix]) => best.get(prefix)?.addr === project.addr && !taken.has(prefix))
-      .sort((a, b) => b[1] - a[1])[0]
-    if (won) {
-      keys.set(project.addr, won[0])
-      taken.add(won[0])
-    }
+  // Step 2: a prefix goes to the keyless project holding the most refs under
+  // it. Greedy over every (project, prefix) pair, most refs first, so a
+  // project holding the most under two prefixes takes one and the runner-up
+  // for the other still gets it. Ties go to the older project (`keyless` order).
+  const order = new Map(keyless.map((project, i) => [project.addr, i]))
+  const pairs = keyless.flatMap((project) =>
+    [...(held.get(project.addr) ?? [])]
+      .filter(([prefix]) => KEY_PATTERN.test(prefix))
+      .map(([prefix, count]) => ({ addr: project.addr, prefix, count })),
+  )
+  pairs.sort((a, b) => b.count - a.count || order.get(a.addr)! - order.get(b.addr)! || (a.prefix < b.prefix ? -1 : 1))
+  for (const { addr, prefix } of pairs) {
+    if (keys.has(addr) || taken.has(prefix)) continue
+    keys.set(addr, prefix)
+    taken.add(prefix)
   }
 
   // Step 3: the rest take the shortest free key from their title.
@@ -145,8 +146,12 @@ export function projectKeys(projects: readonly Project[], issues: readonly Issue
 }
 
 /** Keys a new project may not take: every visible project's key, and every prefix a ref carries. */
-export function takenKeys(projects: readonly Project[], issues: readonly Issue[]): Set<string> {
-  const taken = new Set(projectKeys(projects, issues).values())
+export function takenKeys(
+  projects: readonly Project[],
+  issues: readonly Issue[],
+  keys: ReadonlyMap<string, string> = projectKeys(projects, issues),
+): Set<string> {
+  const taken = new Set(keys.values())
   for (const issue of issues) {
     const prefix = keyOfRef(issue.ref)
     if (prefix) taken.add(prefix)
@@ -155,9 +160,13 @@ export function takenKeys(projects: readonly Project[], issues: readonly Issue[]
 }
 
 /** Why `key` cannot be a new project's key, or undefined when it can. */
-export function keyProblem(key: string, projects: readonly Project[], issues: readonly Issue[]): string | undefined {
+export function keyProblem(
+  key: string,
+  projects: readonly Project[],
+  issues: readonly Issue[],
+  keys: ReadonlyMap<string, string> = projectKeys(projects, issues),
+): string | undefined {
   if (!KEY_PATTERN.test(key)) return 'A key is 3–6 letters, A to Z.'
-  const keys = projectKeys(projects, issues)
   const holder = projects.find((project) => keys.get(project.addr) === key)
   if (holder) return `${key} is used by ${holder.title}.`
   if (issues.some((issue) => keyOfRef(issue.ref) === key)) return `${key} is already used by older issues.`

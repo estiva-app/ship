@@ -51,6 +51,19 @@ describe('projectKeys', () => {
     expect(keys.get(bugs.addr)).toBe('PEE')
   })
 
+  it('a project winning two prefixes takes one, and the runner-up for the other still gets it', () => {
+    const a = project('a', 'Alpha', { createdAt: 1 })
+    const b = project('b', 'Beta', { createdAt: 2 })
+    const keys = projectKeys([a, b], [...refs('XRAY', 10, a.addr), ...refs('YAK', 5, a.addr), ...refs('YAK', 3, b.addr)])
+    expect(keys.get(a.addr)).toBe('XRAY')
+    expect(keys.get(b.addr)).toBe('YAK')
+  })
+
+  it('a value on the wire that is not a key is not numbered from (SPEC §6.1)', () => {
+    const p = project('p', 'Payments', { key: 'pee x' })
+    expect(projectKeys([p], refs('PAY', 2, p.addr)).get(p.addr)).toBe('PAY')
+  })
+
   it('an archived project without a key gets none, and its prefix stays taken', () => {
     const old = project('old', 'Shrinking Convex', { archived: true })
     const fresh = project('new', 'Shrine', {})

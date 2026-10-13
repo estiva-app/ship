@@ -108,6 +108,17 @@ describe('settleClaims — the later claim moves, and only its own client moves 
     expect(setField.mock.calls[0][0]).toEqual(expect.objectContaining({ target: ours.addr, field: 'ref', value: 'PAY-2' }))
   })
 
+  it('moves a losing claim once, not again on every refresh that still shows it', async () => {
+    setField.mockClear()
+    await assignMissingRefs(payments, visible([issue('again', undefined, 200)]))
+    const theirs = issue('first', 'PAY-1', 100)
+    const ours = { ...issue('again', 'PAY-1', 200), fields: { ref: { value: 'PAY-1', by: 'me', at: 201, format: 'marker' } } } as unknown as Issue
+    setField.mockClear()
+    await settleClaims(visible([theirs, ours]))
+    await settleClaims(visible([theirs, ours]))
+    expect(setField).toHaveBeenCalledTimes(1)
+  })
+
   it('leaves a duplicate it did not make — old duplicates stay', async () => {
     setField.mockClear()
     await settleClaims(visible([issue('x', 'PEE-8', 100), issue('y', 'PEE-8', 200)]))

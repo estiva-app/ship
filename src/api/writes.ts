@@ -1,7 +1,7 @@
 import type { Imeta, PublishResult } from '@estiva-app/protocol'
 import { addrToNaddr } from '@estiva-app/protocol'
 import type { Conversation, Issue, Project } from '../nostr/fold'
-import { clashes, keyOfRef, nextRef, projectKeys, suggestKey, takenKeys } from '../nostr/keys'
+import { clashes, explicitKey, keyOfRef, nextRef, projectKeys, suggestKey, takenKeys } from '../nostr/keys'
 import { RELAY_URL } from '../config'
 import { clockProblem } from './clock'
 import { readFolderListing, readFolders } from './foreign'
@@ -321,7 +321,9 @@ const claimedHere = new Set<string>()
  * project or a moved issue cannot change it.
  */
 async function keyFor(project: Project, visible: Visible): Promise<string> {
-  if (project.key) return project.key
+  // A value another client wrote that is not a key is shown, never numbered from (SPEC §6.1).
+  const own = explicitKey(project)
+  if (own) return own
   const key = projectKeys(visible.projects, visible.issues).get(project.addr) ?? suggestKey(project.title, takenKeys(visible.projects, visible.issues))
   const pinned = await setProjectField(project, 'key', key, `Key → ${key}`)
   if (pinned.ok) claimedHere.add(project.addr)
@@ -476,22 +478,41 @@ export async function assignMissingRefs(project: Project, visible: Visible): Pro
  * keys stays as it is (Miky, 2026-10-09).
  */
 export async function settleClaims(visible: Visible): Promise<WriteResult[]> {
-  if (claimedHere.size === 0) return []
-  const results: WriteResult[] = []
-  for (const project of clashes(visible.projects, (project) => project.key, 'key', claimedHere)) {
-    const key = suggestKey(project.title, takenKeys(visible.projects, visible.issues))
-    results.push(await setProjectField(project, 'key', key, `Key → ${key}, ${project.key} was taken`))
+  if (claimedHere.size === 0 || settling) return []
+  settling = true
+  try {
+    const results: WriteResult[] = []
+    // Each losing claim is moved once. A move that failed, or that the next read
+    // has not caught up with yet, is not retried on every refresh — that would
+    // publish the same change in a loop (a 429 answered by another 429).
+    const once = (addr: string, value: string) => {
+      const attempt = `${addr}=${value}`
+      if (settled.has(attempt)) return false
+      settled.add(attempt)
+      return true
+    }
+    for (const project of clashes(visible.projects, (project) => explicitKey(project), 'key', claimedHere)) {
+      if (!once(project.addr, project.key ?? '')) continue
+      const key = suggestKey(project.title, takenKeys(visible.projects, visible.issues))
+      results.push(await setProjectField(project, 'key', key, `Key → ${key}, ${project.key} was taken`))
+    }
+    const assigned = visible.issues.map((issue) => issue.ref)
+    for (const issue of clashes(visible.issues, (issue) => issue.ref, 'ref', claimedHere)) {
+      const key = keyOfRef(issue.ref)
+      if (!key || !once(issue.addr, issue.ref ?? '')) continue
+      const ref = nextRef(key, assigned)
+      assigned.push(ref)
+      results.push(await setIssueField(issue, 'ref', ref, `Ref → ${ref}, ${issue.ref} was taken`))
+    }
+    return results
+  } finally {
+    settling = false
   }
-  const assigned = visible.issues.map((issue) => issue.ref)
-  for (const issue of clashes(visible.issues, (issue) => issue.ref, 'ref', claimedHere)) {
-    const key = keyOfRef(issue.ref)
-    if (!key) continue
-    const ref = nextRef(key, assigned)
-    assigned.push(ref)
-    results.push(await setIssueField(issue, 'ref', ref, `Ref → ${ref}, ${issue.ref} was taken`))
-  }
-  return results
 }
+
+/** Moves `settleClaims` has made, as `addr=value`, and whether one is running. */
+const settled = new Set<string>()
+let settling = false
 
 // ── Reactions ───────────────────────────────────────────────────────────────
 

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { PROJECT_STATUSES, createProject, keyProblem, lookupStatus, suggestKey, takenKeys, type DirectoryView, type FolderState } from '@/api'
+import { PROJECT_STATUSES, createProject, keyProblem, lookupStatus, projectKeys, suggestKey, takenKeys, type DirectoryView, type FolderState } from '@/api'
 import type { FolderSummary } from '@estiva-app/interop'
 import { renderTreeText, toRenderTree } from '@estiva-app/protocol'
 import { NewProjectDialog } from '@/components/NewProjectDialog'
@@ -23,6 +23,11 @@ import { type Say } from './act'
  */
 export function ProjectsPage({ state, directory, teams, archives, archived, say, refresh }: { state: FolderState; directory: DirectoryView; teams: FolderSummary[] | undefined; archives: Archives; archived: boolean; say: Say; refresh: () => Promise<void> }) {
   const [adding, setAdding] = useState(false)
+  // Derived once per read, not per keystroke in the Add project dialog (SHI-4).
+  const keys = useMemo(() => {
+    const byProject = projectKeys(state.projects, state.issues)
+    return { byProject, taken: takenKeys(state.projects, state.issues, byProject) }
+  }, [state.projects, state.issues])
 
   const cards = useMemo(() => {
     const isArchived = (project: FolderState['projects'][number]) => !!archives.ofProject(project.addr)
@@ -65,8 +70,8 @@ export function ProjectsPage({ state, directory, teams, archives, archived, say,
       {adding && (
         <NewProjectDialog
           teams={teams?.map((team) => ({ id: team.id, name: team.name ?? `Folder ${team.id.slice(0, 8)}…`, hasState: team.hasState }))}
-          suggestKey={(title) => suggestKey(title, takenKeys(state.projects, state.issues))}
-          keyProblem={(key) => keyProblem(key, state.projects, state.issues)}
+          suggestKey={(title) => suggestKey(title, keys.taken)}
+          keyProblem={(key) => keyProblem(key, state.projects, state.issues, keys.byProject)}
           onClose={() => setAdding(false)}
           onCreate={async (draft) => {
             const result = await createProject(draft)

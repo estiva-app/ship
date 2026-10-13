@@ -1,7 +1,7 @@
 import { IconLink } from '@tabler/icons-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AppProvider } from '@estiva-app/ui'
-import { createFolder, me, peopleIn, resolveInbound, useDirectory, useWorkspace, type DirectoryView, type FolderState, type WorkspaceState, installReadStateFlush } from '@/api'
+import { createFolder, me, peopleIn, resolveInbound, settleClaims, useDirectory, useWorkspace, type DirectoryView, type FolderState, type WorkspaceState, installReadStateFlush } from '@/api'
 import { AppShell } from '@/components/AppShell'
 import { Banner } from '@/components/Banner'
 import { ToastProvider, useToast, type ToastOptions } from '@/components/ui/Toast'
@@ -115,6 +115,16 @@ function Shell() {
      the tab goes away. `visibilitychange` is the one mobile browsers reliably
      fire when a tab is backgrounded or killed (CRO-8). */
   useEffect(() => installReadStateFlush(), [])
+
+  // A key or ref this tab just claimed — on any page — that an earlier claim
+  // holds moves to the next free one (SPEC §6.1, SHI-4). A no-op until this tab
+  // has claimed something.
+  useEffect(() => {
+    if (!state || !signedIn()) return
+    void settleClaims(state).then((results) => {
+      if (results.length) void refresh()
+    })
+  }, [state, refresh])
 
   const copyKey = useCallback(async () => {
     try {

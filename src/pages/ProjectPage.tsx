@@ -22,7 +22,6 @@ import {
 
   unreact,
   assignMissingRefs,
-  settleClaims,
   setProjectField,
   startConversation,
   workFolder,
@@ -499,15 +498,6 @@ export function ProjectPage({
     for (const row of missing) attempted.current.add(row.addr)
     void assignMissingRefs(project, state).then(() => refresh())
   }, [project, issues, state, refresh])
-
-  // A key or ref this tab just claimed that an earlier claim holds moves to the
-  // next free one (SPEC §6.1); a no-op unless this tab claimed something.
-  useEffect(() => {
-    if (!signedIn()) return
-    void settleClaims(state).then((results) => {
-      if (results.length) refresh()
-    })
-  }, [state, refresh])
 
   const done = issues.filter((issue) => issue.status === 'done').length
   const set = (field: 'title' | 'description' | 'status' | 'lead', value: string, note: string, contentFormat?: string) => act(note, () => setProjectField(project, field, value, note, contentFormat), say, refresh)
