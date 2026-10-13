@@ -45,6 +45,25 @@ export const NewProject: Story = {
   render: () => <NewProjectDialog {...KEYS} teams={TEAMS} onClose={fn()} onCreate={fn()} />,
 }
 
+/** The key follows the title — the shortest free 3–6 letters — until the person types their own (SHI-4). */
+export const NewProjectKey: Story = {
+  render: () => <NewProjectDialog {...KEYS} teams={TEAMS} onClose={fn()} onCreate={fn()} />,
+  play: async () => {
+    await userEvent.type(screen.getByPlaceholderText('New project title'), 'Peek: Onboarding')
+  },
+}
+
+/** A key another project holds is refused here, before anything is published, and Create stays shut (SHI-4). */
+export const NewProjectTakenKey: Story = {
+  render: () => <NewProjectDialog {...KEYS} teams={TEAMS} onClose={fn()} onCreate={fn()} />,
+  play: async () => {
+    await userEvent.type(screen.getByPlaceholderText('New project title'), 'Peek: Onboarding')
+    const key = screen.getByPlaceholderText('ABC')
+    await userEvent.clear(key)
+    await userEvent.type(key, 'PEE')
+  },
+}
+
 /** From the Issues page: the project is chosen here. */
 export const NewIssue: Story = {
   render: () => <NewIssueDialog projects={PROJECT_OPTIONS} onClose={fn()} onCreate={fn()} />,
