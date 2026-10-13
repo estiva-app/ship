@@ -64,14 +64,14 @@ export function IssuesTable({ issues, statuses, hrefFor, className }: IssuesTabl
                 whose description pushes this table below the first screen, the
                 WHOLE page (sidebar and top bar included) became scrollable by
                 exactly that distance. */}
-            {/* `w-20`, and the cell never wraps (Katerina, 2026-09-09; ADOPTION
+            {/* `w-24`, and the cell never wraps (Katerina, 2026-09-09; ADOPTION
                 S25): under `border-box` the 64px of `w-16` left 40px for text
                 once `px-3` was paid, and "PEE-27" at 12px Geist Mono needs 43 —
-                five characters fit, six broke onto a second line. 80px leaves
-                56px, which holds three letters, a dash and three digits
-                (`refPrefix` takes three letters); the Issues page's list row
-                uses the same width, so the two surfaces line up. */}
-            <th className={cn(TH_CLASSES, 'relative w-20')}>
+                five characters fit, six broke onto a second line. A key is now
+                up to six letters (SHI-4), so 96px leaves 72px: six letters, a
+                dash and three digits. The Issues page's list row holds the same
+                ten characters, so the two surfaces line up. */}
+            <th className={cn(TH_CLASSES, 'relative w-24')}>
               <span className="sr-only">Ref</span>
             </th>
             <th className={TH_CLASSES}>Title</th>

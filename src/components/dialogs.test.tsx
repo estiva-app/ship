@@ -4,6 +4,13 @@ import { describe, expect, it, vi } from 'vitest'
 import { MoveProjectDialog } from './MoveProjectDialog'
 import { NewIssueDialog } from './NewIssueDialog'
 import { NewProjectDialog } from './NewProjectDialog'
+import { suggestKey } from '../nostr/keys'
+
+// PEE is held by another project, as on production.
+const KEYS = {
+  suggestKey: (title: string) => suggestKey(title, new Set(['PEE'])),
+  keyProblem: (key: string) => (key === 'PEE' ? 'PEE is used by Peek: Feedback & Bugs.' : undefined),
+}
 
 const FOLDER = '5c1e2a7b-9d40-4f3a-8e6b-2f0c7d1a9b34'
 const OTHER = '11111111-2222-4333-8444-555555555555'
@@ -64,7 +71,7 @@ describe('NewProjectDialog', () => {
   it('needs a title and a team, and hands over a trimmed draft filed into that team', async () => {
     const onCreate = vi.fn().mockResolvedValue(true)
     const onClose = vi.fn()
-    render(<NewProjectDialog teams={teams} onClose={onClose} onCreate={onCreate} />)
+    render(<NewProjectDialog {...KEYS} teams={teams} onClose={onClose} onCreate={onCreate} />)
     const create = screen.getByRole('button', { name: 'Create project' })
     expect(create).toBeDisabled()
     fireEvent.change(screen.getByPlaceholderText('New project title'), { target: { value: '  Design System ' } })
@@ -72,28 +79,45 @@ describe('NewProjectDialog', () => {
     await chooseTeam('Peek')
     expect(create).toBeEnabled()
     fireEvent.click(create)
-    await waitFor(() => expect(onCreate).toHaveBeenCalledWith({ title: 'Design System', description: '', team: { folder: OTHER, hasState: true } }))
+    await waitFor(() => expect(onCreate).toHaveBeenCalledWith({ title: 'Design System', description: '', key: 'DES', team: { folder: OTHER, hasState: true } }))
     await waitFor(() => expect(onClose).toHaveBeenCalled())
   })
 
+  it('prefills a free key from the title, and refuses a taken one before anything is published (SHI-4)', async () => {
+    const onCreate = vi.fn().mockResolvedValue(true)
+    render(<NewProjectDialog {...KEYS} teams={teams} onClose={vi.fn()} onCreate={onCreate} />)
+    fireEvent.change(screen.getByPlaceholderText('New project title'), { target: { value: 'Peek: Onboarding' } })
+    const key = screen.getByPlaceholderText('ABC')
+    expect(key).toHaveValue('PEEK')
+    await chooseTeam('Peek')
+    fireEvent.change(key, { target: { value: 'pee' } })
+    expect(key).toHaveValue('PEE')
+    expect(screen.getByText('PEE is used by Peek: Feedback & Bugs.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Create project' })).toBeDisabled()
+    fireEvent.change(key, { target: { value: 'onb-oard!' } })
+    expect(key).toHaveValue('ONBOAR')
+    fireEvent.click(screen.getByRole('button', { name: 'Create project' }))
+    await waitFor(() => expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({ key: 'ONBOAR' })))
+  })
+
   it('offers no Folder of its own and no pairing', () => {
-    render(<NewProjectDialog teams={teams} onClose={vi.fn()} onCreate={vi.fn()} />)
+    render(<NewProjectDialog {...KEYS} teams={teams} onClose={vi.fn()} onCreate={vi.fn()} />)
     expect(screen.queryByPlaceholderText(/Paste a Peek topic link/)).not.toBeInTheDocument()
     expect(screen.queryByText(/Folder of its own/)).not.toBeInTheDocument()
   })
 
   it('cannot be submitted while the teams are read, or when there are none', () => {
-    const { rerender } = render(<NewProjectDialog teams={undefined} onClose={vi.fn()} onCreate={vi.fn()} />)
+    const { rerender } = render(<NewProjectDialog {...KEYS} teams={undefined} onClose={vi.fn()} onCreate={vi.fn()} />)
     fireEvent.change(screen.getByPlaceholderText('New project title'), { target: { value: 'X' } })
     expect(screen.getByRole('button', { name: 'Create project' })).toBeDisabled()
-    rerender(<NewProjectDialog teams={[]} onClose={vi.fn()} onCreate={vi.fn()} />)
+    rerender(<NewProjectDialog {...KEYS} teams={[]} onClose={vi.fn()} onCreate={vi.fn()} />)
     expect(screen.getByText(/No Folders to file into/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Create project' })).toBeDisabled()
   })
 
   it('stays open when the caller says the write failed', async () => {
     const onClose = vi.fn()
-    render(<NewProjectDialog teams={teams} onClose={onClose} onCreate={vi.fn().mockResolvedValue(false)} />)
+    render(<NewProjectDialog {...KEYS} teams={teams} onClose={onClose} onCreate={vi.fn().mockResolvedValue(false)} />)
     fireEvent.change(screen.getByPlaceholderText('New project title'), { target: { value: 'X' } })
     await chooseTeam('Ship')
     fireEvent.click(screen.getByRole('button', { name: 'Create project' }))

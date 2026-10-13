@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { PROJECT_STATUSES, createProject, lookupStatus, type DirectoryView, type FolderState } from '@/api'
+import { PROJECT_STATUSES, createProject, keyProblem, lookupStatus, suggestKey, takenKeys, type DirectoryView, type FolderState } from '@/api'
 import type { FolderSummary } from '@estiva-app/interop'
 import { renderTreeText, toRenderTree } from '@estiva-app/protocol'
 import { NewProjectDialog } from '@/components/NewProjectDialog'
@@ -65,6 +65,8 @@ export function ProjectsPage({ state, directory, teams, archives, archived, say,
       {adding && (
         <NewProjectDialog
           teams={teams?.map((team) => ({ id: team.id, name: team.name ?? `Folder ${team.id.slice(0, 8)}…`, hasState: team.hasState }))}
+          suggestKey={(title) => suggestKey(title, takenKeys(state.projects, state.issues))}
+          keyProblem={(key) => keyProblem(key, state.projects, state.issues)}
           onClose={() => setAdding(false)}
           onCreate={async (draft) => {
             const result = await createProject(draft)

@@ -64,7 +64,7 @@ export function IssuesPage({ state, directory, archives, say, refresh }: { state
               say('Pick a project for this issue.', 'error')
               return false
             }
-            const result = await createIssue(project, state.issues, draft)
+            const result = await createIssue(project, state, draft)
             if (!result.ok) {
               say(`Issue rejected — ${result.reason}`, 'error')
               return false

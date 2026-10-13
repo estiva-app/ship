@@ -117,9 +117,12 @@ export function buildProject(
     lead?: string
     /** Free-text description. */
     description?: string
+    /** The prefix of its issues' refs, 3–6 letters — SHI-4, SPEC §6.1. */
+    key?: string
   },
 ): UnsignedEvent {
   assertFolderId(args.folder)
+  if (args.key !== undefined && !/^[A-Z]{3,6}$/.test(args.key)) throw new Error(`A project's key is 3–6 letters A to Z, not "${args.key}".`)
   const tags: NostrTag[] = [
     ['d', args.projectId],
     ['name', args.title],
@@ -135,6 +138,8 @@ export function buildProject(
     if (!/^[0-9a-f]{64}$/.test(args.lead)) throw new Error(`A project's lead must be a 64-character lower-case hex key, not "${args.lead}".`)
     tags.push(['lead', args.lead], ['p', args.lead])
   }
+  // Last, so every tag before it keeps its place in the id preimage.
+  if (args.key) tags.push(['key', args.key])
   return {
     pubkey,
     created_at: toNostrSeconds(createdAtMs),

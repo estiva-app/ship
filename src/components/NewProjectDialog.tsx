@@ -15,6 +15,11 @@ import { Textarea } from '@/components/ui/Textarea'
  *
  * **The team is required and starts unchosen.** A default would be a guess,
  * and a project filed into the wrong team is listed there for everyone.
+ *
+ * **The key is prefilled and editable** (SHI-4, Miky 2026-10-13): it follows
+ * the title — the shortest free 3–6 letters — until the person types their
+ * own, and one another project holds is refused here, before anything is
+ * published. It is fixed once the project exists.
  */
 export interface NewProjectTeam {
   id: string
@@ -26,30 +31,39 @@ export interface NewProjectTeam {
 export interface NewProjectDraft {
   title: string
   description: string
+  key: string
   team: { folder: string; hasState: boolean }
 }
 
 export interface NewProjectDialogProps {
   /** The teams a project can be filed into (`topLevelFolders`); `undefined` while they are read. */
   teams: NewProjectTeam[] | undefined
+  /** The shortest free key for a title (`suggestKey` over what is visible). */
+  suggestKey: (title: string) => string
+  /** Why a key cannot be used, or undefined when it can (`keyProblem`). */
+  keyProblem: (key: string) => string | undefined
   onClose: () => void
   /** Resolve `false` to keep the dialog open (the caller has said why). */
   onCreate: (draft: NewProjectDraft) => Promise<boolean | void> | boolean | void
 }
 
-export function NewProjectDialog({ teams, onClose, onCreate }: NewProjectDialogProps) {
+export function NewProjectDialog({ teams, suggestKey, keyProblem, onClose, onCreate }: NewProjectDialogProps) {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
+  // Undefined until the person types one: until then the key follows the title.
+  const [typedKey, setTypedKey] = useState<string>()
   const [teamId, setTeamId] = useState('')
   const [busy, setBusy] = useState(false)
   const team = teams?.find((candidate) => candidate.id === teamId)
-  const canSubmit = title.trim().length > 0 && team !== undefined && !busy
+  const key = typedKey ?? (title.trim() ? suggestKey(title) : '')
+  const problem = key ? keyProblem(key) : undefined
+  const canSubmit = title.trim().length > 0 && key.length > 0 && !problem && team !== undefined && !busy
 
   const submit = async () => {
     if (!canSubmit || !team) return
     setBusy(true)
     try {
-      const ok = await onCreate({ title: title.trim(), description: description.trim(), team: { folder: team.id, hasState: team.hasState } })
+      const ok = await onCreate({ title: title.trim(), description: description.trim(), key, team: { folder: team.id, hasState: team.hasState } })
       if (ok !== false) onClose()
     } finally {
       setBusy(false)
@@ -75,6 +89,13 @@ export function NewProjectDialog({ teams, onClose, onCreate }: NewProjectDialogP
       <Form id="new-project" onSubmit={submit} busy={busy}>
         <Field label="Title" required>
           <TextInput value={title} onChange={(e) => setTitle(e.target.value)} placeholder="New project title" autoFocus />
+        </Field>
+        <Field label="Key" required helper={problem ? undefined : `Its issues are ${key || 'KEY'}-1, ${key || 'KEY'}-2, …`} error={problem}>
+          <TextInput
+            value={key}
+            onChange={(e) => setTypedKey(e.target.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 6))}
+            placeholder="ABC"
+          />
         </Field>
         <Field label="Description">
           <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description (optional)" className="h-[80px]" />

@@ -294,7 +294,12 @@ export function manifestContent(): ManifestContent {
           status: { fold: 'status', map: 'statuses', default: DEFAULT_PROJECT_STATUS },
           // Seeded by the root's `lead` tag, overridden by a change — the same
           // rule `fold.ts` applies, now stated where a consumer can read it.
-          meta: [{ label: 'Lead', fold: 'lead', tag: 'lead', as: 'pubkey' }],
+          // The key, folded the same way (SHI-4, SPEC §6.1): the root's `key`
+          // tag, overridden by the change Ship writes when it pins one.
+          meta: [
+            { label: 'Lead', fold: 'lead', tag: 'lead', as: 'pubkey' },
+            { label: 'Key', fold: 'key', tag: 'key' },
+          ],
           /*
            * The issues in this project — PRO-2.
            *
@@ -705,8 +710,10 @@ export function manifestContent(): ManifestContent {
         id: 'add-project',
         label: 'New project',
         description:
-          'Start a project in a Folder: a name, and optionally a description of what it is for. Issues are filed ' +
-          'under it afterwards with add-issue; its status and lead are their own actions.',
+          'Start a project in a Folder: a name, and optionally a description of what it is for and a key. Issues are filed ' +
+          'under it afterwards with add-issue; its status and lead are their own actions. The key is 3–6 letters A–Z, ' +
+          'the prefix of its issues\' refs (KEY-1, KEY-2…), and must be one no project you can see holds; it is fixed ' +
+          'once the project exists. Left out, Ship gives the project one the first time it numbers an issue in it.',
         effect: 'writes',
         // NIP-29's channel record — a Folder, as `folderOf` reads one (interop's KIND_CHANNEL_METADATA).
         appliesTo: '39000',
@@ -724,6 +731,8 @@ export function manifestContent(): ManifestContent {
               as it does in Ship.
             */
             description: { type: 'string' },
+            // SHI-4: written as `["key", …]`, the tag `buildProject` writes last.
+            key: { type: 'string' },
           },
           required: ['name'],
         },

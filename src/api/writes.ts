@@ -1,7 +1,7 @@
 import type { Imeta, PublishResult } from '@estiva-app/protocol'
 import { addrToNaddr } from '@estiva-app/protocol'
 import type { Conversation, Issue, Project } from '../nostr/fold'
-import { nextRef, refPrefix } from '../nostr/store'
+import { clashes, keyOfRef, nextRef, projectKeys, suggestKey, takenKeys } from '../nostr/keys'
 import { RELAY_URL } from '../config'
 import { clockProblem } from './clock'
 import { readFolderListing, readFolders } from './foreign'
@@ -81,11 +81,12 @@ export function setMembership(target: { kind: 'issue'; issue: Issue } | { kind: 
  * team. A refused listing is still a created project — Ship shows it under
  * the team — so it comes back `ok` with `unlisted` saying why Peek will not.
  */
-export async function createProject(draft: { title: string; description: string; team: { folder: string; hasState: boolean } }): Promise<CreateResult & { unlisted?: string }> {
+export async function createProject(draft: { title: string; description: string; key: string; team: { folder: string; hasState: boolean } }): Promise<CreateResult & { unlisted?: string }> {
   const clock = await clockProblem()
   if (clock) return { ok: false, reason: clock }
   try {
-    const { result, placed, addr } = await store.createProject({ title: draft.title, description: draft.description, team: draft.team })
+    const { result, placed, addr } = await store.createProject({ title: draft.title, description: draft.description, key: draft.key, team: draft.team })
+    if (result.ok) claimedHere.add(addr)
     if (!result.ok) return { ok: false, reason: result.reason ?? 'no reason given' }
     if (placed && !placed.ok) return { ok: true, addr, unlisted: placed.reason ?? 'no reason given' }
     return { ok: true, addr }
@@ -95,7 +96,7 @@ export async function createProject(draft: { title: string; description: string;
 }
 
 /** One field of a project record: title, description, status, lead. The record's own Folder. */
-export function setProjectField(project: Project, field: 'title' | 'description' | 'status' | 'lead', value: string, note: string, contentFormat?: string): Promise<WriteResult> {
+export function setProjectField(project: Project, field: 'title' | 'description' | 'status' | 'lead' | 'key', value: string, note: string, contentFormat?: string): Promise<WriteResult> {
   /*
     A description is a rich text field (SPEC §13) and goes on the wire as a
     block document; every other field is a scalar and goes as it arrived.
@@ -295,25 +296,59 @@ export async function workFolder(project: Project, folders?: readonly { id: stri
   }
 }
 
+/** What numbering reads: every project and issue this reader can see. */
+export interface Visible {
+  projects: Project[]
+  issues: Issue[]
+}
+
 /**
- * Create an issue in the Folder that lists its project (`workFolder`), with a display ref derived
- * from what is currently visible (`nextRef(refPrefix(title), siblings)`) —
- * so it can collide across projects, as the old app's does. The address is
- * the identity; the ref is decoration, generated the same way, never
+ * Projects and issues whose key or ref this tab claimed, so `settleClaims` can
+ * tell its own claims from everybody else's (SPEC §6.1: only the later claim's
+ * client moves it). A reload forgets them, which is fine: a race is settled
+ * in the seconds after the claim, by the page that made it.
+ */
+const claimedHere = new Set<string>()
+
+/**
+ * The project's key, writing it first when the project has none of its own on
+ * the wire (SHI-4).
+ *
+ * A project made before keys, or by an app that set none, gets the key
+ * `projectKeys` derives — the prefix it holds most refs under, or the shortest
+ * free one from its title — the first time Ship numbers an issue in it. From
+ * then on the key is a fact on the relay rather than a derivation, so a later
+ * project or a moved issue cannot change it.
+ */
+async function keyFor(project: Project, visible: Visible): Promise<string> {
+  if (project.key) return project.key
+  const key = projectKeys(visible.projects, visible.issues).get(project.addr) ?? suggestKey(project.title, takenKeys(visible.projects, visible.issues))
+  const pinned = await setProjectField(project, 'key', key, `Key → ${key}`)
+  if (pinned.ok) claimedHere.add(project.addr)
+  return key
+}
+
+/**
+ * Create an issue in the Folder that lists its project (`workFolder`), with
+ * the next ref under the project's key (SHI-4). The ref counts every issue
+ * this reader can see, in any project, so it is unique among them; a race is
+ * `settleClaims`'s. The address is still the identity — a ref is never
  * resolved by.
  */
-export async function createIssue(project: Project, existing: Issue[], draft: { title: string; description: string }): Promise<CreateResult> {
+export async function createIssue(project: Project, visible: Visible, draft: { title: string; description: string }): Promise<CreateResult> {
   const clock = await clockProblem()
   if (clock) return { ok: false, reason: clock }
   try {
+    const key = await keyFor(project, visible)
     const { result, addr } = await store.createIssue({
       folder: await workFolder(project),
       title: draft.title,
       description: draft.description,
       projectAddr: project.addr,
-      ref: nextRef(refPrefix(project.title), existing.map((issue) => issue.ref)),
+      ref: nextRef(key, visible.issues.map((issue) => issue.ref)),
     })
     if (!result.ok) return { ok: false, reason: result.reason ?? 'no reason given' }
+    claimedHere.add(addr)
     return { ok: true, addr }
   } catch (error) {
     return { ok: false, reason: error instanceof Error ? error.message : String(error) }
@@ -390,9 +425,9 @@ export function reply(conversation: Conversation, fallbackFolder: string, body: 
 /**
  * Give display keys to a project's issues that arrived without one.
  *
- * Only Ship can mint a ref: it is the project title's first three letters and a
- * count of that project's issues, so a consumer creating an issue through the
- * manifest cannot produce one — it cannot see the siblings. And Ship cannot put
+ * Only Ship mints a ref: it is the project's key and one past the highest number
+ * under that key in the workspace (SHI-4), so a consumer creating an issue
+ * through the manifest — Peek, the agent — files it without one. And Ship cannot put
  * it on the root, because a NIP-33 address is `(kind, pubkey, d)` and the root
  * belongs to whoever signed it. A change event is the only move available,
  * which is why `ref` is folded now (`fold.ts`).
@@ -406,19 +441,54 @@ export function reply(conversation: Conversation, fallbackFolder: string, body: 
  * `nextRef` reads the refs assigned so far, so issuing them one at a time
  * against unrefreshed state would give every one of them the same number.
  *
- * Racing another tab produces two changes for one field and last-write-wins
- * settles it — a cosmetic collision `nextRef` already tolerates by design,
- * since it counts what it can see rather than owning a counter.
+ * It numbers against **every** visible issue, not the project's own: until
+ * SHI-4 it counted only the siblings, so two agent-filed issues in two new
+ * projects both became `SHI-1` beside the real one.
+ *
+ * Two tabs filling the same issue write the same number, and last-write-wins
+ * settles it. Two tabs giving one number to two different issues is a clash,
+ * which `settleClaims` moves.
  */
-export async function assignMissingRefs(project: Project, issues: Issue[]): Promise<WriteResult[]> {
-  const assigned = issues.map((issue) => issue.ref)
-  const results: WriteResult[] = []
+export async function assignMissingRefs(project: Project, visible: Visible): Promise<WriteResult[]> {
+  const mine = visible.issues.filter((issue) => issue.projectAddr === project.addr)
   // Oldest first, so the numbers run in the order the issues were filed.
-  const missing = issues.filter((issue) => !issue.ref).sort((a, b) => a.createdAt - b.createdAt)
+  const missing = mine.filter((issue) => !issue.ref).sort((a, b) => a.createdAt - b.createdAt)
+  if (missing.length === 0) return []
+  const key = await keyFor(project, visible)
+  const assigned = visible.issues.map((issue) => issue.ref)
+  const results: WriteResult[] = []
   for (const issue of missing) {
-    const ref = nextRef(refPrefix(project.title), assigned)
+    const ref = nextRef(key, assigned)
     assigned.push(ref)
-    results.push(await setIssueField(issue, 'ref', ref, `Ref → ${ref}`))
+    const result = await setIssueField(issue, 'ref', ref, `Ref → ${ref}`)
+    if (result.ok) claimedHere.add(issue.addr)
+    results.push(result)
+  }
+  return results
+}
+
+/**
+ * Move this tab's own claims that lost a race — SPEC §6.1's later-claim rule.
+ *
+ * Run after a refresh that follows a claim. Where this tab gave a project a
+ * key, or an issue a ref, that an earlier claim already holds, it takes the
+ * next free one. Nobody else's claim is touched, so a duplicate from before
+ * keys stays as it is (Miky, 2026-10-09).
+ */
+export async function settleClaims(visible: Visible): Promise<WriteResult[]> {
+  if (claimedHere.size === 0) return []
+  const results: WriteResult[] = []
+  for (const project of clashes(visible.projects, (project) => project.key, 'key', claimedHere)) {
+    const key = suggestKey(project.title, takenKeys(visible.projects, visible.issues))
+    results.push(await setProjectField(project, 'key', key, `Key → ${key}, ${project.key} was taken`))
+  }
+  const assigned = visible.issues.map((issue) => issue.ref)
+  for (const issue of clashes(visible.issues, (issue) => issue.ref, 'ref', claimedHere)) {
+    const key = keyOfRef(issue.ref)
+    if (!key) continue
+    const ref = nextRef(key, assigned)
+    assigned.push(ref)
+    results.push(await setIssueField(issue, 'ref', ref, `Ref → ${ref}, ${issue.ref} was taken`))
   }
   return results
 }

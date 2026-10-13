@@ -8,6 +8,7 @@ import { MoveProjectDialog } from './MoveProjectDialog'
 import { NewFolderDialog } from './NewFolderDialog'
 import { NewIssueDialog } from './NewIssueDialog'
 import { NewProjectDialog } from './NewProjectDialog'
+import { suggestKey } from '../nostr/keys'
 
 /**
  * The four dialogs the writes need (REW-5), every one built from the shared
@@ -25,6 +26,12 @@ const meta = {
 export default meta
 type Story = StoryObj<typeof meta>
 
+// PEE is held by another project, as on production (SHI-4).
+const KEYS = {
+  suggestKey: (title: string) => suggestKey(title, new Set(['PEE'])),
+  keyProblem: (key: string) => (key === 'PEE' ? 'PEE is used by Peek: Feedback & Bugs.' : undefined),
+}
+
 const PROJECT_OPTIONS = SIDEBAR_PROJECTS.map((p) => ({ value: p.addr, label: p.title }))
 
 const TEAMS = [
@@ -35,7 +42,7 @@ const TEAMS = [
 
 /** Production's form: a title, a description, and the team the project is filed into (FOL-2). */
 export const NewProject: Story = {
-  render: () => <NewProjectDialog teams={TEAMS} onClose={fn()} onCreate={fn()} />,
+  render: () => <NewProjectDialog {...KEYS} teams={TEAMS} onClose={fn()} onCreate={fn()} />,
 }
 
 /** From the Issues page: the project is chosen here. */
@@ -66,7 +73,7 @@ export const DeleteProject: Story = {
 
 /** No teams came back from the read: the picker says why it is shut, and nothing can be created. */
 export const NewProjectNoTeams: Story = {
-  render: () => <NewProjectDialog teams={[]} onClose={fn()} onCreate={fn()} />,
+  render: () => <NewProjectDialog {...KEYS} teams={[]} onClose={fn()} onCreate={fn()} />,
   play: async () => {
     await userEvent.type(screen.getByPlaceholderText('New project title'), 'Relay migration')
   },
@@ -107,7 +114,7 @@ export const OpenAndClose: Story = {
         <Button variant="destructive" onClick={() => setOpen('delete')}>
           Delete project
         </Button>
-        {open === 'project' && <NewProjectDialog teams={TEAMS} onClose={() => setOpen(null)} onCreate={fn()} />}
+        {open === 'project' && <NewProjectDialog {...KEYS} teams={TEAMS} onClose={() => setOpen(null)} onCreate={fn()} />}
         {open === 'issue' && <NewIssueDialog projects={PROJECT_OPTIONS} onClose={() => setOpen(null)} onCreate={fn()} />}
         {open === 'delete' && (
           <ConfirmDialog title="Delete “Relay Migration”?" confirmLabel="Delete project" destructive onConfirm={fn()} onClose={() => setOpen(null)}>
