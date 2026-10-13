@@ -85,10 +85,32 @@ describe('a message that asks for a card', () => {
     expect(cards(c)).toEqual([])
   })
 
-  it('replaces the lone-line card: none leaves the chip, compact draws the row once', async () => {
+  it('draws a reference alone on its line as its chip, with no card, when no embed names it (OPT-18)', async () => {
     const lone = show(thread(ISSUE_REF))
-    await waitFor(() => expect(lone.querySelector('[data-foreign-references] [data-foreign-object]')).not.toBeNull())
+    await waitFor(() => expect(lone.querySelector('[data-reference]')).not.toBeNull())
+    expect(lone.querySelector('[data-foreign-object]')).toBeNull()
+  })
 
+  it('draws a bare app link as the chip of what it names, alone or mid-sentence, with no card (OPT-18)', async () => {
+    const lone = show(thread(ISSUE_URL))
+    await waitFor(() => expect(lone.querySelector('[data-reference]')).not.toBeNull())
+    expect(lone.querySelector('[data-foreign-object]')).toBeNull()
+    expect(lone.textContent).not.toContain(ISSUE_URL)
+    const mid = show(thread(`see ${ISSUE_URL}, then ship`))
+    await waitFor(() => expect(mid.querySelector('[data-reference]')).not.toBeNull())
+    expect(mid.textContent).toContain(', then ship')
+    expect(mid.querySelector('[data-foreign-object]')).toBeNull()
+  })
+
+  it('keeps a link nothing claims, and a link on words, as links with no card (OPT-18)', async () => {
+    const c = show(thread(`https://example.com/a and [these words](${ISSUE_URL})`))
+    await new Promise((r) => setTimeout(r, 50))
+    expect(c.querySelector('[data-reference]')).toBeNull()
+    expect(c.querySelector('[data-foreign-object]')).toBeNull()
+    expect(c.querySelector('a[href="https://example.com/a"]')).not.toBeNull()
+  })
+
+  it('a chosen layout draws under the chip: none leaves the chip, compact draws the row once', async () => {
     const none = show(thread(ISSUE_REF, [{ value: ISSUE, layout: 'none' }]))
     await waitFor(() => expect(none.querySelector('[data-reference]')).not.toBeNull())
     expect(none.querySelector('[data-foreign-object]')).toBeNull()

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { IconBox, IconListDetails } from '@tabler/icons-react'
-import { addressToPointer, bech32Decode, cardsIn, convertBits, decodeNevent, encodeNaddr, encodeNevent, pointerToAddress, referencesIn, referenceToPointer, standaloneReference, toRenderTree, type Embed, type Imeta, type LinkResolver, type PartPointer } from '@estiva-app/protocol'
+import { addressToPointer, bech32Decode, cardsIn, convertBits, decodeNevent, encodeNaddr, encodeNevent, pointerToAddress, referencesIn, referenceToPointer, toRenderTree, type Embed, type Imeta, type LinkResolver, type PartPointer } from '@estiva-app/protocol'
 import { WithTooltip } from '@estiva-app/ui'
 import { ago } from '@/lib/time'
 import type { DraftStore } from '@/lib/drafts'
@@ -13,18 +13,6 @@ import type { ActivityProps, Relation } from '@/components/Activity'
 /** Messages are marker text (SPEC §13.2); only a rich text *field* is a block document. */
 export const MESSAGE_FORMAT = 'marker' as const
 
-/**
- * The pointers standing alone on a line of a message: drawn below it as the
- * object they name, while a pointer inside a sentence stays where it was
- * written (RIC-10). The package's rule (`standaloneReference`), so Peek reaches
- * the same answer. Reading the tree only — `RichText` draws it.
- */
-export function standaloneReferencesOf(body: string): string[] {
-  return toRenderTree(body, MESSAGE_FORMAT)
-    .map(standaloneReference)
-    .filter((r): r is string => !!r)
-}
-
 /** One card a message asks for, with the `nostr:` reference its object is resolved under. */
 export interface MessageCard extends Embed {
   reference: string
@@ -32,11 +20,11 @@ export interface MessageCard extends Embed {
 
 /**
  * The cards a message asks for — SPEC §13.6.2, OPT-16 — in body order, `none`
- * included (it draws nothing, but it overrides the lone-line card for its
- * value). The package's rule (`cardsIn`), so Peek reaches the same answer.
+ * included (it draws nothing). The only cards a message draws (OPT-18). The
+ * package's rule (`cardsIn`), so Peek reaches the same answer.
  *
- * Each is keyed by the reference the body wrote, so it resolves with the chip
- * and the lone-line card it may replace. An app link names a card too once
+ * Each is keyed by the reference the body wrote, so it resolves with the
+ * chip. An app link names a card too once
  * `resolveLink` says what it names by §7.7 (OPT-17, `api/linkCards`); its card
  * resolves under the reference its value spells, since the body wrote only the URL.
  */
@@ -52,15 +40,6 @@ export function cardsOf(body: string, embeds: readonly Embed[] | undefined, part
     const reference = written.get(card.value) ?? referenceOfValue(card.value)
     return reference ? [{ ...card, reference }] : []
   })
-}
-
-/** The app links a message's cards depend on: what `cardsIn` asks a resolver about, that may name one. None for a message with no `embed`. */
-export function linksAskedFor(body: string, embeds: readonly Embed[] | undefined, parts: readonly PartPointer[] = []): string[] {
-  if (!embeds?.length) return []
-  const named = linksNamingCards(body)
-  const asked: string[] = []
-  cardsIn(embeds, toRenderTree(body, MESSAGE_FORMAT), parts, (url) => void (named.has(url) && asked.push(url)))
-  return asked
 }
 
 const MARKER_LINK = /\[[^\]]*\]\(([^)\s]+)\)/g

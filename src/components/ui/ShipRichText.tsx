@@ -3,7 +3,7 @@ import { RichText as PackageRichText, type RichTextBlock, type RichTextSize } fr
 import { Attachment } from './Attachment'
 import { Reference } from './Reference'
 import { imetaFromAttrs } from '../../nostr/attachments'
-import { standaloneReference, toRenderTree, type ContentFormat } from '@estiva-app/protocol'
+import { linksAsReferences, standaloneReference, toRenderTree, type ContentFormat, type LinkResolver } from '@estiva-app/protocol'
 
 /**
  * A body, drawn — SPEC §13.
@@ -33,6 +33,7 @@ export function ShipRichText({
   resolved,
   urgent,
   hideStandalone,
+  resolveLink,
 }: {
   value: string
   format: ContentFormat
@@ -50,7 +51,8 @@ export function ShipRichText({
   /** A message's urgent keys, which draw their person chips urgent — SPEC §13.1, CON-24. */
   urgent?: readonly string[]
   /**
-   * Skip a block that is nothing but one reference.
+   * Skip a block that is nothing but one reference — a description's, not a
+   * message's: in a message every reference is its chip (OPT-18).
    *
    * Those are attachments and are drawn below the text by the caller. Passing
    * this rather than deciding here keeps the rule in one place — the caller
@@ -65,8 +67,15 @@ export function ShipRichText({
    * chip for whatever it cannot draw below.
    */
   hideStandalone?: boolean | ((reference: string) => boolean)
+  /**
+   * A message's: what each app link names (§7.7), so a bare link draws as the
+   * chip of what it names, as Peek draws it (`linksAsReferences`, OPT-18). A
+   * link on words stays a link, and one not answered yet stays the URL.
+   */
+  resolveLink?: LinkResolver
 }) {
-  const all = toRenderTree(value, format)
+  const tree = toRenderTree(value, format)
+  const all = resolveLink ? linksAsReferences(tree, resolveLink) : tree
   // A block that is nothing but one reference is an attachment; the caller
   // draws it below the text (SPEC §13.1, RIC-10).
   const hide =

@@ -16,7 +16,7 @@ import { SkeletonBar } from '@/components/ui/Skeleton'
 import { REACTION_OPTIONS, Reactions } from '@/components/Reactions'
 import { ConfirmDeleteMessage, NewSinceHere, useThreadReactions, useThreadReferences, type ConversationsProps, type MessageData, type ThreadData } from '@/components/ConversationThread'
 import type { ActivityProps } from '@/components/Activity'
-import { MESSAGE_FORMAT, PLACE_ICON, RELATION, Time, cardsOf, linkResolverFor, meaningLabel, standaloneReferencesOf, valueOfReference, type MentionListViewProps, type ThreadListViewProps } from './shared'
+import { MESSAGE_FORMAT, PLACE_ICON, RELATION, Time, cardsOf, linkResolverFor, meaningLabel, type MentionListViewProps, type ThreadListViewProps } from './shared'
 import { MessageBoxShell } from './writingBox'
 import type { Picks } from './MessageBox'
 import { messageScope, referenceSections } from '@/api/references'
@@ -130,22 +130,18 @@ function AddReaction({ onPick, disabledReason }: { onPick: (emoji: string) => vo
 function Message({ message, resolved, resolving, nameOf, reactions, onToggleReaction, onDelete, onEdit, repliesLeftBehind = 0, disabledReason, drafts, footer }: MessageProps) {
   const [editing, setEditing] = useState(false)
   const [confirming, setConfirming] = useState(false)
-  // A block of another object, live (SPEC §13.6.1, COM-2). Its card stands for the object, so its plain widget is not drawn too.
+  // A block of another object, live (SPEC §13.6.1, COM-2).
   const parts = shownParts(message.parts, message.body, namedAddresses(message.body))
-  // The cards its author asked for (SPEC §13.6.2, OPT-16). A value with an `embed` is the author's call: its
-  // lone-line card gives way to the chosen layout, and `none` leaves only the chip.
-  // A link on words names its card by §7.7, from what the surface has asked (OPT-17).
-  const cards = cardsOf(message.body, message.embeds, parts, linkResolverFor(message.body, knownLinkValue))
-  const chosen = new Set(cards.map((card) => card.value))
-  const isChosen = (reference: string) => chosen.has(valueOfReference(reference) ?? '')
+  // What each app link names by §7.7, from what the surface has asked: a bare link reads as that chip (OPT-18),
+  // and a link on words can name its card (OPT-17).
+  const resolveLink = linkResolverFor(message.body, knownLinkValue)
+  // The cards its author asked for (SPEC §13.6.2, OPT-16) — the only cards a message draws. Every reference,
+  // alone on its line too, is its chip in the text (OPT-18), and `none` leaves only that.
+  const cards = cardsOf(message.body, message.embeds, parts, resolveLink)
   const shownCards = cards.flatMap((card) => {
     const object = card.layout === 'none' ? undefined : resolved?.[card.reference]
     return object ? [{ card, object }] : []
   })
-  const attached = standaloneReferencesOf(message.body).filter((reference) => !isChosen(reference))
-  const objects = attached
-    .map((r) => resolved?.[r])
-    .filter((o): o is ForeignObjectData => !!o && !parts.some((part) => o.address === part.address))
   const react = onToggleReaction && ((emoji: string) => onToggleReaction(emoji, reactions?.find((r) => r.emoji === emoji)?.mine))
 
   return (
@@ -183,17 +179,10 @@ function Message({ message, resolved, resolving, nameOf, reactions, onToggleReac
       ) : (
         <>
           <div className="break-words">
-            <ShipRichText value={message.body} format={MESSAGE_FORMAT} hideStandalone={(reference) => resolved?.[reference] !== null && !isChosen(reference)} nameOf={nameOf} resolved={resolved} urgent={message.urgent} />
+            <ShipRichText value={message.body} format={MESSAGE_FORMAT} resolveLink={resolveLink} nameOf={nameOf} resolved={resolved} urgent={message.urgent} />
           </div>
           <FileAttachments files={message.files} />
-          {(attached.length > 0 || cards.some((card) => card.layout !== 'none')) && resolving && <SkeletonBar className="h-16 w-full" data-foreign-references="loading" />}
-          {objects.length > 0 && (
-            <div className="flex flex-col gap-2" data-foreign-references={String(objects.length)}>
-              {objects.map((object) => (
-                <ForeignObject key={object.ref} object={object} />
-              ))}
-            </div>
-          )}
+          {cards.some((card) => card.layout !== 'none') && resolving && <SkeletonBar className="h-16 w-full" data-foreign-references="loading" />}
           {shownCards.length > 0 && (
             <div className="flex flex-col gap-2" data-cards={String(shownCards.length)}>
               {shownCards.map(({ card, object }) => (

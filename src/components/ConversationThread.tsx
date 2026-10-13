@@ -6,7 +6,7 @@ import { Divider } from './ui/Divider'
 import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
 import { byReference, useForeignObjects } from '@/api/useForeignObjects'
 import { useLinkValues } from '@/api/linkCards'
-import { linksAskedFor, referenceOfValue } from '@/components/conversations/shared'
+import { linksNamingCards, referenceOfValue } from '@/components/conversations/shared'
 import { useReactions } from '@/api'
 import type { Reaction } from '@/api'
 import type { Picks } from '@/components/conversations/MessageBox'
@@ -148,12 +148,13 @@ export function useThreadReferences(threads: readonly ThreadData[]): {
 } {
   const messages = useMemo(() => threads.flatMap((thread) => [thread.root, ...thread.replies]), [threads])
   /*
-    A link on words can carry a card (SPEC §13.6.2, OPT-17): what each link a
-    card depends on names is asked once (`useLinkValues`), and the objects
-    named are resolved with the rest, under the reference their value spells.
-    Only messages carrying an `embed` ask, so an ordinary link costs nothing.
+    An app link reads as the chip of what it names (OPT-18), and a link on words
+    can carry a card (SPEC §13.6.2, OPT-17): what each link names is asked once
+    (`useLinkValues`), and the objects named are resolved with the rest, under
+    the reference their value spells. A link no manifest claims is answered
+    from the manifests alone, so an ordinary link costs no query.
   */
-  const links = useMemo(() => [...new Set(messages.flatMap((message) => linksAskedFor(message.body, message.embeds)))], [messages])
+  const links = useMemo(() => [...new Set(messages.flatMap((message) => [...linksNamingCards(message.body)]))], [messages])
   const linked = useLinkValues(links)
   const linkedKey = [...new Set(linked.values())].join('\n')
   const references = useMemo(() => {
