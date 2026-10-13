@@ -183,7 +183,7 @@ describe('Projects page — cards from the fold', () => {
     await userEvent.click(dialog.getByRole('combobox', { name: 'Folder' }))
     await userEvent.click(await screen.findByRole('option', { name: 'Ship' }))
     fireEvent.click(dialog.getByRole('button', { name: 'Create project' }))
-    await waitFor(() => expect(createProject).toHaveBeenCalledWith({ title: 'Mobile app', description: '', team: { folder: '3167adea-877f-43c4-96fb-517a2b2d5d24', hasState: true } }))
+    await waitFor(() => expect(createProject).toHaveBeenCalledWith({ title: 'Mobile app', description: '', key: 'MOB', team: { folder: '3167adea-877f-43c4-96fb-517a2b2d5d24', hasState: true } }))
     await waitFor(() => expect(refresh).toHaveBeenCalled())
     expect(await screen.findByText('Project created')).toBeInTheDocument()
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'New project' })).not.toBeInTheDocument())

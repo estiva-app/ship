@@ -334,6 +334,8 @@ export class Store {
     title: string
     description?: string
     lead?: string
+    /** The prefix of its issues' refs — SHI-4. */
+    key?: string
     /** The team's Folder, and whether it has state — from a read, never a guess. */
     team: { folder: string; hasState: boolean }
   }): Promise<{ result: PublishResult; placed?: PublishResult; addr: string; id: string; folder: string }> {
@@ -348,6 +350,7 @@ export class Store {
         title: args.title,
         description: args.description,
         lead: args.lead,
+        key: args.key,
         folder,
       }),
     )
@@ -1099,26 +1102,4 @@ export class Store {
     return folder ? { event, folder } : null
   }
 
-}
-
-/**
- * Next display key for a project, e.g. `LL-7`.
- *
- * Display-only, per the spec: never used for addressing, never authoritative.
- * It is derived from what we can currently see, so two people creating an issue
- * at the same moment can produce the same key. That is a cosmetic collision and
- * fixing it would need a counter nobody owns — the address is the identity.
- */
-export function nextRef(prefix: string, existingRefs: (string | undefined)[]): string {
-  const used = existingRefs
-    .filter((ref): ref is string => !!ref && ref.startsWith(`${prefix}-`))
-    .map((ref) => Number.parseInt(ref.slice(prefix.length + 1), 10))
-    .filter((n) => Number.isFinite(n))
-  return `${prefix}-${used.length ? Math.max(...used) + 1 : 1}`
-}
-
-/** A short, stable prefix from a project title: "Payment integration" → "PAY". */
-export function refPrefix(title: string): string {
-  const letters = title.toUpperCase().replace(/[^A-Z]/g, '')
-  return letters.slice(0, 3) || 'LL'
 }

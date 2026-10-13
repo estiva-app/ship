@@ -496,9 +496,8 @@ export function ProjectPage({
     const missing = issues.filter((row) => !row.ref && !attempted.current.has(row.addr))
     if (missing.length === 0) return
     for (const row of missing) attempted.current.add(row.addr)
-    const mine = state.issues.filter((issue) => issue.projectAddr === project.addr)
-    void assignMissingRefs(project, mine).then(() => refresh())
-  }, [project, issues, state.issues, refresh])
+    void assignMissingRefs(project, state).then(() => refresh())
+  }, [project, issues, state, refresh])
 
   const done = issues.filter((issue) => issue.status === 'done').length
   const set = (field: 'title' | 'description' | 'status' | 'lead', value: string, note: string, contentFormat?: string) => act(note, () => setProjectField(project, field, value, note, contentFormat), say, refresh)
@@ -678,7 +677,7 @@ export function ProjectPage({
           project={{ addr: project.addr, title: project.title }}
           onClose={() => setDialog(null)}
           onCreate={async (draft) => {
-            const result = await createIssue(project, state.issues, draft)
+            const result = await createIssue(project, state, draft)
             if (!result.ok) {
               say(`Issue rejected — ${result.reason}`, 'error')
               return false

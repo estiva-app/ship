@@ -34,6 +34,9 @@ export const NoProject: Story = { args: { issue: ROWS[7] } }
 /** Filed by another app without a ref: an em dash, not a blank. */
 export const NoRef: Story = { args: { issue: ROWS[4] } }
 
+/** A six-letter key and a three-digit number, the longest ref a key makes (SHI-4): it fits without truncating. */
+export const LongestRef: Story = { args: { issue: { ...ROWS[0], ref: 'ONBOAR-128' } } }
+
 /** A status the vocabulary does not know: a plain circle. */
 export const UnknownStatus: Story = { args: { issue: ROWS[8] } }
 

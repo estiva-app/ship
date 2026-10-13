@@ -22,6 +22,7 @@ export type { Directory, Profile } from '../nostr/profiles'
 export { initials } from '../nostr/profiles'
 export { ISSUE_STATUSES, PROJECT_STATUSES, lookupStatus, type VocabEntry } from '../nostr/kinds'
 export { conversationsAbout } from '../nostr/fold'
+export { keyProblem, projectKeys, suggestKey, takenKeys } from '../nostr/keys'
 /*
   The two lists, and the rule that separates them — SPEC §6.4, CON-7.
 
@@ -73,6 +74,7 @@ export {
   unreact,
   reply,
   assignMissingRefs,
+  settleClaims,
   setIssueField,
   setMembership,
   setProjectField,

@@ -151,6 +151,8 @@ export interface Project {
    */
   contentFolder: string
   lead?: string
+  /** The project's own key, when it has one on the wire — `projectKeys` gives every project's. */
+  key?: string
   status: string
   /**
    * Hidden from the lists, reversibly.
@@ -581,6 +583,10 @@ export function foldFolder(
       // read: re-pointing a project is gone (MAN-5).
       contentFolder: projectFolder(event) ?? '',
       lead: fields.lead?.value ?? tag(event, 'lead'),
+      // The prefix of its issues' refs (SHI-4, SPEC §6.1): seeded by the root's
+      // tag, overridden by a change, as `lead` is. Absent on every project made
+      // before keys; `projectKeys` in keys.ts derives one for those.
+      key: fields.key?.value ?? tag(event, 'key'),
       status: fields.status?.value ?? DEFAULT_PROJECT_STATUS,
       // Any non-empty value means archived; unarchiving writes an empty string
       // rather than deleting the change, because an append-only stream has no
