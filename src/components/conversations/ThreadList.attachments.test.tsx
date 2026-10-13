@@ -82,6 +82,14 @@ describe('threadFor', () => {
     expect(thread.root.files).toBeUndefined()
     expect(threadFor(conversation('m1'), directory as never).root.files).toBeUndefined()
   })
+
+  /* The same wiring for the cards a message asks for (SPEC §13.6.2, OPT-16), the last argument. */
+  it('carries a message’s cards from the index onto roots and replies', () => {
+    const card = { value: `30851:${SHA}:f78c3b96-2a3b-4d92-910a-ac25aba672cd`, layout: 'compact' as const }
+    const thread = threadFor(conversation('m1', 'r1'), directory as never, undefined, undefined, undefined, undefined, undefined, undefined, { m1: [card], r1: [card] })
+    expect(thread.root.embeds).toEqual([card])
+    expect(thread.replies[0].embeds).toEqual([card])
+  })
 })
 
 /* `MessageCard` is gone: a message is drawn inside the thread list, so it is

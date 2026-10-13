@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import type { BlockAnchor, Imeta, PartPointer } from '@estiva-app/protocol'
+import type { BlockAnchor, Embed, Imeta, PartPointer } from '@estiva-app/protocol'
 import { referencesIn, toRenderTree } from '@estiva-app/protocol'
 import { ConfirmDialog } from './ui/ConfirmDialog'
 import { Divider } from './ui/Divider'
@@ -100,6 +100,11 @@ export interface MessageData {
    */
   parts?: PartPointer[]
   /**
+   * The cards it asks for — its `embed` tags, folded over its edits like
+   * `files` (SPEC §13.6.2, OPT-16). Which of them draw is `cardsOf`'s answer.
+   */
+  embeds?: Embed[]
+  /**
    * The block of its own object a comment is anchored to (SPEC §13.6), drawn
    * above the text with the same card as a part — Decided 2026-10-07, as Peek
    * draws it. Undefined for a comment about the whole object.
@@ -110,7 +115,11 @@ export interface MessageData {
 /** Messages are marker text (SPEC §13.2); only a rich text *field* is a block document. */
 const MESSAGE_FORMAT = 'marker' as const
 
-/** Every `nostr:` pointer in a set of messages, deduplicated, in the order they appear. */
+/**
+ * Every `nostr:` pointer in a set of messages, deduplicated, in the order they
+ * appear. A card (SPEC §13.6.2) resolves under the reference the body wrote, so
+ * these are its objects too.
+ */
 export function referencesInMessages(messages: readonly MessageData[]): string[] {
   const seen = new Set<string>()
   for (const message of messages) {

@@ -7,7 +7,7 @@
  * of the state, "two apps agree on the data" would be measuring Ship's
  * cache rather than the shared record.
  */
-import type { Imeta, NostrTag, PartPointer, PublishResult, Relay } from '@estiva-app/protocol'
+import type { Embed, Imeta, NostrTag, PartPointer, PublishResult, Relay } from '@estiva-app/protocol'
 import { partsOf } from '@estiva-app/protocol'
 import type { Signer } from './signer'
 import {
@@ -30,7 +30,7 @@ import {
 import { findNaddrs, naddrToAddr, buildReaction, buildEdit, buildDeletion as buildEventDeletion } from '@estiva-app/protocol'
 import { planArchiveFolder, planCreateFolder, planDeleteFolder, planMoveFromFolders, planPlaceFile, planRenameFolder, planUnlistFile, type FolderRef, type MovableFile, type MoveRefusal } from '@estiva-app/interop'
 import { foldFolder, type FolderState } from './fold'
-import { buildMembershipChange, decorationsOf, foldAttachments, foldEdits, URGENT_TAG, type Decorations, type EditFold, type QueryFn } from '@estiva-app/conversation'
+import { buildMembershipChange, decorationsOf, foldAttachments, foldEdits, foldEmbeds, URGENT_TAG, type Decorations, type EditFold, type QueryFn } from '@estiva-app/conversation'
 import { anchorIndex, type AnchorIndex } from './references'
 import { directoryFrom, type Directory } from './profiles'
 import { KIND } from './kinds'
@@ -131,6 +131,12 @@ export interface WorkspaceState extends FolderState {
    */
   parts: Record<string, PartPointer[]>
   /**
+   * Message id → the cards it asks for: its `embed` tags, replaced by the
+   * latest edit carrying any (SPEC §13.6.2, OPT-16) — folded like
+   * `attachments`, not kept like `parts`. Absent for a message with none.
+   */
+  embeds: Record<string, Embed[]>
+  /**
    * Every Folder this read actually fetched (PER-3).
    *
    * Beside the fold, like the three above, and for the same reason: `foldFolder`
@@ -178,6 +184,7 @@ function read(events: SignedEvent[], folders: string[]): WorkspaceState {
     attachments: foldAttachments(events),
     urgent: urgentIndex(events),
     parts: partsIndex(events),
+    embeds: foldEmbeds(events),
     // A parameter rather than derived from the events: the set that was
     // *asked for* is not the set that came back. A Folder holding nothing this
     // reader may see yields no events and would vanish from a derived list,

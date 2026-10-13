@@ -74,6 +74,13 @@ export interface ForeignObjectProps {
    * to ask for, the widget's to draw.
    */
   conversations?: number
+  /**
+   * The layout a message's author chose for this card (SPEC §13.6.2, OPT-16):
+   * `row` for compact, `card` for detailed. It replaces the manifest's
+   * `widget`, except for a message, which is drawn as a quoted message either
+   * way (§7.6). Omitted, the manifest decides, as in a Folder listing.
+   */
+  layout?: 'row' | 'card'
   className?: string
 }
 
@@ -88,7 +95,7 @@ export interface ForeignObjectProps {
  * from the relay and must never look identical on screen. `unreachable` is the
  * resolver telling us which one it was.
  */
-export function ForeignObject({ object, conversations, className }: ForeignObjectProps) {
+export function ForeignObject({ object, conversations, layout, className }: ForeignObjectProps) {
   if (object.unreachable) {
     return (
       <Card
@@ -117,7 +124,8 @@ export function ForeignObject({ object, conversations, className }: ForeignObjec
     )
   }
 
-  const widget = pickWidget(object.widget, IMPLEMENTED, 'card')
+  const picked = pickWidget(object.widget, IMPLEMENTED, 'card')
+  const widget = layout && picked !== 'message' ? layout : picked
   return widget === 'message' ? (
     <ForeignMessage object={object} className={className} />
   ) : (
