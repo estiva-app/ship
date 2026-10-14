@@ -12,7 +12,7 @@ import {
   type Imeta,
 } from '@estiva-app/protocol'
 import { FieldLine, FilePicker, richTextClassName } from '@estiva-app/ui'
-import { Callout, Checklist, CodeBlockColours, EditorBlockHandle, PastedImages, SelectionToolbar, blockDropCursor, isChecklistTick, isSuggestionOpen } from '@estiva-app/ui/editor'
+import { Callout, Checklist, CodeBlockColours, EditorBlockHandle, EditorTableControls, PastedImages, SelectionToolbar, blockDropCursor, isChecklistTick, isSuggestionOpen } from '@estiva-app/ui/editor'
 import { uploadAttachment } from '@/api/blobs'
 import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
 import { AttachmentNode, BlockId, ReferenceNode, ReferenceProvider, UnknownBlock } from '@/components/ui/editorSchema'
@@ -234,7 +234,10 @@ export function LiveDescription({
         {/* The reading surface's own `-mx-2 px-2 py-1`, so nothing moves. The text cursor is the only sign it is editable. */}
         {/* The handle sits in the gutter left of the text, so nothing moves (RIC-18). */}
         <EditorBlockHandle editor={editor} turnInto={TURN_INTO} actions={blockRows(onCommentOnBlock, onCopyBlockLink)}>
-          <EditorContent editor={editor} className="-mx-2 cursor-text px-2 py-1" data-description="editing" />
+          {/* A table's handles and ➕ bars while you point at it (RIC-21); the block handle stays the table's. */}
+          <EditorTableControls editor={editor}>
+            <EditorContent editor={editor} className="-mx-2 cursor-text px-2 py-1" data-description="editing" />
+          </EditorTableControls>
           {/* Peek's composer pattern: muted words over an empty editor. */}
           {empty && <span aria-hidden className="pointer-events-none absolute left-0 top-1 text-body-2 text-text-muted">Add a description…</span>}
         </EditorBlockHandle>
