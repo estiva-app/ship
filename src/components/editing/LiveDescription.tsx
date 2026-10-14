@@ -20,7 +20,7 @@ import { askLinkValues, knownLinkValue } from '@/api/linkCards'
 import { AttachmentNode, BlockId, ReferenceNode, ReferenceProvider, UnknownBlock } from '@/components/ui/editorSchema'
 import { LinkDecoration } from './linkDecoration'
 import { blockRows } from './blockRows'
-import { CardChoice, EditorLineCards, useChipObjects } from './DescriptionCards'
+import { CardChoice, EditorLineCards, MAX_LINKS_PER_DESCRIPTION, useChipObjects } from './DescriptionCards'
 import { ShipSlashMenu, TURN_INTO, slashSections } from './slashMenu'
 
 /**
@@ -154,7 +154,7 @@ export function LiveDescription({
         // The card a chip asks for, after its line (SPEC §13.3); drawn by `EditorLineCards` below.
         ReferenceCards,
         // An app URL reads as the chip of what it names, and saves as the URL (Widgets, Miky 14 Oct).
-        LinkChips.configure({ referenceOf: (url) => referenceOfLink(url, knownLinkValue), ask: askLinkValues }),
+        LinkChips.configure({ referenceOf: (url) => referenceOfLink(url, knownLinkValue), ask: askLinkValues, limit: MAX_LINKS_PER_DESCRIPTION }),
         UnknownBlock,
         AttachmentNode,
         LinkDecoration.configure({ openOnClick: true }),

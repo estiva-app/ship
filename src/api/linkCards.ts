@@ -62,9 +62,15 @@ export function knownLinkValue(url: string): string | undefined {
   return known.get(url) ?? undefined
 }
 
-/** Ask what each of these links names; settles when every answer is in. A description editor's `LinkChips` asks this way. */
+/**
+ * Ask what each of these links names; settles when every answer is in. A
+ * description editor's `LinkChips` asks this way. Rejects when a read failed
+ * (it left no answer), so the editor forgets those links and asks again.
+ */
 export async function askLinkValues(urls: readonly string[]): Promise<void> {
-  await Promise.all(urls.filter((url) => !known.has(url)).map(ask))
+  const waiting = urls.filter((url) => !known.has(url))
+  await Promise.all(waiting.map(ask))
+  if (waiting.some((url) => !known.has(url))) throw new Error('A link could not be asked about; asked again later.')
 }
 
 /**

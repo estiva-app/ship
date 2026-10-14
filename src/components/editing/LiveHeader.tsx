@@ -1,8 +1,8 @@
 import { Suspense, lazy, useEffect, useRef, useState } from 'react'
-import { linksAsReferences, referencesIn, resolveBlockAnchor, toRenderTree, type ContentFormat, type Imeta } from '@estiva-app/protocol'
+import { linksAsReferences, referencesIn, resolveBlockAnchor, toRenderTree, type ContentFormat, type Imeta, type LinkResolver } from '@estiva-app/protocol'
 import { BlockHandle } from '@estiva-app/ui'
 import { Banner } from '@/components/Banner'
-import { knownLinkValue, useLinkValues } from '@/api/linkCards'
+import { useLinkValues } from '@/api/linkCards'
 import { blockRows, linkedBlock } from './blockRows'
 import { blockLineCards, linksInBlocks } from './DescriptionCards'
 import { ShipRichText } from '@/components/ui/ShipRichText'
@@ -100,14 +100,16 @@ export function LiveHeader(props: LiveHeaderProps) {
   const { description, format, nameOf, readOnly = false } = props
   const blocks = toRenderTree(description, format)
   // An app URL reads as the chip of what it names (Widgets): ask what each names, and resolve those with the rest.
+  // Only the URLs asked (the first 24) are read as chips, so what is drawn is what is resolved.
   const linked = useLinkValues(linksInBlocks(blocks))
-  const references = referencesIn(linked.size ? linksAsReferences(blocks, knownLinkValue) : blocks)
+  const resolveLink: LinkResolver = (url) => linked.get(url)
+  const references = referencesIn(linked.size ? linksAsReferences(blocks, resolveLink) : blocks)
   const objects = useForeignObjects(references)
   const resolved = byReference(references, objects)
 
   const [missing, dismiss] = useLinkedBlock(description, format, readOnly)
 
-  const reading = <ReadingHeader {...props} resolved={resolved} />
+  const reading = <ReadingHeader {...props} resolved={resolved} resolveLink={resolveLink} />
   return (
     <div className="flex flex-col gap-4">
       {missing && (
@@ -131,7 +133,7 @@ export function LiveHeader(props: LiveHeaderProps) {
  * the moment before the editor arrives. Laid out exactly as the editors are,
  * so nothing moves when they replace it.
  */
-function ReadingHeader({ title, titlePlaceholder, description, format, nameOf, readOnly, resolved, onCommentOnBlock, onCopyBlockLink }: LiveHeaderProps & { resolved: Record<string, ForeignObjectData | null | undefined> }) {
+function ReadingHeader({ title, titlePlaceholder, description, format, nameOf, readOnly, resolved, resolveLink, onCommentOnBlock, onCopyBlockLink }: LiveHeaderProps & { resolved: Record<string, ForeignObjectData | null | undefined>; resolveLink: LinkResolver }) {
   const empty = description.trim() === ''
   return (
     <div className="flex flex-col gap-4">
@@ -143,7 +145,7 @@ function ReadingHeader({ title, titlePlaceholder, description, format, nameOf, r
         ) : (
           // A reader gets the handle too, with Copy link and Comment (Miky, RIC-18 kickoff); the editing rows need the editor.
           <BlockHandle actions={blockRows(onCommentOnBlock, onCopyBlockLink)}>
-            <ShipRichText value={description} format={format} nameOf={nameOf} resolved={resolved} resolveLink={knownLinkValue} renderAfter={(block) => blockLineCards(block, resolved)} />
+            <ShipRichText value={description} format={format} nameOf={nameOf} resolved={resolved} resolveLink={resolveLink} renderAfter={(block) => blockLineCards(block, resolved)} />
           </BlockHandle>
         )}
       </div>
