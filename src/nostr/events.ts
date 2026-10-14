@@ -388,6 +388,12 @@ export function buildConversationMessage(
      * because a link names a `d` and the address needs the relay.
      */
     partTags?: readonly NostrTag[]
+    /**
+     * The `a` and `q` tags for the app links in the body — SPEC §13.1, OPT-19:
+     * a link is a mention as a `nostr:` reference is. Resolved before this is
+     * called (`linkReferenceTagsFor`), for the reason `partTags` is.
+     */
+    linkTags?: readonly NostrTag[]
   },
 ): UnsignedEvent {
   assertFolderId(args.folder)
@@ -400,15 +406,17 @@ export function buildConversationMessage(
     missing from that file's Mentioned in.
   */
   const earned = (own: { address?: string; event?: string }): NostrTag[] => {
-    const references = referenceTagsFor(args.body, own.address)
-    const named = new Set(references.filter((t) => t[0] === 'a').map((t) => t[1]))
-    return [
-      ...urgentTagsFor(args.body, args.urgent),
-      ...references,
-      ...quoteTagsFor(args.body, own.event),
-      // A block link's `a`, unless a `nostr:` pointer in the body already earned it.
-      ...(args.partTags ?? []).filter((t) => t[0] !== 'a' || (t[1] !== own.address && !named.has(t[1]))),
-    ]
+    const references = [...referenceTagsFor(args.body, own.address), ...quoteTagsFor(args.body, own.event)]
+    const named = new Set(references.map((t) => `${t[0]}:${t[1]}`))
+    // A link's `a` or `q`, unless the object is the one this is on (or answers), or something else already earned it.
+    const linked = [...(args.linkTags ?? []), ...(args.partTags ?? [])].filter((t) => {
+      if (t[0] !== 'a' && t[0] !== 'q') return true
+      const key = `${t[0]}:${t[1]}`
+      if (t[1] === (t[0] === 'a' ? own.address : own.event) || named.has(key)) return false
+      named.add(key)
+      return true
+    })
+    return [...urgentTagsFor(args.body, args.urgent), ...references, ...linked]
   }
 
   // A comment, or a reply to one, is a NIP-22 `kind:1111`; chat — a message in

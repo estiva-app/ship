@@ -46,6 +46,8 @@ vi.mock('@/api/linkCards', () => {
   ])
   return {
     knownLinkValue: (asked: string) => named.get(asked),
+    // The message box's chips ask too (OPT-19).
+    askLinkValues: () => Promise.resolve(),
     useLinkValues: (urls: readonly string[]) => new Map(urls.flatMap((asked) => (named.has(asked) ? [[asked, named.get(asked)!] as const] : []))),
   }
 })

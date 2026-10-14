@@ -5,7 +5,8 @@ import { clashes, explicitKey, keyOfRef, nextRef, projectKeys, suggestKey, taken
 import { RELAY_URL } from '../config'
 import { clockProblem } from './clock'
 import { readFolderListing, readFolders } from './foreign'
-import { partTagsFor } from './part'
+import { linkReferenceTagsFor } from './linkCards'
+import { partTagsFor, urlsIn } from './part'
 import { placedIn } from '../lib/placement'
 import { store } from './store'
 
@@ -375,13 +376,16 @@ export function setIssueField(issue: Issue, field: 'title' | 'description' | 'st
  * noise.
  */
 export function startConversation(args: { folder: string; about: string; withReference: boolean; body: string; blockId?: string; files?: readonly Imeta[]; urgent?: readonly string[] }): Promise<WriteResult> {
-  return publish(async () =>
-    store.postMessage({
+  return publish(async () => {
+    // A pasted block link shows that block (SPEC §13.6.1, COM-2); a pasted app link is a mention, as a `nostr:`
+    // reference is (SPEC §13.1, OPT-19).
+    const [partTags, linkTags] = await Promise.all([partTagsFor(args.body, args.about), linkReferenceTagsFor(urlsIn(args.body))])
+    return store.postMessage({
       folder: args.folder,
       body: args.body,
       about: args.about,
-      // A pasted block link shows that block (SPEC §13.6.1, COM-2).
-      partTags: await partTagsFor(args.body, args.about),
+      partTags,
+      linkTags,
       // SPEC §13.6 — present only when the author was commenting on one block.
       blockId: args.blockId,
       aboutRef: args.withReference ? `nostr:${addrToNaddr(args.about, [RELAY_URL])}` : undefined,
@@ -390,8 +394,8 @@ export function startConversation(args: { folder: string; about: string; withRef
       // message naming a blob it does not hold.
       files: args.files,
       urgent: args.urgent,
-    }),
-  )
+    })
+  })
 }
 
 /**
@@ -403,12 +407,14 @@ export function startConversation(args: { folder: string; about: string; withRef
  */
 export function reply(conversation: Conversation, fallbackFolder: string, body: string, files?: readonly Imeta[], urgent?: readonly string[]): Promise<WriteResult> {
   const { root } = conversation
-  return publish(async () =>
-    store.postMessage({
+  return publish(async () => {
+    // A pasted block link shows that block (SPEC §13.6.1, COM-2); a comment's own file keeps its one `a`.
+    const [partTags, linkTags] = await Promise.all([partTagsFor(body, root.anchor), linkReferenceTagsFor(urlsIn(body))])
+    return store.postMessage({
       folder: root.folder || fallbackFolder,
       body,
-      // A pasted block link shows that block (SPEC §13.6.1, COM-2); a comment's own file keeps its one `a`.
-      partTags: await partTagsFor(body, root.anchor),
+      partTags,
+      linkTags,
       ...(root.anchor
         ? {
             replyToComment: {
@@ -421,8 +427,8 @@ export function reply(conversation: Conversation, fallbackFolder: string, body: 
         : { replyTo: { rootId: conversation.id, parentId: conversation.id } }),
       files,
       urgent,
-    }),
-  )
+    })
+  })
 }
 
 /**

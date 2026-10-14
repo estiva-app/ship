@@ -483,6 +483,18 @@ check('  …a reply about that object keeps no lowercase a', tag(partOnOwn, 'a')
 const partNamedTwice = buildConversationMessage(PK, Date.now(), { folder: CONTENT, body: 'see link', about: PARTED, partTags })
 check('  …and one a, not two, when the message is about it', partNamedTwice.tags.filter((t) => t[0] === 'a' && t[1] === PARTED).length === 1)
 
+// A pasted app link's tags — OPT-19, SPEC §13.1: an `a` or a `q` per object a
+// link names, as a `nostr:` reference earns, never the object it is on twice.
+const LINKED = `30851:${PK}:l1`
+const LINKED_MSG = 'e'.repeat(64)
+const linkTags = [['a', LINKED], ['q', LINKED_MSG]]
+const linkChat = buildConversationMessage(PK, Date.now(), { folder: CONTENT, body: 'see https://ship.estiva.app/i/x-l1', linkTags })
+check('a pasted app link earns its a and its q', linkChat.tags.some((t) => t[0] === 'a' && t[1] === LINKED) && linkChat.tags.some((t) => t[0] === 'q' && t[1] === LINKED_MSG))
+const linkOnOwn = buildConversationMessage(PK, Date.now(), { folder: CONTENT, body: 'see link', replyToComment: { id: LINKED_MSG, anchor: LINKED }, linkTags })
+check('  …a reply about that object adds no a for it, and quotes not the comment it answers', tag(linkOnOwn, 'a') === undefined && linkOnOwn.tags.every((t) => !(t[0] === 'q' && t[1] === LINKED_MSG)))
+const linkAndPart = buildConversationMessage(PK, Date.now(), { folder: CONTENT, body: `nostr:${addrToNaddr(LINKED)} link`, linkTags, partTags: [['a', LINKED], ['part', LINKED, 'b1']] })
+check('  …one a, when a nostr: reference and a block link name it too', linkAndPart.tags.filter((t) => t[0] === 'a' && t[1] === LINKED).length === 1)
+
 // What the body earns — CON-25: a `p` per person, an `urgent` per urgent one,
 // an `a` per other address, a `q` per message, on all three paths.
 const BOB = 'b'.repeat(64)
