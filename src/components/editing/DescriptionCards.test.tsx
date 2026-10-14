@@ -1,12 +1,11 @@
 /**
- * A writer chooses a chip's card in the description (SPEC §13.3, Widgets): the
- * chip selected, the toolbar offers None, Compact and Detailed, and the choice
- * is saved on the chip itself when they leave.
+ * A writer chooses a chip's card in the description (SPEC §13.3, Widgets): a
+ * click on the chip opens its menu — Open, then None, Compact and Detailed —
+ * and the choice is saved on the chip itself when they leave.
  */
 import { describe, it, expect, vi, beforeAll } from 'vitest'
 import { act, render, screen, fireEvent, waitFor } from '@testing-library/react'
 import type { Editor } from '@tiptap/react'
-import { TextSelection } from '@tiptap/pm/state'
 
 vi.mock('@/api/blobs', () => ({ blobObjectUrl: vi.fn(async () => 'blob:fetched'), uploadAttachment: vi.fn() }))
 vi.mock(import('@/api/foreign'), async (importOriginal) => ({ ...(await importOriginal()), resolveForeign: vi.fn(async () => null) }))
@@ -34,21 +33,21 @@ const DOC = JSON.stringify({
 type EditorBox = HTMLElement & { editor: Editor }
 
 describe('choosing a chip\'s card in the description', () => {
-  it('offers the three cards for a selected chip, and saves the choice on the chip', async () => {
+  it('opens the chip\'s menu on a click, and saves the card chosen there on the chip', async () => {
     const onCommit = vi.fn(() => true)
     render(<LiveDescription value={DOC} format="blocks" onCommit={onCommit} />)
     const box = (await screen.findByRole('textbox', { name: 'Description' })) as EditorBox
     await waitFor(() => expect(box.editor.isInitialized).toBe(true))
 
-    // Shift+arrow over the chip: a range holding it and nothing else.
-    act(() => {
-      box.editor.commands.focus()
-      box.editor.view.dispatch(box.editor.state.tr.setSelection(TextSelection.create(box.editor.state.doc, 1, 2)))
-    })
-    const detailed = await screen.findByRole('button', { name: 'Detailed card' }, { timeout: 3000 })
-    expect(screen.getByRole('button', { name: 'No card' }).getAttribute('aria-pressed')).toBe('true')
-    fireEvent.click(detailed)
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Detailed card' }).getAttribute('aria-pressed')).toBe('true'))
+    act(() => box.editor.commands.focus())
+    const chip = box.querySelector('[data-node-view-wrapper]')
+    expect(chip).not.toBeNull()
+    fireEvent.click(chip!)
+    const none = await screen.findByRole('menuitemradio', { name: 'None' }, { timeout: 3000 })
+    expect(none.getAttribute('aria-checked')).toBe('true')
+    expect(screen.getByRole('menuitem', { name: 'Open' })).toBeDefined()
+    fireEvent.mouseDown(screen.getByRole('menuitemradio', { name: 'Detailed' }))
+    await waitFor(() => expect(screen.queryByRole('menu', { name: 'Reference' })).toBeNull())
 
     act(() => box.editor.commands.blur())
     await waitFor(() => expect(onCommit).toHaveBeenCalled())

@@ -1,9 +1,7 @@
 import { createPortal } from 'react-dom'
 import { useEditorState, type Editor } from '@tiptap/react'
-import { IconCircleOff, IconLayoutCards, IconLayoutList } from '@tabler/icons-react'
 import { blockCards, urlRunsIn, type RenderBlock } from '@estiva-app/protocol'
-import { ToolbarButton } from '@estiva-app/ui'
-import { referenceAtSelection, setReferenceCard, useReferenceCards, type ReferenceCard, type ReferenceCardLayout } from '@estiva-app/ui/editor'
+import { useReferenceCards, type ReferenceCard } from '@estiva-app/ui/editor'
 import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
 import { byReference, useForeignObjects } from '@/api/useForeignObjects'
 import { ForeignObject } from '@/components/ui/ForeignObject'
@@ -99,46 +97,4 @@ export function EditorLineCards({ editor, resolved }: { editor: Editor | null; r
   const all = missing.length ? { ...own, ...resolved } : resolved
   // @estiva-escape(no-rebuilt-behaviour): each card goes into the slot ReferenceCards placed after its line, inside the editor's text; no part owns a place there, and a portal keeps Ship's providers around the card
   return <>{slots.map((slot) => createPortal(<LineCards cards={slot.cards} resolved={all} />, slot.element, slot.key))}</>
-}
-
-const CHOICES: { layout: ReferenceCardLayout; label: string; Icon: typeof IconCircleOff }[] = [
-  { layout: 'none', label: 'No card', Icon: IconCircleOff },
-  { layout: 'compact', label: 'Compact card', Icon: IconLayoutList },
-  { layout: 'detailed', label: 'Detailed card', Icon: IconLayoutCards },
-]
-
-/**
- * None, compact or detailed for the selected chip, in the selection toolbar.
- * Shown only while one chip is selected: a chip here is a link, so it is
- * selected with Shift+arrow or a drag across it. Build first; the look is
- * Katerina's to level up (Miky, 5 Oct).
- */
-export function CardChoice({ editor }: { editor: Editor | null }) {
-  const at = useEditorState({
-    editor,
-    selector: ({ editor: ed }) => {
-      if (!ed || ed.isDestroyed) return null
-      const chip = referenceAtSelection(ed.state)
-      return chip ? chip.layout : null
-    },
-  })
-  if (!editor || !at) return null
-  return (
-    <>
-      {CHOICES.map(({ layout, label, Icon }) => (
-        <ToolbarButton
-          key={layout}
-          aria-label={label}
-          tooltip={label}
-          pressed={at === layout}
-          data-card-choice={layout}
-          // Keep the selection: focus must not leave the editor on press.
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => setReferenceCard(editor, layout)}
-        >
-          <Icon size={16} stroke={1.5} />
-        </ToolbarButton>
-      ))}
-    </>
-  )
 }
