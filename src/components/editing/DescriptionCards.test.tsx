@@ -45,7 +45,8 @@ describe('choosing a chip\'s card in the description', () => {
     fireEvent.click(chip!)
     const none = await screen.findByRole('menuitemradio', { name: 'None' }, { timeout: 3000 })
     expect(none.getAttribute('aria-checked')).toBe('true')
-    expect(screen.getByRole('menuitem', { name: 'Open' })).toBeDefined()
+    // The object is not readable here (resolveForeign is null), so the chip has no link: nothing to Open.
+    expect(screen.queryByRole('menuitem', { name: 'Open' })).toBeNull()
     fireEvent.mouseDown(screen.getByRole('menuitemradio', { name: 'Detailed' }))
     await waitFor(() => expect(screen.queryByRole('menu', { name: 'Link' })).toBeNull())
 
