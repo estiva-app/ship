@@ -43,7 +43,7 @@ describe('choosing a chip\'s card in the description', () => {
     const chip = box.querySelector('[data-node-view-wrapper]')
     expect(chip).not.toBeNull()
     fireEvent.click(chip!)
-    const none = await screen.findByRole('menuitemradio', { name: 'None' }, { timeout: 3000 })
+    const none = await screen.findByRole('menuitemradio', { name: 'None' })
     expect(none.getAttribute('aria-checked')).toBe('true')
     // The object is not readable here (resolveForeign is null), so the chip has no link: nothing to Open.
     expect(screen.queryByRole('menuitem', { name: 'Open' })).toBeNull()

@@ -65,10 +65,11 @@ export default defineConfig({
     setupFiles: './src/test-setup.ts',
     /**
      * A run on a box other sessions are testing on gets a fraction of a core
-     * per worker: at load ~40 the 5 s default failed 11 screen tests that pass
-     * alone; 30 s failed none (2164b3d5). Locally a run also takes 4 workers,
-     * not every core, so two sessions testing at once do not starve each
-     * other; CI has its runner to itself.
+     * per worker: at load ~40 the defaults failed 11 screen tests that pass
+     * alone, waiting on findBy/vi.waitFor's 1 s (raised in test-setup.ts).
+     * These timeouts leave room for that wait, and locally a run takes 4
+     * workers, not every core, so two sessions testing at once do not starve
+     * each other (2164b3d5). CI has its runner to itself.
      */
     testTimeout: 30_000,
     hookTimeout: 30_000,
