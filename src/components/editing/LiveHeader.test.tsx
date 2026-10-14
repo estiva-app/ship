@@ -86,7 +86,7 @@ const read = (description: string, format: Format = 'marker') => render(header(d
 */
 const write = async (description: string, format: Format = 'marker') => {
   render(header(description, format, false))
-  return screen.findByRole('textbox', { name: 'Description' }, { timeout: 5000 })
+  return screen.findByRole('textbox', { name: 'Description' })
 }
 
 /** The description's area on the reading surface: the block under the title row. */
@@ -150,7 +150,7 @@ describe('LiveHeader draws its description (from Description.test.tsx)', () => {
       content: [{ type: 'paragraph', id: 'p1', content: [{ type: 'text', text: NADDR, marks: [{ type: 'reference', attrs: { uri: NADDR, embed: 'compact' } }] }] }],
     })
     const editor = await write(doc, 'blocks')
-    await waitFor(() => expect(editor.querySelector('[data-reference-cards] [data-foreign-object]')?.getAttribute('data-widget')).toBe('row'), { timeout: 5000 })
+    await waitFor(() => expect(editor.querySelector('[data-reference-cards] [data-foreign-object]')?.getAttribute('data-widget')).toBe('row'))
     vi.mocked(resolveForeign).mockImplementation(async () => null)
   })
 
@@ -294,7 +294,7 @@ describe('LiveHeader, a block link (RIC-18)', () => {
     // block was off screen. The scroll has to land on the surface that stays.
     await opened(
       () => write(doc, 'blocks'),
-      (scrolled) => waitFor(() => expect(scrolled.at(-1)).toBe('editing'), { timeout: 5000 }),
+      (scrolled) => waitFor(() => expect(scrolled.at(-1)).toBe('editing')),
     )
   })
 
@@ -315,7 +315,7 @@ describe('LiveHeader, a block link (RIC-18)', () => {
         // Scrolled before the first tick: the link does nothing, on either surface.
         render(header(doc, 'blocks', false))
         window.dispatchEvent(new Event('wheel'))
-        await screen.findByRole('textbox', { name: 'Description' }, { timeout: 5000 })
+        await screen.findByRole('textbox', { name: 'Description' })
         await new Promise((r) => setTimeout(r, 300))
       },
       (scrolled) => expect(scrolled).toEqual([]),

@@ -52,7 +52,7 @@ type EditorBox = HTMLElement & { editor: Editor }
 const openEditor = async () => {
   fireEvent.click(screen.getAllByRole('button', { name: 'Message actions' })[0])
   fireEvent.click(screen.getByRole('menuitem', { name: 'Edit message' }))
-  const box = (await screen.findByRole('textbox', { name: 'Edit message' }, { timeout: 5000 })) as EditorBox
+  const box = (await screen.findByRole('textbox', { name: 'Edit message' })) as EditorBox
   await waitFor(() => expect(box.editor.isInitialized).toBe(true))
   return box
 }
