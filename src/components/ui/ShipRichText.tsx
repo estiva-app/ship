@@ -3,7 +3,8 @@ import { RichText as PackageRichText, type RichTextBlock, type RichTextSize } fr
 import { Attachment } from './Attachment'
 import { Reference } from './Reference'
 import { imetaFromAttrs } from '../../nostr/attachments'
-import { linksAsReferences, standaloneReference, toRenderTree, type ContentFormat, type LinkResolver } from '@estiva-app/protocol'
+import type { ReactNode } from 'react'
+import { linksAsReferences, toRenderTree, type ContentFormat, type LinkResolver, type RenderBlock } from '@estiva-app/protocol'
 
 /**
  * A body, drawn — SPEC §13.
@@ -23,7 +24,7 @@ import { linksAsReferences, standaloneReference, toRenderTree, type ContentForma
  * **The look is the package's** (UIG-30, Katerina, 28 September): Peek and Ship
  * had drawn the same tree two ways, and one design now draws both. What is
  * Ship's is what a word points at — a person or an item (`Reference`) and a
- * file (`Attachment`) — and which standalone pointers leave the text.
+ * file (`Attachment`) — and what a description draws after a line, its cards.
  */
 export function ShipRichText({
   value,
@@ -32,7 +33,7 @@ export function ShipRichText({
   nameOf,
   resolved,
   urgent,
-  hideStandalone,
+  renderAfter,
   resolveLink,
 }: {
   value: string
@@ -51,39 +52,24 @@ export function ShipRichText({
   /** A message's urgent keys, which draw their person chips urgent — SPEC §13.1, CON-24. */
   urgent?: readonly string[]
   /**
-   * Skip a block that is nothing but one reference — a description's, not a
-   * message's: in a message every reference is its chip (OPT-18).
-   *
-   * Those are attachments and are drawn below the text by the caller. Passing
-   * this rather than deciding here keeps the rule in one place — the caller
-   * already has to know which references are standalone in order to draw them.
-   *
-   * **A predicate, for a caller that cannot afford to hide one it will not
-   * draw** (SHI-1). A pointer nothing resolves is an attachment the caller has
-   * no card for, so hiding it unconditionally deletes it from the screen — fine
-   * inside a description, and not fine when the pointer is the whole message,
-   * which then renders as a name and a time above nothing. §13.1's rule is that
-   * a reference is never blank: a caller passing a predicate keeps the shortened
-   * chip for whatever it cannot draw below.
+   * Draws after a line of the text — where a description's chip asks for its
+   * card (SPEC §13.3; `blockLineCards`). Only a page's own description passes
+   * it: inside a card's body every reference is its chip, never a card, or two
+   * objects that card each other nest forever. A reference alone on its line
+   * is its chip too, as in a message (OPT-18).
    */
-  hideStandalone?: boolean | ((reference: string) => boolean)
+  renderAfter?: (block: RenderBlock) => ReactNode
   /**
-   * A message's: what each app link names (§7.7), so a bare link draws as the
-   * chip of what it names, as Peek draws it (`linksAsReferences`, OPT-18). A
-   * link on words stays a link, and one not answered yet stays the URL.
+   * What each app link names (§7.7), so a bare link draws as the chip of what
+   * it names, as Peek draws it (`linksAsReferences`, OPT-18) — in a message,
+   * and in a description, where a URL keeps the card its writer chose (SPEC
+   * §13.3, Widgets). A link on words stays a link, and one not answered yet
+   * stays the URL.
    */
   resolveLink?: LinkResolver
 }) {
   const tree = toRenderTree(value, format)
-  const all = resolveLink ? linksAsReferences(tree, resolveLink) : tree
-  // A block that is nothing but one reference is an attachment; the caller
-  // draws it below the text (SPEC §13.1, RIC-10).
-  const hide =
-    typeof hideStandalone === 'function' ? hideStandalone : hideStandalone ? () => true : () => false
-  const blocks = all.filter((b) => {
-    const reference = standaloneReference(b)
-    return !reference || !hide(reference)
-  })
+  const blocks = resolveLink ? linksAsReferences(tree, resolveLink) : tree
   if (blocks.length === 0) return null
   return (
     <PackageRichText
@@ -91,6 +77,8 @@ export function ShipRichText({
       size={size}
       renderReference={(reference) => <Reference uri={reference} object={resolved?.[reference]} nameOf={nameOf} urgent={urgent} />}
       renderBlock={drawAttachment}
+      // The package's block is the protocol's, handed back.
+      renderAfter={renderAfter ? (block) => renderAfter(block as RenderBlock) : undefined}
     />
   )
 }

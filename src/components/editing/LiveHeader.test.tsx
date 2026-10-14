@@ -26,7 +26,22 @@ vi.mock(import('@/api/foreign'), async (importOriginal) => ({
   resolveForeign: vi.fn(async () => null),
 }))
 
+import { resolveForeign, type ForeignObject } from '@/api/foreign'
 import { LiveHeader } from './LiveHeader'
+
+const ISSUE: ForeignObject = {
+  ref: '30851:pk:d',
+  eventId: 'e'.repeat(64),
+  kind: 30851,
+  widget: 'row',
+  appName: 'Ship',
+  openUrl: 'https://ship.estiva.app/issue/d',
+  slots: { title: { value: 'The probe issue' } },
+  meta: [],
+  comments: [],
+  actions: [],
+  viaRecommendation: false,
+}
 
 /* jsdom implements neither `getClientRects` nor `getBoundingClientRect` on text
    nodes, and ProseMirror calls them when it scrolls the caret into view. Without
@@ -97,12 +112,46 @@ describe('LiveHeader draws its description (from Description.test.tsx)', () => {
     expect(d.textContent!.length).toBeLessThan(NADDR.length)
   })
 
-  it('keeps a pointer that is the whole paragraph out of the prose', () => {
-    // The attachment variant: alone on its line it is drawn below the text, so
-    // it leaves the prose entirely. That is RIC-9's behaviour, still true for
-    // the case RIC-9 was actually about.
+  it('draws a pointer that is the whole paragraph as its chip, with no card', () => {
+    // Changed on purpose (Widgets, SPEC §13.3): alone on its line it is its
+    // chip, as in a sentence, and a card comes only from the writer's choice.
     const c = read(NADDR)
-    expect(c.textContent).not.toContain('naddr1')
+    expect(c.querySelector('[data-reference]')).not.toBeNull()
+    expect(c.querySelector('[data-foreign-object]')).toBeNull()
+    expect(c.textContent).not.toContain(NADDR.slice(6))
+  })
+
+  it('draws the card a writer chose after the line that holds its chip, and none for a chip with none', async () => {
+    vi.mocked(resolveForeign).mockImplementation(async () => ISSUE)
+    const doc = JSON.stringify({
+      type: 'doc',
+      content: [
+        { type: 'paragraph', id: 'p1', content: [{ type: 'text', text: 'Blocked by ' }, { type: 'text', text: NADDR, marks: [{ type: 'reference', attrs: { uri: NADDR, embed: 'detailed' } }] }] },
+        { type: 'paragraph', id: 'p2', content: [{ type: 'text', text: 'after' }] },
+        { type: 'paragraph', id: 'p3', content: [{ type: 'text', text: NADDR, marks: [{ type: 'reference', attrs: { uri: NADDR } }] }] },
+      ],
+    })
+    const c = read(doc, 'blocks')
+    await waitFor(() => expect(c.querySelectorAll('[data-foreign-object]')).toHaveLength(1))
+    const card = c.querySelector('[data-foreign-object]')!
+    expect(card.getAttribute('data-widget')).toBe('card')
+    // After the first paragraph, before the second: under its line, not under the description.
+    const first = c.querySelector('[data-block-id="p1"]')!
+    const second = c.querySelector('[data-block-id="p2"]')!
+    expect(first.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(card.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    vi.mocked(resolveForeign).mockImplementation(async () => null)
+  })
+
+  it('draws the chosen card in the editor too, after its line', async () => {
+    vi.mocked(resolveForeign).mockImplementation(async () => ISSUE)
+    const doc = JSON.stringify({
+      type: 'doc',
+      content: [{ type: 'paragraph', id: 'p1', content: [{ type: 'text', text: NADDR, marks: [{ type: 'reference', attrs: { uri: NADDR, embed: 'compact' } }] }] }],
+    })
+    const editor = await write(doc, 'blocks')
+    await waitFor(() => expect(editor.querySelector('[data-reference-cards] [data-foreign-object]')?.getAttribute('data-widget')).toBe('row'), { timeout: 5000 })
+    vi.mocked(resolveForeign).mockImplementation(async () => null)
   })
 
   // Changed on purpose: no click opens the editor — a writer has it from the start.

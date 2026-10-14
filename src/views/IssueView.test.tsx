@@ -39,7 +39,6 @@ const view = (tab: 'overview' | 'activity', extra: Partial<IssueViewProps>) => (
       onProjectChange: vi.fn(),
       openedBy: {},
       openedAt: Math.floor(Date.now() / 1000),
-      onCopyReference: vi.fn(),
       archived: true,
       onArchive: vi.fn(),
       onDelete: vi.fn(),

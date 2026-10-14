@@ -6,18 +6,37 @@ import { TextSelection } from '@tiptap/pm/state'
 import {
   documentForEditing,
   publishableFromEditor,
+  referenceOfLink,
   toEditorDocument,
   type ContentFormat,
   type EditorDocument,
   type Imeta,
 } from '@estiva-app/protocol'
 import { FieldLine, FilePicker, richTextClassName } from '@estiva-app/ui'
-import { Callout, Checklist, CodeBlockColours, EditorBlockHandle, EditorTableControls, PastedImages, SelectionToolbar, blockDropCursor, isChecklistTick, isSuggestionOpen } from '@estiva-app/ui/editor'
+import {
+  Callout,
+  Checklist,
+  CodeBlockColours,
+  EditorBlockHandle,
+  EditorTableControls,
+  LinkChips,
+  PastedImages,
+  ReferenceCards,
+  ReferenceMenu,
+  ReferenceMenuView,
+  SelectionToolbar,
+  blockDropCursor,
+  isChecklistTick,
+  isReferenceMenuOpen,
+  isSuggestionOpen,
+} from '@estiva-app/ui/editor'
 import { uploadAttachment } from '@/api/blobs'
 import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
+import { askLinkValues, knownLinkValue } from '@/api/linkCards'
 import { AttachmentNode, BlockId, ReferenceNode, ReferenceProvider, UnknownBlock } from '@/components/ui/editorSchema'
 import { LinkDecoration } from './linkDecoration'
 import { blockRows } from './blockRows'
+import { EditorLineCards, MAX_LINKS_PER_DESCRIPTION, useChipObjects } from './DescriptionCards'
 import { ShipSlashMenu, TURN_INTO, slashSections } from './slashMenu'
 
 /**
@@ -148,6 +167,12 @@ export function LiveDescription({
         Checklist,
         Callout,
         ReferenceNode,
+        // The card a chip asks for, after its line (SPEC §13.3); drawn by `EditorLineCards` below.
+        ReferenceCards,
+        // A click on a chip, or a chip just pasted, offers Open and its card (Miky, 14 Oct, at /land); drawn by `ReferenceMenuView` below.
+        ReferenceMenu,
+        // An app URL reads as the chip of what it names, and saves as the URL (Widgets, Miky 14 Oct).
+        LinkChips.configure({ referenceOf: (url) => referenceOfLink(url, knownLinkValue), ask: askLinkValues, limit: MAX_LINKS_PER_DESCRIPTION }),
         UnknownBlock,
         AttachmentNode,
         LinkDecoration.configure({ openOnClick: true }),
@@ -168,8 +193,8 @@ export function LiveDescription({
         attributes: { 'aria-label': 'Description', role: 'textbox', 'aria-multiline': 'true', class: richTextClassName('default', 'outline-none') },
         handleKeyDown: (view, event) => {
           if (event.key !== 'Escape') return false
-          // An open `/` list closes first; the next Escape leaves (e33e9a4f, as the message box since f586437a).
-          if (isSuggestionOpen()) return false
+          // An open `/` list or chip menu closes first; the next Escape leaves (e33e9a4f, as the message box since f586437a).
+          if (isSuggestionOpen() || isReferenceMenuOpen(view.state)) return false
           const { selection, tr } = view.state
           // Words selected: the first Escape lets go of them, which also closes
           // the formatting strip. Blurring with the strip open does not work —
@@ -228,8 +253,10 @@ export function LiveDescription({
   // Leaving the tab or the page unmounts this: save on the way out.
   useEffect(() => () => void latestSave.current(typed.current), [])
 
+  const chips = useChipObjects(editor, resolved)
+
   return (
-    <ReferenceProvider value={{ resolved, nameOf }}>
+    <ReferenceProvider value={{ resolved: chips, nameOf }}>
       <div className="flex flex-col gap-1">
         {/* The reading surface's own `-mx-2 px-2 py-1`, so nothing moves. The text cursor is the only sign it is editable. */}
         {/* The handle sits in the gutter left of the text, so nothing moves (RIC-18). */}
@@ -241,7 +268,9 @@ export function LiveDescription({
           {/* Peek's composer pattern: muted words over an empty editor. */}
           {empty && <span aria-hidden className="pointer-events-none absolute left-0 top-1 text-body-2 text-text-muted">Add a description…</span>}
         </EditorBlockHandle>
+        <EditorLineCards editor={editor} resolved={chips} />
         <SelectionToolbar editor={editor} marks={['bold', 'italic', 'underline', 'code']} />
+        <ReferenceMenuView editor={editor} />
         <FilePicker ref={picker} multiple onPick={(files) => void attach(files)} />
         {uploadError && <FieldLine tone="error">{uploadError}</FieldLine>}
         {failed && <FieldLine tone="error">Could not save. Your text is still here.</FieldLine>}

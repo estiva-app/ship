@@ -5,7 +5,7 @@ import { useCallback, useMemo, useState } from 'react'
 import { ArchiveDialog } from '@/components/ArchiveDialog'
 import { ArchivedNotice } from '@/components/ArchivedNotice'
 import { lockedReason, ownArchive, type Archives } from '@/lib/archive'
-import { ISSUE_STATUSES, lookupStatus, archiveIssue, commentsOn, deleteIssue, deleteMessage, editMessage, react, referenceFor, reply, setIssueField, unreact, startConversation, type DirectoryView, type FolderState, type WorkspaceState, threadContext, fileContext, useMergedReadState, useFeedJudges, unreadByThread } from '@/api'
+import { ISSUE_STATUSES, lookupStatus, archiveIssue, commentsOn, deleteIssue, deleteMessage, editMessage, react, reply, setIssueField, unreact, startConversation, type DirectoryView, type FolderState, type WorkspaceState, threadContext, fileContext, useMergedReadState, useFeedJudges, unreadByThread } from '@/api'
 import { me } from '@/api'
 import { MEMBER_FIELD_PREFIX, memberOfField } from '@estiva-app/conversation'
 import { useRelated } from '@/api/useRelated'
@@ -89,8 +89,7 @@ function changeInWords(field: string, value: string, previous: string | undefine
  * One issue from the fold, as the old app's issueView: the trail (its
  * project, or none), title and description, every conversation that
  * mentions it — including ones started in Peek before it came up — its
- * history, and the rail with who opened it and a working "Copy reference
- * for Peek". History and conversation stay two sections (REW-4). Every
+ * history, and the rail with who opened it. History and conversation stay two sections (REW-4). Every
  * field edit is one change event to the issue's own Folder, followed by a
  * re-read; a refused one leaves the field as the relay has it.
  */
@@ -335,7 +334,6 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
           },
           openedBy: directory.personOf(issue.author),
           openedAt: issue.createdAt,
-          onCopyReference: () => void copyText(referenceFor(issue.addr), 'Reference copied', 'Copy this reference:', say),
           archived: !!own,
           onArchive: () => (own ? unarchive() : setArchiving(true)),
           onDelete: () => setConfirmingDelete(true),

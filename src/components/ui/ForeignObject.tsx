@@ -154,13 +154,13 @@ function ForeignMessage({ object, className }: ForeignObjectProps) {
           </span>
         </div>
         {/*
-          Formatted, never markup. See the note at the top of this file. A
-          pointer alone on its line leaves the text, so a message that is only
-          one draws nothing rather than a line of bech32; one inside a sentence
-          stays, as a chip.
+          Formatted, never markup. See the note at the top of this file. Every
+          pointer is its chip, alone on its line too, and never a card: a card
+          inside a card's body would let two objects that card each other nest
+          forever (SPEC §13.3).
         */}
         {object.slots.body && (
-          <ShipRichText value={object.slots.body.value} format={object.slots.body.format ?? 'marker'} size="small" hideStandalone />
+          <ShipRichText value={object.slots.body.value} format={object.slots.body.format ?? 'marker'} size="small" />
         )}
       </div>
     </div>

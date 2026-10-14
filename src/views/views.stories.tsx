@@ -243,7 +243,6 @@ const issuePage = (startTab: IssueTab, archivedWithProject = false): Story => ({
             onProjectChange: setProject,
             openedBy: issue.openedBy,
             openedAt: issue.at,
-            onCopyReference: fn(),
             onArchive: fn(),
             onDelete: fn(),
           }}
