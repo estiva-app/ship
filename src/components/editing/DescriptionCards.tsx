@@ -37,9 +37,14 @@ export function blockLineCards(block: RenderBlock, resolved: Resolved) {
   return cards.length ? <LineCards cards={cards} resolved={resolved} /> : null
 }
 
+/** How many of a description's URLs are asked what they name — the editor's `LinkChips` limit. */
+export const MAX_LINKS_PER_DESCRIPTION = 24
+
 /**
- * Every URL a description holds — in its text, and on a link that carries a
- * card — for `useLinkValues` to ask what each names (§7.7, Widgets).
+ * The URLs a description holds — in its text, and on a link that carries a
+ * card — for `useLinkValues` to ask what each names (§7.7, Widgets). At most
+ * `MAX_LINKS_PER_DESCRIPTION`, the first ones, as a message's are capped: a
+ * claimed link is a relay query for every viewer. The rest stay links.
  */
 export function linksInBlocks(blocks: readonly RenderBlock[]): string[] {
   const out = new Set<string>()
@@ -54,7 +59,7 @@ export function linksInBlocks(blocks: readonly RenderBlock[]): string[] {
     }
   }
   walk(blocks)
-  return [...out]
+  return [...out].slice(0, MAX_LINKS_PER_DESCRIPTION)
 }
 
 /**

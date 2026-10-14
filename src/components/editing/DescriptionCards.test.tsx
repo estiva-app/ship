@@ -11,7 +11,9 @@ import { TextSelection } from '@tiptap/pm/state'
 vi.mock('@/api/blobs', () => ({ blobObjectUrl: vi.fn(async () => 'blob:fetched'), uploadAttachment: vi.fn() }))
 vi.mock(import('@/api/foreign'), async (importOriginal) => ({ ...(await importOriginal()), resolveForeign: vi.fn(async () => null) }))
 
+import { toRenderTree } from '@estiva-app/protocol'
 import { LiveDescription } from './LiveDescription'
+import { MAX_LINKS_PER_DESCRIPTION, linksInBlocks } from './DescriptionCards'
 
 beforeAll(() => {
   Element.prototype.scrollIntoView = () => {}
@@ -53,5 +55,23 @@ describe('choosing a chip\'s card in the description', () => {
     const saved = JSON.parse((onCommit.mock.calls[0] as unknown as [string])[0])
     expect(saved.content[0].id).toBe('p1')
     expect(saved.content[0].content[0].marks).toEqual([{ type: 'reference', attrs: { uri: NADDR, embed: 'detailed' } }])
+  })
+})
+
+describe('linksInBlocks', () => {
+  const doc = (content: unknown[]) => toRenderTree(JSON.stringify({ type: 'doc', content }), 'blocks')
+  it('asks about a URL in the text and one a card hangs from, never one in code', () => {
+    const blocks = doc([
+      { type: 'paragraph', id: 'p1', content: [{ type: 'text', text: 'See https://a.example/1.' }] },
+      { type: 'paragraph', id: 'p2', content: [{ type: 'text', text: 'https://a.example/2', marks: [{ type: 'link', attrs: { href: 'https://a.example/2', embed: 'compact' } }] }] },
+      { type: 'paragraph', id: 'p3', content: [{ type: 'text', text: 'https://a.example/3', marks: [{ type: 'code' }] }] },
+    ])
+    expect(linksInBlocks(blocks)).toEqual(['https://a.example/1', 'https://a.example/2'])
+  })
+  it('asks about the first ones only', () => {
+    const text = Array.from({ length: MAX_LINKS_PER_DESCRIPTION + 3 }, (_, i) => `https://a.example/${i}`).join(' ')
+    const asked = linksInBlocks(doc([{ type: 'paragraph', id: 'p1', content: [{ type: 'text', text }] }]))
+    expect(asked).toHaveLength(MAX_LINKS_PER_DESCRIPTION)
+    expect(asked[0]).toBe('https://a.example/0')
   })
 })
