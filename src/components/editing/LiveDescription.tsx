@@ -12,12 +12,13 @@ import {
   type Imeta,
 } from '@estiva-app/protocol'
 import { FieldLine, FilePicker, richTextClassName } from '@estiva-app/ui'
-import { Callout, Checklist, CodeBlockColours, EditorBlockHandle, PastedImages, SelectionToolbar, blockDropCursor, isChecklistTick, isSuggestionOpen } from '@estiva-app/ui/editor'
+import { Callout, Checklist, CodeBlockColours, EditorBlockHandle, PastedImages, ReferenceCards, SelectionToolbar, blockDropCursor, isChecklistTick, isSuggestionOpen } from '@estiva-app/ui/editor'
 import { uploadAttachment } from '@/api/blobs'
 import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
 import { AttachmentNode, BlockId, ReferenceNode, ReferenceProvider, UnknownBlock } from '@/components/ui/editorSchema'
 import { LinkDecoration } from './linkDecoration'
 import { blockRows } from './blockRows'
+import { CardChoice, EditorLineCards } from './DescriptionCards'
 import { ShipSlashMenu, TURN_INTO, slashSections } from './slashMenu'
 
 /**
@@ -148,6 +149,8 @@ export function LiveDescription({
         Checklist,
         Callout,
         ReferenceNode,
+        // The card a chip asks for, after its line (SPEC §13.3); drawn by `EditorLineCards` below.
+        ReferenceCards,
         UnknownBlock,
         AttachmentNode,
         LinkDecoration.configure({ openOnClick: true }),
@@ -238,7 +241,10 @@ export function LiveDescription({
           {/* Peek's composer pattern: muted words over an empty editor. */}
           {empty && <span aria-hidden className="pointer-events-none absolute left-0 top-1 text-body-2 text-text-muted">Add a description…</span>}
         </EditorBlockHandle>
-        <SelectionToolbar editor={editor} marks={['bold', 'italic', 'underline', 'code']} />
+        <EditorLineCards editor={editor} resolved={resolved} />
+        <SelectionToolbar editor={editor} marks={['bold', 'italic', 'underline', 'code']}>
+          <CardChoice editor={editor} />
+        </SelectionToolbar>
         <FilePicker ref={picker} multiple onPick={(files) => void attach(files)} />
         {uploadError && <FieldLine tone="error">{uploadError}</FieldLine>}
         {failed && <FieldLine tone="error">Could not save. Your text is still here.</FieldLine>}

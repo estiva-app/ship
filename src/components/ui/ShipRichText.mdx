@@ -36,20 +36,21 @@ rather than by care.
 ```tsx
 import { ShipRichText } from '@/components/ui/ShipRichText'
 
-<ShipRichText value={body} format={format} resolved={resolved} nameOf={nameOf} hideStandalone />
+<ShipRichText value={body} format={format} resolved={resolved} nameOf={nameOf} renderAfter={(block) => blockLineCards(block, resolved)} />
 ```
 
 - `resolved` is keyed by URI and resolved once for the whole body, so an object
   named twice cannot be drawn in two states on one screen.
-- `hideStandalone` takes a predicate as well as a boolean. Pass one where you
-  cannot afford to hide a pointer you will not draw below: a message that is
-  *only* a pointer would otherwise render as a name and a time above nothing.
+- Every pointer is its chip, alone on its line too. `renderAfter` draws what
+  a description's chips ask for after their line (`blockLineCards`, SPEC
+  §13.3); only a page's own description passes it, never a card's body, where
+  two objects that card each other would nest forever.
 
 ## What it owns
 
 - **What is Ship's in a body**: a person or an item a run points at
-  (`Reference`), a file (`Attachment`), and which standalone pointers leave the
-  text. Everything else — the look, tables, links, the fallback for a block it
+  (`Reference`), a file (`Attachment`), and a description's cards after their
+  lines. Everything else — the look, tables, links, the fallback for a block it
   has never heard of — is the package's `RichText` (UIG-30, Katerina,
   28 September), the same part Peek draws with.
 - **The look is the one the editor wears**: `richTextClassName()` on

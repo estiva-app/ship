@@ -1,11 +1,10 @@
 import { Suspense, lazy, useEffect, useRef, useState } from 'react'
-import { referencesIn, resolveBlockAnchor, standaloneReference, toRenderTree, type ContentFormat, type Imeta } from '@estiva-app/protocol'
+import { referencesIn, resolveBlockAnchor, toRenderTree, type ContentFormat, type Imeta } from '@estiva-app/protocol'
 import { BlockHandle } from '@estiva-app/ui'
 import { Banner } from '@/components/Banner'
 import { blockRows, linkedBlock } from './blockRows'
-import { ForeignObject } from '@/components/ui/ForeignObject'
+import { blockLineCards } from './DescriptionCards'
 import { ShipRichText } from '@/components/ui/ShipRichText'
-import { SkeletonBar } from '@/components/ui/Skeleton'
 import { byReference, useForeignObjects } from '@/api/useForeignObjects'
 import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
 
@@ -91,20 +90,17 @@ function useLinkedBlock(description: string, format: ContentFormat, readOnly: bo
  * write in the same place. Enter in the title moves you into the description;
  * each saves when you leave it.
  *
- * What production's header did, kept: the objects a description points at on a
- * line of their own are drawn below it (RIC-10, with a skeleton while they
- * resolve), a pointer inside a sentence is drawn where it was written, a
- * project's "Archived" chip sits beside its title, and a reader who cannot
- * write gets text and no editor.
+ * A pointer is its chip wherever it was written, alone on its line too, and a
+ * card is drawn after its line only where the writer chose one (SPEC §13.3,
+ * Widgets): the editor's slots, or `blockLineCards` when only read. A reader
+ * who cannot write gets text and no editor.
  */
 export function LiveHeader(props: LiveHeaderProps) {
   const { description, format, nameOf, readOnly = false } = props
   const blocks = toRenderTree(description, format)
   const references = referencesIn(blocks)
-  const attached = blocks.map(standaloneReference).filter((r): r is string => !!r)
   const objects = useForeignObjects(references)
   const resolved = byReference(references, objects)
-  const cards = attached.map((r) => resolved[r]).filter((o): o is ForeignObjectData => !!o)
 
   const [missing, dismiss] = useLinkedBlock(description, format, readOnly)
 
@@ -122,14 +118,6 @@ export function LiveHeader(props: LiveHeaderProps) {
         <Suspense fallback={reading}>
           <HeaderEditing {...props} resolved={resolved} />
         </Suspense>
-      )}
-      {attached.length > 0 && objects === undefined && <SkeletonBar className="h-16 w-full" data-foreign-references="loading" />}
-      {cards.length > 0 && (
-        <div className="flex flex-col gap-2" data-foreign-references={String(cards.length)}>
-          {cards.map((object) => (
-            <ForeignObject key={object.ref} object={object} />
-          ))}
-        </div>
       )}
     </div>
   )
@@ -152,7 +140,7 @@ function ReadingHeader({ title, titlePlaceholder, description, format, nameOf, r
         ) : (
           // A reader gets the handle too, with Copy link and Comment (Miky, RIC-18 kickoff); the editing rows need the editor.
           <BlockHandle actions={blockRows(onCommentOnBlock, onCopyBlockLink)}>
-            <ShipRichText value={description} format={format} nameOf={nameOf} resolved={resolved} hideStandalone />
+            <ShipRichText value={description} format={format} nameOf={nameOf} resolved={resolved} renderAfter={(block) => blockLineCards(block, resolved)} />
           </BlockHandle>
         )}
       </div>

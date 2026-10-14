@@ -82,7 +82,7 @@ function Row({ object, count }: { object: ForeignObject; count?: number }) {
           <span className={cn('text-body-2-strong', profile?.displayName ? 'text-text-primary' : 'text-text-muted')}>{profile?.displayName ?? '—'}</span>
           {slots.body && (
             <div className="line-clamp-2">
-              <ShipRichText value={slots.body.value} format={slots.body.format ?? 'marker'} size="small" hideStandalone />
+              <ShipRichText value={slots.body.value} format={slots.body.format ?? 'marker'} size="small" />
             </div>
           )}
         </div>
