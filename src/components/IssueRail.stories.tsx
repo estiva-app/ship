@@ -36,7 +36,6 @@ const meta = {
     onProjectChange: fn(),
     openedBy: { name: 'Ana Duarte' },
     openedAt: NOW - 36000,
-    onCopyReference: fn(),
     onDelete: fn(),
   },
 } satisfies Meta<typeof IssueRail>

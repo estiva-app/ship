@@ -9,8 +9,9 @@ import { peopleOptions, type RailPerson } from './ProjectRail'
 
 /**
  * The issue page's right rail, as production: Status, Assignee (with a
- * face) and Project as selects; then who opened it and when; then the one
- * action Peek needs, "Copy reference for Peek". Every button small.
+ * face) and Project as selects; then who opened it and when. Every button
+ * small. No "Copy reference": the page's URL is how a person addresses an
+ * issue, in Peek too (Miky, 2026-10-14).
  *
  * Ship-only: it knows what an issue is. Writes arrive with REW-5.
  */
@@ -29,7 +30,6 @@ export interface IssueRailProps {
   openedBy: { name?: string; picture?: string }
   /** Seconds, as the relay keeps them. */
   openedAt: number
-  onCopyReference: () => void
   /** The issue's own archive (FOL-46); archived only with its project, there is nothing here to unarchive. */
   archived?: boolean
   /** Archive or unarchive it. Omitted: no control. */
@@ -54,7 +54,6 @@ export function IssueRail({
   onProjectChange,
   openedBy,
   openedAt,
-  onCopyReference,
   archived = false,
   onArchive,
   onDelete,
@@ -87,9 +86,6 @@ export function IssueRail({
           · {ago(openedAt)}
         </span>
       </Property>
-      <Button size="small" variant="outlined" className="self-start" onClick={onCopyReference}>
-        Copy reference for Peek
-      </Button>
       <Divider className="mx-0" />
       {/* The project rail's pair (FOL-46): archive, the reversible one, first. */}
       <div className="flex flex-col items-start gap-1">

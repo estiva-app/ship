@@ -1,9 +1,10 @@
 import { Suspense, lazy, useEffect, useRef, useState } from 'react'
-import { referencesIn, resolveBlockAnchor, toRenderTree, type ContentFormat, type Imeta } from '@estiva-app/protocol'
+import { linksAsReferences, referencesIn, resolveBlockAnchor, toRenderTree, type ContentFormat, type Imeta } from '@estiva-app/protocol'
 import { BlockHandle } from '@estiva-app/ui'
 import { Banner } from '@/components/Banner'
+import { knownLinkValue, useLinkValues } from '@/api/linkCards'
 import { blockRows, linkedBlock } from './blockRows'
-import { blockLineCards } from './DescriptionCards'
+import { blockLineCards, linksInBlocks } from './DescriptionCards'
 import { ShipRichText } from '@/components/ui/ShipRichText'
 import { byReference, useForeignObjects } from '@/api/useForeignObjects'
 import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
@@ -98,7 +99,9 @@ function useLinkedBlock(description: string, format: ContentFormat, readOnly: bo
 export function LiveHeader(props: LiveHeaderProps) {
   const { description, format, nameOf, readOnly = false } = props
   const blocks = toRenderTree(description, format)
-  const references = referencesIn(blocks)
+  // An app URL reads as the chip of what it names (Widgets): ask what each names, and resolve those with the rest.
+  const linked = useLinkValues(linksInBlocks(blocks))
+  const references = referencesIn(linked.size ? linksAsReferences(blocks, knownLinkValue) : blocks)
   const objects = useForeignObjects(references)
   const resolved = byReference(references, objects)
 
@@ -140,7 +143,7 @@ function ReadingHeader({ title, titlePlaceholder, description, format, nameOf, r
         ) : (
           // A reader gets the handle too, with Copy link and Comment (Miky, RIC-18 kickoff); the editing rows need the editor.
           <BlockHandle actions={blockRows(onCommentOnBlock, onCopyBlockLink)}>
-            <ShipRichText value={description} format={format} nameOf={nameOf} resolved={resolved} renderAfter={(block) => blockLineCards(block, resolved)} />
+            <ShipRichText value={description} format={format} nameOf={nameOf} resolved={resolved} resolveLink={knownLinkValue} renderAfter={(block) => blockLineCards(block, resolved)} />
           </BlockHandle>
         )}
       </div>

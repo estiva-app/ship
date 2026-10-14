@@ -6,19 +6,21 @@ import { TextSelection } from '@tiptap/pm/state'
 import {
   documentForEditing,
   publishableFromEditor,
+  referenceOfLink,
   toEditorDocument,
   type ContentFormat,
   type EditorDocument,
   type Imeta,
 } from '@estiva-app/protocol'
 import { FieldLine, FilePicker, richTextClassName } from '@estiva-app/ui'
-import { Callout, Checklist, CodeBlockColours, EditorBlockHandle, PastedImages, ReferenceCards, SelectionToolbar, blockDropCursor, isChecklistTick, isSuggestionOpen } from '@estiva-app/ui/editor'
+import { Callout, Checklist, CodeBlockColours, EditorBlockHandle, LinkChips, PastedImages, ReferenceCards, SelectionToolbar, blockDropCursor, isChecklistTick, isSuggestionOpen } from '@estiva-app/ui/editor'
 import { uploadAttachment } from '@/api/blobs'
 import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
+import { askLinkValues, knownLinkValue } from '@/api/linkCards'
 import { AttachmentNode, BlockId, ReferenceNode, ReferenceProvider, UnknownBlock } from '@/components/ui/editorSchema'
 import { LinkDecoration } from './linkDecoration'
 import { blockRows } from './blockRows'
-import { CardChoice, EditorLineCards } from './DescriptionCards'
+import { CardChoice, EditorLineCards, useChipObjects } from './DescriptionCards'
 import { ShipSlashMenu, TURN_INTO, slashSections } from './slashMenu'
 
 /**
@@ -151,6 +153,8 @@ export function LiveDescription({
         ReferenceNode,
         // The card a chip asks for, after its line (SPEC §13.3); drawn by `EditorLineCards` below.
         ReferenceCards,
+        // An app URL reads as the chip of what it names, and saves as the URL (Widgets, Miky 14 Oct).
+        LinkChips.configure({ referenceOf: (url) => referenceOfLink(url, knownLinkValue), ask: askLinkValues }),
         UnknownBlock,
         AttachmentNode,
         LinkDecoration.configure({ openOnClick: true }),
@@ -231,8 +235,10 @@ export function LiveDescription({
   // Leaving the tab or the page unmounts this: save on the way out.
   useEffect(() => () => void latestSave.current(typed.current), [])
 
+  const chips = useChipObjects(editor, resolved)
+
   return (
-    <ReferenceProvider value={{ resolved, nameOf }}>
+    <ReferenceProvider value={{ resolved: chips, nameOf }}>
       <div className="flex flex-col gap-1">
         {/* The reading surface's own `-mx-2 px-2 py-1`, so nothing moves. The text cursor is the only sign it is editable. */}
         {/* The handle sits in the gutter left of the text, so nothing moves (RIC-18). */}
@@ -241,7 +247,7 @@ export function LiveDescription({
           {/* Peek's composer pattern: muted words over an empty editor. */}
           {empty && <span aria-hidden className="pointer-events-none absolute left-0 top-1 text-body-2 text-text-muted">Add a description…</span>}
         </EditorBlockHandle>
-        <EditorLineCards editor={editor} resolved={resolved} />
+        <EditorLineCards editor={editor} resolved={chips} />
         <SelectionToolbar editor={editor} marks={['bold', 'italic', 'underline', 'code']}>
           <CardChoice editor={editor} />
         </SelectionToolbar>

@@ -70,8 +70,7 @@ describe('ProjectRail', () => {
 })
 
 describe('IssueRail', () => {
-  it('names who opened it as a person, never a key, and offers the Peek reference and Delete', () => {
-    const onCopyReference = vi.fn()
+  it('names who opened it as a person, never a key, and offers Delete but no "Copy reference"', () => {
     const onDelete = vi.fn()
     render(
       <IssueRail
@@ -86,15 +85,14 @@ describe('IssueRail', () => {
         onProjectChange={vi.fn()}
         openedBy={{}}
         openedAt={Math.floor(Date.now() / 1000) - 36000}
-        onCopyReference={onCopyReference}
         onDelete={onDelete}
       />,
     )
     expect(screen.getByText(/Opened by/)).toBeInTheDocument()
     expect(screen.getByText('—')).toBeInTheDocument()
     expect(screen.getByText(/10h ago/)).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Copy reference for Peek' }))
-    expect(onCopyReference).toHaveBeenCalledTimes(1)
+    // The page's URL is how a person addresses an issue (Miky, 2026-10-14).
+    expect(screen.queryByRole('button', { name: /Copy reference/ })).toBeNull()
     // Offered to everyone; the relay decides who may (SHI-14, and SHI-3 for issues).
     fireEvent.click(screen.getByRole('button', { name: 'Delete issue' }))
     expect(onDelete).toHaveBeenCalledTimes(1)
@@ -161,7 +159,6 @@ describe('a write control that cannot succeed says why', () => {
         onProjectChange={vi.fn()}
         openedBy={{}}
         openedAt={Math.floor(Date.now() / 1000)}
-        onCopyReference={vi.fn()}
         onDelete={onDelete}
       />,
     )
@@ -191,7 +188,6 @@ describe('an archived file’s rail: its fields shut, Unarchive and Delete open 
         onProjectChange={vi.fn()}
         openedBy={{}}
         openedAt={Math.floor(Date.now() / 1000)}
-        onCopyReference={vi.fn()}
         archived
         onArchive={onArchive}
         onDelete={onDelete}
@@ -223,7 +219,6 @@ describe('an archived file’s rail: its fields shut, Unarchive and Delete open 
         onProjectChange={vi.fn()}
         openedBy={{}}
         openedAt={Math.floor(Date.now() / 1000)}
-        onCopyReference={vi.fn()}
         archived={false}
         onArchive={onArchive}
         onDelete={vi.fn()}

@@ -368,7 +368,8 @@ describe('Issue page — one issue from the fold', () => {
     const feed = main.getAllByText(/set status to|assigned/)
     expect(feed.map((node) => node.textContent)).toEqual(['Me Myself set status to In Progress', 'Someone assigned Me Myself'])
     expect(main.getByRole('combobox', { name: 'Assignee' })).toBeEnabled()
-    expect(main.getByRole('button', { name: 'Copy reference for Peek' })).toBeEnabled()
+    // A URL is how a person addresses an issue: no "Copy reference" (Miky, 2026-10-14).
+    expect(main.queryByRole('button', { name: /Copy reference/ })).toBeNull()
     expect(main.getByText(/Opened by/)).toBeInTheDocument()
   })
 

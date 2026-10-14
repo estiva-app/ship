@@ -62,6 +62,11 @@ export function knownLinkValue(url: string): string | undefined {
   return known.get(url) ?? undefined
 }
 
+/** Ask what each of these links names; settles when every answer is in. A description editor's `LinkChips` asks this way. */
+export async function askLinkValues(urls: readonly string[]): Promise<void> {
+  await Promise.all(urls.filter((url) => !known.has(url)).map(ask))
+}
+
 /**
  * Ask what each of these links names, and draw again as the answers come back.
  * Returns the values known so far, by URL — the objects whose cards the surface

@@ -60,9 +60,11 @@ export function ShipRichText({
    */
   renderAfter?: (block: RenderBlock) => ReactNode
   /**
-   * A message's: what each app link names (§7.7), so a bare link draws as the
-   * chip of what it names, as Peek draws it (`linksAsReferences`, OPT-18). A
-   * link on words stays a link, and one not answered yet stays the URL.
+   * What each app link names (§7.7), so a bare link draws as the chip of what
+   * it names, as Peek draws it (`linksAsReferences`, OPT-18) — in a message,
+   * and in a description, where a URL keeps the card its writer chose (SPEC
+   * §13.3, Widgets). A link on words stays a link, and one not answered yet
+   * stays the URL.
    */
   resolveLink?: LinkResolver
 }) {

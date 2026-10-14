@@ -12,8 +12,7 @@
  */
 import type { WorkspaceEvents } from '../nostr/store'
 import type { Directory } from '../nostr/profiles'
-import { addrToNaddr, naddrToAddr } from '@estiva-app/protocol'
-import { RELAY_URL } from '../config'
+import { naddrToAddr } from '@estiva-app/protocol'
 
 export type { Change, Conversation, FolderState, Issue, Message, Project } from '../nostr/fold'
 export type { WorkspaceEvents, WorkspaceState } from '../nostr/store'
@@ -134,14 +133,6 @@ export function profiles(pubkeys: string[]): Promise<Directory> {
 
 /** The viewer's own key — what "assigned to me" and "you" mean. */
 export const me: string = signer.pubkey
-
-/**
- * A `nostr:naddr…` reference for an object, carrying this relay as its hint —
- * what "Copy reference for Peek" puts on the clipboard.
- */
-export function referenceFor(addr: string): string {
-  return `nostr:${addrToNaddr(addr, [RELAY_URL])}`
-}
 
 /**
  * Land an inbound `#/o/<naddr>` on the right surface. Resolves the pointer

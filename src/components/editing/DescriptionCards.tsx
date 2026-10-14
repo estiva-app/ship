@@ -1,7 +1,7 @@
 import { createPortal } from 'react-dom'
 import { useEditorState, type Editor } from '@tiptap/react'
 import { IconCircleOff, IconLayoutCards, IconLayoutList } from '@tabler/icons-react'
-import { blockCards, type RenderBlock } from '@estiva-app/protocol'
+import { blockCards, urlRunsIn, type RenderBlock } from '@estiva-app/protocol'
 import { ToolbarButton } from '@estiva-app/ui'
 import { referenceAtSelection, setReferenceCard, useReferenceCards, type ReferenceCard, type ReferenceCardLayout } from '@estiva-app/ui/editor'
 import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
@@ -35,6 +35,48 @@ export function LineCards({ cards, resolved }: { cards: readonly ReferenceCard[]
 export function blockLineCards(block: RenderBlock, resolved: Resolved) {
   const cards = blockCards(block).map((card) => ({ uri: card.reference, layout: card.layout }))
   return cards.length ? <LineCards cards={cards} resolved={resolved} /> : null
+}
+
+/**
+ * Every URL a description holds — in its text, and on a link that carries a
+ * card — for `useLinkValues` to ask what each names (§7.7, Widgets).
+ */
+export function linksInBlocks(blocks: readonly RenderBlock[]): string[] {
+  const out = new Set<string>()
+  const walk = (bs: readonly RenderBlock[]) => {
+    for (const block of bs) {
+      if (block.type === 'codeBlock') continue
+      for (const run of block.inline ?? []) {
+        if (run.href) out.add(run.href)
+        else if (!run.reference && !run.marks.includes('code')) for (const { url } of urlRunsIn(run.text)) out.add(url)
+      }
+      if (block.children) walk(block.children)
+    }
+  }
+  walk(blocks)
+  return [...out]
+}
+
+/**
+ * What the editor's chips draw from: the page's answers, and for a chip put in
+ * since the description was saved — a URL that became its chip while typing —
+ * its own, rather than loading until the save.
+ */
+export function useChipObjects(editor: Editor | null, resolved: Resolved): Resolved {
+  const key = useEditorState({
+    editor,
+    selector: ({ editor: ed }) => {
+      if (!ed || ed.isDestroyed) return ''
+      const uris = new Set<string>()
+      ed.state.doc.descendants((node) => {
+        if (node.type.name === 'reference' && node.attrs.uri) uris.add(String(node.attrs.uri))
+      })
+      return [...uris].join('\n')
+    },
+  })
+  const missing = (key ? key.split('\n') : []).filter((uri) => !(uri in resolved))
+  const own = byReference(missing, useForeignObjects(missing))
+  return missing.length ? { ...own, ...resolved } : resolved
 }
 
 /**
