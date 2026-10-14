@@ -5,7 +5,8 @@ import { clashes, explicitKey, keyOfRef, nextRef, projectKeys, suggestKey, taken
 import { RELAY_URL } from '../config'
 import { clockProblem } from './clock'
 import { readFolderListing, readFolders } from './foreign'
-import { partTagsFor } from './part'
+import { linkReferenceTagsFor } from './linkCards'
+import { partTagsFor, urlsIn } from './part'
 import { placedIn } from '../lib/placement'
 import { store } from './store'
 
@@ -382,6 +383,8 @@ export function startConversation(args: { folder: string; about: string; withRef
       about: args.about,
       // A pasted block link shows that block (SPEC §13.6.1, COM-2).
       partTags: await partTagsFor(args.body, args.about),
+      // A pasted app link is a mention, as a `nostr:` reference is (SPEC §13.1, OPT-19).
+      linkTags: await linkReferenceTagsFor(urlsIn(args.body)),
       // SPEC §13.6 — present only when the author was commenting on one block.
       blockId: args.blockId,
       aboutRef: args.withReference ? `nostr:${addrToNaddr(args.about, [RELAY_URL])}` : undefined,
@@ -409,6 +412,7 @@ export function reply(conversation: Conversation, fallbackFolder: string, body: 
       body,
       // A pasted block link shows that block (SPEC §13.6.1, COM-2); a comment's own file keeps its one `a`.
       partTags: await partTagsFor(body, root.anchor),
+      linkTags: await linkReferenceTagsFor(urlsIn(body)),
       ...(root.anchor
         ? {
             replyToComment: {

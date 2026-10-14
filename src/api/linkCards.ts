@@ -74,6 +74,26 @@ export async function askLinkValues(urls: readonly string[]): Promise<void> {
 }
 
 /**
+ * The tags a message earns for the app links in its body (SPEC §13.1, OPT-19):
+ * an `a` per address a link names, a `q` per message — the index half of a
+ * link, as `referenceTagsFor` is for a `nostr:` reference, so the object lists
+ * the message under "Mentioned in". Peek's `urlReferenceTagsAsViewer`.
+ *
+ * Asked at send, from the answers the box's chips already asked for; a link
+ * that names nothing, or whose read failed, earns nothing and the body keeps it.
+ */
+export async function linkReferenceTagsFor(urls: readonly string[]): Promise<string[][]> {
+  const values = await Promise.all([...new Set(urls)].map(ask))
+  const tags = new Map<string, string[]>()
+  for (const value of values) {
+    if (!value) continue
+    const tag = EVENT_ID.test(value) ? ['q', value] : ['a', value]
+    tags.set(tag.join(':'), tag)
+  }
+  return [...tags.values()]
+}
+
+/**
  * Ask what each of these links names, and draw again as the answers come back.
  * Returns the values known so far, by URL — the objects whose cards the surface
  * resolves with the rest of its references.

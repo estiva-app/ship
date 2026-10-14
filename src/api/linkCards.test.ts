@@ -15,7 +15,7 @@ const held = vi.hoisted(() => ({ authors: [] as string[], queries: 0 }))
 
 vi.mock('./handoff', () => ({
   declaredManifests: async () => [
-    { kind: 31990, pubkey: 'c'.repeat(64), tags: [['urls', 'https://ship.estiva.app/issue/<slug>-<d>#block-<block>', '30851'], ['k', '30851']], content: '{}', created_at: 1, id: 'm'.repeat(64), sig: '' },
+    { kind: 31990, pubkey: 'c'.repeat(64), tags: [['urls', 'https://ship.estiva.app/issue/<slug>-<d>#block-<block>', '30851'], ['urls', 'https://ship.estiva.app/m/<id>'], ['k', '30851']], content: '{}', created_at: 1, id: 'm'.repeat(64), sig: '' },
   ],
 }))
 vi.mock('./store', () => ({
@@ -27,7 +27,7 @@ vi.mock('./store', () => ({
   },
 }))
 
-import { knownLinkValue, useLinkValues } from './linkCards'
+import { knownLinkValue, linkReferenceTagsFor, useLinkValues } from './linkCards'
 
 const url = (slug: string) => `https://ship.estiva.app/issue/${slug}-${D}`
 
@@ -59,5 +59,17 @@ describe('a link a card depends on', () => {
     await new Promise((r) => setTimeout(r, 20))
     expect(result.current.size).toBe(0)
     expect(held.queries).toBe(0)
+  })
+})
+
+describe('the tags a message earns for its app links (OPT-19)', () => {
+  it('an a per object a link names, a q per message, once each, and nothing for a link that names nothing', async () => {
+    held.authors = [PK]
+    const message = 'ab'.repeat(32)
+    const tags = await linkReferenceTagsFor([url('four'), url('four-again'), `https://ship.estiva.app/m/${message}`, `${url('four')}#block-0123456789ab`, 'https://example.com/x'])
+    expect(tags).toEqual([
+      ['a', `30851:${PK}:${D}`],
+      ['q', message],
+    ])
   })
 })

@@ -692,6 +692,8 @@ export class Store {
     urgent?: readonly string[]
     /** The block links' `part` tags, already resolved — COM-2. See `buildConversationMessage`. */
     partTags?: readonly NostrTag[]
+    /** The body's app links' `a` and `q` tags, already resolved — OPT-19. See `buildConversationMessage`. */
+    linkTags?: readonly NostrTag[]
   }): Promise<PublishResult> {
     const body = args.aboutRef ? `${args.body}\n\n${args.aboutRef}` : args.body
     return this.publish(
@@ -705,6 +707,7 @@ export class Store {
         files: args.files,
         urgent: args.urgent,
         partTags: args.partTags,
+        linkTags: args.linkTags,
       }),
     )
   }

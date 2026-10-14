@@ -8,18 +8,21 @@ import {
   blockDocumentToMarkerText,
   documentForEditing,
   fromEditorDocument,
+  referenceOfLink,
   toEditorDocument,
   type EditorDocument,
   type Imeta,
 } from '@estiva-app/protocol'
 import { AttachmentCard, Avatar, Button, FieldLine, FilePicker, IconButton, Kbd, Toolbar, ToolbarButton, richTextClassName } from '@estiva-app/ui'
-import { CodeBlockColours, PastedImages, SelectionToolbar, isSuggestionActive, isSuggestionOpen, urgentPubkeys } from '@estiva-app/ui/editor'
+import { CodeBlockColours, LinkChips, PastedImages, SelectionToolbar, isSuggestionActive, isSuggestionOpen, urgentPubkeys } from '@estiva-app/ui/editor'
 import { subscribeReferences, type ReferenceSection } from '@/api/references'
 import { cn } from '@/lib/cn'
 import { browserDrafts, type DraftStore } from '@/lib/drafts'
 import { uploadAttachment } from '@/api/blobs'
 import { ReferenceNode, ReferenceProvider } from '@/components/ui/editorSchema'
+import { askLinkValues, knownLinkValue } from '@/api/linkCards'
 import { LinkDecoration } from '@/components/editing/linkDecoration'
+import { PastedLinkOnWords } from '@/components/editing/pastedLinkOnWords'
 import { ShipSlashMenu, slashSections } from '@/components/editing/slashMenu'
 import { chipsAsReferences, composerTriggers, urgentChipsFrom, withoutNewUrgency } from '@/components/editing/composerTriggers'
 import { useMentionPeople } from '@/components/editing/mentionables'
@@ -187,6 +190,10 @@ export function MessageBox({ kind = 'conversation', onSubmit, references, initia
         StarterKit.configure({ link: false, strike: false, heading: { levels: [1, 2] }, trailingNode: false, codeBlock: false }),
         CodeBlockColours,
         ReferenceNode,
+        // Every app link reads as its chip, pasted, typed or inside a passage, and is sent as the URL it was (OPT-19,
+        // Miky 14 Oct): the box shows what the sent message will draw. A URL over selected words is a link on them.
+        LinkChips.configure({ referenceOf: (url) => referenceOfLink(url, knownLinkValue), ask: askLinkValues }),
+        PastedLinkOnWords,
         LinkDecoration,
         // No new urgent pick in an edit, which carries no tags (CON-24); its own urgent chips still load.
         ...composerTriggers({ people: () => people.current, references: (query) => offered.current?.(query) ?? [], subscribe: subscribeReferences, urgent: kind !== 'edit' }),
