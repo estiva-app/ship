@@ -5,8 +5,8 @@
  * their own tests. This is the wiring: the `embed` set reaches the message
  * through `threadFor`, `compact` draws the object's row and `detailed` its
  * card, whatever the manifest's `widget` says, and `none` — or no `embed` at
- * all — draws none. Until milestone 2 a reference alone on its line is still a
- * card by default, and an `embed` for it is the author's call.
+ * all — draws none. A reference alone on its line, and a bare app link once
+ * what it names has resolved, read as their chip, with no card (OPT-18).
  *
  * Fixtures are Ship's real shapes: an issue (manifest `row`) and a project
  * (manifest `card`), each asked for in the other layout, so a pass cannot be
@@ -33,15 +33,20 @@ vi.mock(import('@/api/foreign'), async (importOriginal) => ({
   ),
 }))
 
-// §7.7 as `api/linkCards` answers it, with its own test: Ship's link names the issue, nothing else names anything.
+// §7.7 as `api/linkCards` answers it, with its own test: Ship's link names the issue, a second one an issue that
+// resolves to nothing, and nothing else names anything.
 const ISSUE_URL = `https://ship.estiva.app/issue/the-probe-issue-${ISSUE.split(':')[2]}`
+const GONE_URL = 'https://ship.estiva.app/issue/gone-0d6a0a3e-7a4e-4c39-9f0b-5d1c7e2a9b11'
 vi.mock('@/api/linkCards', () => {
   // Hoisted above the constants, so spelled out again.
-  const url = 'https://ship.estiva.app/issue/the-probe-issue-f78c3b96-2a3b-4d92-910a-ac25aba672cd'
-  const issue = '30851:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:f78c3b96-2a3b-4d92-910a-ac25aba672cd'
+  const pk = 'b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46'
+  const named = new Map([
+    ['https://ship.estiva.app/issue/the-probe-issue-f78c3b96-2a3b-4d92-910a-ac25aba672cd', `30851:${pk}:f78c3b96-2a3b-4d92-910a-ac25aba672cd`],
+    ['https://ship.estiva.app/issue/gone-0d6a0a3e-7a4e-4c39-9f0b-5d1c7e2a9b11', `30851:${pk}:0d6a0a3e-7a4e-4c39-9f0b-5d1c7e2a9b11`],
+  ])
   return {
-    knownLinkValue: (asked: string) => (asked === url ? issue : undefined),
-    useLinkValues: (urls: readonly string[]) => new Map(urls.filter((asked) => asked === url).map((asked) => [asked, issue])),
+    knownLinkValue: (asked: string) => named.get(asked),
+    useLinkValues: (urls: readonly string[]) => new Map(urls.flatMap((asked) => (named.has(asked) ? [[asked, named.get(asked)!] as const] : []))),
   }
 })
 
@@ -93,13 +98,21 @@ describe('a message that asks for a card', () => {
 
   it('draws a bare app link as the chip of what it names, alone or mid-sentence, with no card (OPT-18)', async () => {
     const lone = show(thread(ISSUE_URL))
-    await waitFor(() => expect(lone.querySelector('[data-reference]')).not.toBeNull())
+    await waitFor(() => expect(lone.textContent).toContain('The probe issue'))
     expect(lone.querySelector('[data-foreign-object]')).toBeNull()
     expect(lone.textContent).not.toContain(ISSUE_URL)
     const mid = show(thread(`see ${ISSUE_URL}, then ship`))
-    await waitFor(() => expect(mid.querySelector('[data-reference]')).not.toBeNull())
-    expect(mid.textContent).toContain(', then ship')
+    await waitFor(() => expect(mid.textContent).toContain('see The probe issue, then ship'))
     expect(mid.querySelector('[data-foreign-object]')).toBeNull()
+  })
+
+  it('keeps a bare app link a link when what it names cannot be read, rather than an empty chip (OPT-18)', async () => {
+    const c = show(thread(`see ${GONE_URL}`))
+    await waitFor(() => expect(c.querySelector(`a[href="${GONE_URL}"]`)).not.toBeNull())
+    // Long enough for the link's answer and the object's to have come back.
+    await new Promise((r) => setTimeout(r, 50))
+    expect(c.querySelector(`a[href="${GONE_URL}"]`)).not.toBeNull()
+    expect(c.querySelector('[data-reference]')).toBeNull()
   })
 
   it('keeps a link nothing claims, and a link on words, as links with no card (OPT-18)', async () => {

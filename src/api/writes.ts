@@ -369,9 +369,10 @@ export function setIssueField(issue: Issue, field: 'title' | 'description' | 'st
 
 /**
  * Start a conversation about an object, in its Folder. About an issue, the
- * body also carries a `nostr:naddr` reference so Peek renders the issue's
- * widget above the message; about a project, the message is already in the
- * topic it belongs to and a reference would be noise.
+ * body also carries a `nostr:naddr` reference, so a reader of the Folder in
+ * Peek sees which issue it is about, as that issue's chip; about a project,
+ * the message is already in the topic it belongs to and a reference would be
+ * noise.
  */
 export function startConversation(args: { folder: string; about: string; withReference: boolean; body: string; blockId?: string; files?: readonly Imeta[]; urgent?: readonly string[] }): Promise<WriteResult> {
   return publish(async () =>

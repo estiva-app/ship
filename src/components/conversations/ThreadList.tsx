@@ -16,11 +16,11 @@ import { SkeletonBar } from '@/components/ui/Skeleton'
 import { REACTION_OPTIONS, Reactions } from '@/components/Reactions'
 import { ConfirmDeleteMessage, NewSinceHere, useThreadReactions, useThreadReferences, type ConversationsProps, type MessageData, type ThreadData } from '@/components/ConversationThread'
 import type { ActivityProps } from '@/components/Activity'
-import { MESSAGE_FORMAT, PLACE_ICON, RELATION, Time, cardsOf, linkResolverFor, meaningLabel, type MentionListViewProps, type ThreadListViewProps } from './shared'
+import { MESSAGE_FORMAT, PLACE_ICON, RELATION, Time, cardsOf, linkResolverFor, meaningLabel, referenceOfValue, type MentionListViewProps, type ThreadListViewProps } from './shared'
 import { MessageBoxShell } from './writingBox'
 import type { Picks } from './MessageBox'
 import { messageScope, referenceSections } from '@/api/references'
-import { shownParts } from '@/api/part'
+import { shownParts, urlNames } from '@/api/part'
 import { knownLinkValue } from '@/api/linkCards'
 import { PartCard } from '@/components/ui/PartCard'
 
@@ -132,12 +132,21 @@ function Message({ message, resolved, resolving, nameOf, reactions, onToggleReac
   const [confirming, setConfirming] = useState(false)
   // A block of another object, live (SPEC §13.6.1, COM-2).
   const parts = shownParts(message.parts, message.body, namedAddresses(message.body))
-  // What each app link names by §7.7, from what the surface has asked: a bare link reads as that chip (OPT-18),
-  // and a link on words can name its card (OPT-17).
-  const resolveLink = linkResolverFor(message.body, knownLinkValue)
+  // What each app link names by §7.7, from what the surface has asked; a link to a block shown live keeps its
+  // words, as in Peek — the block's card already stands for it (COM-2). A link on words can name its card (OPT-17).
+  const named = linkResolverFor(message.body, knownLinkValue)
+  const claimed = (url: string) => (parts.some((part) => urlNames(url, part.address)) ? undefined : named(url))
+  // A bare link reads as that chip (OPT-18) once what it names has come back and can be read: until then, and
+  // for good when it cannot, it stays the link it was written as rather than a chip with nothing in it.
+  const resolveLink = (url: string) => {
+    const value = claimed(url)
+    const reference = value ? referenceOfValue(value) : undefined
+    const object = reference ? resolved?.[reference] : undefined
+    return object && !object.unreachable ? value : undefined
+  }
   // The cards its author asked for (SPEC §13.6.2, OPT-16) — the only cards a message draws. Every reference,
   // alone on its line too, is its chip in the text (OPT-18), and `none` leaves only that.
-  const cards = cardsOf(message.body, message.embeds, parts, resolveLink)
+  const cards = cardsOf(message.body, message.embeds, parts, claimed)
   const shownCards = cards.flatMap((card) => {
     const object = card.layout === 'none' ? undefined : resolved?.[card.reference]
     return object ? [{ card, object }] : []
