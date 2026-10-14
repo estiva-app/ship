@@ -52,13 +52,20 @@ const TRAILING = /[.,;:!?)\]]+$/
  * `cardsIn` sees a label's text too, and `[https://ship…/issue/x](https://elsewhere)`
  * would put that issue's card under a link that goes elsewhere (OPT-17's
  * security review). Peek's `findUrls` answers the same.
+ *
+ * At most `MAX_LINKS_PER_MESSAGE`, the first ones in that order, as Peek asks:
+ * each claimed link is a relay query, and a message with hundreds would spend
+ * every viewer's quota (OPT-18's security review). The rest stay links.
  */
 export function linksNamingCards(body: string): Set<string> {
   const out = new Set<string>()
   for (const match of body.matchAll(MARKER_LINK)) if (/^https?:/i.test(match[1])) out.add(match[1])
   for (const url of body.replace(MARKER_LINK, ' ').match(BARE_URL) ?? []) out.add(url.replace(TRAILING, ''))
-  return out
+  return new Set([...out].slice(0, MAX_LINKS_PER_MESSAGE))
 }
+
+/** How many of a message's links are asked what they name — Peek's `MAX_LINKS_PER_MESSAGE`. */
+export const MAX_LINKS_PER_MESSAGE = 8
 
 /** A `LinkResolver` for one message: what `known` says, for a URL that may name a card in its body. */
 export function linkResolverFor(body: string, known: LinkResolver): LinkResolver {
