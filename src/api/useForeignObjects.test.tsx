@@ -84,4 +84,17 @@ describe('useForeignObjects — a refresh never puts a card back to its skeleton
     rerender({ refs: ['nostr:c'] })
     expect(result.current).toBeUndefined()
   })
+
+  it('keeps what a grown set shares with the old one, and only the new reference waits (OPT-18)', async () => {
+    resolveForeign.mockImplementation(async (r) => card(r, r))
+    const { result, rerender } = renderHook(({ refs }) => useForeignObjects(refs), {
+      initialProps: { refs: ['nostr:a'] },
+    })
+    await settle()
+
+    resolveForeign.mockImplementation(() => new Promise(() => {}))
+    rerender({ refs: ['nostr:a', 'nostr:b'] })
+    expect((result.current?.[0] as unknown as { title: string }).title).toBe('nostr:a')
+    expect(result.current?.[1]).toBeUndefined()
+  })
 })

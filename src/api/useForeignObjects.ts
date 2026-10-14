@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { resolveForeign, type ForeignObject } from '@/api/foreign'
 import { useRefresh } from '@/lib/useRefresh'
 
@@ -30,11 +30,13 @@ const FAILED: unique symbol = Symbol('failed')
  *
  * @returns `undefined` while the first resolve is in flight, then one entry per
  *   reference — `null` where nothing resolved, which is a real answer and not
- *   an error.
+ *   an error, and `undefined` for a reference added since, until it resolves.
  */
-export function useForeignObjects(references: readonly string[]): (ForeignObject | null)[] | undefined {
-  const [objects, setObjects] = useState<(ForeignObject | null)[] | undefined>(undefined)
+export function useForeignObjects(references: readonly string[]): (ForeignObject | null | undefined)[] | undefined {
+  const [objects, setObjects] = useState<(ForeignObject | null | undefined)[] | undefined>(undefined)
   const [nonce, setNonce] = useState(0)
+  // The last answer for each reference drawn, by reference, so a new set keeps what it shares with the old one.
+  const answers = useRef(new Map<string, ForeignObject | null>())
 
   // The joined string rather than the array: a new array every render would
   // re-resolve on every keystroke in the editor above.
@@ -53,7 +55,9 @@ export function useForeignObjects(references: readonly string[]): (ForeignObject
       // A throw is not an answer. On the first resolve it draws as `null`, as
       // it always has; on a refresh it keeps the card that is already there,
       // so one dropped request does not take a correct card off the page.
-      setObjects((held) => found.map((f, i) => (f === FAILED ? (held?.[i] ?? null) : f)))
+      const next = found.map((f, i) => (f === FAILED ? (answers.current.get(references[i]) ?? null) : f))
+      next.forEach((object, i) => answers.current.set(references[i], object))
+      setObjects(next)
     })
     return () => {
       cancelled = true
@@ -70,9 +74,17 @@ export function useForeignObjects(references: readonly string[]): (ForeignObject
     each message carrying an issue pointer, which is most of them, and it is
     what "reloads the conversations" was. What is held belongs to the same
     references until `key` changes, so a refresh replaces it in one step.
+
+    A new set keeps the answers it shares with the old one, and only what is new
+    waits (OPT-18): a conversation's set grows each time a link's answer comes
+    back, and blanking it then put every chip and card on the page back to
+    pending for one new reference.
   */
   useEffect(() => {
-    setObjects(undefined)
+    const kept = new Map(references.flatMap((r) => (answers.current.has(r) ? [[r, answers.current.get(r) ?? null] as const] : [])))
+    answers.current = kept
+    setObjects(kept.size > 0 ? references.map((r) => kept.get(r)) : undefined)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key])
 
   useEffect(
@@ -89,7 +101,7 @@ export function useForeignObjects(references: readonly string[]): (ForeignObject
 /** The same answers keyed by reference, for a caller drawing them in place. */
 export function byReference(
   references: readonly string[],
-  objects: (ForeignObject | null)[] | undefined,
+  objects: (ForeignObject | null | undefined)[] | undefined,
 ): Record<string, ForeignObject | null | undefined> {
   const out: Record<string, ForeignObject | null | undefined> = {}
   references.forEach((r, i) => {
