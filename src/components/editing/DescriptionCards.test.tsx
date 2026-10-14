@@ -47,7 +47,7 @@ describe('choosing a chip\'s card in the description', () => {
     expect(none.getAttribute('aria-checked')).toBe('true')
     expect(screen.getByRole('menuitem', { name: 'Open' })).toBeDefined()
     fireEvent.mouseDown(screen.getByRole('menuitemradio', { name: 'Detailed' }))
-    await waitFor(() => expect(screen.queryByRole('menu', { name: 'Reference' })).toBeNull())
+    await waitFor(() => expect(screen.queryByRole('menu', { name: 'Link' })).toBeNull())
 
     act(() => box.editor.commands.blur())
     await waitFor(() => expect(onCommit).toHaveBeenCalled())
