@@ -111,4 +111,12 @@ describe('a pasted link in the message box (OPT-19)', () => {
     expect(onSubmit).toHaveBeenCalledWith(`read [the plan](${ISSUE_URL}) first`, [], { urgent: undefined })
   })
 
+  it('never nests a link: a URL pasted over the words of a link already written replaces them', async () => {
+    const { box, onSubmit } = await compose()
+    await type(box, 'read [the plan](https://example.com/p) first')
+    await act(() => void box.editor.commands.setTextSelection({ from: 7, to: 15 }))
+    await paste(box, ISSUE_URL)
+    await enter(box)
+    expect(onSubmit).toHaveBeenCalledWith(`read [${ISSUE_URL}](https://example.com/p) first`, [], { urgent: undefined })
+  })
 })

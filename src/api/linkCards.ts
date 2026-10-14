@@ -73,6 +73,9 @@ export async function askLinkValues(urls: readonly string[]): Promise<void> {
   if (waiting.some((url) => !known.has(url))) throw new Error('A link could not be asked about; asked again later.')
 }
 
+/** How many of a message's links are looked up at send — `LinkChips`' default `limit`. */
+const MAX_LINKS_TAGGED = 24
+
 /**
  * The tags a message earns for the app links in its body (SPEC §13.1, OPT-19):
  * an `a` per address a link names, a `q` per message — the index half of a
@@ -83,7 +86,8 @@ export async function askLinkValues(urls: readonly string[]): Promise<void> {
  * that names nothing, or whose read failed, earns nothing and the body keeps it.
  */
 export async function linkReferenceTagsFor(urls: readonly string[]): Promise<string[][]> {
-  const values = await Promise.all([...new Set(urls)].map(ask))
+  // The first links only, as the box's `LinkChips` asks about (its `limit`): each answer can cost a relay query.
+  const values = await Promise.all([...new Set(urls)].slice(0, MAX_LINKS_TAGGED).map(ask))
   const tags = new Map<string, string[]>()
   for (const value of values) {
     if (!value) continue

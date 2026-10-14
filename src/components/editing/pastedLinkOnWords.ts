@@ -31,6 +31,11 @@ export const PastedLinkOnWords = Extension.create({
             if (!words.trim() || /[[\]\n]/.test(words) || words.length !== selection.to - selection.from) return false
             const code = view.state.schema.marks.code
             if (code && view.state.doc.rangeHasMark(selection.from, selection.to, code)) return false
+            // Words inside a link already written, or inside a URL, would nest one link in another.
+            const start = selection.$from.start()
+            const line = selection.$from.parent.textBetween(0, selection.$from.parent.content.size, undefined, '￼')
+            const [from, to] = [selection.from - start, selection.to - start]
+            for (const m of line.matchAll(LINK_OR_URL)) if (m.index < to && m.index + m[0].length > from) return false
             view.dispatch(view.state.tr.insertText(`[${words}](${url})`, selection.from, selection.to).scrollIntoView())
             return true
           },
@@ -39,6 +44,9 @@ export const PastedLinkOnWords = Extension.create({
     ]
   },
 })
+
+/** A link on words in marker text, or a bare URL. */
+const LINK_OR_URL = /\[[^[\]\n]*\]\([^)\s]*\)|https?:\/\/[^\s<>"'`]+/g
 
 /** The one http(s) URL a clipboard holds, or null when it holds anything else. */
 export function loneUrl(text: string): string | null {
