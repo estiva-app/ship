@@ -201,6 +201,32 @@ const refOnRoot = buildIssue(PK, Date.now(), {
 const rootOnly = foldFolder([sign(project, 's1'), sign(refOnRoot, 's2')])
 check('  …while a ref written on the root still reads, as every existing issue does', rootOnly.issues[0]?.ref === 'PAY-1')
 
+// ── The parent is the project `a`, not the first `a` ────────────────────────
+
+/*
+  Ship, the agent and the manifest runtime (`buildActionEvent`) each write one
+  `a` on an issue root today: the project's. But `a` is also how an event points
+  at any other addressable thing — a Leaf document it is about, another issue —
+  and a writer from outside the suite may put such a link first. The issue must
+  still be listed under its project, not orphaned under a document.
+*/
+console.log('\n# an issue that links a document before its project\n')
+
+const LEAF_DOC = `30842:${PK}:the-spec`
+const linksFirst = sign(
+  { ...buildIssue(PK, Date.now(), { issueId: 'i4', title: 'Follow the spec', folder: CONTENT }), tags: [['d', 'i4'], ['title', 'Follow the spec'], ['h', CONTENT], ['a', LEAF_DOC], ['a', `30850:${PK}:p1`]] },
+  'l2',
+)
+const underProject = foldFolder([sign(project, 'l1'), linksFirst]).issues.find((i) => i.id === 'i4')
+check('an issue whose first `a` names a document still folds under its project', underProject?.projectAddr === `30850:${PK}:p1`, String(underProject?.projectAddr))
+
+const linksAfter = sign(
+  { ...buildIssue(PK, Date.now(), { issueId: 'i5', title: 'Then the spec', folder: CONTENT }), tags: [['d', 'i5'], ['title', 'Then the spec'], ['h', CONTENT], ['a', `30850:${PK}:p1`], ['a', LEAF_DOC]] },
+  'l3',
+)
+const projectFirst = foldFolder([sign(project, 'l1'), linksAfter]).issues.find((i) => i.id === 'i5')
+check('…and one that names its project first and a document after it too', projectFirst?.projectAddr === `30850:${PK}:p1`, String(projectFirst?.projectAddr))
+
 // ── The order two changes to one field are replayed in ──────────────────────
 
 /*
