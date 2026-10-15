@@ -4,6 +4,7 @@ import StarterKit from '@tiptap/starter-kit'
 import { TableKit } from '@tiptap/extension-table'
 import { TextSelection } from '@tiptap/pm/state'
 import {
+  descriptionTextToBlockDocument,
   documentForEditing,
   publishableFromEditor,
   referenceOfLink,
@@ -21,6 +22,7 @@ import {
   EditorTableControls,
   LinkChips,
   PastedImages,
+  PastedMarkdown,
   ReferenceCards,
   ReferenceMenu,
   ReferenceMenuView,
@@ -186,6 +188,8 @@ export function LiveDescription({
             return true
           },
         }),
+        // Markdown pasted as plain text lands as the blocks it spells, tables included, read as the agent reads a description (LEAF-10).
+        PastedMarkdown.configure({ read: (text) => toEditorDocument(descriptionTextToBlockDocument(text)) }),
       ],
       // Built once. A value coming back must not rebuild the editor under the caret; see the effect below.
       content: toEditorDocument(documentForEditing(value, format)),
