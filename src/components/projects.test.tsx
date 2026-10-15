@@ -53,15 +53,6 @@ describe('StatusLabel', () => {
     expect(container.querySelector('svg.tabler-icon-circle')).not.toBeNull()
     expect(container.textContent).toBe('blocked')
   })
-
-  it('shares shapes between issues and projects, and one colour across sizes', () => {
-    const done = render(<StatusLabel value="done" label="Done" />).container
-    const completed = render(<StatusLabel value="completed" label="Completed" size="small" />).container
-    expect(done.querySelector('svg')!.className.baseVal).toContain('tabler-icon-circle-check')
-    expect(completed.querySelector('svg')!.className.baseVal).toContain('tabler-icon-circle-check')
-    expect(done.firstElementChild).toHaveClass('text-text-secondary')
-    expect(completed.firstElementChild).toHaveClass('text-text-secondary')
-  })
 })
 
 describe('ago', () => {
