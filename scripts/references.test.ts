@@ -247,7 +247,8 @@ const late = [
   ]
   const state = foldFolder(events, refs)
   const anchors = anchorIndex(events)
-  const mine = new Set([ISSUE, OTHER_ISSUE])
+  // The issue `s5` names is one of ours too, or "never a thread that merely mentions one" would pass with nothing to refuse.
+  const mine = new Set([ISSUE, OTHER_ISSUE, POINTED_AT])
 
   const rolled = commentsOnAny(state.conversations, mine, anchors)
   check('a project rolls up the comments on its own issues', rolled.length === 2, `${rolled.length}`)
@@ -286,14 +287,15 @@ const late = [
   const state = foldFolder(events, refs)
   const anchors = anchorIndex(events)
 
-  const rolled = commentsOnAny(state.conversations, new Set([ISSUE]), anchors)
+  // Ours is the issue the bodies name.
+  const rolled = commentsOnAny(state.conversations, new Set([POINTED_AT]), anchors)
   check(
     "a comment on another project's issue that names one of ours stays out of our conversation",
     !rolled.some((r) => r.conversation.id === 'x1'),
     rolled.map((r) => r.conversation.id).join(','),
   )
 
-  const both = commentsOnAny(state.conversations, new Set([ISSUE, OTHER_ISSUE]), anchors)
+  const both = commentsOnAny(state.conversations, new Set([POINTED_AT, OTHER_ISSUE]), anchors)
   const x2 = both.find((r) => r.conversation.id === 'x2')
   check(
     '  …and a comment on one of our issues that names another is paired with the issue it is on',
