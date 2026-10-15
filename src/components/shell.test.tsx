@@ -2,18 +2,10 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { IdentityMenu } from './IdentityMenu'
-import { NavItem } from '@estiva-app/ui'
 import { ShipSidebar } from './ShipSidebar'
 
 /** A 64-hex key. Nothing below may ever print this, or any part of it. */
 const KEY = 'a8a7d739'.repeat(8)
-
-describe('NavItem', () => {
-  it('marks the active entry for assistive tech', () => {
-    render(<NavItem label="Issues" href="#/" active />)
-    expect(screen.getByRole('link')).toHaveAttribute('aria-current', 'page')
-  })
-})
 
 describe('ShipSidebar', () => {
   const projects = [

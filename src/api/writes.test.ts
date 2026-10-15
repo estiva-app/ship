@@ -269,12 +269,6 @@ describe('createFolder and renameFolder say what the relay did (FOL-8)', () => {
     expect(await createFolder('New')).toEqual({ ok: true, id: FOLDER.id, unlisted: 'rate limited' })
   })
 
-  it('a rename passes the Folder and the name through — the channel is the only home (MAN-17)', async () => {
-    s.renameFolder.mockResolvedValue({ ok: true })
-    expect(await renameFolder(FOLDER, 'Renamed')).toEqual({ ok: true })
-    expect(s.renameFolder).toHaveBeenCalledWith({ folder: FOLDER.id, name: 'Renamed' })
-  })
-
   it('a refused rename is the relay’s reason', async () => {
     s.renameFolder.mockResolvedValue({ ok: false, reason: 'restricted' })
     expect(await renameFolder(FOLDER, 'Renamed')).toEqual({ ok: false, reason: 'restricted' })

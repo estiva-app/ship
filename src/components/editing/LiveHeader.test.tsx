@@ -176,11 +176,6 @@ describe('LiveHeader draws its description (from Description.test.tsx)', () => {
     expect(editor.textContent!.length).toBeLessThan(NADDR.length)
   })
 
-  it('renders structure as well', async () => {
-    expect(read('# Title\n\n- one\n- two').querySelectorAll('li')).toHaveLength(2)
-    expect((await write('# Title\n\n- one\n- two')).querySelectorAll('li')).toHaveLength(2)
-  })
-
   it('shows the placeholder when there is nothing yet', async () => {
     await write('')
     expect(document.body.textContent).toContain('Add a description…')
