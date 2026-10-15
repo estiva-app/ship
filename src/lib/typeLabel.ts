@@ -6,6 +6,8 @@
  * and stands in here only when the object's app declares no noun. The noun is
  * the owner's — or, for a file nobody owns, the opening app's `fileNoun` —
  * lower case and singular, so it is capitalised for a label.
+ *
+ * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-file-is-labelled-by-its-type-not-its-app.md
  */
 export function typeLabelOf(object: { noun?: string; appName?: string }): string | undefined {
   return object.noun ? object.noun.charAt(0).toUpperCase() + object.noun.slice(1) : object.appName
