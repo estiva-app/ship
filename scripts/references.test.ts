@@ -269,6 +269,39 @@ const late = [
   )
 }
 
+{
+  /*
+    The same door from the other side (PEE-50, a planted bug nothing caught): a
+    Ship comment on another project's issue whose *body* names one of ours. Its
+    root names this project's issue in the text, so a roll-up that read the
+    thread's references instead of the root's anchors would pull another
+    project's thread into this project's conversation.
+  */
+  const UNRELATED = `30851:${'a'.repeat(64)}:not-in-this-project`
+  const OTHER_ISSUE = `30851:${'a'.repeat(64)}:the-other-issue`
+  const events = [
+    event({ id: 'x1', kind: 1111, tags: [['A', UNRELATED], ['a', UNRELATED]], content: `Blocked on ${POINTER}` }),
+    event({ id: 'x2', kind: 1111, tags: [['A', OTHER_ISSUE], ['a', OTHER_ISSUE]], content: `Same cause as ${POINTER}` }),
+  ]
+  const state = foldFolder(events, refs)
+  const anchors = anchorIndex(events)
+
+  const rolled = commentsOnAny(state.conversations, new Set([ISSUE]), anchors)
+  check(
+    "a comment on another project's issue that names one of ours stays out of our conversation",
+    !rolled.some((r) => r.conversation.id === 'x1'),
+    rolled.map((r) => r.conversation.id).join(','),
+  )
+
+  const both = commentsOnAny(state.conversations, new Set([ISSUE, OTHER_ISSUE]), anchors)
+  const x2 = both.find((r) => r.conversation.id === 'x2')
+  check(
+    '  …and a comment on one of our issues that names another is paired with the issue it is on',
+    both.length === 1 && x2?.about === OTHER_ISSUE,
+    both.map((r) => `${r.conversation.id}→${r.about}`).join(','),
+  )
+}
+
 console.log(
   failures === 0
     ? '\nComments and mentions stay apart.'
