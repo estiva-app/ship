@@ -96,10 +96,10 @@ describe('unread dots on a project page', () => {
     expect(dots).toEqual({})
   })
 
-  it('still shows one on the same page when the project is not muted, so the case above is the mute at work', async () => {
+  it('still shows one when only the project’s chat is muted, so the case above is the project’s own mute at work', async () => {
     const mine = comment(ME, 1500, 'Count me in.')
     const theirs = comment(ELSE, 2000, 'Shipping Friday.')
-    const dots = await dotsFor([mine, muteList([]), theirs], CHANNEL)
+    const dots = await dotsFor([mine, muteList([CHANNEL]), theirs], CHANNEL)
     expect(Object.values(dots).flat()).toEqual([theirs.id])
   })
 })

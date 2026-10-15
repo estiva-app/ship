@@ -220,6 +220,13 @@ const linksFirst = sign(
 const underProject = foldFolder([sign(project, 'l1'), linksFirst]).issues.find((i) => i.id === 'i4')
 check('an issue whose first `a` names a document still folds under its project', underProject?.projectAddr === `30850:${PK}:p1`, String(underProject?.projectAddr))
 
+const linksAfter = sign(
+  { ...buildIssue(PK, Date.now(), { issueId: 'i5', title: 'Then the spec', folder: CONTENT }), tags: [['d', 'i5'], ['title', 'Then the spec'], ['h', CONTENT], ['a', `30850:${PK}:p1`], ['a', LEAF_DOC]] },
+  'l3',
+)
+const projectFirst = foldFolder([sign(project, 'l1'), linksAfter]).issues.find((i) => i.id === 'i5')
+check('…and one that names its project first and a document after it too', projectFirst?.projectAddr === `30850:${PK}:p1`, String(projectFirst?.projectAddr))
+
 // ── The order two changes to one field are replayed in ──────────────────────
 
 /*
