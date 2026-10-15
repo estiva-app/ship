@@ -288,6 +288,8 @@ export function deleteIssue(issue: Issue): Promise<WriteResult> {
  * signals from — Miky's ruling on MAN-5. The record's own Folder only when
  * nothing lists it, or the listing cannot be read; either way the write is
  * found again by its parent or anchor, not by its Folder.
+ *
+ * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-thread-belongs-to-what-it-is-about.md
  */
 export async function workFolder(project: Project, folders?: readonly { id: string; addresses?: readonly string[] }[]): Promise<string> {
   try {
