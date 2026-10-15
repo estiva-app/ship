@@ -39,7 +39,7 @@ import { AttachmentNode, BlockId, ReferenceNode, ReferenceProvider, UnknownBlock
 import { LinkDecoration } from './linkDecoration'
 import { blockRows } from './blockRows'
 import { EditorLineCards, MAX_LINKS_PER_DESCRIPTION, useChipObjects } from './DescriptionCards'
-import { ShipSlashMenu, TURN_INTO, slashSections } from './slashMenu'
+import { ShipSlashMenu, slashSections } from './slashMenu'
 
 /**
  * The description as one surface that is always an editor (Katerina,
@@ -264,7 +264,7 @@ export function LiveDescription({
       <div className="flex flex-col gap-1">
         {/* The reading surface's own `-mx-2 px-2 py-1`, so nothing moves. The text cursor is the only sign it is editable. */}
         {/* The handle sits in the gutter left of the text, so nothing moves (RIC-18). */}
-        <EditorBlockHandle editor={editor} turnInto={TURN_INTO} actions={blockRows(onCommentOnBlock, onCopyBlockLink)}>
+        <EditorBlockHandle editor={editor} actions={blockRows(onCommentOnBlock, onCopyBlockLink)}>
           {/* A table's handles and ➕ bars while you point at it (RIC-21); the block handle stays the table's. */}
           <EditorTableControls editor={editor}>
             <EditorContent editor={editor} className="-mx-2 cursor-text px-2 py-1" data-description="editing" />
