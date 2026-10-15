@@ -265,9 +265,12 @@ export function manifestContent(): ManifestContent {
           */
           title: { tag: ['name', 'title'], fold: 'title' },
           /*
-           * No `subtitle`, on purpose — PRO-8.
+           * No `subtitle` declared, on purpose. Interop gives every file kind
+           * one, read from its `summary` field (SPEC §6.12, §7.2), and a
+           * manifest MUST NOT point it anywhere else — so a project's card
+           * shows its summary without a line here.
            *
-           * This slot used to be `{ field: 'content', truncate: 120 }`. Against
+           * Never the description — PRO-8. This slot used to be `{ field: 'content', truncate: 120 }`. Against
            * the descriptions production actually holds — 76 of 89 carrying
            * markdown structure, the longest 5,706 characters — that renders the
            * first 120 characters of *raw markup* as an object's subtitle. A
@@ -281,15 +284,8 @@ export function manifestContent(): ManifestContent {
            * summary rather than expecting it to flatten a grammar it does not
            * know.
            *
-           * Declaring nothing is the honest interim state, and it is strictly
-           * better than what shipped: a consumer that omits a slot renders a
-           * named, resolvable object, because §13.3 makes `title` the required
-           * one and obliges a consumer to ignore what it cannot use. A
-           * consumer handed 120 characters of markup renders something wrong
-           * and cannot tell that it is wrong.
-           *
-           * The slot comes back when Ship can derive a real summary, which
-           * needs the `body` slot and the content-format decision behind it.
+           * The summary is that plain-text line, written by whoever writes the
+           * file rather than flattened from its description.
            */
           status: { fold: 'status', map: 'statuses', default: DEFAULT_PROJECT_STATUS },
           // Seeded by the root's `lead` tag, overridden by a change — the same
@@ -333,12 +329,10 @@ export function manifestContent(): ManifestContent {
            * shorter version renders something wrong — the tag alone loses every
            * edit, the fold alone renders blank for a project nobody has edited.
            *
-           * **No `truncate`, and no `subtitle` yet.** SPEC §13.5 makes rendering
-           * a body as plain text conformant, so a consumer can show this today;
-           * what it cannot do is flatten marker text into a one-line summary
-           * without a parser, and that parser is RIC-4. PRO-8's rule stands
-           * until then: an app whose description is structured owes the
-           * consumer the summary rather than expecting it to guess.
+           * **No `truncate`.** SPEC §13.5 makes rendering a body as plain text
+           * conformant, so a consumer can show this today; what it cannot do
+           * is flatten marker text into a one-line summary without a parser.
+           * The one-line summary is its own field (SPEC §6.12), above.
            */
           body: { fold: 'description', tag: 'description', field: 'content' },
         },
@@ -355,13 +349,10 @@ export function manifestContent(): ManifestContent {
             (PER-21, found folding it through interop).
           */
           title: { fold: 'title', tag: 'title' },
-          // No `subtitle` — same reason as the project above (PRO-8). Peek's
-          // current widget never rendered this one anyway: a `row` is a single
-          // line by definition, so it reads `subtitle` only for a `card`. That
-          // made the issue projection the quieter half of the same defect, not
-          // an exempt one — the declaration was wrong for any consumer that
-          // chose to use it, and a manifest describes the object rather than
-          // one consumer's layout.
+          // No `subtitle` declared — as the project above: interop reads it
+          // from the issue's `summary` field (SPEC §6.12), never from the
+          // description (PRO-8). A consumer drawing the issue as a `row` may
+          // leave it out; on a card or the issue's own page it shows.
           status: { fold: 'status', map: 'issueStatuses', default: DEFAULT_ISSUE_STATUS },
           meta: [
             // Folded, seeded from the tag — see `fold.ts`. Declared this way so

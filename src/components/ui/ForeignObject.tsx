@@ -194,7 +194,7 @@ function ForeignCard({ object, row, conversations, className }: ForeignObjectPro
         </span>
       </div>
       {slots.subtitle && (
-        <p className="line-clamp-2 text-body-2 text-text-secondary">{slots.subtitle.value}</p>
+        <p className="line-clamp-2 break-words text-body-2 text-text-secondary">{slots.subtitle.value}</p>
       )}
       {(slots.status || meta.length > 0) && (
         <div className="flex flex-wrap items-center gap-2.5 text-caption text-text-muted">
