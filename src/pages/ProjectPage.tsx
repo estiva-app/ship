@@ -247,6 +247,8 @@ export function placeOf(folder: string, state: FolderState): { where?: string; w
  * about other objects — resolving them against this page's description would
  * report a block that has nothing to do with them. Passing nothing reports
  * every anchor as unaddressable, which is honest rather than wrong.
+ *
+ * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/activity-lists-only-mentions-from-elsewhere.md
  */
 export function activityFor(
   addr: string,
