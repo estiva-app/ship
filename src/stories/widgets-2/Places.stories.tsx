@@ -312,7 +312,7 @@ export const InADescriptionSlashMenu: Story = {
   ),
 }
 
-/** "Mentioned in" on an issue's Activity tab: the place each conversation lives, then the conversation, its links drawn the same way. */
+/** "Mentioned in" on an issue's Activity tab: the place each conversation lives, then the conversation, its links drawn the same way, except no card for this issue: you are already on it (Miky, 15 Oct). */
 export const MentionedIn: Story = {
   render: () => (
     <IssueColumn>
@@ -327,7 +327,7 @@ export const MentionedIn: Story = {
             </p>
             <Thread>
               <Comment>
-                <PlacedMessage lines={[['Some words before a link to ', ISSUE, ', and the sentence goes on after it.']]} />
+                <PlacedMessage lines={[['Some words before a link to ', ISSUE, ', and the sentence goes on after it.']]} here={ISSUE} />
               </Comment>
             </Thread>
           </li>
@@ -340,7 +340,7 @@ export const MentionedIn: Story = {
             </p>
             <Thread>
               <Comment name="Person One" at="Yesterday">
-                <PlacedMessage lines={[['Two links: ', ISSUE, ' and'], PAGE]} />
+                <PlacedMessage lines={[['Two links: ', ISSUE, ' and'], PAGE]} here={ISSUE} />
               </Comment>
             </Thread>
           </li>
