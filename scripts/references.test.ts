@@ -247,7 +247,8 @@ const late = [
   ]
   const state = foldFolder(events, refs)
   const anchors = anchorIndex(events)
-  const mine = new Set([ISSUE, OTHER_ISSUE])
+  // The issue `s5` names is one of ours too, or "never a thread that merely mentions one" would pass with nothing to refuse.
+  const mine = new Set([ISSUE, OTHER_ISSUE, POINTED_AT])
 
   const rolled = commentsOnAny(state.conversations, mine, anchors)
   check('a project rolls up the comments on its own issues', rolled.length === 2, `${rolled.length}`)
@@ -266,6 +267,40 @@ const late = [
   check(
     '  …and never a thread that merely mentions one of them',
     !rolled.some((r) => r.conversation.id === 's4'),
+  )
+}
+
+{
+  /*
+    The same door from the other side (PEE-50, a planted bug nothing caught): a
+    Ship comment on another project's issue whose *body* names one of ours. Its
+    root names this project's issue in the text, so a roll-up that read the
+    thread's references instead of the root's anchors would pull another
+    project's thread into this project's conversation.
+  */
+  const UNRELATED = `30851:${'a'.repeat(64)}:not-in-this-project`
+  const OTHER_ISSUE = `30851:${'a'.repeat(64)}:the-other-issue`
+  const events = [
+    event({ id: 'x1', kind: 1111, tags: [['A', UNRELATED], ['a', UNRELATED]], content: `Blocked on ${POINTER}` }),
+    event({ id: 'x2', kind: 1111, tags: [['A', OTHER_ISSUE], ['a', OTHER_ISSUE]], content: `Same cause as ${POINTER}` }),
+  ]
+  const state = foldFolder(events, refs)
+  const anchors = anchorIndex(events)
+
+  // Ours is the issue the bodies name.
+  const rolled = commentsOnAny(state.conversations, new Set([POINTED_AT]), anchors)
+  check(
+    "a comment on another project's issue that names one of ours stays out of our conversation",
+    !rolled.some((r) => r.conversation.id === 'x1'),
+    rolled.map((r) => r.conversation.id).join(','),
+  )
+
+  const both = commentsOnAny(state.conversations, new Set([POINTED_AT, OTHER_ISSUE]), anchors)
+  const x2 = both.find((r) => r.conversation.id === 'x2')
+  check(
+    '  …and a comment on one of our issues that names another is paired with the issue it is on',
+    both.length === 1 && x2?.about === OTHER_ISSUE,
+    both.map((r) => `${r.conversation.id}→${r.about}`).join(','),
   )
 }
 
