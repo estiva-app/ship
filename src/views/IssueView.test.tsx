@@ -253,12 +253,15 @@ describe('the summary on an issue’s and a project’s page (SUM-4)', () => {
   }
 
   it('keeps your text where you wrote it with the reason when the relay refuses it, until you change it', async () => {
-    await refuse(refusedBy(async () => ({ ok: false, reason: 'rate-limited: quota exceeded; retry in 14s' })))
+    const write = vi.fn(async (): Promise<WriteResult> => ({ ok: false, reason: 'rate-limited: quota exceeded; retry in 14s' }))
+    await refuse(refusedBy(write))
     await waitFor(() => expect(screen.queryByText('Summary not saved. Too busy right now — try again in 14s. Your text is still here.')).not.toBeNull())
     expect(box().textContent).toBe('A new summary the relay did not take.')
     // Coming back and leaving tries again, and is refused again: the text and the reason stay.
+    const tries = write.mock.calls.length
     await act(async () => box().focus())
     await leave(box())
+    await waitFor(() => expect(write).toHaveBeenCalledTimes(tries + 1))
     expect(box().textContent).toBe('A new summary the relay did not take.')
     expect(screen.queryByText(/Summary not saved/)).not.toBeNull()
     // Changing it is a new attempt: the old reason goes.
