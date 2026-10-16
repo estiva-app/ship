@@ -4,7 +4,7 @@ import { BlockHandle } from '@estiva-app/ui'
 import { Banner } from '@/components/Banner'
 import { useLinkValues } from '@/api/linkCards'
 import { blockRows, linkedBlock } from './blockRows'
-import { LiveSummary } from './LiveSummary'
+import { ReadingSummary } from './ReadingSummary'
 import { blockLineCards, linksInBlocks } from './DescriptionCards'
 import { ShipRichText } from '@/components/ui/ShipRichText'
 import { byReference, useForeignObjects } from '@/api/useForeignObjects'
@@ -148,7 +148,7 @@ function ReadingHeader({ title, titlePlaceholder, summary, onSummarize, descript
         <h1 className={title ? '-mx-2 px-2 py-1 text-h2 text-text-primary' : '-mx-2 px-2 py-1 text-h2 text-text-muted'}>{title || titlePlaceholder}</h1>
         {/* For a writer this is the moment before the editors arrive: the summary waits, unclickable, so nothing typed is
             lost when HeaderEditing replaces this header. */}
-        <LiveSummary value={summary ?? ''} onCommit={onSummarize} readOnly={readOnly} waiting={!readOnly} />
+        <ReadingSummary value={summary ?? ''} waiting={!readOnly && !!onSummarize} />
       </div>
       <div className="-mx-2 px-2 py-1" data-description="reading">
         {empty ? (

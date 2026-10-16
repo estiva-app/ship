@@ -4,8 +4,9 @@ import { Meta } from '@storybook/addon-docs/blocks'
 
 # LiveSummary
 
-A file's summary under its title on its own page: all of it, click to edit,
-with a count past about 240 characters and a refused save said in the field.
+A file's summary under its title on its own page, edited where it stands, as
+in a document: all of it, with a count past about 240 characters and a refused
+save said under it.
 
 **Seen in** — *Pages/Title and description*: **Default**, **Long Summary**,
 **Empty**, **Read Only**, **Read Only No Summary** and **Summary Refused**.
@@ -13,34 +14,37 @@ It is drawn by **LiveHeader**, so its stories are that page's.
 
 ## When
 
-- Under the title of an issue's or a project's page, inside **LiveHeader**.
+- Under the title of an issue's or a project's page, inside **LiveHeader**'s
+  editors, for someone who can write.
 
 ## When not
 
+- For a reader, or before the editors arrive → **ReadingSummary**, the same
+  text in the same place.
 - In a row, a card or the table → **SummaryLine**, which cuts it short.
 - In a New dialog → **SummaryField**, a field of the form.
-- For a title → **LiveTitle**; for a Folder's name → **EditableText**.
+- For a title → the package's **InlineText**; for a Folder's name →
+  **EditableText**.
 
 ## How
 
 ```tsx
 import { LiveSummary } from '@/components/editing/LiveSummary'
 
-<LiveSummary value={summary ?? ''} onCommit={summarize} readOnly={!!readOnlyReason} />
+<LiveSummary ref={summary} value={summary ?? ''} onCommit={summarize} onEnter={toDescription} />
 ```
 
 - `onCommit` resolves `true` when saved, or the words for why the relay
-  refused (`actInField`); the field stays open with your text and those words.
-- Without `onCommit`, or `readOnly`, it is text, and nothing when empty.
-- `waiting` draws it as the field will be, but not clickable: **LiveHeader**
-  passes it while the editors' chunk loads, so nothing typed is lost when the
-  header is replaced.
+  refused (`actInField`); your text stays where you wrote it, with those words
+  under it, until you change it.
+- `onEnter` says where the caret goes after Enter: the description.
+- `ref` lets the title's Enter put the caret in it.
 
 ## What it owns
 
-- **The package's EditableText** for the edit: Enter or leaving saves,
-  Escape puts the saved one back.
-- **The count past 240** and **the refusal's reason** under the field, read
-  from the field's own events, never handling its keys.
-- **One line of plain text**: line breaks are saved as spaces, and an empty
-  one clears the summary.
+- **The package's InlineText** for the edit (Miky, 16 October: it feels like
+  a document, not a form): no box, the text in its own size and colour, Enter,
+  Escape or leaving saves.
+- **The count past 240** and **the refusal's reason** under it.
+- **One line of plain text**: pasted line breaks are saved as spaces, and an
+  empty one clears the summary.
