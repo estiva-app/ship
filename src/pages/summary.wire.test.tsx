@@ -14,6 +14,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorkspaceState } from '@/api'
+import { press, rewrite, stubLayout } from '@/test/inlineText'
 
 type Signed = { id: string; kind: number; pubkey: string; sig: string; tags: string[][]; content: string }
 
@@ -84,18 +85,18 @@ beforeEach(() => {
   vi.mocked(useDirectory).mockReturnValue({ directory: new Map(), nameOf: () => 'Someone', personOf: () => ({ name: 'Someone' }), profileOf: () => undefined })
 })
 
-/** Open the page, wait for its editors, and save a summary from the field under the title. */
+stubLayout()
+
+/** Open the page, wait for its editors, and save a summary typed (pasted, line breaks and all) under the title. */
 async function summarize(path: string, text: string) {
   goTo(path)
   render(<App />)
   const main = within(screen.getByRole('main'))
   await main.findByRole('textbox', { name: 'Description' }, { timeout: 5000 })
-  const edit = main.queryByRole('button', { name: 'Edit summary' })
-  expect(edit).not.toBeNull()
-  fireEvent.click(edit!)
   const box = main.getByRole('textbox', { name: 'Summary' })
-  fireEvent.input(box, { target: { value: text } })
-  fireEvent.keyDown(box, { key: 'Enter' })
+  await rewrite(box, '')
+  await userEvent.paste(text)
+  await press(box, 'Enter')
 }
 
 describe('a summary saved on its page goes on the wire as one kind:1851', () => {

@@ -1,105 +1,88 @@
-import { useState } from 'react'
+import { useRef, useState, type Ref } from 'react'
 import { FieldLine } from '@estiva-app/ui'
-import { cn } from '@/lib/cn'
-import { EditableText } from '@/components/ui/EditableText'
+import { InlineText, type InlineTextHandle } from '@estiva-app/ui/editor'
 import { SummaryCount } from '@/components/SummaryField'
 import { summaryText } from '@/nostr/summary'
 
 /**
- * A file's summary under its title on its own page: all of it, click to edit, with a count past about 240 and a refused save said in the field.
+ * A file's summary under its title on its own page, edited where it stands, as in a document: all of it, with a count past about 240 and a refused save said under it.
  *
- * The short-summary prototype's `OwnSummary` (estiva-ui `concept/short-summary`,
- * approved by Miky 15 Oct; record a-files-summary-is-its-own-field):
- * - **Someone who can edit** clicks it to change it — the package's
- *   `EditableText`, a plain text box: Enter or leaving it saves, Escape puts
- *   the saved one back. Empty, it says "Add a summary", quietly.
- * - **Someone who cannot** (no rights, or an archived file) reads the text, and
- *   sees nothing at all when there is none.
- * - **Past about 240 characters** a count appears under the field; nothing is
+ * - **Editing feels like a document, not a form** (Miky, 16 October, after
+ *   seeing the first build on production): the text stays where it is, in the
+ *   same size and colour, and becomes editable. No box, no jump in layout, no
+ *   form chrome. The package's `InlineText`, as the title above it is: click
+ *   anywhere in it and type. Enter saves and goes on into the description;
+ *   Escape or leaving saves too. Empty, it says "Add a summary", quietly, and
+ *   clearing it removes the summary.
+ * - **Past about 240 characters** a count appears under it; nothing is
  *   refused (Miky, 15 Oct, call 1 A).
  * - **A save the relay refuses**: the page keeps the summary the relay holds,
- *   and your text stays in the field with the reason, until you change it,
- *   save it, or Escape (why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-refused-action-is-undone-and-your-text-comes-back.md).
- *   `EditableText` already keeps a refused field open; the reason is drawn
- *   here, under it, as the prototype's `SummaryBeingWritten` does.
+ *   and your text stays where you wrote it with the reason under it, until you
+ *   change it or save it (why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-refused-action-is-undone-and-your-text-comes-back.md).
  *
- * Plain text on one line (SPEC §6.12): line breaks typed with Shift+Enter are
- * saved as spaces, and clearing it to nothing removes the summary.
- *
- * The count and the reason need the text being typed, which `EditableText`
- * keeps to itself, so they are read from the field's own events as they
- * bubble out of it — observed, not handled: the field still owns its keys.
+ * Plain text on one line (SPEC §6.12): pasted line breaks are saved as spaces.
+ * Only for someone who can write, once the editors have loaded; before that,
+ * and for everyone else, `ReadingSummary` draws the same text in the same place.
  */
 export function LiveSummary({
   value,
   onCommit,
-  readOnly = false,
-  waiting = false,
+  onEnter,
+  ref,
 }: {
   /** The summary the relay holds; empty when there is none. */
   value: string
-  /** Save it: `true`, or the words for why the relay refused. Empty text clears it. Omitted, it is text only. */
-  onCommit?: (value: string) => Promise<true | string>
-  readOnly?: boolean
-  /**
-   * A writer's page before the editors' chunk has arrived: drawn as the field
-   * will be, "Add a summary" included, but not yet clickable — the header that
-   * replaces this one would drop anything typed into it.
-   */
-  waiting?: boolean
+  /** Save it: `true`, or the words for why the relay refused. Empty text clears it. */
+  onCommit: (value: string) => Promise<true | string>
+  /** Enter, after the save has started: the caret goes into the description. */
+  onEnter?: () => void
+  ref?: Ref<InlineTextHandle>
 }) {
-  // The text in the open field while it is being written, for the count; null when it is not.
+  // The text being written, for the count; null when you are not in it.
   const [typing, setTyping] = useState<string | null>(null)
   const [refused, setRefused] = useState<string>()
-
-  if (readOnly || !onCommit) return value ? <p className="-mx-2 px-2 py-1 text-body-1 text-text-secondary">{value}</p> : null
-  // The same box as EditableText's at rest (its 1px border included), so nothing moves when the field replaces it.
-  if (waiting) return <p className={cn('-mx-2 border border-transparent px-2 py-1 text-body-1', value ? 'text-text-secondary' : 'text-text-muted')}>{value || 'Add a summary'}</p>
+  // The text the reason is about: the reason stays until that text changes.
+  const attempted = useRef<string | null>(null)
+  // What the field holds now, as last typed: a refusal that answers older text says nothing.
+  const written = useRef<string | null>(null)
 
   const commit = async (next: string) => {
     const text = summaryText(next)
-    if (text === value) {
-      setRefused(undefined)
-      setTyping(null)
-      return true
-    }
+    attempted.current = text
+    written.current = text
+    // Never compared with `value` here: it is the store's copy, which lags a save
+    // just made, so changing straight back would never be written. InlineText
+    // already skips an unchanged text.
     const result = await onCommit(text)
     if (result === true) {
       setRefused(undefined)
-      setTyping(null)
       return true
     }
-    // Never a field held open with nothing said: a refusal always shows a reason.
+    // You changed it while the relay was answering: the reason is about text no longer there.
+    if (written.current !== text) return false
+    // Never a refusal with nothing said: it always shows a reason.
     setRefused(result || 'The relay gave no reason.')
     return false
   }
 
-  const field = (target: EventTarget) => (target instanceof HTMLTextAreaElement ? target : null)
   return (
-    // The size is set here: EditableText takes the size around it.
-    <div
-      className="flex flex-col gap-1 text-body-1"
-      onFocus={(event) => {
-        const box = field(event.target)
-        if (box) setTyping(box.value)
-      }}
-      onInput={(event) => {
-        const box = field(event.target)
-        if (!box) return
-        setTyping(box.value)
-        setRefused(undefined)
-      }}
-      onBlur={(event) => {
-        if (field(event.target)) setTyping(null)
-      }}
-      onKeyDown={(event) => {
-        if (event.key !== 'Escape' || !field(event.target)) return
-        setTyping(null)
-        setRefused(undefined)
-      }}
-    >
-      {/* @estiva-escape(no-restyled-part): EditableText has no quieter tone, and the approved short-summary prototype (Miky, 15 Oct) draws a summary in the secondary colour under the title; the tone belongs in the package */}
-      <EditableText multiline label="Summary" placeholder="Add a summary" value={value} onCommit={commit} className={cn('-mx-2', value && 'text-text-secondary')} />
+    <div className="flex flex-col gap-1">
+      <InlineText
+        ref={ref}
+        variant="summary"
+        clearable
+        label="Summary"
+        placeholder="Add a summary"
+        value={value}
+        onCommit={commit}
+        onEnter={onEnter}
+        onText={(text) => {
+          // Changing the refused text is a new attempt: the old reason goes.
+          if (text !== null) written.current = summaryText(text)
+          if (text !== null && summaryText(text) !== attempted.current) setRefused(undefined)
+          setTyping(text)
+        }}
+      />
       {typing !== null && <SummaryCount text={typing} />}
       {refused && <FieldLine tone="error">Summary not saved. {refused} Your text is still here.</FieldLine>}
     </div>

@@ -85,7 +85,7 @@ const meta = {
 export default meta
 type Story = StoryObj<typeof meta>
 
-/** A project with its summary under the title, and a description that has headings, a list and a quote. Click the summary to change it. */
+/** A project with its summary under the title, and a description that has headings, a list and a quote. Click anywhere in the title or the summary and type: no box, nothing moves; Enter goes on down the page. */
 export const Default: Story = {}
 
 /** A summary past about 240 characters: all of it, on the page. Click it and type: past 240 a count appears, and nothing is refused. */
@@ -94,13 +94,13 @@ export const LongSummary: Story = { args: { summary: LONG_SUMMARY } }
 /** Nothing written yet: "Untitled issue", a quiet "Add a summary" and "Add a description…", muted, over empty editors. */
 export const Empty: Story = { args: { title: '', summary: '', description: '', issue: true } }
 
-/** A reader who cannot write, or an archived file: text, the summary not clickable, and no editor is downloaded. */
+/** A reader who cannot write, or an archived file: text, the summary not editable, and no editor is downloaded. */
 export const ReadOnly: Story = { args: { readOnly: true } }
 
 /** A reader, and no summary: nothing at all where it would be — no "Add a summary". */
 export const ReadOnlyNoSummary: Story = { args: { readOnly: true, summary: '' } }
 
-/** Change the summary and press Enter: the relay refuses it, the old one stays, and your text stays in the field with the reason. */
+/** Change the summary and press Enter: the relay refuses it, the old one stays for everyone else, and your text stays where you wrote it with the reason under it. */
 export const SummaryRefused: Story = { args: { refuse: 'Too busy right now — try again in 14s.' } }
 
 /** Links in the description open in a new tab on a click — a bare address and one with words. A click on plain text still places the caret. */
