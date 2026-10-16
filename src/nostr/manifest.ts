@@ -564,6 +564,9 @@ export function manifestContent(): ManifestContent {
           properties: {
             title: { type: 'string' },
             description: { type: 'string', target: 'content', format: BLOCK_DOCUMENT_FORMAT },
+            // The root's `summary` tag, the seed `summarize-issue` folds over
+            // (SPEC §6.12). Plain text, so no `format`; last, as `buildIssue` writes it.
+            summary: { type: 'string' },
           },
           required: ['title'],
         },
@@ -686,6 +689,35 @@ export function manifestContent(): ManifestContent {
         emits: { kind: KIND.CHANGE, field: 'description' },
         input: { type: 'string', format: BLOCK_DOCUMENT_FORMAT },
       },
+      /*
+        The one-line summary beside the title (SPEC §6.12, §7.3): a `kind:1851`
+        on `summary`, which is `setIssueField` / `setProjectField` on that field.
+        Its input declares no `format` — a summary is plain text, never a
+        document — and a consumer finds it by `emits.field`, not by id. An empty
+        value clears it; the root's seed does not come back.
+      */
+      {
+        id: 'summarize-issue',
+        label: 'Edit summary',
+        description:
+          'Set the one- or two-sentence summary shown under an issue\'s title in lists and on cards, about 240 ' +
+          'characters of plain text; an empty value clears it. A change event, so anyone in the Folder may.',
+        effect: 'writes',
+        appliesTo: String(KIND.ISSUE),
+        emits: { kind: KIND.CHANGE, field: 'summary' },
+        input: { type: 'string' },
+      },
+      {
+        id: 'summarize-project',
+        label: 'Edit summary',
+        description:
+          'Set the one- or two-sentence summary shown under a project\'s name in lists and on cards, about 240 ' +
+          'characters of plain text; an empty value clears it. A change event, so anyone in the Folder may.',
+        effect: 'writes',
+        appliesTo: String(KIND.PROJECT),
+        emits: { kind: KIND.CHANGE, field: 'summary' },
+        input: { type: 'string' },
+      },
       {
         id: 'move-issue',
         label: 'Move to project',
@@ -722,8 +754,11 @@ export function manifestContent(): ManifestContent {
               as it does in Ship.
             */
             description: { type: 'string' },
-            // SHI-4: written as `["key", …]`, the tag `buildProject` writes last.
+            // SHI-4: written as `["key", …]`, the tag `buildProject` writes after `lead`.
             key: { type: 'string' },
+            // The root's `summary` tag (SPEC §6.12), after `key` as `buildProject`
+            // writes it. Readable across the workspace, like `name`.
+            summary: { type: 'string' },
           },
           required: ['name'],
         },

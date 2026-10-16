@@ -82,11 +82,11 @@ export function setMembership(target: { kind: 'issue'; issue: Issue } | { kind: 
  * team. A refused listing is still a created project — Ship shows it under
  * the team — so it comes back `ok` with `unlisted` saying why Peek will not.
  */
-export async function createProject(draft: { title: string; description: string; key: string; team: { folder: string; hasState: boolean } }): Promise<CreateResult & { unlisted?: string }> {
+export async function createProject(draft: { title: string; description: string; summary?: string; key: string; team: { folder: string; hasState: boolean } }): Promise<CreateResult & { unlisted?: string }> {
   const clock = await clockProblem()
   if (clock) return { ok: false, reason: clock }
   try {
-    const { result, placed, addr } = await store.createProject({ title: draft.title, description: draft.description, key: draft.key, team: draft.team })
+    const { result, placed, addr } = await store.createProject({ title: draft.title, description: draft.description, summary: draft.summary, key: draft.key, team: draft.team })
     if (result.ok) claimedHere.add(addr)
     if (!result.ok) return { ok: false, reason: result.reason ?? 'no reason given' }
     if (placed && !placed.ok) return { ok: true, addr, unlisted: placed.reason ?? 'no reason given' }
@@ -97,7 +97,7 @@ export async function createProject(draft: { title: string; description: string;
 }
 
 /** One field of a project record: title, description, status, lead. The record's own Folder. */
-export function setProjectField(project: Project, field: 'title' | 'description' | 'status' | 'lead' | 'key', value: string, note: string, contentFormat?: string): Promise<WriteResult> {
+export function setProjectField(project: Project, field: 'title' | 'description' | 'summary' | 'status' | 'lead' | 'key', value: string, note: string, contentFormat?: string): Promise<WriteResult> {
   /*
     A description is a rich text field (SPEC §13) and goes on the wire as a
     block document; every other field is a scalar and goes as it arrived.
@@ -340,7 +340,7 @@ async function keyFor(project: Project, visible: Visible): Promise<string> {
  * `settleClaims`'s. The address is still the identity — a ref is never
  * resolved by.
  */
-export async function createIssue(project: Project, visible: Visible, draft: { title: string; description: string }): Promise<CreateResult> {
+export async function createIssue(project: Project, visible: Visible, draft: { title: string; description: string; summary?: string }): Promise<CreateResult> {
   const clock = await clockProblem()
   if (clock) return { ok: false, reason: clock }
   try {
@@ -349,6 +349,7 @@ export async function createIssue(project: Project, visible: Visible, draft: { t
       folder: await workFolder(project),
       title: draft.title,
       description: draft.description,
+      summary: draft.summary,
       projectAddr: project.addr,
       ref: nextRef(key, visible.issues.map((issue) => issue.ref)),
     })
@@ -361,7 +362,7 @@ export async function createIssue(project: Project, visible: Visible, draft: { t
 }
 
 /** One field of an issue: title, description, status, assignee, project. The issue's own Folder. */
-export function setIssueField(issue: Issue, field: 'title' | 'description' | 'status' | 'assignee' | 'project' | 'ref', value: string, note: string, contentFormat?: string): Promise<WriteResult> {
+export function setIssueField(issue: Issue, field: 'title' | 'description' | 'summary' | 'status' | 'assignee' | 'project' | 'ref', value: string, note: string, contentFormat?: string): Promise<WriteResult> {
   // The description arrives as a built document with its own tag — see
   // `setProjectField`.
   const body = field === 'description' ? { value, contentFormat } : { value, contentFormat: undefined }

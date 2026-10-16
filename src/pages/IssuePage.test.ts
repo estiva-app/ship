@@ -51,6 +51,13 @@ describe("an issue's History (RIC-15)", () => {
     ])
   })
 
+  it('says a summary was edited or removed, never its text (SPEC §6.12)', () => {
+    // Newest first, as History lists them.
+    expect(texts([change('summary', 'Totals are off by one cent.'), change('summary', ' ')])).toEqual([
+      'removed the summary',
+      'edited the summary',
+    ])
+  })
 })
 
 describe('no History row prints a wire value (564ee489)', () => {

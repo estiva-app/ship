@@ -46,7 +46,7 @@ export function assertFolderId(folder: string): void {
 }
 
 /**
- * kind:30850 Project. Tag order: d, name, [description], buzz-channel, [lead].
+ * kind:30850 Project. Tag order: d, name, [description], buzz-channel, [lead, p], [key], [summary].
  *
  * ## The Folder *is* the project
  *
@@ -119,6 +119,8 @@ export function buildProject(
     description?: string
     /** The prefix of its issues' refs, 3–6 letters — SHI-4, SPEC §6.1. */
     key?: string
+    /** The one-line summary beside its name — SPEC §6.12. Only the seed: a later edit is a change. */
+    summary?: string
   },
 ): UnsignedEvent {
   assertFolderId(args.folder)
@@ -140,6 +142,9 @@ export function buildProject(
   }
   // Last, so every tag before it keeps its place in the id preimage.
   if (args.key) tags.push(['key', args.key])
+  // After `key`, for the same reason (SPEC §6.1). Blank is no summary, so no tag.
+  const summary = args.summary?.trim()
+  if (summary) tags.push(['summary', summary])
   return {
     pubkey,
     created_at: toNostrSeconds(createdAtMs),
@@ -155,7 +160,7 @@ export function buildProject(
 }
 
 /**
- * kind:30851 Issue — the root event. Tag order: d, title, h, [a], [ref].
+ * kind:30851 Issue — the root event. Tag order: d, title, h, [a], [ref], [summary].
  *
  * Note what is **not** here: status and assignee. Those are `1851` changes, so
  * that somebody other than the author can set them. Putting them on the root
@@ -174,6 +179,8 @@ export function buildIssue(
     /** Display-only key such as `LL-12`. Never used for addressing. */
     ref?: string
     description?: string
+    /** The one-line summary beside its title — SPEC §6.12. Only the seed: a later edit is a change. */
+    summary?: string
   },
 ): UnsignedEvent {
   assertFolderId(args.folder)
@@ -184,6 +191,9 @@ export function buildIssue(
   ]
   if (args.projectAddr) tags.push(['a', args.projectAddr])
   if (args.ref) tags.push(['ref', args.ref])
+  // Last (SPEC §6.1). Blank is no summary, so no tag.
+  const summary = args.summary?.trim()
+  if (summary) tags.push(['summary', summary])
   return {
     pubkey,
     created_at: toNostrSeconds(createdAtMs),
