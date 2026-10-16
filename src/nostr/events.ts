@@ -23,6 +23,7 @@ import { buildComment, buildReply, mentionTagsFor, quoteTagsFor, referenceTagsFo
 import { KIND } from './kinds'
 import { attachmentsInDocument } from './attachments'
 import { manifestContent } from './manifest'
+import { summaryText } from './summary'
 
 /*
   A comment and a reply to one are `@estiva-app/conversation`'s builders
@@ -142,8 +143,8 @@ export function buildProject(
   }
   // Last, so every tag before it keeps its place in the id preimage.
   if (args.key) tags.push(['key', args.key])
-  // After `key`, for the same reason (SPEC §6.1). Blank is no summary, so no tag.
-  const summary = args.summary?.trim()
+  // After `key`, for the same reason (SPEC §6.1). On one line, as every reader draws it; blank is no summary, so no tag.
+  const summary = summaryText(args.summary ?? '')
   if (summary) tags.push(['summary', summary])
   return {
     pubkey,
@@ -191,8 +192,8 @@ export function buildIssue(
   ]
   if (args.projectAddr) tags.push(['a', args.projectAddr])
   if (args.ref) tags.push(['ref', args.ref])
-  // Last (SPEC §6.1). Blank is no summary, so no tag.
-  const summary = args.summary?.trim()
+  // Last (SPEC §6.1). On one line, as every reader draws it; blank is no summary, so no tag.
+  const summary = summaryText(args.summary ?? '')
   if (summary) tags.push(['summary', summary])
   return {
     pubkey,

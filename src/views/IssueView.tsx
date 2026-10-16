@@ -46,6 +46,10 @@ export interface IssueViewProps {
   /** Resolve a mentioned key to a name — SPEC §13.1. */
   nameOf?: (pubkey: string) => string
   onRename: (v: string) => Promise<boolean> | boolean
+  /** The one-line summary under the title (SPEC §6.12); absent when it has none. */
+  summary?: string
+  /** Save the summary: `true`, or the words for why it was refused. Empty clears it. */
+  onSummarize?: (v: string) => Promise<true | string>
   /** The block menu's Copy link (RIC-18): copies and says so. */
   onCopyBlockLink?: (link: string) => void
   /** The body, and the format tag the editor built it in — RIC-14. */
@@ -102,7 +106,7 @@ const TABS: { id: IssueTab; label: string }[] = [
 ]
 
 /** One issue's page, in tabs: Overview and Activity, with the rail on every tab. */
-export function IssueView({ crumbs, tab, onTab, title, description, descriptionFormat, nameOf, onRename, onCopyBlockLink, onDescribe, related, threads, unread, stillUnread, onThreadShown, onStartConversation, onReply, activity, activityTruncated, onReplyInActivity, history, rail, about, onReact, onDeleteMessage, onEditMessage, readOnlyReason, lockedReason, upload, archivedNotice, members }: IssueViewProps) {
+export function IssueView({ crumbs, tab, onTab, title, summary, onSummarize, description, descriptionFormat, nameOf, onRename, onCopyBlockLink, onDescribe, related, threads, unread, stillUnread, onThreadShown, onStartConversation, onReply, activity, activityTruncated, onReplyInActivity, history, rail, about, onReact, onDeleteMessage, onEditMessage, readOnlyReason, lockedReason, upload, archivedNotice, members }: IssueViewProps) {
   // `linkTo` on each crumb (S15, 0.10.0): the breadcrumbs were the last links in Ship that reloaded the app (SHI-20).
   const items: Crumb[] = [{ label: 'Issues', ...linkTo(crumbs.issuesHref) }]
   // The box before the project's name says it is a project, as the sidebar's entry does (Katerina, 2026-09-09).
@@ -129,7 +133,7 @@ export function IssueView({ crumbs, tab, onTab, title, description, descriptionF
         {tab === 'overview' && (
           <Centred>
             {archivedNotice}
-            <LiveHeader title={title} titlePlaceholder="Untitled issue" onRename={onRename} description={description} format={descriptionFormat} onDescribe={onDescribe} nameOf={nameOf} readOnly={!!(readOnlyReason ?? lockedReason)} upload={upload} onCommentOnBlock={comment.start} onCopyBlockLink={onCopyBlockLink} />
+            <LiveHeader title={title} titlePlaceholder="Untitled issue" onRename={onRename} summary={summary} onSummarize={onSummarize} description={description} format={descriptionFormat} onDescribe={onDescribe} nameOf={nameOf} readOnly={!!(readOnlyReason ?? lockedReason)} upload={upload} onCommentOnBlock={comment.start} onCopyBlockLink={onCopyBlockLink} />
             {/* Nesting is by intent (RFC 0.5 §10.7): what somebody placed under this issue, from whichever app owns it. */}
             {hasRelated(related) && (
               <>

@@ -1,0 +1,35 @@
+import { Meta } from '@storybook/addon-docs/blocks'
+
+<Meta title="Overlays/SummaryCount" />
+
+# SummaryCount
+
+The count a summary past about 240 characters shows under its field: a
+warning, never a refusal.
+
+**Seen in** — *Overlays/Dialogs*: **New Issue With A Long Summary**; and under
+the summary on *Pages/Title and description*: **Long Summary**, while it is
+being typed.
+
+## When
+
+- Under a summary's field, as it is typed: **SummaryField** and
+  **LiveSummary** draw it.
+
+## When not
+
+- To stop someone typing: a summary is never cut or refused (Miky, 15 Oct).
+- For any other line under a field → **FieldLine**, or **Field**'s `helper`.
+
+## How
+
+```tsx
+import { SummaryCount } from '@/components/SummaryField'
+
+<SummaryCount text={draft} />
+```
+
+## What it owns
+
+- **The limit**, 240, and **counting as a person does**: what would be saved,
+  letter by letter. Nothing at or under the limit.

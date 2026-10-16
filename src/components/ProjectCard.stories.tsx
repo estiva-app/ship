@@ -15,8 +15,7 @@ const meta = {
   args: {
     href: '#/p/des',
     title: 'Design System',
-    description:
-      'Tokens, primitives and the Storybook that reviews them. One vocabulary for every surface, so a new screen starts from the same parts as the last one.',
+    summary: 'Tokens, primitives and the Storybook that reviews them.',
     status: { value: 'in_progress', label: 'In Progress' },
     issueCount: 11,
     doneCount: 2,
@@ -38,13 +37,25 @@ const oneCard: Story['decorators'] = [
   ),
 ]
 
-/** Title · two-line description · status · N issues · x/y done · by face name ago. */
+/** Title · its summary · status · N issues · x/y done · by face name ago. */
 export const Default: Story = { decorators: oneCard }
+
+/** A summary past about 240 characters: cut at two lines. All of it is on the project's page. */
+export const LongSummary: Story = {
+  decorators: oneCard,
+  args: {
+    summary:
+      'A summary that runs well past the length it is meant to keep to, so every place that shows it has to decide where to cut it short: two lines in a row, a card or the picker, and all of it on the file’s own page, where whoever can edit it sees the whole text and can shorten it.',
+  },
+}
+
+/** No summary: no line at all, so the card is shorter — the description is never cut into its place. */
+export const NoSummary: Story = { decorators: oneCard, args: { summary: undefined } }
 
 /** No issues: the counters are absent, not "0 issues · 0/0 done". */
 export const Empty: Story = {
   decorators: oneCard,
-  args: { title: 'Mobile app', description: undefined, status: { value: 'planned', label: 'Planned' }, issueCount: 0, doneCount: 0 },
+  args: { title: 'Mobile app', summary: undefined, status: { value: 'planned', label: 'Planned' }, issueCount: 0, doneCount: 0 },
 }
 
 /** Archived, with its chip. */

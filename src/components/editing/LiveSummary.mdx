@@ -1,0 +1,46 @@
+import { Meta } from '@storybook/addon-docs/blocks'
+
+<Meta title="Pages/LiveSummary" />
+
+# LiveSummary
+
+A file's summary under its title on its own page: all of it, click to edit,
+with a count past about 240 characters and a refused save said in the field.
+
+**Seen in** — *Pages/Title and description*: **Default**, **Long Summary**,
+**Empty**, **Read Only**, **Read Only No Summary** and **Summary Refused**.
+It is drawn by **LiveHeader**, so its stories are that page's.
+
+## When
+
+- Under the title of an issue's or a project's page, inside **LiveHeader**.
+
+## When not
+
+- In a row, a card or the table → **SummaryLine**, which cuts it short.
+- In a New dialog → **SummaryField**, a field of the form.
+- For a title → **LiveTitle**; for a Folder's name → **EditableText**.
+
+## How
+
+```tsx
+import { LiveSummary } from '@/components/editing/LiveSummary'
+
+<LiveSummary value={summary ?? ''} onCommit={summarize} readOnly={!!readOnlyReason} />
+```
+
+- `onCommit` resolves `true` when saved, or the words for why the relay
+  refused (`actInField`); the field stays open with your text and those words.
+- Without `onCommit`, or `readOnly`, it is text, and nothing when empty.
+- `waiting` draws it as the field will be, but not clickable: **LiveHeader**
+  passes it while the editors' chunk loads, so nothing typed is lost when the
+  header is replaced.
+
+## What it owns
+
+- **The package's EditableText** for the edit: Enter or leaving saves,
+  Escape puts the saved one back.
+- **The count past 240** and **the refusal's reason** under the field, read
+  from the field's own events, never handling its keys.
+- **One line of plain text**: line breaks are saved as spaces, and an empty
+  one clears the summary.

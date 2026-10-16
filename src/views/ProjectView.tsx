@@ -41,7 +41,19 @@ import type { RelatedState } from '@/api/useRelated'
  */
 export interface ProjectViewProps {
   crumbs: { projectsHref: string; title: string }
-  header: { title: string; description: string; descriptionFormat: ContentFormat; nameOf?: (pubkey: string) => string; archived: boolean; onRename: (v: string) => Promise<boolean> | boolean; onDescribe: (v: string, contentFormat?: string) => Promise<boolean> | boolean }
+  header: {
+    title: string
+    /** The one-line summary under the title (SPEC §6.12); absent when it has none. */
+    summary?: string
+    description: string
+    descriptionFormat: ContentFormat
+    nameOf?: (pubkey: string) => string
+    archived: boolean
+    onRename: (v: string) => Promise<boolean> | boolean
+    /** Save the summary: `true`, or the words for why it was refused. Empty clears it. */
+    onSummarize?: (v: string) => Promise<true | string>
+    onDescribe: (v: string, contentFormat?: string) => Promise<boolean> | boolean
+  }
   /** "Add issue", at the right end of the tab row. */
   onAddIssue?: () => void
   /** The open tab — in the URL. */
@@ -157,7 +169,7 @@ export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onVi
         {tab === 'overview' && (
           <Centred>
             {archivedNotice}
-            <LiveHeader title={header.title} titlePlaceholder="Untitled project" onRename={header.onRename} description={header.description} format={header.descriptionFormat} onDescribe={header.onDescribe} nameOf={header.nameOf} readOnly={!!(readOnlyReason ?? lockedReason)} upload={upload} onCommentOnBlock={comment.start} onCopyBlockLink={onCopyBlockLink} />
+            <LiveHeader title={header.title} titlePlaceholder="Untitled project" onRename={header.onRename} summary={header.summary} onSummarize={header.onSummarize} description={header.description} format={header.descriptionFormat} onDescribe={header.onDescribe} nameOf={header.nameOf} readOnly={!!(readOnlyReason ?? lockedReason)} upload={upload} onCommentOnBlock={comment.start} onCopyBlockLink={onCopyBlockLink} />
             {/* Nesting is by intent (RFC 0.5 §10.7): what somebody placed under this project, whatever app it belongs
                 to. A line first, so the list the app adds never reads as part of the description someone typed. */}
             {hasRelated(related) && (

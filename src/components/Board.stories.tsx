@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite'
 import { ISSUE_STATUSES, ROWS, hrefFor } from '@/fixtures/issues'
 import { Board } from './Board'
 
-/** One column per status, cards of ref · title · face. Read-only until REW-5 wires the drag. */
+/** One column per status, cards of ref · title · summary (two lines, when it has one) · face. Read-only until REW-5 wires the drag. */
 const meta = {
   title: 'Issues/Board',
   component: Board,

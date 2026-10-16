@@ -57,3 +57,24 @@ export async function act(
   await refresh?.()
   return true
 }
+
+/**
+ * `act` for a field that says its own refusal (a summary, SUM-4): no toast —
+ * the reason is drawn under the field, where your text still is — so this
+ * resolves `true`, or the words for why the relay said no, as one sentence.
+ */
+export async function actInField(what: string, write: () => Promise<WriteResult>, refresh?: () => Promise<void>): Promise<true | string> {
+  const sentence = (reason: string) => {
+    const text = reason.trim() || 'The relay gave no reason'
+    return /[.!?]$/.test(text) ? text : `${text}.`
+  }
+  let words = ''
+  try {
+    const ok = await act(what, write, (text) => { words = text }, refresh, sentence)
+    // A refusal always comes back with words, even if `act` said none: a field is never held open with nothing shown.
+    return ok || words || sentence('')
+  } catch (error) {
+    // A write that throws is a refusal like any other, said in the field — never a rejection the field cannot show.
+    return sentence(error instanceof Error ? error.message : String(error))
+  }
+}

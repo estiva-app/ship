@@ -4,6 +4,7 @@ import { BlockHandle } from '@estiva-app/ui'
 import { Banner } from '@/components/Banner'
 import { useLinkValues } from '@/api/linkCards'
 import { blockRows, linkedBlock } from './blockRows'
+import { LiveSummary } from './LiveSummary'
 import { blockLineCards, linksInBlocks } from './DescriptionCards'
 import { ShipRichText } from '@/components/ui/ShipRichText'
 import { byReference, useForeignObjects } from '@/api/useForeignObjects'
@@ -21,6 +22,10 @@ export interface LiveHeaderProps {
   title: string
   titlePlaceholder: string
   onRename: (value: string) => Promise<boolean> | boolean
+  /** The one-line summary under the title (SPEC §6.12); absent when it has none. */
+  summary?: string
+  /** Save the summary: `true`, or the words for why it was refused (`actInField`). Empty clears it. Omitted, the summary is text only. */
+  onSummarize?: (value: string) => Promise<true | string>
   description: string
   format: ContentFormat
   /** The body, and the format tag the editor built it in — RIC-14. */
@@ -133,12 +138,18 @@ export function LiveHeader(props: LiveHeaderProps) {
  * the moment before the editor arrives. Laid out exactly as the editors are,
  * so nothing moves when they replace it.
  */
-function ReadingHeader({ title, titlePlaceholder, description, format, nameOf, readOnly, resolved, resolveLink, onCommentOnBlock, onCopyBlockLink }: LiveHeaderProps & { resolved: Record<string, ForeignObjectData | null | undefined>; resolveLink: LinkResolver }) {
+function ReadingHeader({ title, titlePlaceholder, summary, onSummarize, description, format, nameOf, readOnly, resolved, resolveLink, onCommentOnBlock, onCopyBlockLink }: LiveHeaderProps & { resolved: Record<string, ForeignObjectData | null | undefined>; resolveLink: LinkResolver }) {
   const empty = description.trim() === ''
   return (
     <div className="flex flex-col gap-4">
-      {/* No "Archived" chip beside the title: the Archived notice above it says so in words (Katerina, 30 September). */}
-      <h1 className={title ? '-mx-2 px-2 py-1 text-h2 text-text-primary' : '-mx-2 px-2 py-1 text-h2 text-text-muted'}>{title || titlePlaceholder}</h1>
+      {/* The title and the summary under it, 4px apart; the description 16px below (the short-summary prototype's ShipFilePage). */}
+      <div className="flex flex-col gap-1">
+        {/* No "Archived" chip beside the title: the Archived notice above it says so in words (Katerina, 30 September). */}
+        <h1 className={title ? '-mx-2 px-2 py-1 text-h2 text-text-primary' : '-mx-2 px-2 py-1 text-h2 text-text-muted'}>{title || titlePlaceholder}</h1>
+        {/* For a writer this is the moment before the editors arrive: the summary waits, unclickable, so nothing typed is
+            lost when HeaderEditing replaces this header. */}
+        <LiveSummary value={summary ?? ''} onCommit={onSummarize} readOnly={readOnly} waiting={!readOnly} />
+      </div>
       <div className="-mx-2 px-2 py-1" data-description="reading">
         {empty ? (
           <span className="text-body-2 text-text-muted">{readOnly ? '' : 'Add a description…'}</span>

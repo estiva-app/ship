@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react'
 import { PROJECT_STATUSES, createProject, keyProblem, lookupStatus, projectKeys, suggestKey, takenKeys, type DirectoryView, type FolderState } from '@/api'
 import type { FolderSummary } from '@estiva-app/interop'
-import { renderTreeText, toRenderTree } from '@estiva-app/protocol'
 import { NewProjectDialog } from '@/components/NewProjectDialog'
 import type { ProjectCardProps } from '@/components/ProjectCard'
 import { ProjectsView } from '@/views/ProjectsView'
@@ -41,9 +40,8 @@ export function ProjectsPage({ state, directory, teams, archives, archived, say,
       return {
         href: href({ name: 'project', d: project.id, slug: project.title, view: 'table' }),
         title: project.title,
-        // The words a reader would see, never the stored document: a description saved by the editor is a block
-        // document, and the card printed its JSON (found 30 September).
-        description: renderTreeText(toRenderTree(project.description, project.descriptionFormat)).trim() || undefined,
+        // The summary, never the description cut short (SUM-4): a project without one gets a shorter card.
+        summary: project.summary,
         status: { value: status.value, label: status.label },
         issueCount: issues.length,
         doneCount: issues.filter((issue) => issue.status === 'done').length,

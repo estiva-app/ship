@@ -6,6 +6,8 @@ import { Field } from '@/components/ui/Field'
 import { Select } from '@/components/ui/Select'
 import { TextInput } from '@/components/ui/TextInput'
 import { Textarea } from '@/components/ui/Textarea'
+import { summaryText } from '@/nostr/summary'
+import { SummaryField } from './SummaryField'
 
 /**
  * Production's "New project" form (apps/ship/views/projects.ts) in the
@@ -30,6 +32,8 @@ export interface NewProjectTeam {
 
 export interface NewProjectDraft {
   title: string
+  /** Optional; empty creates the project with no summary (no root tag). */
+  summary: string
   description: string
   key: string
   team: { folder: string; hasState: boolean }
@@ -49,6 +53,7 @@ export interface NewProjectDialogProps {
 
 export function NewProjectDialog({ teams, suggestKey, keyProblem, onClose, onCreate }: NewProjectDialogProps) {
   const [title, setTitle] = useState('')
+  const [summary, setSummary] = useState('')
   const [description, setDescription] = useState('')
   // Undefined until the person types one: until then the key follows the title.
   const [typedKey, setTypedKey] = useState<string>()
@@ -63,7 +68,7 @@ export function NewProjectDialog({ teams, suggestKey, keyProblem, onClose, onCre
     if (!canSubmit || !team) return
     setBusy(true)
     try {
-      const ok = await onCreate({ title: title.trim(), description: description.trim(), key, team: { folder: team.id, hasState: team.hasState } })
+      const ok = await onCreate({ title: title.trim(), summary: summaryText(summary), description: description.trim(), key, team: { folder: team.id, hasState: team.hasState } })
       if (ok !== false) onClose()
     } finally {
       setBusy(false)
@@ -90,6 +95,7 @@ export function NewProjectDialog({ teams, suggestKey, keyProblem, onClose, onCre
         <Field label="Title" required>
           <TextInput value={title} onChange={(e) => setTitle(e.target.value)} placeholder="New project title" autoFocus />
         </Field>
+        <SummaryField value={summary} onChange={setSummary} />
         <Field label="Key" required helper={problem ? undefined : `Its issues are ${key || 'KEY'}-1, ${key || 'KEY'}-2, …`} error={problem}>
           <TextInput
             value={key}

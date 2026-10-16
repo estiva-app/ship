@@ -144,6 +144,7 @@ const projectPage = (startTab: ProjectTab, startView: 'table' | 'board' = 'table
     const [status, setStatus] = useState('in_progress')
     const [lead, setLead] = useState('ravi')
     const [title, setTitle] = useState('Relay Migration')
+    const [summary, setSummary] = useState<string | undefined>('Every workspace read and write on the relay, one surface at a time.')
     const [description, setDescription] = useState('Moving every workspace read and write onto the relay, one surface at a time, with the old path kept until each is proven.')
     const done = ISSUES.filter((issue) => issue.status === 'done').length
     return (
@@ -151,7 +152,7 @@ const projectPage = (startTab: ProjectTab, startView: 'table' | 'board' = 'table
         <ProjectView
           onAddIssue={fn()}
           crumbs={{ projectsHref: '#/projects', title }}
-          header={{ title, description, descriptionFormat: 'marker', archived, onRename: (v) => (setTitle(v), true), onDescribe: (v) => (setDescription(v), true) }}
+          header={{ title, summary, description, descriptionFormat: 'marker', archived, onRename: (v) => (setTitle(v), true), onSummarize: async (v) => (setSummary(v || undefined), true), onDescribe: (v) => (setDescription(v), true) }}
           tab={tab}
           onTab={setTab}
           view={view}
@@ -202,7 +203,7 @@ export const ProjectSignedOut: Story = projectPage('activity', 'table', 'Sign in
 export const ProjectArchived: Story = projectPage('overview', 'table', undefined, true)
 
 /** One issue, in tabs: Overview (title, description, Related) and Activity (Conversations, Mentioned in, History). The rail on every tab. */
-const issuePage = (startTab: IssueTab, archivedWithProject = false): Story => ({
+const issuePage = (startTab: IssueTab, archivedWithProject = false, withSummary = true): Story => ({
   render: () => {
     const issue = ISSUES[0]
     const [tab, setTab] = useState<IssueTab>(startTab)
@@ -210,6 +211,7 @@ const issuePage = (startTab: IssueTab, archivedWithProject = false): Story => ({
     const [assignee, setAssignee] = useState('ana')
     const [project, setProject] = useState('rel')
     const [title, setTitle] = useState(issue.title)
+    const [summary, setSummary] = useState(withSummary ? issue.summary : undefined)
     const [description, setDescription] = useState('After an archived project is restored, the board draws its columns in the order the folder union returned them rather than the vocabulary order.')
     return (
       <Shell current={{ projectAddr: '30850:a:rel' }}>
@@ -218,6 +220,8 @@ const issuePage = (startTab: IssueTab, archivedWithProject = false): Story => ({
           tab={tab}
           onTab={setTab}
           title={title}
+          summary={summary}
+          onSummarize={async (v) => (setSummary(v || undefined), true)}
           description={description}
           descriptionFormat="marker"
           onRename={(v) => (setTitle(v), true)}
@@ -252,8 +256,10 @@ const issuePage = (startTab: IssueTab, archivedWithProject = false): Story => ({
   },
 })
 
-/** An issue, Overview. */
+/** An issue, Overview: its summary under the title — click it to change it. */
 export const Issue: Story = issuePage('overview')
+/** An issue with no summary: a quiet "Add a summary" under the title, for someone who can edit. */
+export const IssueNoSummary: Story = issuePage('overview', false, false)
 /** An issue, Activity: Conversations, Mentioned in, History. */
 export const IssueActivity: Story = issuePage('activity')
 /** An issue archived with its project (FOL-46): the notice names the project and opens it. */

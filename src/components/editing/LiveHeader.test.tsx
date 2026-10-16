@@ -90,7 +90,7 @@ const write = async (description: string, format: Format = 'marker') => {
 }
 
 /** The description's area on the reading surface: the block under the title row. */
-const readDescription = (c: HTMLElement) => c.querySelector('h1')!.closest('div.flex-col')!.lastElementChild as HTMLElement
+const readDescription = (c: HTMLElement) => c.querySelector('[data-description="reading"]') as HTMLElement
 
 describe('LiveHeader draws its description (from Description.test.tsx)', () => {
   /*
