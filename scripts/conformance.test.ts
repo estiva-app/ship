@@ -57,8 +57,12 @@ const here = dirname(fileURLToPath(import.meta.url))
  * silently agreeing on *different* inputs — and it means refreshing the fixture
  * is a deliberate change in two places, which is the correct amount of friction
  * for editing a contract between repositories.
+ *
+ * The synthetic half is rebuilt by `scripts/fixture-synthetic.ts`, which leaves
+ * the recorded events byte-identical (8fd1c059: the ordering cases moved into
+ * their target's Folder, and SPEC §6.2's cases joined them).
  */
-const EVENTS_SHA256 = '64cd76f53c9ab7ab346c5dd352fd81b58cfedcece1bd9e944c22817368eac14e'
+const EVENTS_SHA256 = '0fc809c77a92156536668a9a99d6cdfc433526a0e32a029165f534f8364e31e3'
 
 let failures = 0
 function check(label: string, condition: boolean, detail = '') {

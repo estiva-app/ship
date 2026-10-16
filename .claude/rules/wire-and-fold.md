@@ -55,7 +55,12 @@ shape of event nobody had recorded before, and then the fixture *and* the
 either tree: it was the agent's `scripts/make-conformance-fixture.ts`, deleted
 with the copy (`git -C ../estiva-agent show d5e39b7:scripts/make-conformance-fixture.ts`).
 It records production through a `Store` and an agent credential, so reviving it
-means pointing it at this repo's `src/nostr/` and a credential.
+means pointing it at this repo's `src/nostr/` and a credential. Its synthetic
+half lives here: `npx tsx scripts/fixture-synthetic.ts conformance/fold-fixture.json`
+re-signs the cases a healthy workspace cannot show, keeps the recorded events
+byte-identical, and prints the new `EVENTS_SHA256`. 8fd1c059 used it when SPEC
+§6.2 made every reader drop the old cases, which had been signed outside their
+target's Folder.
 
 When the fold's rules change **on purpose**, re-record only `expected` with
 `npx tsx scripts/refresh-expected.ts conformance/fold-fixture.json` — it checks

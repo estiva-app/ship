@@ -116,6 +116,12 @@ export interface Change {
   format: ContentFormat
   /** Optional human note from `.content`. */
   note: string
+  /**
+   * The Folder the change was signed in: its first `h` with a value, the one
+   * the relay checks the signer's membership against. A `buzz-channel` on a
+   * change proves nothing, so it is not read (SPEC §6.2).
+   */
+  folder?: string
 }
 
 /** Fields on a Project or Issue that changes are allowed to set. */
@@ -212,7 +218,46 @@ export function parseChange(event: SignedEvent): Change | null {
     value,
     format: contentFormatOf(event),
     note: event.content,
+    folder: event.tags.find((t) => t[0] === 'h' && t[1])?.[1],
   }
+}
+
+/** The tags a root names its Folder with: `h`, or Ship's older `buzz-channel` (SPEC §7.3). */
+const PLACEMENTS = ['h', 'buzz-channel']
+
+/**
+ * Every Folder a root is filed in, or `undefined` when it names none.
+ *
+ * All of them, both tags, not `projectFolder`'s first: the question here is
+ * whether a change's Folder is one the file is in, and a root carrying both
+ * tags is in both. Read the same way as interop's `targetFolders`.
+ */
+function rootFolders(root: SignedEvent): ReadonlySet<string> | undefined {
+  const folders = new Set(PLACEMENTS.flatMap((name) => root.tags.filter((t) => t[0] === name && t[1]).map((t) => t[1]!)))
+  return folders.size ? folders : undefined
+}
+
+/**
+ * Drop every change signed in a Folder its target is not in (SPEC §6.2).
+ *
+ * The relay checks a change only against its own `h`, so a member of any
+ * Folder can sign a rename, a status, an archive or a move aimed at an issue
+ * in a Folder they cannot read, and Ship pools every Folder it reads into one
+ * fold. Without this, anyone in both Folders saw that change applied.
+ *
+ * Two cases cannot be checked and count as before: a target whose root is not
+ * in the read (only its address is held), and a root that names no Folder.
+ * Checked against the newest root, as `latestPerAddress` picks it. A dropped
+ * change leaves the activity feed too: it set nothing, so a line saying it did
+ * would be the feed disagreeing with the state.
+ */
+function inTargetFolder(changes: Change[], roots: Map<string, SignedEvent>): Change[] {
+  const folders = new Map<string, ReadonlySet<string> | undefined>()
+  for (const [address, root] of roots) folders.set(address, rootFolders(root))
+  return changes.filter((change) => {
+    const held = folders.get(change.target)
+    return !held || (change.folder !== undefined && held.has(change.folder))
+  })
 }
 
 /**
@@ -552,11 +597,14 @@ export function foldFolder(
    */
   resolveRefs: (body: string) => string[] = () => [],
 ): FolderState {
-  const changes: Change[] = []
+  const projectRoots = latestPerAddress(events, KIND.PROJECT)
+  const issueRoots = latestPerAddress(events, KIND.ISSUE)
+  const parsed: Change[] = []
   for (const event of events) {
     const change = parseChange(event)
-    if (change) changes.push(change)
+    if (change) parsed.push(change)
   }
+  const changes = inTargetFolder(parsed, new Map([...projectRoots, ...issueRoots]))
   // Oldest first, in exactly the total order the fold replays, so the activity
   // feed can never disagree with the state it produced.
   changes.sort(byOrder)
@@ -564,7 +612,7 @@ export function foldFolder(
   const folded = foldChanges(changes)
 
   const projects: Project[] = []
-  for (const [address, event] of latestPerAddress(events, KIND.PROJECT)) {
+  for (const [address, event] of projectRoots) {
     const fields = folded.get(address) ?? {}
     projects.push({
       addr: address,
@@ -597,7 +645,7 @@ export function foldFolder(
   }
 
   const issues: Issue[] = []
-  for (const [address, event] of latestPerAddress(events, KIND.ISSUE)) {
+  for (const [address, event] of issueRoots) {
     const fields = folded.get(address) ?? {}
     // The spec puts the parent project in an `a` tag, and NIP-22-style comments
     // would also use `a`. Only a project address can be the parent, so match on
