@@ -108,6 +108,15 @@ describe('a Folder linked in a message', () => {
     expect(askedFiles()).toBe(2)
   })
 
+  it('draws its row as one line, with no list and no read of its files', async () => {
+    const c = show([thread('t1', FOLDER_REF, [{ value: FOLDER, layout: 'compact' }])])
+    await flush()
+    await act(async () => filesArrive(FILES))
+    expect(cardOf(c)?.textContent).toContain('Estiva HQ')
+    expect(listed(c)).toEqual([])
+    expect(askedFiles()).toBe(0)
+  })
+
   it('draws no list, and no "nothing in it", for a Folder whose files cannot be listed', async () => {
     const c = show([thread('t1', FOLDER_REF, [{ value: FOLDER, layout: 'detailed' }])])
     await flush()
