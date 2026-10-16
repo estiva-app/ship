@@ -43,10 +43,13 @@ export function LiveSummary({
   const [refused, setRefused] = useState<string>()
   // The text the reason is about: the reason stays until that text changes.
   const attempted = useRef<string | null>(null)
+  // What the field holds now, as last typed: a refusal that answers older text says nothing.
+  const written = useRef<string | null>(null)
 
   const commit = async (next: string) => {
     const text = summaryText(next)
     attempted.current = text
+    written.current = text
     // Never compared with `value` here: it is the store's copy, which lags a save
     // just made, so changing straight back would never be written. InlineText
     // already skips an unchanged text.
@@ -55,6 +58,8 @@ export function LiveSummary({
       setRefused(undefined)
       return true
     }
+    // You changed it while the relay was answering: the reason is about text no longer there.
+    if (written.current !== text) return false
     // Never a refusal with nothing said: it always shows a reason.
     setRefused(result || 'The relay gave no reason.')
     return false
@@ -73,6 +78,7 @@ export function LiveSummary({
         onEnter={onEnter}
         onText={(text) => {
           // Changing the refused text is a new attempt: the old reason goes.
+          if (text !== null) written.current = summaryText(text)
           if (text !== null && summaryText(text) !== attempted.current) setRefused(undefined)
           setTyping(text)
         }}

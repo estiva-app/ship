@@ -7,7 +7,7 @@
  * stay). This pins the split at the view, where the two meet.
  */
 import { describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { WriteResult } from '@/api'
 import { leave, press, rewrite, stubLayout, typeAtEnd } from '@/test/inlineText'
@@ -244,6 +244,15 @@ describe('the summary on an issue’s and a project’s page (SUM-4)', () => {
     expect(screen.queryByText(/Summary not saved/)).not.toBeNull()
     // Changing it is a new attempt: the old reason goes.
     await typeAtEnd(box(), '!')
+    expect(screen.queryByText(/Summary not saved/)).toBeNull()
+  })
+
+  it('says nothing about a refusal that arrives after you changed the text', async () => {
+    let answer: (result: WriteResult) => void = () => {}
+    await refuse(refusedBy(() => new Promise<WriteResult>((resolve) => (answer = resolve))))
+    await typeAtEnd(box(), ' More.')
+    await act(async () => answer({ ok: false, reason: 'rate-limited: quota exceeded; retry in 14s' }))
+    expect(box().textContent).toBe('A new summary the relay did not take. More.')
     expect(screen.queryByText(/Summary not saved/)).toBeNull()
   })
 
