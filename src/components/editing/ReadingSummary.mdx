@@ -1,0 +1,46 @@
+import { Meta } from '@storybook/addon-docs/blocks'
+
+<Meta title="Pages/ReadingSummary" />
+
+# ReadingSummary
+
+A file's summary under its title as plain text: for someone who cannot change
+it, and for a writer in the moment before the editors arrive. It is drawn
+exactly as **LiveSummary**'s text is, so nothing moves when one replaces the
+other.
+
+**Seen in** — *Pages/Title and description*: **Read Only** and **Read Only No
+Summary**. It is drawn by **LiveHeader**, so its stories are that page's.
+
+## When
+
+- Under the title of an issue's or a project's page, for a reader (no rights,
+  or an archived file).
+- For a writer, while **LiveHeader**'s editors are still loading (`waiting`).
+
+## When not
+
+- For a writer once the editors are there → **LiveSummary**, which edits it in
+  place.
+- In a row, a card or the table → **SummaryLine**, which cuts it short.
+- In a New dialog → **SummaryField**, a field of the form.
+
+## How
+
+```tsx
+import { ReadingSummary } from '@/components/editing/ReadingSummary'
+
+<ReadingSummary value={summary ?? ''} waiting={!readOnly && !!onSummarize} />
+```
+
+- `value` is the summary the relay holds; empty when there is none.
+- `waiting` says a writer is waiting for the editors: with no summary it shows
+  the quiet "Add a summary" the editor will show. Without it, no summary draws
+  nothing at all.
+
+## What it owns
+
+- **The summary's place and look** at rest: the package's `InlineText`
+  summary variant's size, colour and padding, so the editor takes its place
+  without a jump.
+- **No editor code**: it imports none, so a reader never downloads one.
