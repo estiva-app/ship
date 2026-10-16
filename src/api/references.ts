@@ -94,7 +94,15 @@ function itemOf(candidate: ReferenceCandidate): CaptionedItem {
     return { id: candidate.id, label: candidate.title, snippet: candidate.caption, uri: candidate.uri, search: candidate.search }
   }
   // The title alone: the row's icon says what it is (Katerina, 8 October), as in Peek, so "Project:" before it said it twice.
-  return { id: candidate.id, label: candidate.title, snippet: '', uri: candidate.uri, description: candidate.caption || undefined }
+  // A file's summary is the row's second line, and an issue's project moves up beside its title (SUM-7).
+  return {
+    id: candidate.id,
+    label: candidate.title,
+    snippet: '',
+    uri: candidate.uri,
+    description: candidate.caption || undefined,
+    summary: candidate.summary,
+  }
 }
 
 /**
