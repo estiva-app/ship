@@ -3,16 +3,17 @@
  * click on the chip opens its menu — Open, then None, Compact and Detailed —
  * and the choice is saved on the chip itself when they leave.
  */
-import { describe, it, expect, vi, beforeAll } from 'vitest'
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest'
 import { act, render, screen, fireEvent, waitFor } from '@testing-library/react'
 import type { Editor } from '@tiptap/react'
 
 vi.mock('@/api/blobs', () => ({ blobObjectUrl: vi.fn(async () => 'blob:fetched'), uploadAttachment: vi.fn() }))
 vi.mock(import('@/api/foreign'), async (importOriginal) => ({ ...(await importOriginal()), resolveForeign: vi.fn(async () => null) }))
 
-import { toRenderTree } from '@estiva-app/protocol'
+import { addrToNaddr, toRenderTree } from '@estiva-app/protocol'
 import { LiveDescription } from './LiveDescription'
-import { MAX_LINKS_PER_DESCRIPTION, linksInBlocks } from './DescriptionCards'
+import { MAX_LINKS_PER_DESCRIPTION, blockLineCards, linksInBlocks } from './DescriptionCards'
+import { resolveForeign, type ForeignObject as ForeignObjectData } from '@/api/foreign'
 
 beforeAll(() => {
   Element.prototype.scrollIntoView = () => {}
@@ -73,5 +74,40 @@ describe('linksInBlocks', () => {
     const asked = linksInBlocks(doc([{ type: 'paragraph', id: 'p1', content: [{ type: 'text', text }] }]))
     expect(asked).toHaveLength(MAX_LINKS_PER_DESCRIPTION)
     expect(asked[0]).toBe('https://a.example/0')
+  })
+})
+
+describe('a Folder\'s card after a description\'s line', () => {
+  const object = (ref: string, title: string, over: Partial<ForeignObjectData> = {}) =>
+    ({ ref, eventId: 'e'.repeat(64), kind: Number(ref.split(':')[0]), widget: 'card', slots: { title: { value: title } }, meta: [], comments: [], actions: [], viaRecommendation: true, ...over }) as ForeignObjectData
+  // A Folder of its own for each test: a Folder's files are held for the tab, as they are in Ship.
+  let folders = 0
+  let FOLDER = ''
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+    FOLDER = `39000:${'c'.repeat(64)}:0b8b7c1e-5f0e-4b4a-9d55-2f1d3c8a7e${String(++folders).padStart(2, '0')}`
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.mocked(resolveForeign).mockImplementation(async () => null)
+  })
+
+  it('lists the files in the Folder, in its order, read for the card alone', async () => {
+    const uri = `nostr:${addrToNaddr(FOLDER)}`
+    const folder = object(FOLDER, 'Estiva HQ', { noun: 'folder' })
+    const files = [object('30840:a:topic', 'Weekly notes', { noun: 'topic' }), object('30842:a:page', 'Handbook', { noun: 'document' })]
+    vi.mocked(resolveForeign).mockImplementation(async (_reference, options) => (options?.folderFiles ? { ...folder, children: files } : folder))
+
+    const [block] = toRenderTree(
+      JSON.stringify({ type: 'doc', content: [{ type: 'paragraph', id: 'p1', content: [{ type: 'text', text: uri, marks: [{ type: 'reference', attrs: { uri, embed: 'detailed' } }] }] }] }),
+      'blocks',
+    )
+    const { container } = render(<>{blockLineCards(block, { [uri]: folder })}</>)
+
+    const card = () => container.querySelector(`[data-foreign-object="${FOLDER}"]`)
+    expect(card()?.textContent).toContain('Estiva HQ')
+    await act(() => vi.advanceTimersByTimeAsync(0))
+    expect([...card()!.querySelectorAll('[data-foreign-object]')].map((e) => e.textContent)).toEqual([expect.stringContaining('Weekly notes'), expect.stringContaining('Handbook')])
   })
 })

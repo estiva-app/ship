@@ -1075,14 +1075,8 @@ async function main() {
       },
     }),
   })
-  seed({
-    kind: 31990,
-    tags: [['d', 'estiva-peek-smoke'], ['k', '39000']],
-    content: JSON.stringify({
-      name: 'Peek',
-      projections: { 39000: { widget: 'card', slots: { title: { tag: 'name' } } } },
-    }),
-  })
+  // No manifest for the Folder kind: a Folder resolves through the protocol's own (interop 0.58, SPEC §3.2),
+  // and a `k 39000` claim, Peek's included, is no longer read.
   seed({ kind: 39000, tags: [['d', FOLDER_ID], ['name', 'Onboarding']] })
   const tideAddr = `${TIDE_KIND}:${RELAY_KEY}:spring`
   const topicAddr = `39000:${RELAY_KEY}:${FOLDER_ID}`

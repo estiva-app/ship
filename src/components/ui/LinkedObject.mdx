@@ -1,0 +1,39 @@
+import { Meta } from '@storybook/addon-docs/blocks'
+
+<Meta title="Primitives/LinkedObject" />
+
+# LinkedObject
+
+A linked file's card or row, under a message or after a description's line;
+a Folder's card lists the files in it this reader can open.
+
+**Seen in** Primitives/ForeignObject: Folder With Files.
+
+## When
+
+- A card or a row a message or a description asks for: under a message
+  (`ThreadList`), after a description's line (`LineCards`).
+
+## When not
+
+- A chip in a sentence → **Reference**. A Folder's chip names it and lists
+  nothing, so it reads none of its files.
+- A Folder's own listing, or a child inside a card → **ForeignObject**: those
+  rows are files, and a Folder among them stays a row with no list.
+
+## How
+
+```tsx
+import { LinkedObject } from '@/components/ui/LinkedObject'
+
+<LinkedObject reference={card.reference} object={resolved[card.reference]} layout="card" />
+```
+
+## What it owns
+
+- **A Folder's files, read on their own** (`useFolderFiles`): when the card is
+  drawn and when the window comes back into focus, never on the ten-second
+  refresh every chip and card shares, since they cost a Folder page's read.
+  The card draws at once and the list fills in when it arrives.
+- **No list rather than an empty one** for a Folder whose files cannot be
+  listed (a DM's), so a card never says "nothing in it" wrongly.
