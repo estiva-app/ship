@@ -64,6 +64,9 @@ function changeInWords(field: string, value: string, previous: string | undefine
   switch (field) {
     case 'description':
       return 'edited the description'
+    case 'summary':
+      // Never the text itself: it is up to ~240 characters, and blank is a clear.
+      return value.trim() ? 'edited the summary' : 'removed the summary'
     case 'status':
       return `set status to ${lookupStatus(ISSUE_STATUSES, value).label}`
     case 'assignee':
