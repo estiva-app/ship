@@ -250,15 +250,22 @@ function rootFolders(root: SignedEvent): ReadonlySet<string> | undefined {
  * Checked against the newest root, as `latestPerAddress` picks it. A dropped
  * change leaves the activity feed too: it set nothing, so a line saying it did
  * would be the feed disagreeing with the state.
+ *
+ * A `summary` takes neither exception (SPEC §6.12): new, so nothing written
+ * before the rule depends on it, it counts only where the check can be made.
  */
-function inTargetFolder(changes: Change[], roots: Map<string, SignedEvent>): Change[] {
+function changesInTargetFolder(changes: Change[], roots: Map<string, SignedEvent>): Change[] {
   const folders = new Map<string, ReadonlySet<string> | undefined>()
   for (const [address, root] of roots) folders.set(address, rootFolders(root))
   return changes.filter((change) => {
     const held = folders.get(change.target)
-    return !held || (change.folder !== undefined && held.has(change.folder))
+    if (!held) return change.field !== SUMMARY_FIELD
+    return change.folder !== undefined && held.has(change.folder)
   })
 }
+
+/** The one-line summary beside a file's title (SPEC §6.12). */
+const SUMMARY_FIELD = 'summary'
 
 /**
  * Keep one event per address.
@@ -604,7 +611,7 @@ export function foldFolder(
     const change = parseChange(event)
     if (change) parsed.push(change)
   }
-  const changes = inTargetFolder(parsed, new Map([...projectRoots, ...issueRoots]))
+  const changes = changesInTargetFolder(parsed, new Map([...projectRoots, ...issueRoots]))
   // Oldest first, in exactly the total order the fold replays, so the activity
   // feed can never disagree with the state it produced.
   changes.sort(byOrder)

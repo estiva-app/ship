@@ -3,9 +3,9 @@
   "generatedAt": "2026-09-02T20:14:38.440Z",
   "relay": "https://estiva.estiva.app",
   "counts": {
-    "events": 1094,
+    "events": 1096,
     "recorded": 1073,
-    "adversarial": 21,
+    "adversarial": 23,
     "projects": 8,
     "issues": 172,
     "changes": 455,
@@ -13,7 +13,7 @@
     "byKind": {
       "9": 204,
       "1111": 249,
-      "1851": 460,
+      "1851": 462,
       "30850": 8,
       "30851": 173
     }
@@ -959,7 +959,7 @@
       ],
       "content": "trusted ts, finer than a second",
       "id": "080ffed3dab1d1616f7446a57b3d3dffc4a4b8260029da1e35c374559586ad81",
-      "sig": "5bf5f5749342ed32bcd291b258156154f76c71cd82bfafb80f277ba07c26755d0452650e34907ae515345fb2548bfef033522bfedc996269636c87cd54970f07"
+      "sig": "be3f716019fc13349be083bfb04bb97bc7012425e7e8a55759df353cdf3fb38c4dbaae2773d3e45076958486bae34909a625c1503b7c57f56bafba16d066ae10"
     },
     {
       "content": "Status → done",
@@ -2047,7 +2047,7 @@
       ],
       "content": "drifted ts, refused at 1s of slack",
       "id": "0f0abd04af495a70e2fc610fea817ad9721eaa7fb15765a21422ea15a1ef2fdc",
-      "sig": "2edda73f7fdac7136a8fb67f2934def30632df00e9791cd54702fb02dfbb6b900afa77e5df0b36ec9439da5b8739f537b07638dd01153ec1fbd0c168c744d5de"
+      "sig": "5f6136eb3749c2a294ea8141db358b0b816b73cc0b0a663f0523490f1501acfad66b02c3a4b7220db32bbbfa310d0877426ed951c1cf591a3da2d6ac5968ec4b"
     },
     {
       "content": "Still live, confirmed 2026-09-02 while working in `estiva-docs`. `site/check.mjs` is absent from the repo and `npm run check` fails with `ERR_MODULE_NOT_FOUND`.\n\n`npm run build` is fine — 9 pages — so the gap is only the check. Which matters more than it sounds: `site/nav.mjs` says listing a doc in `NAV`/`INTERNAL` \"is also what makes the build's check meaningful — a link to anything in neither list is a mistake and fails the build\". That guarantee has not been running.\n\nNoticed because a docs PR today added a file to `INTERNAL` and nothing verified it.",
@@ -2271,7 +2271,7 @@
       ],
       "content": "a buzz-channel on a change proves nothing, must not count",
       "id": "0fdd49a65dcb4604d2f3760be15deebf1333fa199ba3c9f92161728a99c04277",
-      "sig": "ca90958359b2b16e3315fdb42868e292fc29cd5854c7b957a3d5a06e069a12bf60db0b0fbcb8b68bddf0876583d73402bedca31bff2af4039e660ddd1013fb57"
+      "sig": "2336b6683ec05339a271f7083fb588556de47427202f70ae69c4a90a884ae80538e245a6a0fff7f5792dde0d40089d4d56ec1fa0b5696820fe6c2ec70120ca24"
     },
     {
       "content": "BLOCKED on GitHub Actions minutes. PR #45 is merged (29b7ab0) but no image was published, so production still serves the vanilla app — verified by curl, not assumed: served index.html has bundle.js, an inline <style> and id=\"sidebar\", and no id=\"root\" or /assets/.\n\nThe post-merge run failed in 3 seconds with zero steps executed on both check and web. The repo is private, so minutes are metered; this is a quota block, not a code failure. CI passed on the same content on the PR branch minutes earlier.\n\nNot deployed, and nothing will deploy unattended: estiva-ship-update.timer is stopped. That is itself a trap to remember — while it is stopped, every future merge silently fails to reach production.\n\nThe image is not unverified, only unpublished. Built locally with the production build args from the commit whose tree is byte-identical to origin/main, and checked at the served-bytes level: index.html + hashed assets and no bundle.js, / no-cache and /assets/ immutable, /p/abc a real 404, the three production values baked in once each, localhost:3000 absent, and the identity package shell copy present.\n\nUnblocks by any of: restoring Actions minutes (cleanest); pushing that image to GHCR with a write:packages token; or building on the box and tagging it ghcr.io/estiva-app/ship:main locally, which needs no registry but is undone by the next docker compose pull.",
@@ -2801,7 +2801,7 @@
       ],
       "content": "signed in another Folder, must not count",
       "id": "1388c1b0747440c5e855e3b1b1d367522ea9569cf48e3d7222de58b1b527a3ba",
-      "sig": "c1fb91109694b0634c4579de582ce54e7de481a4eb343304dd998a767fe6aef664444f7147fc88e18768f42a6a11a6188f7141ee203ed8fcff77a18c69a5da16"
+      "sig": "6446ad5667ff9666870b52baa8e4946119f5195ddf17ffe0a1f8ac59a157fbb2e733f2a8317d945942baea2cfabbe81b4ae40b7c827de82b7052bc5221c894a5"
     },
     {
       "content": "Status → in_progress",
@@ -2861,7 +2861,7 @@
       ],
       "content": "an empty h ahead of the real one names nothing",
       "id": "13f99cb0b7f9601f6b4748c4f3762d9f77b1991d3e7769d881d4659f2d0c519f",
-      "sig": "c8e7a9f60225785cae0f2a4eb2bd638a9d38df8faa20bbddf0a3277fd970c750cdf8b9e32d727fcefc978ccf23043169fa1b34ef71714a4e3bae370909481a2b"
+      "sig": "9b4afbd442056cc75a8c657604b3e556293cca9744f83becaf27f15d3de3ef3be6de865a06fc95932cc2583814c7551b1eaa0341ec179ba1b29170aed852489e"
     },
     {
       "content": "https://github.com/estiva-app/ship/pull/61\n\nTwo stale bits in this description: it says `h:<folder-uuid>`, but SPEC §11.1 fixes the container context as the bare uuid (MUST NOT prefix) — Peek writes bare, so a prefix here would never match, permanently. And the React rewrite is already done, so this is in `web/`, not written twice.\n\nMapping as specified: a project takes the bare folder uuid, an issue's discussion takes `thread:<root>`. Tests pin that reading an issue never advances its project.\n\nNot done: the cross-app round trip needs a signed-in browser on both origins.",
@@ -5291,7 +5291,7 @@
       ],
       "content": "the newest root's Folder, so this counts",
       "id": "2342b585a95e7b945498b9f719f7918d7bdc39b6597212dc7e2e0949f36abbde",
-      "sig": "c0dd487a532fe450cefcb4efd56c7df829b629327855eade3e1b2a903faad9ee622eb81ad1e780445b7e0391eea591b9ac789b37fc6ad985ab80d2808d80c669"
+      "sig": "3d66fe61acdaa7ebdce773c4acd9e64cfd257a1dcd171326ea3fe5c7eeddb5ca630dc3ce32c733343545829f2d702d69848860cf48e06c41fc70ee31b38fa940"
     },
     {
       "content": "",
@@ -6269,7 +6269,7 @@
       ],
       "content": "",
       "id": "2bbabf5609ef30434b27694dfa51d7ca0c5677c22175c0d69cb79fd76357d99a",
-      "sig": "09e1f9ec42b5e96f13197ad397cbb258858865bb91214d89f55a89f286f51c6ac3bc4d63119587f118a882f9fa6c96b30ff4c1fcdcef83c41720f02a3007e6ab"
+      "sig": "c8d0fe68d4d72421049fa955b09c0a23465e4cd046a3ac8619a4690291c1bb1de86143270be7cca6f66401edc8c611a295957d4b0e551b9bd65e417392674c29"
     },
     {
       "content": "archived",
@@ -6883,7 +6883,7 @@
       ],
       "content": "",
       "id": "31541800b0b07dc18b852b602fc6f0b5ebb83b7ec046b3617e874372064a9657",
-      "sig": "7891e80e6c0948032cfe3370b67937427770c63dd379cec57b0071b0eb882ce41f36500a4ef252616cf56ac81718fac3ced6fb157a48f942b1939b35866574d5"
+      "sig": "4ea6bd9342e8b2f249af2b582ef5af78a7d4d3717f22c5836230474dcb684c217cda8ede54fe5c719dc90608187b284c582651fbf08c0af5a5f252e6db9b8d02"
     },
     {
       "content": "So cool!",
@@ -7671,7 +7671,7 @@
       ],
       "content": "tie a",
       "id": "382c53fe8e826893cf63db7ca9bbd17bf5f9d5f83ddf8b63a0d8785bac90621f",
-      "sig": "a19916c9ce8d83743037932e2d2c676666b68bdc768b8b411300293fabd1aa1ac188630ca1f541544000d08ed697e9a1d40057add640d850cd9bccc8c6d18058"
+      "sig": "02ca0902be69265989174b6367739e1c809e836b8afb6d318fca996bf73fdd2468925c180a3c67d1a8f15bef313c5eeafa59bc3c22c460d74a03a19a8eefea86"
     },
     {
       "content": "Edit is good one.",
@@ -11621,7 +11621,7 @@
       ],
       "content": "no h at all, must not count",
       "id": "57d513b4f4912f6be241d4f147ed8ef990402ca2b2f0455b374cf8196aae39d7",
-      "sig": "fa00aa258ffdd911c4653408d4dd068f6ac308406f74116ed77d556a06d36b6708a421ee93ae01207a2d5717f3ff83551d3d4702defc7cdd3b85f9c86cd5804b"
+      "sig": "3520e1310e3dcba5589f5d16cf18025cfc5a21c1e8709b1fcfce0d816f740ea43aff899726fb356ec2416d79d33675c1e7c33a99ebb40b8a0aecc2f641a2e4a4"
     },
     {
       "content": "One issue when trying to write a comment in Ship. @Miky might be yours to take a look",
@@ -12463,7 +12463,7 @@
       ],
       "content": "",
       "id": "60a2d191bf2aa9d4431116fc27d06c3563e9e7348d319f096a7ecc22fad146b1",
-      "sig": "ebc2e92319103f2110a7d82b96794ddd9deb0c469023ecb56d1856ebc4a6c54d92bae1b0ab9940eee8062863519934ead2dbc72fa7467f8de5face8e87f4c555"
+      "sig": "1b2432eec6e9ab19514c147497db8a4f707a21bcbcd7a1288b3b05b04b738984f13e55171867a4eaaaa5a6b26de58e327c6f488e01eeca0b8dd86adf2ab8e12a"
     },
     {
       "content": "",
@@ -14103,7 +14103,7 @@
       ],
       "content": "signed in another Folder, must not count",
       "id": "6db46bf4fb0153f95553d4580399107d4ea46390527a99c5ba17125f76885948",
-      "sig": "d0b114bcef583ffad4b44a71fb5b817f790e60a10af1ddab1d9fbad3a7d5bf9eb90dc6d8d0a59260b431fba65e06ef70166ee8638cb9a153930eb3951122856e"
+      "sig": "68ad3b9ce47efa9fa2c4a26afe7cf1ba0b0b10d152614cb83b24e8a1203a9327506cdb8b0168321d3326affd255a24706dda9b58d4671fc13a216815073304ed"
     },
     {
       "content": "**Issue list, issue page, history and conversation ported** — same branch (`rew-ship-rewrite`, not pushed), same untouched data layer; `src/fold.ts` unchanged, conformance passes unchanged.\n\n**What works (side by side with the old app on the local relay):**\n- Issue list: All / Open / Assigned to me with counts (0 shown), grouped by status in the vocabulary's order, unknown statuses in their own group, parentless issues in the list. Rows: title, description (two-line clamp), ref, status, assignee, opened by, age, conversation count. Same 28 rows, same order.\n- Issue page: trail (Issues / project / ref; project linked even without a ref), title, description, **Conversations** (every thread mentioning the issue, via `conversationsAbout`; root + one level of replies; `nostr:naddr` references stripped from bodies), **Activity** as a separate section — \"<who> set <field> to <value>\", newest first, a pubkey in the value shown as the person's name, empty as \"(none)\". Rail: status, assignee, project, \"Opened by\", \"Copy reference for Peek\" (working, `nostr:naddr` with relay hint). Same messages, same history lines.\n- Ordering comes from the fold; nothing re-sorts by timestamp. Status and assignee are read off the folded issue.\n- \"That issue is not in this workspace…\" for an address the fold does not have.\n\n**Deliberate differences from the old app:**\n- The rail shows \"Opened by\" only; the old app also listed per-field provenance (\"status set by X · 1d ago\"). The same facts are in Activity.\n- Assignee picker: names only (see REW-3).\n\n**Not done:**\n- Writes (status, assignee, move to project, rename, describe, post, reply, new issue) are disabled with \"Available after sign-in\" — REW-5. Replies must carry the 1111 anchor (REW-10's leftover) when they go live.\n- Verification against production data waits for REW-2.",
@@ -16367,7 +16367,7 @@
       ],
       "content": "tie c",
       "id": "7ce4e5ab12b0124450d8ef7db3d8c054e910f43d8b853c73b3b448142dba4a99",
-      "sig": "3c742a921aefa209f8bc3abf2b361214a4985ab0c1d6c61498de42574b3fa1a05696c87f9f4da4cfc3c69bdfecc082fb637c1775fd8b508d04d51dd68bbc28e7"
+      "sig": "1f7f2a62b2cf6fd9b3fc0b3ce3dfb509247b489fea11f279c64e922fb80c15fdc299d7598bc5734192d05a7b82279fd3e1ff8a4d44e0089ac40d03e8a50e6802"
     },
     {
       "content": "https://github.com/estiva-app/estiva-foundation/pull/16\n\nDone-when met, measured against production three times: loadAll 9.2s -> 1.63s, fold compares equal event for event (every address+status, every change and conversation id). protocol 0.4.0.\n\nNot done: unmerged, and Ship still pins ^0.2.0 so nothing user-facing is faster yet.\n\nCaveat worth reading before treating this as headroom — /query is metered at 300/min and one read is 66 requests, so Ship was already over budget serially. Filed as SHA-15.",
@@ -19270,6 +19270,32 @@
       ]
     },
     {
+      "pubkey": "4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa",
+      "created_at": 1700000050,
+      "kind": 1851,
+      "tags": [
+        [
+          "h",
+          "fixture-folder"
+        ],
+        [
+          "a",
+          "30851:4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa:fixture-no-folder"
+        ],
+        [
+          "field",
+          "summary"
+        ],
+        [
+          "value",
+          "Summarised from anywhere"
+        ]
+      ],
+      "content": "a summary counts only where the Folder can be checked",
+      "id": "9539688b363d0cc9db3d74e583e55139d5808a866e2783b0e38bc27e5a7d034c",
+      "sig": "738a35622002bcbbeb9a1003e0a67071255e42beb8ad8d08514d8126c8eb3015cf72889c4c61ac6a1d7d939deb276856db23da83a07463b87cb3a7cd3104a0ac"
+    },
+    {
       "content": "PEE-8 live-delivery probe at 20:38:19 UTC — posted by the agent straight to the relay, not through Peek. If this appeared without a reload, the socket path works.",
       "created_at": 1787690299,
       "id": "954c83b3032516798ad507827865aa186799513fa23c9a6d24aaeb80724f4a9c",
@@ -22132,6 +22158,32 @@
       ]
     },
     {
+      "pubkey": "4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa",
+      "created_at": 1700000049,
+      "kind": 1851,
+      "tags": [
+        [
+          "h",
+          "fixture-folder"
+        ],
+        [
+          "a",
+          "30851:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:c3b96ada-9de3-40f8-9010-5182ffcecedd"
+        ],
+        [
+          "field",
+          "member:4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa"
+        ],
+        [
+          "value",
+          "true"
+        ]
+      ],
+      "content": "a Join signed in another Folder, must not count",
+      "id": "a987377f53df75f1b0ff635bf655540db9f591ef9f1c7e0578d5b898d15b00dd",
+      "sig": "1099978f538d2505095a867cdc44d633b7e1457fb1f0d7629da82aa8b515f8b4f478161fddd1478bc5e686df3f1aa1d4a4646a9432cbb26e1ae3d66bb4239093"
+    },
+    {
       "content": "Description",
       "created_at": 1788118807,
       "id": "a9cdc7ff52168fb0444be7123179dbc6f0bcb572c8f309733c238fad27a5bf71",
@@ -24885,7 +24937,7 @@
       ],
       "content": "hostile ts, must not win",
       "id": "be7f4bb2ebbc7b05b0d4895f80b909cb34701255e1396f75ca8c3ee728a78f01",
-      "sig": "cc48e8d06057bc4fcb7a48233afcca41a8559cb3eb6443f9b4551abd1302d3a605a5020389c1d0613ee6b686de128a09689e73dbda9deb41ff331f916617b78d"
+      "sig": "24a78a1463c95c393fc07c73aeefeba468959084c7b69820ab7df53e542e9fbc408a494141e70a08588151c3ca0a178fde788ba11bcb187ad192ae378b525df4"
     },
     {
       "content": "Ship got this in ship#72 and it changed how quickly its read-state bugs were found. Peek has the more complicated read path and none of the visibility.\n\n## The evidence, all from one day\n\nFour separate times, Peek's read-state code was correct and something one layer out meant it never ran. None of it was visible to a unit suite, and all of it surfaced only by somebody using the thing and noticing an absence:\n\n| | |\n| --- | --- |\n| `useMergedReadState` was written by CRO-5, given a cache to fill by CRO-6 and a diff by CRO-7, and **mounted by none of them** (peek#97) | the merge never ran; the cache stayed empty; the dual-run had no data |\n| the horizon cache was never written | consequence of the above, invisible |\n| the dual-run comparison was never computed | consequence of the above, invisible |\n| the debug menu holding the readout **has no button on the real app** (peek#105) | it computed all day with nothing able to open it |\n\nEach ticket was green. Each PR was correct. The failure was always in the seam between the code and the thing that runs it.\n\n## What to build\n\n`window.__readState()`, mirroring Ship's, plus the parts Peek has and Ship does not.\n\n```\n__readState()                    the queue, the cache, the diff, and whether the read path has run at all\n__readState.flush()              publish now instead of waiting on the debounce\n__readState.refresh()            re-read and re-merge from the relay\n__readState.marker('<context>')  one context's value, as a date\n```\n\nReport at least:\n\n- **the queue** — `known`, `pending`, `published`, `hydrated`, the retry backoff. `pending` non-empty with a reason is the smell.\n- **`lastAttempt`** with a named outcome, as Ship has: `nothing-pending`, `no-session`, `not-hydrated`, `unchanged`, `published`, `rejected`, `failed`. This is the difference between *\"Peek did not publish\"* and *\"Peek could not publish, and here is the gate\"*.\n- **the merged frontier**, and when it was last fetched.\n- **the horizon cache** — how many contexts Convex holds, and how many of them the relay is missing. That number is the cache earning or not earning its place.\n- **the dual-run diff**, so it can be read without the debug menu at all.\n- **`hasRun`** — whether the read path has executed even once this session.\n\nThat last one is the point. A diagnostic that answers *\"the merge has never run\"* would have caught peek#97 the moment anybody looked, instead of three tickets later.\n\n## Notes\n\n- Ship's version is not gated on a build flag, for the reason that a diagnostic absent from production is one that is never there when it is needed. Same argument applies, and Peek is equally internal.\n- Read-only apart from `flush()` and `refresh()`, both of which do only what the app already does on a timer.\n- Peek's state is spread across `useReadStateSync.ts` (queue), `readStateQueue.ts` (pending) and Convex (cache), so this needs a little assembly rather than one snapshot.\n- Worth checking whether the same shape belongs in `@estiva-app/protocol` once two apps have it, rather than a third copy.\n\n## Done when\n\n`__readState()` answers, on production, why a read marker did or did not reach the relay — without a devtools snippet that re-implements the bridge. Three such snippets were written today and each got the wire format wrong in a different way (bare-array `/query`, the NIP-98 nonce, camelCase `/token`), and every one of those bugs looked like a bug in the app.",
@@ -24941,7 +24993,7 @@
       ],
       "content": "",
       "id": "bf0a733f2d2a39b2b4079b9ba9dc3d832c9fddb9144f55e903be16b9e640c70d",
-      "sig": "830e152fd53188d069c662baf72d54473763ab829897112cb08367fcaddbe3fab7c52fe9be239abe01f78b2f0dbafe9de01759bd49b31a83af885c948a25a923"
+      "sig": "9687b2941a8667ddc00b6be9761a99b0c182cd0500ff2e55dcc7b217de35f8b715abf87de4bed2e01c1322db2ee0b8c3970138b0482c22ef13dc6ea100b81ab6"
     },
     {
       "content": "**Deployed 2026-08-28 14:02 UTC. The catch-up is live. Verified by digest, by schema version, and by the client-visible change actually changing.**\n\n    registry :nfb index digest   sha256:67b436a9f9ef…\n    local :nfb after pull        sha256:67b436a9f9ef…\n    container .Image             sha256:67b436a9f9ef…\n    previously running           sha256:e6aed9aae3e0…   (CAT-11 only)\n\nOnly the relay restarted — postgres, redis and minio are still up 2 weeks, so `pull relay` did what it was supposed to and nothing else was recreated.\n\n## Migrations ran, and the schema moved\n\n    _sqlx_migrations   24 -> 34|34\n\n`Database migrations complete` at 14:02:11.022 against a first log line of 14:02:10.719 — **~303 ms for all ten**, against the ~235 ms measured on the production-shaped restore in M4. Close enough that the rehearsal was worth its cost.\n\n**All four boot gates passed on real production data**, in the relay's own words:\n\n    Database migrations complete\n    Community deletion serving fences verified\n    git object-store backend admitted: A3 conformance probe passed\n    Channel roster fence verified          <- 0032's new gate, on 64 live rosters\n\n## Outage: 13.71 s against an estimate of 13–15 s\n\n    container created   14:02:04.110\n    first relay log     14:02:10.719\n    migrations done     14:02:11.022\n    TCP listening       14:02:17.825\n\n    process boot        7.11 s\n    full window        13.71 s\n\nThe corrected estimate from CAT-7 held. **Boot is still dominated by the git object-store probe** — 6.73 s of the 7.11 s — not by migrations, which were 4% of boot. That remains the thing to watch: if MinIO is ever slow, that is where a deploy stalls.\n\n## The client-visible change is live\n\n    max_limit        10000 -> 1000     <- as predicted from the source in CAT-1\n    supported_nips   ... 56, 43        <- NIP-43 is new from the merge\n\nSo the halved historical query ceiling is now in force. **CAT-8 is where that gets exercised against Peek and Ship**; nothing has been checked at the app level yet, and this is the change most likely to show up there.\n\n## Reads and writes\n\nA REQ through the HTTP bridge returned 11 issues, and **this comment is the write test** — a real signed event published through the caught-up relay. If you are reading it, both paths work on the new image.\n\n## Done-when\n\n`cargo build` succeeded, the suite passed 927/0 with a database, every Estiva kind kept its scope arm and `ALL_KINDS` entry, `relay-image.yml` survived, and no reformatting was introduced. The merge is on `nfb-demo-kinds` as `c8a4d521c` and deployed. **Marking done** — with the squash-merge ancestry caveat in the previous comment standing as the one thing the next catch-up must read first.",
@@ -29923,7 +29975,7 @@
       ],
       "content": "a display key assigned after the fact",
       "id": "e44f5c19f274f78d6a059ccaa6bf7eb2a0962d8277c71792e869076d4f7a359a",
-      "sig": "5d848ab2276eaf65e28408e2630fc6faa164c93667f5d5663abd4ebcdb0db04c4344b85c348426aafdd93c0f0f76cfd17dd80af52e9e9958c78987a6a68e13ce"
+      "sig": "03bf49ce464da4a9fa902e3f6e02b818c07087c74bcd033bf34f34475690d774576e14852cd81d49911792a3d9b7f4203537c28393bd65d932d4833f227c1c4e"
     },
     {
       "content": "**SPEC §6.4 now requires this, and neither app does it.**\n\n## The rule\n\nSPEC §6.4 has always said a thread attaches to whatever anyone in it referenced, *at any point*, and that the **whole** thread attaches — not just the message carrying the reference. That rule is correct and reads as surprising, and the amendment of 2026-08-31 says why it is safe: **attachment has two strengths and an app MUST present them separately.**\n\n| | in the data | presented as |\n| --- | --- | --- |\n| **a comment** | uppercase `A` at the thread root — the thread *is* about this object | the object's own discussion |\n| **a mention** | the address referenced inside a message | *Mentioned in*, secondary and collapsed |\n\n## Why it matters more than it looks\n\nShip's `conversationsAbout()` currently merges both into one list. So a twenty-message conversation that name-drops an issue on message twenty-one lands **inside that issue's comments**, indistinguishable from a comment somebody wrote about it.\n\nThat is also what makes the §6.4 rule defensible at all. Message content is immutable, so an accidental mention attaches **permanently** and cannot be withdrawn — acceptable for a secondary section, indefensible for the primary one.\n\n## Three things to get right\n\n1. **A mention may suggest, never write.** An app MAY offer \"add this to the panel\"; it MUST NOT create an association on its own. Mentions arrive retroactively and by accident, and a shared record must not reorganise itself because somebody typed a reference.\n2. **Counts are approximate.** There is no server to compute \"the 5 most recent mentions\", so any number is really \"of what I fetched\". Do not present it as authoritative.\n3. **Unreadable means invisible** — see the privacy rule below.\n\n## The privacy rule, and its cost\n\nIf a mentioning conversation is one the reader cannot access, **they do not see that it exists** — no count, no locked row, no placeholder.\n\nThe consequence has to be accepted deliberately rather than discovered: **two people open the same object and honestly see different numbers, and neither is told.** Do not \"fix\" that later by showing a global count; the inconsistency is the privacy working.\n\n## Done when\n\nBoth apps show two sections, a mention never lands in the comments, a mentioning conversation the reader cannot read is absent rather than redacted, and the count is not presented as authoritative.",
@@ -30331,7 +30383,7 @@
       ],
       "content": "its root names no Folder, so this counts",
       "id": "e790ee8690576eb227da4b6e065c40f7e922b2cc39e2727351e7dce0280962e5",
-      "sig": "60963cd1d5826a47a260388a6c745e298d4d4409050c5b5719aeae76e785c255076c161c555deb8f7fe1b5a0bd40bb6cc1faf7416550061e04c1e7edacfe341f"
+      "sig": "8ce612883973ca80b73c7e3450244afbd99ae9b916bc0fe506ead72e6b3beb1d7e9cbe56cb282d3b8102ebabcea4c0fb730868044f7967579b29a50e9ba289cf"
     },
     {
       "content": "probe",
@@ -31331,7 +31383,7 @@
       ],
       "content": "tie b",
       "id": "ee01e3773719374bdd2f7ccb1320172a156268eb4b89217989da3f63c7b1b17a",
-      "sig": "a0bbd33a0cc386e284d2df460ae632f947874aaeb949c2b53b837dd87002350f37d5308096d3028a1821fbaff5ab19d7180d3d32134c1baeae1673a0ef54b6dc"
+      "sig": "fc1ed70dddee70dab612bac4224768ee357743858450de4b81a5fce29415d642ef1f0b4f2b37f31a5d05b2df71b44a4e8d6009f1a85abf7637966923af793e76"
     },
     {
       "content": "",
@@ -32475,7 +32527,7 @@
       ],
       "content": "in the Folder its root names by buzz-channel, so this counts",
       "id": "f5b84ddf33c68e0640a816a5cbb626a9f7fa7c650d2376552b244afec6adc3de",
-      "sig": "97d1bb346eaa211aa79cc84774df12e6034ed685edb3036d9766ec56fd440c3e24243965cafd8d0aac71444eb885f2442797edc111bad12036a16eab2c5cf3ca"
+      "sig": "093b9121a8bb5f2e8d16a88c0a2003d5ed2023b1752875eed02a6d23ba3ed0b074107e4191306319b0905c938b40d4d3e6aedfb888b204e27facb7badd673d60"
     },
     {
       "content": "Draft https://github.com/estiva-app/peek/pull/118 — built with PEE-5, since the availability check gates whether prefill is offered at all.\n\nThe typing race is answered per FIELD: a suggestion lands in every box untouched, never in one touched. Typing a title keeps it and still gets the description; a whole-form rule loses one or the other. Clearing a box counts as touching it.\n\ncanPrefill treats \"downloadable\" as unavailable, so opening a form never starts a 22GB fetch.",
@@ -32697,7 +32749,7 @@
       ],
       "content": "the older root's Folder, must not count",
       "id": "f6471eded46b76adf0eef122b7a1f746a95aa194d3980daf42e25440524f2159",
-      "sig": "1071e9a0c3a6bfbfe15e6692bc88743b68b872c44b1f33199ac6f00dc79a679ea48f18244437980c1f04bccfaf62458c6ad186818bc715e5105690776da4ccd0"
+      "sig": "ebdaac8f9cf277fcacda8d01325161bfc2c168320c5d0be64d48e873ebce39d048416a995d7980965fe3e4c85b9a4ee774616868f4b16488926c49032419c03e"
     },
     {
       "content": "`Store.archiveProject`, `linkProjectFolder` and `deleteProject` have **no caller anywhere outside src/store.ts**. They are implemented, tested by nothing, and reachable from neither the CLI nor MCP.\n\nArchiving is the one that matters, because it is the agent's *only* cleanup path: Estiva ID refuses kind:5 for claude-agent, so the agent cannot delete, and NIP-09 is author-scoped so nobody else can tidy up after it either. Today a project the agent creates by mistake is permanent and stays in everyone's project list.\n\nThat risk is not theoretical — `ship projects` already hides 5 archived projects, and creates are rate-limited in a way that makes a careless retry produce duplicates the agent cannot remove.\n\nShape: `ship archive-project <ref>` and `--unarchive`, over the existing `archiveProject`. Note the fold's rule — unarchiving writes an empty value rather than deleting the change, because an append-only stream has no undo. Same pairing over MCP.\n\n`deleteProject` should probably stay out of reach: it only removes the project *record*, leaving its issues orphaned and unreachable from any app, and it is author-scoped so it would only ever work on the agent's own projects.\n\nOpen question for `linkProjectFolder`: 3 of 14 production projects are already re-linked, so somebody is doing this somewhere. Worth finding out whether that was the UI or a script before deciding the agent needs the verb.\n\nDone when: the agent can archive and unarchive a project from the CLI and MCP, and an archived one stops appearing in the default `ship projects` listing.",
@@ -33237,7 +33289,7 @@
       ],
       "content": "later by created_at, wins while the window is 1s",
       "id": "fb592d44317d46cb8040831a62cd82ba545c9e2eaf6e4b246e96abf8f2b1eb75",
-      "sig": "6fc095669ffe4dcd5752517453b1a5fb69395f498d94358f93636f26fce39e7af18df56f0b92167e24046979c5c7c39810d136eb31bcda86b98959ac5c0eae1f"
+      "sig": "0436436b483c403820382f9d66f9625eb94df46153ae90419fbdd5b1b00ba2f0640b3397b15e2d43eb5a5121043702ad28f77da762932422dfe5677a8275d8a3"
     },
     {
       "content": "https://github.com/estiva-app/peek/pull/93\n\nBoth halves of the done-when are checked through `api.unread.summary` — the query the sidebar reads — with a control proving the quiet topic goes unread without the cache. Both directions implemented; every hop takes the max, so the cache↔relay cycle settles rather than loops. Horizon also widened to 90 days.\n\nWatch the units: readState is epoch ms, NIP-RS contexts are seconds. Converted in one place, pinned by a test.\n\nNot proven: these are new Convex functions, and push failures only surface at deploy.",

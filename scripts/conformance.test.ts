@@ -62,7 +62,7 @@ const here = dirname(fileURLToPath(import.meta.url))
  * the recorded events byte-identical (8fd1c059: the ordering cases moved into
  * their target's Folder, and SPEC §6.2's cases joined them).
  */
-const EVENTS_SHA256 = '0fc809c77a92156536668a9a99d6cdfc433526a0e32a029165f534f8364e31e3'
+const EVENTS_SHA256 = '14bf4e5b8b5ee0ac82f08b3ca3ec9e909ed1b1fcf9f297cc3dd120508adf61b1'
 
 let failures = 0
 function check(label: string, condition: boolean, detail = '') {

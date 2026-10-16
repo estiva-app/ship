@@ -90,6 +90,8 @@ const folderRule = [
   change(base + 42, [['h', ''], ['h', ISSUE_FOLDER]], ISSUE, 'title', 'Read by its first h with a value', 'an empty h ahead of the real one names nothing'),
   change(base + 43, [], ISSUE, 'title', 'No Folder named', 'no h at all, must not count'),
   change(base + 44, [['h', ELSEWHERE], ['buzz-channel', ISSUE_FOLDER]], ISSUE, 'status', 'in_progress', 'a buzz-channel on a change proves nothing, must not count'),
+  // Membership is a change like any other: a Join from another Folder is not one.
+  change(base + 49, [['h', ELSEWHERE]], ISSUE, `member:${pubkey}`, 'true', 'a Join signed in another Folder, must not count'),
 ]
 
 /** A root that names no Folder has none to be outside of: every change counts. */
@@ -97,6 +99,8 @@ const UNPLACED = `${KIND.ISSUE}:${pubkey}:fixture-no-folder`
 const unplaced = [
   sign(base + 30, KIND.ISSUE, [['d', 'fixture-no-folder'], ['title', 'Filed before h was required']], ''),
   change(base + 45, [['h', ELSEWHERE]], UNPLACED, 'status', 'done', 'its root names no Folder, so this counts'),
+  // SPEC §6.12: a summary takes neither exception, so here it does not count.
+  change(base + 50, [['h', ELSEWHERE]], UNPLACED, 'summary', 'Summarised from anywhere', 'a summary counts only where the Folder can be checked'),
 ]
 
 /** A project placed by `buzz-channel` alone (SPEC §7.3) is in that Folder. */
