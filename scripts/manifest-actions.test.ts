@@ -184,14 +184,21 @@ const projectSummary = build({ kind: KIND.PROJECT, address: PROJECT, objectAutho
 check('summarize-project builds one kind:1851 on `summary`, untagged', Array.isArray(projectSummary) && tag(projectSummary[0], 'field') === 'summary' && tag(projectSummary[0], 'content-format') === undefined)
 
 const seededRoot = sign({ ...issueRoot, tags: [...issueRoot.tags, ['summary', 'As filed, in one line']] }, 21)
-const clear = (value: string, i: number) => {
+// The summary Ship folds after summarize-issue sets `value` over the seeded root;
+// a sentence, not undefined, when the action cannot be built, so no check passes then.
+const summaryAfter = (value: string, i: number): string | undefined => {
   const built = build({ kind: KIND.ISSUE, address: ISSUE, objectAuthor: ME, folder: FOLDER, actionId: 'summarize-issue', value })
-  return Array.isArray(built) ? foldFolder([seededRoot, sign(built[0], i)]).issues[0] : undefined
+  return Array.isArray(built) ? foldFolder([seededRoot, sign(built[0], i)]).issues[0].summary : `not built: ${built}`
 }
 check('a root’s summary tag is its seed', foldFolder([seededRoot]).issues[0].summary === 'As filed, in one line')
-check('an empty value clears it, and the seed does not show through', clear('', 22) !== undefined && clear('', 22)!.summary === undefined)
-check('a value of spaces is no summary either', clear('  \n ', 23)!.summary === undefined)
-check('line breaks fold to spaces: one line wherever it is drawn', clear('Two\nlines', 24)!.summary === 'Two lines')
+check('an empty value clears it, and the seed does not show through', summaryAfter('', 22) === undefined, summaryAfter('', 22))
+check('a value of spaces is no summary either', summaryAfter('  \n ', 23) === undefined)
+check('line breaks fold to spaces: one line wherever it is drawn', summaryAfter('Two\nlines', 24) === 'Two lines')
+const projectRoot = sign({ pubkey: ME, created_at: NOW / 1000 - 100, kind: KIND.PROJECT, tags: [['d', 'p1'], ['name', 'Billing'], ['buzz-channel', FOLDER]], content: '' }, 27)
+check(
+  'Ship folds summarize-project over a project that names its Folder by buzz-channel',
+  Array.isArray(projectSummary) && foldFolder([projectRoot, sign(projectSummary[0], 28)]).projects[0].summary === 'Ship the summary everywhere.',
+)
 const elsewhere = build({ kind: KIND.ISSUE, address: ISSUE, objectAuthor: ME, folder: OTHER, actionId: 'summarize-issue', value: 'From another Folder' })
 check(
   'a summary signed in another Folder is not read (§6.2)',
