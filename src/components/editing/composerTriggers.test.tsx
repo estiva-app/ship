@@ -3,7 +3,8 @@ import { describe, expect, it, vi } from 'vitest'
 // `[`'s search tier asks the relay once two letters are typed; these tests read no relay.
 vi.mock('@/api/foreign', () => ({ searchFiles: vi.fn(async () => []), fileCandidatesOf: vi.fn(async () => []) }))
 import { blockDocumentToMarkerText, encodeNpub, fromEditorDocument, type EditorDocument } from '@estiva-app/protocol'
-import { messageReference } from '@estiva-app/conversation'
+import { FILE_TIER, fileReference, messageReference } from '@estiva-app/conversation'
+import { searchFiles } from '@/api/foreign'
 import { chipsAsReferences } from './composerTriggers'
 import { mentionPeople, snippetOf } from './mentionables'
 import { messageScope, referenceSections } from '@/api/references'
@@ -75,6 +76,36 @@ describe('what [ offers', () => {
     const page = [1, 2, 3, 4, 5].map(at)
     expect(referenceSections(messageScope(page), '')[0].items.map((item) => item.snippet)).toEqual(['m5', 'm4', 'm3', 'm2'])
     expect(referenceSections(messageScope(page), 'm2')[0].items.map((item) => item.snippet)).toEqual(['m2'])
+  })
+
+  it('Files: a file’s summary is its row’s second line, an issue’s project beside its title; no summary, the row as before (SUM-7)', async () => {
+    vi.useFakeTimers()
+    const file = (d: string, kind: number, title: string, caption: string, summary?: string) => ({
+      id: `${kind}:${BOB}:${d}`,
+      uri: fileReference(`${kind}:${BOB}:${d}`),
+      type: kind === 30851 ? ('issue' as const) : ('document' as const),
+      kind,
+      title,
+      caption,
+      summary,
+      tier: FILE_TIER.search,
+    })
+    vi.mocked(searchFiles).mockResolvedValueOnce([
+      file('a', 30851, 'Budget review', 'Finance', 'Check the Q4 numbers before Friday'),
+      file('b', 30842, 'Budget notes', ''),
+    ])
+    let files
+    try {
+      referenceSections(messageScope([]), 'Budget')
+      await vi.advanceTimersByTimeAsync(2000)
+      files = referenceSections(messageScope([]), 'Budget')[1]
+    } finally {
+      vi.useRealTimers()
+    }
+    const row = (title: string) => files.items.find((item) => item.label === title)
+    expect(row('Budget review')).toMatchObject({ summary: 'Check the Q4 numbers before Friday', description: 'Finance' })
+    expect(row('Budget notes')?.summary).toBeUndefined()
+    expect(row('Budget notes')?.description).toBeUndefined()
   })
 
   it('captions a message by its words: marks stripped, a person by name', () => {
