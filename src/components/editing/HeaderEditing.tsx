@@ -17,7 +17,13 @@ import type { LiveHeaderProps } from './LiveHeader'
 export default function HeaderEditing({ title, titlePlaceholder, onRename, summary, onSummarize, description, format, onDescribe, nameOf, upload, resolved, onCommentOnBlock, onCopyBlockLink }: LiveHeaderProps & { resolved: Record<string, ForeignObjectData | null | undefined> }) {
   const [body, setBody] = useState<Editor | null>(null)
   const summaryEditor = useRef<InlineTextHandle>(null)
-  const toDescription = () => body?.commands.focus('start')
+  const toDescription = () => {
+    if (!body) return
+    body.commands.focus('start')
+    // An empty description gets its first line only as it takes the focus, so that first 'start' selects
+    // the whole document, and the format toolbar opens over nothing. Again, it is a caret on that line.
+    if (!body.state.selection.empty) body.commands.focus('start')
+  }
   return (
     // 16px between title and description (Katerina, 29 September: "a bit more" than the 8px pages had), and the
     // summary 4px under the title, between them (the short-summary prototype's ShipFilePage).
