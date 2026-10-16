@@ -32,6 +32,9 @@ import { LiveSummary } from '@/components/editing/LiveSummary'
 - `onCommit` resolves `true` when saved, or the words for why the relay
   refused (`actInField`); the field stays open with your text and those words.
 - Without `onCommit`, or `readOnly`, it is text, and nothing when empty.
+- `waiting` draws it as the field will be, but not clickable: **LiveHeader**
+  passes it while the editors' chunk loads, so nothing typed is lost when the
+  header is replaced.
 
 ## What it owns
 

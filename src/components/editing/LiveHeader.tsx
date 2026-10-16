@@ -146,8 +146,9 @@ function ReadingHeader({ title, titlePlaceholder, summary, onSummarize, descript
       <div className="flex flex-col gap-1">
         {/* No "Archived" chip beside the title: the Archived notice above it says so in words (Katerina, 30 September). */}
         <h1 className={title ? '-mx-2 px-2 py-1 text-h2 text-text-primary' : '-mx-2 px-2 py-1 text-h2 text-text-muted'}>{title || titlePlaceholder}</h1>
-        {/* Not in the editors' chunk: it is the package's EditableText, so a writer can change it before they arrive. */}
-        <LiveSummary value={summary ?? ''} onCommit={onSummarize} readOnly={readOnly} />
+        {/* For a writer this is the moment before the editors arrive: the summary waits, unclickable, so nothing typed is
+            lost when HeaderEditing replaces this header. */}
+        <LiveSummary value={summary ?? ''} onCommit={onSummarize} readOnly={readOnly} waiting={!readOnly} />
       </div>
       <div className="-mx-2 px-2 py-1" data-description="reading">
         {empty ? (

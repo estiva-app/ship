@@ -7,6 +7,7 @@ import { Field } from '@/components/ui/Field'
 import { Select, type SelectOption } from '@/components/ui/Select'
 import { TextInput } from '@/components/ui/TextInput'
 import { Textarea } from '@/components/ui/Textarea'
+import { summaryText } from '@/nostr/summary'
 import { SummaryField } from './SummaryField'
 
 /**
@@ -49,7 +50,7 @@ export function NewIssueDialog({ projects, project, onClose, onCreate }: NewIssu
     if (!canSubmit) return
     setBusy(true)
     try {
-      const ok = await onCreate({ title: title.trim(), summary: summary.trim(), description: description.trim(), projectAddr })
+      const ok = await onCreate({ title: title.trim(), summary: summaryText(summary), description: description.trim(), projectAddr })
       if (ok !== false) onClose()
     } finally {
       setBusy(false)

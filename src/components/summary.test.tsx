@@ -20,10 +20,20 @@ const SUMMARY = 'Totals on the invoice are off by one cent.'
 const ISSUE: IssueRowData = { addr: '30851:a:1', id: '1', ref: 'BIL-1', title: 'Invoice totals', summary: SUMMARY, status: 'todo', at: Math.floor(Date.now() / 1000) }
 const BARE: IssueRowData = { ...ISSUE, addr: '30851:a:2', id: '2', ref: 'BIL-2', title: 'No summary here', summary: undefined }
 
+/** The summary is drawn after the title in reading order: under it, never before it. */
+function expectAfterTitle(title: string, summary: string) {
+  const t = screen.queryByText(title)
+  const s = screen.queryByText(summary)
+  expect(t).not.toBeNull()
+  expect(s).not.toBeNull()
+  expect(t!.compareDocumentPosition(s!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+}
+
 describe('the issue list row', () => {
   it('draws the summary under the title, inside the link that opens the issue; without one, the title alone', () => {
     const { unmount } = render(<IssueRow issue={ISSUE} statuses={STATUSES} href="#/issue/1" />)
     expect(within(screen.getByRole('link')).queryByText(SUMMARY)).not.toBeNull()
+    expectAfterTitle('Invoice totals', SUMMARY)
     unmount()
     render(<IssueRow issue={BARE} statuses={STATUSES} href="#/issue/2" />)
     expect(screen.getByRole('link').textContent).toBe('BIL-2No summary here')
@@ -40,6 +50,7 @@ describe('the board card', () => {
   it('draws the summary under the title; without one, the title alone', () => {
     const { unmount } = render(<BoardCard issue={ISSUE} href="#/issue/1" />)
     expect(within(screen.getByRole('link')).queryByText(SUMMARY)).not.toBeNull()
+    expectAfterTitle('Invoice totals', SUMMARY)
     unmount()
     render(<BoardCard issue={BARE} href="#/issue/2" />)
     expect(screen.getByRole('link').textContent).toBe('BIL-2No summary here')
@@ -52,6 +63,7 @@ describe('the issues table', () => {
     expect(screen.getAllByRole('columnheader').map((th) => th.textContent)).toEqual(['Ref', 'Title', 'Status', 'Assignee', 'Opened by', 'Updated'])
     const titleCell = screen.getByRole('link', { name: 'Invoice totals' }).closest('td')
     expect(titleCell?.textContent).toBe(`Invoice totals${SUMMARY}`)
+    expectAfterTitle('Invoice totals', SUMMARY)
     expect(screen.getByRole('link', { name: 'No summary here' }).closest('td')?.textContent).toBe('No summary here')
   })
 })
@@ -70,6 +82,7 @@ describe('the project card', () => {
   it('draws the summary under the title', () => {
     render(<ProjectCard {...CARD} summary={SUMMARY} />)
     expect(within(screen.getByRole('link')).queryByText(SUMMARY)).not.toBeNull()
+    expectAfterTitle('Billing', SUMMARY)
   })
 })
 

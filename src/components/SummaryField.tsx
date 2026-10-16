@@ -1,18 +1,7 @@
 import { FieldLine } from '@estiva-app/ui'
 import { Field } from '@/components/ui/Field'
 import { Textarea } from '@/components/ui/Textarea'
-
-/**
- * Where a summary is kept to: about 240 characters (Miky, 14 Oct). Past it a
- * count appears and nothing is refused (Miky, 15 Oct, the short-summary
- * prototype's call 1, option A) — SPEC §6.12 sets no limit on the wire.
- */
-export const SUMMARY_LIMIT = 240
-
-/** How many characters a summary is, as a person counts them: what would be saved, letter by letter. */
-export function summaryLength(text: string): number {
-  return Array.from(text.trim()).length
-}
+import { SUMMARY_LIMIT, summaryLength } from '@/nostr/summary'
 
 /** The count a summary past about 240 characters shows under its field: a warning, never a refusal. */
 export function SummaryCount({ text }: { text: string }) {

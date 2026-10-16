@@ -17,6 +17,7 @@
  */
 import { blockAnchorOf, contentFormatOf, type ContentFormat, type SignedEvent } from '@estiva-app/protocol'
 import { DEFAULT_ISSUE_STATUS, DEFAULT_PROJECT_STATUS, KIND } from './kinds'
+import { summaryText } from './summary'
 
 /** First value of a tag, or undefined. Tags are `[name, value, …]`. */
 function tag(event: SignedEvent, name: string): string | undefined {
@@ -601,7 +602,7 @@ function recordDescription(event: SignedEvent): string {
  */
 function fileSummary(fields: FoldedFields, event: SignedEvent): string | undefined {
   const raw = fields[SUMMARY_FIELD] ? fields[SUMMARY_FIELD].value : tag(event, 'summary')
-  const text = raw?.replace(/\s+/g, ' ').trim()
+  const text = raw === undefined ? undefined : summaryText(raw)
   return text || undefined
 }
 

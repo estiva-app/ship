@@ -3,6 +3,7 @@ import { FieldLine } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
 import { EditableText } from '@/components/ui/EditableText'
 import { SummaryCount } from '@/components/SummaryField'
+import { summaryText } from '@/nostr/summary'
 
 /**
  * A file's summary under its title on its own page: all of it, click to edit, with a count past about 240 and a refused save said in the field.
@@ -33,31 +34,43 @@ export function LiveSummary({
   value,
   onCommit,
   readOnly = false,
+  waiting = false,
 }: {
   /** The summary the relay holds; empty when there is none. */
   value: string
   /** Save it: `true`, or the words for why the relay refused. Empty text clears it. Omitted, it is text only. */
   onCommit?: (value: string) => Promise<true | string>
   readOnly?: boolean
+  /**
+   * A writer's page before the editors' chunk has arrived: drawn as the field
+   * will be, "Add a summary" included, but not yet clickable — the header that
+   * replaces this one would drop anything typed into it.
+   */
+  waiting?: boolean
 }) {
   // The text in the open field while it is being written, for the count; null when it is not.
   const [typing, setTyping] = useState<string | null>(null)
   const [refused, setRefused] = useState<string>()
 
   if (readOnly || !onCommit) return value ? <p className="-mx-2 px-2 py-1 text-body-1 text-text-secondary">{value}</p> : null
+  // The same box as EditableText's at rest (its 1px border included), so nothing moves when the field replaces it.
+  if (waiting) return <p className={cn('-mx-2 border border-transparent px-2 py-1 text-body-1', value ? 'text-text-secondary' : 'text-text-muted')}>{value || 'Add a summary'}</p>
 
   const commit = async (next: string) => {
-    const text = next.replace(/\s+/g, ' ').trim()
+    const text = summaryText(next)
     if (text === value) {
       setRefused(undefined)
+      setTyping(null)
       return true
     }
     const result = await onCommit(text)
     if (result === true) {
       setRefused(undefined)
+      setTyping(null)
       return true
     }
-    setRefused(result)
+    // Never a field held open with nothing said: a refusal always shows a reason.
+    setRefused(result || 'The relay gave no reason.')
     return false
   }
 

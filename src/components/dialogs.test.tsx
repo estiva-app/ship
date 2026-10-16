@@ -83,13 +83,13 @@ describe('NewProjectDialog', () => {
     await waitFor(() => expect(onClose).toHaveBeenCalled())
   })
 
-  it('takes an optional summary under the title and hands it over trimmed (SUM-4)', async () => {
+  it('takes an optional summary under the title and hands it over on one line (SUM-4)', async () => {
     const onCreate = vi.fn().mockResolvedValue(true)
     render(<NewProjectDialog {...KEYS} teams={teams} onClose={vi.fn()} onCreate={onCreate} />)
     const fields = screen.getAllByRole('textbox').map((box) => box.getAttribute('placeholder'))
     expect(fields.indexOf('What is it for, in a sentence?')).toBe(fields.indexOf('New project title') + 1)
     fireEvent.change(screen.getByPlaceholderText('New project title'), { target: { value: 'Billing' } })
-    fireEvent.change(screen.getByRole('textbox', { name: 'Summary' }), { target: { value: '  Take card payments.  ' } })
+    fireEvent.change(screen.getByRole('textbox', { name: 'Summary' }), { target: { value: '  Take card\npayments.  ' } })
     await chooseTeam('Peek')
     fireEvent.click(screen.getByRole('button', { name: 'Create project' }))
     await waitFor(() => expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({ title: 'Billing', summary: 'Take card payments.' })))
@@ -154,13 +154,13 @@ describe('NewIssueDialog', () => {
     await waitFor(() => expect(onCreate).toHaveBeenCalledWith({ title: 'Board loses order', summary: '', description: '', projectAddr: '30850:a:rel' }))
   })
 
-  it('takes an optional summary under the title and hands it over trimmed (SUM-4)', async () => {
+  it('takes an optional summary under the title and hands it over on one line (SUM-4)', async () => {
     const onCreate = vi.fn().mockResolvedValue(true)
     render(<NewIssueDialog projects={projects} project={{ addr: '30850:a:rel', title: 'Relay Migration' }} onClose={vi.fn()} onCreate={onCreate} />)
     const fields = screen.getAllByRole('textbox').map((box) => box.getAttribute('placeholder'))
     expect(fields.indexOf('What is it for, in a sentence?')).toBe(fields.indexOf('New issue in Relay Migration') + 1)
     fireEvent.change(screen.getByPlaceholderText('New issue in Relay Migration'), { target: { value: 'Board loses order' } })
-    fireEvent.change(screen.getByRole('textbox', { name: 'Summary' }), { target: { value: '  Columns come back in the wrong order.\n' } })
+    fireEvent.change(screen.getByRole('textbox', { name: 'Summary' }), { target: { value: '  Columns come back\n in the wrong order.\n' } })
     fireEvent.click(screen.getByRole('button', { name: 'Create issue' }))
     await waitFor(() => expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({ title: 'Board loses order', summary: 'Columns come back in the wrong order.' })))
   })

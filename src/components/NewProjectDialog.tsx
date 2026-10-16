@@ -6,6 +6,7 @@ import { Field } from '@/components/ui/Field'
 import { Select } from '@/components/ui/Select'
 import { TextInput } from '@/components/ui/TextInput'
 import { Textarea } from '@/components/ui/Textarea'
+import { summaryText } from '@/nostr/summary'
 import { SummaryField } from './SummaryField'
 
 /**
@@ -67,7 +68,7 @@ export function NewProjectDialog({ teams, suggestKey, keyProblem, onClose, onCre
     if (!canSubmit || !team) return
     setBusy(true)
     try {
-      const ok = await onCreate({ title: title.trim(), summary: summary.trim(), description: description.trim(), key, team: { folder: team.id, hasState: team.hasState } })
+      const ok = await onCreate({ title: title.trim(), summary: summaryText(summary), description: description.trim(), key, team: { folder: team.id, hasState: team.hasState } })
       if (ok !== false) onClose()
     } finally {
       setBusy(false)

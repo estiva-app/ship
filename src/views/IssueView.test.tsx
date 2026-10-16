@@ -8,6 +8,8 @@
  */
 import { describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import type { WriteResult } from '@/api'
+import { actInField } from '@/pages/act'
 import { IssueView, type IssueViewProps } from './IssueView'
 import { ProjectView, type ProjectViewProps } from './ProjectView'
 
@@ -157,6 +159,10 @@ describe('the summary on an issue’s and a project’s page (SUM-4)', () => {
     const onSummarize = vi.fn().mockResolvedValue(true)
     const edit = await writer({ summary: SUMMARY, onSummarize })
     expect(edit?.textContent).toBe(SUMMARY)
+    // Under the title and above the description, in reading order.
+    const follows = (a: Node, b: Node) => !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)
+    expect(follows(screen.getByRole('textbox', { name: 'Title' }), edit!)).toBe(true)
+    expect(follows(edit!, screen.getByRole('textbox', { name: 'Description' }))).toBe(true)
     fireEvent.click(edit!)
     fireEvent.input(box(), { target: { value: 'The board keeps the order you left it in.' } })
     fireEvent.keyDown(box(), { key: 'Enter' })
@@ -178,7 +184,7 @@ describe('the summary on an issue’s and a project’s page (SUM-4)', () => {
     expect(screen.queryByRole('button', { name: 'Edit summary' })).toBeNull()
   })
 
-  it('counts past 240 characters and saves all of it, refusing nothing', async () => {
+  it('counts past 240 characters and saves all of it, refusing nothing; the count goes once it is saved', async () => {
     const onSummarize = vi.fn().mockResolvedValue(true)
     const edit = await writer({ summary: SUMMARY, onSummarize })
     expect(edit).not.toBeNull()
@@ -188,20 +194,44 @@ describe('the summary on an issue’s and a project’s page (SUM-4)', () => {
     expect(screen.queryByText('300 characters. A summary reads best in one or two sentences, under 240.')).not.toBeNull()
     fireEvent.keyDown(box(), { key: 'Enter' })
     await waitFor(() => expect(onSummarize).toHaveBeenCalledWith(long))
+    await waitFor(() => expect(screen.queryByRole('textbox', { name: 'Summary' })).toBeNull())
+    expect(screen.queryByText(/300 characters/)).toBeNull()
   })
 
-  it('keeps your text in the field with the reason when the relay refuses it, and Escape puts the saved one back', async () => {
-    const onSummarize = vi.fn().mockResolvedValue('Too busy right now — try again in 14s.')
+  /* The page's own refusal path, `actInField`, runs for real: only the write's answer is made up. */
+  const refusedBy = (write: () => Promise<WriteResult>) => () => actInField('Summary', write)
+  const refuse = async (onSummarize: (value: string) => Promise<true | string>) => {
     const edit = await writer({ summary: SUMMARY, onSummarize })
     expect(edit).not.toBeNull()
     fireEvent.click(edit!)
     fireEvent.input(box(), { target: { value: 'A new summary the relay did not take.' } })
     fireEvent.keyDown(box(), { key: 'Enter' })
+  }
+
+  it('keeps your text in the field with the reason when the relay refuses it, and Escape puts the saved one back', async () => {
+    await refuse(refusedBy(async () => ({ ok: false, reason: 'rate-limited: quota exceeded; retry in 14s' })))
     await waitFor(() => expect(screen.queryByText('Summary not saved. Too busy right now — try again in 14s. Your text is still here.')).not.toBeNull())
     expect(box().value).toBe('A new summary the relay did not take.')
     fireEvent.keyDown(box(), { key: 'Escape' })
     expect(screen.queryByRole('button', { name: 'Edit summary' })?.textContent).toBe(SUMMARY)
     expect(screen.queryByText(/Summary not saved/)).toBeNull()
+  })
+
+  it('says the relay’s own words for a refusal, as one sentence', async () => {
+    await refuse(refusedBy(async () => ({ ok: false, reason: 'restricted: not a channel member' })))
+    await waitFor(() => expect(screen.queryByText('Summary not saved. restricted: not a channel member. Your text is still here.')).not.toBeNull())
+    expect(box().value).toBe('A new summary the relay did not take.')
+  })
+
+  it('says a reason even when the relay gave none, or the write threw, and keeps your text', async () => {
+    await refuse(refusedBy(async () => ({ ok: false, reason: '' })))
+    await waitFor(() => expect(screen.queryByText('Summary not saved. The relay gave no reason. Your text is still here.')).not.toBeNull())
+    cleanup()
+    await refuse(refusedBy(async () => {
+      throw new Error('network down')
+    }))
+    await waitFor(() => expect(screen.queryByText('Summary not saved. network down. Your text is still here.')).not.toBeNull())
+    expect(box().value).toBe('A new summary the relay did not take.')
   })
 
   it('clears it when emptied, and saves line breaks as spaces', async () => {
