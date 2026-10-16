@@ -247,13 +247,17 @@ describe('the summary on an issue’s and a project’s page (SUM-4)', () => {
     await writer({ summary: SUMMARY, onSummarize })
     await rewrite(box(), 'A new summary the relay did not take.')
     await press(box(), 'Enter')
+    // Enter moves into the description a frame later (the editor's focus waits for one): wait for it, or under
+    // CI's load it lands after the test has clicked back into the summary, and saves the summary from under it.
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('textbox', { name: 'Description' })))
   }
 
   it('keeps your text where you wrote it with the reason when the relay refuses it, until you change it', async () => {
     await refuse(refusedBy(async () => ({ ok: false, reason: 'rate-limited: quota exceeded; retry in 14s' })))
     await waitFor(() => expect(screen.queryByText('Summary not saved. Too busy right now — try again in 14s. Your text is still here.')).not.toBeNull())
     expect(box().textContent).toBe('A new summary the relay did not take.')
-    // Leaving tries again, and is refused again: the text and the reason stay.
+    // Coming back and leaving tries again, and is refused again: the text and the reason stay.
+    await act(async () => box().focus())
     await leave(box())
     expect(box().textContent).toBe('A new summary the relay did not take.')
     expect(screen.queryByText(/Summary not saved/)).not.toBeNull()
