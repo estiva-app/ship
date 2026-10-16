@@ -186,6 +186,18 @@ describe('the summary on an issue’s and a project’s page (SUM-4)', () => {
     await waitFor(() => expect(onSummarize).toHaveBeenLastCalledWith(`${SUMMARY} Again. Once more.`))
   })
 
+  it('writes a change straight back to the old summary, before the page has caught up with the first save', async () => {
+    // The page's summary stays SUMMARY: the store has not refreshed after the first save.
+    const onSummarize = vi.fn().mockResolvedValue(true)
+    await writer({ summary: SUMMARY, onSummarize })
+    await rewrite(box(), 'A first try.')
+    await press(box(), 'Enter')
+    await waitFor(() => expect(onSummarize).toHaveBeenCalledWith('A first try.'))
+    await rewrite(box(), SUMMARY)
+    await press(box(), 'Enter')
+    await waitFor(() => expect(onSummarize).toHaveBeenLastCalledWith(SUMMARY))
+  })
+
   it('offers "Add a summary" to someone who can edit, and nothing to someone who cannot', async () => {
     const edit = await writer({ onSummarize: vi.fn() })
     expect(edit?.textContent).toBe('')

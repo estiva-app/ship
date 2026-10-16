@@ -47,7 +47,10 @@ export function LiveSummary({
   const commit = async (next: string) => {
     const text = summaryText(next)
     attempted.current = text
-    const result = text === value ? true : await onCommit(text)
+    // Never compared with `value` here: it is the store's copy, which lags a save
+    // just made, so changing straight back would never be written. InlineText
+    // already skips an unchanged text.
+    const result = await onCommit(text)
     if (result === true) {
       setRefused(undefined)
       return true
