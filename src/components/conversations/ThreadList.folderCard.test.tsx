@@ -47,21 +47,30 @@ const listed = (c: HTMLElement) => [...(cardOf(c)?.querySelectorAll('[data-forei
 const askedFiles = () => vi.mocked(resolveForeign).mock.calls.filter(([, options]) => options?.folderFiles).length
 const flush = (ms = 0) => act(() => vi.advanceTimersByTimeAsync(ms))
 
-let filesArrive: (files: Data[]) => void = () => {}
+// The latest files read waiting for its answer; `over` answers it as something else (`unreachable`).
+let filesArrive: (files: Data[] | undefined, over?: Partial<Data>) => void = () => {}
+// The same Folder, written with a relay hint: another reference, the same address.
+let HINTED_REF = ''
 
 beforeEach(() => {
   vi.useFakeTimers()
   FOLDER = `39000:${RELAY}:0b8b7c1e-5f0e-4b4a-9d55-2f1d3c8a7e${String(++folders).padStart(2, '0')}`
   FOLDER_REF = `nostr:${addrToNaddr(FOLDER)}`
+  HINTED_REF = `nostr:${addrToNaddr(FOLDER, ['wss://relay.example.com'])}`
   vi.mocked(resolveForeign).mockReset()
   vi.mocked(resolveForeign).mockImplementation((reference, options) => {
-    if (reference !== FOLDER_REF) return Promise.resolve(null)
+    if (reference !== FOLDER_REF && reference !== HINTED_REF) return Promise.resolve(null)
     if (!options?.folderFiles) return Promise.resolve(object(FOLDER, 'Estiva HQ', { noun: 'folder' }))
     return new Promise((resolve) => {
-      filesArrive = (files) => resolve(object(FOLDER, 'Estiva HQ', { noun: 'folder', children: files }))
+      filesArrive = (files, over) => resolve(object(FOLDER, 'Estiva HQ', { noun: 'folder', children: files, ...over }))
     })
   })
 })
+
+const focus = () =>
+  act(async () => {
+    window.dispatchEvent(new Event('focus'))
+  })
 
 afterEach(() => {
   vi.useRealTimers()
@@ -89,7 +98,7 @@ describe('a Folder linked in a message', () => {
     expect(chip?.querySelector('[data-foreign-object]')).toBeNull()
   })
 
-  it('reads the files again on focus, never on the refresh tick that re-reads every chip and card', async () => {
+  it('never reads the files again on the refresh tick that re-reads every chip and card', async () => {
     show([thread('t1', FOLDER_REF, [{ value: FOLDER, layout: 'detailed' }])])
     await flush()
     await act(async () => filesArrive(FILES))
@@ -99,13 +108,57 @@ describe('a Folder linked in a message', () => {
     // The control: the tick did run, re-resolving the card as it does every chip.
     expect(vi.mocked(resolveForeign).mock.calls.length - askedFiles()).toBeGreaterThan(ticksBefore)
     expect(askedFiles()).toBe(1)
+  })
 
-    // Past the half minute an answer stands for a second card of the same Folder.
-    await flush(30_000)
-    await act(async () => {
-      window.dispatchEvent(new Event('focus'))
-    })
+  it('reads the files again on focus only once the last list is half a minute old', async () => {
+    show([thread('t1', FOLDER_REF, [{ value: FOLDER, layout: 'detailed' }])])
+    await flush()
+    await act(async () => filesArrive(FILES))
+
+    await flush(20_000)
+    await focus()
+    expect(askedFiles()).toBe(1)
+
+    await flush(11_000)
+    await focus()
     expect(askedFiles()).toBe(2)
+  })
+
+  it('keeps the list on screen when a read on focus comes back with none, and reads again on the next focus', async () => {
+    const c = show([thread('t1', FOLDER_REF, [{ value: FOLDER, layout: 'detailed' }])])
+    await flush()
+    await act(async () => filesArrive(FILES))
+
+    await flush(31_000)
+    await focus()
+    // interop answers a listing it could not read with no `children`, as it answers a DM's Folder.
+    await act(async () => filesArrive(undefined))
+    expect(listed(c)).toEqual([FILES[0].ref, FILES[1].ref])
+
+    // Not held as fresh: the next focus asks again.
+    await flush(2_000)
+    await focus()
+    expect(askedFiles()).toBe(3)
+  })
+
+  it('clears the list when a read on focus finds the Folder can no longer be read', async () => {
+    const c = show([thread('t1', FOLDER_REF, [{ value: FOLDER, layout: 'detailed' }])])
+    await flush()
+    await act(async () => filesArrive(FILES))
+
+    await flush(31_000)
+    await focus()
+    await act(async () => filesArrive(undefined, { unreachable: true }))
+    expect(listed(c)).toEqual([])
+  })
+
+  it('reads the files once for the same Folder linked twice, once with a relay hint', async () => {
+    const c = show([thread('t1', FOLDER_REF, [{ value: FOLDER, layout: 'detailed' }]), thread('t2', HINTED_REF, [{ value: FOLDER, layout: 'detailed' }])])
+    await flush()
+    await act(async () => filesArrive(FILES))
+    expect(askedFiles()).toBe(1)
+    const lists = [...c.querySelectorAll(`[data-cards] [data-foreign-object="${FOLDER}"]`)].map((card) => card.querySelectorAll('[data-foreign-object]').length)
+    expect(lists).toEqual([2, 2])
   })
 
   it('draws its row as one line, with no list and no read of its files', async () => {
