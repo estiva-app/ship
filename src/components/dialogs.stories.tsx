@@ -40,7 +40,7 @@ const TEAMS = [
   { id: '3167adea-877f-43c4-96fb-517a2b2d5d24', name: 'Ship', hasState: true },
 ]
 
-/** Production's form: a title, a description, and the team the project is filed into (FOL-2). */
+/** Production's form: a title, an optional summary (SUM-4), the key, a description, and the team the project is filed into (FOL-2). */
 export const NewProject: Story = {
   render: () => <NewProjectDialog {...KEYS} teams={TEAMS} onClose={fn()} onCreate={fn()} />,
 }
@@ -67,6 +67,28 @@ export const NewProjectTakenKey: Story = {
 /** From the Issues page: the project is chosen here. */
 export const NewIssue: Story = {
   render: () => <NewIssueDialog projects={PROJECT_OPTIONS} onClose={fn()} onCreate={fn()} />,
+}
+
+/** Its summary filled in under the title: one or two sentences, the helper still under it (SUM-4). */
+export const NewIssueWithASummary: Story = {
+  render: () => <NewIssueDialog projects={PROJECT_OPTIONS} onClose={fn()} onCreate={fn()} />,
+  play: async () => {
+    await userEvent.type(screen.getByPlaceholderText('Issue title'), 'Item one')
+    await userEvent.type(screen.getByRole('textbox', { name: 'Summary' }), 'A one-sentence summary of what this is for, written by whoever made it.')
+  },
+}
+
+/** Past 240 characters: the count takes the helper's place, and the issue can still be created — nothing is refused (SUM-4). */
+export const NewIssueWithALongSummary: Story = {
+  render: () => <NewIssueDialog projects={PROJECT_OPTIONS} onClose={fn()} onCreate={fn()} />,
+  play: async () => {
+    await userEvent.type(screen.getByPlaceholderText('Issue title'), 'Item one')
+    const box = screen.getByRole('textbox', { name: 'Summary' })
+    await userEvent.click(box)
+    await userEvent.paste(
+      'A summary that runs well past the length it is meant to keep to, so every place that shows it has to decide where to cut it short: two lines in a row, a card or the picker, and all of it on the file’s own page, where whoever can edit it sees the whole text and can shorten it.',
+    )
+  },
 }
 
 /** From a project page: the project is fixed, and the title says so. */

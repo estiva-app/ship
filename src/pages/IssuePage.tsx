@@ -16,7 +16,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { IssueView } from '@/views/IssueView'
 import { go, href, type IssueTab } from '../router'
-import { act, type Say } from './act'
+import { act, actInField, type Say } from './act'
 import { activityFor, copyText, folderOfMessage, railPeople, threadFor } from './ProjectPage'
 import { useReferencePage } from '@/api/references'
 
@@ -230,6 +230,9 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
         descriptionFormat={issue.descriptionFormat}
         nameOf={directory.nameOf}
         onRename={(value) => set('title', value, 'Rename')}
+        summary={issue.summary}
+        // A refusal is said under the field, with your text still in it — not in a toast (SUM-4).
+        onSummarize={(value) => actInField('Summary', () => setIssueField(issue, 'summary', value, 'Summary'), () => refresh([issue.folder]))}
         onCopyBlockLink={(link) => void copyText(link, 'Link copied', 'Copy this link:', say)}
         onDescribe={(value, contentFormat) => set('description', value, 'Description', contentFormat)}
         related={related}

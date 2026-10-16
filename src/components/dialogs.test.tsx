@@ -79,8 +79,20 @@ describe('NewProjectDialog', () => {
     await chooseTeam('Peek')
     expect(create).toBeEnabled()
     fireEvent.click(create)
-    await waitFor(() => expect(onCreate).toHaveBeenCalledWith({ title: 'Design System', description: '', key: 'DES', team: { folder: OTHER, hasState: true } }))
+    await waitFor(() => expect(onCreate).toHaveBeenCalledWith({ title: 'Design System', summary: '', description: '', key: 'DES', team: { folder: OTHER, hasState: true } }))
     await waitFor(() => expect(onClose).toHaveBeenCalled())
+  })
+
+  it('takes an optional summary under the title and hands it over trimmed (SUM-4)', async () => {
+    const onCreate = vi.fn().mockResolvedValue(true)
+    render(<NewProjectDialog {...KEYS} teams={teams} onClose={vi.fn()} onCreate={onCreate} />)
+    const fields = screen.getAllByRole('textbox').map((box) => box.getAttribute('placeholder'))
+    expect(fields.indexOf('What is it for, in a sentence?')).toBe(fields.indexOf('New project title') + 1)
+    fireEvent.change(screen.getByPlaceholderText('New project title'), { target: { value: 'Billing' } })
+    fireEvent.change(screen.getByRole('textbox', { name: 'Summary' }), { target: { value: '  Take card payments.  ' } })
+    await chooseTeam('Peek')
+    fireEvent.click(screen.getByRole('button', { name: 'Create project' }))
+    await waitFor(() => expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({ title: 'Billing', summary: 'Take card payments.' })))
   })
 
   it('prefills a free key from the title, and refuses a taken one before anything is published (SHI-4)', async () => {
@@ -139,7 +151,35 @@ describe('NewIssueDialog', () => {
     expect(screen.queryByRole('combobox', { name: /^Project/ })).not.toBeInTheDocument()
     fireEvent.change(screen.getByPlaceholderText('New issue in Relay Migration'), { target: { value: 'Board loses order' } })
     fireEvent.click(screen.getByRole('button', { name: 'Create issue' }))
-    await waitFor(() => expect(onCreate).toHaveBeenCalledWith({ title: 'Board loses order', description: '', projectAddr: '30850:a:rel' }))
+    await waitFor(() => expect(onCreate).toHaveBeenCalledWith({ title: 'Board loses order', summary: '', description: '', projectAddr: '30850:a:rel' }))
+  })
+
+  it('takes an optional summary under the title and hands it over trimmed (SUM-4)', async () => {
+    const onCreate = vi.fn().mockResolvedValue(true)
+    render(<NewIssueDialog projects={projects} project={{ addr: '30850:a:rel', title: 'Relay Migration' }} onClose={vi.fn()} onCreate={onCreate} />)
+    const fields = screen.getAllByRole('textbox').map((box) => box.getAttribute('placeholder'))
+    expect(fields.indexOf('What is it for, in a sentence?')).toBe(fields.indexOf('New issue in Relay Migration') + 1)
+    fireEvent.change(screen.getByPlaceholderText('New issue in Relay Migration'), { target: { value: 'Board loses order' } })
+    fireEvent.change(screen.getByRole('textbox', { name: 'Summary' }), { target: { value: '  Columns come back in the wrong order.\n' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Create issue' }))
+    await waitFor(() => expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({ title: 'Board loses order', summary: 'Columns come back in the wrong order.' })))
+  })
+
+  it('counts a summary past 240 characters and still creates the issue with all of it (SUM-4)', async () => {
+    const onCreate = vi.fn().mockResolvedValue(true)
+    render(<NewIssueDialog projects={projects} project={{ addr: '30850:a:rel', title: 'Relay Migration' }} onClose={vi.fn()} onCreate={onCreate} />)
+    const long = 'a'.repeat(250)
+    fireEvent.change(screen.getByPlaceholderText('New issue in Relay Migration'), { target: { value: 'Long one' } })
+    const box = screen.queryByRole('textbox', { name: 'Summary' })
+    expect(box).not.toBeNull()
+    fireEvent.change(box!, { target: { value: 'a'.repeat(240) } })
+    expect(screen.queryByText(/characters\. A summary reads best/)).toBeNull()
+    fireEvent.change(box!, { target: { value: long } })
+    expect(screen.queryByText('250 characters. A summary reads best in one or two sentences, under 240.')).not.toBeNull()
+    const create = screen.getByRole('button', { name: 'Create issue' })
+    expect(create).toBeEnabled()
+    fireEvent.click(create)
+    await waitFor(() => expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({ summary: long })))
   })
 
   it('asks for the project when opened from the Issues page, defaulting to the first', async () => {

@@ -7,7 +7,7 @@
  * stay). This pins the split at the view, where the two meet.
  */
 import { describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { IssueView, type IssueViewProps } from './IssueView'
 import { ProjectView, type ProjectViewProps } from './ProjectView'
 
@@ -134,5 +134,95 @@ describe('the Activity tab says when its conversation has something new (66b31c4
     render(projectView('overview', { unread: { t1: ['m1'] }, stillUnread: { t1: ['m1'] } }))
     expect(screen.getByRole('tab', { name: /^Activity.*new$/ }).querySelector('[data-unread]')).not.toBeNull()
     expect(screen.getByRole('tab', { name: /^Issues/ }).querySelector('[data-unread]')).toBeNull()
+  })
+})
+
+/*
+  A file's summary on its own page (SUM-4, part 2), as the short-summary
+  prototype draws it (Miky, 15 Oct): under the title, all of it, click to edit;
+  "Add a summary" only to someone who can edit; text only when archived or
+  read-only. A writer's tests wait for the editors' chunk first, so the header
+  they act on is the one that stays.
+*/
+describe('the summary on an issue’s and a project’s page (SUM-4)', () => {
+  const SUMMARY = 'Columns come back in the order they were made, not the order they were left.'
+  const writer = async (extra: Partial<IssueViewProps>) => {
+    render(view('overview', extra))
+    await screen.findByRole('textbox', { name: 'Description' })
+    return screen.queryByRole('button', { name: 'Edit summary' })
+  }
+  const box = () => screen.getByRole('textbox', { name: 'Summary' }) as HTMLTextAreaElement
+
+  it('draws it under the title, and saves what is typed on Enter', async () => {
+    const onSummarize = vi.fn().mockResolvedValue(true)
+    const edit = await writer({ summary: SUMMARY, onSummarize })
+    expect(edit?.textContent).toBe(SUMMARY)
+    fireEvent.click(edit!)
+    fireEvent.input(box(), { target: { value: 'The board keeps the order you left it in.' } })
+    fireEvent.keyDown(box(), { key: 'Enter' })
+    await waitFor(() => expect(onSummarize).toHaveBeenCalledWith('The board keeps the order you left it in.'))
+  })
+
+  it('offers "Add a summary" to someone who can edit, and nothing to someone who cannot', async () => {
+    const edit = await writer({ onSummarize: vi.fn() })
+    expect(edit?.textContent).toBe('Add a summary')
+    cleanup()
+    render(view('overview', { onSummarize: vi.fn(), readOnlyReason: 'Sign in to edit.' }))
+    expect(screen.queryByText('Add a summary')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Edit summary' })).toBeNull()
+  })
+
+  it('shows an archived issue’s summary as text, not something to click', () => {
+    render(view('overview', { summary: SUMMARY, onSummarize: vi.fn(), lockedReason: 'Unarchive to edit' }))
+    expect(screen.queryByText(SUMMARY)).not.toBeNull()
+    expect(screen.queryByRole('button', { name: 'Edit summary' })).toBeNull()
+  })
+
+  it('counts past 240 characters and saves all of it, refusing nothing', async () => {
+    const onSummarize = vi.fn().mockResolvedValue(true)
+    const edit = await writer({ summary: SUMMARY, onSummarize })
+    expect(edit).not.toBeNull()
+    fireEvent.click(edit!)
+    const long = 'b'.repeat(300)
+    fireEvent.input(box(), { target: { value: long } })
+    expect(screen.queryByText('300 characters. A summary reads best in one or two sentences, under 240.')).not.toBeNull()
+    fireEvent.keyDown(box(), { key: 'Enter' })
+    await waitFor(() => expect(onSummarize).toHaveBeenCalledWith(long))
+  })
+
+  it('keeps your text in the field with the reason when the relay refuses it, and Escape puts the saved one back', async () => {
+    const onSummarize = vi.fn().mockResolvedValue('Too busy right now — try again in 14s.')
+    const edit = await writer({ summary: SUMMARY, onSummarize })
+    expect(edit).not.toBeNull()
+    fireEvent.click(edit!)
+    fireEvent.input(box(), { target: { value: 'A new summary the relay did not take.' } })
+    fireEvent.keyDown(box(), { key: 'Enter' })
+    await waitFor(() => expect(screen.queryByText('Summary not saved. Too busy right now — try again in 14s. Your text is still here.')).not.toBeNull())
+    expect(box().value).toBe('A new summary the relay did not take.')
+    fireEvent.keyDown(box(), { key: 'Escape' })
+    expect(screen.queryByRole('button', { name: 'Edit summary' })?.textContent).toBe(SUMMARY)
+    expect(screen.queryByText(/Summary not saved/)).toBeNull()
+  })
+
+  it('clears it when emptied, and saves line breaks as spaces', async () => {
+    const onSummarize = vi.fn().mockResolvedValue(true)
+    const edit = await writer({ summary: SUMMARY, onSummarize })
+    expect(edit).not.toBeNull()
+    fireEvent.click(edit!)
+    fireEvent.input(box(), { target: { value: 'Two\nlines' } })
+    fireEvent.keyDown(box(), { key: 'Enter' })
+    await waitFor(() => expect(onSummarize).toHaveBeenCalledWith('Two lines'))
+    cleanup()
+    const again = await writer({ summary: SUMMARY, onSummarize })
+    fireEvent.click(again!)
+    fireEvent.input(box(), { target: { value: '   ' } })
+    fireEvent.keyDown(box(), { key: 'Enter' })
+    await waitFor(() => expect(onSummarize).toHaveBeenLastCalledWith(''))
+  })
+
+  it('draws a project’s summary under its title, editable', async () => {
+    render(projectView('overview', { header: { title: 'Relay Migration', summary: SUMMARY, onSummarize: vi.fn(), description: 'Move every Folder.', descriptionFormat: 'marker', archived: false, onRename: vi.fn(), onDescribe: vi.fn() } }))
+    await screen.findByRole('textbox', { name: 'Description' })
+    expect(screen.queryByRole('button', { name: 'Edit summary' })?.textContent).toBe(SUMMARY)
   })
 })

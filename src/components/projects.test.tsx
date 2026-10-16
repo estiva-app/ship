@@ -16,7 +16,7 @@ const base = {
 
 describe('ProjectCard', () => {
   it('reads status · N issues · x/y done · by name · ago', () => {
-    const { container } = render(<ProjectCard {...base} description="Two lines at most." />)
+    const { container } = render(<ProjectCard {...base} summary="Two lines at most." />)
     expect(screen.getByRole('link')).toHaveAttribute('href', '#/p/x')
     expect(container.textContent).toContain('In Progress·4 issues·1/4 done')
     // The face's initials sit in textContent between "by" and the name.

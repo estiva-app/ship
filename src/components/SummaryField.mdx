@@ -1,0 +1,36 @@
+import { Meta } from '@storybook/addon-docs/blocks'
+
+<Meta title="Overlays/SummaryField" />
+
+# SummaryField
+
+The optional Summary field of the New issue and New project dialogs, under
+the title: one or two sentences, with a count past about 240.
+
+**Seen in** — *Overlays/Dialogs*: **New Issue With A Summary**, **New Issue
+With A Long Summary** and **New Project**.
+
+## When
+
+- In a New dialog's **Form**, right under the title.
+
+## When not
+
+- On a file's own page → **LiveSummary**.
+- Outside a **Form**: it is one field of one, and the form sends it.
+
+## How
+
+```tsx
+import { SummaryField } from '@/components/SummaryField'
+
+<SummaryField value={summary} onChange={setSummary} />
+```
+
+- Hand the trimmed text to the create call; empty creates the file with no
+  summary.
+
+## What it owns
+
+- **The helper** until the text runs past 240, then **SummaryCount** in its
+  place and a taller box. Nothing is refused.

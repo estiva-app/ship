@@ -17,7 +17,7 @@ export const PROJECT_CARDS: ProjectCardProps[] = [
   {
     href: '#/project/30850%3Aa%3Ades',
     title: 'Design System',
-    description: 'Tokens, primitives and the Storybook that reviews them.',
+    summary: 'Tokens, primitives and the Storybook that reviews them.',
     status: { value: 'in_progress', label: 'In Progress' },
     issueCount: 11,
     doneCount: 2,
@@ -27,7 +27,7 @@ export const PROJECT_CARDS: ProjectCardProps[] = [
   {
     href: '#/project/30850%3Aa%3Arel',
     title: 'Relay Migration',
-    description: 'Moving every workspace read and write onto the relay, one surface at a time, with the old path kept until each is proven.',
+    summary: 'Moving every workspace read and write onto the relay, one surface at a time, with the old path kept until each is proven.',
     status: { value: 'in_progress', label: 'In Progress' },
     issueCount: 9,
     doneCount: 2,
@@ -37,7 +37,7 @@ export const PROJECT_CARDS: ProjectCardProps[] = [
   {
     href: '#/project/30850%3Aa%3Apay',
     title: 'Payment integration',
-    description: 'Take card payments.',
+    summary: 'Take card payments.',
     status: { value: 'planned', label: 'Planned' },
     issueCount: 11,
     doneCount: 1,
@@ -47,7 +47,7 @@ export const PROJECT_CARDS: ProjectCardProps[] = [
   {
     href: '#/project/30850%3Aa%3Aonb',
     title: 'Onboarding flow for new workspaces',
-    description: 'The first ten minutes, from an invite to a first issue.',
+    summary: 'The first ten minutes, from an invite to a first issue.',
     status: { value: 'planned', label: 'Planned' },
     issueCount: 6,
     doneCount: 0,
@@ -69,7 +69,7 @@ export const ARCHIVED_CARDS: ProjectCardProps[] = [
   {
     href: '#/project/30850%3Aa%3Aweb',
     title: 'Website refresh',
-    description: 'The marketing site on the new tokens.',
+    summary: 'The marketing site on the new tokens.',
     status: { value: 'completed', label: 'Completed' },
     issueCount: 6,
     doneCount: 6,

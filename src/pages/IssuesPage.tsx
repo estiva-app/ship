@@ -15,6 +15,7 @@ export function rowFor(issue: FolderState['issues'][number], state: FolderState,
     id: issue.id,
     ref: issue.ref,
     title: issue.title,
+    summary: issue.summary,
     status: issue.status,
     // The chip names the parent and links to it; a parentless issue (B10),
     // or one whose project is not in this read, shows none.

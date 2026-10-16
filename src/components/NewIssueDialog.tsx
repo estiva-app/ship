@@ -7,6 +7,7 @@ import { Field } from '@/components/ui/Field'
 import { Select, type SelectOption } from '@/components/ui/Select'
 import { TextInput } from '@/components/ui/TextInput'
 import { Textarea } from '@/components/ui/Textarea'
+import { SummaryField } from './SummaryField'
 
 /**
  * Production's "New issue" form (apps/ship/views/new-issue.ts) in the
@@ -19,6 +20,8 @@ import { Textarea } from '@/components/ui/Textarea'
  */
 export interface NewIssueDraft {
   title: string
+  /** Optional; empty creates the issue with no summary (no root tag). */
+  summary: string
   description: string
   projectAddr: string
 }
@@ -35,6 +38,7 @@ export interface NewIssueDialogProps {
 
 export function NewIssueDialog({ projects, project, onClose, onCreate }: NewIssueDialogProps) {
   const [title, setTitle] = useState('')
+  const [summary, setSummary] = useState('')
   const [description, setDescription] = useState('')
   const [projectAddr, setProjectAddr] = useState(project?.addr ?? projects[0]?.value ?? '')
   const [busy, setBusy] = useState(false)
@@ -45,7 +49,7 @@ export function NewIssueDialog({ projects, project, onClose, onCreate }: NewIssu
     if (!canSubmit) return
     setBusy(true)
     try {
-      const ok = await onCreate({ title: title.trim(), description: description.trim(), projectAddr })
+      const ok = await onCreate({ title: title.trim(), summary: summary.trim(), description: description.trim(), projectAddr })
       if (ok !== false) onClose()
     } finally {
       setBusy(false)
@@ -77,6 +81,7 @@ export function NewIssueDialog({ projects, project, onClose, onCreate }: NewIssu
           <Field label="Title" required>
             <TextInput value={title} onChange={(e) => setTitle(e.target.value)} placeholder={project ? `New issue in ${project.title}` : 'Issue title'} autoFocus />
           </Field>
+          <SummaryField value={summary} onChange={setSummary} />
           <Field label="Description">
             <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description (optional)" className="h-[80px]" />
           </Field>

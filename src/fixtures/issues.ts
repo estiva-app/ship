@@ -30,9 +30,9 @@ export const ISSUE_STATUSES = [
 ]
 
 export const ISSUES: IssuesTableRow[] = [
-  { addr: '30851:a:1', id: '1', ref: 'REL-1', project: REL, title: 'Board columns lose order after an archived project returns', status: 'in_progress', assignee: ANA, openedBy: RAVI, at: NOW - 3600 * 2, conversations: 2 },
+  { addr: '30851:a:1', id: '1', ref: 'REL-1', project: REL, title: 'Board columns lose order after an archived project returns', summary: 'Unarchiving a project puts its board columns back in the order they were created, not the order they were left in.', status: 'in_progress', assignee: ANA, openedBy: RAVI, at: NOW - 3600 * 2, conversations: 2 },
   { addr: '30851:a:2', id: '2', ref: 'REL-2', project: REL, title: 'Comments lose their draft when navigating away', status: 'in_progress', assignee: RAVI, openedBy: ANA, at: NOW - 86400 },
-  { addr: '30851:a:3', id: '3', ref: 'REL-3', project: REL, title: 'Pick the dark theme accent', status: 'todo', assignee: MARA, openedBy: ANA, at: NOW - 86400 * 2, conversations: 1 },
+  { addr: '30851:a:3', id: '3', ref: 'REL-3', project: REL, title: 'Pick the dark theme accent', summary: 'A summary that runs well past the length it is meant to keep to, so every place that shows it has to decide where to cut it short: two lines in a row, a card or the picker, and all of it on the file’s own page, where whoever can edit it sees the whole text and can shorten it.', status: 'todo', assignee: MARA, openedBy: ANA, at: NOW - 86400 * 2, conversations: 1 },
   { addr: '30851:a:4', id: '4', ref: 'REL-4', project: REL, title: 'Add a keyboard path for changing status from the list', status: 'todo', assignee: ANA, openedBy: RAVI, at: NOW - 86400 * 3 },
   { addr: '30851:a:5', id: '5', project: REL, title: 'Filed from another app, with no ref', status: 'todo', openedBy: NOBODY, at: NOW - 86400 * 4 },
   { addr: '30851:a:6', id: '6', ref: 'REL-6', project: REL, title: 'Empty states read as broken screens', status: 'done', assignee: RAVI, openedBy: ANA, at: NOW - 86400 * 9 },

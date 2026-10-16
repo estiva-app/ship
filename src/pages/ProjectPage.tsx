@@ -53,7 +53,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { ProjectView } from '@/views/ProjectView'
 import { go, href, type ProjectTab, type ProjectView as ProjectViewName } from '../router'
-import { act, type Say } from './act'
+import { act, actInField, type Say } from './act'
 import { hrefForIssue, rowFor } from './IssuesPage'
 import { MoveProject } from '@/components/MoveProject'
 import { ArchiveDialog } from '@/components/ArchiveDialog'
@@ -554,6 +554,9 @@ export function ProjectPage({
           nameOf: directory.nameOf,
           archived: !!archive,
           onRename: (value) => set('title', value, 'Rename'),
+          summary: project.summary,
+          // A refusal is said under the field, with your text still in it — not in a toast (SUM-4).
+          onSummarize: (value) => actInField('Summary', () => setProjectField(project, 'summary', value, 'Summary'), refresh),
           onDescribe: (value, contentFormat) => set('description', value, 'Description', contentFormat),
         }}
         onAddIssue={() => setDialog('issue')}

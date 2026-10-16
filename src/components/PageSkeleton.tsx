@@ -39,8 +39,12 @@ export function PageSkeleton({ shape }: { shape: PageSkeletonShape }) {
         <div className="flex min-w-0 flex-1 flex-col gap-4 px-6 pt-5">
           <Line className="w-40" />
           <div className="flex flex-col gap-6">
-            <div className="flex h-7 items-center">
-              <SkeletonBar className="h-5 w-2/3" />
+            {/* The title, and the summary's bar 4px under it: it arrives with the title (SUM-4). */}
+            <div className="flex flex-col gap-1">
+              <div className="flex h-7 items-center">
+                <SkeletonBar className="h-5 w-2/3" />
+              </div>
+              <SkeletonBar className="h-4 w-1/2" />
             </div>
             <SkeletonList rows={6} />
           </div>
@@ -92,9 +96,33 @@ export function PageSkeleton({ shape }: { shape: PageSkeletonShape }) {
             <SkeletonBar className="h-7 w-16" />
             <SkeletonBar className="h-7 w-32" />
           </div>
-          <SkeletonList rows={8} />
+          <IssueRowsSkeleton rows={8} />
         </>
       )}
+    </div>
+  )
+}
+
+const TITLE_WIDTH_CLASSES = ['w-36', 'w-28', 'w-44', 'w-32']
+const SUMMARY_WIDTH_CLASSES = ['w-56', 'w-48', 'w-64', 'w-52']
+
+/**
+ * The issues page's rows, each with a second bar for its summary: a summary
+ * arrives with its title, so the list's placeholder is one bar taller per row
+ * rather than a second wait (the short-summary prototype's ShipIssueRowLoading).
+ */
+function IssueRowsSkeleton({ rows }: { rows: number }) {
+  return (
+    <div className="flex flex-col animate-skeleton-in">
+      {Array.from({ length: rows }, (_, i) => (
+        <div key={i} className="flex gap-2 px-2 py-1.5">
+          <SkeletonBar className="size-4 shrink-0" />
+          <div className="flex flex-1 flex-col gap-1.5">
+            <SkeletonBar className={cn('h-3.5', TITLE_WIDTH_CLASSES[i % TITLE_WIDTH_CLASSES.length])} />
+            <SkeletonBar className={cn('h-3', SUMMARY_WIDTH_CLASSES[i % SUMMARY_WIDTH_CLASSES.length])} />
+          </div>
+        </div>
+      ))}
     </div>
   )
 }
