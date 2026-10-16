@@ -12,7 +12,8 @@ vi.mock(import('@/api/foreign'), async (importOriginal) => ({ ...(await importOr
 
 import { toRenderTree } from '@estiva-app/protocol'
 import { LiveDescription } from './LiveDescription'
-import { MAX_LINKS_PER_DESCRIPTION, linksInBlocks } from './DescriptionCards'
+import { MAX_LINKS_PER_DESCRIPTION, blockLineCards, linksInBlocks } from './DescriptionCards'
+import { resolveForeign, type ForeignObject as ForeignObjectData } from '@/api/foreign'
 
 beforeAll(() => {
   Element.prototype.scrollIntoView = () => {}
@@ -73,5 +74,27 @@ describe('linksInBlocks', () => {
     const asked = linksInBlocks(doc([{ type: 'paragraph', id: 'p1', content: [{ type: 'text', text }] }]))
     expect(asked).toHaveLength(MAX_LINKS_PER_DESCRIPTION)
     expect(asked[0]).toBe('https://a.example/0')
+  })
+})
+
+describe('a Folder\'s card after a description\'s line', () => {
+  it('lists the files in the Folder, in its order, read for the card alone', async () => {
+    const FOLDER = `39000:${'c'.repeat(64)}:0b8b7c1e-5f0e-4b4a-9d55-2f1d3c8a7e10`
+    const object = (ref: string, title: string, over: Partial<ForeignObjectData> = {}) =>
+      ({ ref, eventId: 'e'.repeat(64), kind: Number(ref.split(':')[0]), widget: 'card', slots: { title: { value: title } }, meta: [], comments: [], actions: [], viaRecommendation: true, ...over }) as ForeignObjectData
+    const folder = object(FOLDER, 'Estiva HQ', { noun: 'folder' })
+    const files = [object('30840:a:topic', 'Weekly notes', { noun: 'topic' }), object('30842:a:page', 'Handbook', { noun: 'document' })]
+    vi.mocked(resolveForeign).mockImplementation(async (_reference, options) => (options?.folderFiles ? { ...folder, children: files } : folder))
+
+    const [block] = toRenderTree(
+      JSON.stringify({ type: 'doc', content: [{ type: 'paragraph', id: 'p1', content: [{ type: 'text', text: NADDR, marks: [{ type: 'reference', attrs: { uri: NADDR, embed: 'detailed' } }] }] }] }),
+      'blocks',
+    )
+    const { container } = render(<>{blockLineCards(block, { [NADDR]: folder })}</>)
+
+    const card = () => container.querySelector(`[data-foreign-object="${FOLDER}"]`)
+    expect(card()?.textContent).toContain('Estiva HQ')
+    await waitFor(() => expect([...card()!.querySelectorAll('[data-foreign-object]')].map((e) => e.textContent)).toEqual([expect.stringContaining('Weekly notes'), expect.stringContaining('Handbook')]))
+    vi.mocked(resolveForeign).mockImplementation(async () => null)
   })
 })

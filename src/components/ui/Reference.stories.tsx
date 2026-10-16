@@ -87,6 +87,26 @@ export const MessageFromAStranger: Story = {
   },
 }
 
+/**
+ * A Folder in a sentence: its name, labelled by its type, opening in Peek. A
+ * chip lists nothing, so it reads none of the Folder's files (SPEC §3.2).
+ */
+export const Folder: Story = {
+  args: {
+    uri: `nostr:${addrToNaddr(`39000:${STRANGER}:${D}`)}`,
+    object: {
+      ref: `39000:${STRANGER}:${D}`,
+      address: `39000:${STRANGER}:${D}`,
+      kind: 39000,
+      noun: 'folder',
+      widget: 'card',
+      appName: 'Peek',
+      openUrl: `https://peek.estiva.app/o/${addrToNaddr(`39000:${STRANGER}:${D}`)}`,
+      slots: { title: { value: 'Estiva HQ' } },
+    } as unknown as ForeignObject,
+  },
+}
+
 /** Still resolving, and resolved to nothing — drawn alike, marked apart (§13.1: never blank). */
 export const Unresolved: Story = {
   render: (args) => (

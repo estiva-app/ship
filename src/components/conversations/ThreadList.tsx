@@ -10,7 +10,7 @@ import { REACTION_HORIZON, me, type Reaction } from '@/api'
 import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
 import { Attachments as FileAttachments } from '@/components/ui/Attachment'
 import { BlockAnchorNote } from '@/components/ui/BlockAnchorNote'
-import { ForeignObject } from '@/components/ui/ForeignObject'
+import { LinkedObject } from '@/components/ui/LinkedObject'
 import { ShipRichText } from '@/components/ui/ShipRichText'
 import { SkeletonBar } from '@/components/ui/Skeleton'
 import { REACTION_OPTIONS, Reactions } from '@/components/Reactions'
@@ -195,7 +195,7 @@ function Message({ message, resolved, resolving, nameOf, reactions, onToggleReac
           {shownCards.length > 0 && (
             <div className="flex flex-col gap-2" data-cards={String(shownCards.length)}>
               {shownCards.map(({ card, object }) => (
-                <ForeignObject key={card.value} object={object} layout={card.layout === 'detailed' ? 'card' : 'row'} />
+                <LinkedObject key={card.value} reference={card.reference} object={object} layout={card.layout === 'detailed' ? 'card' : 'row'} />
               ))}
             </div>
           )}

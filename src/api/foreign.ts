@@ -112,7 +112,16 @@ export function isEventReference(reference: string): boolean {
   return /^(?:nevent|note)1/i.test(bare) || /^[0-9a-f]{64}$/i.test(bare)
 }
 
-export function resolveForeign(reference: string): Promise<ForeignObject | null> {
+export interface ResolveOptions {
+  /**
+   * A Folder's card: also read the files its `30890` lists that this reader
+   * can open, as `children` (SPEC §3.2, interop 0.58). Costs a Folder page's
+   * read, so only `useFolderFiles` asks, never the refresh tick; a chip never.
+   */
+  folderFiles?: boolean
+}
+
+export function resolveForeign(reference: string, { folderFiles }: ResolveOptions = {}): Promise<ForeignObject | null> {
   /*
     A message mentioned from Peek arrives as `nostr:nevent…` (RIC-11), and
     everything went to `resolveForeignObject`, which decodes an `naddr` or an
@@ -126,7 +135,7 @@ export function resolveForeign(reference: string): Promise<ForeignObject | null>
   // `0` is the list-depth budget, at the top. Positional because that is the
   // runtime's signature; naming them here would be inventing an adapter the
   // seam does not need.
-  return resolveForeignObject(reference, query, profiles.viaRelay(query), 0, manifests)
+  return resolveForeignObject(reference, query, profiles.viaRelay(query), 0, manifests, folderFiles ? { folderFiles } : undefined)
 }
 
 /**

@@ -200,3 +200,42 @@ describe('resolveForeign — a message, pointed at by id', () => {
     await expect(resolveForeign(`nostr:${encodeNevent({ id: 'd'.repeat(64), relays: [], kind: KIND })}`)).resolves.toBeNull()
   })
 })
+
+describe('resolveForeign — a Folder, as its chip and as its card (SPEC §3.2)', () => {
+  const RELAY = 'c'.repeat(64)
+  const FOLDER = '0b8b7c1e-5f0e-4b4a-9d55-2f1d3c8a7e10'
+  const FOLDER_ADDRESS = `39000:${RELAY}:${FOLDER}`
+  const folder = [
+    event({ kind: 39000, pubkey: RELAY, tags: [['d', FOLDER], ['name', 'Estiva HQ']] }),
+    // The Folder's order: the second project first.
+    event({ kind: 30890, pubkey: RELAY, tags: [['d', FOLDER], ['a', `${KIND}:${AUTHOR}:p2`], ['a', ADDRESS]] }),
+    event({ kind: KIND, tags: [['d', 'p2'], ['title', 'A second project']] }),
+    // Not listed: a file that only names the Folder is not in it, and nor is a chat message.
+    event({ kind: KIND, tags: [['d', 'p3'], ['title', 'Not listed'], ['h', FOLDER]] }),
+    event({ kind: 9, tags: [['h', FOLDER]], content: 'a chat message' }),
+    // Peek's old claim on the kind, listing the Folder's messages: no longer read (interop 0.58).
+    event({
+      kind: 31990,
+      tags: [['d', 'peek'], ['k', '39000']],
+      content: JSON.stringify({
+        name: 'Peek',
+        projections: { 39000: { widget: 'card', slots: { title: { tag: 'name' }, list: { children: { kind: 9, via: 'h', limit: 50 } } } } },
+      }),
+    }),
+  ]
+
+  it('lists the files its 30890 names, in its order and with no message, only when drawn as a card', async () => {
+    world.push(...folder)
+    try {
+      const chip = await resolveForeign(FOLDER_ADDRESS)
+      expect(chip?.slots.title?.value).toBe('Estiva HQ')
+      expect(chip?.children).toBeUndefined()
+
+      const card = await resolveForeign(FOLDER_ADDRESS, { folderFiles: true })
+      expect(card?.slots.title?.value).toBe('Estiva HQ')
+      expect(card?.children?.map((file) => file.slots.title?.value)).toEqual(['A second project', 'A project'])
+    } finally {
+      world.splice(world.length - folder.length, folder.length)
+    }
+  })
+})

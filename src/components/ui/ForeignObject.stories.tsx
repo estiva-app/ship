@@ -85,6 +85,29 @@ export const WithChildren: Story = {
   },
 }
 
+/**
+ * A linked Folder's card: the files in it this reader can open, in the
+ * Folder's order, each through its own app's projection — topics, projects
+ * and documents, never its chat messages, and nothing counting the rest
+ * (SPEC §3.2; Miky, 2026-10-16).
+ */
+export const FolderWithFiles: Story = {
+  args: {
+    object: obj({
+      kind: 39000,
+      noun: 'folder',
+      address: '39000:relay:hq',
+      slots: { title: { value: 'Estiva HQ' }, subtitle: { value: 'Where the team plans the week.' } },
+      children: [
+        // Each as its own manifest declares it: Peek's topic, Ship's project and Leaf's document are all `card`.
+        obj({ ref: 'f1', noun: 'topic', slots: { title: { value: 'Weekly notes' } } }),
+        obj({ ref: 'f2', kind: 30850, noun: 'project', appName: 'Estiva Ship', slots: { title: { value: 'Widgets 2: build 1' }, subtitle: { value: 'Messages draw their links by where they sit.' } } }),
+        obj({ ref: 'f3', kind: 30842, noun: 'document', appName: 'Leaf', slots: { title: { value: 'Team handbook' } } }),
+      ],
+    }),
+  },
+}
+
 /** A list declared and empty. "This holds nothing" and "this holds no list" are different sentences. */
 export const EmptyList: Story = {
   args: { object: obj({ slots: { title: { value: 'Relay Migration' } }, children: [] }) },
