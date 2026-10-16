@@ -175,17 +175,20 @@ describe('the summary on an issue’s and a project’s page (SUM-4)', () => {
     await waitFor(() => expect(onSummarize).toHaveBeenCalledWith('The board keeps the order you left it in.'))
   })
 
-  it('goes on from Enter into an empty description with a caret, and no format toolbar over nothing', async () => {
+  /* jsdom draws no format toolbar, so these read what opens it: a selection rather than a caret. */
+  const caretInDescription = async () => {
+    const description = screen.getByRole('textbox', { name: 'Description' })
+    await waitFor(() => expect(document.activeElement).toBe(description))
+    const { selection } = (description as HTMLElement & { editor: Editor }).editor.state
+    return selection.empty && selection.$from.parent.isTextblock
+  }
+
+  it('goes on from Enter into an empty description with a caret, not the whole of it selected', async () => {
     await writer({ summary: SUMMARY, description: '', onSummarize: vi.fn().mockResolvedValue(true) })
     await typeAtEnd(box(), '!')
     await press(box(), 'Enter')
-    const description = screen.getByRole('textbox', { name: 'Description' })
-    await waitFor(() => expect(document.activeElement).toBe(description))
-    // jsdom draws no toolbar: what opens it is a selection, and the whole document selected is one.
-    const { selection } = (description as HTMLElement & { editor: Editor }).editor.state
-    expect([selection.from, selection.to]).toEqual([1, 1])
+    expect(await caretInDescription()).toBe(true)
   })
-
   it('saves on Escape and on leaving it, keeping what was typed', async () => {
     const onSummarize = vi.fn().mockResolvedValue(true)
     await writer({ summary: SUMMARY, onSummarize })

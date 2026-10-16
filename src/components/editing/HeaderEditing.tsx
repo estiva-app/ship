@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import type { Editor } from '@tiptap/react'
+import { TextSelection } from '@tiptap/pm/state'
 import { InlineText, type InlineTextHandle } from '@estiva-app/ui/editor'
 import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
 import { LiveDescription } from './LiveDescription'
@@ -20,9 +21,12 @@ export default function HeaderEditing({ title, titlePlaceholder, onRename, summa
   const toDescription = () => {
     if (!body) return
     body.commands.focus('start')
-    // An empty description gets its first line only as it takes the focus, so that first 'start' selects
-    // the whole document, and the format toolbar opens over nothing. Again, it is a caret on that line.
-    if (!body.state.selection.empty) body.commands.focus('start')
+    // 'start' can be a selection, and a selection opens the format toolbar: the whole document when the
+    // description is empty (its first line is made only as it takes the focus), or the block it opens
+    // with when that is a line or a file. The caret goes on its first line of text instead.
+    if (body.state.selection.empty) return
+    const caret = TextSelection.findFrom(body.state.doc.resolve(0), 1, true)
+    if (caret) body.view.dispatch(body.state.tr.setSelection(caret))
   }
   return (
     // 16px between title and description (Katerina, 29 September: "a bit more" than the 8px pages had), and the
