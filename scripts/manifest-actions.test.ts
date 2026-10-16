@@ -166,6 +166,65 @@ check(
   typeof build({ kind: 39000, address: FOLDER_RECORD, objectAuthor: RELAY, folder: FOLDER, actionId: 'add-project', value: { name: 'Launch' }, newId: 'p9' }) === 'string',
 )
 
+// ── the summary: summarize-*, and the seed on add-issue / add-project ─────────
+console.log('\n# a summary is the change and the root tag Ship writes for it (SPEC §6.12)\n')
+
+const summarized = build({ kind: KIND.ISSUE, address: ISSUE, objectAuthor: ME, folder: FOLDER, actionId: 'summarize-issue', value: 'Totals are off by one cent.' })
+check('summarize-issue builds one kind:1851 on `summary`', Array.isArray(summarized) && summarized.length === 1 && tag(summarized[0], 'field') === 'summary', typeof summarized === 'string' ? summarized : '')
+if (Array.isArray(summarized)) {
+  const [change] = summarized
+  check('plain text: no content-format on the change', tag(change, 'content-format') === undefined)
+  check('Ship folds it as the issue’s summary', foldFolder([issueRoot, sign(change, 20)]).issues[0].summary === 'Totals are off by one cent.')
+  sent = []
+  await store.setField({ folder: FOLDER, target: ISSUE, field: 'summary', value: 'Totals are off by one cent.', note: 'Summary' })
+  const core = (event: { tags: string[][] }) => ['a', 'field', 'value', 'h', 'content-format'].map((name) => `${name}=${tag(event, name)}`).join(' ')
+  check('the same tags Ship’s own setField writes', core(change) === core(sent[0]), `${core(change)} vs ${core(sent[0])}`)
+}
+const projectSummary = build({ kind: KIND.PROJECT, address: PROJECT, objectAuthor: ME, folder: FOLDER, actionId: 'summarize-project', value: 'Ship the summary everywhere.' })
+check('summarize-project builds one kind:1851 on `summary`, untagged', Array.isArray(projectSummary) && tag(projectSummary[0], 'field') === 'summary' && tag(projectSummary[0], 'content-format') === undefined)
+
+const seededRoot = sign({ ...issueRoot, tags: [...issueRoot.tags, ['summary', 'As filed, in one line']] }, 21)
+const clear = (value: string, i: number) => {
+  const built = build({ kind: KIND.ISSUE, address: ISSUE, objectAuthor: ME, folder: FOLDER, actionId: 'summarize-issue', value })
+  return Array.isArray(built) ? foldFolder([seededRoot, sign(built[0], i)]).issues[0] : undefined
+}
+check('a root’s summary tag is its seed', foldFolder([seededRoot]).issues[0].summary === 'As filed, in one line')
+check('an empty value clears it, and the seed does not show through', clear('', 22) !== undefined && clear('', 22)!.summary === undefined)
+check('a value of spaces is no summary either', clear('  \n ', 23)!.summary === undefined)
+check('line breaks fold to spaces: one line wherever it is drawn', clear('Two\nlines', 24)!.summary === 'Two lines')
+const elsewhere = build({ kind: KIND.ISSUE, address: ISSUE, objectAuthor: ME, folder: OTHER, actionId: 'summarize-issue', value: 'From another Folder' })
+check(
+  'a summary signed in another Folder is not read (§6.2)',
+  Array.isArray(elsewhere) && foldFolder([seededRoot, sign(elsewhere[0], 25)]).issues[0].summary === 'As filed, in one line',
+)
+
+const filed = build({ kind: KIND.PROJECT, address: PROJECT, objectAuthor: ME, folder: FOLDER, actionId: 'add-issue', value: { title: 'Billing entry', summary: 'Totals are off.' }, newId: 'i7' })
+check('add-issue takes a summary', Array.isArray(filed), typeof filed === 'string' ? filed : '')
+if (Array.isArray(filed)) {
+  sent = []
+  await store.createIssue({ folder: FOLDER, title: 'Billing entry', summary: 'Totals are off.', projectAddr: PROJECT })
+  // The runtime places `a` and `h` after the properties, so the two orders already
+  // differ; a reader finds every tag by name (SPEC §6.1). Ship's own puts it last.
+  const names = (event: { tags: string[][] }) => event.tags.map((t) => t[0]).join(',')
+  check('on a `summary` tag, as Ship’s own writes it, last there', tag(filed[0], 'summary') === 'Totals are off.' && tag(sent[0], 'summary') === 'Totals are off.' && names(sent[0]).endsWith(',summary'), `${names(filed[0])} vs ${names(sent[0])}`)
+  check('which Ship folds as the new issue’s summary', foldFolder([sign(filed[0], 26)]).issues[0].summary === 'Totals are off.')
+}
+const launched = build({ kind: 39000, address: FOLDER_RECORD, objectAuthor: RELAY, folder: FOLDER, actionId: 'add-project', value: { name: 'Launch', key: 'LAU', summary: 'What launch means.' }, newId: 'p10', folderHasState: false })
+check('add-project takes a summary', Array.isArray(launched), typeof launched === 'string' ? launched : '')
+if (Array.isArray(launched)) {
+  sent = []
+  await store.createProject({ title: 'Launch', key: 'LAU', summary: 'What launch means.', team: { folder: FOLDER, hasState: false } })
+  const names = (event: { tags: string[][] }) => event.tags.map((t) => t[0]).join(',')
+  check(
+    'on a `summary` tag, after `key` in both',
+    tag(launched[0], 'summary') === 'What launch means.' && tag(sent[0], 'summary') === 'What launch means.' && names(launched[0]).includes('key,summary') && names(sent[0]).endsWith(',key,summary'),
+    `${names(launched[0])} vs ${names(sent[0])}`,
+  )
+}
+sent = []
+await store.createIssue({ folder: FOLDER, title: 'Blank', summary: '   ' })
+check('a blank summary writes no tag', tag(sent[0], 'summary') === undefined)
+
 // ── delete-project ──────────────────────────────────────────────────────────
 console.log('\n# delete-project is deleteProject: the kind:5, then every unlisting\n')
 

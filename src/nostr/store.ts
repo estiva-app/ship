@@ -343,6 +343,8 @@ export class Store {
     lead?: string
     /** The prefix of its issues' refs — SHI-4. */
     key?: string
+    /** The one-line summary beside its name — SPEC §6.12. */
+    summary?: string
     /** The team's Folder, and whether it has state — from a read, never a guess. */
     team: { folder: string; hasState: boolean }
   }): Promise<{ result: PublishResult; placed?: PublishResult; addr: string; id: string; folder: string }> {
@@ -358,6 +360,7 @@ export class Store {
         description: args.description,
         lead: args.lead,
         key: args.key,
+        summary: args.summary,
         folder,
       }),
     )
@@ -652,6 +655,7 @@ export class Store {
     folder: string
     title: string
     description?: string
+    summary?: string
     projectAddr?: string
     ref?: string
   }): Promise<{ result: PublishResult; addr: string; id: string }> {

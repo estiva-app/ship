@@ -142,6 +142,8 @@ export interface Project {
    * bodies carry no tag and none of them can be given one.
    */
   descriptionFormat: ContentFormat
+  /** The one-line summary beside the title, as `fileSummary` reads it; absent when it has none. */
+  summary?: string
   /**
    * The Folder the project record names: `buzz-channel` on a global record,
    * `h` on a channel-scoped one — the same answer interop's `folderOf` gives.
@@ -187,6 +189,8 @@ export interface Issue {
    * bodies carry no tag and none of them can be given one.
    */
   descriptionFormat: ContentFormat
+  /** The one-line summary beside the title, as `fileSummary` reads it; absent when it has none. */
+  summary?: string
   folder: string
   /** Parent project address, when the issue has one. */
   projectAddr?: string
@@ -587,6 +591,21 @@ function recordDescription(event: SignedEvent): string {
 }
 
 /**
+ * A file's summary (SPEC §6.12): the winning change when there is one, else the
+ * root's `summary` tag, as plain text on one line.
+ *
+ * A change wins even when it is blank — that is how a summary is cleared, and
+ * the seed must not show through it. Blank after trimming is no summary at all,
+ * so the field is left out rather than drawn as an empty line. Line breaks fold
+ * to spaces: a summary is one line wherever it is drawn, never markup.
+ */
+function fileSummary(fields: FoldedFields, event: SignedEvent): string | undefined {
+  const raw = fields[SUMMARY_FIELD] ? fields[SUMMARY_FIELD].value : tag(event, 'summary')
+  const text = raw?.replace(/\s+/g, ' ').trim()
+  return text || undefined
+}
+
+/**
  * Fold a Folder's raw events into current state.
  *
  * Takes everything the relay returned for one `h` and sorts it out here rather
@@ -634,6 +653,7 @@ export function foldFolder(
       title: fields.title?.value ?? projectName(event) ?? '(untitled project)',
       description: fields.description?.value ?? recordDescription(event),
       descriptionFormat: fields.description?.format ?? contentFormatOf(event),
+      summary: fileSummary(fields, event),
       // The Folder the record names, and only that. A `folder` change is not
       // read: re-pointing a project is gone (MAN-5).
       contentFolder: projectFolder(event) ?? '',
@@ -666,6 +686,7 @@ export function foldFolder(
       title: fields.title?.value ?? tag(event, 'title') ?? '(untitled issue)',
       description: fields.description?.value ?? recordDescription(event),
       descriptionFormat: fields.description?.format ?? contentFormatOf(event),
+      summary: fileSummary(fields, event),
       folder: tag(event, 'h') ?? '',
       projectAddr: fields.project?.value ?? parent,
       /*
