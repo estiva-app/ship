@@ -94,10 +94,14 @@ describe('what [ offers', () => {
       file('a', 30851, 'Budget review', 'Finance', 'Check the Q4 numbers before Friday'),
       file('b', 30842, 'Budget notes', ''),
     ])
-    referenceSections(messageScope([]), 'Budget')
-    await vi.advanceTimersByTimeAsync(2000)
-    const [, files] = referenceSections(messageScope([]), 'Budget')
-    vi.useRealTimers()
+    let files
+    try {
+      referenceSections(messageScope([]), 'Budget')
+      await vi.advanceTimersByTimeAsync(2000)
+      files = referenceSections(messageScope([]), 'Budget')[1]
+    } finally {
+      vi.useRealTimers()
+    }
     const row = (title: string) => files.items.find((item) => item.label === title)
     expect(row('Budget review')).toMatchObject({ summary: 'Check the Q4 numbers before Friday', description: 'Finance' })
     expect(row('Budget notes')?.summary).toBeUndefined()
