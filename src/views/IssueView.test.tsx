@@ -9,6 +9,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import type { Editor } from '@tiptap/core'
 import type { WriteResult } from '@/api'
 import { leave, press, rewrite, stubLayout, typeAtEnd } from '@/test/inlineText'
 import { actInField } from '@/pages/act'
@@ -174,6 +175,20 @@ describe('the summary on an issue’s and a project’s page (SUM-4)', () => {
     await waitFor(() => expect(onSummarize).toHaveBeenCalledWith('The board keeps the order you left it in.'))
   })
 
+  /* jsdom draws no format toolbar, so these read what opens it: a selection rather than a caret. */
+  const caretInDescription = async () => {
+    const description = screen.getByRole('textbox', { name: 'Description' })
+    await waitFor(() => expect(document.activeElement).toBe(description))
+    const { selection } = (description as HTMLElement & { editor: Editor }).editor.state
+    return selection.empty && selection.$from.parent.isTextblock
+  }
+
+  it('goes on from Enter into an empty description with a caret, not the whole of it selected', async () => {
+    await writer({ summary: SUMMARY, description: '', onSummarize: vi.fn().mockResolvedValue(true) })
+    await typeAtEnd(box(), '!')
+    await press(box(), 'Enter')
+    expect(await caretInDescription()).toBe(true)
+  })
   it('saves on Escape and on leaving it, keeping what was typed', async () => {
     const onSummarize = vi.fn().mockResolvedValue(true)
     await writer({ summary: SUMMARY, onSummarize })
