@@ -136,22 +136,34 @@ export function ForeignObject({ object, conversations, layout, className }: Fore
 /**
  * A message: a face, a name, a body. None of `card`/`row`/`table`/`stat`
  * describes one, which is exactly why the chain exists.
+ *
+ * Labelled by its type and opened where it lives, as every other card is: the
+ * same type chip, and the whole message a link to the object's `openUrl`
+ * (a chat message opens in the app declaring the conversation aspect).
+ * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-file-is-labelled-by-its-type-not-its-app.md
+ * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-chat-message-belongs-to-the-protocol.md
  */
 function ForeignMessage({ object, className }: ForeignObjectProps) {
   const author = object.slots.title
   const profile = author?.isPubkey ? object.people?.[author.value] : undefined
+  const label = typeLabelOf(object)
   return (
-    <div
-      className={cn('flex gap-2 py-1.5', className)}
+    <Card
+      href={object.openUrl || undefined}
+      fill="none"
+      hover="fill"
+      quietUntilHover
+      className={cn('flex gap-2 px-2 py-1.5', className)}
       data-foreign-object={object.ref}
       data-widget="message"
     >
       <Avatar name={profile?.displayName} src={profile?.picture} size={24} />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 text-caption text-text-muted">
-          <span className={cn('truncate', profile?.displayName ? 'text-text-secondary' : 'text-text-muted')}>
+          <span className={cn('min-w-0 flex-1 truncate', profile?.displayName ? 'text-text-secondary' : 'text-text-muted')}>
             {profile?.displayName ?? '—'}
           </span>
+          {label && <Chip label={label} />}
         </div>
         {/*
           Formatted, never markup. See the note at the top of this file. Every
@@ -163,7 +175,7 @@ function ForeignMessage({ object, className }: ForeignObjectProps) {
           <ShipRichText value={object.slots.body.value} format={object.slots.body.format ?? 'marker'} size="small" />
         )}
       </div>
-    </div>
+    </Card>
   )
 }
 

@@ -33,6 +33,30 @@ describe('ForeignObject', () => {
     expect(screen.getByText('hello there')).toBeInTheDocument()
   })
 
+  it.each(['card', 'row'] as const)('labels a linked chat message "Message" and opens it in its app, laid out as a %s', (layout) => {
+    // ship#310's probe as QA-1: a kind-9 message linked from an issue drew no
+    // type label and clicking it went nowhere (a-file-is-labelled-by-its-type).
+    const openUrl = 'https://peek.estiva.app/o/nevent1qqs'
+    render(
+      <ForeignObject
+        layout={layout}
+        object={base({
+          ref: 'f'.repeat(64),
+          kind: 9,
+          widget: 'message',
+          noun: 'message',
+          openUrl,
+          slots: { title: { value: 'a'.repeat(64), isPubkey: true }, body: { value: 'QA-2 checking in' } },
+          people: { ['a'.repeat(64)]: { displayName: 'QA-2' } },
+        })}
+      />,
+    )
+    const message = document.querySelector('[data-widget="message"]')!
+    expect(message.textContent).toContain('Message')
+    expect(screen.getByRole('link').getAttribute('href')).toBe(openUrl)
+    expect(screen.getByRole('link').textContent).toContain('QA-2 checking in')
+  })
+
   it('draws a body formatted and small, and markup in it stays text', () => {
     // Formatted since UIG-30 (Katerina, 28 September): the package's RichText,
     // small. Ship's discipline survives it: a tag another app wrote is text.

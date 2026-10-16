@@ -56,11 +56,14 @@ export const Row: Story = {
   args: { object: obj({ widget: 'row', slots: { title: { value: 'Design review' } } }) },
 }
 
-/** `message` — a face, a name, a body, and no card at all. None of card/row/table/stat describes one, which is why the chain exists. */
+/** `message` — a face, a name, a body and its type chip; the whole message opens it where it lives. None of card/row/table/stat describes one, which is why the chain exists. */
 export const Message: Story = {
   args: {
     object: obj({
+      kind: 9,
       widget: ['message', 'card'],
+      noun: 'message',
+      openUrl: 'https://peek.estiva.app/o/nevent1x',
       slots: { title: { value: ADA, isPubkey: true }, body: { value: 'Moved the read path behind the flag — nothing on production yet.' } },
       people: { [ADA]: { displayName: 'Ada Lovelace' } },
     }),
