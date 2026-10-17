@@ -1,7 +1,7 @@
 /**
  * A comment's links drawn by the kit, as Peek draws them — WBM-5 (Widgets 2):
  * where a link sits decides how it draws (SPEC §13.2; record
- * where-a-link-sits-and-which-file-gets-the-card). A link in a sentence is a
+ * a-link-on-words-counts-toward-the-card). A link in a sentence is a
  * chip, a line that is only a link to a file is that file's row, a person or a
  * Folder alone stays a chip, and the file its author chose gets the card under
  * the comment — which any reader may change from (Decided 16 Oct). The file a

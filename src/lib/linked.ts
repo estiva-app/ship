@@ -11,7 +11,7 @@ import { thingKindOfUri } from './thingKind'
   0.75: LinkChip, LinkRow, LinkCard), built from interop's projection — Peek's
   `lib/linked.ts` with Ship's links, so the two apps draw one file the same way
   (why:
-  https://github.com/estiva-app/estiva-docs/blob/main/decisions/where-a-link-sits-and-which-file-gets-the-card.md).
+  https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-link-on-words-counts-toward-the-card.md).
 */
 
 const COLOURS: readonly StatusColour[] = ['neutral', 'blue', 'green', 'muted']

@@ -7,7 +7,7 @@
  * card, whatever the manifest's `widget` says, and `none` — or no `embed` at
  * all — draws none. A reference alone on its line, and a bare app link once
  * what it names has resolved, read as its row, and in a sentence as its chip
- * (record where-a-link-sits-and-which-file-gets-the-card).
+ * (record a-link-on-words-counts-toward-the-card).
  *
  * Fixtures are Ship's real shapes: an issue (manifest `row`) and a project
  * (manifest `card`), each asked for in the other layout, so a pass cannot be
@@ -97,7 +97,7 @@ describe('a message that asks for a card', () => {
     expect(cards(c)).toEqual([])
   })
 
-  // Where a link sits decides how it draws (record where-a-link-sits-and-which-file-gets-the-card, superseding OPT-18's chip).
+  // Where a link sits decides how it draws (record a-link-on-words-counts-toward-the-card, superseding OPT-18's chip).
   it('draws a reference alone on its line as its row, with no card, when no embed names it', async () => {
     const lone = show(thread(ISSUE_REF))
     await waitFor(() => expect(rows(lone)).toEqual(['The probe issue']))
