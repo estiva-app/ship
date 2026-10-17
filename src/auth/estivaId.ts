@@ -250,10 +250,18 @@ export async function renewInPlace(): Promise<Renewal> {
   return renewal
 }
 
-/** For `estivaIdSigner`'s `renew`, so a 401 from `/sign` is an invisible retry. */
+/**
+ * For `estivaIdSigner`'s `renew`, so a 401 from `/sign` is an invisible retry.
+ *
+ * `client.renew` is what `refreshAccessToken` wraps, coalesced the same way; it
+ * is used here for its `refused`, which ends the sign-in on this page too. The
+ * package clears the store, and that tells only the *other* tabs.
+ */
 export async function renew(): Promise<string | null> {
-  const next = await client?.refreshAccessToken()
-  return next?.accessToken ?? null
+  if (!client) return null
+  const renewal = await client.renew()
+  if (renewal.outcome === 'refused') endSession('session_expired')
+  return renewal.outcome === 'renewed' ? renewal.token.accessToken : null
 }
 
 /**

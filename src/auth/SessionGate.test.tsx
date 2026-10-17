@@ -75,6 +75,17 @@ describe('a renewal Estiva ID refuses while Ship is open', () => {
     expect(screen.queryByRole('button', { name: 'Continue with passkey' })).toBeNull()
     expect(JSON.parse(localStorage.getItem(KEY)!).accessToken).toBe('at-2')
   })
+
+  it('asks for the passkey when a save finds the sign-in expired and Estiva ID refuses to renew it', async () => {
+    // The schedule is late (a throttled background tab), so the save's 401 is what renews; clearing the
+    // store tells only the other tabs.
+    store({ expiresAt: Date.now() - 1_000 })
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: false, status: 400, json: async () => ({ error: 'invalid_grant' }) } as Response)
+    const id = await mount()
+    await act(async () => expect(await id.renew()).toBeNull())
+    expect(screen.getByRole('button', { name: 'Continue with passkey' })).toBeTruthy()
+    expect(screen.getByText('The issue you were reading')).toBeTruthy()
+  })
 })
 
 describe('another Ship tab', () => {
