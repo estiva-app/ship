@@ -27,6 +27,22 @@ let person: string | undefined
 
 export function holdTypingFor(pubkey: string | undefined): void {
   person = pubkey
+  // Somebody else signing in on this device, or a hold left too long: it goes, as the plain copy does.
+  const store = storage()
+  if (!store) return
+  try {
+    for (const key of Object.keys(store)) {
+      if (!key.startsWith(`${PREFIX}:`)) continue
+      const mine = `${PREFIX}:${pubkey}:`
+      if (pubkey === undefined || !key.startsWith(mine)) {
+        store.removeItem(key)
+        continue
+      }
+      if (heldText(key.slice(mine.length)) === undefined) store.removeItem(key)
+    }
+  } catch {
+    // Blocked storage holds nothing.
+  }
 }
 
 /** Each open place's text, or `undefined` when there is nothing unsaved in it. */

@@ -64,6 +64,16 @@ import { forgetHeldTyping, holdTyping, holdTypingFor } from './heldTyping'
 /** Where the package keeps the session: `<keyPrefix>.token`, in `localStorage`, shared by every tab. */
 const KEY_PREFIX = 'ship.estiva-id'
 const TOKEN_KEY = `${KEY_PREFIX}.token`
+/** When a tab last signed out, so another tab can tell a sign-out from a refused renewal: both clear the token. */
+const SIGNED_OUT_KEY = `${KEY_PREFIX}.signed-out`
+
+function signedOutJustNow(): boolean {
+  try {
+    return Date.now() - Number(localStorage.getItem(SIGNED_OUT_KEY) ?? 0) < 10_000
+  } catch {
+    return false
+  }
+}
 
 /**
  * Leaving the page, as a replaceable binding.
@@ -240,7 +250,9 @@ export function followOtherTabs(): () => void {
   const follow = (event: StorageEvent) => {
     if (event.storageArea !== window.localStorage || (event.key !== TOKEN_KEY && event.key !== null)) return
     const token = client.storedToken()
-    if (token === null) endSession('no_session')
+    // Gone because that tab signed out, or because its renewal was refused: the second is this sign-in ending too,
+    // and what was typed here is held for it.
+    if (token === null) endSession(event.key === null || signedOutJustNow() ? 'no_session' : 'session_expired')
     else if (ended || token.pubkey !== person) window.location.reload()
   }
   window.addEventListener('storage', follow)
@@ -301,6 +313,12 @@ export async function beginSignIn(options: { silent?: boolean } = {}): Promise<v
  */
 export function beginSignOut(): void {
   forgetHeldTyping()
+  // Before the token goes, so the other tabs read its removal as a sign-out and hold nothing.
+  try {
+    localStorage.setItem(SIGNED_OUT_KEY, String(Date.now()))
+  } catch {
+    // Blocked storage: the other tabs hear nothing either.
+  }
   client?.beginSignOut()
 }
 

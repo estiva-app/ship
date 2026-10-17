@@ -219,6 +219,8 @@ it('keeps nothing on the device when another tab signs out: that is a sign-out, 
   )
   fireEvent.click(screen.getByRole('button', { name: 'New issue' }))
   fireEvent.change(screen.getByRole('textbox', { name: /Title/ }), { target: { value: 'Private plans' } })
+  // What Sign out in the other tab leaves: its moment, then no token.
+  localStorage.setItem('ship.estiva-id.signed-out', String(Date.now()))
   localStorage.removeItem(KEY)
   act(() => void window.dispatchEvent(new StorageEvent('storage', { key: KEY, storageArea: localStorage })))
   expect(screen.getByRole('button', { name: 'Continue with passkey' })).toBeTruthy()
@@ -235,6 +237,52 @@ it('keeps nothing on the device when another tab signs out: that is a sign-out, 
     </page.SessionGate>,
   )
   expect(screen.queryByRole('textbox', { name: /Title/ })).toBeNull()
+  page.stop()
+})
+
+it('keeps what was typed here when the sign-in ends in another tab, whose renewal Estiva ID refused', async () => {
+  signIn()
+  let page = await load()
+  const issues = (p: typeof page) => (
+    <p.SessionGate>
+      <IssuesHarness p={p} />
+    </p.SessionGate>
+  )
+  render(issues(page))
+  fireEvent.click(screen.getByRole('button', { name: 'New issue' }))
+  fireEvent.change(screen.getByRole('textbox', { name: /Title/ }), { target: { value: 'Typed in the other tab' } })
+  // The other tab renewed under the lock and was refused: the package cleared the shared token, and nothing else.
+  localStorage.removeItem(KEY)
+  act(() => void window.dispatchEvent(new StorageEvent('storage', { key: KEY, storageArea: localStorage })))
+  expect(screen.getByText('Your Estiva ID session ended. Continue with your passkey.')).toBeTruthy()
+
+  page.stop()
+  cleanup()
+  signIn()
+  page = await load()
+  render(issues(page))
+  expect(((await screen.findByRole('textbox', { name: /Title/ })) as HTMLInputElement).value).toBe('Typed in the other tab')
+  page.stop()
+})
+
+it('removes what one person held once somebody else signs in on this device', async () => {
+  signIn()
+  let page = await load()
+  render(
+    <page.SessionGate>
+      <IssuesHarness p={page} />
+    </page.SessionGate>,
+  )
+  fireEvent.click(screen.getByRole('button', { name: 'New issue' }))
+  fireEvent.change(screen.getByRole('textbox', { name: /Title/ }), { target: { value: 'Not for the next person' } })
+  await signInEnds(page.id)
+  expect(JSON.stringify({ ...localStorage })).toContain('Not for the next person')
+
+  page.stop()
+  cleanup()
+  signIn('c4'.repeat(32))
+  page = await load()
+  expect(JSON.stringify({ ...localStorage })).not.toContain('Not for the next person')
   page.stop()
 })
 

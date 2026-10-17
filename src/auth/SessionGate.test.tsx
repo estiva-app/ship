@@ -92,6 +92,8 @@ describe('another Ship tab', () => {
     store()
     const id = await mount()
     stopFollowing = id.followOtherTabs()
+    // What Sign out in the other tab leaves: its moment, then no token.
+    localStorage.setItem('ship.estiva-id.signed-out', String(Date.now()))
     localStorage.removeItem(KEY)
     act(otherTabWrote)
     expect(screen.getByText('Continue with your passkey to enter.')).toBeTruthy()
