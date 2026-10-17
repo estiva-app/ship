@@ -18,7 +18,15 @@ const FOLDER = '05bebd5b-b699-4bd4-af50-f5377df0fd67'
 const ISSUE = `30851:${SHIP}:c0b27d90-d5b9-40e7-8078-865ab36a421c`
 
 const signed = (event: Omit<SignedEvent, 'id' | 'sig'>, id: string): SignedEvent => ({ ...event, id: id.padStart(64, '0'), sig: '' })
-const manifest = signed(buildManifest(SHIP, 1_700_000_000_000), '1')
+const shipManifest = signed(buildManifest(SHIP, 1_700_000_000_000), '1')
+/** Ship's manifest with its status action rewritten by a stranger: the manifest is anyone's text on the relay. */
+const tampered = (change: Record<string, unknown>) => {
+  const content = JSON.parse(shipManifest.content)
+  content.actions = content.actions.map((action: { id: string; emits: object }) => (action.id === 'set-issue-status' ? { ...action, emits: { ...action.emits, ...change } } : action))
+  if (change.records) content.records = { ...content.records, ...(change.records as object) }
+  return { ...shipManifest, content: JSON.stringify(content) }
+}
+let manifest = shipManifest
 const root = signed({ pubkey: SHIP, created_at: 1_700_000_100, kind: 30851, tags: [['d', ISSUE.split(':')[2]], ['h', FOLDER], ['title', 'Cards draw from the kit']], content: '' }, '2')
 
 vi.mock('./store', () => ({
@@ -40,6 +48,7 @@ const tagsOf = (event: SignedEvent) => Object.fromEntries(event.tags.map((t) => 
 
 beforeEach(() => {
   publish.mockClear()
+  manifest = shipManifest
 })
 
 describe('a change made from a card', () => {
@@ -59,6 +68,19 @@ describe('a change made from a card', () => {
   it('writes nothing for an action that creates or deletes a file, which a card never offers', async () => {
     const result = await applyCardAction({ reference: `nostr:${addrToNaddr(ISSUE)}`, actionId: 'delete-issue', value: '' })
     expect(result.ok).toBe(false)
+    expect(publish).not.toHaveBeenCalled()
+  })
+
+  // The security review of WBM-5: a "status" whose manifest emits another kind would have the reader sign that kind.
+  it('signs nothing when a manifest’s status emits anything but a change of that field', async () => {
+    for (const change of [{ kind: 31989 }, { kind: 5 }, { listed: true }]) {
+      manifest = tampered(change)
+      // A fresh module: the tab holds the manifest it first read.
+      vi.resetModules()
+      const { applyCardAction } = await import('./foreign')
+      const result = await applyCardAction({ reference: `nostr:${addrToNaddr(ISSUE)}`, actionId: 'set-issue-status', value: 'done' })
+      expect(result.ok, JSON.stringify(change)).toBe(false)
+    }
     expect(publish).not.toHaveBeenCalled()
   })
 
