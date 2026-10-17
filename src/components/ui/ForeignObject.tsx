@@ -1,5 +1,6 @@
 import { Card, Link } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
+import { safeLink } from '@/lib/handoff'
 import { thisObject, typeLabelOf } from '@/lib/typeLabel'
 import { Avatar } from './Avatar'
 import { Chip } from './Chip'
@@ -97,6 +98,7 @@ export interface ForeignObjectProps {
  */
 export function ForeignObject({ object, conversations, layout, className }: ForeignObjectProps) {
   if (object.unreachable) {
+    const open = safeLink(object.openUrl)
     return (
       <Card
         fill="surface"
@@ -108,11 +110,11 @@ export function ForeignObject({ object, conversations, layout, className }: Fore
         {/* The words' look on a box inside the card: Card draws the frame only (UIG-9). */}
         <div className="text-body-2 text-text-muted">
           You may not have access to {thisObject(object)}.
-          {object.openUrl && (
+          {open && (
             <>
               {' '}
               <span className="text-text-secondary">
-                <Link href={object.openUrl} variant="underlined">
+                <Link href={open} variant="underlined">
                   Open it there
                 </Link>
               </span>
@@ -136,22 +138,37 @@ export function ForeignObject({ object, conversations, layout, className }: Fore
 /**
  * A message: a face, a name, a body. None of `card`/`row`/`table`/`stat`
  * describes one, which is exactly why the chain exists.
+ *
+ * Labelled by its type and opened where it lives, as every other card is: the
+ * same type chip, and the whole message a link to the object's `openUrl`
+ * (a chat message opens in the app declaring the conversation aspect).
+ * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-file-is-labelled-by-its-type-not-its-app.md
+ * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-chat-message-belongs-to-the-protocol.md
  */
 function ForeignMessage({ object, className }: ForeignObjectProps) {
   const author = object.slots.title
   const profile = author?.isPubkey ? object.people?.[author.value] : undefined
+  const label = typeLabelOf(object)
+  // The link is another app's manifest's, so only an `https:` one is followed;
+  // with none, the message is still drawn, and does not light up as if it led somewhere.
+  const href = safeLink(object.openUrl)
   return (
-    <div
-      className={cn('flex gap-2 py-1.5', className)}
+    <Card
+      href={href}
+      fill="none"
+      hover={href ? 'fill' : 'none'}
+      quietUntilHover
+      className={cn('flex gap-2 px-2 py-1.5', className)}
       data-foreign-object={object.ref}
       data-widget="message"
     >
       <Avatar name={profile?.displayName} src={profile?.picture} size={24} />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 text-caption text-text-muted">
-          <span className={cn('truncate', profile?.displayName ? 'text-text-secondary' : 'text-text-muted')}>
+          <span className={cn('min-w-0 flex-1 truncate', profile?.displayName ? 'text-text-secondary' : 'text-text-muted')}>
             {profile?.displayName ?? '—'}
           </span>
+          {label && <Chip label={label} />}
         </div>
         {/*
           Formatted, never markup. See the note at the top of this file. Every
@@ -163,7 +180,7 @@ function ForeignMessage({ object, className }: ForeignObjectProps) {
           <ShipRichText value={object.slots.body.value} format={object.slots.body.format ?? 'marker'} size="small" />
         )}
       </div>
-    </div>
+    </Card>
   )
 }
 
@@ -243,7 +260,7 @@ function ForeignCard({ object, row, conversations, className }: ForeignObjectPro
   const layout = cn('flex flex-col gap-2 p-3', row && 'py-2', className)
 
   return (
-    <Card href={object.openUrl || undefined} fill="surface" className={layout} data-foreign-object={object.ref} data-widget={row ? 'row' : 'card'}>
+    <Card href={safeLink(object.openUrl)} fill="surface" className={layout} data-foreign-object={object.ref} data-widget={row ? 'row' : 'card'}>
       {body}
     </Card>
   )
