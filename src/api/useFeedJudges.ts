@@ -135,7 +135,7 @@ export async function readFeedFacts(
   file: FeedFile,
   me: string,
   onMembers?: (members: ReadonlyMap<string, Membership>) => void,
-): Promise<{ membership: Membership; members: ReadonlyMap<string, Membership>; muted: ReadonlySet<string> | undefined }> {
+): Promise<{ membership: Membership; members: ReadonlyMap<string, Membership>; muted: ReadonlySet<string> | undefined; events: readonly SignedEvent[] }> {
   // The same comment can answer two of the filters; the fold counts events, so each is held once.
   const events = [...new Map((await query(feedFactsFilters(file.addr, me))).map((e) => [e.id, e])).values()]
   const folded = [rootOf(file), ...events]
@@ -148,19 +148,19 @@ export async function readFeedFacts(
   if (!list) {
     mutedCache = undefined
     mutedFailed = undefined
-    return { membership, members, muted: NO_MUTES }
+    return { membership, members, muted: NO_MUTES, events }
   }
   if (mutedCache?.eventId !== list.id) {
-    if (mutedFailed?.eventId === list.id && Date.now() - mutedFailed.at < MUTED_RETRY_MS) return { membership, members, muted: undefined }
+    if (mutedFailed?.eventId === list.id && Date.now() - mutedFailed.at < MUTED_RETRY_MS) return { membership, members, muted: undefined, events }
     const parsed = parseMutedBlob((await decrypt(list.content)) ?? '')
     if (!parsed) {
       mutedFailed = { eventId: list.id, at: Date.now() }
-      return { membership, members, muted: undefined }
+      return { membership, members, muted: undefined, events }
     }
     mutedFailed = undefined
     mutedCache = { eventId: list.id, keys: new Set(parsed.keys) }
   }
-  return { membership, members, muted: mutedCache.keys }
+  return { membership, members, muted: mutedCache.keys, events }
 }
 
 /** The judges a feed asks `unreadByThread` with: one for the file's stream and one for the record channel's. */

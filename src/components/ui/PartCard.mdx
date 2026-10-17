@@ -1,0 +1,33 @@
+import { Meta } from '@storybook/addon-docs/blocks'
+
+<Meta title="Primitives/PartCard/Usage" />
+
+# PartCard
+
+One block of another file, live inside a message (SPEC §13.6.1): the package's
+PartCard frame, with the block Ship reads drawn inside it.
+
+## When
+
+- A `part` a message shows, under its text, and the block a comment is about,
+  above it (`MessageText`, `ThreadList`).
+
+## When not
+
+- A whole file linked from a message → its card, which **MessageText** draws.
+- A description's own blocks → **ShipRichText**.
+
+## How
+
+```tsx
+import { PartCard } from '@/components/ui/PartCard'
+
+<PartCard address={part.address} block={part.block} nameOf={nameOf} />
+```
+
+## What it owns
+
+- **The read** (`usePart`), live, and the five states it can be in. Deleted
+  and not this reader's read alike, "not available.", as in Peek (Miky, 15 Oct).
+- **"Open" for a file of Ship's own, "Open in" and the app's name for another app's**
+  (Miky, 2026-10-09), level with Show more.

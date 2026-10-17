@@ -1,0 +1,44 @@
+import { Meta } from '@storybook/addon-docs/blocks'
+
+<Meta title="Conversations/MessageText" />
+
+# MessageText
+
+A message's text with its links, then the cards its author chose and the parts
+it shows, drawn by the kit and by the rule Peek's messages follow.
+
+**Seen in** Conversations/Conversations: Default, Mentioned In.
+
+## When
+
+- The body of a comment or a reply (`ThreadList`, the Activity tab, "Mentioned
+  in").
+- A preview of a message, with `preview` (Related's message rows): its links
+  as chips only.
+
+## When not
+
+- A description → **ShipRichText** with its line cards: a description's links
+  keep their own rule.
+- A block document body in a preview → **ShipRichText**: a message is marker
+  text.
+
+## How
+
+```tsx
+import { MessageText } from '@/components/conversations/MessageText'
+
+<MessageText body={message.body} embeds={message.embeds} parts={message.parts} resolved={resolved} here={about} between={<Attachments files={message.files} />} />
+```
+
+## What it owns
+
+- **Where a link sits decides how it draws** (record
+  where-a-link-sits-and-which-file-gets-the-card): a chip in a sentence, the
+  file's row on a line that is only its link, nothing on the line of a file
+  whose card or part is under the message. A person or a Folder alone stays a
+  chip.
+- **No card for the file the conversation is on** (`here`, WID-3): its link
+  stays where it was written.
+- **A bare app link reads as its file's link** only once what it names has
+  come back and can be read; otherwise it stays the URL as written.

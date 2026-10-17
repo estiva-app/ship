@@ -70,16 +70,12 @@ describe('a pasted block link', () => {
     expect(c.querySelector('[data-part="unaddressable"]')?.textContent).toContain("This part can't be shown")
   })
 
-  it('says a deleted object was deleted', () => {
-    const c = show(LINK, { state: 'deleted' })
-    expect(c.querySelector('[data-part="deleted"]')?.textContent).toBe('Deleted')
-  })
-
-  it('says only "Not available to you" for one the reader may not see, in a frame unlike deleted', () => {
-    const c = show(LINK, { state: 'unreadable' })
-    const card = c.querySelector('[data-part="unreadable"]')
-    expect(card?.textContent).toBe('Not available to you')
-    expect(card?.className).not.toBe(show(LINK, { state: 'deleted' }).querySelector('[data-part="deleted"]')?.className)
+  // Deleted, or not this reader's to see, read the same, as in Peek (Miky, 15 Oct): the relay answers both alike.
+  it('says only "not available." for a deleted object and for one the reader may not see, alike', () => {
+    const deleted = show(LINK, { state: 'deleted' }).querySelector('[data-part="deleted"]')?.textContent
+    const unreadable = show(LINK, { state: 'unreadable' }).querySelector('[data-part="unreadable"]')?.textContent
+    expect(deleted).toMatch(/not available\.$/)
+    expect(unreadable).toBe(deleted)
   })
 
   it("draws a comment's anchored block with the same card, above the text (Decided 2026-10-07)", () => {

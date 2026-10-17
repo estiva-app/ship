@@ -153,7 +153,7 @@ export function IssueView({ crumbs, tab, onTab, title, summary, onSummarize, des
               <ThreadList threads={threads} unread={unread} stillUnread={stillUnread} onThreadShown={onThreadShown} onStart={comment.post} anchor={comment.anchor} onDropAnchor={comment.drop} onReply={onReply} disabledReason={readOnlyReason} nameOf={nameOf} onReact={onReact} onDeleteMessage={onDeleteMessage} onEditMessage={onEditMessage} about={about} upload={upload} />
             </AppSection>
             <AppSection title="Mentioned in">
-              <MentionList items={activity} truncated={activityTruncated} onReply={onReplyInActivity} disabledReason={readOnlyReason} nameOf={nameOf} onReact={onReact} onDeleteMessage={onDeleteMessage} onEditMessage={onEditMessage} upload={upload} />
+              <MentionList items={activity} truncated={activityTruncated} onReply={onReplyInActivity} disabledReason={readOnlyReason} nameOf={nameOf} onReact={onReact} onDeleteMessage={onDeleteMessage} onEditMessage={onEditMessage} about={about} upload={upload} />
             </AppSection>
             <AppSection title="History">
               <History entries={history} />

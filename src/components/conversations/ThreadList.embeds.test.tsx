@@ -6,7 +6,8 @@
  * through `threadFor`, `compact` draws the object's row and `detailed` its
  * card, whatever the manifest's `widget` says, and `none` — or no `embed` at
  * all — draws none. A reference alone on its line, and a bare app link once
- * what it names has resolved, read as their chip, with no card (OPT-18).
+ * what it names has resolved, read as its row, and in a sentence as its chip
+ * (record where-a-link-sits-and-which-file-gets-the-card).
  *
  * Fixtures are Ship's real shapes: an issue (manifest `row`) and a project
  * (manifest `card`), each asked for in the other layout, so a pass cannot be
@@ -62,28 +63,32 @@ const thread = (body: string, embeds?: Embed[]): ThreadData => ({
 })
 const noop = () => {}
 const show = (t: ThreadData) => render(<ThreadList threads={[t]} onStart={noop} onReply={noop} />).container
-const cards = (c: HTMLElement) => [...c.querySelectorAll('[data-cards] [data-foreign-object]')].map((e) => [e.getAttribute('data-foreign-object'), e.getAttribute('data-widget')])
+/** Each card under the message, as [the reference it draws, without `nostr:`; its layout]. */
+const cards = (c: HTMLElement) => [...c.querySelectorAll('[data-cards] [data-card]')].map((e) => [e.getAttribute('data-card-value'), e.getAttribute('data-card')])
+const bare = (reference: string) => reference.replace(/^nostr:/, '')
+const sentence = (c: HTMLElement) => c.querySelector('[data-message-text] p')?.textContent
+const rows = (c: HTMLElement) => [...c.querySelectorAll('[data-message-text] [data-link-row]')].map((row) => row.textContent)
 
 describe('a message that asks for a card', () => {
   it('draws compact as the row, under the sentence, and keeps the chip', async () => {
     const c = show(thread(`the plan is in ${ISSUE_REF} for now`, [{ value: ISSUE, layout: 'compact' }]))
-    await waitFor(() => expect(cards(c)).toEqual([[ISSUE_REF, 'row']]))
-    expect(c.textContent).toContain('the plan is in')
-    expect(c.querySelector('[data-reference]')).not.toBeNull()
+    await waitFor(() => expect(sentence(c)).toBe('the plan is in The probe issue for now'))
+    expect(cards(c)).toEqual([[bare(ISSUE_REF), 'compact']])
   })
 
   it('draws detailed as the card, whatever the manifest says, in body order', async () => {
     const c = show(thread(`${PROJECT_REF} holds ${ISSUE_REF}`, [{ value: ISSUE, layout: 'detailed' }, { value: PROJECT, layout: 'compact' }]))
-    await waitFor(() => expect(cards(c)).toEqual([[PROJECT_REF, 'row'], [ISSUE_REF, 'card']]))
+    await waitFor(() => expect(c.textContent).toContain('The probe project'))
+    expect(cards(c)).toEqual([[bare(PROJECT_REF), 'compact'], [bare(ISSUE_REF), 'detailed']])
   })
 
   it('draws nothing for none, and nothing with no embed', async () => {
     const none = show(thread(`the plan is in ${ISSUE_REF}`, [{ value: ISSUE, layout: 'none' }]))
     const plain = show(thread(`the plan is in ${ISSUE_REF} too`))
-    await waitFor(() => expect(plain.querySelector('[data-reference]')).not.toBeNull())
+    await waitFor(() => expect(sentence(plain)).toBe('the plan is in The probe issue too'))
+    await waitFor(() => expect(sentence(none)).toBe('the plan is in The probe issue'))
     expect(cards(none)).toEqual([])
     expect(cards(plain)).toEqual([])
-    expect(plain.querySelector('[data-foreign-references]')).toBeNull()
   })
 
   it('draws nothing for a value the body no longer names', async () => {
@@ -92,20 +97,21 @@ describe('a message that asks for a card', () => {
     expect(cards(c)).toEqual([])
   })
 
-  it('draws a reference alone on its line as its chip, with no card, when no embed names it (OPT-18)', async () => {
+  // Where a link sits decides how it draws (record where-a-link-sits-and-which-file-gets-the-card, superseding OPT-18's chip).
+  it('draws a reference alone on its line as its row, with no card, when no embed names it', async () => {
     const lone = show(thread(ISSUE_REF))
-    await waitFor(() => expect(lone.querySelector('[data-reference]')).not.toBeNull())
-    expect(lone.querySelector('[data-foreign-object]')).toBeNull()
+    await waitFor(() => expect(rows(lone)).toEqual(['The probe issue']))
+    expect(cards(lone)).toEqual([])
   })
 
-  it('draws a bare app link as the chip of what it names, alone or mid-sentence, with no card (OPT-18)', async () => {
+  it('draws a bare app link as the row of what it names alone, its chip mid-sentence, with no card', async () => {
     const lone = show(thread(ISSUE_URL))
-    await waitFor(() => expect(lone.textContent).toContain('The probe issue'))
-    expect(lone.querySelector('[data-foreign-object]')).toBeNull()
+    await waitFor(() => expect(rows(lone)).toEqual(['The probe issue']))
+    expect(cards(lone)).toEqual([])
     expect(lone.textContent).not.toContain(ISSUE_URL)
     const mid = show(thread(`see ${ISSUE_URL}, then ship`))
-    await waitFor(() => expect(mid.textContent).toContain('see The probe issue, then ship'))
-    expect(mid.querySelector('[data-foreign-object]')).toBeNull()
+    await waitFor(() => expect(sentence(mid)).toBe('see The probe issue, then ship'))
+    expect(cards(mid)).toEqual([])
   })
 
   it('keeps a bare app link a link when what it names cannot be read, rather than an empty chip (OPT-18)', async () => {
@@ -114,35 +120,47 @@ describe('a message that asks for a card', () => {
     // Long enough for the link's answer and the object's to have come back.
     await new Promise((r) => setTimeout(r, 50))
     expect(c.querySelector(`a[href="${GONE_URL}"]`)).not.toBeNull()
-    expect(c.querySelector('[data-reference]')).toBeNull()
+    expect(c.textContent).not.toContain('not available')
   })
 
   it('keeps a link nothing claims, and a link on words, as links with no card (OPT-18)', async () => {
     const c = show(thread(`https://example.com/a and [these words](${ISSUE_URL})`))
     await new Promise((r) => setTimeout(r, 50))
-    expect(c.querySelector('[data-reference]')).toBeNull()
-    expect(c.querySelector('[data-foreign-object]')).toBeNull()
+    expect(rows(c)).toEqual([])
+    expect(cards(c)).toEqual([])
     expect(c.querySelector('a[href="https://example.com/a"]')).not.toBeNull()
+    expect(sentence(c)).toBe('https://example.com/a and these words')
   })
 
-  it('a chosen layout draws under the chip: none leaves the chip, compact draws the row once', async () => {
+  it('a chosen layout on a line that is only the link: none leaves its row, compact draws only the card', async () => {
     const none = show(thread(ISSUE_REF, [{ value: ISSUE, layout: 'none' }]))
-    await waitFor(() => expect(none.querySelector('[data-reference]')).not.toBeNull())
-    expect(none.querySelector('[data-foreign-object]')).toBeNull()
+    await waitFor(() => expect(rows(none)).toEqual(['The probe issue']))
+    expect(cards(none)).toEqual([])
 
     const compact = show(thread(ISSUE_REF, [{ value: ISSUE, layout: 'compact' }]))
-    await waitFor(() => expect(cards(compact)).toEqual([[ISSUE_REF, 'row']]))
-    expect(compact.querySelectorAll('[data-foreign-object]').length).toBe(1)
+    await waitFor(() => expect(compact.querySelector('[data-card]')?.textContent).toContain('The probe issue'))
+    expect(cards(compact)).toEqual([[bare(ISSUE_REF), 'compact']])
+    // The card stands for the line: the file is drawn once.
+    expect(rows(compact)).toEqual([])
+    expect(compact.textContent?.match(/The probe issue/g)).toHaveLength(1)
   })
 })
 
 describe('a link on words that asks for a card (OPT-17)', () => {
   const body = `the plan is [these words](${ISSUE_URL}) for now`
 
-  it('draws the card of the object the link names, resolved under the reference its value spells', async () => {
+  // protocol 0.39's `cardsIn`, as Peek reads it: a URL names a file only where it draws as that file's link, so words keep theirs.
+  it('draws no card for a link on words: the words stay a link, as in Peek', async () => {
     const c = show(thread(body, [{ value: ISSUE, layout: 'detailed' }]))
-    await waitFor(() => expect(cards(c)).toEqual([[ISSUE_REF, 'card']]))
-    expect(c.textContent).toContain('these words')
+    await waitFor(() => expect(c.querySelector(`a[href="${ISSUE_URL}"]`)?.textContent).toBe('these words'))
+    await new Promise((r) => setTimeout(r, 50))
+    expect(cards(c)).toEqual([])
+  })
+
+  it('draws the card a bare app link asks for, resolved under the reference its value spells', async () => {
+    const c = show(thread(`the plan is ${ISSUE_URL} for now`, [{ value: ISSUE, layout: 'detailed' }]))
+    await waitFor(() => expect(cards(c)).toEqual([[bare(ISSUE_REF), 'detailed']]))
+    expect(sentence(c)).toBe('the plan is The probe issue for now')
   })
 
   it('a URL written in a link’s label names nothing: the link goes elsewhere', async () => {

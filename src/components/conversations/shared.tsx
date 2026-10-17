@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { IconBox, IconListDetails } from '@tabler/icons-react'
-import { addressToPointer, bech32Decode, cardsIn, convertBits, decodeNevent, encodeNaddr, encodeNevent, pointerToAddress, referencesIn, referenceToPointer, toRenderTree, type Embed, type Imeta, type LinkResolver, type PartPointer } from '@estiva-app/protocol'
+import { addressToPointer, cardsIn, encodeNaddr, encodeNevent, referencesIn, valueOfReference, type Embed, type Imeta, type LinkResolver, type PartPointer, type RenderBlock } from '@estiva-app/protocol'
 import { WithTooltip } from '@estiva-app/ui'
 import { ago } from '@/lib/time'
 import type { DraftStore } from '@/lib/drafts'
@@ -27,10 +27,11 @@ export interface MessageCard extends Embed {
  * chip. An app link names a card too once
  * `resolveLink` says what it names by §7.7 (OPT-17, `api/linkCards`); its card
  * resolves under the reference its value spells, since the body wrote only the URL.
+ *
+ * `blocks` is the body's tree after `linksAsReferences`, as Peek asks it.
  */
-export function cardsOf(body: string, embeds: readonly Embed[] | undefined, parts: readonly PartPointer[] = [], resolveLink?: LinkResolver): MessageCard[] {
+export function cardsOf(blocks: readonly RenderBlock[], embeds: readonly Embed[] | undefined, parts: readonly PartPointer[] = [], resolveLink?: LinkResolver): MessageCard[] {
   if (!embeds?.length) return []
-  const blocks = toRenderTree(body, MESSAGE_FORMAT)
   const written = new Map<string, string>()
   for (const reference of referencesIn(blocks)) {
     const value = valueOfReference(reference)
@@ -81,22 +82,6 @@ export function referenceOfValue(value: string): string | undefined {
   } catch {
     return undefined
   }
-}
-
-/** The address or event id a `nostr:` reference names — what an `embed` carries for it. */
-export function valueOfReference(reference: string): string | undefined {
-  try {
-    if (/^nostr:nevent1/i.test(reference)) return decodeNevent(reference).id.toLowerCase()
-    if (/^nostr:naddr1/i.test(reference)) return pointerToAddress(referenceToPointer(reference))
-    if (/^nostr:note1/i.test(reference)) {
-      const { hrp, data } = bech32Decode(reference.slice('nostr:'.length).toLowerCase())
-      const id = convertBits(data, 5, 8, false).map((b) => b.toString(16).padStart(2, '0')).join('')
-      return hrp === 'note' && /^[0-9a-f]{64}$/.test(id) ? id : undefined
-    }
-  } catch {
-    return undefined
-  }
-  return undefined
 }
 
 /** The time as "3h ago", and the date and time on hover (Katerina, 29 September). */

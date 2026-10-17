@@ -25,7 +25,8 @@ let folders = 0
 const object = (address: string, title: string, over: Partial<Data> = {}): Data =>
   ({ ref: address, address, eventId: 'e'.repeat(64), kind: Number(address.split(':')[0]), widget: 'card', appName: 'Peek', slots: { title: { value: title } }, meta: [], comments: [], actions: [], viaRecommendation: true, ...over }) as unknown as Data
 
-const FILES = [object(`30840:${PK}:topic`, 'Weekly notes', { noun: 'topic' }), object(`30850:${PK}:project`, 'Launch', { noun: 'project' })]
+const OPENS = 'https://peek.estiva.app/o/'
+const FILES = [object(`30840:${PK}:topic`, 'Weekly notes', { noun: 'topic', openUrl: `${OPENS}30840:${PK}:topic` }), object(`30850:${PK}:project`, 'Launch', { noun: 'project', openUrl: `${OPENS}30850:${PK}:project` })]
 
 vi.mock(import('@/api/foreign'), async (importOriginal) => ({
   ...(await importOriginal()),
@@ -42,8 +43,11 @@ const thread = (id: string, body: string, embeds?: Embed[]): ThreadData => ({
 })
 const noop = () => {}
 const show = (threads: ThreadData[]) => render(<ThreadList threads={threads} onStart={noop} onReply={noop} />).container
-const cardOf = (c: HTMLElement) => c.querySelector(`[data-cards] [data-foreign-object="${FOLDER}"]`)
-const listed = (c: HTMLElement) => [...(cardOf(c)?.querySelectorAll('[data-foreign-object]') ?? [])].map((e) => e.getAttribute('data-foreign-object'))
+const cardOf = (c: HTMLElement) => c.querySelector('[data-cards] [data-card]')
+/** The files a card lists, by title: each row opens its file — Peek's in Peek, Ship's own here. */
+const filesIn = (card: Element | null) => [...(card?.querySelectorAll(`a[href^="${OPENS}"], a[href^="/"]`) ?? [])].map((a) => a.textContent)
+const TITLES = ['Weekly notes', 'Launch']
+const listed = (c: HTMLElement) => filesIn(cardOf(c))
 const askedFiles = () => vi.mocked(resolveForeign).mock.calls.filter(([, options]) => options?.folderFiles).length
 const flush = (ms = 0) => act(() => vi.advanceTimersByTimeAsync(ms))
 
@@ -88,14 +92,14 @@ describe('a Folder linked in a message', () => {
     expect(askedFiles()).toBe(1)
 
     await act(async () => filesArrive(FILES))
-    expect(listed(c)).toEqual([FILES[0].ref, FILES[1].ref])
+    expect(listed(c)).toEqual(TITLES)
     expect(cardOf(c)?.textContent).toContain('Weekly notes')
     expect(cardOf(c)?.textContent).toContain('Launch')
 
     // The chip in the sentence: its name, and no list of its own.
     const chip = c.querySelector('[data-message="t1"]')
     expect(chip?.textContent).toContain('Estiva HQ')
-    expect(chip?.querySelector('[data-foreign-object]')).toBeNull()
+    expect(filesIn(chip)).toEqual([])
   })
 
   it('never reads the files again on the refresh tick that re-reads every chip and card', async () => {
@@ -133,7 +137,7 @@ describe('a Folder linked in a message', () => {
     await focus()
     // interop answers a listing it could not read with no `children`, as it answers a DM's Folder.
     await act(async () => filesArrive(undefined))
-    expect(listed(c)).toEqual([FILES[0].ref, FILES[1].ref])
+    expect(listed(c)).toEqual(TITLES)
 
     // Not held as fresh: the next focus asks again.
     await flush(2_000)
@@ -157,7 +161,7 @@ describe('a Folder linked in a message', () => {
     await flush()
     await act(async () => filesArrive(FILES))
     expect(askedFiles()).toBe(1)
-    const lists = [...c.querySelectorAll(`[data-cards] [data-foreign-object="${FOLDER}"]`)].map((card) => card.querySelectorAll('[data-foreign-object]').length)
+    const lists = [...c.querySelectorAll('[data-cards] [data-card]')].map((card) => filesIn(card).length)
     expect(lists).toEqual([2, 2])
   })
 

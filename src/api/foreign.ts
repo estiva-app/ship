@@ -14,8 +14,11 @@
  * is, the layer has failed and that belongs on PRO-7 rather than being worked
  * around here.
  */
-import type { SignedEvent } from '@estiva-app/protocol'
+import { pointerToAddress, referenceToPointer, type SignedEvent } from '@estiva-app/protocol'
 import {
+  buildActionEvents,
+  folderOf,
+  resolveActingManifest,
   conversationCountsOf,
   archiveImpact,
   createPeopleCache,
@@ -37,7 +40,7 @@ import {
 export { pickWidget } from '@estiva-app/interop'
 import type { ReferenceCandidate } from '@estiva-app/conversation'
 import { relatedTo } from '@/lib/ownKinds'
-import { relay } from './store'
+import { relay, signer } from './store'
 
 export type { ForeignObject, ResolvedSlot, FolderContents, FolderSummary } from '@estiva-app/interop'
 
@@ -136,6 +139,47 @@ export function resolveForeign(reference: string, { folderFiles }: ResolveOption
   // runtime's signature; naming them here would be inventing an adapter the
   // seam does not need.
   return resolveForeignObject(reference, query, profiles.viaRelay(query), 0, manifests, folderFiles ? { folderFiles } : undefined)
+}
+
+/**
+ * Change a linked file from its card: a status, an owner — the manifest's own
+ * action, built by the runtime (`buildActionEvents`) as Peek's `applyAction`
+ * builds it, so a Ship card writes exactly what the file's own app would. Any
+ * reader may (Decided 16 Oct); the relay is the authority on whether it may.
+ *
+ * Only a change of one field, which is all a card's pickers are: never a
+ * creation, a deletion or a write a Folder command follows (`emits.listed`).
+ */
+export async function applyCardAction(args: { reference: string; actionId: string; value: string }): Promise<{ ok: true } | { ok: false; reason: string }> {
+  let pointer
+  try {
+    pointer = referenceToPointer(args.reference)
+  } catch {
+    return { ok: false, reason: 'That link could not be read.' }
+  }
+  const address = pointerToAddress(pointer)
+  const resolved = await resolveActingManifest(pointer, undefined, query, manifests)
+  if (!resolved) return { ok: false, reason: 'No app claims this file, so there is nothing to change.' }
+  const declared = resolved.manifest.actions?.find((action) => action.id === args.actionId)
+  if (!declared || declared.effect !== 'writes' || !declared.emits.field || declared.emits.listed) return { ok: false, reason: 'This can’t be changed from here.' }
+  // The Folder comes off the file itself: the change is written into it.
+  const [root] = await query([{ kinds: [pointer.kind], authors: [pointer.pubkey], '#d': [pointer.identifier], limit: 1 }])
+  const folder = root ? folderOf(root) : undefined
+  if (!folder) return { ok: false, reason: 'That file can’t be read from here.' }
+  const built = buildActionEvents({
+    manifest: resolved.manifest,
+    kind: pointer.kind,
+    address,
+    objectAuthor: pointer.pubkey,
+    folder,
+    actionId: args.actionId,
+    value: args.value,
+    pubkey: signer.pubkey,
+    createdAtMs: Date.now(),
+  })
+  if (typeof built === 'string') return { ok: false, reason: built }
+  const result = await relay.publish(await signer.sign(built[0]))
+  return result.ok ? { ok: true } : { ok: false, reason: result.reason ?? 'The relay refused the change.' }
 }
 
 /**

@@ -34,10 +34,9 @@ import type { Picks } from '@/components/conversations/MessageBox'
  * as an empty paragraph under a name and a time. Descriptions had had the
  * answer since PRO-7 and RIC-10; conversations had never been given it.
  *
- * `Description` is the sibling that already assembles these three pieces, and
- * the pairing is the same one: strip a standalone pointer out of the prose,
- * draw the object it names below, resolve an in-sentence pointer where it was
- * written. Showing the bech32 *and* the object is worse than either.
+ * A message's links now draw by the rule Peek's do (`MessageText`, WBM-5): a
+ * chip in a sentence, a row alone on its line, the card its author chose under
+ * the message.
  *
  * **The screenshots half is answered too, now that there is something to
  * draw.** It could not be, at first: Peek's outbox published `content` and

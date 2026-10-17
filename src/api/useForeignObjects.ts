@@ -5,6 +5,18 @@ import { useRefresh } from '@/lib/useRefresh'
 /** A resolve that threw — not an answer, unlike `null`. */
 const FAILED: unique symbol = Symbol('failed')
 
+/** References whose last resolve threw with no answer before it, so they draw as `null` without being one. */
+const failedNow = new Set<string>()
+
+/**
+ * Whether a `null` for this reference is a failed read (a 429, the network)
+ * rather than an answer of nothing: a card remembers "not available" only for
+ * the second (Peek's OPT-10 rule).
+ */
+export function resolveFailed(reference: string): boolean {
+  return failedNow.has(reference)
+}
+
 /**
  * Resolve a body's `nostr:` references, once for the whole body.
  *
@@ -55,6 +67,10 @@ export function useForeignObjects(references: readonly string[]): (ForeignObject
       // A throw is not an answer. On the first resolve it draws as `null`, as
       // it always has; on a refresh it keeps the card that is already there,
       // so one dropped request does not take a correct card off the page.
+      found.forEach((f, i) => {
+        if (f !== FAILED) failedNow.delete(references[i])
+        else if (!answers.current.has(references[i])) failedNow.add(references[i])
+      })
       const next = found.map((f, i) => (f === FAILED ? (answers.current.get(references[i]) ?? null) : f))
       next.forEach((object, i) => answers.current.set(references[i], object))
       setObjects(next)
