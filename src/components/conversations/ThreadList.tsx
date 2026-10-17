@@ -417,7 +417,7 @@ export function MentionListView(props: MentionListViewProps) {
  * after it is written rather than patched on screen.
  */
 export function ThreadList(props: ConversationsProps & Pick<ThreadListViewProps, 'upload' | 'drafts'>) {
-  const { resolved, resolving } = useThreadReferences(props.threads)
+  const { resolved } = useThreadReferences(props.threads)
   const { reactionsBy, omitted, cut, refresh } = useThreadReactions(props.threads)
   const onReact = props.onReact
     ? async (messageId: string, emoji: string, mine?: string) => {
@@ -425,13 +425,13 @@ export function ThreadList(props: ConversationsProps & Pick<ThreadListViewProps,
         refresh()
       }
     : undefined
-  return <ThreadListView {...props} onReact={onReact} resolved={resolved} resolving={resolving} reactionsBy={reactionsBy} omitted={omitted} reactionsCut={cut} viewer={props.viewer ?? me} />
+  return <ThreadListView {...props} onReact={onReact} resolved={resolved}reactionsBy={reactionsBy} omitted={omitted} reactionsCut={cut} viewer={props.viewer ?? me} />
 }
 
 /** "Mentioned in" with production's `Activity` props and its reads. */
 export function MentionList(props: ActivityProps & Pick<MentionListViewProps, 'upload' | 'drafts'>) {
   const threads = useMemo(() => props.items.map((item) => item.thread), [props.items])
-  const { resolved, resolving } = useThreadReferences(threads)
+  const { resolved } = useThreadReferences(threads)
   const { reactionsBy, refresh } = useThreadReactions(threads)
   const onReact = props.onReact
     ? async (messageId: string, emoji: string, mine?: string) => {
@@ -439,5 +439,5 @@ export function MentionList(props: ActivityProps & Pick<MentionListViewProps, 'u
         refresh()
       }
     : undefined
-  return <MentionListView {...props} onReact={onReact} resolved={resolved} resolving={resolving} reactionsBy={reactionsBy} viewer={props.viewer ?? me} />
+  return <MentionListView {...props} onReact={onReact} resolved={resolved}reactionsBy={reactionsBy} viewer={props.viewer ?? me} />
 }

@@ -127,7 +127,6 @@ export const PLACE_ICON: Record<'project' | 'issue', ReactNode> = {
  */
 export interface ThreadListViewProps extends ConversationsProps {
   resolved?: Record<string, ForeignObjectData | null | undefined>
-  resolving?: boolean
   reactionsBy?: Record<string, readonly Reaction[]>
   /** Messages past the reactions horizon — CON-1. */
   omitted?: number
@@ -141,7 +140,6 @@ export interface ThreadListViewProps extends ConversationsProps {
 
 export interface MentionListViewProps extends ActivityProps {
   resolved?: Record<string, ForeignObjectData | null | undefined>
-  resolving?: boolean
   reactionsBy?: Record<string, readonly Reaction[]>
   upload?: (file: File) => Promise<Imeta>
   drafts?: DraftStore

@@ -67,6 +67,14 @@ describe('a card’s comment count', () => {
     await waitFor(() => expect(result.current).toEqual({ count: 2, unread: false }))
   })
 
+  it('leaves the dot out for the file’s creator for what was said before the read-state horizon', async () => {
+    const mine = `30851:${READER}:d0b27d90-d5b9-40e7-8078-865ab36a421c`
+    const long = Math.floor(Date.now() / 1000) - 120 * 24 * 60 * 60
+    events.list = [{ ...comment(ADA, long), tags: [['A', mine], ['a', mine], ['K', '30851'], ['k', '30851'], ['P', READER], ['p', READER]] }]
+    const { result } = renderHook(() => useCardConversation(mine))
+    await waitFor(() => expect(result.current).toEqual({ count: 1, unread: false }))
+  })
+
   it('asks nothing for a card with no conversation of its own', () => {
     const { result } = renderHook(() => useCardConversation(undefined))
     expect(result.current).toBeUndefined()
