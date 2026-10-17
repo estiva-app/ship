@@ -63,6 +63,12 @@ describe('the issue list row', () => {
     expect(await hoverTooltip(screen.getByRole('link'))).toBe('**Bold** and https://example.com')
     expect(screen.getAllByRole('link')).toHaveLength(1)
   })
+
+  it('cuts a summary longer than 280 characters in the tooltip, since the relay does not (SPEC §6.12)', async () => {
+    render(<IssueRow issue={{ ...ISSUE, summary: 'x'.repeat(5000) }} statuses={STATUSES} href="#/issue/1" />)
+    const tip = await hoverTooltip(screen.getByRole('link'))
+    expect(tip).toBe(`${'x'.repeat(279)}…`)
+  })
 })
 
 describe('the board card', () => {

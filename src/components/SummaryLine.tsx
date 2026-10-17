@@ -17,11 +17,15 @@ import { WithTooltip } from '@/components/ui/Tooltip'
  *
  * A span, not a paragraph, because three of the four places sit inside a link.
  */
+/** Past this a tooltip's summary is cut with an ellipsis, as interop cuts `subtitle`: SPEC §6.12 has every reader clamp it, and the relay does not. */
+const TOOLTIP_MAX = 280
+
 /** A file's summary as the tooltip on what `children` draws — the issue row and the table's title. None or blank: `children` alone. */
 export function WithSummary({ summary, wrapperClassName, children }: { summary?: string; wrapperClassName?: string; children: ReactNode }) {
   if (!summary?.trim()) return <>{children}</>
+  const label = summary.length > TOOLTIP_MAX ? `${summary.slice(0, TOOLTIP_MAX - 1).trimEnd()}…` : summary
   return (
-    <WithTooltip label={summary} wrapperClassName={wrapperClassName}>
+    <WithTooltip label={label} wrapperClassName={wrapperClassName}>
       {children}
     </WithTooltip>
   )
