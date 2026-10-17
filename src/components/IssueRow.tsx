@@ -7,8 +7,8 @@ import { Avatar } from '@/components/ui/Avatar'
 import { Chip } from '@/components/ui/Chip'
 import { ConversationCount } from '@/components/ui/ConversationCount'
 import { StatusShape } from '@/components/ui/StatusLabel'
-import { WithTooltip } from '@/components/ui/Tooltip'
 import { linkTo } from '@/router'
+import { WithSummary } from './SummaryLine'
 
 /**
  * One issue, as a list row (Katerina, 2026-09-09, with Linear's row as the
@@ -84,13 +84,9 @@ export function IssueRow({ issue, statuses, href, className }: IssueRowProps) {
   return (
     <div className={cn('relative flex h-9 min-w-0 items-center gap-3 rounded-md px-3 transition-colors hover:bg-bg-hover', className)}>
       {/* The summary is the link's tooltip, not a line: the link covers the row, so hovering anywhere on it shows it. */}
-      {issue.summary ? (
-        <WithTooltip label={issue.summary} wrapperClassName="flex min-w-0 flex-1">
-          {link}
-        </WithTooltip>
-      ) : (
-        link
-      )}
+      <WithSummary summary={issue.summary} wrapperClassName="flex min-w-0 flex-1">
+        {link}
+      </WithSummary>
       {/* The count before the chip (Katerina, 2026-09-09): what is said
           about the issue, then where it lives, then who and when. */}
       <ConversationCount count={threads} unit="conversation" />

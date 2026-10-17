@@ -1,4 +1,6 @@
+import type { ReactNode } from 'react'
 import { cn } from '@/lib/cn'
+import { WithTooltip } from '@/components/ui/Tooltip'
 
 /**
  * A file's summary as a board card and a project card draw it: its own muted line under the title, cut at `lines`.
@@ -15,6 +17,16 @@ import { cn } from '@/lib/cn'
  *
  * A span, not a paragraph, because three of the four places sit inside a link.
  */
+/** A file's summary as the tooltip on what `children` draws — the issue row and the table's title. None or blank: `children` alone. */
+export function WithSummary({ summary, wrapperClassName, children }: { summary?: string; wrapperClassName?: string; children: ReactNode }) {
+  if (!summary?.trim()) return <>{children}</>
+  return (
+    <WithTooltip label={summary} wrapperClassName={wrapperClassName}>
+      {children}
+    </WithTooltip>
+  )
+}
+
 export function SummaryLine({ summary, lines, className }: { summary?: string; lines: 1 | 2; className?: string }) {
   if (!summary) return null
   return <span className={cn('block text-text-secondary', lines === 1 ? 'truncate' : 'line-clamp-2', className)}>{summary}</span>

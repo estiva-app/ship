@@ -5,7 +5,7 @@ import { statusLabel, type StatusEntry } from '@/lib/issues'
 import { Person } from '@/components/ui/Person'
 import { ScrollArea } from '@/components/ui/ScrollArea'
 import { StatusLabel } from '@/components/ui/StatusLabel'
-import { WithTooltip } from '@/components/ui/Tooltip'
+import { WithSummary } from './SummaryLine'
 import type { IssueRowData } from './IssueRow'
 import { linkTo } from '@/router'
 
@@ -94,17 +94,11 @@ export function IssuesTable({ issues, statuses, hrefFor, className }: IssuesTabl
                   17 Oct). The link covers the row, so hovering anywhere shows it. */}
               <td className={TD}>
                 <div className="text-text-primary">
-                  {issue.summary ? (
-                    <WithTooltip label={issue.summary} wrapperClassName="block min-w-0">
-                      <Link {...linkTo(hrefFor(issue))} variant="quiet" truncate cover className="block">
-                        {issue.title}
-                      </Link>
-                    </WithTooltip>
-                  ) : (
+                  <WithSummary summary={issue.summary} wrapperClassName="block min-w-0">
                     <Link {...linkTo(hrefFor(issue))} variant="quiet" truncate cover className="block">
                       {issue.title}
                     </Link>
-                  )}
+                  </WithSummary>
                 </div>
               </td>
               <td className={TD}>
