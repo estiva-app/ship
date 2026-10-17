@@ -45,37 +45,32 @@ const noop = () => {}
 const show = (t: ThreadData) => render(<ThreadList threads={[t]} onStart={noop} onReply={noop} />).container
 
 describe('a comment that points at an object', () => {
-  it('draws a mid-sentence pointer in place, keeping the sentence', () => {
+  it('draws a mid-sentence pointer in place, keeping the sentence', async () => {
     const c = show(thread(`Fixed in ${NADDR} yesterday.`))
-    expect(c.textContent).toContain('Fixed in')
-    expect(c.textContent).toContain('yesterday.')
-    expect(c.querySelector('[data-reference]')).not.toBeNull()
-    // Shortened, never the 200-character pointer the author typed.
+    // Nothing resolves here: the chip says so in its type's word (Miky, 15 Oct), inside the sentence.
+    await waitFor(() => expect(c.querySelector('[data-message-text] p')?.textContent).toBe('Fixed in Issue, not available yesterday.'))
+    // Never the 200-character pointer the author typed.
     expect(c.textContent).not.toContain(NADDR)
   })
 
   /*
     The regression SHI-1 actually was. A body that is nothing but a pointer used
     to reach `MessageCard` as an empty string, so the card drew a name, a time
-    and a blank line.
-
-    It still would if the standalone rule were applied blindly: nothing resolves
-    here, so there is no card to draw below, and hiding the pointer out of the
-    prose as well would leave the message empty a second way. §13.1 — never
-    blank — is why the chip survives when the object does not.
+    and a blank line. §13.1 — never blank — is why the line still says what it
+    pointed at when the object cannot be read: alone on its line, its row.
   */
   it('does not render a pointer-only body as an empty message', async () => {
     const c = show(thread(NADDR))
-    await waitFor(() => expect(c.querySelector('[data-reference]')).not.toBeNull())
+    await waitFor(() => expect(c.querySelector('[data-link-row]')?.textContent).toBe('Issue — not available.'))
     expect(c.textContent).not.toContain(NADDR)
   })
 
   // Changed on purpose: replies are folded behind the replies button, so the thread is opened first.
-  it('renders a pointer in a reply, not only in the root', () => {
+  it('renders a pointer in a reply, not only in the root', async () => {
     const c = show(thread('Have a look at this.', `Here: ${NADDR}`))
     fireEvent.click(screen.getByRole('button', { name: '1 reply' }))
-    expect(c.textContent).toContain('Here:')
-    expect(c.querySelectorAll('[data-reference]').length).toBe(1)
+    await waitFor(() => expect(c.querySelector('[data-message="r1"] [data-message-text]')?.textContent).toBe('Here: Issue, not available'))
+    expect(c.textContent?.match(/not available/g)).toHaveLength(1)
   })
 
   /*

@@ -1,6 +1,6 @@
 import { Fragment, Suspense, lazy, useCallback, useEffect, useMemo, useState, type ComponentProps } from 'react'
 import { IconDotsVertical, IconMessage2, IconMoodPlus, IconX } from '@tabler/icons-react'
-import { findNaddrs, pointerToAddress, referenceToPointer, type Imeta } from '@estiva-app/protocol'
+import type { Imeta } from '@estiva-app/protocol'
 import { Avatar, Button, Card, EmptyState, IconButton, Menu, MenuItem, Popover, ReactionPicker, WithTooltip } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
 import { ago } from '@/lib/time'
@@ -10,33 +10,16 @@ import { REACTION_HORIZON, me, type Reaction } from '@/api'
 import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
 import { Attachments as FileAttachments } from '@/components/ui/Attachment'
 import { BlockAnchorNote } from '@/components/ui/BlockAnchorNote'
-import { LinkedObject } from '@/components/ui/LinkedObject'
-import { ShipRichText } from '@/components/ui/ShipRichText'
-import { SkeletonBar } from '@/components/ui/Skeleton'
+import { MessagePart } from '@/components/ui/MessageLinks'
 import { REACTION_OPTIONS, Reactions } from '@/components/Reactions'
 import { ConfirmDeleteMessage, NewSinceHere, useThreadReactions, useThreadReferences, type ConversationsProps, type MessageData, type ThreadData } from '@/components/ConversationThread'
 import type { ActivityProps } from '@/components/Activity'
-import { MESSAGE_FORMAT, PLACE_ICON, RELATION, Time, cardsOf, linkResolverFor, meaningLabel, referenceOfValue, type MentionListViewProps, type ThreadListViewProps } from './shared'
+import { PLACE_ICON, RELATION, Time, meaningLabel, type MentionListViewProps, type ThreadListViewProps } from './shared'
+import { MessageText } from './MessageText'
 import { MessageBoxShell } from './writingBox'
 import type { Picks } from './MessageBox'
 import { messageScope, referenceSections } from '@/api/references'
-import { shownParts, urlNames } from '@/api/part'
-import { knownLinkValue } from '@/api/linkCards'
 import { PartCard } from '@/components/ui/PartCard'
-
-/** The address a `nostr:` pointer names, or undefined for an event or a malformed one. */
-function addressOf(reference: string): string | undefined {
-  try {
-    return pointerToAddress(referenceToPointer(reference))
-  } catch {
-    return undefined
-  }
-}
-
-/** The objects a body names by a `nostr:` pointer, as addresses — one of the two ways it keeps a part shown. */
-function namedAddresses(body: string): Set<string> {
-  return new Set(findNaddrs(body).map(addressOf).filter((a): a is string => !!a))
-}
 
 /*
   The writing box is its own chunk: its editor is ProseMirror, which a reader
@@ -84,7 +67,8 @@ function MessageBox(props: ComponentProps<typeof LazyMessageBox>) {
 interface MessageProps {
   message: MessageData
   resolved?: Record<string, ForeignObjectData | null | undefined>
-  resolving?: boolean
+  /** The address of the file this conversation is on: no card for it here, its chip stays (WID-3). */
+  here?: string
   nameOf?: (pubkey: string) => string
   reactions?: readonly Reaction[]
   onToggleReaction?: (emoji: string, mine?: string) => void
@@ -127,36 +111,21 @@ function AddReaction({ onPick, disabledReason }: { onPick: (emoji: string) => vo
   )
 }
 
-function Message({ message, resolved, resolving, nameOf, reactions, onToggleReaction, onDelete, onEdit, repliesLeftBehind = 0, disabledReason, drafts, footer }: MessageProps) {
+function Message({ message, resolved, here, nameOf, reactions, onToggleReaction, onDelete, onEdit, repliesLeftBehind = 0, disabledReason, drafts, footer }: MessageProps) {
   const [editing, setEditing] = useState(false)
   const [confirming, setConfirming] = useState(false)
-  // A block of another object, live (SPEC §13.6.1, COM-2).
-  const parts = shownParts(message.parts, message.body, namedAddresses(message.body))
-  // What each app link names by §7.7, from what the surface has asked; a link to a block shown live keeps its
-  // words, as in Peek — the block's card already stands for it (COM-2). A link on words can name its card (OPT-17).
-  const named = linkResolverFor(message.body, knownLinkValue)
-  const claimed = (url: string) => (parts.some((part) => urlNames(url, part.address)) ? undefined : named(url))
-  // A bare link reads as that chip (OPT-18) once what it names has come back and can be read: until then, and
-  // for good when it cannot, it stays the link it was written as rather than a chip with nothing in it.
-  const resolveLink = (url: string) => {
-    const value = claimed(url)
-    const reference = value ? referenceOfValue(value) : undefined
-    const object = reference ? resolved?.[reference] : undefined
-    return object && !object.unreachable ? value : undefined
-  }
-  // The cards its author asked for (SPEC §13.6.2, OPT-16) — the only cards a message draws. Every reference,
-  // alone on its line too, is its chip in the text (OPT-18), and `none` leaves only that.
-  const cards = cardsOf(message.body, message.embeds, parts, claimed)
-  const shownCards = cards.flatMap((card) => {
-    const object = card.layout === 'none' ? undefined : resolved?.[card.reference]
-    return object ? [{ card, object }] : []
-  })
   const react = onToggleReaction && ((emoji: string) => onToggleReaction(emoji, reactions?.find((r) => r.emoji === emoji)?.mine))
 
   return (
     <article className="flex flex-col gap-2" data-message={message.id}>
       {/* What a comment is about, above it: the anchored block, live, with the same card as a part (COM-2). */}
-      {message.anchorPart ? <PartCard address={message.anchorPart.address} block={message.anchorPart.block} nameOf={nameOf} /> : <BlockAnchorNote anchor={message.anchor} />}
+      {message.anchorPart ? (
+        <MessagePart>
+          <PartCard address={message.anchorPart.address} block={message.anchorPart.block} nameOf={nameOf} />
+        </MessagePart>
+      ) : (
+        <BlockAnchorNote anchor={message.anchor} />
+      )}
       <div className="flex min-h-6 items-center gap-2">
         <Avatar size={20} src={message.author.picture} name={message.author.name} />
         <span className={cn('truncate text-body-2-strong', message.author.name ? 'text-text-primary' : 'text-text-muted')}>{message.author.name ?? '—'}</span>
@@ -187,21 +156,16 @@ function Message({ message, resolved, resolving, nameOf, reactions, onToggleReac
         <MessageBox kind="edit" autoFocus initial={message.body} initialUrgent={message.urgent} nameOf={nameOf} drafts={drafts} onSubmit={(body) => onEdit(body)} onCancel={() => setEditing(false)} />
       ) : (
         <>
-          <div className="break-words">
-            <ShipRichText value={message.body} format={MESSAGE_FORMAT} resolveLink={resolveLink} nameOf={nameOf} resolved={resolved} urgent={message.urgent} />
-          </div>
-          <FileAttachments files={message.files} />
-          {cards.some((card) => card.layout !== 'none') && resolving && <SkeletonBar className="h-16 w-full" data-foreign-references="loading" />}
-          {shownCards.length > 0 && (
-            <div className="flex flex-col gap-2" data-cards={String(shownCards.length)}>
-              {shownCards.map(({ card, object }) => (
-                <LinkedObject key={card.value} reference={card.reference} object={object} layout={card.layout === 'detailed' ? 'card' : 'row'} />
-              ))}
-            </div>
-          )}
-          {parts.map((part) => (
-            <PartCard key={part.address} address={part.address} block={part.block} nameOf={nameOf} />
-          ))}
+          <MessageText
+            body={message.body}
+            embeds={message.embeds}
+            parts={message.parts}
+            urgent={message.urgent}
+            resolved={resolved}
+            nameOf={nameOf}
+            here={here}
+            between={<FileAttachments files={message.files} />}
+          />
           {/* Row one: the pills, then the add-reaction button (her note 4, Linear's order). Signed out, no button. */}
           {(react || !!reactions?.length) && (
             <div className="flex flex-wrap items-center gap-1">
@@ -260,7 +224,7 @@ interface ThreadProps {
   /** False while read state is loading: a thread drawn then opens by itself once it knows (99557309). */
   judged?: boolean
   resolved?: Record<string, ForeignObjectData | null | undefined>
-  resolving?: boolean
+  here?: string
   nameOf?: (pubkey: string) => string
   reactionsBy?: Record<string, readonly Reaction[]>
   onReact?: (messageId: string, emoji: string, mine?: string) => void
@@ -275,7 +239,7 @@ interface ThreadProps {
 /** Replies hang one step in, behind today's left rule. */
 const REPLY_RULE = 'ml-2.5 border-l-2 border-border-default pl-3'
 
-function Thread({ thread, pageThreads, onReply, disabledReason, unread, stillUnread, judged = true, resolved, resolving, nameOf, reactionsBy, onReact, onDeleteMessage, onEditMessage, upload, drafts, viewer, onShown }: ThreadProps) {
+function Thread({ thread, pageThreads, onReply, disabledReason, unread, stillUnread, judged = true, resolved, here, nameOf, reactionsBy, onReact, onDeleteMessage, onEditMessage, upload, drafts, viewer, onShown }: ThreadProps) {
   const references = useCallback((query: string) => referenceSections(messageScope(pageThreads, thread.id), query, nameOf), [pageThreads, thread.id, nameOf])
   const unreadFrom = unread?.[0]
   // The replies that are new to you, not every reply after the first new one:
@@ -301,7 +265,7 @@ function Thread({ thread, pageThreads, onReply, disabledReason, unread, stillUnr
     setFocusReply(!open)
     setOpen(!open)
   }
-  const common = { resolved, resolving, nameOf, disabledReason, drafts }
+  const common = { resolved, here, nameOf, disabledReason, drafts }
   const toolsFor = (message: MessageData) => {
     const offered = offersEditAndDelete({ viewer, author: message.by ?? '' })
     return {
@@ -349,7 +313,7 @@ const threadProps = (p: ThreadListViewProps | MentionListViewProps) => ({
   onReply: p.onReply,
   disabledReason: p.disabledReason,
   resolved: p.resolved,
-  resolving: p.resolving,
+  here: p.about,
   nameOf: p.nameOf,
   reactionsBy: p.reactionsBy,
   onReact: p.onReact && ((id: string, emoji: string, mine?: string) => void p.onReact?.(id, emoji, mine)),
@@ -453,7 +417,7 @@ export function MentionListView(props: MentionListViewProps) {
  * after it is written rather than patched on screen.
  */
 export function ThreadList(props: ConversationsProps & Pick<ThreadListViewProps, 'upload' | 'drafts'>) {
-  const { resolved, resolving } = useThreadReferences(props.threads)
+  const { resolved } = useThreadReferences(props.threads)
   const { reactionsBy, omitted, cut, refresh } = useThreadReactions(props.threads)
   const onReact = props.onReact
     ? async (messageId: string, emoji: string, mine?: string) => {
@@ -461,13 +425,13 @@ export function ThreadList(props: ConversationsProps & Pick<ThreadListViewProps,
         refresh()
       }
     : undefined
-  return <ThreadListView {...props} onReact={onReact} resolved={resolved} resolving={resolving} reactionsBy={reactionsBy} omitted={omitted} reactionsCut={cut} viewer={props.viewer ?? me} />
+  return <ThreadListView {...props} onReact={onReact} resolved={resolved}reactionsBy={reactionsBy} omitted={omitted} reactionsCut={cut} viewer={props.viewer ?? me} />
 }
 
 /** "Mentioned in" with production's `Activity` props and its reads. */
 export function MentionList(props: ActivityProps & Pick<MentionListViewProps, 'upload' | 'drafts'>) {
   const threads = useMemo(() => props.items.map((item) => item.thread), [props.items])
-  const { resolved, resolving } = useThreadReferences(threads)
+  const { resolved } = useThreadReferences(threads)
   const { reactionsBy, refresh } = useThreadReactions(threads)
   const onReact = props.onReact
     ? async (messageId: string, emoji: string, mine?: string) => {
@@ -475,5 +439,5 @@ export function MentionList(props: ActivityProps & Pick<MentionListViewProps, 'u
         refresh()
       }
     : undefined
-  return <MentionListView {...props} onReact={onReact} resolved={resolved} resolving={resolving} reactionsBy={reactionsBy} viewer={props.viewer ?? me} />
+  return <MentionListView {...props} onReact={onReact} resolved={resolved}reactionsBy={reactionsBy} viewer={props.viewer ?? me} />
 }

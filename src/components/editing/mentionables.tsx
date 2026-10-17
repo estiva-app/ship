@@ -2,6 +2,7 @@ import { createContext, useContext } from 'react'
 import { decodeNpub, findNostrUris } from '@estiva-app/protocol'
 import { Avatar } from '@estiva-app/ui'
 import type { MentionPerson } from '@estiva-app/ui/editor'
+import type { People } from '@estiva-app/interop'
 import type { DirectoryView } from '@/api/useDirectory'
 
 /**
@@ -13,8 +14,24 @@ import type { DirectoryView } from '@/api/useDirectory'
 
 /** Everyone `@` and `!@` offer: the people in the workspace snapshot, as the Assignee list has them. */
 const MentionPeopleContext = createContext<readonly MentionPerson[]>([])
+/** Hands every message box on the page the people `@` and `!@` offer. */
 export const MentionPeopleProvider = MentionPeopleContext.Provider
 export const useMentionPeople = () => useContext(MentionPeopleContext)
+
+const WorkspacePeopleContext = createContext<People | undefined>(undefined)
+/** Hands every linked file's card the workspace's people, as interop names them: whom its owner picker offers (WBM-5). */
+export const WorkspacePeopleProvider = WorkspacePeopleContext.Provider
+export const useWorkspacePeople = () => useContext(WorkspacePeopleContext)
+
+/** Everyone with a profile, by key, for {@link WorkspacePeopleProvider}. */
+export function workspacePeople(pubkeys: readonly string[], directory: Pick<DirectoryView, 'profileOf'>): People {
+  const out: People = {}
+  for (const pubkey of pubkeys) {
+    const profile = directory.profileOf(pubkey)
+    if (profile) out[pubkey] = { displayName: profile.name, picture: profile.picture }
+  }
+  return out
+}
 
 /**
  * The people as the package's list draws them: a name, a face, and the key the

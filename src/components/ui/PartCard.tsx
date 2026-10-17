@@ -1,12 +1,11 @@
 import { serializeBlockDocument } from '@estiva-app/protocol'
-import { Button, Card, Link, ShowMore } from '@estiva-app/ui'
+import { Button, PartCard as KitPartCard, ShowMore, thingKindOf } from '@estiva-app/ui'
 import { IconExternalLink } from '@tabler/icons-react'
 import { usePart, type PartView } from '@/api/part'
 import type { ForeignObject } from '@/api/foreign'
 import { typeLabelOf } from '@/lib/typeLabel'
 import { navigateTo } from '@/router'
 import { ShipRichText } from './ShipRichText'
-import { SkeletonBar } from './Skeleton'
 
 /**
  * Past this height a block is cut behind ShowMore's fade, and opens in place.
@@ -14,97 +13,91 @@ import { SkeletonBar } from './Skeleton'
  */
 const CUT_AT = 160
 
-/** One block of another object, live inside a message (SPEC §13.6.1, COM-2); reads it and draws it. */
+/**
+ * One block of another object, live inside a message (SPEC §13.6.1, COM-2); reads it and draws it.
+ *
+ * @registry namesake: reads the part from the relay and draws its blocks inside the package's PartCard, which draws only the frame — as Peek's does.
+ */
 export function PartCard({ address, block, nameOf }: { address: string; block: string; nameOf?: (pubkey: string) => string }) {
   return <PartCardView view={usePart({ address, block })} address={address} block={block} nameOf={nameOf} />
+}
+
+/** Where a part's link opens: a path of Ship's own, so it opens in place, or another app's https address. */
+function placeOf(link: string | undefined): { href: string; here: boolean } | undefined {
+  if (!link) return undefined
+  try {
+    const url = new URL(link)
+    if (url.origin === window.location.origin) return { href: url.pathname + url.search + url.hash, here: true }
+    return /^https?:$/.test(url.protocol) ? { href: url.href, here: false } : undefined
+  } catch {
+    return undefined
+  }
 }
 
 /**
  * One block of another object, drawn from a read that has already happened.
  *
- * Peek's `PartCard`, by design the same in both apps (COM-2): the object's type
- * and title, then the block — whole when it is short; cut behind ShowMore's
- * fade when it is long, and opened in place (Katerina, 2026-10-08). The way into
- * the app it came from is a Button with an open-out icon, level with Show more.
+ * Peek's `PartCard`, by design the same in both apps (COM-2), in the kit's
+ * frame (ui 0.75): the object's type and title, then the block — whole when it
+ * is short; cut behind ShowMore's fade when it is long, and opened in place
+ * (Katerina, 2026-10-08). The way into the app it came from is a Button with an
+ * open-out icon, level with Show more.
  *
- * **Five states, and two of them must never look alike.** A block somebody
- * deleted says so; a block the reader may not see says only that it is not
- * available — no title and no text, because either would tell them something
- * about a Folder they are not in, and a dashed frame so that "gone" and "not
- * yours" cannot be mistaken for each other. Every state that shows no block is
- * said in italic.
+ * Deleted, or not this reader's to see, read the same (Miky, 15 Oct): the relay
+ * answers both alike, and a title or its words would tell a reader something
+ * about a Folder they are not in.
  */
 export function PartCardView({ view, address, block, nameOf }: { view: PartView; address: string; block: string; nameOf?: (pubkey: string) => string }) {
-  if (view.state === 'loading') return <SkeletonBar className="h-16 w-full" data-part="loading" />
-
-  if (view.state === 'unreadable') {
-    // The package's look for something that could not be read: a dashed hairline.
+  // What it is part of, by its icon, known from the address before anything is read.
+  const kind = thingKindOf(Number(address.split(':')[0]))
+  if (view.state === 'loading') {
     return (
-      <Card fill="inset" unreadable data-part="unreadable" data-part-address={address} className="px-3 py-2">
-        <span className="text-caption italic text-text-muted">Not available to you</span>
-      </Card>
+      <div data-part="loading" data-part-address={address}>
+        <KitPartCard state="loading" kind={kind} />
+      </div>
     )
   }
-  if (view.state === 'deleted') {
+  if (view.state === 'unreadable' || view.state === 'deleted') {
     return (
-      <Card fill="inset" data-part="deleted" data-part-address={address} className="px-3 py-2">
-        <span className="text-caption italic text-text-muted">Deleted</span>
-      </Card>
+      <div data-part={view.state} data-part-address={address}>
+        <KitPartCard state="unavailable" kind={kind} noun={kind[0].toUpperCase() + kind.slice(1)} />
+      </div>
     )
   }
 
-  const heading = headingOf(view.object)
-  const link = view.link
-  // Ship's own issue or project changes page in place; another app's opens beside it.
-  const here = link ? sameOrigin(link) : false
-  const source = (
-    <span className="contents text-h5 text-text-primary">
-      {link ? (
-        <Link href={link} variant="quiet" external={!here} truncate>
-          {heading}
-        </Link>
-      ) : (
-        heading
-      )}
-    </span>
-  )
+  const place = placeOf(view.link)
+  const frame = { kind: thingKindOf(view.object.kind), heading: headingOf(view.object), href: place?.href }
 
   if (view.state !== 'resolved') {
     return (
-      <Card fill="inset" data-part={view.state} data-part-address={address} className="flex flex-col gap-3 px-3 py-2">
-        {source}
-        <span className="text-caption italic text-text-muted">{view.state === 'detached' ? 'This part was deleted' : "This part can't be shown"}</span>
-      </Card>
+      <div data-part={view.state} data-part-address={address}>
+        <KitPartCard {...frame}>
+          <span className="text-caption italic text-text-muted">{view.state === 'detached' ? 'This part was deleted' : "This part can't be shown"}</span>
+        </KitPartCard>
+      </div>
     )
   }
 
   // A Button, not a Link, by Katerina's call (2026-10-08): the way out reads as
   // an action, level with Show more at the right of its row.
-  const openIn = link ? (
-    <Button size="small" leadingIcon={<IconExternalLink stroke={1.5} className="size-3.5" />} onClick={() => (here ? navigateTo(new URL(link).pathname + new URL(link).hash) : window.open(link, '_blank', 'noopener,noreferrer'))}>
+  const openIn = place ? (
+    <Button size="small" leadingIcon={<IconExternalLink stroke={1.5} className="size-3.5" />} onClick={() => (place.here ? navigateTo(place.href) : window.open(place.href, '_blank', 'noopener,noreferrer'))}>
       {/* "Open" when it stays in Ship; "in <app>" only when it takes you elsewhere (Miky, 2026-10-09). */}
-      {here ? 'Open' : `Open in ${view.object.appName ?? 'app'}`}
+      {place.here ? 'Open' : `Open in ${view.object.appName ?? 'app'}`}
     </Button>
   ) : undefined
   return (
-    <Card fill="inset" data-part="resolved" data-part-address={address} data-part-block={block} className="flex flex-col gap-3 p-3">
-      {source}
-      {/* An attachment is never cut (no height reaches Infinity): its card is
-          already the thumbnail, and a click on it opens the full picture as it
-          does on a message's own. ShowMore still draws the row for Open in. */}
-      <ShowMore surface="inset" maxHeight={view.block.type === 'attachment' ? Infinity : CUT_AT} action={openIn}>
-        <ShipRichText value={serializeBlockDocument({ type: 'doc', content: [view.block] })} format="blocks" size="small" nameOf={nameOf} />
-      </ShowMore>
-    </Card>
+    <div data-part="resolved" data-part-address={address} data-part-block={block}>
+      <KitPartCard {...frame}>
+        {/* An attachment is never cut (no height reaches Infinity): its card is
+            already the thumbnail, and a click on it opens the full picture as it
+            does on a message's own. ShowMore still draws the row for Open in. */}
+        <ShowMore surface="inset" maxHeight={view.block.type === 'attachment' ? Infinity : CUT_AT} action={openIn}>
+          <ShipRichText value={serializeBlockDocument({ type: 'doc', content: [view.block] })} format="blocks" size="small" nameOf={nameOf} />
+        </ShowMore>
+      </KitPartCard>
+    </div>
   )
-}
-
-function sameOrigin(link: string): boolean {
-  try {
-    return new URL(link).origin === window.location.origin
-  } catch {
-    return false
-  }
 }
 
 /** "Issue · Plan the launch": what it is, then which one (label objects by type, PRO-24). */

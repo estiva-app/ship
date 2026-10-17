@@ -70,6 +70,8 @@ export interface ActivityItem {
 
 export interface ActivityProps {
   items: ActivityItem[]
+  /** The address of the file the page is on: its links here keep their chip and draw no card (Miky, WID-3). */
+  about?: string
   /** The viewer's pubkey, for §6.5's Edit and Delete rule — see `ConversationsProps.viewer`. */
   viewer?: string
   onReply: (threadId: string, text: string, files: readonly Imeta[], picks?: Picks) => Promise<boolean | void> | boolean | void

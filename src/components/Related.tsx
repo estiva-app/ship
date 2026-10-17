@@ -1,5 +1,9 @@
+import { useMemo } from 'react'
 import { IconLock } from '@tabler/icons-react'
+import { referencesIn, toRenderTree } from '@estiva-app/protocol'
 import { Avatar, Card, EmptyState, Link } from '@estiva-app/ui'
+import { byReference, useForeignObjects } from '@/api/useForeignObjects'
+import { MessageText } from '@/components/conversations/MessageText'
 import { cn } from '@/lib/cn'
 import { safeLink } from '@/lib/handoff'
 import { thisObject, typeLabelOf } from '@/lib/typeLabel'
@@ -47,7 +51,10 @@ function SlotValue({ slot, people }: { slot: ResolvedSlot; people?: ForeignObjec
 
 const ROW = 'grid grid-cols-[minmax(0,1fr)_7rem_4rem] items-center gap-3 px-2 py-1.5'
 
-function Row({ object, count }: { object: ForeignObject; count?: number }) {
+/** The messages' references, looked up once for the whole list (RIC-10). */
+type Resolved = Record<string, ForeignObject | null | undefined>
+
+function Row({ object, count, resolved }: { object: ForeignObject; count?: number; resolved?: Resolved }) {
   if (object.unreachable) {
     const open = safeLink(object.openUrl)
     return (
@@ -77,14 +84,30 @@ function Row({ object, count }: { object: ForeignObject; count?: number }) {
   if (widget === 'message') {
     const author = slots.title
     const profile = author?.isPubkey ? object.people?.[author.value] : undefined
+    const opens = safeLink(object.openUrl)
+    const name = <span className={cn('text-body-2-strong', profile?.displayName ? 'text-text-primary' : 'text-text-muted')}>{profile?.displayName ?? '—'}</span>
+    /*
+      A preview of a message: its links are chips only (Decided 16 Oct), and the
+      row is the link — the name covers it — so no chip is a link inside a link.
+    */
     return (
-      <Card href={safeLink(object.openUrl)} fill="none" hover="fill" quietUntilHover className="flex items-start gap-2 px-2 py-1.5" data-foreign-object={object.ref} data-widget="message">
+      <Card fill="none" hover="fill" quietUntilHover className="relative flex items-start gap-2 px-2 py-1.5" data-foreign-object={object.ref} data-widget="message">
         <Avatar name={profile?.displayName} src={profile?.picture} size={16} className="mt-0.5 shrink-0" />
         <div className="min-w-0 flex-1">
-          <span className={cn('text-body-2-strong', profile?.displayName ? 'text-text-primary' : 'text-text-muted')}>{profile?.displayName ?? '—'}</span>
+          {opens ? (
+            <Link href={opens} variant="plain" cover>
+              {name}
+            </Link>
+          ) : (
+            name
+          )}
           {slots.body && (
-            <div className="line-clamp-2">
-              <ShipRichText value={slots.body.value} format={slots.body.format ?? 'marker'} size="small" />
+            <div className="line-clamp-2 text-body-2 text-text-secondary">
+              {(slots.body.format ?? 'marker') === 'marker' ? (
+                <MessageText body={slots.body.value} resolved={resolved} preview />
+              ) : (
+                <ShipRichText value={slots.body.value} format={slots.body.format ?? 'marker'} size="small" />
+              )}
             </div>
           )}
         </div>
@@ -121,12 +144,12 @@ function Row({ object, count }: { object: ForeignObject; count?: number }) {
 }
 
 /** A file, then what is under it — its own list, and what was placed under it — one line down their left. */
-function Item({ object, related }: { object: ForeignObject; related: Exclude<RelatedState, 'failed' | undefined> }) {
+function Item({ object, related, resolved }: { object: ForeignObject; related: Exclude<RelatedState, 'failed' | undefined>; resolved: Resolved }) {
   const placed = related.inside[object.ref] ?? []
   const own = object.children ?? []
   return (
     <div className="flex flex-col" data-related-file={object.ref}>
-      <Row object={object} count={related.counts[object.ref]} />
+      <Row object={object} count={related.counts[object.ref]} resolved={resolved} />
       {object.children?.length === 0 && (
         <div className="ml-6 py-1">
           <EmptyState scope="section" message="Nothing in it yet." />
@@ -135,10 +158,10 @@ function Item({ object, related }: { object: ForeignObject; related: Exclude<Rel
       {(own.length > 0 || placed.length > 0) && (
         <div className="ml-4 flex flex-col border-l border-border-default pl-2" data-inside={object.ref}>
           {own.map((child) => (
-            <Row key={child.ref} object={child} />
+            <Row key={child.ref} object={child} resolved={resolved} />
           ))}
           {placed.map((child) => (
-            <Item key={child.ref} object={child} related={related} />
+            <Item key={child.ref} object={child} related={related} resolved={resolved} />
           ))}
         </div>
       )}
@@ -146,7 +169,30 @@ function Item({ object, related }: { object: ForeignObject; related: Exclude<Rel
   )
 }
 
+/** Every message row's body in the list: its own files' lists and what is placed under them, at any depth. */
+function messageBodies(related: Exclude<RelatedState, 'failed' | undefined>): string[] {
+  const out: string[] = []
+  const seen = new Set<string>()
+  const visit = (object: ForeignObject) => {
+    if (seen.has(object.ref)) return
+    seen.add(object.ref)
+    const body = object.slots.body
+    if (body && (body.format ?? 'marker') === 'marker' && pickWidget(object.widget, IMPLEMENTED, 'card') === 'message') out.push(body.value)
+    for (const child of object.children ?? []) visit(child)
+    for (const child of related.inside[object.ref] ?? []) visit(child)
+  }
+  related.files.forEach(visit)
+  return out
+}
+
 export function Related({ related }: { related: RelatedState }) {
+  const listed = related && related !== 'failed' ? related : undefined
+  const references = useMemo(() => {
+    const bodies = listed ? messageBodies(listed) : []
+    // A person resolves from the directory, not the relay.
+    return [...new Set(bodies.flatMap((body) => referencesIn(toRenderTree(body, 'marker'))))].filter((reference) => !/^nostr:npub1/i.test(reference))
+  }, [listed])
+  const resolved = byReference(references, useForeignObjects(references))
   if (related === 'failed') {
     return (
       <p className="text-body-2 text-text-muted" data-related="failed">
@@ -158,7 +204,7 @@ export function Related({ related }: { related: RelatedState }) {
   return (
     <div className="-mx-2 flex flex-col" data-related="files">
       {related.files.map((file) => (
-        <Item key={file.ref} object={file} related={related} />
+        <Item key={file.ref} object={file} related={related} resolved={resolved} />
       ))}
     </div>
   )

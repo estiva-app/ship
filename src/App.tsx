@@ -24,7 +24,7 @@ import { ID_CONFIG, RELAY_URL } from './config'
 import { beginSignIn, beginSignOut, signInAvailable, signedIn } from './auth/estivaId'
 import { identifierFromRef, type FolderSummary } from '@estiva-app/interop'
 import { archivesOf, type Archives } from '@/lib/archive'
-import { MentionPeopleProvider, mentionPeople } from '@/components/editing/mentionables'
+import { MentionPeopleProvider, WorkspacePeopleProvider, mentionPeople, workspacePeople } from '@/components/editing/mentionables'
 import { mentionableIn } from '@/api/people'
 import { useRoster } from '@/api/useRoster'
 import { go, href, navigateTo, replace, useRoute, type Route } from './router'
@@ -108,6 +108,8 @@ function Shell() {
   // By its two lookups, which change only when a profile arrives: the view itself is a new object every render.
   const { nameOf, personOf, profileOf } = directory
   const mentionable = useMemo(() => mentionPeople(mentionKeys, { nameOf, personOf, profileOf }), [mentionKeys, nameOf, personOf, profileOf])
+  // Whom a linked issue's card offers as its assignee: the people the issue page's own picker draws from.
+  const cardPeople = useMemo(() => workspacePeople(people, { profileOf }), [people, profileOf])
 
   useCanonicalPath(route)
   useInbound(route, say)
@@ -199,7 +201,9 @@ function Shell() {
     >
       {/* Everyone `@` and `!@` offer in any message box on the page (CON-25). */}
       <MentionPeopleProvider value={mentionable}>
-        <Page route={route} state={state} loading={loading} directory={directory} teams={teams} folders={folders} archives={archives} say={say} refresh={refresh} />
+        <WorkspacePeopleProvider value={cardPeople}>
+          <Page route={route} state={state} loading={loading} directory={directory} teams={teams} folders={folders} archives={archives} say={say} refresh={refresh} />
+        </WorkspacePeopleProvider>
       </MentionPeopleProvider>
       {movingProject && teams && <MoveProject project={movingProject} teams={teams} say={say} onClose={() => setMoving(null)} />}
       {creatingFolder && <NewFolderDialog onCreate={newFolder} onClose={() => setCreatingFolder(false)} />}

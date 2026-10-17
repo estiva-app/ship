@@ -14,8 +14,11 @@ import type { ForeignObject as Data } from '@/api/foreign'
 // the counts, and both are the runtime's. `pickWidget` stays real because a
 // bare file's card is drawn through the chain like anything else.
 const readRelated = vi.fn()
+// What a message row's links name: nothing, unless a test says so.
+const resolveForeign = vi.fn(async (_reference: string): Promise<Data | null> => null)
 vi.mock(import('@/api/foreign'), async (importOriginal) => ({
   ...(await importOriginal()),
+  resolveForeign: (reference: string) => resolveForeign(reference),
   // Nothing nested unless a test says so (FOL-4).
   readRelated: async (folder: string, address: string) => {
     const read = await readRelated(folder, address)
@@ -155,5 +158,28 @@ describe('hasRelated', () => {
     expect(hasRelated({ files: [], inside: {}, counts: {} })).toBe(false)
     expect(hasRelated({ files: [file()], inside: {}, counts: {} })).toBe(true)
     expect(hasRelated('failed')).toBe(true)
+  })
+
+  // A preview of a message draws its links as chips only (Decided 16 Oct): no row, no card, and the row stays the one link.
+  it('draws a message row’s links as chips, and the row still opens the message', async () => {
+    const issue = '30851:cb77583ed45cac74ce4e46c626c1edada0204a6fc4c91f9c7be230b5af36156c:c0b27d90-d5b9-40e7-8078-865ab36a421c'
+    const { addrToNaddr } = await import('@estiva-app/protocol')
+    const reference = `nostr:${addrToNaddr(issue, [])}`
+    resolveForeign.mockImplementation(async (asked) =>
+      asked === reference ? file({ ref: issue, address: issue, kind: 30851, widget: 'row', appName: 'Ship', slots: { title: { value: 'Fix the sign-in' } }, actions: [] }) : null,
+    )
+    const message = file({
+      ref: 'm1',
+      widget: 'message',
+      slots: { title: { value: 'pk', isPubkey: true }, body: { value: `see\n\n${reference}` } },
+      openUrl: 'https://peek.estiva.app/message/m1',
+    } as Partial<Data>)
+    readRelated.mockResolvedValue({ files: [file({ children: [message] })], counts: {} })
+    const { container } = render(<Page folder="f1" address={PROJECT} />)
+    await waitFor(() => expect(container.querySelector('[data-widget="message"]')?.textContent).toContain('Fix the sign-in'))
+    const row = container.querySelector('[data-widget="message"]')!
+    expect(row.querySelector('[data-link-row], [data-card]')).toBeNull()
+    expect(row.querySelector('a a')).toBeNull()
+    expect(row.querySelector('a[href="https://peek.estiva.app/message/m1"]')).not.toBeNull()
   })
 })

@@ -14,8 +14,11 @@
  * is, the layer has failed and that belongs on PRO-7 rather than being worked
  * around here.
  */
-import type { SignedEvent } from '@estiva-app/protocol'
+import { pointerToAddress, referenceToPointer, type SignedEvent } from '@estiva-app/protocol'
 import {
+  buildActionEvents,
+  folderOf,
+  resolveActingManifest,
   conversationCountsOf,
   archiveImpact,
   createPeopleCache,
@@ -35,9 +38,9 @@ import {
 
 /** Chain-walking, from the runtime — one implementation, not one per consumer. */
 export { pickWidget } from '@estiva-app/interop'
-import type { ReferenceCandidate } from '@estiva-app/conversation'
+import { KIND_CHANGE, type ReferenceCandidate } from '@estiva-app/conversation'
 import { relatedTo } from '@/lib/ownKinds'
-import { relay } from './store'
+import { relay, signer } from './store'
 
 export type { ForeignObject, ResolvedSlot, FolderContents, FolderSummary } from '@estiva-app/interop'
 
@@ -136,6 +139,67 @@ export function resolveForeign(reference: string, { folderFiles }: ResolveOption
   // runtime's signature; naming them here would be inventing an adapter the
   // seam does not need.
   return resolveForeignObject(reference, query, profiles.viaRelay(query), 0, manifests, folderFiles ? { folderFiles } : undefined)
+}
+
+/** The tags a §7.3 change carries: the file, the field, its value, the Folder, the writer's clock, and a person it names. */
+const CHANGE_TAGS = new Set(['a', 'field', 'value', 'h', 'ts', 'p'])
+
+/** Whether what the runtime built is exactly one `kind:1851` change of `field` on `address`, in `folder`. */
+function isFieldChange(built: readonly { kind: number; tags: string[][] }[], want: { address: string; folder: string; field: string }): boolean {
+  if (built.length !== 1 || built[0].kind !== KIND_CHANGE) return false
+  const tags = built[0].tags
+  const one = (name: string) => tags.filter((t) => t[0] === name)
+  if (!tags.every((t) => CHANGE_TAGS.has(t[0]))) return false
+  return one('a').length === 1 && one('a')[0][1] === want.address && one('h').length === 1 && one('h')[0][1] === want.folder && one('field').length === 1 && one('field')[0][1] === want.field && one('value').length === 1
+}
+
+/**
+ * Change a linked file from its card: a status, an owner — the manifest's own
+ * action, built by the runtime (`buildActionEvents`) as Peek's `applyAction`
+ * builds it, so a Ship card writes exactly what the file's own app would. Any
+ * reader may (Decided 16 Oct); the relay is the authority on whether it may.
+ *
+ * Only a change of one field, which is all a card's pickers are: never a
+ * creation, a deletion or a write a Folder command follows (`emits.listed`).
+ */
+export async function applyCardAction(args: { reference: string; actionId: string; value: string }): Promise<{ ok: true } | { ok: false; reason: string }> {
+  let pointer
+  try {
+    pointer = referenceToPointer(args.reference)
+  } catch {
+    return { ok: false, reason: 'That link could not be read.' }
+  }
+  const address = pointerToAddress(pointer)
+  const resolved = await resolveActingManifest(pointer, undefined, query, manifests)
+  if (!resolved) return { ok: false, reason: 'No app claims this file, so there is nothing to change.' }
+  const declared = resolved.manifest.actions?.find((action) => action.id === args.actionId)
+  if (!declared || declared.effect !== 'writes' || !declared.emits.field || declared.emits.listed) return { ok: false, reason: 'This can’t be changed from here.' }
+  // The Folder comes off the file itself: the change is written into it.
+  const [root] = await query([{ kinds: [pointer.kind], authors: [pointer.pubkey], '#d': [pointer.identifier], limit: 1 }])
+  const folder = root ? folderOf(root) : undefined
+  if (!folder) return { ok: false, reason: 'That file can’t be read from here.' }
+  const built = buildActionEvents({
+    manifest: resolved.manifest,
+    kind: pointer.kind,
+    address,
+    objectAuthor: pointer.pubkey,
+    folder,
+    actionId: args.actionId,
+    value: args.value,
+    pubkey: signer.pubkey,
+    createdAtMs: Date.now(),
+  })
+  if (typeof built === 'string') return { ok: false, reason: built }
+  /*
+    The manifest is a stranger's text on a shared relay (anyone may publish a
+    31990 and point a 31989 at it), and it names the kind and the tags the
+    runtime builds. The reader signs only SPEC §7.3's change of one field on
+    this file, in its Folder — never a handler recommendation, a rename, read
+    state or a deletion dressed as a "status".
+  */
+  if (!isFieldChange(built, { address, folder, field: declared.emits.field })) return { ok: false, reason: 'This can’t be changed from here.' }
+  const result = await relay.publish(await signer.sign(built[0]))
+  return result.ok ? { ok: true } : { ok: false, reason: result.reason ?? 'The relay refused the change.' }
 }
 
 /**

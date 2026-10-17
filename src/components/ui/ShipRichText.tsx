@@ -92,7 +92,7 @@ export function ShipRichText({
  * words: §13.3 calls it malformed and asks for the inline text rather than a
  * broken file.
  */
-function drawAttachment(block: RichTextBlock) {
+export function drawAttachment(block: RichTextBlock) {
   if (block.type !== 'attachment') return undefined
   const file = imetaFromAttrs(block.attrs)
   if (!file) return undefined
