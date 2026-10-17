@@ -7,6 +7,10 @@ import { ProjectsView } from '@/views/ProjectsView'
 import type { Archives } from '@/lib/archive'
 import { go, href } from '../router'
 import { type Say } from './act'
+import { useReopenHeld } from '@/auth/heldTyping'
+
+/** Where the New project dialog holds its fields through a passkey trip (AUT-4). */
+const NEW_PROJECT_HOLD = 'new-project'
 
 /**
  * The projects list from the fold, as the old app draws it
@@ -22,6 +26,7 @@ import { type Say } from './act'
  */
 export function ProjectsPage({ state, directory, teams, archives, archived, say, refresh }: { state: FolderState; directory: DirectoryView; teams: FolderSummary[] | undefined; archives: Archives; archived: boolean; say: Say; refresh: () => Promise<void> }) {
   const [adding, setAdding] = useState(false)
+  useReopenHeld(NEW_PROJECT_HOLD, () => setAdding(true))
   // Derived once per read, not per keystroke in the Add project dialog (SHI-4).
   const keys = useMemo(() => {
     const byProject = projectKeys(state.projects, state.issues)
@@ -70,6 +75,7 @@ export function ProjectsPage({ state, directory, teams, archives, archived, say,
           teams={teams?.map((team) => ({ id: team.id, name: team.name ?? `Folder ${team.id.slice(0, 8)}…`, hasState: team.hasState }))}
           suggestKey={(title) => suggestKey(title, keys.taken)}
           keyProblem={(key) => keyProblem(key, state.projects, state.issues, keys.byProject)}
+          holdKey={NEW_PROJECT_HOLD}
           onClose={() => setAdding(false)}
           onCreate={async (draft) => {
             const result = await createProject(draft)

@@ -2,8 +2,8 @@
 /**
  * A sign-in ending while Ship is open (AUT-4): Katerina, 18 Aug, came back to a
  * "not signed in" banner under her own avatar, with only Sign out in the menu,
- * because a refused renewal only logged. Now the passkey screen draws over the
- * page, which stays mounted under it, and another tab signing out does the same.
+ * because a refused renewal only logged. Now the passkey screen takes the page's
+ * place, at the same address, and another tab signing out does the same.
  */
 import { act, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -49,7 +49,7 @@ afterEach(() => {
 })
 
 describe('a renewal Estiva ID refuses while Ship is open', () => {
-  it('asks for the passkey over the page, which stays under it', async () => {
+  it('asks for the passkey in place of the page, leaving none of it readable', async () => {
     vi.useFakeTimers()
     store({ expiresAt: Date.now() + 120_000 })
     vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: false, status: 400, json: async () => ({ error: 'invalid_grant' }) } as Response)
@@ -58,7 +58,7 @@ describe('a renewal Estiva ID refuses while Ship is open', () => {
     await act(() => vi.advanceTimersByTimeAsync(130_000))
     expect(screen.getByText('Your Estiva ID session ended. Continue with your passkey.')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Continue with passkey' })).toBeTruthy()
-    expect(screen.getByText('The issue you were reading')).toBeTruthy()
+    expect(screen.queryByText('The issue you were reading')).toBeNull()
   })
 
   it('draws nothing over the page when the renewal succeeds', async () => {
@@ -84,12 +84,11 @@ describe('a renewal Estiva ID refuses while Ship is open', () => {
     const id = await mount()
     await act(async () => expect(await id.renew()).toBeNull())
     expect(screen.getByRole('button', { name: 'Continue with passkey' })).toBeTruthy()
-    expect(screen.getByText('The issue you were reading')).toBeTruthy()
   })
 })
 
 describe('another Ship tab', () => {
-  it('signing out signs this tab out at once, not at its next write', async () => {
+  it('signing out signs this tab out at once, not at its next write, leaving none of the page readable', async () => {
     store()
     const id = await mount()
     stopFollowing = id.followOtherTabs()
@@ -97,6 +96,7 @@ describe('another Ship tab', () => {
     act(otherTabWrote)
     expect(screen.getByText('Continue with your passkey to enter.')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Continue with passkey' })).toBeTruthy()
+    expect(screen.queryByText('The issue you were reading')).toBeNull()
   })
 
   it('renewing leaves this tab signed in, on the new token', async () => {

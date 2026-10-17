@@ -59,6 +59,7 @@
  */
 import { createEstivaId, type Renewal, type ShellReason, type StoredToken } from '@estiva-app/identity'
 import { ID_CONFIG } from '../config'
+import { forgetHeldTyping, holdTyping, holdTypingFor } from './heldTyping'
 
 /** Where the package keeps the session: `<keyPrefix>.token`, in `localStorage`, shared by every tab. */
 const KEY_PREFIX = 'ship.estiva-id'
@@ -146,6 +147,17 @@ export function heldBearer(): string | undefined {
 }
 
 /**
+ * The session this page holds, expired or not: whose page it is.
+ *
+ * Not {@link currentToken}: since AUT-4 the boot can enter on an expired token
+ * when Estiva ID is slow to renew it, and the page still belongs to that person
+ * while the renewal finishes.
+ */
+export function heldToken(): StoredToken | null {
+  return client?.storedToken() ?? null
+}
+
+/**
  * Renew before the token expires, rather than when a write discovers it has.
  *
  * Ship has renewed on a 401 from `/sign` since REW-2, which works and is not
@@ -156,7 +168,7 @@ export function heldBearer(): string | undefined {
  * renewal only logged, and Ship went on drawing the person's avatar over a
  * session that had ended: Katerina's "not signed in" banner with only Sign out
  * in the menu (18 Aug). Now it ends the session in {@link sessionEnded}, and
- * `main.tsx` draws the shared passkey screen over the page, which Continue
+ * `SessionGate` draws the shared passkey screen in place of the page, which Continue
  * comes back to (SPEC §4.4).
  *
  * Since identity 0.3.0 the schedule also renews when the tab is shown again and
@@ -192,6 +204,8 @@ const endedListeners = new Set<() => void>()
 
 function endSession(reason: ShellReason): void {
   if (ended) return
+  // Before the screen takes the page's place, while what was typed is still there to read; not for a sign-out.
+  if (reason === 'session_expired') holdTyping()
   ended = reason
   schedule?.cancel()
   for (const listener of endedListeners) listener()
@@ -222,6 +236,7 @@ export function subscribeSessionEnded(listener: () => void): () => void {
 export function followOtherTabs(): () => void {
   if (!client || typeof window === 'undefined') return () => {}
   const person = client.storedToken()?.pubkey
+  holdTypingFor(person)
   const follow = (event: StorageEvent) => {
     if (event.storageArea !== window.localStorage || (event.key !== TOKEN_KEY && event.key !== null)) return
     const token = client.storedToken()
@@ -285,6 +300,7 @@ export async function beginSignIn(options: { silent?: boolean } = {}): Promise<v
  * person straight back in. The cookie can only be reached by going there.
  */
 export function beginSignOut(): void {
+  forgetHeldTyping()
   client?.beginSignOut()
 }
 

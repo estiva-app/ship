@@ -27,6 +27,7 @@ import { ShipSlashMenu, slashSections } from '@/components/editing/slashMenu'
 import { chipsAsReferences, composerTriggers, urgentChipsFrom, withoutNewUrgency } from '@/components/editing/composerTriggers'
 import { useMentionPeople } from '@/components/editing/mentionables'
 import { WRITING_BOX } from './writingBox'
+import { heldText, releaseHeld, useHeldTyping } from '@/auth/heldTyping'
 
 
 export type MessageBoxKind = 'conversation' | 'reply' | 'edit'
@@ -68,6 +69,8 @@ export interface MessageBoxProps {
   disabledReason?: string
   draftKey?: string
   drafts?: DraftStore
+  /** Edit: where its unsaved text is held when the sign-in ends while it is open (AUT-4). */
+  holdKey?: string
   upload?: (file: File) => Promise<Imeta>
   nameOf?: (pubkey: string) => string
   /**
@@ -112,8 +115,15 @@ export interface MessageBoxProps {
  * A new conversation is Peek's tall box, the tools on a row under the text; a
  * reply is one short line with the tools at its end (Katerina, 30 September).
  */
-export function MessageBox({ kind = 'conversation', onSubmit, references, initial = '', initialUrgent, onCancel, autoFocus = false, disabledReason, draftKey, drafts = DEFAULT_DRAFTS, upload = uploadAttachment, nameOf, look = 'box', me, className }: MessageBoxProps) {
-  const [text, setText] = useState(initial)
+export function MessageBox({ kind = 'conversation', onSubmit, references, initial = '', initialUrgent, onCancel: cancel, autoFocus = false, disabledReason, draftKey, drafts = DEFAULT_DRAFTS, upload = uploadAttachment, nameOf, look = 'box', me, className, holdKey }: MessageBoxProps) {
+  // An edit's text from when the sign-in last ended, back after the passkey tap and not yet saved (AUT-4).
+  const [held] = useState(() => (holdKey ? heldText(holdKey) : undefined))
+  const [text, setText] = useState(held ?? initial)
+  // Saved or left: what was held is done with.
+  const onCancel = () => {
+    if (holdKey) releaseHeld(holdKey)
+    cancel?.()
+  }
   const [files, setFiles] = useState<readonly Imeta[]>([])
   const [busy, setBusy] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -137,6 +147,7 @@ export function MessageBox({ kind = 'conversation', onSubmit, references, initia
   const labelOf = (pubkey: string) => people.current.find((p) => p.pubkey === pubkey)?.name ?? names.current?.(pubkey) ?? `${pubkey.slice(0, 8)}…`
 
   const unchanged = kind === 'edit' && text.trim() === initial.trim()
+  useHeldTyping(holdKey, () => (text.trim() !== initial.trim() ? text : undefined))
   const canSubmit = (text.trim().length > 0 || (kind !== 'edit' && files.length > 0)) && !unchanged && !busy && !uploading && !disabledReason
   const blocked = disabledReason || (uploading ? 'Uploading…' : busy ? 'Sending…' : undefined)
 
@@ -211,7 +222,7 @@ export function MessageBox({ kind = 'conversation', onSubmit, references, initia
         keys,
       ],
       // The text gives every person back as an ordinary reference; the message's urgent ones come back urgent (CON-24).
-      content: urgentChipsFrom(editorDocFor(initial) as never, initialUrgent, labelOf) as never,
+      content: urgentChipsFrom(editorDocFor(held ?? initial) as never, initialUrgent, labelOf) as never,
       editable: !disabledReason,
       autofocus: autoFocus ? 'end' : false,
       editorProps: {

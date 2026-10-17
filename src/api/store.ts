@@ -3,7 +3,7 @@ import { isRateLimited, noteRateLimited } from '@/lib/relayBudget'
 import { estivaIdSigner, localSigner, type Signer } from '../nostr/signer'
 import { Store } from '../nostr/store'
 import { ID_CONFIG, RELAY_URL } from '../config'
-import { currentToken, heldBearer, renew } from '../auth/estivaId'
+import { heldBearer, heldToken, renew } from '../auth/estivaId'
 
 /**
  * Who signs, decided once.
@@ -27,7 +27,10 @@ import { currentToken, heldBearer, renew } from '../auth/estivaId'
  * Module-private on purpose: the rest of the seam reads and writes through
  * `store`; nothing outside `api/` sees a signer or a relay.
  */
-const token = currentToken()
+// The held session, not `currentToken()`: a boot that stopped waiting on a slow renewal enters on an expired token
+// (AUT-4), and the page is still that person's. Choosing on a valid token would sign as the device key for the rest
+// of the page.
+const token = heldToken()
 
 export const signer: Signer =
   ID_CONFIG && token

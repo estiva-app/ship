@@ -20,6 +20,7 @@ import { MessageBoxShell } from './writingBox'
 import type { Picks } from './MessageBox'
 import { messageScope, referenceSections } from '@/api/references'
 import { PartCard } from '@/components/ui/PartCard'
+import { useReopenHeld } from '@/auth/heldTyping'
 
 /*
   The writing box is its own chunk: its editor is ProseMirror, which a reader
@@ -113,6 +114,9 @@ function AddReaction({ onPick, disabledReason }: { onPick: (emoji: string) => vo
 
 function Message({ message, resolved, here, nameOf, reactions, onToggleReaction, onDelete, onEdit, repliesLeftBehind = 0, disabledReason, drafts, footer }: MessageProps) {
   const [editing, setEditing] = useState(false)
+  // An edit open when the sign-in ended opens again after the passkey tap, with what was typed (AUT-4).
+  const editHold = `edit:${message.id}`
+  useReopenHeld(onEdit && editHold, () => setEditing(true))
   const [confirming, setConfirming] = useState(false)
   const react = onToggleReaction && ((emoji: string) => onToggleReaction(emoji, reactions?.find((r) => r.emoji === emoji)?.mine))
 
@@ -153,7 +157,7 @@ function Message({ message, resolved, here, nameOf, reactions, onToggleReaction,
         )}
       </div>
       {editing && onEdit ? (
-        <MessageBox kind="edit" autoFocus initial={message.body} initialUrgent={message.urgent} nameOf={nameOf} drafts={drafts} onSubmit={(body) => onEdit(body)} onCancel={() => setEditing(false)} />
+        <MessageBox kind="edit" autoFocus initial={message.body} initialUrgent={message.urgent} nameOf={nameOf} drafts={drafts} holdKey={editHold} onSubmit={(body) => onEdit(body)} onCancel={() => setEditing(false)} />
       ) : (
         <>
           <MessageText

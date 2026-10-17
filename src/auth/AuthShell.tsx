@@ -6,8 +6,9 @@
  * keeps what only Ship knows: its name at the top, and which words and which
  * button each state of entry gets, from `@estiva-app/identity`'s `SHELL_COPY`.
  *
- * It draws over the whole window, so mid-session (AUT-4) it covers the page
- * without unmounting it: the route under it is the one Continue comes back to.
+ * It fills the whole window. Mid-session (AUT-4) `SessionGate` draws it in place
+ * of the page, and the route left in the address bar is the one Continue comes
+ * back to.
  */
 import { EntryShell } from '@estiva-app/ui'
 import { CONTINUE_LABEL, RETRY_LABEL, SHELL_COPY, isRecoverable, type ShellState } from '@estiva-app/identity'

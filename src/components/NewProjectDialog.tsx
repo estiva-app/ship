@@ -6,6 +6,7 @@ import { Field } from '@/components/ui/Field'
 import { Select } from '@/components/ui/Select'
 import { TextInput } from '@/components/ui/TextInput'
 import { Textarea } from '@/components/ui/Textarea'
+import { heldFields, releaseHeld, useHeldTyping } from '@/auth/heldTyping'
 import { summaryText } from '@/nostr/summary'
 import { SummaryField } from './SummaryField'
 
@@ -49,16 +50,37 @@ export interface NewProjectDialogProps {
   onClose: () => void
   /** Resolve `false` to keep the dialog open (the caller has said why). */
   onCreate: (draft: NewProjectDraft) => Promise<boolean | void> | boolean | void
+  /** Where its unsaved fields are held when the sign-in ends while it is open (AUT-4); the page reopens it from there. */
+  holdKey?: string
 }
 
-export function NewProjectDialog({ teams, suggestKey, keyProblem, onClose, onCreate }: NewProjectDialogProps) {
-  const [title, setTitle] = useState('')
-  const [summary, setSummary] = useState('')
-  const [description, setDescription] = useState('')
+/** What a New project dialog holds through the passkey trip (AUT-4). */
+interface HeldProject {
+  title: string
+  summary: string
+  description: string
+  typedKey: string
+  teamId: string
+}
+
+export function NewProjectDialog({ teams, suggestKey, keyProblem, onClose, onCreate, holdKey }: NewProjectDialogProps) {
+  // What was typed here when the sign-in last ended, back after the passkey tap (AUT-4).
+  const [held] = useState(() => heldFields<HeldProject>(holdKey))
+  const [title, setTitle] = useState(held?.title ?? '')
+  const [summary, setSummary] = useState(held?.summary ?? '')
+  const [description, setDescription] = useState(held?.description ?? '')
   // Undefined until the person types one: until then the key follows the title.
-  const [typedKey, setTypedKey] = useState<string>()
-  const [teamId, setTeamId] = useState('')
+  const [typedKey, setTypedKey] = useState<string | undefined>(held?.typedKey)
+  const [teamId, setTeamId] = useState(held?.teamId ?? '')
   const [busy, setBusy] = useState(false)
+
+  useHeldTyping(holdKey, () =>
+    title.trim() || summary.trim() || description.trim() || typedKey ? JSON.stringify({ title, summary, description, typedKey, teamId }) : undefined,
+  )
+  const close = () => {
+    if (holdKey) releaseHeld(holdKey)
+    onClose()
+  }
   const team = teams?.find((candidate) => candidate.id === teamId)
   const key = typedKey ?? (title.trim() ? suggestKey(title) : '')
   const problem = key ? keyProblem(key) : undefined
@@ -69,7 +91,7 @@ export function NewProjectDialog({ teams, suggestKey, keyProblem, onClose, onCre
     setBusy(true)
     try {
       const ok = await onCreate({ title: title.trim(), summary: summaryText(summary), description: description.trim(), key, team: { folder: team.id, hasState: team.hasState } })
-      if (ok !== false) onClose()
+      if (ok !== false) close()
     } finally {
       setBusy(false)
     }
@@ -78,11 +100,11 @@ export function NewProjectDialog({ teams, suggestKey, keyProblem, onClose, onCre
   return (
     <DialogShell
       title="New project"
-      onClose={onClose}
+      onClose={close}
       bodyClassName="flex flex-col gap-6"
       footer={
         <>
-          <Button variant="muted" onClick={onClose} disabled={busy}>
+          <Button variant="muted" onClick={close} disabled={busy}>
             Cancel
           </Button>
           <Button variant="primary" type="submit" form="new-project" disabled={!canSubmit}>
