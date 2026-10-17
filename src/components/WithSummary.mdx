@@ -1,0 +1,45 @@
+import { Meta } from '@storybook/addon-docs/blocks'
+
+<Meta title="Issues/WithSummary" />
+
+# WithSummary
+
+Shows a file's summary as the tooltip of what it wraps. This is how the issue
+list's row and the table's title show the summary: hover the title and the
+summary appears.
+
+**Seen in** — *Issues/IssueRow*: **Default**, **No Summary** and **Long
+Summary**; *Issues/IssuesTable*: **Default**.
+
+## When
+
+- In a list read at a glance, where each row stays one line and the title
+  stands alone (Miky, SUM-9, 17 Oct).
+
+## When not
+
+- On a board card or a project card, which show the summary as its own line
+  under the title → **SummaryLine**.
+- On the file's own page, where the whole summary shows and can be edited →
+  **LiveSummary**.
+
+## How
+
+```tsx
+import { WithSummary } from '@/components/SummaryLine'
+
+<WithSummary summary={issue.summary} wrapperClassName="flex min-w-0 flex-1">
+  {link}
+</WithSummary>
+```
+
+- `wrapperClassName` lays out the tooltip's wrapper in its row, so a cut
+  title still truncates.
+
+## What it owns
+
+- **The clamp** that SPEC §6.12 asks of every reader: past 280 characters the
+  summary is cut with an ellipsis, just as interop cuts `subtitle`.
+- **Nothing for none**: with no summary, or a blank one, there is no tooltip
+  and `children` draw alone.
+- **Literal text**: no markup or links are read out of it.

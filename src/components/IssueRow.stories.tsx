@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite'
 import { ANA, ISSUE_STATUSES, ROWS, hrefFor } from '@/fixtures/issues'
 import { IssueRow } from './IssueRow'
 
-/** One line, or two with a summary under the title: ref · status shape · title, then the conversations, the project chip (its own link), the assignee's face and when it was opened. Hover it; click anywhere but the chip to open the issue. */
+/** One line: ref · status shape · title, then the conversations, the project chip (its own link), the assignee's face and when it was opened. Hover it for the summary; click anywhere but the chip to open the issue. */
 const meta = {
   title: 'Issues/IssueRow',
   component: IssueRow,
@@ -19,13 +19,13 @@ const meta = {
 export default meta
 type Story = StoryObj<typeof meta>
 
-/** Everything present: a summary under the title, a project, two conversations, an assignee. */
+/** Everything present: a summary (hover the row to see it), a project, two conversations, an assignee. */
 export const Default: Story = {}
 
-/** No summary: the title alone, at today's 36px. */
+/** No summary: the same 36px row, and no tooltip. */
 export const NoSummary: Story = { args: { issue: { ...ROWS[0], summary: undefined } } }
 
-/** A summary past about 240 characters: one line, cut short. All of it is on the issue's page. */
+/** A summary past about 240 characters: the tooltip wraps it onto more lines. */
 export const LongSummary: Story = { args: { issue: ROWS[2] } }
 
 /** No conversations yet: the count is simply absent, not a zero. */

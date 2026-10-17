@@ -4,20 +4,20 @@ import { Meta } from '@storybook/addon-docs/blocks'
 
 # SummaryLine
 
-A file's summary as a row, a board card, the table and a project card draw it:
-its own muted line under the title, cut at one or two lines.
+A file's summary as a board card and a project card draw it: its own muted
+line under the title, cut at two lines.
 
-**Seen in** — *Issues/IssueRow*: **Default**, **No Summary** and **Long
-Summary**; *Issues/Board* and *Issues/IssuesTable*: **Default**;
-*Projects/ProjectCard*: **Default**, **Long Summary** and **No Summary**.
+**Seen in** — *Issues/Board*: **Default**; *Projects/ProjectCard*:
+**Default**, **Long Summary** and **No Summary**.
 
 ## When
 
-- Under a file's title wherever it is listed: one line in a row and the
-  table, two on a board card and a project card.
+- Under a file's title on a board card and a project card.
 
 ## When not
 
+- In the issue list's row and the table, which stay one line and show the
+  summary on hover → **WithSummary**.
 - On the file's own page, where all of it shows and it is edited →
   **LiveSummary**.
 - For a description: a summary is its own field, never the description cut

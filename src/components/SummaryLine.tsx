@@ -1,7 +1,10 @@
+import type { ReactNode } from 'react'
 import { cn } from '@/lib/cn'
+import { WithTooltip } from '@/components/ui/Tooltip'
 
 /**
- * A file's summary as a row, a board card, the table and a project card draw it: its own muted line under the title, cut at `lines`.
+ * A file's summary as a board card and a project card draw it: its own muted line under the title, cut at `lines`.
+ * The issue row and the table drew it too, as one line, and now carry it as the title's hover (Miky, SUM-9, 17 Oct).
  *
  * The rules are the short-summary prototype's (estiva-ui `concept/short-summary`,
  * approved by Miky 15 Oct; record a-files-summary-is-its-own-field):
@@ -14,6 +17,20 @@ import { cn } from '@/lib/cn'
  *
  * A span, not a paragraph, because three of the four places sit inside a link.
  */
+/** Past this a tooltip's summary is cut with an ellipsis, as interop cuts `subtitle`: SPEC §6.12 has every reader clamp it, and the relay does not. */
+const TOOLTIP_MAX = 280
+
+/** A file's summary as the tooltip on what `children` draws — the issue row and the table's title. None or blank: `children` alone. */
+export function WithSummary({ summary, wrapperClassName, children }: { summary?: string; wrapperClassName?: string; children: ReactNode }) {
+  if (!summary?.trim()) return <>{children}</>
+  const label = summary.length > TOOLTIP_MAX ? `${summary.slice(0, TOOLTIP_MAX - 1).trimEnd()}…` : summary
+  return (
+    <WithTooltip label={label} wrapperClassName={wrapperClassName}>
+      {children}
+    </WithTooltip>
+  )
+}
+
 export function SummaryLine({ summary, lines, className }: { summary?: string; lines: 1 | 2; className?: string }) {
   if (!summary) return null
   return <span className={cn('block text-text-secondary', lines === 1 ? 'truncate' : 'line-clamp-2', className)}>{summary}</span>
