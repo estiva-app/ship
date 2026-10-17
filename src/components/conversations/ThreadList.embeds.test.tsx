@@ -7,7 +7,7 @@
  * card, whatever the manifest's `widget` says, and `none` — or no `embed` at
  * all — draws none. A reference alone on its line, and a bare app link once
  * what it names has resolved, read as its row, and in a sentence as its chip
- * (record where-a-link-sits-and-which-file-gets-the-card).
+ * (record a-link-on-words-counts-toward-the-card).
  *
  * Fixtures are Ship's real shapes: an issue (manifest `row`) and a project
  * (manifest `card`), each asked for in the other layout, so a pass cannot be
@@ -97,7 +97,7 @@ describe('a message that asks for a card', () => {
     expect(cards(c)).toEqual([])
   })
 
-  // Where a link sits decides how it draws (record where-a-link-sits-and-which-file-gets-the-card, superseding OPT-18's chip).
+  // Where a link sits decides how it draws (record a-link-on-words-counts-toward-the-card, superseding OPT-18's chip).
   it('draws a reference alone on its line as its row, with no card, when no embed names it', async () => {
     const lone = show(thread(ISSUE_REF))
     await waitFor(() => expect(rows(lone)).toEqual(['The probe issue']))
@@ -149,14 +149,11 @@ describe('a message that asks for a card', () => {
 describe('a link on words that asks for a card (OPT-17)', () => {
   const body = `the plan is [these words](${ISSUE_URL}) for now`
 
-  // protocol 0.39's `cardsIn`, as Peek reads it: a URL names a file only where it draws as that file's link, so words keep theirs.
-  it('draws no card for a link on words: the words stay a link, as in Peek', async () => {
+  // protocol 0.40's `cardsIn`, as Peek reads it: a link on words names its file, so the card it chose draws under the message.
+  it('draws the card a link on words asks for, and the words stay a link, as in Peek', async () => {
     const c = show(thread(body, [{ value: ISSUE, layout: 'detailed' }]))
-    // The control: the same body's bare link would have drawn its card by now.
-    const control = show(thread(`the plan is ${ISSUE_URL} for now`, [{ value: ISSUE, layout: 'detailed' }]))
-    await waitFor(() => expect(cards(control)).toEqual([[bare(ISSUE_REF), 'detailed']]))
+    await waitFor(() => expect(cards(c)).toEqual([[bare(ISSUE_REF), 'detailed']]))
     expect(c.querySelector(`a[href="${ISSUE_URL}"]`)?.textContent).toBe('these words')
-    expect(cards(c)).toEqual([])
   })
 
   it('draws the card a bare app link asks for, resolved under the reference its value spells', async () => {

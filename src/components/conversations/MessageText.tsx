@@ -23,7 +23,7 @@ function addressOf(reference: string): string | undefined {
  * A message's text with its links, then the cards its author chose and the
  * parts it shows — drawn as Peek's `MessageBody` draws them, from the same kit
  * and by the same rule (SPEC §13.2, §13.6; why:
- * https://github.com/estiva-app/estiva-docs/blob/main/decisions/where-a-link-sits-and-which-file-gets-the-card.md):
+ * https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-link-on-words-counts-toward-the-card.md):
  * a link in a sentence is its chip, a line that is only a link to a file or a
  * message is that file's row, and the file whose card is under the message
  * draws nothing in the text, since the card stands for it.
