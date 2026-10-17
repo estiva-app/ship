@@ -22,13 +22,23 @@
  * screen, so a cold boot is the only case it sees. A mid-session expiry is
  * handled by renewal inside the signer, not by coming back through here.
  */
-import { decideBoot, type ShellReason, type ShellState } from '@estiva-app/identity'
+import {
+  decideAfterRenewal,
+  decideBoot,
+  type BootAction,
+  type BootObservation,
+  type Renewal,
+  type ShellReason,
+  type ShellState,
+} from '@estiva-app/identity'
 import {
   beginSignIn,
   callbackParams,
+  canRenew,
   clearQuery,
   completeSignIn,
   currentToken,
+  renewInPlace,
   guardAttemptedAt,
   restoreRoute,
   startRenewal,
@@ -58,15 +68,45 @@ export async function bootAuth(): Promise<BootResult> {
   if (!signInAvailable) return { kind: 'app' }
 
   const callback = callbackParams()
-  const action = decideBoot({
+  const observation: BootObservation = {
     callback,
     hasValidToken: currentToken() !== null,
+    canRenew: canRenew(),
     guardAttemptedAt: guardAttemptedAt(),
     enteredThisPageLoad: false,
     now: Date.now(),
-  })
+  }
+  return act(decideBoot(observation), observation)
+}
 
+/**
+ * How long the boot waits on a renewal before entering on what it holds.
+ *
+ * A renewal the network neither answers nor fails (wifi joined, no route yet)
+ * would hold a blank page for as long as the browser waits. Past this, Ship
+ * enters as for an unreachable Estiva ID and the schedule renews once the
+ * network answers: the package hands it the same renewal, still out. Peek's
+ * `RENEWAL_WAIT_MS`.
+ */
+export const RENEWAL_WAIT_MS = 3_000
+
+async function act(action: BootAction, observation: BootObservation): Promise<BootResult> {
+  const callback = observation.callback
   switch (action.do) {
+    case 'renew': {
+      // An expired access token and a refresh token to spend: renew here, with
+      // no trip to Estiva ID, and stay on the page asked for (AUT-4, as Peek's
+      // AUT-3). A refusal is an ended sign-in and asks for the passkey on this
+      // page; no answer enters on the held token.
+      let timer: ReturnType<typeof setTimeout> | undefined
+      const late = new Promise<Renewal>((resolve) => {
+        timer = setTimeout(() => resolve({ outcome: 'unreachable' }), RENEWAL_WAIT_MS)
+      })
+      const outcome = await Promise.race([renewInPlace(), late]).then((r) => r.outcome)
+      clearTimeout(timer)
+      return act(decideAfterRenewal(outcome, observation), observation)
+    }
+
     case 'enter':
       startRenewal()
       return { kind: 'app' }
@@ -111,7 +151,8 @@ export async function bootAuth(): Promise<BootResult> {
       }
       // A reason stashed by a previous load is more specific than the one the
       // decision inferred — it was observed rather than deduced.
-      return shell(takeShellReason() ?? action.reason)
+      // `authenticating`, as Peek's: the button says "Continue with passkey", not "Try again".
+      return { kind: 'shell', state: { phase: 'authenticating', reason: takeShellReason() ?? action.reason } }
 
     case 'fail':
       return shell(action.reason)

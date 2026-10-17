@@ -5,6 +5,7 @@ import { ownConversations, recordChannel } from '@/lib/ownConversation'
 import { pointerToAddress, referenceToPointer, resolveBlockAnchor, type ContentFormat, type Embed, type PartPointer } from '@estiva-app/protocol'
 import type { AttachmentIndex, EditIndex } from '@/api'
 import { signedIn } from '@/auth/estivaId'
+import { useReopenHeld } from '@/auth/heldTyping'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ISSUE_STATUSES,
@@ -365,6 +366,8 @@ export function ProjectPage({
 }) {
   const project = state.projects.find((candidate) => candidate.id === d)
   const [dialog, setDialog] = useState<'issue' | 'delete' | 'move' | 'archive' | null>(null)
+  const newIssueHold = project && `new-issue:${project.addr}`
+  useReopenHeld(newIssueHold, () => setDialog('issue'))
 
   const issues = useMemo<IssuesTableRow[]>(() => {
     if (!project) return []
@@ -684,6 +687,7 @@ export function ProjectPage({
         <NewIssueDialog
           projects={[{ value: project.addr, label: project.title }]}
           project={{ addr: project.addr, title: project.title }}
+          holdKey={newIssueHold}
           onClose={() => setDialog(null)}
           onCreate={async (draft) => {
             const result = await createIssue(project, state, draft)

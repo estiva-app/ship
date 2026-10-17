@@ -39,6 +39,8 @@ export interface LiveHeaderProps {
   onCommentOnBlock?: (blockId: string) => void
   /** The block menu's Copy link: the page's copy, which confirms it. */
   onCopyBlockLink?: (link: string) => void
+  /** Where the description's unsaved text is held when the sign-in ends (AUT-4). */
+  holdKey?: string
 }
 
 /**

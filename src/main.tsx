@@ -17,6 +17,8 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import { bootAuth, enterFromShell } from './auth/boot'
 import { AuthShell } from './auth/AuthShell'
+import { SessionGate } from './auth/SessionGate'
+import { followOtherTabs } from './auth/estivaId'
 
 /*
   An async IIFE rather than top-level await. TLA works in a `type="module"`
@@ -45,9 +47,12 @@ void (async () => {
 
   // Imported here, not at the top: see the note above on boot order.
   const { default: App } = await import('./App.tsx')
+  followOtherTabs()
   root.render(
     <StrictMode>
-      <App />
+      <SessionGate>
+        <App />
+      </SessionGate>
     </StrictMode>,
   )
 })()

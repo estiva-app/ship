@@ -7,6 +7,7 @@ import { Field } from '@/components/ui/Field'
 import { Select, type SelectOption } from '@/components/ui/Select'
 import { TextInput } from '@/components/ui/TextInput'
 import { Textarea } from '@/components/ui/Textarea'
+import { heldFields, releaseHeld, useHeldTyping } from '@/auth/heldTyping'
 import { summaryText } from '@/nostr/summary'
 import { SummaryField } from './SummaryField'
 
@@ -35,23 +36,33 @@ export interface NewIssueDialogProps {
   onClose: () => void
   /** Resolve `false` to keep the dialog open (the caller has said why). */
   onCreate: (draft: NewIssueDraft) => Promise<boolean | void> | boolean | void
+  /** Where its unsaved fields are held when the sign-in ends while it is open (AUT-4); the page reopens it from there. */
+  holdKey?: string
 }
 
-export function NewIssueDialog({ projects, project, onClose, onCreate }: NewIssueDialogProps) {
-  const [title, setTitle] = useState('')
-  const [summary, setSummary] = useState('')
-  const [description, setDescription] = useState('')
-  const [projectAddr, setProjectAddr] = useState(project?.addr ?? projects[0]?.value ?? '')
+export function NewIssueDialog({ projects, project, onClose, onCreate, holdKey }: NewIssueDialogProps) {
+  // What was typed here when the sign-in last ended, back after the passkey tap (AUT-4).
+  const [held] = useState(() => heldFields<NewIssueDraft>(holdKey))
+  const [title, setTitle] = useState(held?.title ?? '')
+  const [summary, setSummary] = useState(held?.summary ?? '')
+  const [description, setDescription] = useState(held?.description ?? '')
+  const [projectAddr, setProjectAddr] = useState(project?.addr ?? (held?.projectAddr && projects.some((p) => p.value === held.projectAddr) ? held.projectAddr : projects[0]?.value ?? ''))
   const [busy, setBusy] = useState(false)
   const none = !project && projects.length === 0
   const canSubmit = title.trim().length > 0 && projectAddr !== '' && !busy
+
+  useHeldTyping(holdKey, () => (title.trim() || summary.trim() || description.trim() ? JSON.stringify({ title, summary, description, projectAddr }) : undefined))
+  const close = () => {
+    if (holdKey) releaseHeld(holdKey)
+    onClose()
+  }
 
   const submit = async () => {
     if (!canSubmit) return
     setBusy(true)
     try {
       const ok = await onCreate({ title: title.trim(), summary: summaryText(summary), description: description.trim(), projectAddr })
-      if (ok !== false) onClose()
+      if (ok !== false) close()
     } finally {
       setBusy(false)
     }
@@ -60,11 +71,11 @@ export function NewIssueDialog({ projects, project, onClose, onCreate }: NewIssu
   return (
     <DialogShell
       title={project ? `New issue in ${project.title}` : 'New issue'}
-      onClose={onClose}
+      onClose={close}
       bodyClassName="flex flex-col gap-6"
       footer={
         <>
-          <Button variant="muted" onClick={onClose} disabled={busy}>
+          <Button variant="muted" onClick={close} disabled={busy}>
             Cancel
           </Button>
           {!none && (

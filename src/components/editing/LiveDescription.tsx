@@ -33,6 +33,8 @@ import {
   isSuggestionOpen,
 } from '@estiva-app/ui/editor'
 import { uploadAttachment } from '@/api/blobs'
+import { sessionEnded } from '@/auth/estivaId'
+import { heldText, releaseHeld, useHeldTyping } from '@/auth/heldTyping'
 import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
 import { askLinkValues, knownLinkValue } from '@/api/linkCards'
 import { AttachmentNode, BlockId, ReferenceNode, ReferenceProvider, UnknownBlock } from '@/components/ui/editorSchema'
@@ -75,8 +77,11 @@ export function LiveDescription({
   upload = uploadAttachment,
   onCommentOnBlock,
   onCopyBlockLink,
+  holdKey,
 }: {
   value: string
+  /** Where its unsaved text is held when the sign-in ends while it is open (AUT-4): the issue's or project's address. */
+  holdKey?: string
   format: ContentFormat
   onCommit: (value: string, contentFormat?: string) => Promise<boolean> | boolean
   nameOf?: (pubkey: string) => string
@@ -110,15 +115,24 @@ export function LiveDescription({
     window.addEventListener('focus', released)
     picker.current?.click()
   }
-  const [empty, setEmpty] = useState(value.trim() === '')
+  // What was typed here when the sign-in last ended, back after the passkey tap and not yet saved (AUT-4).
+  const [held] = useState(() => heldDocument(holdKey))
+  const [empty, setEmpty] = useState(!held && value.trim() === '')
   const committing = useRef(false)
   // The last value saved or loaded, so a blur with nothing new is not a write and
   // our own save coming back is not someone else's edit.
   const saved = useRef(value)
   // The text as last typed. Saving on the way out reads this, not the editor,
   // which may already be torn down by then.
-  const typed = useRef<EditorDocument | null>(null)
+  const typed = useRef<EditorDocument | null>(held)
   const again = useRef(false)
+  // Until the held text is saved, it is what is in the field: an edit loading meanwhile does not replace it.
+  const restored = useRef(held !== null)
+
+  useHeldTyping(holdKey, () => {
+    const doc = typed.current
+    return doc && publishableFromEditor(doc).value !== saved.current ? JSON.stringify(doc) : undefined
+  })
 
   const save = useCallback(
     async (doc: EditorDocument | null) => {
@@ -134,7 +148,11 @@ export function LiveDescription({
       try {
         const ok = await onCommit(next.value, next.contentFormat)
         setFailed(!ok)
-        if (ok) saved.current = next.value
+        if (ok) {
+          saved.current = next.value
+          restored.current = false
+          if (holdKey) releaseHeld(holdKey)
+        }
       } finally {
         committing.current = false
         // In `finally`, so a commit that throws still hands on the change waiting behind it.
@@ -144,7 +162,7 @@ export function LiveDescription({
         }
       }
     },
-    [onCommit],
+    [onCommit, holdKey],
   )
   /*
     The latest `save`, for the editor's `onBlur` (created once) and the unmount
@@ -192,7 +210,7 @@ export function LiveDescription({
         PastedMarkdown.configure({ read: (text) => toEditorDocument(descriptionTextToBlockDocument(text)) }),
       ],
       // Built once. A value coming back must not rebuild the editor under the caret; see the effect below.
-      content: toEditorDocument(documentForEditing(value, format)),
+      content: held ?? toEditorDocument(documentForEditing(value, format)),
       editorProps: {
         attributes: { 'aria-label': 'Description', role: 'textbox', 'aria-multiline': 'true', class: richTextClassName('default', 'outline-none') },
         handleKeyDown: (view, event) => {
@@ -227,7 +245,7 @@ export function LiveDescription({
 
   // Someone else's edit: loaded while you are not in the field; your own save coming back is left alone.
   useEffect(() => {
-    if (!editor || editor.isDestroyed || value === saved.current || editor.isFocused || committing.current) return
+    if (!editor || editor.isDestroyed || value === saved.current || editor.isFocused || committing.current || restored.current) return
     editor.commands.setContent(toEditorDocument(documentForEditing(value, format)), { emitUpdate: false })
     saved.current = value
     typed.current = null
@@ -254,8 +272,14 @@ export function LiveDescription({
     return () => onEditor?.(null)
   }, [editor, onEditor])
 
-  // Leaving the tab or the page unmounts this: save on the way out.
-  useEffect(() => () => void latestSave.current(typed.current), [])
+  // Leaving the tab or the page unmounts this: save on the way out. Not when the sign-in ended: the save would be
+  // refused with nothing left on screen to say so, and the text is held on the device instead (AUT-4).
+  useEffect(
+    () => () => {
+      if (!sessionEnded()) void latestSave.current(typed.current)
+    },
+    [],
+  )
 
   const chips = useChipObjects(editor, resolved)
 
@@ -281,4 +305,16 @@ export function LiveDescription({
       </div>
     </ReferenceProvider>
   )
+}
+
+/** The editor's own document held for this place when the sign-in ended (AUT-4), block ids and all; `null` when none. */
+function heldDocument(key: string | undefined): EditorDocument | null {
+  const text = key ? heldText(key) : undefined
+  if (!text) return null
+  try {
+    const doc = JSON.parse(text) as EditorDocument
+    return doc?.type === 'doc' ? doc : null
+  } catch {
+    return null
+  }
 }

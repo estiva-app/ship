@@ -82,6 +82,56 @@ describe('a cold load with a live session', () => {
   })
 })
 
+describe('a cold load with an expired token and a refresh token (AUT-4)', () => {
+  const tokenCalls = (answer: { status: number; body: unknown } | 'hang') =>
+    vi.spyOn(globalThis, 'fetch').mockImplementation((async () =>
+      answer === 'hang'
+        ? new Promise<Response>(() => {})
+        : ({ ok: answer.status < 300, status: answer.status, json: async () => answer.body } as Response)) as typeof fetch)
+  const expiredWithRefresh = () => validSession({ expiresAt: Date.now() - 1_000, refreshToken: 'rt-1' })
+
+  it('renews in place and enters on the page asked for, with no trip to Estiva ID', async () => {
+    expiredWithRefresh()
+    window.history.replaceState({}, '', '/issue/abc#block-b1')
+    const fetchSpy = tokenCalls({
+      status: 200,
+      body: { access_token: 'at-2', expires_in: 3600, refresh_token: 'rt-2', pubkey: 'b3'.repeat(32) },
+    })
+    const { bootAuth } = await freshBootWithNav()
+    expect(await bootAuth()).toEqual({ kind: 'app' })
+    expect(navigated).toEqual([])
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    expect(String(fetchSpy.mock.calls[0][0])).toBe('https://id.estiva.app/token')
+    expect(JSON.parse(localStorage.getItem('ship.estiva-id.token')!).accessToken).toBe('at-2')
+    expect(window.location.pathname + window.location.hash).toBe('/issue/abc#block-b1')
+  })
+
+  it('asks for the passkey on this page when Estiva ID refuses the renewal, without a silent trip', async () => {
+    expiredWithRefresh()
+    window.history.replaceState({}, '', '/issue/abc')
+    tokenCalls({ status: 400, body: { error: 'invalid_grant' } })
+    const { bootAuth } = await freshBootWithNav()
+    expect(await bootAuth()).toEqual({ kind: 'shell', state: { phase: 'authenticating', reason: 'session_expired' } })
+    expect(navigated).toEqual([])
+    expect(window.location.pathname).toBe('/issue/abc')
+  })
+
+  it('enters on the held token when Estiva ID does not answer, rather than holding a blank page', async () => {
+    vi.useFakeTimers()
+    try {
+      expiredWithRefresh()
+      tokenCalls('hang')
+      const { bootAuth, RENEWAL_WAIT_MS } = await freshBootWithNav()
+      const boot = bootAuth()
+      await vi.advanceTimersByTimeAsync(RENEWAL_WAIT_MS)
+      expect(await boot).toEqual({ kind: 'app' })
+      expect(navigated).toEqual([])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
 describe('a cold load with nothing', () => {
   it('probes silently and reports that the page is leaving', async () => {
     const { bootAuth } = await freshBootWithNav()
@@ -133,7 +183,8 @@ describe('coming back from a silent probe with no session', () => {
     const { bootAuth } = await freshBootWithNav()
     const result = await bootAuth()
     expect(result.kind).toBe('shell')
-    if (result.kind === 'shell') expect(result.state.phase).toBe('failed')
+    // `authenticating`: the button is "Continue with passkey", as Peek's, not "Try again" (AUT-4).
+    if (result.kind === 'shell') expect(result.state).toEqual({ phase: 'authenticating', reason: 'no_session' })
     expect(navigated).toEqual([])
   })
 

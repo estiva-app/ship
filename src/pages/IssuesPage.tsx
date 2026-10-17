@@ -6,6 +6,10 @@ import { IssuesView, type IssuesScope } from '@/views/IssuesView'
 import type { Archives } from '@/lib/archive'
 import { href } from '../router'
 import { type Say } from './act'
+import { useReopenHeld } from '@/auth/heldTyping'
+
+/** Where the Issues page's New issue dialog holds its fields through a passkey trip (AUT-4). */
+const NEW_ISSUE_HOLD = 'new-issue'
 
 /** One issue as the list draws it — status and assignee read off the fold, never recomputed. */
 export function rowFor(issue: FolderState['issues'][number], state: FolderState, directory: DirectoryView): IssueRowData {
@@ -44,6 +48,7 @@ export const hrefForIssue = (issue: { id: string; title?: string }) =>
 export function IssuesPage({ state, directory, archives, say, refresh }: { state: FolderState; directory: DirectoryView; archives: Archives; say: Say; refresh: () => Promise<void> }) {
   const [scope, setScope] = useState<IssuesScope>('all')
   const [adding, setAdding] = useState(false)
+  useReopenHeld(NEW_ISSUE_HOLD, () => setAdding(true))
   const live = useMemo(() => state.issues.filter((issue) => !archives.ofIssue(issue)), [state, archives])
   const rows = useMemo(() => live.map((issue) => rowFor(issue, state, directory)), [live, state, directory])
   const mine = useMemo(() => new Set(live.filter((issue) => issue.assignee === me).map((issue) => issue.addr)), [live])
@@ -58,6 +63,7 @@ export function IssuesPage({ state, directory, archives, say, refresh }: { state
       {adding && (
         <NewIssueDialog
           projects={projectOptions}
+          holdKey={NEW_ISSUE_HOLD}
           onClose={() => setAdding(false)}
           onCreate={async (draft) => {
             const project = state.projects.find((p) => p.addr === draft.projectAddr)

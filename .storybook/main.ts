@@ -16,7 +16,7 @@ const config: StorybookConfig = {
     the rule travels with the file if the component is ever promoted. The
     standalone pages under src/stories stay where they are.
   */
-  stories: ['../src/stories/**/*.mdx', '../src/components/**/*.mdx', '../src/**/*.stories.@(ts|tsx)'],
+  stories: ['../src/stories/**/*.mdx', '../src/components/**/*.mdx', '../src/auth/**/*.mdx', '../src/**/*.stories.@(ts|tsx)'],
   addons: ['@storybook/addon-docs'],
   viteFinal: (viteConfig) => {
     // Stories must be deterministic and must never touch production: the
