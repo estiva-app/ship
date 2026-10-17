@@ -49,4 +49,9 @@ describe('referenceLink', () => {
     expect(referenceLink(object({ kind: 30851, address: `30851:${AUTHOR}:${D}`, unreachable: true }))).toBeNull()
     expect(referenceLink(object({ kind: 30852 }))).toBeNull()
   })
+
+  it("leads nowhere when another app's manifest gave a link that is not https", () => {
+    expect(referenceLink(object({ kind: 9, openUrl: 'search-ms:query=nevent1msg' }))).toBeNull()
+    expect(referenceLink(object({ kind: 39000, openUrl: 'http://peek.estiva.app/o/naddr1topic' }))).toBeNull()
+  })
 })

@@ -2,6 +2,7 @@ import type { ForeignObject } from '@estiva-app/interop'
 import { KIND } from '../nostr/kinds'
 import { isOwnKind } from './ownKinds'
 import { href } from '@/router'
+import { safeLink } from './handoff'
 
 /**
  * Where a reference chip leads — RIC-16.
@@ -41,5 +42,7 @@ export function referenceLink(object: ForeignObject | null | undefined): Referen
           : href({ name: 'issue', d, slug }),
     }
   }
-  return object.openUrl ? { place: 'app', href: object.openUrl } : null
+  // Another app's manifest wrote it, so only an `https:` link is followed.
+  const link = safeLink(object.openUrl)
+  return link ? { place: 'app', href: link } : null
 }

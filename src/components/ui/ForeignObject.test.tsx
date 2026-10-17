@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import { ForeignObject } from './ForeignObject'
 import type { ForeignObject as Data } from '@/api/foreign'
 
@@ -18,7 +18,7 @@ const base = (over: Partial<Data> = {}): Data => ({
 })
 
 describe('ForeignObject', () => {
-  it('renders a message as a person and a body, not as a card', () => {
+  it('renders a message as a person and a body, not as a titled card', () => {
     render(
       <ForeignObject
         object={base({
@@ -51,10 +51,50 @@ describe('ForeignObject', () => {
         })}
       />,
     )
-    const message = document.querySelector('[data-widget="message"]')!
-    expect(message.textContent).toContain('Message')
-    expect(screen.getByRole('link').getAttribute('href')).toBe(openUrl)
-    expect(screen.getByRole('link').textContent).toContain('QA-2 checking in')
+    const link = screen.getByRole('link')
+    expect(within(link).getByText('Message')).toBeInTheDocument()
+    expect(link.getAttribute('href')).toBe(openUrl)
+    expect(link.textContent).toContain('QA-2 checking in')
+  })
+
+  it('labels a linked comment "Comment", by its type and not its app', () => {
+    render(
+      <ForeignObject
+        object={base({
+          kind: 1111,
+          widget: 'message',
+          noun: 'comment',
+          openUrl: 'https://peek.estiva.app/o/nevent1qqs',
+          slots: { title: { value: 'a'.repeat(64), isPubkey: true }, body: { value: 'looks right' } },
+          people: { ['a'.repeat(64)]: { displayName: 'QA-2' } },
+        })}
+      />,
+    )
+    expect(within(screen.getByRole('link')).getByText('Comment')).toBeInTheDocument()
+    expect(screen.queryByText('Peek')).not.toBeInTheDocument()
+  })
+
+  it.each([
+    ['no link', undefined],
+    ['a link that is not https', 'search-ms:query=nevent1qqs'],
+  ])('draws a linked message with %s as a message that leads nowhere', (_case, openUrl) => {
+    // The link is written by whichever app's manifest declares conversations,
+    // so only an `https:` one is followed (safeLink, as the handoff page does).
+    render(
+      <ForeignObject
+        object={base({
+          kind: 9,
+          widget: 'message',
+          noun: 'message',
+          openUrl,
+          slots: { title: { value: 'a'.repeat(64), isPubkey: true }, body: { value: 'QA-2 checking in' } },
+          people: { ['a'.repeat(64)]: { displayName: 'QA-2' } },
+        })}
+      />,
+    )
+    expect(screen.getByText('QA-2 checking in')).toBeInTheDocument()
+    expect(screen.getByText('Message')).toBeInTheDocument()
+    expect(screen.queryByRole('link')).not.toBeInTheDocument()
   })
 
   it('draws a body formatted and small, and markup in it stays text', () => {

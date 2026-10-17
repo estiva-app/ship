@@ -1,6 +1,7 @@
 import { IconLock } from '@tabler/icons-react'
 import { Avatar, Card, EmptyState, Link } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
+import { safeLink } from '@/lib/handoff'
 import { thisObject, typeLabelOf } from '@/lib/typeLabel'
 import { pickWidget, type ForeignObject, type ResolvedSlot } from '@/api/foreign'
 import type { RelatedState } from '@/api/useRelated'
@@ -48,16 +49,17 @@ const ROW = 'grid grid-cols-[minmax(0,1fr)_7rem_4rem] items-center gap-3 px-2 py
 
 function Row({ object, count }: { object: ForeignObject; count?: number }) {
   if (object.unreachable) {
+    const open = safeLink(object.openUrl)
     return (
       <Card fill="none" unreadable className={cn(ROW, 'grid-cols-1')} data-foreign-object={object.ref} data-state="unreachable">
         <span className="flex items-center gap-2 text-body-2 text-text-muted">
           <IconLock size={14} stroke={1.5} className="shrink-0" />
           <span className="truncate">
             You may not have access to {thisObject(object)}.
-            {object.openUrl && (
+            {open && (
               <>
                 {' '}
-                <Link href={object.openUrl} variant="underlined">
+                <Link href={open} variant="underlined">
                   Open it there
                 </Link>
                 .
@@ -76,7 +78,7 @@ function Row({ object, count }: { object: ForeignObject; count?: number }) {
     const author = slots.title
     const profile = author?.isPubkey ? object.people?.[author.value] : undefined
     return (
-      <Card href={object.openUrl || undefined} fill="none" hover="fill" quietUntilHover className="flex items-start gap-2 px-2 py-1.5" data-foreign-object={object.ref} data-widget="message">
+      <Card href={safeLink(object.openUrl)} fill="none" hover="fill" quietUntilHover className="flex items-start gap-2 px-2 py-1.5" data-foreign-object={object.ref} data-widget="message">
         <Avatar name={profile?.displayName} src={profile?.picture} size={16} className="mt-0.5 shrink-0" />
         <div className="min-w-0 flex-1">
           <span className={cn('text-body-2-strong', profile?.displayName ? 'text-text-primary' : 'text-text-muted')}>{profile?.displayName ?? '—'}</span>
@@ -93,7 +95,7 @@ function Row({ object, count }: { object: ForeignObject; count?: number }) {
 
   const second = slots.subtitle || meta.length > 0
   return (
-    <Card href={object.openUrl || undefined} fill="none" hover="fill" quietUntilHover className={ROW} data-foreign-object={object.ref} data-widget={widget === 'row' ? 'row' : 'card'}>
+    <Card href={safeLink(object.openUrl)} fill="none" hover="fill" quietUntilHover className={ROW} data-foreign-object={object.ref} data-widget={widget === 'row' ? 'row' : 'card'}>
       <span className="flex min-w-0 flex-col gap-0.5">
         <span className="flex min-w-0 items-baseline gap-2">
           <span className="truncate text-body-2 text-text-primary">{slots.title?.value ?? 'Untitled'}</span>
