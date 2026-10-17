@@ -19,7 +19,7 @@ import { Reference } from './Reference'
   sentence, a row alone on its line, the card its author chose under the
   message — Peek's `MessageLinks.tsx`, so one body draws the same in both apps
   (why:
-  https://github.com/estiva-app/estiva-docs/blob/main/decisions/where-a-link-sits-and-which-file-gets-the-card.md).
+  https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-link-on-words-counts-toward-the-card.md).
   Ship adds what only it knows: where its own files open, and how it writes a
   change.
 */

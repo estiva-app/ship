@@ -49,10 +49,10 @@ const TRAILING = /[.,;:!?)\]]+$/
 
 /**
  * The URLs that may name a card: each link's target and each bare URL, never a
- * URL written in a link's label. The package's tree has no link mark, so
- * `cardsIn` sees a label's text too, and `[https://ship…/issue/x](https://elsewhere)`
- * would put that issue's card under a link that goes elsewhere (OPT-17's
- * security review). Peek's `findUrls` answers the same.
+ * URL written in a link's label: `[https://ship…/issue/x](https://elsewhere)`
+ * must never put that issue's card under a link that goes elsewhere (OPT-17's
+ * security review). A link on words counts its target, as `cardsIn` does since
+ * protocol 0.40. Peek's `findUrls` answers the same.
  *
  * At most `MAX_LINKS_PER_MESSAGE`, the first ones in that order, as Peek asks:
  * each claimed link is a relay query, and a message with hundreds would spend
