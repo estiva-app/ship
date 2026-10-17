@@ -149,14 +149,11 @@ describe('a message that asks for a card', () => {
 describe('a link on words that asks for a card (OPT-17)', () => {
   const body = `the plan is [these words](${ISSUE_URL}) for now`
 
-  // protocol 0.39's `cardsIn`, as Peek reads it: a URL names a file only where it draws as that file's link, so words keep theirs.
-  it('draws no card for a link on words: the words stay a link, as in Peek', async () => {
+  // protocol 0.40's `cardsIn`, as Peek reads it: a link's target names its file for the one card, and the words keep theirs.
+  it('draws the card a link on words asks for, and the words stay a link, as in Peek', async () => {
     const c = show(thread(body, [{ value: ISSUE, layout: 'detailed' }]))
-    // The control: the same body's bare link would have drawn its card by now.
-    const control = show(thread(`the plan is ${ISSUE_URL} for now`, [{ value: ISSUE, layout: 'detailed' }]))
-    await waitFor(() => expect(cards(control)).toEqual([[bare(ISSUE_REF), 'detailed']]))
+    await waitFor(() => expect(cards(c)).toEqual([[bare(ISSUE_REF), 'detailed']]))
     expect(c.querySelector(`a[href="${ISSUE_URL}"]`)?.textContent).toBe('these words')
-    expect(cards(c)).toEqual([])
   })
 
   it('draws the card a bare app link asks for, resolved under the reference its value spells', async () => {
