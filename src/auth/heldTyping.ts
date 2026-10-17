@@ -42,8 +42,12 @@ function storage(): Storage | null {
   }
 }
 
+/** Set by an ending, so the places it unmounts keep what it held (see {@link useHeldTyping}). */
+let ending = false
+
 /** The sign-in ended: keep every open place's unsaved text on the device. */
 export function holdTyping(): void {
+  ending = true
   const store = storage()
   if (!store || !person) return
   for (const [key, read] of readers) {
@@ -120,9 +124,11 @@ export function useReopenHeld(key: string | undefined, open: () => void): void {
  * While this place is open, let an ending read its unsaved text. `read` is the
  * latest one given; `undefined` for `key` registers nothing.
  *
- * What was held stays held until the place is done with it — saved, created or
- * cancelled, when it calls {@link releaseHeld} — so a tab closed right after the
- * tap still brings the text back next time.
+ * What was held stays held until the place is done with it: saved, created or
+ * cancelled (it calls {@link releaseHeld}), or left by any other way than an
+ * ending, so a dialog walked away from does not open by itself on the next
+ * visit. A tab closed right after the tap unmounts nothing, and brings the text
+ * back next time.
  */
 export function useHeldTyping(key: string | undefined, read: () => string | undefined): void {
   const latest = useRef(read)
@@ -130,6 +136,9 @@ export function useHeldTyping(key: string | undefined, read: () => string | unde
   useEffect(() => {
     if (!key) return
     readers.set(key, () => latest.current())
-    return () => void readers.delete(key)
+    return () => {
+      readers.delete(key)
+      if (!ending) releaseHeld(key)
+    }
   }, [key])
 }

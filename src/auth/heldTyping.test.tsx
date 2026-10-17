@@ -180,6 +180,35 @@ it('keeps a New issue dialog open through the passkey trip, with what was typed 
   page.stop()
 })
 
+it('does not open the New issue dialog by itself again once it was walked away from after the tap', async () => {
+  signIn()
+  let page = await load()
+  const issues = (p: typeof page) => (
+    <p.SessionGate>
+      <IssuesHarness p={p} />
+    </p.SessionGate>
+  )
+  render(issues(page))
+  fireEvent.click(screen.getByRole('button', { name: 'New issue' }))
+  fireEvent.change(screen.getByRole('textbox', { name: /Title/ }), { target: { value: 'Half a thought' } })
+  await signInEnds(page.id)
+
+  page.stop()
+  cleanup()
+  signIn()
+  page = await load()
+  render(issues(page))
+  expect(await screen.findByRole('textbox', { name: /Title/ })).toBeTruthy()
+  // Off to another page by the sidebar: the dialog goes with the page, not by Cancel.
+  page.stop()
+  cleanup()
+
+  page = await load()
+  render(issues(page))
+  expect(screen.queryByRole('textbox', { name: /Title/ })).toBeNull()
+  page.stop()
+})
+
 it('keeps nothing on the device when another tab signs out: that is a sign-out, not an ending', async () => {
   signIn()
   let page = await load()
