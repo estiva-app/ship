@@ -5,8 +5,8 @@ import { statusLabel, type StatusEntry } from '@/lib/issues'
 import { Person } from '@/components/ui/Person'
 import { ScrollArea } from '@/components/ui/ScrollArea'
 import { StatusLabel } from '@/components/ui/StatusLabel'
+import { WithTooltip } from '@/components/ui/Tooltip'
 import type { IssueRowData } from './IssueRow'
-import { SummaryLine } from './SummaryLine'
 import { linkTo } from '@/router'
 
 /**
@@ -90,15 +90,22 @@ export function IssuesTable({ issues, statuses, hrefFor, className }: IssuesTabl
                   the project page assigns one. Nothing to click: it is the
                   app's bookkeeping, not a chore for whoever opened the page. */}
               <td className={cn(TD, 'whitespace-nowrap font-mono', SMALL, issue.ref ? 'text-text-muted' : 'text-text-disabled')}>{issue.ref ?? '—'}</td>
-              {/* The summary sits in the Title cell, under the title, one line — not a column of its own (the
-                  short-summary prototype's ShipTable). With one, the row grows by that line; without, it is 40px. */}
-              <td className={cn(TD, issue.summary && 'py-1.5')}>
+              {/* The summary is the title link's tooltip, not a line under it: as a line it was always cut (Miky, SUM-9,
+                  17 Oct). The link covers the row, so hovering anywhere shows it. */}
+              <td className={TD}>
                 <div className="text-text-primary">
-                  <Link {...linkTo(hrefFor(issue))} variant="quiet" truncate cover className="block">
-                    {issue.title}
-                  </Link>
+                  {issue.summary ? (
+                    <WithTooltip label={issue.summary} wrapperClassName="block min-w-0">
+                      <Link {...linkTo(hrefFor(issue))} variant="quiet" truncate cover className="block">
+                        {issue.title}
+                      </Link>
+                    </WithTooltip>
+                  ) : (
+                    <Link {...linkTo(hrefFor(issue))} variant="quiet" truncate cover className="block">
+                      {issue.title}
+                    </Link>
+                  )}
                 </div>
-                <SummaryLine summary={issue.summary} lines={1} className="text-caption" />
               </td>
               <td className={TD}>
                 <StatusLabel value={issue.status} label={statusLabel(issue.status, statuses)} />

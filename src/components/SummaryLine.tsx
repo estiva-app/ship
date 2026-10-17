@@ -1,7 +1,8 @@
 import { cn } from '@/lib/cn'
 
 /**
- * A file's summary as a row, a board card, the table and a project card draw it: its own muted line under the title, cut at `lines`.
+ * A file's summary as a board card and a project card draw it: its own muted line under the title, cut at `lines`.
+ * The issue row and the table drew it too, as one line, and now carry it as the title's hover (Miky, SUM-9, 17 Oct).
  *
  * The rules are the short-summary prototype's (estiva-ui `concept/short-summary`,
  * approved by Miky 15 Oct; record a-files-summary-is-its-own-field):

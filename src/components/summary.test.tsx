@@ -1,11 +1,13 @@
 /**
- * A file's summary in Ship's lists (SUM-4, part 2): the issue list's row, the
- * board's card, the table's Title cell and the project card each draw it as
- * its own line under the title, and with none draw the title alone. The
- * project card's summary replaces the description it used to cut short.
- * As the short-summary prototype draws them (Miky, 15 Oct).
+ * A file's summary in Ship's lists (SUM-4, part 2): the board's card and the
+ * project card draw it as its own line under the title, and with none draw
+ * the title alone. The project card's summary replaces the description it
+ * used to cut short. As the short-summary prototype draws them (Miky, 15 Oct).
+ * The issue list's row and the table's Title cell draw the title alone and
+ * show the summary on hover (Miky, SUM-9, 17 Oct).
  */
-import { render, screen, within } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import type { DirectoryView, FolderState } from '@/api'
 import type { Archives } from '@/lib/archive'
@@ -29,19 +31,36 @@ function expectAfterTitle(title: string, summary: string) {
   expect(t!.compareDocumentPosition(s!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
 }
 
+/** Hovers `link` and returns the tooltip's text once it opens, or null when none does. */
+async function hoverTooltip(link: HTMLElement): Promise<string | null> {
+  // `shouldAdvanceTime`: user-event's act wrapper waits on a setTimeout(0), which a clock that never moves never fires.
+  vi.useFakeTimers({ shouldAdvanceTime: true })
+  try {
+    await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).hover(link)
+    // Past the tooltip's 300ms wait (D23).
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(400)
+    })
+    return screen.queryByRole('tooltip')?.textContent ?? null
+  } finally {
+    vi.useRealTimers()
+  }
+}
+
 describe('the issue list row', () => {
-  it('draws the summary under the title, inside the link that opens the issue; without one, the title alone', () => {
+  it('draws the title alone, and hovering the link that opens the issue shows the summary; without one, no tooltip', async () => {
     const { unmount } = render(<IssueRow issue={ISSUE} statuses={STATUSES} href="#/issue/1" />)
-    expect(within(screen.getByRole('link')).queryByText(SUMMARY)).not.toBeNull()
-    expectAfterTitle('Invoice totals', SUMMARY)
+    expect(screen.getByRole('link').textContent).toBe('BIL-1Invoice totals')
+    expect(await hoverTooltip(screen.getByRole('link'))).toBe(SUMMARY)
     unmount()
     render(<IssueRow issue={BARE} statuses={STATUSES} href="#/issue/2" />)
     expect(screen.getByRole('link').textContent).toBe('BIL-2No summary here')
+    expect(await hoverTooltip(screen.getByRole('link'))).toBeNull()
   })
 
-  it('draws a summary as typed: no markup read and no link made of it', () => {
+  it('shows a summary in the tooltip as typed: no markup read and no link made of it', async () => {
     render(<IssueRow issue={{ ...ISSUE, summary: '**Bold** and https://example.com' }} statuses={STATUSES} href="#/issue/1" />)
-    expect(screen.queryByText('**Bold** and https://example.com')).not.toBeNull()
+    expect(await hoverTooltip(screen.getByRole('link'))).toBe('**Bold** and https://example.com')
     expect(screen.getAllByRole('link')).toHaveLength(1)
   })
 })
@@ -58,13 +77,17 @@ describe('the board card', () => {
 })
 
 describe('the issues table', () => {
-  it('puts the summary in the Title cell, under the title, not in a column of its own', () => {
-    render(<IssuesTable issues={[{ ...ISSUE, openedBy: {} }, { ...BARE, openedBy: {} }]} statuses={STATUSES} hrefFor={(issue) => `#/issue/${issue.id}`} />)
+  it('draws the title alone in the Title cell, hovering it shows the summary, and there is no column for it', async () => {
+    const { unmount } = render(<IssuesTable issues={[{ ...ISSUE, openedBy: {} }, { ...BARE, openedBy: {} }]} statuses={STATUSES} hrefFor={(issue) => `#/issue/${issue.id}`} />)
     expect(screen.getAllByRole('columnheader').map((th) => th.textContent)).toEqual(['Ref', 'Title', 'Status', 'Assignee', 'Opened by', 'Updated'])
-    const titleCell = screen.getByRole('link', { name: 'Invoice totals' }).closest('td')
-    expect(titleCell?.textContent).toBe(`Invoice totals${SUMMARY}`)
-    expectAfterTitle('Invoice totals', SUMMARY)
-    expect(screen.getByRole('link', { name: 'No summary here' }).closest('td')?.textContent).toBe('No summary here')
+    const link = screen.getByRole('link', { name: 'Invoice totals' })
+    expect(link.closest('td')?.textContent).toBe('Invoice totals')
+    expect(await hoverTooltip(link)).toBe(SUMMARY)
+    unmount()
+    render(<IssuesTable issues={[{ ...BARE, openedBy: {} }]} statuses={STATUSES} hrefFor={(issue) => `#/issue/${issue.id}`} />)
+    const bare = screen.getByRole('link', { name: 'No summary here' })
+    expect(bare.closest('td')?.textContent).toBe('No summary here')
+    expect(await hoverTooltip(bare)).toBeNull()
   })
 })
 
