@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite'
 import { ISSUES, ISSUE_STATUSES, hrefFor } from '@/fixtures/issues'
 import { IssuesTable } from './IssuesTable'
 
-/** The project page's table view, as production: ref · Title (with the summary under it, one line) · Status · Assignee · Opened by · Updated. Scrolls inside itself. */
+/** The project page's table view, as production: ref · Title (its summary on hover) · Status · Assignee · Opened by · Updated. Scrolls inside itself. */
 const meta = {
   title: 'Issues/IssuesTable',
   component: IssuesTable,
