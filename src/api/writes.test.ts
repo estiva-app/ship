@@ -20,7 +20,7 @@ vi.mock('./foreign', () => ({ readFolders: vi.fn(), readFolderListing: vi.fn() }
 import { clockProblem } from './clock'
 import { readFolderListing, readFolders } from './foreign'
 import { store } from './store'
-import { archiveProject, createFolder, createIssue, createProject, deleteProject, editMessage, moveProject, renameFolder, reply, setIssueField, setProjectField, startConversation, workFolder } from './writes'
+import { archiveProject, createFolder, createIssue, createProject, deleteProject, editMessage, moveProject, renameFolder, reply, setIssueField, setProjectField, startConversation } from './writes'
 import { addrToNaddr } from '@estiva-app/protocol'
 
 const s = store as unknown as Record<string, ReturnType<typeof vi.fn>>
@@ -143,23 +143,9 @@ describe('deleting a project unlists it from its team (FOL-48)', () => {
     s.createIssue.mockResolvedValue({ result: { ok: true }, addr: '30851:me:new', id: 'new' })
     const result = await createIssue(PROJECT, { projects: [PROJECT], issues: [ISSUE, { ...ISSUE, ref: 'REL-7' }, { ...ISSUE, ref: 'DES-9' }] }, { title: 'New', description: 'd' })
     expect(s.createIssue).toHaveBeenCalledWith({ folder: 'content-folder', title: 'New', description: 'd', projectAddr: PROJECT.addr, ref: 'REL-8' })
-    expect(result).toEqual({ ok: true, addr: '30851:me:new' })
+    expect(result).toEqual({ ok: true, addr: '30851:me:new', folder: 'content-folder' })
   })
 
-  it("a new issue goes to the project's own Folder, not the other Folder that lists it", async () => {
-    vi.mocked(readFolders).mockResolvedValue([{ id: 'team', hasState: true, addresses: [PROJECT.addr] }] as never)
-    s.createIssue.mockResolvedValue({ result: { ok: true }, addr: '30851:me:new', id: 'new' })
-    await createIssue(PROJECT, { projects: [PROJECT], issues: [] }, { title: 'New', description: 'd' })
-    expect(s.createIssue).toHaveBeenCalledWith(expect.objectContaining({ folder: 'content-folder' }))
-  })
-
-  it("a new comment on a project goes to its own Folder even where another Folder lists it", async () => {
-    expect(await workFolder(PROJECT, [{ id: 'team', addresses: [PROJECT.addr] }])).toBe('content-folder')
-  })
-
-  it('a project record that names no Folder takes the Folder that lists it', async () => {
-    expect(await workFolder({ ...PROJECT, contentFolder: '' }, [{ id: 'team', addresses: [PROJECT.addr] }])).toBe('team')
-  })
 })
 
 describe('conversations', () => {

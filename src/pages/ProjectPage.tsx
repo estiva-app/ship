@@ -600,10 +600,16 @@ export function ProjectPage({
         onThreadShown={onThreadShown}
         // A project conversation is already in the topic it belongs to, so a
         // reference would be noise (withReference: false), as the old app has it.
-        onStartConversation={(body, files, picks, blockId) => {
-          // Re-read the Folder the thread went into: the project's own (workFolder).
-          let into = project.contentFolder
-          return act('Message', async () => startConversation({ folder: (into = await workFolder(project, teams)), about: project.addr, withReference: false, body, blockId, files, urgent: picks?.urgent }), say, () => refresh([into]))
+        onStartConversation={async (body, files, picks, blockId) => {
+          // The project's own Folder (workFolder), written into and then re-read.
+          let folder: string
+          try {
+            folder = await workFolder(project, teams)
+          } catch (error) {
+            say(`Message rejected — ${error instanceof Error ? error.message : String(error)}`, 'error')
+            return false
+          }
+          return act('Message', () => startConversation({ folder, about: project.addr, withReference: false, body, blockId, files, urgent: picks?.urgent }), say, () => refresh([folder]))
         }}
         onCopyBlockLink={(link) => void copyText(link, 'Link copied', 'Copy this link:', say)}
         onReply={(threadId, body, files, picks) => {
@@ -722,7 +728,7 @@ export function ProjectPage({
               say(`Issue rejected — ${result.reason}`, 'error')
               return false
             }
-            await refresh([project.contentFolder])
+            await refresh([result.folder ?? project.contentFolder])
             say('Issue created')
             return true
           }}
