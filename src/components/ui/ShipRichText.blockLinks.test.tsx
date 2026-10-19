@@ -9,11 +9,12 @@ import { addrToNaddr } from '@estiva-app/protocol'
 import { ShipRichText } from './ShipRichText'
 
 const D = 'b4ea696a-d4a2-4833-8f2a-6aa1e2f3c4d5'
-const ADDRESS = `30851:${'f'.repeat(64)}:${D}`
-const FILE_LINK = `https://ship.estiva.app/issue/plan-the-launch-${D}`
-const OLD_LINK = `https://ship.estiva.app/#/issue/${D}`
+// Another app's page, so its chip opens in that app (Ship's own issue opens as a route, on Ship's origin).
+const ADDRESS = `30842:${'f'.repeat(64)}:${D}`
+const FILE_LINK = `https://leaf.estiva.app/page/plan-the-launch-${D}`
+const OLD_LINK = `https://leaf.estiva.app/#/page/${D}`
 const REFERENCE =`nostr:${addrToNaddr(ADDRESS, [])}`
-const object = { ref: ADDRESS, address: ADDRESS, kind: 30851, appName: 'Ship', noun: 'issue', openUrl: `https://ship.estiva.app/o/${ADDRESS}`, slots: { title: { value: 'Plan the launch' } } } as never
+const object = { ref: ADDRESS, address: ADDRESS, kind: 30842, appName: 'Leaf', noun: 'page', openUrl: `https://leaf.estiva.app/o/${ADDRESS}`, slots: { title: { value: 'Plan the launch' } } } as never
 
 const chipOf = (value: string) => {
   const { container } = render(<ShipRichText value={value} format="marker" resolved={{ [REFERENCE]: object }} resolveLink={(url) => (url.startsWith(FILE_LINK) || url === OLD_LINK ? ADDRESS : undefined)} />)

@@ -3,6 +3,7 @@ import { linksAsReferences, referencesIn, resolveBlockAnchor, toRenderTree, type
 import { BlockHandle } from '@estiva-app/ui'
 import { Banner } from '@/components/Banner'
 import { useLinkValues } from '@/api/linkCards'
+import { referenceOfValue } from '@/components/conversations/shared'
 import { blockRows, linkedBlock } from './blockRows'
 import { ReadingSummary } from './ReadingSummary'
 import { blockLineCards, linksInBlocks } from './DescriptionCards'
@@ -130,10 +131,18 @@ export function LiveHeader(props: LiveHeaderProps) {
   const references = referencesIn(linked.size ? linksAsReferences(blocks, resolveLink) : blocks)
   const objects = useForeignObjects(references)
   const resolved = byReference(references, objects)
+  // Drawn as a chip only once its file has come back and can be read: until then, and for good when it cannot, the
+  // URL as written (OPT-18, as a message reads; WBM-11), never a chip with nothing in it.
+  const readable: LinkResolver = (url) => {
+    const value = linked.get(url)
+    const reference = value ? referenceOfValue(value) : undefined
+    const object = reference ? resolved[reference] : undefined
+    return object && !object.unreachable ? value : undefined
+  }
 
   const [missing, dismiss] = useLinkedBlock(description, format, readOnly)
 
-  const reading = <ReadingHeader {...props} resolved={resolved} resolveLink={resolveLink} />
+  const reading = <ReadingHeader {...props} resolved={resolved} resolveLink={readable} />
   return (
     <div className="flex flex-col gap-4">
       {missing && (

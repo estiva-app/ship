@@ -126,7 +126,7 @@ export function Reference({
   // An object: whatever its owner's projection says it is.
   if (object) {
     const label = objectLabel(object, nameOf) ?? short
-    const link = blockLinkOf(opensAt) ?? referenceLink(object)
+    const link = blockLinkOf(opensAt, referenceLink(object)?.href) ?? referenceLink(object)
     const chip = {
       tone: 'neutral' as const,
       // What it is, before its name: a topic, a project, an issue, a file or a message (Katerina, 8 October), as in Peek.
