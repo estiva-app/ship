@@ -8,7 +8,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ForeignObject } from '@estiva-app/interop'
 import { href } from '@/router'
-import { referenceLink } from './referenceLink'
+import { blockLinkOf, referenceLink } from './referenceLink'
 
 const AUTHOR = 'ab'.repeat(32)
 const D = '0212db6d-bcbf-40d0-890e-f4f056db2f5d'
@@ -53,5 +53,24 @@ describe('referenceLink', () => {
   it("leads nowhere when another app's manifest gave a link that is not https", () => {
     expect(referenceLink(object({ kind: 9, openUrl: 'search-ms:query=nevent1msg' }))).toBeNull()
     expect(referenceLink(object({ kind: 39000, openUrl: 'http://peek.estiva.app/o/naddr1topic' }))).toBeNull()
+  })
+})
+
+describe('blockLinkOf', () => {
+  const SHIP = 'https://ship.estiva.app'
+  const LEAF_PAGE = 'https://leaf.estiva.app/p/x'
+
+  it('a block link on the origin its file opens on leads to that block', () => {
+    expect(blockLinkOf('https://leaf.estiva.app/p/x#block-1', LEAF_PAGE, SHIP)).toEqual({ place: 'app', href: 'https://leaf.estiva.app/p/x#block-1' })
+  })
+
+  /*
+    WBM-11's security review: a chip draws one file and must never open another
+    site. A host that merely ends in the file's host is another site, so a
+    block chip would open a lookalike; the origin is compared exactly.
+  */
+  it('a block link on a lookalike host that ends in the file’s host leads nowhere, https or http', () => {
+    expect(blockLinkOf('https://evil-leaf.estiva.app/p/x#block-1', LEAF_PAGE, SHIP)).toBeUndefined()
+    expect(blockLinkOf('http://evil-leaf.estiva.app/p/x#block-1', LEAF_PAGE, SHIP)).toBeUndefined()
   })
 })
