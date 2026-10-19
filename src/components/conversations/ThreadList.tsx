@@ -119,6 +119,15 @@ function Message({ message, resolved, here, nameOf, reactions, onToggleReaction,
   const editHold = `edit:${message.id}`
   useReopenHeld(onEdit && editHold, () => setEditing(true))
   const [confirming, setConfirming] = useState(false)
+  // One ✕ at a time: the next one reads the set this one leaves, once the page has read it back.
+  const [removing, setRemoving] = useState(false)
+  const removeCard =
+    onEdit && !disabledReason && !removing
+      ? (value: string) => {
+          setRemoving(true)
+          void Promise.resolve(onEdit(message.body, value)).finally(() => setRemoving(false))
+        }
+      : undefined
   const react = onToggleReaction && ((emoji: string) => onToggleReaction(emoji, reactions?.find((r) => r.emoji === emoji)?.mine))
 
   return (
@@ -170,7 +179,7 @@ function Message({ message, resolved, here, nameOf, reactions, onToggleReaction,
             nameOf={nameOf}
             here={here}
             between={<FileAttachments files={message.files} />}
-            onRemoveCard={onEdit && ((value) => void onEdit(message.body, value))}
+            onRemoveCard={removeCard}
           />
           {/* Row one: the pills, then the add-reaction button (her note 4, Linear's order). Signed out, no button. */}
           {(react || !!reactions?.length) && (
