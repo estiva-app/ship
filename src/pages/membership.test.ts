@@ -58,7 +58,11 @@ describe('adding people from the Members dialog', () => {
     expect(await onAdd([KATERINA, MIKY])).toBe(true)
     expect(changesFor(KATERINA)).toHaveLength(1)
     expect(changesFor(MIKY)).toHaveLength(1)
-    expect(published.every((event) => event.tags.some((t) => t[0] === 'h' && t[1] === FOLDER))).toBe(true)
+    // Each change adds (not removes) that person, on the issue, in its Folder.
+    for (const [person, event] of [[KATERINA, changesFor(KATERINA)[0]], [MIKY, changesFor(MIKY)[0]]] as const) {
+      expect(event.tags).toEqual(expect.arrayContaining([['a', ISSUE_ADDR], ['value', 'true'], ['h', FOLDER], ['p', person]]))
+      expect(event.content).toBe('Add')
+    }
     expect(after).toHaveBeenCalledOnce()
   })
 
