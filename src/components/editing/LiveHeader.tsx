@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { linksAsReferences, referencesIn, resolveBlockAnchor, toRenderTree, type ContentFormat, type Imeta, type LinkResolver } from '@estiva-app/protocol'
 import { BlockHandle } from '@estiva-app/ui'
 import { Banner } from '@/components/Banner'
@@ -51,8 +51,25 @@ export interface LiveHeaderProps {
 /** What a person does that means they have taken the page over from a block link's scroll. */
 const PERSON = ['wheel', 'touchmove', 'keydown', 'pointerdown'] as const
 
+/** The page's path and fragment: a new one is a new arrival, a block link's included. */
+const currentArrival = () => `${window.location.pathname}${window.location.hash}`
+function subscribeArrival(changed: () => void): () => void {
+  window.addEventListener('popstate', changed)
+  window.addEventListener('hashchange', changed)
+  return () => {
+    window.removeEventListener('popstate', changed)
+    window.removeEventListener('hashchange', changed)
+  }
+}
+
 function useLinkedBlock(description: string, format: ContentFormat, readOnly: boolean): [missing: 'detached' | 'unaddressable' | null, dismiss: () => void] {
   const [missing, setMissing] = useState<'detached' | 'unaddressable' | null>(null)
+  /*
+    Where the page was arrived at: the URL, which a block link followed inside
+    Ship changes without remounting the page (the router's `navigateTo`), so
+    that is an arrival too (WBM-11).
+  */
+  const arrival = useSyncExternalStore(subscribeArrival, currentArrival)
   // Read at each tick, not at mount: whether this person may write can settle after the header has drawn.
   const writer = useRef(!readOnly)
   useEffect(() => {
@@ -87,8 +104,8 @@ function useLinkedBlock(description: string, format: ContentFormat, readOnly: bo
     }, 100)
     for (const type of PERSON) window.addEventListener(type, stop, { capture: true, passive: true })
     return stop
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- the description the link was opened on; a later edit is not a new arrival
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the description the link was opened on; a later edit is not a new arrival, a link followed here is
+  }, [arrival])
   return [missing, () => setMissing(null)]
 }
 

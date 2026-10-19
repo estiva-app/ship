@@ -11,11 +11,12 @@ import { ShipRichText } from './ShipRichText'
 const D = 'b4ea696a-d4a2-4833-8f2a-6aa1e2f3c4d5'
 const ADDRESS = `30851:${'f'.repeat(64)}:${D}`
 const FILE_LINK = `https://ship.estiva.app/issue/plan-the-launch-${D}`
-const REFERENCE = `nostr:${addrToNaddr(ADDRESS, [])}`
+const OLD_LINK = `https://ship.estiva.app/#/issue/${D}`
+const REFERENCE =`nostr:${addrToNaddr(ADDRESS, [])}`
 const object = { ref: ADDRESS, address: ADDRESS, kind: 30851, appName: 'Ship', noun: 'issue', openUrl: `https://ship.estiva.app/o/${ADDRESS}`, slots: { title: { value: 'Plan the launch' } } } as never
 
 const chipOf = (value: string) => {
-  const { container } = render(<ShipRichText value={value} format="marker" resolved={{ [REFERENCE]: object }} resolveLink={(url) => (url.startsWith(FILE_LINK) ? ADDRESS : undefined)} />)
+  const { container } = render(<ShipRichText value={value} format="marker" resolved={{ [REFERENCE]: object }} resolveLink={(url) => (url.startsWith(FILE_LINK) || url === OLD_LINK ? ADDRESS : undefined)} />)
   return container.querySelector('[data-reference="object"]')
 }
 const hrefOf = (chip: Element | null) => chip?.closest('a')?.getAttribute('href') ?? chip?.getAttribute('href')
@@ -30,5 +31,9 @@ describe('a link to one block in a description', () => {
   it('a link to the whole file opens where the file opens, as before', () => {
     const chip = chipOf(`see ${FILE_LINK} here`)
     expect(hrefOf(chip)).not.toContain('#block-')
+  })
+
+  it('an old `#/issue/…` link is no block: it opens where the file opens', () => {
+    expect(hrefOf(chipOf(`see ${OLD_LINK} here`))).not.toContain('#/')
   })
 })
