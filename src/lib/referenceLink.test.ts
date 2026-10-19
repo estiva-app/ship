@@ -73,4 +73,15 @@ describe('blockLinkOf', () => {
     expect(blockLinkOf('https://evil-leaf.estiva.app/p/x#block-1', LEAF_PAGE, SHIP)).toBeUndefined()
     expect(blockLinkOf('http://evil-leaf.estiva.app/p/x#block-1', LEAF_PAGE, SHIP)).toBeUndefined()
   })
+
+  it('a block link on a host that starts with the file’s host, hides it before an @, adds a port or a subdomain leads nowhere', () => {
+    for (const url of [
+      'https://leaf.estiva.app.evil.com/p/x#block-1',
+      'https://leaf.estiva.app@evil.com/p/x#block-1',
+      'https://leaf.estiva.app:8443/p/x#block-1',
+      'https://x.leaf.estiva.app/p/x#block-1',
+    ]) {
+      expect(blockLinkOf(url, LEAF_PAGE, SHIP), url).toBeUndefined()
+    }
+  })
 })
