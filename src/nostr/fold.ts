@@ -477,9 +477,7 @@ function parseNip22Comment(
       ]),
     ],
     ...(tag(event, 'A') ? { anchor: tag(event, 'A') } : {}),
-    // A reply copies its comment's `block` (SPEC §13.6): the thread's place, which its comment already shows, so a reply draws none of its own.
-    // why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-reply-on-a-page-keeps-its-threads-place.md
-    ...(!parentEvent && blockAnchorOf(event) ? { blockId: blockAnchorOf(event) } : {}),
+    ...(blockAnchorOf(event) ? { blockId: blockAnchorOf(event) } : {}),
   }
 }
 
@@ -499,7 +497,11 @@ function foldConversations(messages: Message[]): Conversation[] {
     // thread with no visible root is still worth showing, so the earliest
     // message stands in rather than the whole conversation disappearing.
     const root = group.find((message) => message.id === id) ?? group[0]
-    const replies = group.filter((message) => message !== root)
+    // A reply copies its comment's `block` (SPEC §13.6): the thread's place,
+    // which the root already shows, so a reply draws none of its own. A reply
+    // standing in for a deleted comment keeps it, and with it the thread's place.
+    // why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-reply-on-a-page-keeps-its-threads-place.md
+    const replies = group.filter((message) => message !== root).map(({ blockId: _, ...reply }) => reply)
     conversations.push({
       id,
       root,
