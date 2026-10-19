@@ -124,11 +124,14 @@ export function MessageCard({
   uri,
   object: given,
   compact = false,
+  onRemove,
 }: {
   uri: string
   object: ForeignObject | null | undefined
   /** An old message's `compact` card: the file's row under the message, as it drew before the kit. */
   compact?: boolean
+  /** ✕ on the card, offered to its message's author (Decided 19 Oct, WBM-7): the message then asks for no card. */
+  onRemove?: () => void
 }) {
   // A re-read after a change, until the conversation's next answer replaces it.
   const [after, setAfter] = useState<{ given: ForeignObject | null | undefined; object: ForeignObject | null }>()
@@ -167,13 +170,13 @@ export function MessageCard({
   )
 
   const ready = object && !object.unreachable ? object : undefined
-  if (ready && !compact && isReadableFolder(ready)) return <FolderCard uri={uri} folder={ready} error={error} />
-  return <CardBox uri={uri} object={object} failed={failed} compact={compact} onAct={onAct} error={error} />
+  if (ready && !compact && isReadableFolder(ready)) return <FolderCard uri={uri} folder={ready} error={error} onRemove={onRemove} />
+  return <CardBox uri={uri} object={object} failed={failed} compact={compact} onAct={onAct} error={error} onRemove={onRemove} />
 }
 
 /** A linked Folder's card, with its files read for it alone (Miky, 16 Oct, ship#310). */
-function FolderCard({ uri, folder, error }: { uri: string; folder: ForeignObject; error?: string }) {
-  return <CardBox uri={uri} object={useFolderFiles(uri, folder)} failed={false} compact={false} error={error} />
+function FolderCard({ uri, folder, error, onRemove }: { uri: string; folder: ForeignObject; error?: string; onRemove?: () => void }) {
+  return <CardBox uri={uri} object={useFolderFiles(uri, folder)} failed={false} compact={false} error={error} onRemove={onRemove} />
 }
 
 function CardBox({
@@ -183,6 +186,7 @@ function CardBox({
   compact,
   onAct,
   error,
+  onRemove,
 }: {
   uri: string
   object: ForeignObject | null | undefined
@@ -190,6 +194,7 @@ function CardBox({
   compact: boolean
   onAct?: (actionId: string, value: string) => void
   error?: string
+  onRemove?: () => void
 }) {
   const naddr = uri.replace(/^nostr:/i, '')
   const directory = useWorkspacePeople()
@@ -249,7 +254,7 @@ function CardBox({
   return (
     <LinkClicks block>
       <div ref={box} data-card={compact ? 'compact' : 'detailed'} data-card-value={naddr} style={loadingShape?.height ? { minHeight: loadingShape.height } : undefined}>
-        {compact ? <LinkRow link={link} /> : <CardUnder link={link} />}
+        {compact ? <LinkRow link={link} /> : <CardUnder link={link} onRemove={onRemove} revealOnHover />}
         {error && (
           <FieldLine tone="error" className="mt-1">
             {error}

@@ -11,9 +11,11 @@
 import {
   addr,
   buildMessage,
+  embedTagsOf,
   imetaTag,
   threadTags,
   toNostrSeconds,
+  type Embed,
   type Imeta,
   type NostrTag,
   type ThreadRef,
@@ -405,9 +407,12 @@ export function buildConversationMessage(
      * called (`linkReferenceTagsFor`), for the reason `partTags` is.
      */
     linkTags?: readonly NostrTag[]
+    /** The card the message asks for under it, one `embed` per file (SPEC §13.6.2) — `embedsToSend`. */
+    embeds?: readonly Embed[]
   },
 ): UnsignedEvent {
   assertFolderId(args.folder)
+  const embeds = embedTagsOf(args.embeds ?? [])
 
   /*
     The tags the body earns (CON-25), the ones Peek appends: a `p` per person it
@@ -438,7 +443,7 @@ export function buildConversationMessage(
       body: args.body,
       comment: args.replyToComment,
       files: args.files,
-      tags: [...mentionTagsFor(args.body), ...earned({ address: args.replyToComment.anchor, event: args.replyToComment.id })],
+      tags: [...mentionTagsFor(args.body), ...earned({ address: args.replyToComment.anchor, event: args.replyToComment.id }), ...embeds],
     })
   }
   if (args.about && !args.replyTo) {
@@ -448,7 +453,7 @@ export function buildConversationMessage(
       about: args.about,
       blockId: args.blockId,
       files: args.files,
-      tags: [...mentionTagsFor(args.body), ...earned({ address: args.about })],
+      tags: [...mentionTagsFor(args.body), ...earned({ address: args.about }), ...embeds],
     })
   }
 
@@ -460,7 +465,7 @@ export function buildConversationMessage(
   const tags: NostrTag[] = [...event.tags]
   if (args.replyTo) tags.push(...threadTags(args.replyTo))
   if (args.about) tags.push(['a', args.about])
-  tags.push(...earned({ address: args.about, event: args.replyTo?.parentId }))
+  tags.push(...earned({ address: args.about, event: args.replyTo?.parentId }), ...embeds)
   // Same `ts` as a change event, for the same reason and found the same way:
   // `created_at` is seconds, two messages posted in one second sorted by event
   // id, and the thread read back in the wrong order. A conversation is the one

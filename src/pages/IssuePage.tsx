@@ -17,7 +17,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { IssueView } from '@/views/IssueView'
 import { go, href, type IssueTab } from '../router'
 import { act, actInField, type Say } from './act'
-import { activityFor, copyText, folderOfMessage, railPeople, threadFor } from './ProjectPage'
+import { activityFor, cardEditOf, copyText, folderOfMessage, railPeople, threadFor } from './ProjectPage'
 import { useReferencePage } from '@/api/references'
 
 /**
@@ -311,13 +311,13 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
           author or the NIP-OA owner of an authoring agent, and no client can
           evaluate the second half — same reasoning as the deletion above.
         */
-        onEditMessage={(messageId, body) => {
+        onEditMessage={(messageId, body, removeCard) => {
           const folder = folderOfMessage(state, messageId)
           if (!folder) {
             say('That message has no Folder to publish an edit into.', 'error')
             return false
           }
-          return act('Edit', () => editMessage(folder, messageId, body), say, () => refresh([folder]))
+          return act(removeCard ? 'Remove card' : 'Edit', () => editMessage(folder, messageId, body, cardEditOf(state, messageId, removeCard)), say, () => refresh([folder]))
         }}
         onReplyInActivity={(threadId, body, files, picks) => {
           const conversation = state.conversations.find((c) => c.id === threadId)

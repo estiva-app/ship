@@ -79,6 +79,7 @@ export {
   setProjectField,
   startConversation,
   workFolder,
+  type CardEdit,
   type CreateResult,
   type WriteResult,
 } from './writes'
