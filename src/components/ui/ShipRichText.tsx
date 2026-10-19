@@ -75,7 +75,8 @@ export function ShipRichText({
     <PackageRichText
       blocks={blocks}
       size={size}
-      renderReference={(reference) => <Reference uri={reference} object={resolved?.[reference]} nameOf={nameOf} urgent={urgent} />}
+      // A link to one block opens at the block (WBM-11): the run keeps the URL as written.
+      renderReference={(reference, run) => <Reference uri={reference} object={resolved?.[reference]} nameOf={nameOf} urgent={urgent} opensAt={run.text} />}
       renderBlock={drawAttachment}
       // The package's block is the protocol's, handed back.
       renderAfter={renderAfter ? (block) => renderAfter(block as RenderBlock) : undefined}

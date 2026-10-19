@@ -9,6 +9,7 @@ import { useWorkspacePeople } from '@/components/editing/mentionables'
 import { cardShapeOf, noteCardShape, type CardShape } from '@/lib/cardShapes'
 import { hrefOf, linkedKindOf, linkStateOf, notAvailable } from '@/lib/linked'
 import { isOwnKind } from '@/lib/ownKinds'
+import { blockLinkOf } from '@/lib/referenceLink'
 import { noteCardAvailability, rememberedUnavailable } from '@/lib/unavailableCards'
 import { KIND } from '@/nostr/kinds'
 import { href } from '@/router'
@@ -48,6 +49,12 @@ function LinkClicks({ block = false, children }: { block?: boolean; children: Re
   return block ? <div onClickCapture={onClickCapture}>{children}</div> : <span onClickCapture={onClickCapture}>{children}</span>
 }
 
+/** A file's link state, opening at the block a link to one block was written for (§13.6.1). */
+function openingAt(link: LinkState, written: string | undefined): LinkState {
+  const block = link.state === 'ready' ? blockLinkOf(written) : undefined
+  return block && link.state === 'ready' ? { ...link, linked: { ...link.linked, href: block.href } } : link
+}
+
 /** A part of another file shown in a message (SPEC §13.6.1): its links are clicked as a chip's are. */
 export function MessagePart({ children }: { children: ReactNode }) {
   return <LinkClicks block>{children}</LinkClicks>
@@ -64,6 +71,7 @@ export function MessageChip({
   nameOf,
   urgent,
   preview = true,
+  opensAt,
 }: {
   uri: string
   object: ForeignObject | null | undefined
@@ -71,11 +79,13 @@ export function MessageChip({
   urgent?: readonly string[]
   /** Hovering shows its card; off in a list of previews, where a card would cover the next one. */
   preview?: boolean
+  /** The URL it was written as: a link to one block opens there (WBM-11). */
+  opensAt?: string
 }) {
   if (/^nostr:npub1/i.test(uri)) return <Reference uri={uri} nameOf={nameOf} urgent={urgent} />
   return (
     <LinkClicks>
-      <LinkChip link={linkStateOf(uri, object)} preview={preview} />
+      <LinkChip link={openingAt(linkStateOf(uri, object), opensAt)} preview={preview} />
     </LinkClicks>
   )
 }
@@ -85,16 +95,19 @@ export function MessageRow({
   uri,
   object,
   unreadable = false,
+  opensAt,
 }: {
   uri: string
   object: ForeignObject | null | undefined
   /** A reference that names no address or event id. */
   unreadable?: boolean
+  /** The URL it was written as: a link to one block opens there (WBM-11). */
+  opensAt?: string
 }) {
   return (
     <LinkClicks block>
       <div data-link-row>
-        <LinkRow link={unreadable ? notAvailable(uri) : linkStateOf(uri, object)} />
+        <LinkRow link={unreadable ? notAvailable(uri) : openingAt(linkStateOf(uri, object), opensAt)} />
       </div>
     </LinkClicks>
   )

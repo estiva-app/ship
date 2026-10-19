@@ -8,8 +8,9 @@
  * `<type>` against a published `urls` pattern, then **one author** for the
  * `d`. The `#d` query asks for two, and a `d` two authors hold names nothing,
  * so somebody publishing the same `(kind, d)` cannot put their object's card
- * under a link to another's. A link to one block names its part (§13.6.1),
- * not a card.
+ * under a link to another's. A link to one block names its file (§7.7), so it
+ * reads as that file's chip; its `part` draws the block under the message and
+ * keeps the file's card off (WBM-11).
  *
  * Asked once per link for the tab: a link names the same object for as long as
  * its owner's manifest does. A read that failed is forgotten, so the next ask
@@ -27,7 +28,7 @@ const EVENT_ID = /^[0-9a-f]{64}$/i
 async function cardValueOf(url: string): Promise<string | null> {
   const shapes = (await declaredManifests()).flatMap((manifest) => urlPatternsOf(manifest))
   const hit = matchObjectUrl(url, shapes)
-  if (!hit || hit.block !== undefined) return null
+  if (!hit) return null
   if (hit.by === 'id') return EVENT_ID.test(hit.identifier) ? hit.identifier.toLowerCase() : null
   const filter: Record<string, unknown> = { '#d': [hit.identifier], limit: 2 }
   if (hit.kind !== undefined) filter.kinds = [hit.kind]
