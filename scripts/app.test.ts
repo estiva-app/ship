@@ -420,6 +420,15 @@ check('  …and its reply is grouped under it, not beside it', thread?.replies.l
 check('  …the reply keeps the thread anchor from the uppercase A', thread?.replies[0]?.about.includes(ISSUE_ADDR) === true)
 check('the comment stays in its Folder', thread?.root.folder === CONTENT)
 
+// A reply copies its comment's `block` (SPEC §13.6): the comment shows the place, the reply does not show it again.
+const onBlock = sign({ ...nip22Root, tags: [...nip22Root.tags, ['block', 'b1']] }, 'c3')
+const copied = sign({ ...nip22Reply, tags: [['A', ISSUE_ADDR], ['K', '30851'], ['P', PK], ['e', 'c3'], ['k', '1111'], ['block', 'b1'], ['h', CONTENT]] }, 'c4')
+const placed = foldFolder([sign(issue, 'e2'), onBlock, copied]).conversations.find((c) => c.root.id === 'c3')
+check('a comment on a block keeps its block', placed?.root.blockId === 'b1')
+check('  …and a reply that copied it carries none of its own', placed?.replies[0]?.id === 'c4' && placed?.replies[0]?.blockId === undefined)
+const orphaned = foldFolder([sign(issue, 'e2'), copied]).conversations.find((c) => c.root.id === 'c4')
+check('  …and once the comment is deleted, its reply keeps the thread on its block', orphaned?.root.blockId === 'b1')
+
 // Case is the trap: reading lowercase `a` as the root would put a reply in its
 // own thread, and reading uppercase `E` as the parent would lose the ordering.
 const miscased = foldFolder([nip22Reply])
