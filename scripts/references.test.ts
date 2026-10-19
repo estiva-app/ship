@@ -156,6 +156,34 @@ const late = [
   )
 }
 
+// ── A reply to a reply stays in its thread ──────────────────────────────────
+
+{
+  /*
+    NIP-22's case split, two deep. Every other reply in this file has `E` equal
+    to `e`, so reading the root from the lowercase tag passes them all. Here
+    they differ — `E` is the thread's first comment, `e` the reply being
+    answered — and only the uppercase one says which conversation this is.
+    Read the other way, a reply to a reply splits off into its own thread.
+  */
+  const events = [
+    shipComment('t1', 'Is the Stripe key in?'),
+    event({ id: 't2', kind: 1111, tags: [['A', ISSUE], ['E', 't1'], ['e', 't1', '', 'reply'], ['K', '1111']], content: 'Not yet.' }),
+    event({ id: 't3', kind: 1111, tags: [['A', ISSUE], ['E', 't1'], ['e', 't2', '', 'reply'], ['K', '1111']], content: 'Asking finance today.' }),
+  ]
+  const state = foldFolder(events, refs)
+  const anchors = anchorIndex(events)
+  const thread = state.conversations.find((c) => c.id === 't1')
+  const deep = thread?.replies.find((m) => m.id === 't3')
+  check(
+    'a reply two deep folds into its root’s conversation — one thread, not two',
+    state.conversations.length === 1 && thread?.replies.length === 2,
+    state.conversations.map((c) => `${c.id}:${c.replies.length}`).join(','),
+  )
+  check('  …its root is the first comment and its parent the reply it answers', deep?.rootId === 't1' && deep?.parentId === 't2')
+  check('  …and the issue has one comment, not two', commentsOn(state.conversations, ISSUE, anchors).length === 1)
+}
+
 // ── A thread whose root nobody can see reads as a mention ───────────────────
 
 {
