@@ -88,9 +88,13 @@ const goTo = (path: string) => {
 const tag = (event: Signed, name: string) => event.tags.find((t) => t[0] === name)?.[1]
 const sent = (kind: number) => published.filter((event) => event.kind === kind)
 
+/** The workspace re-read the page asks for after a write, by the Folders it names. */
+const refresh = vi.fn()
+
 beforeEach(() => {
   published.length = 0
-  vi.mocked(useWorkspace).mockReturnValue({ state: STATE, error: null, loading: false, busy: false, refresh: vi.fn().mockResolvedValue(undefined), live: false })
+  refresh.mockReset().mockResolvedValue(undefined)
+  vi.mocked(useWorkspace).mockReturnValue({ state: STATE, error: null, loading: false, busy: false, refresh, live: false })
   vi.mocked(useDirectory).mockReturnValue({ directory: new Map(), nameOf: () => 'Someone', personOf: () => ({ name: 'Someone' }), profileOf: () => undefined })
 })
 
@@ -115,24 +119,28 @@ async function comment(path: string, text: string) {
 }
 
 describe("a moved project's new work goes into its own Folder, not the one that lists it", () => {
-  it('New issue on its page: the kind:30851 carries h = the project’s own Folder', async () => {
+  it('New issue on its page: the kind:30851 carries h = the project’s own Folder, and that Folder is re-read so it shows', async () => {
     await addIssue(`/project/billing-${D_PROJECT}`)
     await waitFor(() => expect(sent(30851)).toHaveLength(1))
     expect(tag(sent(30851)[0], 'h')).toBe(OWN)
+    await waitFor(() => expect(refresh).toHaveBeenCalledWith([OWN]))
+    expect(refresh).not.toHaveBeenCalledWith([TEAM])
   })
 
-  it('A comment started on its page: the kind:1111 about it carries h = the project’s own Folder', async () => {
+  it('A comment started on its page: the kind:1111 about it carries h = the project’s own Folder, and that Folder is re-read', async () => {
     await comment(`/project/billing-${D_PROJECT}?tab=activity`, 'hello')
     await waitFor(() => expect(sent(1111)).toHaveLength(1))
     expect(tag(sent(1111)[0], 'h')).toBe(OWN)
     expect(tag(sent(1111)[0], 'A')).toBe(PROJECT_ADDR)
+    await waitFor(() => expect(refresh).toHaveBeenCalledWith([OWN]))
+    expect(refresh).not.toHaveBeenCalledWith([TEAM])
   })
 })
 
 describe('a project that names no Folder, and that no Folder lists, writes nothing', () => {
-  /** Whichever comes first, a refusal said or an event sent; then only the refusal may be there. */
+  /** Whichever comes first, any refusal said or an event sent; then only this refusal may be there. */
   async function refusedNotSent(kind: number) {
-    await waitFor(() => expect(sent(kind).length + screen.queryAllByText(/names no Folder/).length).toBeGreaterThan(0))
+    await waitFor(() => expect(sent(kind).length + screen.queryAllByText(/rejected/).length).toBeGreaterThan(0))
     expect(sent(kind)).toHaveLength(0)
     expect(screen.getByText(/names no Folder/)).toBeInTheDocument()
   }
