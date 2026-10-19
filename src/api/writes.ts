@@ -34,8 +34,8 @@ import { store } from './store'
  *   is not necessarily its project's;
  * - a project's record changes go to the Folder the record names
  *   (`project.contentFolder`);
- * - its new comments and new issues go to the Folder that lists it
- *   (`workFolder`), which differs for a project once re-pointed or moved.
+ * - its new comments and new issues go to its own Folder too (`workFolder`),
+ *   never the one that lists it, which differs once a project is moved.
  *
  * Getting it wrong does **not** fail. Measured against production on
  * 2026-08-29, when a re-pointed project's content Folder could differ from its
@@ -285,20 +285,19 @@ export function deleteIssue(issue: Issue): Promise<WriteResult> {
 // ── Issues ──────────────────────────────────────────────────────────────────
 
 /**
- * Where a project's new issues and new comments go: the Folder that lists it,
- * which is the one both apps draw it under and the one its people get unread
- * signals from — Miky's ruling on MAN-5. The record's own Folder only when
- * nothing lists it, or the listing cannot be read; either way the write is
- * found again by its parent or anchor, not by its Folder.
+ * Where a project's new issues and new comments go: the project's own Folder
+ * (`contentFolder`, its `h` or `buzz-channel`), never the Folder whose listing
+ * it was opened from, so they have the project's readers once a Folder can be
+ * private. Either way the write is found again by its parent or anchor, not by
+ * its Folder. Only a record that names no Folder falls back to the one that
+ * lists it, and one nothing lists is refused rather than written with no `h`.
  *
- * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-thread-belongs-to-what-it-is-about.md
+ * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/what-belongs-to-a-file-is-stored-with-it.md
  */
 export async function workFolder(project: Project, folders?: readonly { id: string; addresses?: readonly string[] }[]): Promise<string> {
-  try {
-    return placedIn({ addr: project.addr, folder: project.contentFolder }, folders ?? (await readFolders()))[0]?.id ?? project.contentFolder
-  } catch {
-    return project.contentFolder
-  }
+  const folder = project.contentFolder || placedIn({ addr: project.addr }, folders ?? (await readFolders()))[0]?.id
+  if (!folder) throw new Error('This project names no Folder, and no Folder lists it')
+  return folder
 }
 
 /** What numbering reads: every project and issue this reader can see. */
@@ -336,19 +335,20 @@ async function keyFor(project: Project, visible: Visible): Promise<string> {
 }
 
 /**
- * Create an issue in the Folder that lists its project (`workFolder`), with
+ * Create an issue in its project's own Folder (`workFolder`), with
  * the next ref under the project's key (SHI-4). The ref counts every issue
  * this reader can see, in any project, so it is unique among them; a race is
  * `settleClaims`'s. The address is still the identity — a ref is never
- * resolved by.
+ * resolved by. Says which Folder it went into, for the page to re-read.
  */
-export async function createIssue(project: Project, visible: Visible, draft: { title: string; description: string; summary?: string }): Promise<CreateResult> {
+export async function createIssue(project: Project, visible: Visible, draft: { title: string; description: string; summary?: string }): Promise<CreateResult & { folder?: string }> {
   const clock = await clockProblem()
   if (clock) return { ok: false, reason: clock }
   try {
+    const folder = await workFolder(project)
     const key = await keyFor(project, visible)
     const { result, addr } = await store.createIssue({
-      folder: await workFolder(project),
+      folder,
       title: draft.title,
       description: draft.description,
       summary: draft.summary,
@@ -357,7 +357,7 @@ export async function createIssue(project: Project, visible: Visible, draft: { t
     })
     if (!result.ok) return { ok: false, reason: result.reason ?? 'no reason given' }
     claimedHere.add(addr)
-    return { ok: true, addr }
+    return { ok: true, addr, folder }
   } catch (error) {
     return { ok: false, reason: error instanceof Error ? error.message : String(error) }
   }

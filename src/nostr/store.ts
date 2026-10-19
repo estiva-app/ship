@@ -377,7 +377,8 @@ export class Store {
    * `kind:1852 remove` from each Folder in `from`, planned by interop's
    * `planMoveFromFolders` — the planner Peek and the agent move by too.
    * No `kind:1851` and no `buzz-channel` change: what is already written stays
-   * where it is, and new comments follow the listing (`workFolder`, MAN-5);
+   * where it is, and new comments and issues stay in the project's own Folder
+   * (`workFolder`; record what-belongs-to-a-file-is-stored-with-it);
    * both apps find a project's threads by anchor, not by Folder. The old "Pair with another Folder…" wrote the
    * record's Folder instead, and that is how Ship and Peek came to read one
    * project's conversation from two channels (PRO-21).

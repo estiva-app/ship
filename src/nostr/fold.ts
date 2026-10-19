@@ -150,9 +150,9 @@ export interface Project {
    * `h` on a channel-scoped one — the same answer interop's `folderOf` gives.
    *
    * Where a `kind:1851` about the project is addressed, since changes stay
-   * channel-scoped whatever the record does. New issues and comments go to
-   * the Folder that lists the project instead (`workFolder` in
-   * `api/writes.ts`). Nothing overrides this one: the
+   * channel-scoped whatever the record does, and where new issues and
+   * comments go (`workFolder` in `api/writes.ts`), never the Folder that
+   * lists the project. Nothing overrides this one: the
    * `folder` field that used to re-point a project is no longer read (MAN-5),
    * and a move changes only the Folder listings (FOL-7). Older issues and
    * threads may sit in other Folders; they are found by their parent and
