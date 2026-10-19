@@ -46,3 +46,26 @@ export function referenceLink(object: ForeignObject | null | undefined): Referen
   const link = safeLink(object.openUrl)
   return link ? { place: 'app', href: link } : null
 }
+
+/**
+ * Where a chip written as a link to one block opens (§13.6.1, WBM-11): the URL
+ * as written, so a click lands on the block, not the top of its file — or
+ * undefined for a link with no fragment, and for anything but `https:`, which
+ * open where {@link referenceLink} says. `opens` is where the file itself
+ * opens: the written URL is taken only on that same origin, so a chip that
+ * draws one file never opens another site (WBM-11 security review). Ship's own
+ * URL is a path for the router, and the issue page scrolls to the block it names.
+ */
+export function blockLinkOf(url: string | undefined, opens: string | undefined, origin = window.location.origin): ReferenceLink | undefined {
+  const link = safeLink(url)
+  if (!link || !opens) return undefined
+  const parsed = new URL(link)
+  try {
+    if (new URL(opens, origin).origin !== parsed.origin) return undefined
+  } catch {
+    return undefined
+  }
+  // `#/…` is an old hash route, not a block: it opens where the file does.
+  if (parsed.hash.length < 2 || parsed.hash.startsWith('#/')) return undefined
+  return parsed.origin === origin ? { place: 'here', href: `${parsed.pathname}${parsed.search}${parsed.hash}` } : { place: 'app', href: link }
+}

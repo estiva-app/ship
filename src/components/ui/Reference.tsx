@@ -3,7 +3,7 @@ import { decodeNpub, stripNaddrs } from '@estiva-app/protocol'
 import { InlineChip, KindIcon, WithTooltip, thingKindOf } from '@estiva-app/ui'
 import type { ForeignObject } from '@/api/foreign'
 import { StatusLabel } from './StatusLabel'
-import { referenceLink } from '@/lib/referenceLink'
+import { blockLinkOf, referenceLink } from '@/lib/referenceLink'
 import { linkTo } from '@/router'
 
 /**
@@ -69,8 +69,11 @@ export function Reference({
   nameOf,
   urgent,
   className,
+  opensAt,
 }: {
   uri: string
+  /** The URL it was written as: a link to one block opens there, not at the top of its file (§13.6.1, WBM-11). */
+  opensAt?: string
   /**
    * The resolved object, when the URI names one.
    *
@@ -123,7 +126,7 @@ export function Reference({
   // An object: whatever its owner's projection says it is.
   if (object) {
     const label = objectLabel(object, nameOf) ?? short
-    const link = referenceLink(object)
+    const link = blockLinkOf(opensAt, referenceLink(object)?.href) ?? referenceLink(object)
     const chip = {
       tone: 'neutral' as const,
       // What it is, before its name: a topic, a project, an issue, a file or a message (Katerina, 8 October), as in Peek.

@@ -3,7 +3,7 @@ import { findNaddrs, linksAsReferences, pointerToAddress, referenceToPointer, to
 import { RichText } from '@estiva-app/ui'
 import type { ForeignObject } from '@/api/foreign'
 import { knownLinkValue } from '@/api/linkCards'
-import { shownParts, urlNames } from '@/api/part'
+import { shownParts } from '@/api/part'
 import { MessageCard, MessageChip, MessagePart, MessageRow } from '@/components/ui/MessageLinks'
 import { PartCard } from '@/components/ui/PartCard'
 import { drawAttachment } from '@/components/ui/ShipRichText'
@@ -61,9 +61,8 @@ export function MessageText({
 }) {
   // A block of another object, live (SPEC §13.6.1, COM-2), while the body still names it.
   const parts = preview ? [] : shownParts(partTags, body, new Set(findNaddrs(body).map(addressOf).filter((a): a is string => !!a)))
-  // What each app link names by §7.7; a link to a block shown live keeps its words — the block's card stands for it (COM-2).
-  const named = linkResolverFor(body, knownLinkValue)
-  const claimed = (url: string) => (parts.some((part) => urlNames(url, part.address)) ? undefined : named(url))
+  // What each app link names by §7.7; a link to one block names its file, so it is that file's chip, the block live under the message (WBM-11).
+  const claimed = linkResolverFor(body, knownLinkValue)
   // A bare link reads as that file's link once what it names has come back and can be read; until then, and for good
   // when it cannot, it stays the URL it was written as (OPT-18).
   const resolveLink = (url: string) => {
@@ -76,8 +75,9 @@ export function MessageText({
   const isHere = (value: string) => !!here && value.toLowerCase() === here.toLowerCase()
   const cards = preview ? [] : cardsOf(blocks, embeds, parts, claimed).filter((card) => !isHere(card.value))
   const placed = preview ? undefined : placeLines(blocks, { cards, parts, resolveLink, stayChip: isHere })
-  const chip = (reference: string) => <MessageChip uri={reference} object={resolved?.[reference]} nameOf={nameOf} urgent={urgent} preview={!preview} />
-  const row = (line: RowLine) => <MessageRow uri={line.reference} object={resolved?.[line.reference]} unreadable={line.unreadable} />
+  // A link to one block opens at the block (`opensAt`, the URL as written); any other where its file opens.
+  const chip = (reference: string, written?: string) => <MessageChip uri={reference} object={resolved?.[reference]} nameOf={nameOf} urgent={urgent} preview={!preview} opensAt={written} />
+  const row = (line: RowLine) => <MessageRow uri={line.reference} object={resolved?.[line.reference]} unreadable={line.unreadable} opensAt={line.url} />
   const shown = cards.filter((card) => card.layout !== 'none')
   return (
     <>
@@ -87,7 +87,7 @@ export function MessageText({
             blocks={placed?.blocks ?? blocks}
             renderReference={(reference, run) => {
               const line = placed?.rowRuns.get(run)
-              return line ? row(line) : chip(reference)
+              return line ? row(line) : chip(reference, run.text)
             }}
             renderBlock={(block) => {
               const line = block.type === ROW_BLOCK ? placed?.rowOf(block) : undefined

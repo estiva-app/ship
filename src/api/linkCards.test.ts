@@ -52,13 +52,20 @@ describe('a link a card depends on', () => {
     expect(knownLinkValue(url('two'))).toBeUndefined()
   })
 
-  it('names nothing for another host or a block, and asks the relay nothing for them', async () => {
+  it('names the file a link to one of its blocks is in, so the link reads as that file (WBM-11)', async () => {
     held.authors = [PK]
     const block = `${url('three')}#block-0123456789ab`
-    const { result } = renderHook(() => useLinkValues([`https://evil.example/issue/x-${D}`, block]))
-    await new Promise((r) => setTimeout(r, 20))
-    expect(result.current.size).toBe(0)
-    expect(held.queries).toBe(0)
+    const { result } = renderHook(() => useLinkValues([block]))
+    await waitFor(() => expect(result.current.get(block)).toBe(`30851:${PK}:${D}`))
+  })
+
+  it('names nothing for another host, and asks the relay nothing for it', async () => {
+    held.authors = [PK]
+    const { result } = renderHook(() => useLinkValues([`https://evil.example/issue/x-${D}`, url('five')]))
+    // The link that does resolve answers once the relay was asked, for it alone.
+    await waitFor(() => expect(result.current.get(url('five'))).toBe(`30851:${PK}:${D}`))
+    expect(result.current.size).toBe(1)
+    expect(held.queries).toBe(1)
   })
 })
 

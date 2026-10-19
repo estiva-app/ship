@@ -40,9 +40,12 @@ export { BlockId, UnknownBlock } from '@estiva-app/ui/editor'
  * beside it — the alternative is bech32 in the middle of a sentence the moment
  * you click.
  */
-function ReferenceView({ uri }: ReferenceViewProps) {
+function ReferenceView({ uri, href }: ReferenceViewProps) {
   const { resolved, nameOf } = useContext(ReferenceContext)
-  return <Reference uri={uri} object={resolved[uri]} nameOf={nameOf} />
+  const object = resolved[uri]
+  // A URL chip whose file has not come back, or cannot be read, reads as the URL it was written as (WBM-11), as the node draws it before it names anything.
+  if (href && (!object || object.unreachable)) return <span>{href}</span>
+  return <Reference uri={uri} object={object} nameOf={nameOf} opensAt={href} />
 }
 
 // Drawn, never opened: the description saves on blur, and a link or a Download button would take focus.

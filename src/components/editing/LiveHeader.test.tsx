@@ -304,6 +304,20 @@ describe('LiveHeader, a block link (RIC-18)', () => {
     )
   })
 
+  it('scrolls to the block when a block link is followed inside Ship, with the page already open (WBM-11)', async () => {
+    window.history.replaceState(null, '', '/p/abc')
+    render(header(doc, 'blocks', true))
+    await screen.findByText('Linked')
+    await opened(
+      // A chip in a comment or description routes here without reloading: the router's `navigateTo`.
+      () => {
+        window.history.pushState(null, '', '/p/abc#block-b2')
+        window.dispatchEvent(new PopStateEvent('popstate'))
+      },
+      (scrolled) => waitFor(() => expect(scrolled).toEqual(['reading'])),
+    )
+  })
+
   it('leaves the page alone once the person has scrolled it themselves', async () => {
     await opened(
       async () => {

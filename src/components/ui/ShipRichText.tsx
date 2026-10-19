@@ -4,7 +4,7 @@ import { Attachment } from './Attachment'
 import { Reference } from './Reference'
 import { imetaFromAttrs } from '../../nostr/attachments'
 import type { ReactNode } from 'react'
-import { linksAsReferences, toRenderTree, type ContentFormat, type LinkResolver, type RenderBlock } from '@estiva-app/protocol'
+import { linksAsReferences, referenceOfLink, toRenderTree, type ContentFormat, type LinkResolver, type RenderBlock } from '@estiva-app/protocol'
 
 /**
  * A body, drawn — SPEC §13.
@@ -75,7 +75,11 @@ export function ShipRichText({
     <PackageRichText
       blocks={blocks}
       size={size}
-      renderReference={(reference) => <Reference uri={reference} object={resolved?.[reference]} nameOf={nameOf} urgent={urgent} />}
+      // A link to one block opens at the block (WBM-11): the run keeps the URL as written. Only a run whose words are
+      // that URL, resolved to this same file: a stored reference's words are its author's (security review).
+      renderReference={(reference, run) => (
+        <Reference uri={reference} object={resolved?.[reference]} nameOf={nameOf} urgent={urgent} opensAt={resolveLink && referenceOfLink(run.text, resolveLink) === reference ? run.text : undefined} />
+      )}
       renderBlock={drawAttachment}
       // The package's block is the protocol's, handed back.
       renderAfter={renderAfter ? (block) => renderAfter(block as RenderBlock) : undefined}
