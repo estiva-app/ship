@@ -604,7 +604,7 @@ export function ProjectPage({
           // The project's own Folder (workFolder), written into and then re-read.
           let folder: string
           try {
-            folder = await workFolder(project, teams)
+            folder = workFolder(project)
           } catch (error) {
             say(`Message rejected — ${error instanceof Error ? error.message : String(error)}`, 'error')
             return false
