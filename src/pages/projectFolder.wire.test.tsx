@@ -42,6 +42,7 @@ const D_PROJECT = '00000000-0000-4000-8000-000000000001'
 const D_LOOSE = '00000000-0000-4000-8000-000000000002'
 const AUTHOR = 'f'.repeat(64)
 const PROJECT_ADDR = `30850:${AUTHOR}:${D_PROJECT}`
+const LOOSE_ADDR = `30850:${AUTHOR}:${D_LOOSE}`
 
 vi.mock('@/api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/api')>()),
@@ -54,7 +55,7 @@ vi.mock('@/api/foreign', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/api/foreign')>()),
   readFolder: vi.fn(() => new Promise(() => {})),
   readFolders: vi.fn(() => Promise.resolve([
-    { id: TEAM, name: 'Team', hasState: true, addresses: [PROJECT_ADDR] },
+    { id: TEAM, name: 'Team', hasState: true, addresses: [PROJECT_ADDR, LOOSE_ADDR] },
     { id: OWN, name: 'Own', hasState: true, addresses: [] },
   ])),
   readFolderListing: vi.fn(() => Promise.resolve([])),
@@ -67,7 +68,7 @@ const project = (id: string, title: string, contentFolder: string, key: string) 
   ({ addr: `30850:${AUTHOR}:${id}`, id, author: AUTHOR, createdAt: 1, title, description: '', descriptionFormat: 'marker', contentFolder, key, status: 'planned', archived: false, fields: {} })
 
 const STATE: WorkspaceState = {
-  // "Loose" is a record that names no Folder, and no Folder lists it.
+  // "Loose" is a record that names no Folder; the team Folder lists it.
   projects: [project(D_PROJECT, 'Billing', OWN, 'BIL'), project(D_LOOSE, 'Loose', '', 'LOO')],
   issues: [],
   activity: [],
@@ -137,7 +138,7 @@ describe("a moved project's new work goes into its own Folder, not the one that 
   })
 })
 
-describe('a project that names no Folder, and that no Folder lists, writes nothing', () => {
+describe('a project that names no Folder of its own writes nothing, not even into the Folder that lists it', () => {
   /** Whichever comes first, any refusal said or an event sent; then only this refusal may be there. */
   async function refusedNotSent(kind: number) {
     await waitFor(() => expect(sent(kind).length + screen.queryAllByText(/rejected/).length).toBeGreaterThan(0))

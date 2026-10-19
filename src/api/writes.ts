@@ -9,7 +9,6 @@ import { knownLinkValue, linkReferenceTagsFor } from './linkCards'
 import { partTagsFor, urlsIn } from './part'
 import { linkResolverFor } from '../lib/linksNamingCards'
 import { embedsToEdit, embedsToSend, withoutCard } from '../lib/messageCard'
-import { placedIn } from '../lib/placement'
 import { store } from './store'
 
 /**
@@ -289,15 +288,14 @@ export function deleteIssue(issue: Issue): Promise<WriteResult> {
  * (`contentFolder`, its `h` or `buzz-channel`), never the Folder whose listing
  * it was opened from, so they have the project's readers once a Folder can be
  * private. Either way the write is found again by its parent or anchor, not by
- * its Folder. Only a record that names no Folder falls back to the one that
- * lists it, and one nothing lists is refused rather than written with no `h`.
+ * its Folder. A record that names no Folder is refused rather than written
+ * with no `h`, or into a Folder that lists it (0 of 76 projects, 19 Oct).
  *
  * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/what-belongs-to-a-file-is-stored-with-it.md
  */
-export async function workFolder(project: Project, folders?: readonly { id: string; addresses?: readonly string[] }[]): Promise<string> {
-  const folder = project.contentFolder || placedIn({ addr: project.addr }, folders ?? (await readFolders()))[0]?.id
-  if (!folder) throw new Error('This project names no Folder, and no Folder lists it')
-  return folder
+export function workFolder(project: Project): string {
+  if (!project.contentFolder) throw new Error('This project names no Folder of its own')
+  return project.contentFolder
 }
 
 /** What numbering reads: every project and issue this reader can see. */
@@ -345,7 +343,7 @@ export async function createIssue(project: Project, visible: Visible, draft: { t
   const clock = await clockProblem()
   if (clock) return { ok: false, reason: clock }
   try {
-    const folder = await workFolder(project)
+    const folder = workFolder(project)
     const key = await keyFor(project, visible)
     const { result, addr } = await store.createIssue({
       folder,
