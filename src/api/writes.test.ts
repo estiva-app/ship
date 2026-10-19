@@ -146,16 +146,19 @@ describe('deleting a project unlists it from its team (FOL-48)', () => {
     expect(result).toEqual({ ok: true, addr: '30851:me:new' })
   })
 
-  it('a new issue goes to the Folder that lists the project when that is another one (MAN-5)', async () => {
+  it("a new issue goes to the project's own Folder, not the other Folder that lists it", async () => {
     vi.mocked(readFolders).mockResolvedValue([{ id: 'team', hasState: true, addresses: [PROJECT.addr] }] as never)
     s.createIssue.mockResolvedValue({ result: { ok: true }, addr: '30851:me:new', id: 'new' })
     await createIssue(PROJECT, { projects: [PROJECT], issues: [] }, { title: 'New', description: 'd' })
-    expect(s.createIssue).toHaveBeenCalledWith(expect.objectContaining({ folder: 'team' }))
+    expect(s.createIssue).toHaveBeenCalledWith(expect.objectContaining({ folder: 'content-folder' }))
   })
 
-  it("workFolder falls back to the record's Folder when the listing cannot be read", async () => {
-    vi.mocked(readFolders).mockRejectedValue(new Error('rate limited'))
-    expect(await workFolder(PROJECT)).toBe('content-folder')
+  it("a new comment on a project goes to its own Folder even where another Folder lists it", async () => {
+    expect(await workFolder(PROJECT, [{ id: 'team', addresses: [PROJECT.addr] }])).toBe('content-folder')
+  })
+
+  it('a project record that names no Folder takes the Folder that lists it', async () => {
+    expect(await workFolder({ ...PROJECT, contentFolder: '' }, [{ id: 'team', addresses: [PROJECT.addr] }])).toBe('team')
   })
 })
 
