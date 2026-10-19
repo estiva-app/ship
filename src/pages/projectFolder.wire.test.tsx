@@ -130,15 +130,20 @@ describe("a moved project's new work goes into its own Folder, not the one that 
 })
 
 describe('a project that names no Folder, and that no Folder lists, writes nothing', () => {
+  /** Whichever comes first, a refusal said or an event sent; then only the refusal may be there. */
+  async function refusedNotSent(kind: number) {
+    await waitFor(() => expect(sent(kind).length + screen.queryAllByText(/names no Folder/).length).toBeGreaterThan(0))
+    expect(sent(kind)).toHaveLength(0)
+    expect(screen.getByText(/names no Folder/)).toBeInTheDocument()
+  }
+
   it('New issue is refused with the reason, and nothing reaches the relay', async () => {
     await addIssue(`/project/loose-${D_LOOSE}`)
-    expect(await screen.findByText(/names no Folder/)).toBeInTheDocument()
-    expect(sent(30851)).toHaveLength(0)
+    await refusedNotSent(30851)
   })
 
   it('A comment is refused with the reason, and nothing reaches the relay', async () => {
     await comment(`/project/loose-${D_LOOSE}?tab=activity`, 'hello')
-    expect(await screen.findByText(/names no Folder/)).toBeInTheDocument()
-    expect(sent(1111)).toHaveLength(0)
+    await refusedNotSent(1111)
   })
 })
