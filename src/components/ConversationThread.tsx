@@ -6,7 +6,8 @@ import { Divider } from './ui/Divider'
 import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
 import { byReference, useForeignObjects } from '@/api/useForeignObjects'
 import { useLinkValues } from '@/api/linkCards'
-import { linksNamingCards, referenceOfValue } from '@/components/conversations/shared'
+import { referenceOfValue } from '@/components/conversations/shared'
+import { linksNamingCards } from '@/lib/linksNamingCards'
 import { useReactions } from '@/api'
 import type { Reaction } from '@/api'
 import type { Picks } from '@/components/conversations/MessageBox'
@@ -325,7 +326,7 @@ export interface ConversationsProps {
    * still in it. Omitted where nobody may write, and the control is then absent
    * rather than disabled.
    */
-  onEditMessage?: (messageId: string, body: string) => Promise<boolean | void> | boolean | void
+  onEditMessage?: (messageId: string, body: string, removeCard?: string) => Promise<boolean | void> | boolean | void
   className?: string
 }
 

@@ -8,7 +8,8 @@ import { MessageCard, MessageChip, MessagePart, MessageRow } from '@/components/
 import { PartCard } from '@/components/ui/PartCard'
 import { drawAttachment } from '@/components/ui/ShipRichText'
 import { placeLines, ROW_BLOCK, type RowLine } from '@/lib/messageLines'
-import { MESSAGE_FORMAT, cardsOf, linkResolverFor, referenceOfValue } from './shared'
+import { linkResolverFor } from '@/lib/linksNamingCards'
+import { MESSAGE_FORMAT, cardsOf, referenceOfValue } from './shared'
 
 /** The address a `nostr:` pointer names, or undefined for an event or a malformed one. */
 function addressOf(reference: string): string | undefined {
@@ -38,6 +39,7 @@ export function MessageText({
   here,
   preview = false,
   between,
+  onRemoveCard,
 }: {
   body: string
   /** The cards its author asked for, after edits (SPEC §13.6.2). */
@@ -54,6 +56,8 @@ export function MessageText({
   preview?: boolean
   /** Drawn between the text and the cards: the message's files. */
   between?: ReactNode
+  /** ✕ on a sent card, by its file: offered on your own message only, as Edit is (Decided 19 Oct, WBM-7). */
+  onRemoveCard?: (value: string) => void
 }) {
   // A block of another object, live (SPEC §13.6.1, COM-2), while the body still names it.
   const parts = preview ? [] : shownParts(partTags, body, new Set(findNaddrs(body).map(addressOf).filter((a): a is string => !!a)))
@@ -96,7 +100,13 @@ export function MessageText({
       {shown.length > 0 && (
         <div className="flex flex-col gap-2" data-cards={String(shown.length)}>
           {shown.map((card) => (
-            <MessageCard key={card.value} uri={card.reference} object={resolved?.[card.reference]} compact={card.layout !== 'detailed'} />
+            <MessageCard
+              key={card.value}
+              uri={card.reference}
+              object={resolved?.[card.reference]}
+              compact={card.layout !== 'detailed'}
+              onRemove={onRemoveCard && card.layout === 'detailed' ? () => onRemoveCard(card.value) : undefined}
+            />
           ))}
         </div>
       )}

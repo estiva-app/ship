@@ -521,6 +521,15 @@ check('  …a reply about that object adds no a for it, and quotes not the comme
 const linkAndPart = buildConversationMessage(PK, Date.now(), { folder: CONTENT, body: `nostr:${addrToNaddr(LINKED)} link`, linkTags, partTags: [['a', LINKED], ['part', LINKED, 'b1']] })
 check('  …one a, when a nostr: reference and a block link name it too', linkAndPart.tags.filter((t) => t[0] === 'a' && t[1] === LINKED).length === 1)
 
+// The card a message asks for — SPEC §13.6.2, WBM-7: `["embed", V, "detailed"]` on all three paths.
+const embeds = [{ value: LINKED, layout: 'detailed' as const }]
+const embedOn = (event: { tags: string[][] }) => JSON.stringify(event.tags.filter((t) => t[0] === 'embed'))
+const CARD = JSON.stringify([['embed', LINKED, 'detailed']])
+check('a comment carries its card as an embed', embedOn(buildConversationMessage(PK, Date.now(), { folder: CONTENT, body: 'x', about: ISSUE_ADDR2, embeds })) === CARD)
+check('  …a reply to a comment too', embedOn(buildConversationMessage(PK, Date.now(), { folder: CONTENT, body: 'x', replyToComment: { id: 'c1', anchor: ISSUE_ADDR2 }, embeds })) === CARD)
+check('  …and chat', embedOn(buildConversationMessage(PK, Date.now(), { folder: CONTENT, body: 'x', embeds })) === CARD)
+check('  …and a message with no card carries none', embedOn(buildConversationMessage(PK, Date.now(), { folder: CONTENT, body: 'x', about: ISSUE_ADDR2 })) === '[]')
+
 // What the body earns — CON-25: a `p` per person, an `urgent` per urgent one,
 // an `a` per other address, a `q` per message, on all three paths.
 const BOB = 'b'.repeat(64)

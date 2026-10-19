@@ -110,7 +110,7 @@ export interface ProjectViewProps {
   /** Publish a deletion for one message — CON-3. Omitted where nobody may write. */
   onDeleteMessage?: (messageId: string) => Promise<boolean | void> | boolean | void
   /** Publish an edit of one message — CON-4. Omitted where nobody may write. */
-  onEditMessage?: (messageId: string, body: string) => Promise<boolean | void> | boolean | void
+  onEditMessage?: (messageId: string, body: string, removeCard?: string) => Promise<boolean | void> | boolean | void
   /** Why writes are unavailable — every write control on the page is disabled with it. */
   readOnlyReason?: string
   /** Why this project's own title, description, rail and Add issue are shut while it can still be discussed, archived or deleted — an archived project (SHI-36). */

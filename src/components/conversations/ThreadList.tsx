@@ -74,7 +74,8 @@ interface MessageProps {
   reactions?: readonly Reaction[]
   onToggleReaction?: (emoji: string, mine?: string) => void
   onDelete?: () => Promise<boolean | void> | boolean | void
-  onEdit?: (body: string) => Promise<boolean | void> | boolean | void
+  /** Publish an edit; with `removeCard`, ✕ on that file's sent card, the text left as it is. */
+  onEdit?: (body: string, removeCard?: string) => Promise<boolean | void> | boolean | void
   repliesLeftBehind?: number
   disabledReason?: string
   drafts?: DraftStore
@@ -118,6 +119,15 @@ function Message({ message, resolved, here, nameOf, reactions, onToggleReaction,
   const editHold = `edit:${message.id}`
   useReopenHeld(onEdit && editHold, () => setEditing(true))
   const [confirming, setConfirming] = useState(false)
+  // One ✕ at a time: the next one reads the set this one leaves, once the page has read it back.
+  const [removing, setRemoving] = useState(false)
+  const removeCard =
+    onEdit && !disabledReason && !removing
+      ? (value: string) => {
+          setRemoving(true)
+          void Promise.resolve(onEdit(message.body, value)).finally(() => setRemoving(false))
+        }
+      : undefined
   const react = onToggleReaction && ((emoji: string) => onToggleReaction(emoji, reactions?.find((r) => r.emoji === emoji)?.mine))
 
   return (
@@ -169,6 +179,7 @@ function Message({ message, resolved, here, nameOf, reactions, onToggleReaction,
             nameOf={nameOf}
             here={here}
             between={<FileAttachments files={message.files} />}
+            onRemoveCard={removeCard}
           />
           {/* Row one: the pills, then the add-reaction button (her note 4, Linear's order). Signed out, no button. */}
           {(react || !!reactions?.length) && (
@@ -233,7 +244,7 @@ interface ThreadProps {
   reactionsBy?: Record<string, readonly Reaction[]>
   onReact?: (messageId: string, emoji: string, mine?: string) => void
   onDeleteMessage?: (messageId: string) => Promise<boolean | void> | boolean | void
-  onEditMessage?: (messageId: string, body: string) => Promise<boolean | void> | boolean | void
+  onEditMessage?: (messageId: string, body: string, removeCard?: string) => Promise<boolean | void> | boolean | void
   upload?: (file: File) => Promise<Imeta>
   drafts?: DraftStore
   viewer?: string
@@ -276,7 +287,7 @@ function Thread({ thread, pageThreads, onReply, disabledReason, unread, stillUnr
       reactions: reactionsBy?.[message.id],
       onToggleReaction: onReact && ((emoji: string, mine?: string) => onReact(message.id, emoji, mine)),
       onDelete: offered && onDeleteMessage ? () => onDeleteMessage(message.id) : undefined,
-      onEdit: offered && onEditMessage ? (body: string) => onEditMessage(message.id, body) : undefined,
+      onEdit: offered && onEditMessage ? (...edit: [body: string, removeCard?: string]) => onEditMessage(message.id, ...edit) : undefined,
     }
   }
 

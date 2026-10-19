@@ -1,12 +1,14 @@
-import type { Imeta, PublishResult } from '@estiva-app/protocol'
-import { addrToNaddr } from '@estiva-app/protocol'
+import type { Embed, Imeta, NostrTag, PartPointer, PublishResult } from '@estiva-app/protocol'
+import { addrToNaddr, partsOf } from '@estiva-app/protocol'
 import type { Conversation, Issue, Project } from '../nostr/fold'
 import { clashes, explicitKey, keyOfRef, nextRef, projectKeys, suggestKey, takenKeys } from '../nostr/keys'
 import { RELAY_URL } from '../config'
 import { clockProblem } from './clock'
 import { readFolderListing, readFolders } from './foreign'
-import { linkReferenceTagsFor } from './linkCards'
+import { knownLinkValue, linkReferenceTagsFor } from './linkCards'
 import { partTagsFor, urlsIn } from './part'
+import { linkResolverFor } from '../lib/linksNamingCards'
+import { embedsToEdit, embedsToSend, withoutCard } from '../lib/messageCard'
 import { placedIn } from '../lib/placement'
 import { store } from './store'
 
@@ -372,6 +374,16 @@ export function setIssueField(issue: Issue, field: 'title' | 'description' | 'su
 // ── Conversations ───────────────────────────────────────────────────────────
 
 /**
+ * The card a new message sends: its one file's default (SPEC §13.6.2), read
+ * from the links its send has just asked about, so readers count the same
+ * links. Ship's box offers no ✕ before sending yet (Decided 19 Oct, WBM-7);
+ * ✕ on the sent card takes it off.
+ */
+function cardToSend(body: string, partTags: readonly NostrTag[], here: string | undefined): Embed[] {
+  return embedsToSend(body, { resolveLink: linkResolverFor(body, knownLinkValue), parts: partsOf({ tags: partTags.map((tag) => [...tag]) }), here })
+}
+
+/**
  * Start a conversation about an object, in its Folder. About an issue, the
  * body also carries a `nostr:naddr` reference, so a reader of the Folder in
  * Peek sees which issue it is about, as that issue's chip; about a project,
@@ -389,6 +401,7 @@ export function startConversation(args: { folder: string; about: string; withRef
       about: args.about,
       partTags,
       linkTags,
+      embeds: cardToSend(args.body, partTags, args.about),
       // SPEC §13.6 — present only when the author was commenting on one block.
       blockId: args.blockId,
       aboutRef: args.withReference ? `nostr:${addrToNaddr(args.about, [RELAY_URL])}` : undefined,
@@ -418,6 +431,7 @@ export function reply(conversation: Conversation, fallbackFolder: string, body: 
       body,
       partTags,
       linkTags,
+      embeds: cardToSend(body, partTags, root.anchor ?? conversation.about[0]),
       ...(root.anchor
         ? {
             replyToComment: {
@@ -603,6 +617,36 @@ export function deleteMessage(messageEventId: string): Promise<WriteResult> {
  * target's effective author or the NIP-OA owner of an authoring agent, and no
  * client can evaluate the second half. Same reasoning as `deleteMessage`.
  */
-export function editMessage(folder: string, messageEventId: string, body: string): Promise<WriteResult> {
-  return publish(() => store.editMessage({ folder, messageEventId, body }))
+export function editMessage(folder: string, messageEventId: string, body: string, card?: CardEdit): Promise<WriteResult> {
+  return publish(async () => {
+    if (!card) return store.editMessage({ folder, messageEventId, body })
+    if (card.remove) {
+      // ✕ on a sent card: the text as it was, byte for byte, so the message is not marked edited (§7.2.1).
+      return store.editMessage({ folder, messageEventId, body: card.before, embeds: withoutCard(card.embeds, card.remove) })
+    }
+    // Asked before the rule reads them, as at send: what the old text named and what the new one names first.
+    await linkReferenceTagsFor([...urlsIn(card.before), ...urlsIn(body)])
+    const [after, before] = [linkResolverFor(body, knownLinkValue), linkResolverFor(card.before, knownLinkValue)]
+    const resolveLink = (url: string) => after(url) ?? before(url)
+    const embeds = embedsToEdit(card.before, body, card.embeds, { resolveLink, parts: card.parts, here: card.here })
+    return store.editMessage({ folder, messageEventId, body, embeds })
+  })
+}
+
+/**
+ * What an edit needs to keep a message's cards right (SPEC §13.6.2): the text
+ * it replaces, as sent, and the message's folded cards and parts. With
+ * `remove`, the edit is ✕ on that file's card and leaves the text as it is.
+ */
+export interface CardEdit {
+  /** The message's text before this edit, whole: its own reference included. */
+  before: string
+  /** Its `embed` set, folded over earlier edits. */
+  embeds?: readonly Embed[]
+  /** Its `part` pointers, as sent. */
+  parts?: readonly PartPointer[]
+  /** The file whose conversation it is in: it never gets a card there. */
+  here?: string
+  /** The file whose sent card ✕ removes. */
+  remove?: string
 }

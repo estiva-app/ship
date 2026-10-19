@@ -640,13 +640,20 @@ export class Store {
    * No client can evaluate that, so nothing here gates on authorship; the
    * control is offered and a refusal is reported, exactly as for deletion.
    */
-  editMessage(args: { folder: string; messageEventId: string; body: string }): Promise<PublishResult> {
+  editMessage(args: {
+    folder: string
+    messageEventId: string
+    body: string
+    /** The message's whole `embed` set after the edit, when it changes it (SPEC §13.6.2); omitted, the set stays. */
+    embeds?: readonly Embed[]
+  }): Promise<PublishResult> {
     assertFolderId(args.folder)
     return this.publish(
       buildEdit(this.signer.pubkey, Date.now(), {
         channelUuid: args.folder,
         targetEventId: args.messageEventId,
         body: args.body,
+        embeds: args.embeds,
       }),
     )
   }
@@ -698,6 +705,8 @@ export class Store {
     partTags?: readonly NostrTag[]
     /** The body's app links' `a` and `q` tags, already resolved — OPT-19. See `buildConversationMessage`. */
     linkTags?: readonly NostrTag[]
+    /** The card it asks for under it (SPEC §13.6.2) — `embedsToSend`. */
+    embeds?: readonly Embed[]
   }): Promise<PublishResult> {
     const body = args.aboutRef ? `${args.body}\n\n${args.aboutRef}` : args.body
     return this.publish(
@@ -712,6 +721,7 @@ export class Store {
         urgent: args.urgent,
         partTags: args.partTags,
         linkTags: args.linkTags,
+        embeds: args.embeds,
       }),
     )
   }

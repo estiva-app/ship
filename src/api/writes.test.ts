@@ -11,6 +11,7 @@ vi.mock('./store', () => ({
     createFolder: vi.fn(),
     renameFolder: vi.fn(),
     postMessage: vi.fn(),
+    editMessage: vi.fn(),
   },
 }))
 vi.mock('./clock', () => ({ clockProblem: vi.fn() }))
@@ -19,7 +20,8 @@ vi.mock('./foreign', () => ({ readFolders: vi.fn(), readFolderListing: vi.fn() }
 import { clockProblem } from './clock'
 import { readFolderListing, readFolders } from './foreign'
 import { store } from './store'
-import { archiveProject, createFolder, createIssue, createProject, deleteProject, moveProject, renameFolder, reply, setIssueField, setProjectField, startConversation, workFolder } from './writes'
+import { archiveProject, createFolder, createIssue, createProject, deleteProject, editMessage, moveProject, renameFolder, reply, setIssueField, setProjectField, startConversation, workFolder } from './writes'
+import { addrToNaddr } from '@estiva-app/protocol'
 
 const s = store as unknown as Record<string, ReturnType<typeof vi.fn>>
 const PK = 'ab'.repeat(32)
@@ -163,14 +165,14 @@ describe('conversations', () => {
     await startConversation({ folder: 'issue-folder', about: ISSUE.addr, withReference: true, body: 'hi' })
     expect(s.postMessage).toHaveBeenLastCalledWith(expect.objectContaining({ folder: 'issue-folder', body: 'hi', about: ISSUE.addr, aboutRef: expect.stringMatching(/^nostr:naddr1/) }))
     await startConversation({ folder: 'content-folder', about: PROJECT.addr, withReference: false, body: 'hi' })
-    expect(s.postMessage).toHaveBeenLastCalledWith({ folder: 'content-folder', body: 'hi', about: PROJECT.addr, aboutRef: undefined, partTags: [], linkTags: [] })
+    expect(s.postMessage).toHaveBeenLastCalledWith({ folder: 'content-folder', body: 'hi', about: PROJECT.addr, aboutRef: undefined, partTags: [], linkTags: [], embeds: [] })
   })
 
   it("a reply goes to the thread's own Folder, anchored to its root", async () => {
     s.postMessage.mockResolvedValue({ ok: true })
     const conversation = { id: 'root-id', root: { id: 'root-id', author: 'a', createdAt: 1, body: 'x', folder: 'thread-folder', about: [] }, replies: [], about: [], createdAt: 1, lastAt: 1 }
     await reply(conversation, 'fallback', 'yes')
-    expect(s.postMessage).toHaveBeenCalledWith({ folder: 'thread-folder', body: 'yes', replyTo: { rootId: 'root-id', parentId: 'root-id' }, partTags: [], linkTags: [] })
+    expect(s.postMessage).toHaveBeenCalledWith({ folder: 'thread-folder', body: 'yes', replyTo: { rootId: 'root-id', parentId: 'root-id' }, partTags: [], linkTags: [], embeds: [] })
     await reply({ ...conversation, root: { ...conversation.root, folder: '' } }, 'fallback', 'yes')
     expect(s.postMessage).toHaveBeenLastCalledWith(expect.objectContaining({ folder: 'fallback' }))
   })
@@ -180,10 +182,57 @@ describe('conversations', () => {
     const root = { id: 'root-id', author: 'a', createdAt: 1, body: 'x', folder: 'thread-folder', about: [ISSUE.addr], anchor: ISSUE.addr }
     const conversation = { id: 'root-id', root, replies: [], about: [ISSUE.addr], createdAt: 1, lastAt: 1 }
     await reply(conversation, 'fallback', 'yes')
-    expect(s.postMessage).toHaveBeenLastCalledWith({ folder: 'thread-folder', body: 'yes', replyToComment: { id: 'root-id', anchor: ISSUE.addr, author: 'a' }, partTags: [], linkTags: [] })
+    expect(s.postMessage).toHaveBeenLastCalledWith({ folder: 'thread-folder', body: 'yes', replyToComment: { id: 'root-id', anchor: ISSUE.addr, author: 'a' }, partTags: [], linkTags: [], embeds: [] })
     // The comment is outside the read and a reply stands in: its author is not the comment's.
     await reply({ ...conversation, root: { ...root, id: 'stand-in', author: 'b' } }, 'fallback', 'yes')
     expect(s.postMessage).toHaveBeenLastCalledWith(expect.objectContaining({ replyToComment: { id: 'root-id', anchor: ISSUE.addr, author: undefined } }))
+  })
+})
+
+describe('the card a comment sent from Ship carries (WBM-7, SPEC §13.6.2)', () => {
+  const LINKED = `30851:${PK}:linked`
+  const see = (address: string) => `see nostr:${addrToNaddr(address)}`
+
+  it('a comment naming one other issue sends its detailed card; naming only the issue it is on, none', async () => {
+    s.postMessage.mockResolvedValue({ ok: true })
+    await startConversation({ folder: 'issue-folder', about: ISSUE.addr, withReference: true, body: see(LINKED) })
+    expect(s.postMessage).toHaveBeenLastCalledWith(expect.objectContaining({ embeds: [{ value: LINKED, layout: 'detailed' }] }))
+    await startConversation({ folder: 'issue-folder', about: ISSUE.addr, withReference: true, body: see(ISSUE.addr) })
+    expect(s.postMessage).toHaveBeenLastCalledWith(expect.objectContaining({ embeds: [] }))
+  })
+
+  it('a reply to a comment sends the card too, never for the issue the comment is on', async () => {
+    s.postMessage.mockResolvedValue({ ok: true })
+    const root = { id: 'root-id', author: 'a', createdAt: 1, body: 'x', folder: 'thread-folder', about: [ISSUE.addr], anchor: ISSUE.addr }
+    await reply({ id: 'root-id', root, replies: [], about: [ISSUE.addr], createdAt: 1, lastAt: 1 }, 'fallback', `${see(LINKED)} and ${see(ISSUE.addr)}`)
+    expect(s.postMessage).toHaveBeenLastCalledWith(expect.objectContaining({ embeds: [{ value: LINKED, layout: 'detailed' }] }))
+  })
+
+  it('✕ on a sent card sends the text as it was, that card none and the other kept', async () => {
+    s.editMessage.mockResolvedValue({ ok: true })
+    const before = `${see(LINKED)}\n\nnostr:${addrToNaddr(ISSUE.addr)}`
+    const embeds = [
+      { value: LINKED, layout: 'detailed' as const },
+      { value: PROJECT.addr, layout: 'detailed' as const },
+    ]
+    await editMessage('issue-folder', 'm1', 'the drawn body, own reference left out', { before, embeds, here: ISSUE.addr, remove: LINKED })
+    expect(s.editMessage).toHaveBeenLastCalledWith({
+      folder: 'issue-folder',
+      messageEventId: 'm1',
+      body: before,
+      embeds: [
+        { value: LINKED, layout: 'none' },
+        { value: PROJECT.addr, layout: 'detailed' },
+      ],
+    })
+  })
+
+  it('an edit adding the first link adds its card; an edit after ✕ leaves the set as it is', async () => {
+    s.editMessage.mockResolvedValue({ ok: true })
+    await editMessage('issue-folder', 'm1', see(LINKED), { before: 'no link', here: ISSUE.addr })
+    expect(s.editMessage).toHaveBeenLastCalledWith(expect.objectContaining({ body: see(LINKED), embeds: [{ value: LINKED, layout: 'detailed' }] }))
+    await editMessage('issue-folder', 'm1', `${see(LINKED)}, edited`, { before: see(LINKED), embeds: [{ value: LINKED, layout: 'none' }], here: ISSUE.addr })
+    expect(s.editMessage).toHaveBeenLastCalledWith(expect.objectContaining({ embeds: undefined }))
   })
 })
 

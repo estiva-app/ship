@@ -35,6 +35,7 @@ import {
   commentsOn,
   mentionsOf,
   commentsOnAny,
+  type CardEdit,
   type DirectoryView,
   type FolderState,
   type WorkspaceState,
@@ -194,6 +195,28 @@ export function folderOfMessage(state: FolderState, messageId: string): string |
   for (const conversation of state.conversations) {
     for (const message of [conversation.root, ...conversation.replies]) {
       if (message.id === messageId) return message.folder || undefined
+    }
+  }
+  return undefined
+}
+
+/**
+ * What an edit of one message needs to keep its cards right (SPEC §13.6.2): its
+ * whole text as it stands, its own reference included (the drawn body leaves
+ * that out), its folded cards and parts, and the file its conversation is on.
+ * With `remove`, the edit is ✕ on that file's card.
+ */
+export function cardEditOf(state: WorkspaceState, messageId: string, remove?: string): CardEdit | undefined {
+  for (const conversation of state.conversations) {
+    for (const message of [conversation.root, ...conversation.replies]) {
+      if (message.id !== messageId) continue
+      return {
+        before: state.edits[messageId]?.body ?? message.body,
+        embeds: state.embeds[messageId],
+        parts: state.parts[messageId],
+        here: message.anchor ?? conversation.root.anchor ?? conversation.about[0],
+        remove,
+      }
     }
   }
   return undefined
@@ -643,13 +666,13 @@ export function ProjectPage({
           author or the NIP-OA owner of an authoring agent, and no client can
           evaluate the second half — same reasoning as the deletion above.
         */
-        onEditMessage={(messageId, body) => {
+        onEditMessage={(messageId, body, removeCard) => {
           const folder = folderOfMessage(state, messageId)
           if (!folder) {
             say('That message has no Folder to publish an edit into.', 'error')
             return false
           }
-          return act('Edit', () => editMessage(folder, messageId, body), say, () => refresh([folder]))
+          return act(removeCard ? 'Remove card' : 'Edit', () => editMessage(folder, messageId, body, cardEditOf(state, messageId, removeCard)), say, () => refresh([folder]))
         }}
         onReplyInActivity={(threadId, body, files, picks) => {
           const conversation = state.conversations.find((c) => c.id === threadId)
