@@ -477,7 +477,9 @@ function parseNip22Comment(
       ]),
     ],
     ...(tag(event, 'A') ? { anchor: tag(event, 'A') } : {}),
-    ...(blockAnchorOf(event) ? { blockId: blockAnchorOf(event) } : {}),
+    // A reply copies its comment's `block` (SPEC §13.6): the thread's place, which its comment already shows, so a reply draws none of its own.
+    // why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-reply-on-a-page-keeps-its-threads-place.md
+    ...(!parentEvent && blockAnchorOf(event) ? { blockId: blockAnchorOf(event) } : {}),
   }
 }
 
