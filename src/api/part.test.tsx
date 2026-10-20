@@ -16,8 +16,9 @@ const paused = vi.hoisted(() => ({ ms: 0 }))
 vi.mock('./store', () => ({ relay: { query: (filters: unknown[]) => query(filters) } }))
 vi.mock('./foreign', () => ({ resolveForeign: resolve }))
 vi.mock('@/lib/relayBudget', () => ({ pausedForMs: () => paused.ms }))
+const others = vi.hoisted(() => ({ manifests: [] as unknown[] }))
 vi.mock('./handoff', () => ({
-  declaredManifests: async () => [{ ...buildManifest('8'.repeat(64), 0, 'https://ship.estiva.app'), id: 'm', sig: '' }],
+  declaredManifests: async () => [{ ...buildManifest('8'.repeat(64), 0, 'https://ship.estiva.app'), id: 'm', sig: '' }, ...others.manifests],
 }))
 
 import { openLinkOf, partTagsFor, readPart, resetParts, shownParts, urlNames, usePart } from './part'
@@ -46,6 +47,7 @@ afterEach(() => {
   query.mockReset()
   resolve.mockReset()
   paused.ms = 0
+  others.manifests = []
 })
 
 describe('partTagsFor — a pasted block link earns its tags', () => {
@@ -56,6 +58,21 @@ describe('partTagsFor — a pasted block link earns its tags', () => {
       ['part', ADDRESS, 'p1'],
     ])
     expect(query).toHaveBeenCalledWith([{ '#d': [D], kinds: [30851], limit: 10 }])
+  })
+
+  it('earns the same tags for the block link on Leaf’s host, looked up under every kind that path reads as (LTX-6)', async () => {
+    // Leaf serves the path; a wiki reads `/issue/` as its own kind; a third kind holding the d is not what the link names.
+    const manifest = (web: string, ...urls: string[][]) => ({ id: web, sig: '', pubkey: 'c'.repeat(64), kind: 31990, created_at: 1, content: '{}', tags: [['web', web, 'naddr'], ...urls] })
+    others.manifests = [
+      manifest('https://leaf.estiva.app/f/<bech32>', ['urls', 'https://leaf.estiva.app/document/<slug>-<d>#block-<block>', '30842']),
+      manifest('https://wiki.example/o/<bech32>', ['urls', 'https://wiki.example/issue/<slug>-<d>', '30023']),
+    ]
+    const held = [issueEvent, { ...issueEvent, id: 'x', kind: 30818, pubkey: 'b'.repeat(64) }]
+    query.mockImplementation(async ([filter]: { kinds?: number[] }[]) => held.filter((e) => !filter.kinds || filter.kinds.includes(e.kind)))
+    expect(await partTagsFor(`https://leaf.estiva.app/issue/plan-the-launch-${D}#block-p1`)).toEqual([
+      ['a', ADDRESS],
+      ['part', ADDRESS, 'p1'],
+    ])
   })
 
   it('earns nothing when two authors hold that d: the link cannot say which', async () => {
