@@ -31,7 +31,9 @@ async function cardValueOf(url: string): Promise<{ value: string | null; block?:
   if (!hit) return { value: null }
   if (hit.by === 'id') return { value: EVENT_ID.test(hit.identifier) ? hit.identifier.toLowerCase() : null }
   const filter: Record<string, unknown> = { '#d': [hit.identifier], limit: 2 }
-  if (hit.kind !== undefined) filter.kinds = [hit.kind]
+  // A path on another app's host can read as several kinds (SPEC §7.7, LTX-6): ask under each.
+  const kinds = hit.kinds ?? (hit.kind === undefined ? undefined : [hit.kind])
+  if (kinds) filter.kinds = kinds
   const found: SignedEvent[] = await relay.query([filter] as never)
   const authors = new Set(found.map((event) => `${event.kind}:${event.pubkey}`))
   return authors.size === 1 ? { value: `${[...authors][0]}:${hit.identifier}`, block: hit.block } : { value: null }

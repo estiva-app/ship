@@ -270,17 +270,19 @@ export async function partTagsFor(body: string, own?: string): Promise<NostrTag[
     return []
   }
   // The first link's block per object, so one read per object, all at once.
-  const first = new Map<string, { kind?: number; identifier: string; block: string }>()
+  const first = new Map<string, { kinds?: number[]; identifier: string; block: string }>()
   for (const url of urls) {
     const hit = matchObjectUrl(url, shapes)
     if (!hit || hit.by !== 'd' || hit.block === undefined) continue
-    const key = `${hit.kind ?? ''}:${hit.identifier}`
-    if (!first.has(key)) first.set(key, { kind: hit.kind, identifier: hit.identifier, block: hit.block })
+    // A path on another app's host can read as several kinds (SPEC §7.7, LTX-6): the lookup asks under each.
+    const kinds = hit.kinds ?? (hit.kind === undefined ? undefined : [hit.kind])
+    const key = `${kinds?.join(',') ?? ''}:${hit.identifier}`
+    if (!first.has(key)) first.set(key, { kinds, identifier: hit.identifier, block: hit.block })
   }
   const found = await Promise.all(
     [...first.values()].map(async (hit) => {
       const filter: Record<string, unknown> = { '#d': [hit.identifier], limit: 10 }
-      if (hit.kind !== undefined) filter.kinds = [hit.kind]
+      if (hit.kinds) filter.kinds = hit.kinds
       const events = await query([filter]).catch(() => [] as SignedEvent[])
       // A link names a `d`, not who wrote it. When two authors hold that `d`,
       // anyone could have published the second, so the link earns nothing
