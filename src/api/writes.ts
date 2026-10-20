@@ -429,7 +429,8 @@ export function reply(conversation: Conversation, fallbackFolder: string, body: 
       body,
       partTags,
       linkTags,
-      embeds: embeds ? [...embeds] : cardToSend(body, partTags, root.anchor ?? conversation.about[0]),
+      // The box's card, but never the thread's own file: a reply under "Mentioned in" is read on another page than its own.
+      embeds: embeds ? embeds.filter((embed) => embed.value !== (root.anchor ?? conversation.about[0])) : cardToSend(body, partTags, root.anchor ?? conversation.about[0]),
       ...(root.anchor
         ? {
             replyToComment: {

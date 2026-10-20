@@ -12,7 +12,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { ThreadListView } from './ThreadList'
+import { MentionListView, ThreadListView } from './ThreadList'
 import type { ThreadData } from '@/components/ConversationThread'
 import type { ThreadListViewProps } from './shared'
 
@@ -78,5 +78,22 @@ describe('the message tools', () => {
     expect(screen.queryByRole('button', { name: 'Add a reaction' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Message actions' })).toBeNull()
     expect(screen.getByRole('button', { name: 'Thank you, 1' })).toBeDisabled()
+  })
+
+  it('offers no reaction under "Mentioned in" on a thread whose own file is archived, and still does on one that is not', () => {
+    const open = { ...thread, id: 'm2', root: { ...thread.root, id: 'm2', by: 'ann' } }
+    render(
+      <MentionListView
+        items={[
+          { thread, relation: 'mention', closed: 'Archived. Unarchive it to comment.' },
+          { thread: open, relation: 'mention' },
+        ]}
+        onReply={async () => true}
+        onReact={answered()}
+        viewer="bob"
+      />,
+    )
+    expect(screen.getAllByRole('button', { name: 'Add a reaction' })).toHaveLength(1)
+    expect(document.querySelector('[data-thread="m1"]')?.querySelector('button[aria-label="Add a reaction"]')).toBeNull()
   })
 })

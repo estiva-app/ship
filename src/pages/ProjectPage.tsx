@@ -61,6 +61,7 @@ import { MoveProject } from '@/components/MoveProject'
 import { ArchiveDialog } from '@/components/ArchiveDialog'
 import { ArchivedNotice } from '@/components/ArchivedNotice'
 import { archivedLine, lockedReason, ownArchive, type Archives } from '@/lib/archive'
+import { KIND } from '@/nostr/kinds'
 
 export type { Say } from './act'
 
@@ -278,12 +279,22 @@ export function activityFor(
   addr: string,
   state: WorkspaceState,
   directory: DirectoryView,
+  archives?: Archives,
 ): { items: ActivityItem[]; truncated: number } {
-  const mentions: ActivityItem[] = mentionsOf(state.conversations, addr, state.anchors).map((conversation) => ({
-    thread: threadFor(conversation, directory, undefined, addr, state.edits, state.attachments, state.urgent, state.parts, state.embeds),
-    relation: 'mention' as const,
-    ...placeOf(conversation.root.folder, state),
-  }))
+  // A thread on an archived file takes no reply or reaction here either (Decided 2026-10-17: none, in every app).
+  const closedOn = (file: string | undefined) => {
+    if (!file || !archives) return undefined
+    return archivedLine(file.startsWith(`${KIND.PROJECT}:`) ? archives.ofProject(file) : archives.ofIssue({ addr: file }))
+  }
+  const mentions: ActivityItem[] = mentionsOf(state.conversations, addr, state.anchors).map((conversation) => {
+    const closed = closedOn(conversation.root.anchor ?? conversation.about[0])
+    return {
+      thread: threadFor(conversation, directory, undefined, addr, state.edits, state.attachments, state.urgent, state.parts, state.embeds),
+      relation: 'mention' as const,
+      ...placeOf(conversation.root.folder, state),
+      ...(closed ? { closed } : {}),
+    }
+  })
   return { items: mentions.slice(0, ACTIVITY_HORIZON), truncated: Math.max(0, mentions.length - ACTIVITY_HORIZON) }
 }
 
@@ -409,8 +420,8 @@ export function ProjectPage({
   }, [project, state, directory, archives])
 
   const activity = useMemo(
-    () => (project ? activityFor(project.addr, state, directory) : { items: [], truncated: 0 }),
-    [project, state, directory],
+    () => (project ? activityFor(project.addr, state, directory, archives) : { items: [], truncated: 0 }),
+    [project, state, directory, archives],
   )
 
   /*

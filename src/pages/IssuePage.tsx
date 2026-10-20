@@ -109,8 +109,8 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
   const conversations = useMemo(() => (issue ? commentsOn(state.conversations, issue.addr, state.anchors) : []), [issue, state])
   /* Activity is where else this issue was mentioned (PEE-26). */
   const activity = useMemo(
-    () => (issue ? activityFor(issue.addr, state, directory) : { items: [], truncated: 0 }),
-    [issue, state, directory],
+    () => (issue ? activityFor(issue.addr, state, directory, archives) : { items: [], truncated: 0 }),
+    [issue, state, directory, archives],
   )
   /* An issue's comments are its own stream, keyed on its address — SPEC §11.1
      (FOL-16) — so reading it advances that address and one `thread:` context

@@ -66,6 +66,8 @@ export interface ActivityItem {
   where?: string
   /** What `where` is, when Ship knows: a project or an issue, so it can be drawn with that one's icon. */
   whereKind?: 'project' | 'issue'
+  /** Why this thread takes no reply or reaction: the file it is on is archived (Decided 2026-10-17). */
+  closed?: string
 }
 
 export interface ActivityProps {

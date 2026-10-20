@@ -251,6 +251,8 @@ interface ThreadProps {
   judged?: boolean
   resolved?: Record<string, ForeignObjectData | null | undefined>
   here?: string
+  /** A thread living on another file ("Mentioned in"): its reply box treats no file as its own, and the send drops the thread's own file's card. */
+  elsewhere?: boolean
   nameOf?: (pubkey: string) => string
   reactionsBy?: Record<string, readonly Reaction[]>
   onReact?: (messageId: string, emoji: string, mine?: string) => Promise<Answer>
@@ -265,7 +267,7 @@ interface ThreadProps {
 /** Replies hang one step in, behind today's left rule. */
 const REPLY_RULE = 'ml-2.5 border-l-2 border-border-default pl-3'
 
-function Thread({ thread, pageThreads, onReply, disabledReason, unread, stillUnread, judged = true, resolved, here, nameOf, reactionsBy, onReact, onDeleteMessage, onEditMessage, upload, drafts, viewer, onShown }: ThreadProps) {
+function Thread({ thread, pageThreads, onReply, disabledReason, unread, stillUnread, judged = true, resolved, here, elsewhere = false, nameOf, reactionsBy, onReact, onDeleteMessage, onEditMessage, upload, drafts, viewer, onShown }: ThreadProps) {
   const scope = useMemo(() => messageScope(pageThreads, thread.id), [pageThreads, thread.id])
   const references = useCallback((query: string) => referenceSections(scope, query, nameOf), [scope, nameOf])
   const captions = useMemo(() => referenceCaptions(scope, nameOf), [scope, nameOf])
@@ -320,23 +322,25 @@ function Thread({ thread, pageThreads, onReply, disabledReason, unread, stillUnr
               </div>
             </Fragment>
           ))}
-          {/* Escape no longer closes an empty reply: the box's rule is that Escape cancels an edit only (approved Ship stories). */}
-          <Box
-            key={thread.id}
-            kind="reply"
-            autoFocus={focusReply}
-            closed={disabledReason}
-            draftKey={draftKeys.thread(thread.id)}
-            drafts={drafts}
-            upload={upload}
-            nameOf={nameOf}
-            resolved={resolved}
-            here={here}
-            className="ml-2.5"
-            references={references}
-            captions={captions}
-            onSend={(text, files, picks) => onReply(thread.id, text, files, picks)}
-          />
+          {/* Escape no longer closes an empty reply: the box's rule is that Escape cancels an edit only (approved Ship stories).
+              Closed, no reply box at all: the start box's line already says why (the approved Ship story). */}
+          {!disabledReason && (
+            <Box
+              key={thread.id}
+              kind="reply"
+              autoFocus={focusReply}
+              draftKey={draftKeys.thread(thread.id)}
+              drafts={drafts}
+              upload={upload}
+              nameOf={nameOf}
+              resolved={resolved}
+              here={elsewhere ? undefined : here}
+              className="ml-2.5"
+              references={references}
+              captions={captions}
+              onSend={(text, files, picks) => onReply(thread.id, text, files, picks)}
+            />
+          )}
         </div>
       )}
     </Card>
@@ -438,7 +442,7 @@ export function MentionListView(props: MentionListViewProps) {
                   <span>{relation.label}</span>
                 )}
               </p>
-              <Thread thread={item.thread} pageThreads={pageThreads} {...threadProps(props)} />
+              <Thread thread={item.thread} pageThreads={pageThreads} elsewhere {...threadProps(props)} disabledReason={item.closed ?? props.disabledReason} />
             </li>
           )
         })}
