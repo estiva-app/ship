@@ -119,4 +119,28 @@ describe('an address on another Estiva app’s host opens as written', () => {
     expect(chip?.getAttribute('href')).not.toContain('evil.example')
     expect(chip?.getAttribute('href')).toMatch(/^\/issue\//)
   })
+
+  // The card its author asked for opens where the chip would: the address as written.
+  const card = (body: string, layout: 'detailed' | 'compact') => {
+    const c = render(<MessageText body={body} embeds={[{ value: ISSUE, layout }]} resolved={{ [`nostr:${addrToNaddr(ISSUE, [])}`]: issue }} />).container
+    return [...c.querySelectorAll('[data-cards] a')].map((a) => a.getAttribute('href'))
+  }
+
+  it('alone on its line with its card, the card opens Leaf at the address, not the issue’s page in Ship', () => {
+    const hrefs = card(LEAF_ISSUE, 'detailed')
+    expect(hrefs).toContain(LEAF_ISSUE)
+    expect(hrefs.some((href) => href?.startsWith('/issue/'))).toBe(false)
+  })
+
+  it('an old message’s compact card opens Leaf at the address too', () => {
+    expect(card(LEAF_ISSUE, 'compact')).toEqual([LEAF_ISSUE])
+  })
+
+  it('a card for an address on a host no app declares opens the issue’s page here, never that site (security review)', () => {
+    const rogue = `https://evil.example/issue/plan-the-launch-${ISSUE_D}`
+    answers.set(rogue, ISSUE)
+    const hrefs = card(rogue, 'detailed')
+    expect(hrefs.some((href) => href?.startsWith('/issue/'))).toBe(true)
+    expect(hrefs.some((href) => href?.includes('evil.example'))).toBe(false)
+  })
 })

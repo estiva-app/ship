@@ -106,4 +106,11 @@ describe('writtenLinkOf', () => {
     expect(writtenLinkOf('https://leaf.estiva.app.evil.com/issue/plan-x', ISSUE_ROUTE, SHIP, DECLARED)).toBeUndefined()
     expect(writtenLinkOf('http://leaf.estiva.app/issue/plan-x', ISSUE_ROUTE, SHIP, DECLARED)).toBeUndefined()
   })
+
+  // LTX-6 security re-review: a route starting `//` is another host to the router and the browser.
+  it('a path on Ship’s host that starts with two slashes (or a slash and a backslash) never becomes a route to another host', () => {
+    for (const url of ['https://ship.estiva.app//document/plan-x', 'https://ship.estiva.app/\\document/plan-x', 'https://ship.estiva.app//evil.example/issue/plan-x#block-1']) {
+      expect(writtenLinkOf(url, LEAF_PAGE, SHIP, DECLARED), url).toBeUndefined()
+    }
+  })
 })

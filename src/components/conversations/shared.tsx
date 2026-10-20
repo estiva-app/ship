@@ -15,6 +15,8 @@ export const MESSAGE_FORMAT = 'marker' as const
 /** One card a message asks for, with the `nostr:` reference its object is resolved under. */
 export interface MessageCard extends Embed {
   reference: string
+  /** The first URL the body wrote for its file: the card opens it, as that file's chip would (LTX-6). */
+  opensAt?: string
 }
 
 /**
@@ -36,9 +38,21 @@ export function cardsOf(blocks: readonly RenderBlock[], embeds: readonly Embed[]
     const value = valueOfReference(reference)
     if (value && !written.has(value)) written.set(value, reference)
   }
+  const writtenUrl = new Map<string, string>()
+  const urlsIn = (bs: readonly RenderBlock[]) => {
+    for (const block of bs) {
+      for (const run of block.inline ?? []) {
+        const value = run.reference && /^https?:\/\//i.test(run.text) ? valueOfReference(run.reference) : undefined
+        if (value && !writtenUrl.has(value)) writtenUrl.set(value, run.text)
+      }
+      if (block.children) urlsIn(block.children)
+    }
+  }
+  urlsIn(blocks)
   return cardsIn(embeds, blocks, parts, resolveLink).flatMap((card) => {
     const reference = written.get(card.value) ?? referenceOfValue(card.value)
-    return reference ? [{ ...card, reference }] : []
+    const opensAt = writtenUrl.get(card.value)
+    return reference ? [{ ...card, reference, ...(opensAt ? { opensAt } : {}) }] : []
   })
 }
 

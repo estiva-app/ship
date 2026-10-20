@@ -138,6 +138,7 @@ export function MessageCard({
   object: given,
   compact = false,
   onRemove,
+  opensAt,
 }: {
   uri: string
   object: ForeignObject | null | undefined
@@ -145,6 +146,8 @@ export function MessageCard({
   compact?: boolean
   /** ✕ on the card, offered to its message's author (Decided 19 Oct, WBM-7): the message then asks for no card. */
   onRemove?: () => void
+  /** The URL the body wrote for its file: a click opens it, as the file's chip would (LTX-6). */
+  opensAt?: string
 }) {
   // A re-read after a change, until the conversation's next answer replaces it.
   const [after, setAfter] = useState<{ given: ForeignObject | null | undefined; object: ForeignObject | null }>()
@@ -183,13 +186,13 @@ export function MessageCard({
   )
 
   const ready = object && !object.unreachable ? object : undefined
-  if (ready && !compact && isReadableFolder(ready)) return <FolderCard uri={uri} folder={ready} error={error} onRemove={onRemove} />
-  return <CardBox uri={uri} object={object} failed={failed} compact={compact} onAct={onAct} error={error} onRemove={onRemove} />
+  if (ready && !compact && isReadableFolder(ready)) return <FolderCard uri={uri} folder={ready} error={error} onRemove={onRemove} opensAt={opensAt} />
+  return <CardBox uri={uri} object={object} failed={failed} compact={compact} onAct={onAct} error={error} onRemove={onRemove} opensAt={opensAt} />
 }
 
 /** A linked Folder's card, with its files read for it alone (Miky, 16 Oct, ship#310). */
-function FolderCard({ uri, folder, error, onRemove }: { uri: string; folder: ForeignObject; error?: string; onRemove?: () => void }) {
-  return <CardBox uri={uri} object={useFolderFiles(uri, folder)} failed={false} compact={false} error={error} onRemove={onRemove} />
+function FolderCard({ uri, folder, error, onRemove, opensAt }: { uri: string; folder: ForeignObject; error?: string; onRemove?: () => void; opensAt?: string }) {
+  return <CardBox uri={uri} object={useFolderFiles(uri, folder)} failed={false} compact={false} error={error} onRemove={onRemove} opensAt={opensAt} />
 }
 
 function CardBox({
@@ -200,6 +203,7 @@ function CardBox({
   onAct,
   error,
   onRemove,
+  opensAt,
 }: {
   uri: string
   object: ForeignObject | null | undefined
@@ -208,6 +212,7 @@ function CardBox({
   onAct?: (actionId: string, value: string) => void
   error?: string
   onRemove?: () => void
+  opensAt?: string
 }) {
   const naddr = uri.replace(/^nostr:/i, '')
   const directory = useWorkspacePeople()
@@ -229,7 +234,7 @@ function CardBox({
     link = rememberedUnavailable(naddr) ? notAvailable(uri) : null
   } else {
     const conversation: LinkedConversation | undefined = ready && said ? { count: said.count, href: conversationHref(ready), unread: said.unread } : undefined
-    link = linkStateOf(uri, object, { directory, onAct, conversation })
+    link = openingAt(linkStateOf(uri, object, { directory, onAct, conversation }), opensAt)
   }
 
   /*

@@ -91,5 +91,8 @@ export function writtenLinkOf(
   // Ship's own file written on Ship's host already opens here, at its route; only a block (not `#/…`, an old hash
   // route) changes where.
   if (opensHere && parsed.origin === origin && (parsed.hash.length < 2 || parsed.hash.startsWith('#/'))) return undefined
-  return parsed.origin === origin ? { place: 'here', href: `${parsed.pathname}${parsed.search}${parsed.hash}` } : { place: 'app', href: link }
+  if (parsed.origin !== origin) return { place: 'app', href: link }
+  // A path that starts `//` (`/\` parses the same) would read as another host once it is a route: it opens where its file opens.
+  const route = `${parsed.pathname}${parsed.search}${parsed.hash}`
+  return new URL(route, origin).origin === origin ? { place: 'here', href: route } : undefined
 }
