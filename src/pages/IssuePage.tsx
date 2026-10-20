@@ -4,7 +4,7 @@ import { useNewSince } from '@/lib/useNewSince'
 import { useCallback, useMemo, useState } from 'react'
 import { ArchiveDialog } from '@/components/ArchiveDialog'
 import { ArchivedNotice } from '@/components/ArchivedNotice'
-import { lockedReason, ownArchive, type Archives } from '@/lib/archive'
+import { archivedLine, lockedReason, ownArchive, type Archives } from '@/lib/archive'
 import { ISSUE_STATUSES, lookupStatus, archiveIssue, commentsOn, deleteIssue, deleteMessage, editMessage, react, reply, setIssueField, unreact, startConversation, type DirectoryView, type FolderState, type WorkspaceState, threadContext, fileContext, useMergedReadState, useFeedJudges, unreadByThread } from '@/api'
 import { me } from '@/api'
 import { MEMBER_FIELD_PREFIX, memberOfField } from '@estiva-app/conversation'
@@ -109,8 +109,8 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
   const conversations = useMemo(() => (issue ? commentsOn(state.conversations, issue.addr, state.anchors) : []), [issue, state])
   /* Activity is where else this issue was mentioned (PEE-26). */
   const activity = useMemo(
-    () => (issue ? activityFor(issue.addr, state, directory) : { items: [], truncated: 0 }),
-    [issue, state, directory],
+    () => (issue ? activityFor(issue.addr, state, directory, archives) : { items: [], truncated: 0 }),
+    [issue, state, directory, archives],
   )
   /* An issue's comments are its own stream, keyed on its address — SPEC §11.1
      (FOL-16) — so reading it advances that address and one `thread:` context
@@ -203,8 +203,9 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
             />
           )
         }
-        // Archived, its own fields stay shut until it is unarchived; comments stay open (SHI-36).
+        // Archived, its own fields stay shut until it is unarchived (SHI-36), and it takes no comment or reaction (Decided 2026-10-17).
         lockedReason={lockedReason(archive)}
+        commentsClosed={archivedLine(archive)}
         members={
           <Members
             // A new issue is a new dialog: an open one must not carry over to the next page.
@@ -242,11 +243,11 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
         onThreadShown={onThreadShown}
         // Threads about an issue carry a reference in the body so Peek renders
         // the issue's widget above them (withReference: true), as the old app has it.
-        onStartConversation={(body, files, picks, blockId) => act('Message', () => startConversation({ folder: issue.folder, about: issue.addr, withReference: true, body, blockId, files, urgent: picks?.urgent }), say, () => refresh([issue.folder]))}
+        onStartConversation={(body, files, picks, blockId) => actInField('Message', () => startConversation({ folder: issue.folder, about: issue.addr, withReference: true, body, blockId, files, urgent: picks?.urgent, embeds: picks?.embeds }), () => refresh([issue.folder]))}
         onReply={(threadId, body, files, picks) => {
           const conversation = conversations.find((c) => c.id === threadId)
-          if (!conversation) return false
-          return act('Reply', () => reply(conversation, issue.folder, body, files, picks?.urgent), say, () => refresh([issue.folder]))
+          if (!conversation) return Promise.resolve('That conversation is no longer on this page.')
+          return actInField('Reply', () => reply(conversation, issue.folder, body, files, picks?.urgent, picks?.embeds), () => refresh([issue.folder]))
         }}
         activity={activity.items}
         activityTruncated={activity.truncated}
@@ -273,7 +274,7 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
           The reaction surface re-reads its own query instead — one request.
         */
         onReact={(messageId, emoji, mine) =>
-          mine ? act('Reaction', () => unreact(mine), say) : act('Reaction', () => react(messageId, emoji), say)
+          actInField('Reaction', () => (mine ? unreact(mine) : react(messageId, emoji)))
         }
         /*
           Deleting a comment — CON-3.
@@ -314,15 +315,14 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
         onEditMessage={(messageId, body, removeCard) => {
           const folder = folderOfMessage(state, messageId)
           if (!folder) {
-            say('That message has no Folder to publish an edit into.', 'error')
-            return false
+            return Promise.resolve('That message has no Folder to publish an edit into.')
           }
-          return act(removeCard ? 'Remove card' : 'Edit', () => editMessage(folder, messageId, body, cardEditOf(state, messageId, removeCard)), say, () => refresh([folder]))
+          return actInField(removeCard ? 'Remove card' : 'Edit', () => editMessage(folder, messageId, body, cardEditOf(state, messageId, removeCard)), () => refresh([folder]))
         }}
         onReplyInActivity={(threadId, body, files, picks) => {
           const conversation = state.conversations.find((c) => c.id === threadId)
-          if (!conversation?.root.folder) return false
-          return act('Reply', () => reply(conversation, conversation.root.folder, body, files, picks?.urgent), say, () => refresh([conversation.root.folder]))
+          if (!conversation?.root.folder) return Promise.resolve('That conversation has no Folder to reply into.')
+          return actInField('Reply', () => reply(conversation, conversation.root.folder, body, files, picks?.urgent, picks?.embeds), () => refresh([conversation.root.folder]))
         }}
         history={history}
         rail={{

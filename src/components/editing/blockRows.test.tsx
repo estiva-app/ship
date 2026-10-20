@@ -75,7 +75,7 @@ describe('a reader who cannot edit', () => {
 describe('a comment from a block’s menu', () => {
   it('goes to the Activity tab with that block as the anchor, and posting sends it once', async () => {
     const onTab = vi.fn()
-    const onStart = vi.fn(async () => true)
+    const onStart = vi.fn(async (): Promise<true | string> => true)
     const { result } = renderHook(() => useBlockComment(DESCRIPTION, 'blocks', onTab, onStart))
     act(() => result.current.start('b1'))
     expect(onTab).toHaveBeenCalledWith('activity')
@@ -86,7 +86,7 @@ describe('a comment from a block’s menu', () => {
   })
 
   it('keeps the anchor when the post is refused, so nothing typed loses its subject', async () => {
-    const { result } = renderHook(() => useBlockComment(DESCRIPTION, 'blocks', () => {}, async () => false))
+    const { result } = renderHook(() => useBlockComment(DESCRIPTION, 'blocks', () => {}, async () => 'refused'))
     act(() => result.current.start('b1'))
     await act(() => result.current.post('about this', [], undefined, 'b1'))
     expect(result.current.anchor).toMatchObject({ id: 'b1' })
@@ -94,7 +94,7 @@ describe('a comment from a block’s menu', () => {
 
   it('draws the block above the composer, which can be told it is about the whole page instead', async () => {
     const onDrop = vi.fn()
-    render(<ThreadListView threads={[]} onStart={() => true} onReply={() => true} anchor={{ state: 'resolved', id: 'b1', block: { type: 'paragraph', id: 'b1', content: [{ type: 'text', text: 'first part' }] } } as never} onDropAnchor={onDrop} />)
+    render(<ThreadListView threads={[]} onStart={async () => true} onReply={async () => true} anchor={{ state: 'resolved', id: 'b1', block: { type: 'paragraph', id: 'b1', content: [{ type: 'text', text: 'first part' }] } } as never} onDropAnchor={onDrop} />)
     expect(document.querySelector('[data-pending-anchor="b1"]')?.textContent).toContain('first part')
     await userEvent.setup().click(screen.getByRole('button', { name: 'Remove' }))
     expect(onDrop).toHaveBeenCalled()

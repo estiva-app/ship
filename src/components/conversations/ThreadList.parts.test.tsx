@@ -35,7 +35,7 @@ const thread = (body: string): ThreadData => ({
 })
 const show = (body: string, view: PartView) => {
   views.set(ADDRESS, view)
-  return render(<ThreadList threads={[thread(body)]} onStart={() => {}} onReply={() => {}} />).container
+  return render(<ThreadList threads={[thread(body)]} onStart={async () => true} onReply={async () => true} />).container
 }
 
 describe('a pasted block link', () => {
@@ -81,7 +81,7 @@ describe('a pasted block link', () => {
   it("draws a comment's anchored block with the same card, above the text (Decided 2026-10-07)", () => {
     views.set(ADDRESS, { state: 'detached', object })
     const t: ThreadData = { id: 't2', root: { id: 't2', author: { name: 'Ann' }, at: 1000, body: 'About this paragraph', by: 'ann', anchorPart: { address: ADDRESS, block: 'p1' } }, replies: [] }
-    const c = render(<ThreadList threads={[t]} onStart={() => {}} onReply={() => {}} />).container
+    const c = render(<ThreadList threads={[t]} onStart={async () => true} onReply={async () => true} />).container
     const card = c.querySelector('[data-part="detached"]')
     expect(card?.textContent).toContain('This part was deleted')
     expect(c.querySelector('[data-anchor]')).toBeNull()

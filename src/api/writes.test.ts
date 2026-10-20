@@ -176,6 +176,17 @@ describe('conversations', () => {
     await reply({ ...conversation, root: { ...root, id: 'stand-in', author: 'b' } }, 'fallback', 'yes')
     expect(s.postMessage).toHaveBeenLastCalledWith(expect.objectContaining({ replyToComment: { id: 'root-id', anchor: ISSUE.addr, author: undefined } }))
   })
+
+  it('a reply sends the card its box showed, but never one for the file the thread is on (a reply under "Mentioned in")', async () => {
+    s.postMessage.mockResolvedValue({ ok: true })
+    const root = { id: 'root-id', author: 'a', createdAt: 1, body: 'x', folder: 'thread-folder', about: [ISSUE.addr], anchor: ISSUE.addr }
+    const conversation = { id: 'root-id', root, replies: [], about: [ISSUE.addr], createdAt: 1, lastAt: 1 }
+    const other = `30851:${PK}:other`
+    await reply(conversation, 'fallback', 'see both', undefined, undefined, [{ value: ISSUE.addr, layout: 'detailed' }])
+    expect(s.postMessage).toHaveBeenLastCalledWith(expect.objectContaining({ embeds: [] }))
+    await reply(conversation, 'fallback', 'see both', undefined, undefined, [{ value: other, layout: 'detailed' }])
+    expect(s.postMessage).toHaveBeenLastCalledWith(expect.objectContaining({ embeds: [{ value: other, layout: 'detailed' }] }))
+  })
 })
 
 describe('the card a comment sent from Ship carries (WBM-7, SPEC §13.6.2)', () => {

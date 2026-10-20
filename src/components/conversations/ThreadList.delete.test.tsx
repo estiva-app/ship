@@ -44,7 +44,7 @@ const own: ThreadData = { ...thread, replies: [{ ...thread.replies[0], author: t
 // Changed on purpose: replies are folded behind the replies button, so the thread is opened to reach the reply's menu.
 function open(onDeleteMessage?: (id: string) => Promise<boolean | void> | boolean | void, threads = [own], viewer = AGENT) {
   const view = render(
-    <ThreadListView threads={threads} onStart={() => true} onReply={() => true} onDeleteMessage={onDeleteMessage} viewer={viewer} />,
+    <ThreadListView threads={threads} onStart={async () => true} onReply={async () => true} onDeleteMessage={onDeleteMessage} viewer={viewer} />,
   )
   fireEvent.click(screen.getByRole('button', { name: '1 reply' }))
   return view
@@ -61,7 +61,7 @@ describe('the delete control', () => {
   })
 
   it('is offered on nothing when nobody is signed in', () => {
-    render(<ThreadListView threads={[own]} onStart={() => true} onReply={() => true} onDeleteMessage={vi.fn()} />)
+    render(<ThreadListView threads={[own]} onStart={async () => true} onReply={async () => true} onDeleteMessage={vi.fn()} />)
     expect(screen.queryAllByRole('button', { name: 'Message actions' })).toHaveLength(0)
   })
 

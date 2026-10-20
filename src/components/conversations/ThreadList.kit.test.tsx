@@ -74,7 +74,7 @@ import { noteCardShape } from '@/lib/cardShapes'
 import { noteCardAvailability } from '@/lib/unavailableCards'
 
 const thread = (body: string, embeds?: Embed[]): ThreadData => ({ id: 't1', root: { id: 't1', author: { name: 'Ann' }, at: 1000, body, by: 'ann', embeds }, replies: [] })
-const noop = () => {}
+const noop = async (): Promise<true> => true
 const show = (body: string, { embeds, about }: { embeds?: Embed[]; about?: string } = {}) => render(<ThreadList threads={[thread(body, embeds)]} onStart={noop} onReply={noop} about={about} />).container
 const rows = (c: HTMLElement) => [...c.querySelectorAll('[data-message-text] [data-link-row]')].map((row) => row.textContent)
 const sentence = (c: HTMLElement) => c.querySelector('[data-message-text] p')?.textContent

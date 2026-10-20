@@ -4,7 +4,7 @@ import type { Reaction } from '@/api'
 import type { ForeignObject } from '@/api/foreign'
 import type { ActivityItem } from '@/components/Activity'
 import { referencesInMessages, type MessageData, type ThreadData, type UnreadByThread } from '@/components/ConversationThread'
-import type { MentionListViewProps, ThreadListViewProps } from '@/components/conversations/shared'
+import type { Answer, MentionListViewProps, ThreadListViewProps } from '@/components/conversations/shared'
 
 /**
  * A relay for the stories, so the new design can be tried with
@@ -133,16 +133,16 @@ export function useFakeRelay({ threads: seedThreads, mentioned: seedMentioned, p
   const mapMessage = (id: string, fn: (m: MessageData) => MessageData) =>
     mapAll((t) => ({ ...t, root: t.root.id === id ? fn(t.root) : t.root, replies: t.replies.map((r) => (r.id === id ? fn(r) : r)) }))
 
-  const reply = async (threadId: string, text: string, files: readonly Imeta[]) => {
+  const reply = async (threadId: string, text: string, files: readonly Imeta[]): Promise<Answer> => {
     await new Promise((r) => setTimeout(r, 300))
-    if (refused(text)) return false
+    if (refused(text)) return 'blocked: the word refuse is not allowed here'
     mapAll((t) => (t.id === threadId ? { ...t, replies: [...t.replies, message(text, files)] } : t))
     return true
   }
   const handlers = signedOut
     ? {}
     : {
-        onReact: (id: string, emoji: string, mine?: string) =>
+        onReact: async (id: string, emoji: string, mine?: string): Promise<Answer> => {
           setReactions((all) => {
             const list = [...(all[id] ?? [])]
             const i = list.findIndex((r) => r.emoji === emoji)
@@ -151,7 +151,9 @@ export function useFakeRelay({ threads: seedThreads, mentioned: seedMentioned, p
             if (i >= 0) list[i] = next
             else list.push(next)
             return { ...all, [id]: list.filter((r) => r.count > 0) }
-          }),
+          })
+          return true
+        },
         onDeleteMessage: async (id: string) => {
           // The relay's rule: a root's replies stay, the next one opening the conversation.
           mapAll((t) => {
@@ -160,9 +162,9 @@ export function useFakeRelay({ threads: seedThreads, mentioned: seedMentioned, p
           })
           return true
         },
-        onEditMessage: async (id: string, body: string) => {
+        onEditMessage: async (id: string, body: string): Promise<Answer> => {
           await new Promise((r) => setTimeout(r, 300))
-          if (refused(body)) return false
+          if (refused(body)) return 'blocked: the word refuse is not allowed here'
           mapMessage(id, (m) => ({ ...m, body, editedAt: now() }))
           return true
         },
@@ -179,9 +181,9 @@ export function useFakeRelay({ threads: seedThreads, mentioned: seedMentioned, p
       threads,
       unread,
       about: '30850:a:rel',
-      onStart: async (text, files) => {
+      onStart: async (text, files): Promise<Answer> => {
         await new Promise((r) => setTimeout(r, 300))
-        if (refused(text)) return false
+        if (refused(text)) return 'blocked: the word refuse is not allowed here'
         const root = message(text, files)
         setThreads((ts) => [{ id: root.id, root, replies: [] }, ...ts])
         return true

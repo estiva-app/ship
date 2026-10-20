@@ -48,8 +48,8 @@ async function load() {
   const { LiveDescription } = await import('@/components/editing/LiveDescription')
   const { NewIssueDialog } = await import('@/components/NewIssueDialog')
   const { useReopenHeld } = await import('./heldTyping')
-  const { MessageBox } = await import('@/components/conversations/MessageBox')
-  return { id, stop, SessionGate, LiveDescription, NewIssueDialog, MessageBox, useReopenHeld }
+  const { ConversationBox } = await import('@/components/conversations/ConversationBox')
+  return { id, stop, SessionGate, LiveDescription, NewIssueDialog, ConversationBox, useReopenHeld }
 }
 
 /** Estiva ID refuses the next renewal: the sign-in has ended. */
@@ -94,11 +94,11 @@ it('keeps an issue description typed when the sign-in ends, and puts it back uns
 })
 
 /** A message, as `ThreadList`'s: Edit opens the box, and it opens again when it holds text. */
-function MessageHarness({ p, onSubmit }: { p: Awaited<ReturnType<typeof load>>; onSubmit: () => boolean }) {
+function MessageHarness({ p, onSubmit }: { p: Awaited<ReturnType<typeof load>>; onSubmit: () => Promise<true | string> }) {
   const [editing, setEditing] = useState(false)
   p.useReopenHeld('edit:m1', () => setEditing(true))
   return editing ? (
-    <p.MessageBox kind="edit" initial="See you at 10" holdKey="edit:m1" onSubmit={onSubmit} onCancel={() => setEditing(false)} />
+    <p.ConversationBox kind="edit" editing={{ body: 'See you at 10', holdKey: 'edit:m1', onCancel: () => setEditing(false) }} onSend={onSubmit} />
   ) : (
     <button onClick={() => setEditing(true)}>Edit message</button>
   )
@@ -106,7 +106,7 @@ function MessageHarness({ p, onSubmit }: { p: Awaited<ReturnType<typeof load>>; 
 
 it('keeps a message being edited open through the passkey trip, with the new words, not yet saved', async () => {
   signIn()
-  const onSubmit = vi.fn(() => true)
+  const onSubmit = vi.fn(async (): Promise<true | string> => true)
   let page = await load()
   const thread = (p: typeof page) => (
     <p.SessionGate>

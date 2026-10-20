@@ -15,6 +15,7 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { Editor } from '@tiptap/react'
+import { encodeNevent, encodeNpub } from '@estiva-app/protocol'
 import { ThreadListView } from './ThreadList'
 import type { ThreadData } from '@/components/ConversationThread'
 import type { ThreadListViewProps } from './shared'
@@ -42,7 +43,7 @@ const thread: ThreadData = {
 
 /** The agent viewing its own message. */
 function open(props: Partial<ThreadListViewProps> = {}) {
-  return render(<ThreadListView threads={[thread]} onStart={() => true} onReply={() => true} viewer={AGENT} {...props} />)
+  return render(<ThreadListView threads={[thread]} onStart={async () => true} onReply={async () => true} viewer={AGENT} {...props} />)
 }
 
 type EditorBox = HTMLElement & { editor: Editor }
@@ -68,17 +69,17 @@ describe('the edit control', () => {
   const menuOffered = () => screen.queryAllByRole('button', { name: 'Message actions' }).length > 0
 
   it('is not offered on an agent’s message, even to a viewer who may own it (SHI-29)', () => {
-    render(<ThreadListView threads={[as({ name: 'Claude', bot: true }, AGENT)]} onStart={() => true} onReply={() => true} viewer={HUMAN} onEditMessage={vi.fn()} onDeleteMessage={vi.fn()} />)
+    render(<ThreadListView threads={[as({ name: 'Claude', bot: true }, AGENT)]} onStart={async () => true} onReply={async () => true} viewer={HUMAN} onEditMessage={vi.fn()} onDeleteMessage={vi.fn()} />)
     expect(menuOffered()).toBe(false)
   })
 
   it('is not offered on another human’s message, which the relay refuses every time', () => {
-    render(<ThreadListView threads={[as({ name: 'Somebody', bot: false }, AGENT)]} onStart={() => true} onReply={() => true} viewer={HUMAN} onEditMessage={vi.fn()} onDeleteMessage={vi.fn()} />)
+    render(<ThreadListView threads={[as({ name: 'Somebody', bot: false }, AGENT)]} onStart={async () => true} onReply={async () => true} viewer={HUMAN} onEditMessage={vi.fn()} onDeleteMessage={vi.fn()} />)
     expect(menuOffered()).toBe(false)
   })
 
   it('is offered on the viewer’s own message', () => {
-    render(<ThreadListView threads={[as({ name: 'Me', bot: false }, HUMAN)]} onStart={() => true} onReply={() => true} viewer={HUMAN} onEditMessage={vi.fn()} />)
+    render(<ThreadListView threads={[as({ name: 'Me', bot: false }, HUMAN)]} onStart={async () => true} onReply={async () => true} viewer={HUMAN} onEditMessage={vi.fn()} />)
     expect(menuOffered()).toBe(true)
   })
 
@@ -103,7 +104,7 @@ describe('the edit control', () => {
   })
 
   it('publishes the new body for the message being edited', async () => {
-    const onEditMessage = vi.fn(async () => true)
+    const onEditMessage = vi.fn(async (): Promise<true | string> => true)
     open({ onEditMessage })
     const box = await openEditor()
     replace(box, 'Key is in 1Password.')
@@ -116,7 +117,7 @@ describe('the edit control', () => {
   // Changed on purpose: the edit box is the writing box, whose keys are the same in every kind — Enter and
   // Ctrl+Enter save, and Shift+Enter is the new line (a new block, as a document has it).
   it('saves on Ctrl+Enter, and Shift+Enter in the text is a new line', async () => {
-    const onEditMessage = vi.fn(async () => true)
+    const onEditMessage = vi.fn(async (): Promise<true | string> => true)
     open({ onEditMessage })
     const box = await openEditor()
     replace(box, 'Key is in 1Password.')
@@ -128,34 +129,55 @@ describe('the edit control', () => {
   })
 
   /* Nothing to publish, and a no-op edit would still cost an event that every
-     reader has to fold. */
-  it('will not save an unchanged body', async () => {
-    open({ onEditMessage: vi.fn() })
+     reader has to fold. Changed on purpose (COMM-7): the shared box's Save is
+     always enabled, so an unchanged Save closes with nothing published. */
+  it('publishes nothing for an unchanged body, and closes', async () => {
+    const onEditMessage = vi.fn(async (): Promise<true | string> => true)
+    open({ onEditMessage })
     await openEditor()
-    expect(save().disabled).toBe(true)
+    fireEvent.click(save())
+    await waitFor(() => expect(screen.queryByRole('textbox', { name: 'Edit message' })).toBeNull())
+    expect(onEditMessage).not.toHaveBeenCalled()
   })
 
-  it('will not save an empty one', async () => {
-    open({ onEditMessage: vi.fn() })
+  it('will not save an empty one, and says so under the box', async () => {
+    const onEditMessage = vi.fn(async (): Promise<true | string> => true)
+    open({ onEditMessage })
     const box = await openEditor()
     replace(box, '   ')
-    expect(save().disabled).toBe(true)
+    fireEvent.click(save())
+    expect(await screen.findByText(/Not saved: a message needs words; Delete removes it/)).toBeInTheDocument()
+    expect(onEditMessage).not.toHaveBeenCalled()
   })
 
   /* The refusal path. Closing would throw away what was typed to no purpose —
-     the same rule the composer and the delete dialog keep. */
-  it('stays open when the relay refuses', async () => {
-    const onEditMessage = vi.fn(async () => false)
+     the same rule the composer and the delete dialog keep. The relay's words go
+     under the box, not in a toast (Decided 2026-10-17). */
+  it('stays open when the relay refuses, with the words still in it and why under it', async () => {
+    const onEditMessage = vi.fn(async (): Promise<true | string> => 'blocked: not your message')
     open({ onEditMessage })
     const box = await openEditor()
     replace(box, 'a change')
     fireEvent.click(save())
     await waitFor(() => expect(onEditMessage).toHaveBeenCalled())
     expect(screen.getByRole('textbox', { name: 'Edit message' }).textContent).toBe('a change')
+    expect(await screen.findByText(/Not saved: blocked: not your message/)).toBeInTheDocument()
+  })
+
+  /* SHI-49: the edit box showed a message reference as "nevent1…" and a person as "npub1…". */
+  it('opens a message reference and a person as chips, not as their nostr: text', async () => {
+    const ANN = 'a'.repeat(64)
+    const quoted: ThreadData = { id: 'f'.repeat(64), root: { id: 'f'.repeat(64), author: { name: 'Ann' }, at: 1_756_000_000, body: 'The key is rotated.', by: ANN }, replies: [] }
+    const body = `See nostr:${encodeNevent({ id: 'f'.repeat(64), relays: [] })} and ask nostr:${encodeNpub(ANN)}`
+    open({ onEditMessage: vi.fn(async (): Promise<true | string> => true), threads: [{ ...thread, root: { ...thread.root, body } }, quoted], nameOf: (pubkey) => (pubkey === ANN ? 'Ann Lee' : 'Someone') })
+    const box = await openEditor()
+    expect(box.textContent).not.toMatch(/nevent1|npub1|nostr:/)
+    expect(box.textContent).toContain('The key is rotated.')
+    expect(box.textContent).toContain('Ann Lee')
   })
 
   it('closes once the relay took it', async () => {
-    open({ onEditMessage: vi.fn(async () => true) })
+    open({ onEditMessage: vi.fn(async (): Promise<true | string> => true) })
     const box = await openEditor()
     replace(box, 'a change')
     fireEvent.click(save())

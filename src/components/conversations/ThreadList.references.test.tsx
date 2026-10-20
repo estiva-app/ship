@@ -41,7 +41,7 @@ const thread = (body: string, replyBody?: string): ThreadData => ({
   replies: replyBody ? [{ id: 'r1', author: { name: 'Ann' }, at: 2000, body: replyBody, by: 'ann' }] : [],
 })
 
-const noop = () => {}
+const noop = async (): Promise<true> => true
 const show = (t: ThreadData) => render(<ThreadList threads={[t]} onStart={noop} onReply={noop} />).container
 
 describe('a comment that points at an object', () => {

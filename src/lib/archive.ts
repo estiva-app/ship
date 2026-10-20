@@ -68,8 +68,8 @@ export function ownArchive(file: Archivable, activity: readonly ChangeLike[]): A
 
 /**
  * Why an archived file's own fields cannot change: its title, description and
- * rail stay shut until it is unarchived, while comments, Archive and Delete stay
- * open (Miky, SHI-36). Ship's courtesy, not the relay's rule — the relay does not
+ * rail stay shut until it is unarchived, while Archive and Delete stay open
+ * (Miky, SHI-36). Ship's courtesy, not the relay's rule — the relay does not
  * know an archive and accepts the write from any other app.
  */
 export function lockedReason(archive: ArchiveState | undefined): string | undefined {
@@ -77,6 +77,18 @@ export function lockedReason(archive: ArchiveState | undefined): string | undefi
   if (archive.with?.kind === 'project') return 'Unarchive its project to edit'
   if (archive.with?.kind === 'folder') return 'Unarchive its Folder to edit'
   return 'Unarchive to edit'
+}
+
+/**
+ * The line in the comment box's place on an archived file: it takes no new
+ * comment or reaction, in every app (Miky, 2026-10-17, reversing SHI-36's
+ * "comments stay open"). Ship's courtesy, as above.
+ */
+export function archivedLine(archive: ArchiveState | undefined): string | undefined {
+  if (!archive) return undefined
+  if (archive.with?.kind === 'project') return 'Archived with its project. Unarchive the project to comment.'
+  if (archive.with?.kind === 'folder') return 'Archived with its Folder. Unarchive the Folder to comment.'
+  return 'Archived. Unarchive it to comment.'
 }
 
 export interface Archives {

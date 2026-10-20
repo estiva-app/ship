@@ -18,35 +18,45 @@
  */
 import { useEffect, useState } from 'react'
 import { matchObjectUrl, urlPatternsOf } from '@estiva-app/interop'
-import type { SignedEvent } from '@estiva-app/protocol'
+import type { PartPointer, SignedEvent } from '@estiva-app/protocol'
 import { declaredManifests } from './handoff'
 import { relay } from './store'
 
 const EVENT_ID = /^[0-9a-f]{64}$/i
 
-/** The `embed` value an app link names — an address, or a message's event id — or null. Throws when the relay could not be asked. */
-async function cardValueOf(url: string): Promise<string | null> {
+/** The `embed` value an app link names — an address, or a message's event id — or null, and the block a link to one block names. Throws when the relay could not be asked. */
+async function cardValueOf(url: string): Promise<{ value: string | null; block?: string }> {
   const shapes = (await declaredManifests()).flatMap((manifest) => urlPatternsOf(manifest))
   const hit = matchObjectUrl(url, shapes)
-  if (!hit) return null
-  if (hit.by === 'id') return EVENT_ID.test(hit.identifier) ? hit.identifier.toLowerCase() : null
+  if (!hit) return { value: null }
+  if (hit.by === 'id') return { value: EVENT_ID.test(hit.identifier) ? hit.identifier.toLowerCase() : null }
   const filter: Record<string, unknown> = { '#d': [hit.identifier], limit: 2 }
   if (hit.kind !== undefined) filter.kinds = [hit.kind]
   const found: SignedEvent[] = await relay.query([filter] as never)
   const authors = new Set(found.map((event) => `${event.kind}:${event.pubkey}`))
-  return authors.size === 1 ? `${[...authors][0]}:${hit.identifier}` : null
+  return authors.size === 1 ? { value: `${[...authors][0]}:${hit.identifier}`, block: hit.block } : { value: null }
 }
 
 const asked = new Map<string, Promise<string | null>>()
 const known = new Map<string, string | null>()
+const blocks = new Map<string, string>()
+const answered = new Set<() => void>()
+
+/** Called whenever a link's answer comes back, so a box reading what its links name reads again (COMM-7). */
+export function linksChanged(listener: () => void): () => void {
+  answered.add(listener)
+  return () => void answered.delete(listener)
+}
 
 function ask(url: string): Promise<string | null> {
   let value = asked.get(url)
   if (!value) {
     value = cardValueOf(url).then(
       (answer) => {
-        known.set(url, answer)
-        return answer
+        known.set(url, answer.value)
+        if (answer.value && answer.block !== undefined) blocks.set(url, answer.block)
+        answered.forEach((listener) => listener())
+        return answer.value
       },
       () => {
         asked.delete(url)
@@ -61,6 +71,13 @@ function ask(url: string): Promise<string | null> {
 /** What a link names, from what has come back: undefined until it has, and for nothing. A `LinkResolver` for `cardsIn`. */
 export function knownLinkValue(url: string): string | undefined {
   return known.get(url) ?? undefined
+}
+
+/** The file and block a link to one block names, from what has come back: what `boxReadOf` draws as a live part under the box. */
+export function knownBlockOf(url: string): PartPointer | undefined {
+  const address = known.get(url)
+  const block = blocks.get(url)
+  return address && block !== undefined ? { address, block } : undefined
 }
 
 /**

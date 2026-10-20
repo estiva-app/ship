@@ -1,6 +1,6 @@
 import { IconBox, IconLayoutKanban, IconTable } from '@tabler/icons-react'
 import type { ContentFormat, Imeta } from '@estiva-app/protocol'
-import type { Picks } from '@/components/conversations/MessageBox'
+import type { Answer, Picks } from '@/components/conversations/shared'
 import type { ReactNode } from 'react'
 import { Breadcrumb } from '@/components/ui/Breadcrumb'
 import { ScrollArea } from '@/components/ui/ScrollArea'
@@ -77,8 +77,8 @@ export interface ProjectViewProps {
    * `files` are attachments already on the relay — SHI-2; `picks` the composer's urgent mentions (CON-25);
    * `blockId` when it starts from a block's menu, a comment anchored to that block — SPEC §13.6, RIC-18.
    */
-  onStartConversation: (text: string, files: readonly Imeta[], picks?: Picks, blockId?: string) => Promise<boolean | void> | boolean | void
-  onReply: (threadId: string, text: string, files: readonly Imeta[], picks?: Picks) => Promise<boolean | void> | boolean | void
+  onStartConversation: (text: string, files: readonly Imeta[], picks?: Picks, blockId?: string) => Promise<Answer>
+  onReply: (threadId: string, text: string, files: readonly Imeta[], picks?: Picks) => Promise<Answer>
   /** The block menu's Copy link (RIC-18): copies and says so. */
   onCopyBlockLink?: (link: string) => void
   /** Threads elsewhere that mention this project — CON-9. */
@@ -86,7 +86,7 @@ export interface ProjectViewProps {
   /** How many the horizon left out — `ACTIVITY_HORIZON`. Said on screen, never implied. */
   activityTruncated?: number
   /** Reply into a thread belonging to another file: its own Folder, never this project's. */
-  onReplyInActivity: (threadId: string, text: string, files: readonly Imeta[], picks?: Picks) => Promise<boolean | void> | boolean | void
+  onReplyInActivity: (threadId: string, text: string, files: readonly Imeta[], picks?: Picks) => Promise<Answer>
   rail: {
     status: string
     statuses: StatusEntry[]
@@ -106,15 +106,17 @@ export interface ProjectViewProps {
   /** This object's address, so an unsent message is kept against it — CON-10. */
   about?: string
   /** Add or take back a reaction on a message — CON-2. */
-  onReact?: (messageId: string, emoji: string, mine?: string) => Promise<boolean | void> | boolean | void
+  onReact?: (messageId: string, emoji: string, mine?: string) => Promise<Answer>
   /** Publish a deletion for one message — CON-3. Omitted where nobody may write. */
   onDeleteMessage?: (messageId: string) => Promise<boolean | void> | boolean | void
   /** Publish an edit of one message — CON-4. Omitted where nobody may write. */
-  onEditMessage?: (messageId: string, body: string, removeCard?: string) => Promise<boolean | void> | boolean | void
+  onEditMessage?: (messageId: string, body: string, removeCard?: string) => Promise<Answer>
   /** Why writes are unavailable — every write control on the page is disabled with it. */
   readOnlyReason?: string
   /** Why this project's own title, description, rail and Add issue are shut while it can still be discussed, archived or deleted — an archived project (SHI-36). */
   lockedReason?: string
+  /** The line in the comment box's place when this file takes no comment or reaction — archived (Decided 2026-10-17). */
+  commentsClosed?: string
   /** The upload behind attach. Injected so a story needs no relay; the app's by default. */
   upload?: (file: File) => Promise<Imeta>
   /** The `ArchivedNotice` of an archived project: the first thing on every tab (FOL-46). */
@@ -130,7 +132,7 @@ const TABS: { id: ProjectTab; label: string }[] = [
 ]
 
 /** One project's page, in tabs: Overview, Activity and Issues, with the rail on every tab. */
-export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onView, issues, issueStatuses, hrefFor, related, threads, unread, stillUnread, onThreadShown, onStartConversation, onReply, onCopyBlockLink, activity, activityTruncated, onReplyInActivity, rail, about, onReact, onDeleteMessage, onEditMessage, readOnlyReason, lockedReason, upload, archivedNotice, members }: ProjectViewProps) {
+export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onView, issues, issueStatuses, hrefFor, related, threads, unread, stillUnread, onThreadShown, onStartConversation, onReply, onCopyBlockLink, activity, activityTruncated, onReplyInActivity, rail, about, onReact, onDeleteMessage, onEditMessage, readOnlyReason, lockedReason, commentsClosed, upload, archivedNotice, members }: ProjectViewProps) {
   const comment = useBlockComment(header.description, header.descriptionFormat, onTab, onStartConversation)
   return (
     // `data-surface`, `data-view` and `data-tab` are the smoke test's waypoints — see IssuesView. The Table/Board
@@ -169,7 +171,7 @@ export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onVi
         {tab === 'overview' && (
           <Centred>
             {archivedNotice}
-            <LiveHeader title={header.title} titlePlaceholder="Untitled project" onRename={header.onRename} summary={header.summary} onSummarize={header.onSummarize} description={header.description} format={header.descriptionFormat} onDescribe={header.onDescribe} nameOf={header.nameOf} readOnly={!!(readOnlyReason ?? lockedReason)} upload={upload} onCommentOnBlock={comment.start} onCopyBlockLink={onCopyBlockLink} holdKey={about && `description:${about}`} />
+            <LiveHeader title={header.title} titlePlaceholder="Untitled project" onRename={header.onRename} summary={header.summary} onSummarize={header.onSummarize} description={header.description} format={header.descriptionFormat} onDescribe={header.onDescribe} nameOf={header.nameOf} readOnly={!!(readOnlyReason ?? lockedReason)} upload={upload} onCommentOnBlock={readOnlyReason ?? commentsClosed ? undefined : comment.start} onCopyBlockLink={onCopyBlockLink} holdKey={about && `description:${about}`} />
             {/* Nesting is by intent (RFC 0.5 §10.7): what somebody placed under this project, whatever app it belongs
                 to. A line first, so the list the app adds never reads as part of the description someone typed. */}
             {hasRelated(related) && (
@@ -187,7 +189,7 @@ export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onVi
           <Centred>
             {archivedNotice}
             <AppSection title="Conversations">
-              <ThreadList threads={threads} unread={unread} stillUnread={stillUnread} onThreadShown={onThreadShown} onStart={comment.post} anchor={comment.anchor} onDropAnchor={comment.drop} onReply={onReply} disabledReason={readOnlyReason} nameOf={header.nameOf} onReact={onReact} onDeleteMessage={onDeleteMessage} onEditMessage={onEditMessage} about={about} upload={upload} />
+              <ThreadList threads={threads} unread={unread} stillUnread={stillUnread} onThreadShown={onThreadShown} onStart={comment.post} anchor={comment.anchor} onDropAnchor={comment.drop} onReply={onReply} disabledReason={readOnlyReason ?? commentsClosed} nameOf={header.nameOf} onReact={onReact} onDeleteMessage={onDeleteMessage} onEditMessage={onEditMessage} about={about} upload={upload} />
             </AppSection>
             <AppSection title="Mentioned in">
               <MentionList items={activity} truncated={activityTruncated} onReply={onReplyInActivity} disabledReason={readOnlyReason} nameOf={header.nameOf} onReact={onReact} onDeleteMessage={onDeleteMessage} onEditMessage={onEditMessage} about={about} upload={upload} />

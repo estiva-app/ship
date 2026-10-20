@@ -60,7 +60,8 @@ import { hrefForIssue, rowFor } from './IssuesPage'
 import { MoveProject } from '@/components/MoveProject'
 import { ArchiveDialog } from '@/components/ArchiveDialog'
 import { ArchivedNotice } from '@/components/ArchivedNotice'
-import { lockedReason, ownArchive, type Archives } from '@/lib/archive'
+import { archivedLine, lockedReason, ownArchive, type Archives } from '@/lib/archive'
+import { KIND } from '@/nostr/kinds'
 
 export type { Say } from './act'
 
@@ -278,12 +279,22 @@ export function activityFor(
   addr: string,
   state: WorkspaceState,
   directory: DirectoryView,
+  archives?: Archives,
 ): { items: ActivityItem[]; truncated: number } {
-  const mentions: ActivityItem[] = mentionsOf(state.conversations, addr, state.anchors).map((conversation) => ({
-    thread: threadFor(conversation, directory, undefined, addr, state.edits, state.attachments, state.urgent, state.parts, state.embeds),
-    relation: 'mention' as const,
-    ...placeOf(conversation.root.folder, state),
-  }))
+  // A thread on an archived file takes no reply or reaction here either (Decided 2026-10-17: none, in every app).
+  const closedOn = (file: string | undefined) => {
+    if (!file || !archives) return undefined
+    return archivedLine(file.startsWith(`${KIND.PROJECT}:`) ? archives.ofProject(file) : archives.ofIssue({ addr: file }))
+  }
+  const mentions: ActivityItem[] = mentionsOf(state.conversations, addr, state.anchors).map((conversation) => {
+    const closed = closedOn(conversation.root.anchor ?? conversation.about[0])
+    return {
+      thread: threadFor(conversation, directory, undefined, addr, state.edits, state.attachments, state.urgent, state.parts, state.embeds),
+      relation: 'mention' as const,
+      ...placeOf(conversation.root.folder, state),
+      ...(closed ? { closed } : {}),
+    }
+  })
   return { items: mentions.slice(0, ACTIVITY_HORIZON), truncated: Math.max(0, mentions.length - ACTIVITY_HORIZON) }
 }
 
@@ -409,8 +420,8 @@ export function ProjectPage({
   }, [project, state, directory, archives])
 
   const activity = useMemo(
-    () => (project ? activityFor(project.addr, state, directory) : { items: [], truncated: 0 }),
-    [project, state, directory],
+    () => (project ? activityFor(project.addr, state, directory, archives) : { items: [], truncated: 0 }),
+    [project, state, directory, archives],
   )
 
   /*
@@ -554,8 +565,9 @@ export function ProjectPage({
             />
           )
         }
-        // Archived, its own fields stay shut until it is unarchived; comments stay open (SHI-36).
+        // Archived, its own fields stay shut until it is unarchived (SHI-36), and it takes no comment or reaction (Decided 2026-10-17).
         lockedReason={lockedReason(archive)}
+        commentsClosed={archivedLine(archive)}
         members={
           <Members
             key={project.addr}
@@ -606,17 +618,16 @@ export function ProjectPage({
           try {
             folder = workFolder(project)
           } catch (error) {
-            say(`Message rejected — ${error instanceof Error ? error.message : String(error)}`, 'error')
-            return false
+            return error instanceof Error ? error.message : String(error)
           }
-          return act('Message', () => startConversation({ folder, about: project.addr, withReference: false, body, blockId, files, urgent: picks?.urgent }), say, () => refresh([folder]))
+          return actInField('Message', () => startConversation({ folder, about: project.addr, withReference: false, body, blockId, files, urgent: picks?.urgent, embeds: picks?.embeds }), () => refresh([folder]))
         }}
         onCopyBlockLink={(link) => void copyText(link, 'Link copied', 'Copy this link:', say)}
         onReply={(threadId, body, files, picks) => {
           const conversation = conversations.find((c) => c.id === threadId)
-          if (!conversation) return false
+          if (!conversation) return Promise.resolve('That conversation is no longer on this page.')
           // The reply goes to the thread's own Folder, which need not be the project's.
-          return act('Reply', () => reply(conversation, project.contentFolder, body, files, picks?.urgent), say, () => refresh([conversation.root.folder || project.contentFolder]))
+          return actInField('Reply', () => reply(conversation, project.contentFolder, body, files, picks?.urgent, picks?.embeds), () => refresh([conversation.root.folder || project.contentFolder]))
         }}
         activity={activity.items}
         activityTruncated={activity.truncated}
@@ -638,7 +649,7 @@ export function ProjectPage({
           The reaction surface re-reads its own query instead — one request.
         */
         onReact={(messageId, emoji, mine) =>
-          mine ? act('Reaction', () => unreact(mine), say) : act('Reaction', () => react(messageId, emoji), say)
+          actInField('Reaction', () => (mine ? unreact(mine) : react(messageId, emoji)))
         }
         /*
           Deleting a comment — CON-3.
@@ -679,15 +690,14 @@ export function ProjectPage({
         onEditMessage={(messageId, body, removeCard) => {
           const folder = folderOfMessage(state, messageId)
           if (!folder) {
-            say('That message has no Folder to publish an edit into.', 'error')
-            return false
+            return Promise.resolve('That message has no Folder to publish an edit into.')
           }
-          return act(removeCard ? 'Remove card' : 'Edit', () => editMessage(folder, messageId, body, cardEditOf(state, messageId, removeCard)), say, () => refresh([folder]))
+          return actInField(removeCard ? 'Remove card' : 'Edit', () => editMessage(folder, messageId, body, cardEditOf(state, messageId, removeCard)), () => refresh([folder]))
         }}
         onReplyInActivity={(threadId, body, files, picks) => {
           const conversation = state.conversations.find((c) => c.id === threadId)
-          if (!conversation?.root.folder) return false
-          return act('Reply', () => reply(conversation, conversation.root.folder, body, files, picks?.urgent), say, () => refresh([conversation.root.folder]))
+          if (!conversation?.root.folder) return Promise.resolve('That conversation has no Folder to reply into.')
+          return actInField('Reply', () => reply(conversation, conversation.root.folder, body, files, picks?.urgent, picks?.embeds), () => refresh([conversation.root.folder]))
         }}
         rail={{
           status: project.status,

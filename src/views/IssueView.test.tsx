@@ -63,20 +63,21 @@ describe('IssueView, archived (SHI-36)', () => {
   })
 
   /*
-    The composer's editor is its own chunk; until it lands, its shell draws the
-    box's words — the invitation when it may be written, the reason when not.
-    That shell is what these read, so they hold without loading ProseMirror.
+    Changed on purpose (COMM-7, Decided 2026-10-17, reversing SHI-36's
+    "comments stay open"): an archived issue takes no new comment, and the box
+    is a line in its place saying why. The box is its own chunk, so `findBy`.
   */
-  it('keeps the composer open: a reader can still start a conversation', () => {
-    render(view('activity', { lockedReason: 'Unarchive to edit' }))
-    expect(screen.getByText('Start a conversation or type')).toBeInTheDocument()
-    expect(screen.queryByText('Unarchive to edit')).toBeNull()
+  it('shows a line saying it is archived where the box was, and no box', async () => {
+    render(view('activity', { lockedReason: 'Unarchive to edit', commentsClosed: 'Archived. Unarchive it to comment.' }))
+    expect(await screen.findByText('Archived. Unarchive it to comment.')).toBeInTheDocument()
+    expect(screen.queryByRole('textbox', { name: 'Start a conversation…' })).toBeNull()
+    expect(screen.queryByText('Start a conversation or type')).toBeNull()
   })
 
-  it('still shuts the composer when nothing on the page may be written', () => {
+  it('shows the same line, saying why, when nothing on the page may be written', async () => {
     render(view('activity', { readOnlyReason: 'Sign in to reply.' }))
-    expect(screen.getByText('Sign in to reply.')).toBeInTheDocument()
-    expect(screen.queryByText('Start a conversation or type')).toBeNull()
+    expect(await screen.findByText('Sign in to reply.')).toBeInTheDocument()
+    expect(screen.queryByRole('textbox', { name: 'Start a conversation…' })).toBeNull()
   })
 })
 
@@ -111,9 +112,11 @@ describe('ProjectView, archived (SHI-36)', () => {
     for (const name of ['Unarchive project', 'Delete project']) expect(screen.getByRole('button', { name }).getAttribute('aria-disabled')).toBe(null)
   })
 
-  it('keeps the composer open', () => {
-    render(projectView('activity', { lockedReason: 'Unarchive to edit' }))
-    expect(screen.getByText('Start a conversation or type')).toBeInTheDocument()
+  // Changed on purpose (COMM-7, Decided 2026-10-17): an archived project's chat takes no new message either.
+  it('shows a line saying it is archived where the chat box was', async () => {
+    render(projectView('activity', { lockedReason: 'Unarchive to edit', commentsClosed: 'Archived. Unarchive it to comment.' }))
+    expect(await screen.findByText('Archived. Unarchive it to comment.')).toBeInTheDocument()
+    expect(screen.queryByRole('textbox', { name: 'Start a conversation…' })).toBeNull()
   })
 })
 

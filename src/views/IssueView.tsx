@@ -4,7 +4,7 @@ import { Breadcrumb, type Crumb } from '@/components/ui/Breadcrumb'
 import { ScrollArea } from '@/components/ui/ScrollArea'
 import { linkTo, type IssueTab } from '@/router'
 import type { ContentFormat, Imeta } from '@estiva-app/protocol'
-import type { Picks } from '@/components/conversations/MessageBox'
+import type { Answer, Picks } from '@/components/conversations/shared'
 import { Divider } from '@/components/ui/Divider'
 import { Tabs } from '@/components/ui/Tabs'
 import { History, type HistoryEntry } from '@/components/History'
@@ -74,24 +74,26 @@ export interface IssueViewProps {
    * about one block of the description — SPEC §13.6; supplied by whoever built
    * that affordance.
    */
-  onStartConversation: (text: string, files: readonly Imeta[], picks?: Picks, blockId?: string) => Promise<boolean | void> | boolean | void
-  onReply: (threadId: string, text: string, files: readonly Imeta[], picks?: Picks) => Promise<boolean | void> | boolean | void
+  onStartConversation: (text: string, files: readonly Imeta[], picks?: Picks, blockId?: string) => Promise<Answer>
+  onReply: (threadId: string, text: string, files: readonly Imeta[], picks?: Picks) => Promise<Answer>
   /** Reply into a thread that belongs to another file — its own Folder, never this issue's (CON-9). */
-  onReplyInActivity: (threadId: string, text: string, files: readonly Imeta[], picks?: Picks) => Promise<boolean | void> | boolean | void
+  onReplyInActivity: (threadId: string, text: string, files: readonly Imeta[], picks?: Picks) => Promise<Answer>
   history: HistoryEntry[]
   rail: Omit<IssueRailProps, 'className'>
   /** This object's address, so an unsent message is kept against it — CON-10. */
   about?: string
   /** Add or take back a reaction on a message — CON-2. */
-  onReact?: (messageId: string, emoji: string, mine?: string) => Promise<boolean | void> | boolean | void
+  onReact?: (messageId: string, emoji: string, mine?: string) => Promise<Answer>
   /** Publish a deletion for one message — CON-3. Omitted where nobody may write. */
   onDeleteMessage?: (messageId: string) => Promise<boolean | void> | boolean | void
   /** Publish an edit of one message — CON-4. Omitted where nobody may write. */
-  onEditMessage?: (messageId: string, body: string, removeCard?: string) => Promise<boolean | void> | boolean | void
+  onEditMessage?: (messageId: string, body: string, removeCard?: string) => Promise<Answer>
   /** Why writes are unavailable — every write control on the page is disabled with it. */
   readOnlyReason?: string
   /** Why this issue's own title, description and rail are shut while it can still be discussed, archived or deleted — an archived issue (SHI-36). */
   lockedReason?: string
+  /** The line in the comment box's place when this file takes no comment or reaction — archived (Decided 2026-10-17). */
+  commentsClosed?: string
   /** The upload behind attach. Injected so a story needs no relay; the app's by default. */
   upload?: (file: File) => Promise<Imeta>
   /** The `ArchivedNotice` of an archived issue, or one archived with its project: the first thing on every tab (FOL-46). */
@@ -106,7 +108,7 @@ const TABS: { id: IssueTab; label: string }[] = [
 ]
 
 /** One issue's page, in tabs: Overview and Activity, with the rail on every tab. */
-export function IssueView({ crumbs, tab, onTab, title, summary, onSummarize, description, descriptionFormat, nameOf, onRename, onCopyBlockLink, onDescribe, related, threads, unread, stillUnread, onThreadShown, onStartConversation, onReply, activity, activityTruncated, onReplyInActivity, history, rail, about, onReact, onDeleteMessage, onEditMessage, readOnlyReason, lockedReason, upload, archivedNotice, members }: IssueViewProps) {
+export function IssueView({ crumbs, tab, onTab, title, summary, onSummarize, description, descriptionFormat, nameOf, onRename, onCopyBlockLink, onDescribe, related, threads, unread, stillUnread, onThreadShown, onStartConversation, onReply, activity, activityTruncated, onReplyInActivity, history, rail, about, onReact, onDeleteMessage, onEditMessage, readOnlyReason, lockedReason, commentsClosed, upload, archivedNotice, members }: IssueViewProps) {
   // `linkTo` on each crumb (S15, 0.10.0): the breadcrumbs were the last links in Ship that reloaded the app (SHI-20).
   const items: Crumb[] = [{ label: 'Issues', ...linkTo(crumbs.issuesHref) }]
   // The box before the project's name says it is a project, as the sidebar's entry does (Katerina, 2026-09-09).
@@ -133,7 +135,7 @@ export function IssueView({ crumbs, tab, onTab, title, summary, onSummarize, des
         {tab === 'overview' && (
           <Centred>
             {archivedNotice}
-            <LiveHeader title={title} titlePlaceholder="Untitled issue" onRename={onRename} summary={summary} onSummarize={onSummarize} description={description} format={descriptionFormat} onDescribe={onDescribe} nameOf={nameOf} readOnly={!!(readOnlyReason ?? lockedReason)} upload={upload} onCommentOnBlock={comment.start} onCopyBlockLink={onCopyBlockLink} holdKey={about && `description:${about}`} />
+            <LiveHeader title={title} titlePlaceholder="Untitled issue" onRename={onRename} summary={summary} onSummarize={onSummarize} description={description} format={descriptionFormat} onDescribe={onDescribe} nameOf={nameOf} readOnly={!!(readOnlyReason ?? lockedReason)} upload={upload} onCommentOnBlock={readOnlyReason ?? commentsClosed ? undefined : comment.start} onCopyBlockLink={onCopyBlockLink} holdKey={about && `description:${about}`} />
             {/* Nesting is by intent (RFC 0.5 §10.7): what somebody placed under this issue, from whichever app owns it. */}
             {hasRelated(related) && (
               <>
@@ -150,7 +152,7 @@ export function IssueView({ crumbs, tab, onTab, title, summary, onSummarize, des
           <Centred>
             {archivedNotice}
             <AppSection title="Conversations">
-              <ThreadList threads={threads} unread={unread} stillUnread={stillUnread} onThreadShown={onThreadShown} onStart={comment.post} anchor={comment.anchor} onDropAnchor={comment.drop} onReply={onReply} disabledReason={readOnlyReason} nameOf={nameOf} onReact={onReact} onDeleteMessage={onDeleteMessage} onEditMessage={onEditMessage} about={about} upload={upload} />
+              <ThreadList threads={threads} unread={unread} stillUnread={stillUnread} onThreadShown={onThreadShown} onStart={comment.post} anchor={comment.anchor} onDropAnchor={comment.drop} onReply={onReply} disabledReason={readOnlyReason ?? commentsClosed} nameOf={nameOf} onReact={onReact} onDeleteMessage={onDeleteMessage} onEditMessage={onEditMessage} about={about} upload={upload} />
             </AppSection>
             <AppSection title="Mentioned in">
               <MentionList items={activity} truncated={activityTruncated} onReply={onReplyInActivity} disabledReason={readOnlyReason} nameOf={nameOf} onReact={onReact} onDeleteMessage={onDeleteMessage} onEditMessage={onEditMessage} about={about} upload={upload} />

@@ -20,7 +20,7 @@ const thread = (id: string, replyIds: string[] = []): ThreadData => ({
   replies: replyIds.map((r) => ({ id: r, author: { name: 'Bob' }, at: 2000, body: `reply ${r}`, by: 'bob' })),
 })
 
-const noop = () => {}
+const noop = async (): Promise<true> => true
 
 describe('the new-since-you-looked divider', () => {
   it('is absent when nothing is unread', () => {

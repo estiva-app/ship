@@ -16,13 +16,14 @@ conversation, or a line saying there are none yet.
   **AppSection** titled "Conversations".
 - Wherever somebody may write. Leave a write callback out where nobody may,
   which removes the control instead of disabling it; pass `disabledReason` when
-  writing is only momentarily impossible (signed out).
+  nothing can be written here (an archived file, signed out): each box becomes
+  a line saying why, and React, Edit and Delete are not offered.
 
 ## When not
 
 - For conversations that belong to other files and only mention this one →
   **MentionList**. The distinction is the model (CON-9), not a layout choice.
-- For a single message box on its own → **MessageBox**.
+- For a single comment box on its own → **ConversationBox**.
 
 ## How
 

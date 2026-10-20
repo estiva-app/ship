@@ -6,7 +6,6 @@ import { ago } from '@/lib/time'
 import type { DraftStore } from '@/lib/drafts'
 import type { Reaction } from '@/api'
 import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
-import { reactionName } from '@/components/Reactions'
 import type { ConversationsProps } from '@/components/ConversationThread'
 import type { ActivityProps, Relation } from '@/components/Activity'
 
@@ -63,16 +62,18 @@ export function Time({ at }: { at: number }) {
   )
 }
 
-/**
- * A reaction's tooltip in Peek's words: who, and what the reaction means —
- * "Ravi Mehta and Mara Sato reacted with Makes sense" (Katerina, 29 September:
- * the two apps say the same thing).
- */
-export function meaningLabel(reaction: Reaction, nameOf?: (pubkey: string) => string): string {
-  const names = reaction.by.map((pubkey) => nameOf?.(pubkey) ?? `${pubkey.slice(0, 8)}…`)
-  const who = names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
-  return `${who} reacted with ${reactionName(reaction.emoji)}`
+/** What a send carries beyond its text: whom it names urgently (SPEC §13.1), and the card the box showed under itself unless ✕ took it off (COMM-7). */
+export interface Picks {
+  urgent?: readonly string[]
+  embeds?: readonly Embed[]
 }
+
+/**
+ * What a write from the box answered: `true`, or the words for why the relay
+ * said no, which the box says under itself with your words still in it — never
+ * a toast (record a-refused-action-is-undone-and-your-text-comes-back).
+ */
+export type Answer = true | string
 
 /**
  * How a conversation elsewhere is related, in words for a screen reader —

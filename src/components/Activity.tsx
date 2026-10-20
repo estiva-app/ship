@@ -1,6 +1,6 @@
 import type { Imeta } from '@estiva-app/protocol'
 import type { ThreadData } from './ConversationThread'
-import type { Picks } from './conversations/MessageBox'
+import type { Answer, Picks } from './conversations/shared'
 
 /**
  * **Activity: the conversations of files *related* to this one** — CON-9.
@@ -66,6 +66,8 @@ export interface ActivityItem {
   where?: string
   /** What `where` is, when Ship knows: a project or an issue, so it can be drawn with that one's icon. */
   whereKind?: 'project' | 'issue'
+  /** Why this thread takes no reply or reaction: the file it is on is archived (Decided 2026-10-17). */
+  closed?: string
 }
 
 export interface ActivityProps {
@@ -74,13 +76,13 @@ export interface ActivityProps {
   about?: string
   /** The viewer's pubkey, for §6.5's Edit and Delete rule — see `ConversationsProps.viewer`. */
   viewer?: string
-  onReply: (threadId: string, text: string, files: readonly Imeta[], picks?: Picks) => Promise<boolean | void> | boolean | void
+  onReply: (threadId: string, text: string, files: readonly Imeta[], picks?: Picks) => Promise<Answer>
   /** Why nothing can be posted right now — every composer here is disabled with it. */
   disabledReason?: string
   /** Resolve a mentioned key to a name — SPEC §13.1. */
   nameOf?: (pubkey: string) => string
   /** Add or take back a reaction on a message in one of these threads — CON-2. */
-  onReact?: (messageId: string, emoji: string, mine?: string) => Promise<boolean | void> | boolean | void
+  onReact?: (messageId: string, emoji: string, mine?: string) => Promise<Answer>
   /**
    * Publish a deletion for one message — CON-3.
    *
@@ -91,7 +93,7 @@ export interface ActivityProps {
    */
   onDeleteMessage?: (messageId: string) => Promise<boolean | void> | boolean | void
   /** Publish an edit of one message — CON-4. Offered here for the same reason delete is. */
-  onEditMessage?: (messageId: string, body: string, removeCard?: string) => Promise<boolean | void> | boolean | void
+  onEditMessage?: (messageId: string, body: string, removeCard?: string) => Promise<Answer>
   /**
    * How many threads the horizon left out — `ACTIVITY_HORIZON`.
    *
