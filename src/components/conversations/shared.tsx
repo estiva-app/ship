@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { IconBox, IconListDetails } from '@tabler/icons-react'
-import { addressToPointer, cardsIn, encodeNaddr, encodeNevent, referencesIn, valueOfReference, type Embed, type Imeta, type LinkResolver, type PartPointer, type RenderBlock } from '@estiva-app/protocol'
+import { addressToPointer, cardsIn, encodeNaddr, encodeNevent, referenceOfLink, referencesIn, valueOfReference, type Embed, type Imeta, type LinkResolver, type PartPointer, type RenderBlock } from '@estiva-app/protocol'
 import { WithTooltip } from '@estiva-app/ui'
 import { ago } from '@/lib/time'
 import type { DraftStore } from '@/lib/drafts'
@@ -38,11 +38,13 @@ export function cardsOf(blocks: readonly RenderBlock[], embeds: readonly Embed[]
     const value = valueOfReference(reference)
     if (value && !written.has(value)) written.set(value, reference)
   }
+  // Only a URL that itself names that file, as a chip checks (LTX-6 security review).
   const writtenUrl = new Map<string, string>()
   const urlsIn = (bs: readonly RenderBlock[]) => {
     for (const block of bs) {
       for (const run of block.inline ?? []) {
-        const value = run.reference && /^https?:\/\//i.test(run.text) ? valueOfReference(run.reference) : undefined
+        const names = resolveLink && run.reference && /^https?:\/\//i.test(run.text) && referenceOfLink(run.text, resolveLink) === run.reference
+        const value = names && run.reference ? valueOfReference(run.reference) : undefined
         if (value && !writtenUrl.has(value)) writtenUrl.set(value, run.text)
       }
       if (block.children) urlsIn(block.children)
