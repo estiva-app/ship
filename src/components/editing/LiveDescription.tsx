@@ -37,6 +37,7 @@ import { sessionEnded } from '@/auth/estivaId'
 import { heldText, releaseHeld, useHeldTyping } from '@/auth/heldTyping'
 import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
 import { askLinkValues, knownLinkValue } from '@/api/linkCards'
+import { Button } from '@/components/ui/Button'
 import { AttachmentNode, BlockId, ReferenceNode, ReferenceProvider, UnknownBlock } from '@/components/ui/editorSchema'
 import { LinkDecoration } from './linkDecoration'
 import { blockRows } from './blockRows'
@@ -58,9 +59,15 @@ import { ShipSlashMenu, slashSections } from './slashMenu'
  *   Escape leaves and keeps the text (Notion's Esc). A refused save keeps the
  *   text and says so.
  * - **Someone else's edit arrives** while you are not in it: it is loaded. While
- *   you are typing it waits, and your own save coming back is never mistaken for
- *   someone else's (Peek's RIC-13 lesson: an echo of your own edit must not
- *   overwrite newer text).
+ *   you are in it, it waits, and a line says who saved a newer version with
+ *   "Load it", as Leaf's page does (LTX-3); leaving without having changed
+ *   anything loads it, and leaving with a change saves yours over it — the last
+ *   save wins. Your own save coming back is never mistaken for someone else's
+ *   (Peek's RIC-13 lesson: an echo of your own edit must not overwrite newer
+ *   text). A save refused after you left is the page's to say: `onCommit`'s
+ *   `left` tells it, read when the relay answers.
+ *
+ *   why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-files-text-is-a-readable-snapshot.md
  *
  * Kept from `DescriptionEditing`: the block ids and unknown blocks that let
  * comments stay anchored (§13.6), tables, attachments uploaded before they are
@@ -78,12 +85,16 @@ export function LiveDescription({
   onCommentOnBlock,
   onCopyBlockLink,
   holdKey,
+  changedBy = null,
 }: {
   value: string
   /** Where its unsaved text is held when the sign-in ends while it is open (AUT-4): the issue's or project's address. */
   holdKey?: string
   format: ContentFormat
-  onCommit: (value: string, contentFormat?: string) => Promise<boolean> | boolean
+  /** `left()` is true once the description has gone from the page: a refusal then has no line under the field to say it. */
+  onCommit: (value: string, contentFormat?: string, left?: () => boolean) => Promise<boolean> | boolean
+  /** The name in "<name> saved a newer version": who saved `value` last, when it was not you. */
+  changedBy?: string | null
   nameOf?: (pubkey: string) => string
   /** The description's references, resolved once by the page — RIC-10. */
   resolved?: Record<string, ForeignObjectData | null | undefined>
@@ -116,18 +127,45 @@ export function LiveDescription({
     picker.current?.click()
   }
   // What was typed here when the sign-in last ended, back after the passkey tap and not yet saved (AUT-4).
-  const [held] = useState(() => heldDocument(holdKey))
+  // Not when it is what the page already has (a save that was out as the sign-in ended went through): only a save
+  // clears `restored`, a save of what is saved sends nothing, and someone else's save would wait behind it for good.
+  const [held] = useState(() => {
+    const doc = heldDocument(holdKey)
+    return doc && publishableFromEditor(doc).value !== value ? doc : null
+  })
   const [empty, setEmpty] = useState(!held && value.trim() === '')
-  const committing = useRef(false)
-  // The last value saved or loaded, so a blur with nothing new is not a write and
-  // our own save coming back is not someone else's edit.
+  const [focused, setFocused] = useState(false)
+  /*
+    The text the editor holds as saved or loaded. A page value that differs is
+    someone else's save: loaded at once while you are not in the field, waiting
+    with a line while you are. `saved` is the same, for the editor's callbacks,
+    so a blur with nothing new is not a write.
+  */
+  const [base, setBase] = useState(value)
   const saved = useRef(value)
+  /*
+    The page's value your own save replaced. Until your save comes back from the
+    relay the page may still hold the text before it, which is not someone else's.
+  */
+  const [superseded, setSuperseded] = useState<string | null>(null)
+  // A save out: nothing is loaded over the text it carries until the relay has answered.
+  const [saving, setSaving] = useState(false)
+  const committing = useRef(false)
+  // The page's value now, for the editor's callbacks.
+  const latest = useRef({ value, format })
+  useEffect(() => {
+    latest.current = { value, format }
+  }, [value, format])
   // The text as last typed. Saving on the way out reads this, not the editor,
   // which may already be torn down by then.
   const typed = useRef<EditorDocument | null>(held)
   const again = useRef(false)
-  // Until the held text is saved, it is what is in the field: an edit loading meanwhile does not replace it.
-  const restored = useRef(held !== null)
+  // The description has gone from the page: a refusal now is the page's to say.
+  const left = useRef(false)
+  // Until the held text is saved, it is what is in the field: someone else's save waits behind it, as behind a refused one.
+  const [restored, setRestored] = useState(held !== null)
+  // The text the editor was last set to, so a `base` it already shows is not set again under the caret.
+  const shown = useRef(value)
 
   useHeldTyping(holdKey, () => {
     const doc = typed.current
@@ -145,20 +183,29 @@ export function LiveDescription({
       const next = publishableFromEditor(doc)
       if (next.value === saved.current) return
       committing.current = true
+      setSaving(true)
+      // The last save wins: whatever the page holds as you save is replaced by yours.
+      const replaced = latest.current.value
       try {
-        const ok = await onCommit(next.value, next.contentFormat)
-        setFailed(!ok)
+        const ok = await onCommit(next.value, next.contentFormat, () => left.current)
+        if (!left.current) setFailed(!ok)
         if (ok) {
+          // The editor already shows it, and may hold more typed since: `shown` keeps the effect below from setting it.
           saved.current = next.value
-          restored.current = false
+          shown.current = next.value
+          setSuperseded(replaced)
+          setBase(next.value)
+          setRestored(false)
           if (holdKey) releaseHeld(holdKey)
         }
       } finally {
         committing.current = false
+        setSaving(false)
         // In `finally`, so a commit that throws still hands on the change waiting behind it.
+        // Only a change: leaving while a blur's save is out asks again for the same text, and a refusal would be said twice.
         if (again.current) {
           again.current = false
-          void latestSave.current(typed.current)
+          if (typed.current && publishableFromEditor(typed.current).value !== next.value) void latestSave.current(typed.current)
         }
       }
     },
@@ -235,22 +282,44 @@ export function LiveDescription({
         // A click on a box does not focus the field, so no blur will save it: one click ticks, and is saved (RIC-19, Miky 2026-10-13).
         if (isChecklistTick(transaction)) void latestSave.current(typed.current)
       },
+      onFocus: () => setFocused(true),
       onBlur: () => {
+        // The file dialog is not leaving: you are still in the field, and what waits keeps waiting.
         if (picking.current) return
+        setFocused(false)
+        // Yours, if you changed anything: it replaces what waited. If not, what waited is loaded as you leave (below).
         void latestSave.current(typed.current)
       },
     },
     [],
   )
 
-  // Someone else's edit: loaded while you are not in the field; your own save coming back is left alone.
+  /*
+    Someone else's save. Not in the field: theirs is the text now. In it, or
+    with your own text unsaved after a refusal: it waits, and the line below
+    says so. Never over a save that is still out.
+  */
+  const arrived = value !== base && value !== superseded
+  if (arrived && !focused && !saving && !failed && !restored) setBase(value)
+  const waiting = arrived && (focused || failed || restored)
+
+  // The text the editor should hold, set into it when it changes — never under your own typing, which `shown` already holds.
   useEffect(() => {
-    if (!editor || editor.isDestroyed || value === saved.current || editor.isFocused || committing.current || restored.current) return
-    editor.commands.setContent(toEditorDocument(documentForEditing(value, format)), { emitUpdate: false })
-    saved.current = value
+    saved.current = base
+    if (!editor || editor.isDestroyed || base === shown.current) return
+    editor.commands.setContent(toEditorDocument(documentForEditing(base, latest.current.format)), { emitUpdate: false })
+    shown.current = base
     typed.current = null
-    setEmpty(value.trim() === '')
-  }, [editor, value, format])
+    setEmpty(base.trim() === '')
+  }, [editor, base])
+
+  // "Load it": theirs replaces what you have not saved.
+  const load = () => {
+    setBase(latest.current.value)
+    setFailed(false)
+    setRestored(false)
+    if (holdKey) releaseHeld(holdKey)
+  }
 
   /* `/` File: the upload first, then the block — its attributes are the relay's answers (SHI-2). */
   const attach = async (chosen: File[]) => {
@@ -276,6 +345,7 @@ export function LiveDescription({
   // refused with nothing left on screen to say so, and the text is held on the device instead (AUT-4).
   useEffect(
     () => () => {
+      left.current = true
       if (!sessionEnded()) void latestSave.current(typed.current)
     },
     [],
@@ -301,7 +371,16 @@ export function LiveDescription({
         <ReferenceMenuView editor={editor} />
         <FilePicker ref={picker} multiple onPick={(files) => void attach(files)} />
         {uploadError && <FieldLine tone="error">{uploadError}</FieldLine>}
-        {failed && <FieldLine tone="error">Could not save. Your text is still here.</FieldLine>}
+        {waiting && (
+          <FieldLine tone="helper">
+            {`${changedBy ?? 'Someone'} saved a newer version.`}{' '}
+            {/* Pressing it must not take focus from the field: that blur would save yours over theirs first. */}
+            <Button variant="muted" size="small" onMouseDown={(event) => event.preventDefault()} onClick={load}>
+              Load it
+            </Button>
+          </FieldLine>
+        )}
+        {failed &&<FieldLine tone="error">Could not save. Your text is still here.</FieldLine>}
       </div>
     </ReferenceProvider>
   )

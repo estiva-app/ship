@@ -17,7 +17,7 @@ import type { IssueRowData } from '@/components/IssueRow'
 import { IssuesTable, type IssuesTableRow } from '@/components/IssuesTable'
 import { ProjectRail, type RailFolder, type RailPerson } from '@/components/ProjectRail'
 import { Related, hasRelated } from '@/components/Related'
-import { LiveHeader } from '@/components/editing/LiveHeader'
+import { LiveHeader, type LiveHeaderProps } from '@/components/editing/LiveHeader'
 import { MentionList, ThreadList } from '@/components/conversations/ThreadList'
 import { useBlockComment } from '@/components/conversations/useBlockComment'
 import { AppSection, Centred } from '@/components/layout/ReadingColumn'
@@ -52,7 +52,9 @@ export interface ProjectViewProps {
     onRename: (v: string) => Promise<boolean> | boolean
     /** Save the summary: `true`, or the words for why it was refused. Empty clears it. */
     onSummarize?: (v: string) => Promise<true | string>
-    onDescribe: (v: string, contentFormat?: string) => Promise<boolean> | boolean
+    onDescribe: LiveHeaderProps['onDescribe']
+    /** Who saved the description last, by name, when it was not you (LTX-3). */
+    descriptionBy?: string | null
   }
   /** "Add issue", at the right end of the tab row. */
   onAddIssue?: () => void
@@ -171,7 +173,7 @@ export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onVi
         {tab === 'overview' && (
           <Centred>
             {archivedNotice}
-            <LiveHeader title={header.title} titlePlaceholder="Untitled project" onRename={header.onRename} summary={header.summary} onSummarize={header.onSummarize} description={header.description} format={header.descriptionFormat} onDescribe={header.onDescribe} nameOf={header.nameOf} readOnly={!!(readOnlyReason ?? lockedReason)} upload={upload} onCommentOnBlock={readOnlyReason ?? commentsClosed ? undefined : comment.start} onCopyBlockLink={onCopyBlockLink} holdKey={about && `description:${about}`} />
+            <LiveHeader title={header.title} titlePlaceholder="Untitled project" onRename={header.onRename} summary={header.summary} onSummarize={header.onSummarize} description={header.description} format={header.descriptionFormat} onDescribe={header.onDescribe} descriptionBy={header.descriptionBy} nameOf={header.nameOf} readOnly={!!(readOnlyReason ?? lockedReason)} upload={upload} onCommentOnBlock={readOnlyReason ?? commentsClosed ? undefined : comment.start} onCopyBlockLink={onCopyBlockLink} holdKey={about && `description:${about}`} />
             {/* Nesting is by intent (RFC 0.5 §10.7): what somebody placed under this project, whatever app it belongs
                 to. A line first, so the list the app adds never reads as part of the description someone typed. */}
             {hasRelated(related) && (

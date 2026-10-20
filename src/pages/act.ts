@@ -4,6 +4,16 @@ import { isRateLimited, retryHintMs } from '@/lib/relayBudget'
 export type Say = (text: string, tone?: 'ok' | 'error') => void
 
 /**
+ * A description's `say`: a refusal that comes back once the description has
+ * gone from the page names the file, in Leaf's words, since there is no line
+ * under the field left to say it and the toast may be read on another page
+ * (LTX-3). `left` is read when the relay answers, not when the save went out.
+ */
+export function sayOnceLeft(say: Say, title: string, left?: () => boolean): Say {
+  return (text, tone) => say(tone === 'error' && left?.() ? `Your last changes to ${title} were not saved.` : text, tone)
+}
+
+/**
  * Every write the pages make goes through here — the old app's `publish`:
  * a refusal is said with its reason ("<what> rejected — …"), and a success
  * is followed by a re-read of the workspace, so what the page shows next is
