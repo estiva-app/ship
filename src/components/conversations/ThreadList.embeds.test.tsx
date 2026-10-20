@@ -49,6 +49,8 @@ vi.mock('@/api/linkCards', () => {
     knownLinkValue: (asked: string) => named.get(asked),
     // The message box's chips ask too (OPT-19).
     askLinkValues: () => Promise.resolve(),
+    knownBlockOf: () => undefined,
+    linksChanged: () => () => {},
     useLinkValues: (urls: readonly string[]) => new Map(urls.flatMap((asked) => (named.has(asked) ? [[asked, named.get(asked)!] as const] : []))),
   }
 })
@@ -61,7 +63,7 @@ const thread = (body: string, embeds?: Embed[]): ThreadData => ({
   root: { id: 't1', author: { name: 'Ann' }, at: 1000, body, by: 'ann', embeds },
   replies: [],
 })
-const noop = () => {}
+const noop = async (): Promise<true> => true
 const show = (t: ThreadData) => render(<ThreadList threads={[t]} onStart={noop} onReply={noop} />).container
 /** Each card under the message, as [the reference it draws, without `nostr:`; its layout]. */
 const cards = (c: HTMLElement) => [...c.querySelectorAll('[data-cards] [data-card]')].map((e) => [e.getAttribute('data-card-value'), e.getAttribute('data-card')])

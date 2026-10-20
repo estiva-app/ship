@@ -41,7 +41,7 @@ const thread = (id: string, body: string, embeds?: Embed[]): ThreadData => ({
   root: { id, author: { name: 'Ann' }, at: 1000, body, by: 'ann', embeds },
   replies: [],
 })
-const noop = () => {}
+const noop = async (): Promise<true> => true
 const show = (threads: ThreadData[]) => render(<ThreadList threads={threads} onStart={noop} onReply={noop} />).container
 const cardOf = (c: HTMLElement) => c.querySelector('[data-cards] [data-card]')
 /** The files a card lists, by title: each row opens its file — Peek's in Peek, Ship's own here. */

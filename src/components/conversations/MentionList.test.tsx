@@ -35,7 +35,7 @@ const items: ActivityItem[] = [
 ]
 
 const show = (props: Partial<React.ComponentProps<typeof MentionList>> = {}) =>
-  render(<MentionList items={items} onReply={() => {}} {...props} />).container
+  render(<MentionList items={items} onReply={async () => true} {...props} />).container
 
 describe('MentionList', () => {
   it('is one list, with both relations in it', () => {

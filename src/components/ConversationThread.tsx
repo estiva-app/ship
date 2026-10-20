@@ -10,7 +10,7 @@ import { referenceOfValue } from '@/components/conversations/shared'
 import { linksNamingCards } from '@/lib/linksNamingCards'
 import { useReactions } from '@/api'
 import type { Reaction } from '@/api'
-import type { Picks } from '@/components/conversations/MessageBox'
+import type { Answer, Picks } from '@/components/conversations/shared'
 
 /**
  * Conversations as production shows them: a composer to start one, then
@@ -271,8 +271,8 @@ export interface ConversationsProps {
   unread?: UnreadByThread
   /** Which are still unread now: "N new" counts these, and leaves once they are read (SHI-38). Defaults to `unread`. */
   stillUnread?: UnreadByThread
-  /** The text and the files already on the relay — SHI-2. See `Composer`. `blockId` when it starts from a block's menu — RIC-18. */
-  onStart: (text: string, files: readonly Imeta[], picks?: Picks, blockId?: string) => Promise<boolean | void> | boolean | void
+  /** The text and the files already on the relay — SHI-2. `blockId` when it starts from a block's menu — RIC-18. Answers `true`, or why not. */
+  onStart: (text: string, files: readonly Imeta[], picks?: Picks, blockId?: string) => Promise<Answer>
   /**
    * The block the next conversation is about — chosen from a block's menu
    * (RIC-18). Drawn above the composer, as the comment will show it; posting
@@ -280,10 +280,14 @@ export interface ConversationsProps {
    */
   anchor?: BlockAnchor
   onDropAnchor?: () => void
-  onReply: (threadId: string, text: string, files: readonly Imeta[], picks?: Picks) => Promise<boolean | void> | boolean | void
+  onReply: (threadId: string, text: string, files: readonly Imeta[], picks?: Picks) => Promise<Answer>
   /** A thread's replies were drawn (`open`) or hidden: drawing them is what reads them, SPEC §11.2 (CON-34). */
   onThreadShown?: (threadId: string, open: boolean) => void
-  /** Why nothing can be posted right now — every composer here is disabled with it. */
+  /**
+   * Why nothing can be written here — an archived file, or signed out. Every box
+   * becomes a line saying it, and React, Edit and Delete are not offered
+   * (Decided 2026-10-17).
+   */
   disabledReason?: string
   /**
    * The viewer's pubkey. Edit and Delete are offered only on the viewer's own
@@ -307,10 +311,10 @@ export interface ConversationsProps {
    * Add or take back a reaction on one message — CON-2.
    *
    * Resolves when the relay has answered, so this surface can re-read rather
-   * than assume. Omitted where nobody may write, which removes the controls
-   * instead of disabling them.
+   * than assume; a refusal's words are said under the row. Omitted where nobody
+   * may write, which removes the controls instead of disabling them.
    */
-  onReact?: (messageId: string, emoji: string, mine?: string) => Promise<boolean | void> | boolean | void
+  onReact?: (messageId: string, emoji: string, mine?: string) => Promise<Answer>
   /**
    * Publish a deletion for one message — CON-3.
    *
@@ -322,11 +326,11 @@ export interface ConversationsProps {
   /**
    * Publish an edit of one message — CON-4.
    *
-   * Resolves `false` on a refusal, which keeps the editor open with the text
-   * still in it. Omitted where nobody may write, and the control is then absent
-   * rather than disabled.
+   * Answers why not on a refusal, which keeps the editor open with the text
+   * still in it and the words under it. Omitted where nobody may write, and the
+   * control is then absent rather than disabled.
    */
-  onEditMessage?: (messageId: string, body: string, removeCard?: string) => Promise<boolean | void> | boolean | void
+  onEditMessage?: (messageId: string, body: string, removeCard?: string) => Promise<Answer>
   className?: string
 }
 

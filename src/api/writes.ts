@@ -372,10 +372,10 @@ export function setIssueField(issue: Issue, field: 'title' | 'description' | 'su
 // ── Conversations ───────────────────────────────────────────────────────────
 
 /**
- * The card a new message sends: its one file's default (SPEC §13.6.2), read
- * from the links its send has just asked about, so readers count the same
- * links. Ship's box offers no ✕ before sending yet (Decided 19 Oct, WBM-7);
- * ✕ on the sent card takes it off.
+ * The card a new message sends when the box did not say: its one file's
+ * default (SPEC §13.6.2), read from the links its send has just asked about, so
+ * readers count the same links. The shared box says (COMM-7): the card it
+ * showed under itself, unless ✕ took it off, comes in as `embeds`.
  */
 function cardToSend(body: string, partTags: readonly NostrTag[], here: string | undefined): Embed[] {
   return embedsToSend(body, { resolveLink: linkResolverFor(body, knownLinkValue), parts: partsOf({ tags: partTags.map((tag) => [...tag]) }), here })
@@ -388,7 +388,7 @@ function cardToSend(body: string, partTags: readonly NostrTag[], here: string | 
  * the message is already in the topic it belongs to and a reference would be
  * noise.
  */
-export function startConversation(args: { folder: string; about: string; withReference: boolean; body: string; blockId?: string; files?: readonly Imeta[]; urgent?: readonly string[] }): Promise<WriteResult> {
+export function startConversation(args: { folder: string; about: string; withReference: boolean; body: string; blockId?: string; files?: readonly Imeta[]; urgent?: readonly string[]; embeds?: readonly Embed[] }): Promise<WriteResult> {
   return publish(async () => {
     // A pasted block link shows that block (SPEC §13.6.1, COM-2); a pasted app link is a mention, as a `nostr:`
     // reference is (SPEC §13.1, OPT-19).
@@ -399,7 +399,7 @@ export function startConversation(args: { folder: string; about: string; withRef
       about: args.about,
       partTags,
       linkTags,
-      embeds: cardToSend(args.body, partTags, args.about),
+      embeds: args.embeds ? [...args.embeds] : cardToSend(args.body, partTags, args.about),
       // SPEC §13.6 — present only when the author was commenting on one block.
       blockId: args.blockId,
       aboutRef: args.withReference ? `nostr:${addrToNaddr(args.about, [RELAY_URL])}` : undefined,
@@ -419,7 +419,7 @@ export function startConversation(args: { folder: string; about: string; withRef
  * (SHI-28); a chat thread gets a `kind:9`. The root's `anchor` is what tells
  * them apart — only a NIP-22 comment carries one.
  */
-export function reply(conversation: Conversation, fallbackFolder: string, body: string, files?: readonly Imeta[], urgent?: readonly string[]): Promise<WriteResult> {
+export function reply(conversation: Conversation, fallbackFolder: string, body: string, files?: readonly Imeta[], urgent?: readonly string[], embeds?: readonly Embed[]): Promise<WriteResult> {
   const { root } = conversation
   return publish(async () => {
     // A pasted block link shows that block (SPEC §13.6.1, COM-2); a comment's own file keeps its one `a`.
@@ -429,7 +429,7 @@ export function reply(conversation: Conversation, fallbackFolder: string, body: 
       body,
       partTags,
       linkTags,
-      embeds: cardToSend(body, partTags, root.anchor ?? conversation.about[0]),
+      embeds: embeds ? [...embeds] : cardToSend(body, partTags, root.anchor ?? conversation.about[0]),
       ...(root.anchor
         ? {
             replyToComment: {

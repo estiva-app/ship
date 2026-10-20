@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { resolveBlockAnchor, type BlockAnchor, type ContentFormat, type Imeta } from '@estiva-app/protocol'
-import type { Picks } from '@/components/conversations/MessageBox'
+import type { Answer, Picks } from '@/components/conversations/shared'
 
-type Start = (text: string, files: readonly Imeta[], picks?: Picks, blockId?: string) => Promise<boolean | void> | boolean | void
+type Start = (text: string, files: readonly Imeta[], picks?: Picks, blockId?: string) => Promise<Answer>
 
 /**
  * A block menu's Comment (RIC-18): the page goes to its Activity tab, where
@@ -23,7 +23,7 @@ export function useBlockComment(description: string, format: ContentFormat, onTa
     drop: () => setPending(null),
     post: async (text: string, files: readonly Imeta[], picks?: Picks, blockId?: string) => {
       const posted = await onStart(text, files, picks, blockId)
-      if (posted !== false) setPending(null)
+      if (posted === true) setPending(null)
       return posted
     },
   }

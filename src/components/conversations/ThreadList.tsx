@@ -1,41 +1,40 @@
-import { Fragment, Suspense, lazy, useCallback, useEffect, useMemo, useState, type ComponentProps } from 'react'
-import { IconDotsVertical, IconMessage2, IconMoodPlus, IconX } from '@tabler/icons-react'
+import { Fragment, Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from 'react'
+import { IconDotsVertical, IconMessage2, IconX } from '@tabler/icons-react'
 import type { Imeta } from '@estiva-app/protocol'
-import { Avatar, Button, Card, EmptyState, IconButton, Menu, MenuItem, Popover, ReactionPicker, WithTooltip } from '@estiva-app/ui'
+import { AddReactionButton, Avatar, Button, Card, EmptyState, FieldLine, IconButton, Menu, MenuItem, ReactionRow, SkeletonBar, WithTooltip } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
 import { ago } from '@/lib/time'
 import { draftKeys, type DraftStore } from '@/lib/drafts'
 import { offersEditAndDelete } from '@estiva-app/conversation'
-import { REACTION_HORIZON, me, type Reaction } from '@/api'
+import { REACTION_EMOJI, REACTION_HORIZON, me, type Reaction } from '@/api'
 import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
 import { Attachments as FileAttachments } from '@/components/ui/Attachment'
 import { BlockAnchorNote } from '@/components/ui/BlockAnchorNote'
 import { MessagePart } from '@/components/ui/MessageLinks'
-import { REACTION_OPTIONS, Reactions } from '@/components/Reactions'
 import { ConfirmDeleteMessage, NewSinceHere, useThreadReactions, useThreadReferences, type ConversationsProps, type MessageData, type ThreadData } from '@/components/ConversationThread'
 import type { ActivityProps } from '@/components/Activity'
-import { PLACE_ICON, RELATION, Time, meaningLabel, type MentionListViewProps, type ThreadListViewProps } from './shared'
+import { PLACE_ICON, RELATION, Time, type Answer, type MentionListViewProps, type Picks, type ThreadListViewProps } from './shared'
 import { MessageText } from './MessageText'
-import { MessageBoxShell } from './writingBox'
-import type { Picks } from './MessageBox'
-import { messageScope, referenceSections } from '@/api/references'
+import { messageScope, referenceCaptions, referenceSections } from '@/api/references'
 import { PartCard } from '@/components/ui/PartCard'
 import { useReopenHeld } from '@/auth/heldTyping'
 
 /*
-  The writing box is its own chunk: its editor is ProseMirror, which a reader
-  must never download (RIC-14's rule for the description, kept). Until it lands
-  the same-sized shell holds its place.
+  The box is its own chunk: its editor is ProseMirror, which a reader must
+  never download (RIC-14's rule for the description, kept). Until it lands a
+  bar holds its place; a closed box is a line and needs no editor.
 */
-const LazyMessageBox = lazy(() => import('./MessageBox'))
-function MessageBox(props: ComponentProps<typeof LazyMessageBox>) {
-  const shell = props.kind === 'edit' ? null : <MessageBoxShell kind={props.kind ?? 'conversation'} reason={props.disabledReason} className={props.className} />
+const LazyBox = lazy(() => import('./ConversationBox'))
+function Box(props: ComponentProps<typeof LazyBox>) {
   return (
-    <Suspense fallback={shell}>
-      <LazyMessageBox {...props} />
+    <Suspense fallback={props.kind === 'edit' ? null : <SkeletonBar shape="control" className={cn('h-10 w-full', props.className)} />}>
+      <LazyBox {...props} />
     </Suspense>
   )
 }
+
+/** The five reactions, each named, as the package's row and picker take them (SPEC §6.6). */
+const REACTION_OPTIONS = REACTION_EMOJI.map(({ emoji, name }) => ({ emoji, label: name }))
 
 /**
  * The conversations on a project or an issue, and the ones elsewhere that
@@ -61,8 +60,11 @@ function MessageBox(props: ComponentProps<typeof LazyMessageBox>) {
  * replies it leaves behind; edits and deletes kept open on a refusal; controls
  * absent where nobody may write and disabled with the reason where it is
  * momentary; drafts per thread and per object; the relation line on "Mentioned
- * in" with its note about what this reader cannot see. The writing box is
- * `MessageBox`, which publishes the same marker text the old field did.
+ * in" with its note about what this reader cannot see. Every box — start,
+ * reply, edit — is estiva-ui's `CommentBox` (`ConversationBox`), and the
+ * reactions are its `ReactionRow` (COMM-7). Where nothing can be written (an
+ * archived file, signed out) each box is a line saying why, and React, Edit
+ * and Delete are not offered (Decided 2026-10-17).
  */
 
 interface MessageProps {
@@ -71,49 +73,22 @@ interface MessageProps {
   /** The address of the file this conversation is on: no card for it here, its chip stays (WID-3). */
   here?: string
   nameOf?: (pubkey: string) => string
+  viewer?: string
   reactions?: readonly Reaction[]
-  onToggleReaction?: (emoji: string, mine?: string) => void
+  onToggleReaction?: (emoji: string, mine?: string) => Promise<Answer>
   onDelete?: () => Promise<boolean | void> | boolean | void
   /** Publish an edit; with `removeCard`, ✕ on that file's sent card, the text left as it is. */
-  onEdit?: (body: string, removeCard?: string) => Promise<boolean | void> | boolean | void
+  onEdit?: (body: string, removeCard?: string) => Promise<Answer>
+  /** What `[` offers in its edit box, and the captions its references open with. */
+  references?: (query: string) => ReturnType<typeof referenceSections>
+  captions?: ReturnType<typeof referenceCaptions>
   repliesLeftBehind?: number
-  disabledReason?: string
   drafts?: DraftStore
   /** A first message's second row: the replies button. */
   footer?: React.ReactNode
 }
 
-/** Add a reaction: the package IconButton, opening the package's picker. */
-function AddReaction({ onPick, disabledReason }: { onPick: (emoji: string) => void; disabledReason?: string }) {
-  const [open, setOpen] = useState(false)
-  return (
-    <Popover
-      side="top"
-      align="left"
-      ariaLabel="Reactions"
-      className="w-auto min-w-0"
-      contentClassName="p-1"
-      open={open}
-      onOpenChange={setOpen}
-      trigger={
-        <IconButton variant="muted" aria-label="React" tooltip="React" disabledReason={disabledReason}>
-          <IconMoodPlus size={16} stroke={1.5} />
-        </IconButton>
-      }
-    >
-      <ReactionPicker
-        options={REACTION_OPTIONS}
-        surface={false}
-        onSelect={(emoji) => {
-          setOpen(false)
-          onPick(emoji)
-        }}
-      />
-    </Popover>
-  )
-}
-
-function Message({ message, resolved, here, nameOf, reactions, onToggleReaction, onDelete, onEdit, repliesLeftBehind = 0, disabledReason, drafts, footer }: MessageProps) {
+function Message({ message, resolved, here, nameOf, viewer, reactions, onToggleReaction, onDelete, onEdit, references, captions, repliesLeftBehind = 0, drafts, footer }: MessageProps) {
   const [editing, setEditing] = useState(false)
   // An edit open when the sign-in ended opens again after the passkey tap, with what was typed (AUT-4).
   const editHold = `edit:${message.id}`
@@ -121,14 +96,35 @@ function Message({ message, resolved, here, nameOf, reactions, onToggleReaction,
   const [confirming, setConfirming] = useState(false)
   // One ✕ at a time: the next one reads the set this one leaves, once the page has read it back.
   const [removing, setRemoving] = useState(false)
+  const [refused, setRefused] = useState<string | null>(null)
   const removeCard =
-    onEdit && !disabledReason && !removing
+    onEdit && !removing
       ? (value: string) => {
           setRemoving(true)
-          void Promise.resolve(onEdit(message.body, value)).finally(() => setRemoving(false))
+          setRefused(null)
+          void onEdit(message.body, value)
+            .then((answer) => setRefused(answer === true ? null : `Card not removed: ${answer}`))
+            .finally(() => setRemoving(false))
         }
       : undefined
-  const react = onToggleReaction && ((emoji: string) => onToggleReaction(emoji, reactions?.find((r) => r.emoji === emoji)?.mine))
+  // One reaction write at a time, until the read after it lands: a second click before then would write from the row as it was.
+  const pending = useRef(false)
+  useEffect(() => {
+    pending.current = false
+  }, [reactions])
+  const react =
+    onToggleReaction &&
+    (async (emoji: string) => {
+      if (pending.current) return
+      pending.current = true
+      setRefused(null)
+      const answer = await onToggleReaction(emoji, reactions?.find((r) => r.emoji === emoji)?.mine)
+      if (answer !== true) {
+        pending.current = false
+        setRefused(`Not reacted: ${answer}`)
+      }
+    })
+  const named = (pubkey: string) => nameOf?.(pubkey) ?? `${pubkey.slice(0, 8)}…`
 
   return (
     <article className="flex flex-col gap-2" data-message={message.id}>
@@ -155,7 +151,7 @@ function Message({ message, resolved, here, nameOf, reactions, onToggleReaction,
             <Menu
               align="right"
               trigger={
-                <IconButton variant="muted" aria-label="Message actions" tooltip="Message actions" disabledReason={disabledReason}>
+                <IconButton variant="muted" aria-label="Message actions" tooltip="Message actions">
                   <IconDotsVertical size={16} stroke={1.5} />
                 </IconButton>
               }
@@ -167,7 +163,17 @@ function Message({ message, resolved, here, nameOf, reactions, onToggleReaction,
         )}
       </div>
       {editing && onEdit ? (
-        <MessageBox kind="edit" autoFocus initial={message.body} initialUrgent={message.urgent} nameOf={nameOf} drafts={drafts} holdKey={editHold} onSubmit={(body) => onEdit(body)} onCancel={() => setEditing(false)} />
+        <Box
+          kind="edit"
+          editing={{ body: message.body, urgent: message.urgent, holdKey: editHold, onCancel: () => setEditing(false) }}
+          references={references}
+          captions={captions}
+          resolved={resolved}
+          nameOf={nameOf}
+          here={here}
+          drafts={drafts}
+          onSend={(body) => onEdit(body)}
+        />
       ) : (
         <>
           <MessageText
@@ -181,13 +187,17 @@ function Message({ message, resolved, here, nameOf, reactions, onToggleReaction,
             between={<FileAttachments files={message.files} />}
             onRemoveCard={removeCard}
           />
-          {/* Row one: the pills, then the add-reaction button (her note 4, Linear's order). Signed out, no button. */}
-          {(react || !!reactions?.length) && (
-            <div className="flex flex-wrap items-center gap-1">
-              <Reactions reactions={reactions} nameOf={nameOf} onToggle={onToggleReaction} disabledReason={disabledReason} labelOf={meaningLabel} />
-              {react && <AddReaction onPick={react} disabledReason={disabledReason} />}
-            </div>
+          {/* Row one: the package's pills, then its add button (her note 4, Linear's order); none yet, the add button alone. Where nobody may write, the pills only. */}
+          {reactions?.length ? (
+            <ReactionRow reactions={reactions} options={REACTION_OPTIONS} nameOf={named} viewer={viewer} onToggle={react ? (emoji) => void react(emoji) : undefined} />
+          ) : (
+            react && (
+              <div className="flex">
+                <AddReactionButton options={REACTION_OPTIONS} onPick={(emoji) => void react(emoji)} />
+              </div>
+            )
           )}
+          {refused && <FieldLine tone="error">{refused}</FieldLine>}
           {/* Row two, a first message only: the replies button. */}
           {footer}
         </>
@@ -230,7 +240,8 @@ interface ThreadProps {
   thread: ThreadData
   /** Every thread on the page: what the reply box's `[` offers (CON-25). */
   pageThreads: readonly ThreadData[]
-  onReply: (threadId: string, text: string, files: readonly Imeta[], picks?: Picks) => Promise<boolean | void> | boolean | void
+  onReply: (threadId: string, text: string, files: readonly Imeta[], picks?: Picks) => Promise<Answer>
+  /** Why nothing can be written here: the reply box is a line saying it, and React, Edit and Delete are not offered. */
   disabledReason?: string
   /** This thread's message ids that were new when the page opened, oldest first: the divider and opening by itself. */
   unread?: readonly string[]
@@ -242,9 +253,9 @@ interface ThreadProps {
   here?: string
   nameOf?: (pubkey: string) => string
   reactionsBy?: Record<string, readonly Reaction[]>
-  onReact?: (messageId: string, emoji: string, mine?: string) => void
+  onReact?: (messageId: string, emoji: string, mine?: string) => Promise<Answer>
   onDeleteMessage?: (messageId: string) => Promise<boolean | void> | boolean | void
-  onEditMessage?: (messageId: string, body: string, removeCard?: string) => Promise<boolean | void> | boolean | void
+  onEditMessage?: (messageId: string, body: string, removeCard?: string) => Promise<Answer>
   upload?: (file: File) => Promise<Imeta>
   drafts?: DraftStore
   viewer?: string
@@ -255,7 +266,9 @@ interface ThreadProps {
 const REPLY_RULE = 'ml-2.5 border-l-2 border-border-default pl-3'
 
 function Thread({ thread, pageThreads, onReply, disabledReason, unread, stillUnread, judged = true, resolved, here, nameOf, reactionsBy, onReact, onDeleteMessage, onEditMessage, upload, drafts, viewer, onShown }: ThreadProps) {
-  const references = useCallback((query: string) => referenceSections(messageScope(pageThreads, thread.id), query, nameOf), [pageThreads, thread.id, nameOf])
+  const scope = useMemo(() => messageScope(pageThreads, thread.id), [pageThreads, thread.id])
+  const references = useCallback((query: string) => referenceSections(scope, query, nameOf), [scope, nameOf])
+  const captions = useMemo(() => referenceCaptions(scope, nameOf), [scope, nameOf])
   const unreadFrom = unread?.[0]
   // The replies that are new to you, not every reply after the first new one:
   // your own reply below it is never new, and an unread root leaves its
@@ -280,12 +293,14 @@ function Thread({ thread, pageThreads, onReply, disabledReason, unread, stillUnr
     setFocusReply(!open)
     setOpen(!open)
   }
-  const common = { resolved, here, nameOf, disabledReason, drafts }
+  const common = { resolved, here, nameOf, viewer, drafts, references, captions }
+  // Closed (an archived file, signed out): no React, Edit or Delete, as the box is a line (Decided 2026-10-17).
+  const writable = !disabledReason
   const toolsFor = (message: MessageData) => {
-    const offered = offersEditAndDelete({ viewer, author: message.by ?? '' })
+    const offered = writable && offersEditAndDelete({ viewer, author: message.by ?? '' })
     return {
       reactions: reactionsBy?.[message.id],
-      onToggleReaction: onReact && ((emoji: string, mine?: string) => onReact(message.id, emoji, mine)),
+      onToggleReaction: writable && onReact ? (emoji: string, mine?: string) => onReact(message.id, emoji, mine) : undefined,
       onDelete: offered && onDeleteMessage ? () => onDeleteMessage(message.id) : undefined,
       onEdit: offered && onEditMessage ? (...edit: [body: string, removeCard?: string]) => onEditMessage(message.id, ...edit) : undefined,
     }
@@ -305,18 +320,22 @@ function Thread({ thread, pageThreads, onReply, disabledReason, unread, stillUnr
               </div>
             </Fragment>
           ))}
-          <MessageBox
+          {/* Escape no longer closes an empty reply: the box's rule is that Escape cancels an edit only (approved Ship stories). */}
+          <Box
+            key={thread.id}
             kind="reply"
             autoFocus={focusReply}
-            disabledReason={disabledReason}
+            closed={disabledReason}
             draftKey={draftKeys.thread(thread.id)}
             drafts={drafts}
             upload={upload}
             nameOf={nameOf}
+            resolved={resolved}
+            here={here}
             className="ml-2.5"
             references={references}
-            onSubmit={(text, files, picks) => onReply(thread.id, text, files, picks)}
-            onCancel={() => (setOpen(false), setFocusReply(false))}
+            captions={captions}
+            onSend={(text, files, picks) => onReply(thread.id, text, files, picks)}
           />
         </div>
       )}
@@ -331,7 +350,7 @@ const threadProps = (p: ThreadListViewProps | MentionListViewProps) => ({
   here: p.about,
   nameOf: p.nameOf,
   reactionsBy: p.reactionsBy,
-  onReact: p.onReact && ((id: string, emoji: string, mine?: string) => void p.onReact?.(id, emoji, mine)),
+  onReact: p.onReact,
   onDeleteMessage: p.onDeleteMessage,
   onEditMessage: p.onEditMessage,
   viewer: p.viewer,
@@ -342,7 +361,9 @@ const threadProps = (p: ThreadListViewProps | MentionListViewProps) => ({
 /** The drawing, with the reads handed in — for a story, or a caller that has them. */
 export function ThreadListView(props: ThreadListViewProps) {
   const { threads, onStart, disabledReason, className, unread, nameOf, about, omitted = 0, reactionsCut = false, upload, drafts, anchor, onDropAnchor } = props
-  const references = useCallback((query: string) => referenceSections(messageScope(threads), query, nameOf), [threads, nameOf])
+  const scope = useMemo(() => messageScope(threads), [threads])
+  const references = useCallback((query: string) => referenceSections(scope, query, nameOf), [scope, nameOf])
+  const captions = useMemo(() => referenceCaptions(scope, nameOf), [scope, nameOf])
   const blockId = anchor && anchor.state !== 'unanchored' ? anchor.id : undefined
   return (
     <div className={cn('flex flex-col gap-3', className)}>
@@ -357,16 +378,20 @@ export function ThreadListView(props: ThreadListViewProps) {
           )}
         </div>
       )}
-      <MessageBox
+      <Box
+        key={about}
         kind="conversation"
-        onSubmit={(text, files, picks) => onStart(text, files, picks, blockId)}
+        onSend={(text, files, picks) => onStart(text, files, picks, blockId)}
         references={references}
+        captions={captions}
         autoFocus={!!blockId}
-        disabledReason={disabledReason}
+        closed={disabledReason}
         draftKey={about && draftKeys.object(about)}
         drafts={drafts}
         upload={upload}
         nameOf={nameOf}
+        resolved={props.resolved}
+        here={about}
       />
       {threads.length ? (
         <ol className="flex flex-col gap-3">
@@ -436,8 +461,9 @@ export function ThreadList(props: ConversationsProps & Pick<ThreadListViewProps,
   const { reactionsBy, omitted, cut, refresh } = useThreadReactions(props.threads)
   const onReact = props.onReact
     ? async (messageId: string, emoji: string, mine?: string) => {
-        await props.onReact?.(messageId, emoji, mine)
-        refresh()
+        const answer = await props.onReact!(messageId, emoji, mine)
+        if (answer === true) refresh()
+        return answer
       }
     : undefined
   return <ThreadListView {...props} onReact={onReact} resolved={resolved}reactionsBy={reactionsBy} omitted={omitted} reactionsCut={cut} viewer={props.viewer ?? me} />
@@ -450,8 +476,9 @@ export function MentionList(props: ActivityProps & Pick<MentionListViewProps, 'u
   const { reactionsBy, refresh } = useThreadReactions(threads)
   const onReact = props.onReact
     ? async (messageId: string, emoji: string, mine?: string) => {
-        await props.onReact?.(messageId, emoji, mine)
-        refresh()
+        const answer = await props.onReact!(messageId, emoji, mine)
+        if (answer === true) refresh()
+        return answer
       }
     : undefined
   return <MentionListView {...props} onReact={onReact} resolved={resolved}reactionsBy={reactionsBy} viewer={props.viewer ?? me} />

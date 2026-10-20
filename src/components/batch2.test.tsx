@@ -83,7 +83,7 @@ describe('IssuesTable and Board', () => {
 describe('a message in the conversations list', () => {
   it('names the author as a person or an em dash, never a key, and keeps the body as text', () => {
     const message = { ...THREADS[0].replies[1], author: {}, body: '<b>not markup</b>' }
-    const { container } = render(<ThreadListView threads={[{ id: 't', root: message, replies: [] }]} onStart={() => {}} onReply={() => {}} />)
+    const { container } = render(<ThreadListView threads={[{ id: 't', root: message, replies: [] }]} onStart={async () => true} onReply={async () => true} />)
     expect(container.textContent).toContain('—')
     expect(container.querySelector('b')).toBeNull()
     expect(container.textContent).not.toMatch(/[0-9a-f]{8}/)

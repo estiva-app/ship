@@ -342,7 +342,7 @@ describe('Project page — one project from the fold', () => {
     const box = (await main.findByRole('textbox', { name: 'Start a conversation…' })) as HTMLElement & { editor: { commands: { insertContent: (s: string) => void } } }
     act(() => box.editor.commands.insertContent('hello'))
     fireEvent.click(main.getByRole('button', { name: 'Send' }))
-    await waitFor(() => expect(startConversation).toHaveBeenCalledWith({ folder: 'f', about: `30850:x:${LIVE}`, withReference: false, body: 'hello', files: [] }))
+    await waitFor(() => expect(startConversation).toHaveBeenCalledWith({ folder: 'f', about: `30850:x:${LIVE}`, withReference: false, body: 'hello', files: [], embeds: [] }))
     await waitFor(() => expect(refresh).toHaveBeenCalled())
   })
 
@@ -428,7 +428,7 @@ describe('Issue page — one issue from the fold', () => {
     const box = (await main.findByRole('textbox', { name: 'Start a conversation…' })) as HTMLElement & { editor: { commands: { insertContent: (s: string) => void } } }
     act(() => box.editor.commands.insertContent('seen this?'))
     fireEvent.click(main.getByRole('button', { name: 'Send' }))
-    await waitFor(() => expect(startConversation).toHaveBeenCalledWith({ folder: 'f', about: `30851:x:${D('14')}`, withReference: true, body: 'seen this?', files: [] }))
+    await waitFor(() => expect(startConversation).toHaveBeenCalledWith({ folder: 'f', about: `30851:x:${D('14')}`, withReference: true, body: 'seen this?', files: [], embeds: [] }))
   })
 
   it('links the project in the trail when the issue has one', () => {

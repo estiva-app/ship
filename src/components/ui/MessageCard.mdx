@@ -1,0 +1,36 @@
+import { Meta } from '@storybook/addon-docs/blocks'
+
+<Meta title="Primitives/MessageCard/Usage" />
+
+# MessageCard
+
+The card a message carries for one file it names (SPEC §13.6.2): the package's
+card, filled with what Ship reads about that file.
+
+**Seen in** no story: a card draws a file read from the relay, which the stories' fake relay does not answer; `ThreadList.cards` and `ThreadList.embeds` draw it in tests.
+
+## When
+
+- A sent message's card, under its text (`MessageText`), with ✕ for its author.
+- The card a comment will be sent with, under the comment box while it is
+  written (`ConversationBox`, COMM-7), where the box's own ✕ takes it off.
+
+## When not
+
+- A file named mid-sentence → its chip, **Reference**.
+- One block of a file → **PartCard**.
+
+## How
+
+```tsx
+import { MessageCard } from '@/components/ui/MessageLinks'
+
+<MessageCard uri={card.reference} object={resolved[card.reference]} onRemove={removeCard} />
+```
+
+## What it owns
+
+- **The file's live fields**, changed from the card and read back, since the
+  relay is the authority on whether a change happened (Decided 16 Oct).
+- **The comment count's dot**, shown only for a member with something unread.
+- **`compact`**: an old message's row, as it drew before the kit.

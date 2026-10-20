@@ -24,7 +24,7 @@ const thread = (layout: 'detailed' | 'compact'): ThreadData => ({
   replies: [],
 })
 
-const noop = () => {}
+const noop = async (): Promise<true> => true
 
 describe('✕ on a sent comment’s card', () => {
   it('is offered to its author and asks for the edit that removes that card', async () => {
@@ -48,7 +48,7 @@ describe('✕ on a sent comment’s card', () => {
 
   it('is not offered again until the first ✕ has been written and read back', async () => {
     let done = () => {}
-    const onEditMessage = vi.fn(() => new Promise<boolean>((resolve) => (done = () => resolve(true))))
+    const onEditMessage = vi.fn(() => new Promise<true | string>((resolve) => (done = () => resolve(true))))
     render(<ThreadList threads={[thread('detailed')]} onStart={noop} onReply={noop} viewer={BOB} onEditMessage={onEditMessage} />)
     fireEvent.click(await screen.findByRole('button', { name: 'Remove card' }))
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Remove card' })).toBeNull())

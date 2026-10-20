@@ -24,6 +24,7 @@ import {
   referenceSearch,
   type ReferenceCandidate,
 } from '@estiva-app/conversation'
+import { decodeNevent } from '@estiva-app/protocol'
 import type { CaptionedItem, ReferenceTriggerOptions } from '@estiva-app/ui/editor'
 import { snippetOf } from '@/components/editing/mentionables'
 import type { MessageData, ThreadData } from '@/components/ConversationThread'
@@ -134,6 +135,30 @@ export function referenceSections(scope: MessageScope, query: string, nameOf?: (
     { label: REFERENCE_COPY.messages, items: ranked.messages.map(itemOf) },
     { label: REFERENCE_COPY.files, items: ranked.files.map(itemOf) },
   ]
+}
+
+/**
+ * The chip an edit or a draft opens a message or file reference as: the
+ * caption `[` gave it, from the same scope (SHI-49). One it does not know stays
+ * the box's `reference` chip, drawn by Ship's own view.
+ */
+export function referenceCaptions(scope: MessageScope, nameOf?: (pubkey: string) => string): (uri: string) => { label: string; snippet: string } | undefined {
+  const parent = scope.parent === 'page-parent' ? parentThreads : scope.parent
+  return (uri) => {
+    const bare = uri.replace(/^nostr:/i, '').toLowerCase()
+    if (bare.startsWith('nevent1')) {
+      let id: string
+      try {
+        id = decodeNevent(bare).id
+      } catch {
+        return undefined
+      }
+      const message = [...scope.here, ...parent].flatMap((thread) => [thread.root, ...thread.replies]).find((m) => m.id === id)
+      return message ? { label: message.author.name ?? 'Someone', snippet: snippetOf(message.body, nameOf) } : undefined
+    }
+    const file = [...folderFiles, ...recentFiles].find((candidate) => candidate.uri.toLowerCase() === `nostr:${bare}`)
+    return file ? { label: file.title, snippet: '' } : undefined
+  }
 }
 
 /**

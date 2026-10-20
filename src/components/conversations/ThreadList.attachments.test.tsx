@@ -95,7 +95,7 @@ describe('threadFor', () => {
 /* `MessageCard` is gone: a message is drawn inside the thread list, so it is
    handed to the list as a thread's first message. */
 const show = (root: MessageData) =>
-  render(<ThreadListView threads={[{ id: root.id, root, replies: [] }]} onStart={() => true} onReply={() => true} />).container
+  render(<ThreadListView threads={[{ id: root.id, root, replies: [] }]} onStart={async () => true} onReply={async () => true} />).container
 
 describe('a message in the thread list', () => {
   it('draws the file the thread handed it', async () => {

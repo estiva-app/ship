@@ -1,13 +1,13 @@
 // Moved from src/components/ConversationThread.react.test.tsx
 /**
- * The message's tools: "React" and the `…` menu, and the package's picker
- * opening from the first. What is pinned is the controls and the picking; which
- * reaction is yours is the pills' business (`Reactions.test.tsx`).
+ * The message's tools: the package's add-reaction button and reaction row
+ * (COMM-7), and the `…` menu. "…" sits at the end of the message's header
+ * line; the reactions sit under the message, the add button after the pills
+ * (Linear's order, Katerina 29–30 September).
  *
- * Changed on purpose (Katerina, 29–30 September): the two are no longer one
- * strip beside the name. "…" sits at the end of the message's header line,
- * always there; "React" sits under the message, after its reaction pills
- * (Linear's order).
+ * Changed on purpose (COMM-7, Decided 2026-10-17): where nothing can be written
+ * the tools are not offered at all, where they were offered disabled — the box
+ * is a line saying why instead.
  */
 import { describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
@@ -23,54 +23,60 @@ const thread: ThreadData = {
 }
 
 const show = (props: Partial<ThreadListViewProps> = {}) =>
-  render(<ThreadListView threads={[thread]} onStart={() => true} onReply={() => true} viewer="bob" {...props} />)
+  render(<ThreadListView threads={[thread]} onStart={async () => true} onReply={async () => true} viewer="bob" {...props} />)
+
+const answered = () => vi.fn(async (): Promise<true | string> => true)
 
 describe('the message tools', () => {
-  it.todo(
-    'is one strip, one Tab stop, with React and the menu on it — no longer applies: React moved under the message and "…" to the header line, so they are two separate controls, each its own Tab stop (Katerina, 29–30 September)',
-  )
-
-  // Changed on purpose: the strip's assertion, kept for what still holds — both controls are offered on a message.
-  it('offers React and the menu on a message', () => {
-    show({ onReact: vi.fn(), onEditMessage: vi.fn(), onDeleteMessage: vi.fn() })
-    expect(screen.getByRole('button', { name: 'React' })).toBeInTheDocument()
+  it('offers the add-reaction button and the menu on a message', () => {
+    show({ onReact: answered(), onEditMessage: answered(), onDeleteMessage: vi.fn() })
+    expect(screen.getByRole('button', { name: 'Add a reaction' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Message actions' })).toBeInTheDocument()
   })
 
-  it('offers no React without a handler, and no menu without one', () => {
+  it('offers no add-reaction button without a handler, and no menu without one', () => {
     const { unmount } = show({ onDeleteMessage: vi.fn() })
-    expect(screen.queryByRole('button', { name: 'React' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Add a reaction' })).toBeNull()
     expect(screen.getByRole('button', { name: 'Message actions' })).toBeInTheDocument()
     unmount()
-    show({ onReact: vi.fn() })
-    expect(screen.getByRole('button', { name: 'React' })).toBeInTheDocument()
+    show({ onReact: answered() })
+    expect(screen.getByRole('button', { name: 'Add a reaction' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Message actions' })).toBeNull()
   })
 
-  it('opens the picker from React, and picking hands back the emoji and closes it', async () => {
+  it('opens the picker from the add button, and picking hands back the message and the emoji and closes it', async () => {
     const user = userEvent.setup()
-    const onReact = vi.fn()
+    const onReact = answered()
     show({ onReact })
-    await user.click(screen.getByRole('button', { name: 'React' }))
-    const picker = await screen.findByRole('dialog', { name: 'Reactions' })
+    await user.click(screen.getByRole('button', { name: 'Add a reaction' }))
+    const picker = await screen.findByRole('dialog', { name: 'Add a reaction' })
     // Each control is named by its meaning — a bare glyph is not a name.
     await user.click(screen.getByRole('button', { name: 'Thank you' }))
     expect(onReact).toHaveBeenCalledTimes(1)
-    // Changed on purpose: the list hands back the message too, so the emoji is the second argument.
-    expect(onReact.mock.calls[0][0]).toBe('m1')
-    expect(onReact.mock.calls[0][1]).toBe('🙏')
+    expect(onReact.mock.calls[0]).toEqual(['m1', '🙏', undefined])
     await waitFor(() => expect(picker).not.toBeInTheDocument())
   })
 
-  it('says why when nothing can be written, on both controls, and neither opens', async () => {
+  it('takes back your own reaction from its pill, naming the reaction event a retraction targets', async () => {
     const user = userEvent.setup()
-    show({ onReact: vi.fn(), onDeleteMessage: vi.fn(), disabledReason: 'Sign in to react.' })
-    for (const name of ['React', 'Message actions']) {
-      expect(screen.getByRole('button', { name })).toHaveAttribute('aria-disabled', 'true')
-    }
-    await user.click(screen.getByRole('button', { name: 'React' }))
-    expect(screen.queryByRole('dialog', { name: 'Reactions' })).toBeNull()
-    await user.click(screen.getByRole('button', { name: 'Message actions' }))
-    expect(screen.queryByRole('menu')).toBeNull()
+    const onReact = answered()
+    show({ onReact, reactionsBy: { m1: [{ emoji: '🙏', count: 1, by: ['bob'], mine: 'r1' }] } })
+    await user.click(screen.getByRole('button', { name: /Thank you/ }))
+    expect(onReact.mock.calls[0]).toEqual(['m1', '🙏', 'r1'])
+  })
+
+  it('says a refused reaction under the row, in the relay’s words', async () => {
+    const user = userEvent.setup()
+    show({ onReact: vi.fn(async () => 'rate-limited: slow down') })
+    await user.click(screen.getByRole('button', { name: 'Add a reaction' }))
+    await user.click(await screen.findByRole('button', { name: 'Thank you' }))
+    expect(await screen.findByText('Not reacted: rate-limited: slow down')).toBeInTheDocument()
+  })
+
+  it('offers no reaction, edit or delete where nothing can be written, and draws the pills only', () => {
+    show({ onReact: answered(), onEditMessage: answered(), onDeleteMessage: vi.fn(), disabledReason: 'Archived. Unarchive it to comment.', reactionsBy: { m1: [{ emoji: '🙏', count: 1, by: ['ann'] }] } })
+    expect(screen.queryByRole('button', { name: 'Add a reaction' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Message actions' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Thank you, 1' })).toBeDisabled()
   })
 })
