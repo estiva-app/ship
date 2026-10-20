@@ -540,7 +540,8 @@ async function main() {
   const startBox = () => sectionFor('Conversations').getByRole('textbox', { name: 'Start a conversation…' })
   await startBox().click()
   await page.keyboard.type('Blocked on the Stripe key.')
-  await conversations.locator('[data-message-box="conversation"]').getByRole('button', { name: 'Send', exact: true }).click()
+  // Enter sends, as in every app's box (COMM-7).
+  await page.keyboard.press('Enter')
   await conversations.locator('article').first().waitFor()
 
   const comment = stored.find((e) => e.kind === 1111)
@@ -585,11 +586,11 @@ async function main() {
      wait in the file whose budget is `REFRESH_MS`, and it has to stay ahead of
      it: at 20 s the old 15 s timeout failed here, correctly.
   */
-  await conversations.locator('[data-reactions]').first().waitFor({ timeout: 45000 })
+  await conversations.locator('[data-reaction-row]').first().waitFor({ timeout: 45000 })
   check('a reaction written in another app is read here', true)
   check(
     '  …drawn on the message it targets, with its count',
-    (await conversations.locator('[data-reactions]').first().textContent())?.includes('🎉') ?? false,
+    (await conversations.locator('[data-reaction-row]').first().textContent())?.includes('🎉') ?? false,
   )
 
   /*
@@ -640,7 +641,7 @@ async function main() {
      card's React button — it was an inline row when this was written. The
      picker's buttons are named by meaning, not by glyph, the same rule the
      pills follow. */
-  await conversations.getByRole('button', { name: 'React' }).first().click()
+  await conversations.getByRole('button', { name: 'Add a reaction' }).first().click()
   // `page`, not `conversations`: the popover portals to the body, so it is not
   // inside the section its trigger sits in.
   await page.getByRole('button', { name: 'Makes sense', exact: true }).first().click()
@@ -650,7 +651,7 @@ async function main() {
   check('  …and nothing was retracted to make room for it', stored.filter((e) => e.kind === 5).length === 0)
   check(
     '  …with both drawn, each carrying its own count',
-    (await conversations.locator('[data-reactions]').first().getAttribute('data-reactions')) === '2',
+    (await conversations.locator('[data-reaction-row]').first().getByRole('button', { name: /, \d+$/ }).count()) === 2,
   )
 
   // Clicking your own takes it back — a kind:5 naming the REACTION, never the
@@ -688,7 +689,7 @@ async function main() {
   await conversations.getByRole('button', { name: 'Reply', exact: true }).first().click()
   await conversations.getByRole('textbox', { name: 'Reply…' }).first().click()
   await page.keyboard.type('Key is in 1Password now.')
-  await conversations.locator('[data-message-box="reply"]').getByRole('button', { name: 'Send', exact: true }).first().click()
+  await page.keyboard.press('Enter')
   await page.waitForFunction(
     () => document.querySelectorAll('section article').length >= 2,
   )
@@ -878,7 +879,8 @@ async function main() {
 
   // Sending clears it: the next load starts empty rather than re-offering text
   // that has already been posted.
-  await afterReload.locator('[data-message-box="conversation"]').getByRole('button', { name: 'Send', exact: true }).click()
+  // The start box is the first on the page; its Send is the first Send.
+  await afterReload.getByRole('button', { name: 'Send', exact: true }).first().click()
   await page.waitForFunction(
     (n) => document.querySelectorAll('section article').length > n,
     await afterReload.locator('article').count(),
