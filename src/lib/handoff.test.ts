@@ -66,3 +66,25 @@ describe('lookupFor — what a path on Ship names (RFC 0.5 §7.7)', () => {
     expect(lookupFor('note', D, [])).toBe(null)
   })
 })
+
+/*
+  A path two shapes read as different kinds is looked up under exactly those
+  kinds (SPEC §7.7, LTX-6), never every kind the app handles: the one-author
+  rule then decides, and a kind no shape names for the path cannot answer it.
+*/
+describe('lookupFor — a path read as several kinds', () => {
+  const WIKI = {
+    tags: [
+      ['k', '30851'],
+      ['k', '30023'],
+      ['k', '30842'],
+      ['web', 'https://wiki.example/o/<bech32>', 'naddr'],
+      ['urls', 'https://wiki.example/issue/<slug>-<d>', '30851'],
+      ['urls', 'https://wiki.example/issue/<slug>-<d>', '30023'],
+    ],
+  }
+
+  it('asks the kinds the shapes name, not a third the app also handles', () => {
+    expect(lookupFor('issue', `plan-${D}`, [WIKI])?.kinds.sort()).toEqual([30023, 30851])
+  })
+})

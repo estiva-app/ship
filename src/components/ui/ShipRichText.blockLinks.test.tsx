@@ -29,12 +29,12 @@ describe('a link to one block in a description', () => {
     expect(hrefOf(chip)).toBe(`${FILE_LINK}#block-p1`)
   })
 
-  it('a link to the whole file opens where the file opens, as before', () => {
-    const chip = chipOf(`see ${FILE_LINK} here`)
-    expect(hrefOf(chip)).not.toContain('#block-')
+  // A click opens the address as written, in the app it names (LTX-6), block or not.
+  it('a link to the whole file opens as written', () => {
+    expect(hrefOf(chipOf(`see ${FILE_LINK} here`))).toBe(FILE_LINK)
   })
 
-  it('an old `#/issue/…` link is no block: it opens where the file opens', () => {
-    expect(hrefOf(chipOf(`see ${OLD_LINK} here`))).not.toContain('#/')
+  it('an old `#/page/…` link opens as written, where its app still serves it', () => {
+    expect(hrefOf(chipOf(`see ${OLD_LINK} here`))).toBe(OLD_LINK)
   })
 })

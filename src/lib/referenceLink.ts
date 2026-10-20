@@ -47,25 +47,49 @@ export function referenceLink(object: ForeignObject | null | undefined): Referen
   return link ? { place: 'app', href: link } : null
 }
 
+/*
+  The origins the manifests declare, for render, where nothing can await:
+  `api/handoff.ts` fills it each time it reads the manifests, which it does
+  before any pasted link resolves to a file.
+*/
+let declaredOrigins: readonly string[] = []
+
+/** What the manifests declare — from `declaredManifests`, once they have been read. */
+export function rememberDeclaredOrigins(origins: readonly string[]): void {
+  declaredOrigins = origins
+}
+
 /**
- * Where a chip written as a link to one block opens (§13.6.1, WBM-11): the URL
- * as written, so a click lands on the block, not the top of its file — or
- * undefined for a link with no fragment, and for anything but `https:`, which
- * open where {@link referenceLink} says. `opens` is where the file itself
- * opens: the written URL is taken only on that same origin, so a chip that
- * draws one file never opens another site (WBM-11 security review). Ship's own
- * URL is a path for the router, and the issue page scrolls to the block it names.
+ * Where a chip written as a URL opens: the address as written, in the app it
+ * names (SPEC §7.7, LTX-6) — so `leaf.estiva.app/issue/…` opens Leaf, not
+ * Ship's own page, and a link to one block lands on the block, not the top of
+ * its file (§13.6.1, WBM-11). Undefined for anything but `https:`, and for a
+ * host no app declares, which open where {@link referenceLink} says: a chip
+ * that draws one file never opens a site no app serves from (WBM-11 security
+ * review). `opens` is where the file itself opens, and its origin counts as
+ * declared. Ship's own URL is a path for the router, and the issue page
+ * scrolls to the block it names.
+ * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-files-path-is-the-same-on-every-apps-host.md
  */
-export function blockLinkOf(url: string | undefined, opens: string | undefined, origin = window.location.origin): ReferenceLink | undefined {
+export function writtenLinkOf(
+  url: string | undefined,
+  opens: string | undefined,
+  origin = window.location.origin,
+  declared: readonly string[] = declaredOrigins,
+): ReferenceLink | undefined {
   const link = safeLink(url)
   if (!link || !opens) return undefined
   const parsed = new URL(link)
+  let opensHere: boolean
   try {
-    if (new URL(opens, origin).origin !== parsed.origin) return undefined
+    const opensAt = new URL(opens, origin).origin
+    opensHere = opensAt === origin
+    if (parsed.origin !== origin && parsed.origin !== opensAt && !declared.includes(parsed.origin)) return undefined
   } catch {
     return undefined
   }
-  // `#/…` is an old hash route, not a block: it opens where the file does.
-  if (parsed.hash.length < 2 || parsed.hash.startsWith('#/')) return undefined
+  // Ship's own file written on Ship's host already opens here, at its route; only a block (not `#/…`, an old hash
+  // route) changes where.
+  if (opensHere && parsed.origin === origin && (parsed.hash.length < 2 || parsed.hash.startsWith('#/'))) return undefined
   return parsed.origin === origin ? { place: 'here', href: `${parsed.pathname}${parsed.search}${parsed.hash}` } : { place: 'app', href: link }
 }

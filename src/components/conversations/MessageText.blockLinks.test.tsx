@@ -28,6 +28,8 @@ vi.mock(import('@/api/part'), async (importOriginal) => ({
 vi.mock(import('@/api/foreign'), async (importOriginal) => ({ ...(await importOriginal()), resolveForeign: vi.fn(async () => null) }))
 
 import { MessageText } from './MessageText'
+import { declaredManifests } from '@/api/handoff'
+import { relay } from '@/api/store'
 
 const object = { ref: ADDRESS, address: ADDRESS, kind: 30842, appName: 'Leaf', noun: 'page', openUrl: `https://leaf.estiva.app/o/${ADDRESS}`, slots: { title: { value: 'Plan the launch' } }, meta: [], actions: [] } as never
 const PART = [{ address: ADDRESS, block: 'p1' }]
@@ -79,5 +81,42 @@ describe('a link to one block reads as its file', () => {
     const c = show(`see ${UNREAD} here`)
     expect(c.textContent).toContain(UNREAD)
     expect(c.textContent).not.toContain('Plan the launch')
+  })
+})
+
+/*
+  LTX-6: a file's path is the same on every app's host, and a click opens the
+  address as written, in the app it names — Leaf's address for a Ship issue
+  opens Leaf, not the issue's page here (why:
+  https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-files-path-is-the-same-on-every-apps-host.md).
+*/
+describe('an address on another Estiva app’s host opens as written', () => {
+  const ISSUE_D = 'c2a4a8f0-1b2c-4d3e-8f90-a1b2c3d4e5f6'
+  const ISSUE = `30851:${'e'.repeat(64)}:${ISSUE_D}`
+  const LEAF_ISSUE = `https://leaf.estiva.app/issue/plan-the-launch-${ISSUE_D}`
+  const issue = { ref: ISSUE, address: ISSUE, kind: 30851, appName: 'Ship', noun: 'issue', openUrl: `https://ship.estiva.app/o/${ISSUE}`, slots: { title: { value: 'Plan the launch' } }, meta: [], actions: [] } as never
+  const showIssue = (body: string) => render(<MessageText body={body} resolved={{ [`nostr:${addrToNaddr(ISSUE, [])}`]: issue }} />).container
+  // The hosts come from the manifests, as the app reads them: Ship's and Leaf's, each declaring the path on its own.
+  const manifest = (app: string, host: string) => ({ kind: 31990, pubkey: 'c'.repeat(64), id: app, created_at: 1, content: '{}', sig: '', tags: [['d', `estiva-${app}`], ['web', `https://${host}/o/<bech32>`, 'naddr'], ['urls', `https://${host}/issue/<slug>-<d>`, '30851']] })
+
+  beforeEach(async () => {
+    vi.spyOn(relay, 'query').mockResolvedValue([manifest('ship', 'ship.estiva.app'), manifest('leaf', 'leaf.estiva.app')] as never)
+    await declaredManifests()
+    answers.set(LEAF_ISSUE, ISSUE)
+  })
+
+  it('in a sentence, its chip opens Leaf at the address, not the issue’s page in Ship', () => {
+    const c = showIssue(`see ${LEAF_ISSUE} here`)
+    const chip = [...c.querySelectorAll('[data-message-text] a')].find((a) => a.textContent?.includes('Plan the launch'))
+    expect(chip?.getAttribute('href')).toBe(LEAF_ISSUE)
+  })
+
+  it('on a host no app declares, opens the issue’s page here, never that site (security review)', () => {
+    const rogue = `https://evil.example/issue/plan-the-launch-${ISSUE_D}`
+    answers.set(rogue, ISSUE)
+    const c = showIssue(`see ${rogue} here`)
+    const chip = [...c.querySelectorAll('[data-message-text] a')].find((a) => a.textContent?.includes('Plan the launch'))
+    expect(chip?.getAttribute('href')).not.toContain('evil.example')
+    expect(chip?.getAttribute('href')).toMatch(/^\/issue\//)
   })
 })
