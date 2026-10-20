@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { IconBox, IconListDetails } from '@tabler/icons-react'
-import { addressToPointer, cardsIn, encodeNaddr, encodeNevent, referencesIn, valueOfReference, type Embed, type Imeta, type LinkResolver, type PartPointer, type RenderBlock } from '@estiva-app/protocol'
+import { addressToPointer, cardsIn, encodeNaddr, encodeNevent, referenceOfLink, referencesIn, valueOfReference, type Embed, type Imeta, type LinkResolver, type PartPointer, type RenderBlock } from '@estiva-app/protocol'
 import { WithTooltip } from '@estiva-app/ui'
 import { ago } from '@/lib/time'
 import type { DraftStore } from '@/lib/drafts'
@@ -15,6 +15,8 @@ export const MESSAGE_FORMAT = 'marker' as const
 /** One card a message asks for, with the `nostr:` reference its object is resolved under. */
 export interface MessageCard extends Embed {
   reference: string
+  /** The first URL the body wrote for its file: the card opens it, as that file's chip would (LTX-6). */
+  opensAt?: string
 }
 
 /**
@@ -36,9 +38,23 @@ export function cardsOf(blocks: readonly RenderBlock[], embeds: readonly Embed[]
     const value = valueOfReference(reference)
     if (value && !written.has(value)) written.set(value, reference)
   }
+  // Only a URL that itself names that file, as a chip checks (LTX-6 security review).
+  const writtenUrl = new Map<string, string>()
+  const urlsIn = (bs: readonly RenderBlock[]) => {
+    for (const block of bs) {
+      for (const run of block.inline ?? []) {
+        const names = resolveLink && run.reference && /^https?:\/\//i.test(run.text) && referenceOfLink(run.text, resolveLink) === run.reference
+        const value = names && run.reference ? valueOfReference(run.reference) : undefined
+        if (value && !writtenUrl.has(value)) writtenUrl.set(value, run.text)
+      }
+      if (block.children) urlsIn(block.children)
+    }
+  }
+  urlsIn(blocks)
   return cardsIn(embeds, blocks, parts, resolveLink).flatMap((card) => {
     const reference = written.get(card.value) ?? referenceOfValue(card.value)
-    return reference ? [{ ...card, reference }] : []
+    const opensAt = writtenUrl.get(card.value)
+    return reference ? [{ ...card, reference, ...(opensAt ? { opensAt } : {}) }] : []
   })
 }
 

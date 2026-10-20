@@ -8,7 +8,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ForeignObject } from '@estiva-app/interop'
 import { href } from '@/router'
-import { blockLinkOf, referenceLink } from './referenceLink'
+import { writtenLinkOf, referenceLink } from './referenceLink'
 
 const AUTHOR = 'ab'.repeat(32)
 const D = '0212db6d-bcbf-40d0-890e-f4f056db2f5d'
@@ -56,12 +56,12 @@ describe('referenceLink', () => {
   })
 })
 
-describe('blockLinkOf', () => {
+describe('writtenLinkOf', () => {
   const SHIP = 'https://ship.estiva.app'
   const LEAF_PAGE = 'https://leaf.estiva.app/p/x'
 
   it('a block link on the origin its file opens on leads to that block', () => {
-    expect(blockLinkOf('https://leaf.estiva.app/p/x#block-1', LEAF_PAGE, SHIP)).toEqual({ place: 'app', href: 'https://leaf.estiva.app/p/x#block-1' })
+    expect(writtenLinkOf('https://leaf.estiva.app/p/x#block-1', LEAF_PAGE, SHIP)).toEqual({ place: 'app', href: 'https://leaf.estiva.app/p/x#block-1' })
   })
 
   /*
@@ -70,8 +70,8 @@ describe('blockLinkOf', () => {
     block chip would open a lookalike; the origin is compared exactly.
   */
   it('a block link on a lookalike host that ends in the file’s host leads nowhere, https or http', () => {
-    expect(blockLinkOf('https://evil-leaf.estiva.app/p/x#block-1', LEAF_PAGE, SHIP)).toBeUndefined()
-    expect(blockLinkOf('http://evil-leaf.estiva.app/p/x#block-1', LEAF_PAGE, SHIP)).toBeUndefined()
+    expect(writtenLinkOf('https://evil-leaf.estiva.app/p/x#block-1', LEAF_PAGE, SHIP)).toBeUndefined()
+    expect(writtenLinkOf('http://evil-leaf.estiva.app/p/x#block-1', LEAF_PAGE, SHIP)).toBeUndefined()
   })
 
   it('a block link on a host that starts with the file’s host, hides it before an @, adds a port or a subdomain leads nowhere', () => {
@@ -81,7 +81,36 @@ describe('blockLinkOf', () => {
       'https://leaf.estiva.app:8443/p/x#block-1',
       'https://x.leaf.estiva.app/p/x#block-1',
     ]) {
-      expect(blockLinkOf(url, LEAF_PAGE, SHIP), url).toBeUndefined()
+      expect(writtenLinkOf(url, LEAF_PAGE, SHIP), url).toBeUndefined()
+    }
+  })
+
+  const DECLARED = ['https://leaf.estiva.app', 'https://peek.estiva.app', SHIP]
+  const ISSUE_ROUTE = '/issue/plan-x'
+
+  it('Ship’s own file written on another declared host opens there as written, block or not (LTX-6)', () => {
+    expect(writtenLinkOf('https://leaf.estiva.app/issue/plan-x', ISSUE_ROUTE, SHIP, DECLARED)).toEqual({ place: 'app', href: 'https://leaf.estiva.app/issue/plan-x' })
+    expect(writtenLinkOf('https://peek.estiva.app/issue/plan-x#block-1', ISSUE_ROUTE, SHIP, DECLARED)).toEqual({ place: 'app', href: 'https://peek.estiva.app/issue/plan-x#block-1' })
+  })
+
+  it('another app’s file written on Ship’s host opens here, through the router', () => {
+    expect(writtenLinkOf('https://ship.estiva.app/document/plan-x', LEAF_PAGE, SHIP, DECLARED)).toEqual({ place: 'here', href: '/document/plan-x' })
+  })
+
+  it('Ship’s own file written on Ship’s host keeps its own route unless it names a block', () => {
+    expect(writtenLinkOf('https://ship.estiva.app/issue/plan-x', ISSUE_ROUTE, SHIP, DECLARED)).toBeUndefined()
+    expect(writtenLinkOf('https://ship.estiva.app/issue/plan-x#block-1', ISSUE_ROUTE, SHIP, DECLARED)).toEqual({ place: 'here', href: '/issue/plan-x#block-1' })
+  })
+
+  it('a lookalike of a declared host is still another site', () => {
+    expect(writtenLinkOf('https://leaf.estiva.app.evil.com/issue/plan-x', ISSUE_ROUTE, SHIP, DECLARED)).toBeUndefined()
+    expect(writtenLinkOf('http://leaf.estiva.app/issue/plan-x', ISSUE_ROUTE, SHIP, DECLARED)).toBeUndefined()
+  })
+
+  // LTX-6 security re-review: a route starting `//` is another host to the router and the browser.
+  it('a path on Ship’s host that starts with two slashes (or a slash and a backslash) never becomes a route to another host', () => {
+    for (const url of ['https://ship.estiva.app//document/plan-x', 'https://ship.estiva.app/\\document/plan-x', 'https://ship.estiva.app//evil.example/issue/plan-x#block-1']) {
+      expect(writtenLinkOf(url, LEAF_PAGE, SHIP, DECLARED), url).toBeUndefined()
     }
   })
 })

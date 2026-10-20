@@ -39,7 +39,7 @@ describe('resolveHandoff', () => {
     const openUrl = `https://peek.estiva.app/o/${addrToNaddr(`30840:${PK}:${D}`)}`
     resolveForeign.mockResolvedValue({ ref: 'r', appName: 'File', openUrl })
     const handoff = await resolveHandoff('topic', `level-2-${D}`)
-    expect(query).toHaveBeenLastCalledWith([{ kinds: [30840], '#d': [D], limit: 10 }])
+    expect(query).toHaveBeenLastCalledWith([{ kinds: [30840], '#d': [D], limit: 2 }])
     expect(resolveForeign).toHaveBeenCalledWith(`30840:${PK}:${D}`)
     // Named by the manifest whose `web` template built the projection's link,
     // and the link is the same path on that app's host, which serves it.
@@ -70,6 +70,17 @@ describe('resolveHandoff', () => {
   it('says nothing was found rather than drawing an empty file', async () => {
     relayWith([])
     expect(await resolveHandoff('topic', D)).toEqual({ state: 'missing' })
+  })
+
+  // LTX-6 security review: with a file's path on every app's host, more links land here.
+  it('opens nothing when a second author holds the same `d`, rather than the newest of them', async () => {
+    relayWith([
+      { kind: 30840, pubkey: 'b'.repeat(64), id: 'e2', created_at: 2 },
+      { kind: 30840, pubkey: PK, id: 'e1', created_at: 1 },
+    ])
+    resolveForeign.mockResolvedValue({ ref: 'r', appName: 'File', openUrl: 'https://peek.estiva.app/o/x' })
+    expect(await resolveHandoff('topic', D)).toEqual({ state: 'missing' })
+    expect(resolveForeign).not.toHaveBeenCalled()
   })
 
   it('tells a file no app opens apart from a missing one', async () => {

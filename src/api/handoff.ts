@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { SignedEvent } from '@estiva-app/protocol'
-import { appNameOf, lookupFor, manifestOfLink, safeLink, samePathOn } from '@/lib/handoff'
+import { appNameOf, declaredOriginsOf, lookupFor, manifestOfLink, safeLink, samePathOn } from '@/lib/handoff'
+import { rememberDeclaredOrigins } from '@/lib/referenceLink'
 import { isOwnKind } from '@/lib/ownKinds'
 import { resolveForeign, type ForeignObject } from './foreign'
 import { relay } from './store'
@@ -45,6 +46,8 @@ export function declaredManifests(): Promise<SignedEvent[]> {
   manifests ??= relay.query([{ kinds: [31990], limit: 500 }] as never).then(
     (found) => {
       if (found.length === 0) manifests = null
+      // The same read answers which hosts a chip may open as written (LTX-6); render reads it, where it cannot await.
+      rememberDeclaredOrigins(declaredOriginsOf(found))
       return found
     },
     (error: unknown) => {
@@ -59,8 +62,13 @@ export async function resolveHandoff(word: string, ref: string, query?: string):
   const all = await declaredManifests()
   const lookup = lookupFor(word, ref, all)
   if (!lookup || (lookup.by === 'd' && lookup.kinds.length === 0)) return { state: 'missing' }
-  const filter = lookup.by === 'd' ? { kinds: lookup.kinds, '#d': [lookup.identifier], limit: 10 } : { ids: [lookup.identifier], limit: 1 }
-  const [event] = (await relay.query([filter] as never)).sort((a, b) => b.created_at - a.created_at)
+  // Asks for two: a `d` two authors (or two kinds) hold names nothing (§13.1, OPT-19), as Leaf's `addressOfPath`
+  // reads it — taking the newest would hand the page to a member who published the same `(kind, d)` later (LTX-6
+  // security review).
+  const filter = lookup.by === 'd' ? { kinds: lookup.kinds, '#d': [lookup.identifier], limit: 2 } : { ids: [lookup.identifier], limit: 1 }
+  const found = await relay.query([filter] as never)
+  if (new Set(found.map((held) => `${held.kind}:${held.pubkey}`)).size > 1) return { state: 'missing' }
+  const [event] = found
   if (!event) return { state: 'missing' }
   if (lookup.by === 'd' && isOwnKind(event.kind)) return { state: 'own', kind: event.kind, d: lookup.identifier }
   const object = await resolveForeign(lookup.by === 'd' ? `${event.kind}:${event.pubkey}:${lookup.identifier}` : event.id)

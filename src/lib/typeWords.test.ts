@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { fileShapesOf, typeWordOf, wordCollisions } from './typeWords'
 
+// `urls` count only on the manifest's own `web` origin (SPEC §7.7).
 const SHIP = {
   tags: [
+    ['web', 'https://ship.estiva.app/o/<bech32>', 'naddr'],
     ['urls', 'https://ship.estiva.app/project/<slug>-<d>', '30850'],
     ['urls', 'https://ship.estiva.app/issue/<slug>-<d>', '30851'],
     ['urls', 'https://ship.estiva.app/#/issue/<d>', '30851'],
@@ -11,6 +13,7 @@ const SHIP = {
 const PEEK = {
   name: 'Peek',
   tags: [
+    ['web', 'https://peek.estiva.app/o/<bech32>', 'naddr'],
     ['urls', 'https://peek.estiva.app/topic/<slug>-<d>', '30840'],
     ['urls', 'https://peek.estiva.app/topic/<slug>-<d>?thread=<id>', '1111'],
     ['urls', 'https://peek.estiva.app/message/<id>', '9'],
@@ -37,7 +40,7 @@ describe('fileShapesOf', () => {
   })
 
   it('reads a shape with no kind as each kind the manifest handles', () => {
-    const manifest = { tags: [['k', '30023'], ['urls', 'https://leaf.example/doc/<slug>-<d>']] }
+    const manifest = { tags: [['k', '30023'], ['web', 'https://leaf.example/o/<bech32>', 'naddr'], ['urls', 'https://leaf.example/doc/<slug>-<d>']] }
     expect(fileShapesOf(manifest)).toEqual([{ word: 'doc', kind: 30023, pattern: 'https://leaf.example/doc/<slug>-<d>' }])
   })
 })

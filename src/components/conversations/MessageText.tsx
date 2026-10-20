@@ -106,6 +106,7 @@ export function MessageText({
               object={resolved?.[card.reference]}
               compact={card.layout !== 'detailed'}
               onRemove={onRemoveCard && card.layout === 'detailed' ? () => onRemoveCard(card.value) : undefined}
+              opensAt={card.opensAt}
             />
           ))}
         </div>
