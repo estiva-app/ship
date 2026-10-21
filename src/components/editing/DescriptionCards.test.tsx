@@ -44,11 +44,10 @@ describe('choosing a chip\'s card in the description', () => {
     const chip = box.querySelector('[data-node-view-wrapper]')
     expect(chip).not.toBeNull()
     fireEvent.click(chip!)
-    const none = await screen.findByRole('menuitemradio', { name: 'None' })
-    expect(none.getAttribute('aria-checked')).toBe('true')
-    // The object is not readable here (resolveForeign is null), so the chip has no link: nothing to Open.
-    expect(screen.queryByRole('menuitem', { name: 'Open' })).toBeNull()
-    fireEvent.mouseDown(screen.getByRole('menuitemradio', { name: 'Detailed' }))
+    // ui 0.83: a lone link offers Show as Row or Card (record a-lone-links-chip-menu-offers-row-or-card); Row is no card.
+    const row = await screen.findByRole('menuitemradio', { name: 'Row' })
+    expect(row.getAttribute('aria-checked')).toBe('true')
+    fireEvent.mouseDown(screen.getByRole('menuitemradio', { name: 'Card' }))
     await waitFor(() => expect(screen.queryByRole('menu', { name: 'Link' })).toBeNull())
 
     act(() => box.editor.commands.blur())
