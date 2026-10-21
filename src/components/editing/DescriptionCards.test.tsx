@@ -104,9 +104,56 @@ describe('a Folder\'s card after a description\'s line', () => {
     )
     const { container } = render(<>{blockLineCards(block, { [uri]: folder })}</>)
 
-    const card = () => container.querySelector(`[data-foreign-object="${FOLDER}"]`)
-    expect(card()?.textContent).toContain('Estiva HQ')
+    const links = () => [...container.querySelectorAll('[data-card="detailed"] a')].map((a) => a.textContent ?? '')
+    expect(links().some((text) => text.includes('Estiva HQ'))).toBe(true)
     await act(() => vi.advanceTimersByTimeAsync(0))
-    expect([...card()!.querySelectorAll('[data-foreign-object]')].map((e) => e.textContent)).toEqual([expect.stringContaining('Weekly notes'), expect.stringContaining('Handbook')])
+    const rows = links().filter((text) => text.includes('Weekly notes') || text.includes('Handbook'))
+    expect(rows).toEqual([expect.stringContaining('Weekly notes'), expect.stringContaining('Handbook')])
+  })
+})
+
+describe('a project\'s card after a description\'s line (5ebf2756)', () => {
+  it('shows its key, its issues and how many are done, as under a comment', () => {
+    const PROJECT = `30850:${'c'.repeat(64)}:project-one`
+    const uri = `nostr:${addrToNaddr(PROJECT)}`
+    const issue = (n: number, status: string, colour: string, changedAt: number) =>
+      ({
+        ref: `30851:${'c'.repeat(64)}:i${n}`,
+        address: `30851:${'c'.repeat(64)}:i${n}`,
+        eventId: 'e'.repeat(64),
+        kind: 30851,
+        widget: 'row',
+        slots: { title: { value: `Issue ${n}` }, status: { value: status, colour, field: 'status' } },
+        meta: [{ value: `ABC-${n}`, field: 'ref' }],
+        comments: [],
+        actions: [],
+        viaRecommendation: true,
+        changedAt,
+      }) as ForeignObjectData
+    const project = {
+      ref: PROJECT,
+      address: PROJECT,
+      eventId: 'f'.repeat(64),
+      kind: 30850,
+      widget: 'card',
+      slots: { title: { value: 'Project one' } },
+      meta: [{ value: 'ABC', field: 'key' }],
+      comments: [],
+      actions: [],
+      viaRecommendation: true,
+      children: [issue(1, 'Done', 'green', 10), issue(2, 'Todo', 'neutral', 20)],
+    } as ForeignObjectData
+    const [block] = toRenderTree(
+      JSON.stringify({ type: 'doc', content: [{ type: 'paragraph', id: 'p1', content: [{ type: 'text', text: uri, marks: [{ type: 'reference', attrs: { uri, embed: 'detailed' } }] }] }] }),
+      'blocks',
+    )
+    const { container } = render(<>{blockLineCards(block, { [uri]: project })}</>)
+    const card = container.querySelector('[data-card="detailed"]')
+    expect(card, 'the kit’s card, as under a comment').not.toBeNull()
+    if (!card) return
+    expect(card.textContent).toContain('ABC')
+    expect(card.textContent).toContain('1/2')
+    const rows = [...card.querySelectorAll('a')].map((a) => a.textContent ?? '').filter((text) => text.includes('Issue'))
+    expect(rows).toEqual([expect.stringContaining('Issue 2'), expect.stringContaining('Issue 1')])
   })
 })

@@ -132,9 +132,9 @@ describe('LiveHeader draws its description (from Description.test.tsx)', () => {
       ],
     })
     const c = read(doc, 'blocks')
-    await waitFor(() => expect(c.querySelectorAll('[data-foreign-object]')).toHaveLength(1))
-    const card = c.querySelector('[data-foreign-object]')!
-    expect(card.getAttribute('data-widget')).toBe('card')
+    await waitFor(() => expect(c.querySelectorAll('[data-card]')).toHaveLength(1))
+    const card = c.querySelector('[data-card]')!
+    expect(card.getAttribute('data-card')).toBe('detailed')
     // After the first paragraph, before the second: under its line, not under the description.
     const first = c.querySelector('[data-block-id="p1"]')!
     const second = c.querySelector('[data-block-id="p2"]')!
@@ -150,7 +150,7 @@ describe('LiveHeader draws its description (from Description.test.tsx)', () => {
       content: [{ type: 'paragraph', id: 'p1', content: [{ type: 'text', text: NADDR, marks: [{ type: 'reference', attrs: { uri: NADDR, embed: 'compact' } }] }] }],
     })
     const editor = await write(doc, 'blocks')
-    await waitFor(() => expect(editor.querySelector('[data-reference-cards] [data-foreign-object]')?.getAttribute('data-widget')).toBe('row'))
+    await waitFor(() => expect(editor.querySelector('[data-reference-cards] [data-card]')?.getAttribute('data-card')).toBe('compact'))
     vi.mocked(resolveForeign).mockImplementation(async () => null)
   })
 

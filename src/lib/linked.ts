@@ -1,29 +1,18 @@
-import type { LinkState, Linked, LinkedChild, LinkedConversation, LinkedKind, LinkedPicker, StatusColour } from '@estiva-app/ui'
-import { thingKindOf } from '@estiva-app/ui'
-import { KIND_CHANNEL_METADATA, isArchived, type ForeignObject, type People } from '@estiva-app/interop'
+import type { LinkState, Linked, LinkedConversation, LinkedFromOptions, LinkedKind } from '@estiva-app/ui'
+import { linkStateFrom, linkedFrom } from '@estiva-app/ui'
+import type { ForeignObject, People } from '@estiva-app/interop'
 import { decodeNpub, referenceToPointer, stripInlineFormatting } from '@estiva-app/protocol'
 import { referenceLink } from './referenceLink'
 import { safeLink } from './handoff'
 import { thingKindOfUri } from './thingKind'
 
 /*
-  What a link stands for, as the kit's link widgets draw it (`@estiva-app/ui`
-  0.75: LinkChip, LinkRow, LinkCard), built from interop's projection — Peek's
-  `lib/linked.ts` with Ship's links, so the two apps draw one file the same way
-  (why:
+  What a link stands for, as the kit's link widgets draw it, built by the kit's
+  one builder from interop's projection (`linkedFrom`, ui 0.86; 5ebf2756), so
+  Peek, Ship and Leaf draw one file as one card (why:
   https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-link-on-words-counts-toward-the-card.md).
+  Ship adds what only it knows: where its own files open, and a message's words.
 */
-
-const COLOURS: readonly StatusColour[] = ['neutral', 'blue', 'green', 'muted']
-
-function colourOf(colour: string | undefined): StatusColour | undefined {
-  return COLOURS.find((known) => known === colour)
-}
-
-/** The manifest's `message` widget, wherever it sits in the fallback chain (§13.3). */
-function isMessage(object: ForeignObject): boolean {
-  return (Array.isArray(object.widget) ? object.widget : [object.widget]).includes('message')
-}
 
 /** What a referenced address is, by its kind, before anything has been read: Peek's words. */
 const REFERENCE_TYPE_WORDS: Record<number, string> = { 30850: 'Project', 30851: 'Issue', 30840: 'Topic', 30842: 'Document' }
@@ -44,12 +33,6 @@ export function referenceTypeWord(uri: string): string | undefined {
 /** What a reference names, by its icon, before anything has been read. */
 export function linkedKindOf(uri: string): LinkedKind {
   return thingKindOfUri(uri) ?? 'file'
-}
-
-/** What a file is called, by its noun or its app: "Topic", "Peek object". */
-function nounOf(object: { noun?: string; appName?: string }): string | undefined {
-  if (object.noun) return object.noun.charAt(0).toUpperCase() + object.noun.slice(1)
-  return object.appName
 }
 
 const NOSTR_REFERENCE = /nostr:(?:npub1|nprofile1|nevent1|note1|naddr1)[a-z0-9]+/gi
@@ -91,87 +74,18 @@ export function hrefOf(object: ForeignObject): string {
   return referenceLink(object)?.href ?? safeLink(object.openUrl) ?? ''
 }
 
-/** A Folder's files as its card's rows (Miky, 16 Oct, ship#310): Ship's card lists them, as Ship's page does. */
-function childrenOf(object: ForeignObject): LinkedChild[] | undefined {
-  if (object.kind !== KIND_CHANNEL_METADATA || !object.children?.length) return undefined
-  return object.children.map((child) => {
-    const title = child.slots.title
-    const status = child.slots.status
-    return {
-      id: child.address ?? child.eventId ?? child.ref,
-      title: (title && !title.isPubkey ? title.value : undefined) || nounOf(child) || 'Untitled',
-      href: hrefOf(child),
-      status: { label: status?.value ?? nounOf(child) ?? 'File', colour: colourOf(status?.colour) ?? 'muted' },
-    }
-  })
+function optionsOf(context: LinkedContext = {}): LinkedFromOptions {
+  return {
+    // A row on the card is an interop child of the same object: the same rule finds where it opens.
+    hrefOf: (object) => hrefOf(object as ForeignObject),
+    previewText,
+    ...context,
+  }
 }
 
 /** The file a reference names, read from interop's projection of it. */
-export function linkedOf(object: ForeignObject, { directory, onAct: act, conversation }: LinkedContext = {}): Linked {
-  const { slots, people } = object
-  const href = hrefOf(object)
-  const id = object.address ?? object.eventId ?? object.ref
-  const kind = thingKindOf(object.kind)
-  if (isMessage(object) && slots.title?.isPubkey) {
-    // A message is titled by its author (RIC-11): drawn with their face, then its opening words.
-    const person = people?.[slots.title.value]
-    const name = person?.displayName ?? '—'
-    const body = slots.body?.value ? previewText(slots.body.value, people) : undefined
-    return { id, kind: 'message', title: name, href, author: { name, picture: person?.picture }, ...(body ? { body } : {}) }
-  }
-  const title = slots.title?.isPubkey ? (people?.[slots.title.value]?.displayName ?? '—') : slots.title?.value || nounOf(object) || 'Untitled'
-  // An archived file is read-only on its page, so its card's values are words too.
-  const onAct = isArchived(object) ? undefined : act
-
-  const statusAction = object.actions.find((action) => action.control === 'select' && action.field && action.field === slots.status?.field)
-  let status: LinkedPicker | undefined
-  if (statusAction) {
-    status = {
-      value: statusAction.current,
-      options: (statusAction.options ?? []).map((option) => ({ value: option.value, label: option.label, colour: colourOf(option.colour) })),
-      ...(onAct ? { onChange: (value: string) => onAct(statusAction.id, value) } : {}),
-    }
-  } else if (slots.status) {
-    status = { value: slots.status.value, options: [{ value: slots.status.value, label: slots.status.value, colour: colourOf(slots.status.colour) }] }
-  }
-
-  // Who owns it: the manifest's person control that is neither the title nor the move (FOL-4).
-  const ownerAction = object.actions.find(
-    (action) => action.control === 'pubkey' && action.field && action.field !== slots.title?.field && action.field !== object.parentField,
-  )
-  let owner: LinkedPicker | undefined
-  let ownerLabel: string | undefined
-  if (ownerAction) {
-    const known = { ...directory }
-    // The holder stays pickable while the directory loads, or once they have left it: the object names them.
-    if (ownerAction.current && !known[ownerAction.current]) known[ownerAction.current] = people?.[ownerAction.current] ?? {}
-    owner = {
-      value: ownerAction.current || undefined,
-      options: [
-        { value: '', label: 'Unassigned' },
-        ...Object.entries(known)
-          // The em dash for an unnameable person, never the key (FEE-1).
-          .map(([pubkey, profile]) => ({ value: pubkey, label: profile.displayName ?? '—', picture: profile.picture }))
-          .sort((a, b) => a.label.localeCompare(b.label)),
-      ],
-      ...(onAct ? { onChange: (value: string) => onAct(ownerAction.id, value) } : {}),
-    }
-    ownerLabel = object.meta.find((slot) => slot.field === ownerAction.field)?.label ?? ownerAction.label
-  }
-  const children = childrenOf(object)
-
-  return {
-    id,
-    kind,
-    title,
-    href,
-    // Interop gives every file kind a subtitle read from its summary (SPEC §6.12).
-    ...(slots.subtitle?.value ? { summary: slots.subtitle.value } : {}),
-    ...(status ? { status } : {}),
-    ...(owner ? { owner, ownerLabel } : {}),
-    ...(conversation ? { conversation } : {}),
-    ...(children ? { children } : {}),
-  }
+export function linkedOf(object: ForeignObject, context?: LinkedContext): Linked {
+  return linkedFrom(object, optionsOf(context))
 }
 
 /** "Not available.", named by what the reference says it is. */
@@ -185,16 +99,5 @@ export function notAvailable(uri: string): LinkState {
  * draw alike: "not available." (Miky, 15 Oct).
  */
 export function linkStateOf(uri: string, object: ForeignObject | null | undefined, context?: LinkedContext): LinkState {
-  if (object === undefined) return { state: 'loading', kind: linkedKindOf(uri) }
-  if (object === null) return notAvailable(uri)
-  if (object.unreachable) {
-    const href = safeLink(object.openUrl)
-    return {
-      state: 'unavailable',
-      kind: thingKindOf(object.kind),
-      noun: (object.noun && nounOf(object)) || `${object.appName ?? 'Another app'} object`,
-      ...(href ? { openIn: { app: object.appName ?? 'app', href } } : {}),
-    }
-  }
-  return { state: 'ready', linked: linkedOf(object, context) }
+  return linkStateFrom(object, { kind: linkedKindOf(uri), noun: referenceTypeWord(uri) ?? 'Link' }, optionsOf(context))
 }

@@ -4,7 +4,7 @@ import { blockCards, urlRunsIn, type RenderBlock } from '@estiva-app/protocol'
 import { useReferenceCards, type ReferenceCard } from '@estiva-app/ui/editor'
 import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
 import { byReference, useForeignObjects } from '@/api/useForeignObjects'
-import { LinkedObject } from '@/components/ui/LinkedObject'
+import { MessageCard } from '@/components/ui/MessageLinks'
 import { SkeletonBar } from '@/components/ui/Skeleton'
 
 type Resolved = Record<string, ForeignObjectData | null | undefined>
@@ -23,7 +23,8 @@ export function LineCards({ cards, resolved }: { cards: readonly ReferenceCard[]
         const object = resolved[card.uri]
         if (object === undefined) return <SkeletonBar key={`${card.uri}-${i}`} className="h-16 w-full" data-foreign-references="loading" />
         if (object === null) return null
-        return <LinkedObject key={`${card.uri}-${i}`} reference={card.uri} object={object} layout={card.layout === 'detailed' ? 'card' : 'row'} />
+        // The kit's row or card, as under a message (5ebf2756): one file draws one way wherever it is linked.
+        return <MessageCard key={`${card.uri}-${i}`} uri={card.uri} object={object} compact={card.layout !== 'detailed'} />
       })}
     </div>
   )
