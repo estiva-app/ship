@@ -130,6 +130,18 @@ describe('the card under the comment', () => {
     await waitFor(() => expect(applyCardAction).toHaveBeenCalledWith({ reference: ref(CARD_ISSUE), actionId: 'assign-issue', value: BRUNO }))
   })
 
+  it('shows the pick at once and holds it until the file is read again, then shows what the relay holds', async () => {
+    let answer: (result: { ok: true }) => void = () => {}
+    applyCardAction.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)) as never)
+    show(THE_MESSAGE, { embeds: ITS_CARD })
+    await userEvent.click(await screen.findByRole('combobox', { name: 'Status' }))
+    await userEvent.click(await screen.findByRole('option', { name: /Done/ }))
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Status' }).textContent).toContain('Done'))
+    // The relay's answer is the file read again, here still Todo: the card shows that.
+    answer({ ok: true })
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Status' }).textContent).toContain('Todo'))
+  })
+
   it('says why when the relay refuses the change', async () => {
     applyCardAction.mockResolvedValueOnce({ ok: false, reason: 'restricted: not a member' } as never)
     const c = show(THE_MESSAGE, { embeds: ITS_CARD })

@@ -151,7 +151,10 @@ export function MessageCard({
 }) {
   // A re-read after a change, until the conversation's next answer replaces it.
   const [after, setAfter] = useState<{ given: ForeignObject | null | undefined; object: ForeignObject | null }>()
-  const object = after && after.given === given ? after.object : given
+  // The pick shows at once and is held until that re-read lands, as in Leaf (5ebf2756).
+  const [chosen, choose] = useState<{ actionId: string; value: string } | null>(null)
+  const read = after && after.given === given ? after.object : given
+  const object = read && chosen ? { ...read, actions: read.actions.map((one) => (one.id === chosen.actionId ? { ...one, current: chosen.value } : one)) } : read
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
   const naddr = uri.replace(/^nostr:/i, '')
@@ -167,18 +170,20 @@ export function MessageCard({
       if (busy) return
       setBusy(true)
       setError(undefined)
+      choose({ actionId, value })
       try {
         const result = await applyCardAction({ reference: uri, actionId, value })
         if (!result.ok) {
           setError(result.reason)
           return
         }
-        // Not patched on screen: the card shows what the relay now holds.
+        // Then what the relay now holds.
         const fresh = await resolveForeign(uri)
         setAfter({ given, object: fresh })
       } catch (e) {
         setError((e as Error).message)
       } finally {
+        choose(null)
         setBusy(false)
       }
     },
