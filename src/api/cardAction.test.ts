@@ -27,15 +27,18 @@ const tampered = (change: Record<string, unknown>) => {
   return { ...shipManifest, content: JSON.stringify(content) }
 }
 let manifest = shipManifest
-const root = signed({ pubkey: SHIP, created_at: 1_700_000_100, kind: 30851, tags: [['d', ISSUE.split(':')[2]], ['h', FOLDER], ['title', 'Cards draw from the kit']], content: '' }, '2')
+const PROJECT = `30850:${SHIP}:5b1f0a8e-6c1d-4c55-9a0e-2f0d3c1b7e44`
+const root = signed({ pubkey: SHIP, created_at: 1_700_000_100, kind: 30851, tags: [['d', ISSUE.split(':')[2]], ['h', FOLDER], ['a', PROJECT], ['title', 'Cards draw from the kit']], content: '' }, '2')
+/** Ship's archive of a file, as its page writes it. */
+const archiving = (address: string) => signed({ pubkey: SHIP, created_at: 1_700_000_200, kind: 1851, tags: [['a', address], ['field', 'archived'], ['value', 'true'], ['h', FOLDER]], content: '' }, '3')
+let changes: SignedEvent[] = []
 
 vi.mock('./store', () => ({
   relay: {
     query: async (filters: { kinds?: number[] }[]) => {
       const kinds = filters.flatMap((f) => f.kinds ?? [])
       if (kinds.includes(31990)) return [manifest]
-      if (kinds.includes(30851)) return [root]
-      return []
+      return [...(kinds.includes(30851) ? [root] : []), ...(kinds.includes(1851) ? changes : [])]
     },
     publish: (event: SignedEvent) => publish(event),
   },
@@ -49,6 +52,7 @@ const tagsOf = (event: SignedEvent) => Object.fromEntries(event.tags.map((t) => 
 beforeEach(() => {
   publish.mockClear()
   manifest = shipManifest
+  changes = []
 })
 
 describe('a change made from a card', () => {
@@ -68,6 +72,27 @@ describe('a change made from a card', () => {
   it('writes nothing for an action that creates or deletes a file, which a card never offers', async () => {
     const result = await applyCardAction({ reference: `nostr:${addrToNaddr(ISSUE)}`, actionId: 'delete-issue', value: '' })
     expect(result.ok).toBe(false)
+    expect(publish).not.toHaveBeenCalled()
+  })
+
+  // Leaf's `saveCardChoice` refuses the same (5ebf2756): a card holds a status and an owner, never a file's words, archive or place.
+  it('writes nothing for a rename, a description, an archive or a move, though each is a change of one field', async () => {
+    for (const actionId of ['rename-issue', 'describe-issue', 'summarize-issue', 'archive-issue', 'move-issue']) {
+      const result = await applyCardAction({ reference: `nostr:${addrToNaddr(ISSUE)}`, actionId, value: 'true' })
+      expect(result.ok, actionId).toBe(false)
+    }
+    expect(publish).not.toHaveBeenCalled()
+  })
+
+  it('writes nothing to an archived issue, nor to an issue whose project is archived', async () => {
+    for (const archived of [ISSUE, PROJECT]) {
+      changes = [archiving(archived)]
+      // A fresh module: the tab holds what it first read.
+      vi.resetModules()
+      const { applyCardAction } = await import('./foreign')
+      const result = await applyCardAction({ reference: `nostr:${addrToNaddr(ISSUE)}`, actionId: 'set-issue-status', value: 'done' })
+      expect(result.ok, archived).toBe(false)
+    }
     expect(publish).not.toHaveBeenCalled()
   })
 

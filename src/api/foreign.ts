@@ -17,7 +17,6 @@
 import { pointerToAddress, referenceToPointer, type SignedEvent } from '@estiva-app/protocol'
 import {
   buildActionEvents,
-  folderOf,
   resolveActingManifest,
   conversationCountsOf,
   archiveImpact,
@@ -141,6 +140,19 @@ export function resolveForeign(reference: string, { folderFiles }: ResolveOption
   return resolveForeignObject(reference, query, profiles.viaRelay(query), 0, manifests, folderFiles ? { folderFiles } : undefined)
 }
 
+/**
+ * A file's archive when it is archived with its parent (an issue in an archived
+ * project, FOL-46), else `undefined`. One more read than `resolveForeign`, so a
+ * card asks once, never the refresh tick (SHI-13).
+ */
+export async function parentArchiveOf(reference: string): Promise<ForeignObject['archived'] | undefined> {
+  const file = await resolveForeignObject(reference, query, async () => ({}), 0, manifests, { archivedWith: true }).catch(() => null)
+  return file?.archived?.with ? file.archived : undefined
+}
+
+/** The fields a card never writes: a file's words, and its archive. */
+const NOT_ON_A_CARD = new Set(['title', 'summary', 'description', 'archived'])
+
 /** The tags a §7.3 change carries: the file, the field, its value, the Folder, the writer's clock, and a person it names. */
 const CHANGE_TAGS = new Set(['a', 'field', 'value', 'h', 'ts', 'p'])
 
@@ -173,11 +185,14 @@ export async function applyCardAction(args: { reference: string; actionId: strin
   const resolved = await resolveActingManifest(pointer, undefined, query, manifests)
   if (!resolved) return { ok: false, reason: 'No app claims this file, so there is nothing to change.' }
   const declared = resolved.manifest.actions?.find((action) => action.id === args.actionId)
-  if (!declared || declared.effect !== 'writes' || !declared.emits.field || declared.emits.listed) return { ok: false, reason: 'This can’t be changed from here.' }
-  // The Folder comes off the file itself: the change is written into it.
-  const [root] = await query([{ kinds: [pointer.kind], authors: [pointer.pubkey], '#d': [pointer.identifier], limit: 1 }])
-  const folder = root ? folderOf(root) : undefined
-  if (!folder) return { ok: false, reason: 'That file can’t be read from here.' }
+  if (!declared || declared.effect !== 'writes' || !declared.emits.field || declared.emits.listed || NOT_ON_A_CARD.has(declared.emits.field)) return { ok: false, reason: 'This can’t be changed from here.' }
+  // The file as its page reads it: its Folder, which the change is written into, and whether it or its parent is archived.
+  // No names are drawn from it, so no profiles are asked for.
+  const file = await resolveForeignObject(address, query, async () => ({}), 0, manifests, { archivedWith: true }).catch(() => null)
+  const folder = file && !file.unreachable ? file.folder : undefined
+  if (!file || !folder) return { ok: false, reason: 'That file can’t be read from here.' }
+  // A move is the tree's control, and an archived file is read-only (Leaf's `saveCardChoice` refuses the same).
+  if (file.archived || declared.emits.field === file.parentField) return { ok: false, reason: 'This can’t be changed from here.' }
   const built = buildActionEvents({
     manifest: resolved.manifest,
     kind: pointer.kind,

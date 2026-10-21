@@ -5,6 +5,7 @@ import { applyCardAction, resolveForeign, type ForeignObject } from '@/api/forei
 import { resolveFailed } from '@/api/useForeignObjects'
 import { isReadableFolder, useFolderFiles } from '@/api/useFolderFiles'
 import { useCardConversation } from '@/api/useCardConversation'
+import { useParentArchive } from '@/api/useParentArchive'
 import { useWorkspacePeople } from '@/components/editing/mentionables'
 import { cardShapeOf, noteCardShape, type CardShape } from '@/lib/cardShapes'
 import { hrefOf, linkedKindOf, linkStateOf, notAvailable } from '@/lib/linked'
@@ -139,11 +140,14 @@ export function MessageCard({
   compact = false,
   onRemove,
   opensAt,
+  words = false,
 }: {
   uri: string
   object: ForeignObject | null | undefined
   /** An old message's `compact` card: the file's row under the message, as it drew before the kit. */
   compact?: boolean
+  /** Its values as words, no pickers: a card in text being edited (Decided 21 Oct, as in a Leaf page). */
+  words?: boolean
   /** ✕ on the card, offered to its message's author (Decided 19 Oct, WBM-7): the message then asks for no card. */
   onRemove?: () => void
   /** The URL the body wrote for its file: a click opens it, as the file's chip would (LTX-6). */
@@ -151,7 +155,18 @@ export function MessageCard({
 }) {
   // A re-read after a change, until the conversation's next answer replaces it.
   const [after, setAfter] = useState<{ given: ForeignObject | null | undefined; object: ForeignObject | null }>()
-  const object = after && after.given === given ? after.object : given
+  // The pick shows at once and is held until that re-read lands, as in Leaf (5ebf2756).
+  const [chosen, choose] = useState<{ actionId: string; value: string } | null>(null)
+  const shown = after && after.given === given ? after.object : given
+  /*
+    Whether its parent is archived (an issue in an archived project), read once
+    for the card rather than on the conversation's 10 s refresh, which would pay
+    one more request per link each tick (SHI-13). Its values then read as words,
+    as Leaf's do (5ebf2756).
+  */
+  const withParent = useParentArchive(uri, !compact && !words && !!shown && !shown.unreachable && !shown.archived && !!shown.parentRef)
+  const read = shown && withParent && !shown.archived ? { ...shown, archived: withParent } : shown
+  const object = read && chosen ? { ...read, actions: read.actions.map((one) => (one.id === chosen.actionId ? { ...one, current: chosen.value } : one)) } : read
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
   const naddr = uri.replace(/^nostr:/i, '')
@@ -167,18 +182,20 @@ export function MessageCard({
       if (busy) return
       setBusy(true)
       setError(undefined)
+      choose({ actionId, value })
       try {
         const result = await applyCardAction({ reference: uri, actionId, value })
         if (!result.ok) {
           setError(result.reason)
           return
         }
-        // Not patched on screen: the card shows what the relay now holds.
+        // Then what the relay now holds.
         const fresh = await resolveForeign(uri)
         setAfter({ given, object: fresh })
       } catch (e) {
         setError((e as Error).message)
       } finally {
+        choose(null)
         setBusy(false)
       }
     },
@@ -187,7 +204,7 @@ export function MessageCard({
 
   const ready = object && !object.unreachable ? object : undefined
   if (ready && !compact && isReadableFolder(ready)) return <FolderCard uri={uri} folder={ready} error={error} onRemove={onRemove} opensAt={opensAt} />
-  return <CardBox uri={uri} object={object} failed={failed} compact={compact} onAct={onAct} error={error} onRemove={onRemove} opensAt={opensAt} />
+  return <CardBox uri={uri} object={object} failed={failed} compact={compact} onAct={words ? undefined : onAct} error={error} onRemove={onRemove} opensAt={opensAt} />
 }
 
 /** A linked Folder's card, with its files read for it alone (Miky, 16 Oct, ship#310). */
