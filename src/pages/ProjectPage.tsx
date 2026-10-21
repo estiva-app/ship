@@ -597,7 +597,8 @@ export function ProjectPage({
           onSummarize: (value) => actInField('Summary', () => setProjectField(project, 'summary', value, 'Summary'), refresh),
           onDescribe: (value, contentFormat, left) =>
             act('Description', () => setProjectField(project, 'description', value, 'Description', contentFormat), sayOnceLeft(say, project.title || 'Untitled project', left), refresh),
-          descriptionBy: project.fields.description && project.fields.description.by !== me ? directory.nameOf(project.fields.description.by) : null,
+          // The profile's name only: with none the line says "Someone", as Leaf's does, never a shortened key.
+          descriptionBy: project.fields.description && project.fields.description.by !== me ? (directory.profileOf(project.fields.description.by)?.name ?? null) : null,
         }}
         onAddIssue={() => setDialog('issue')}
         tab={tab}

@@ -69,7 +69,7 @@ describe('someone else saves the description', () => {
     const box = await ready()
     type(box, ' and more')
     arrive('theirs')
-    expect(await screen.findByText('Katerina saved a newer version.')).toBeTruthy()
+    expect(screen.getByText('Katerina saved a newer version.')).toBeTruthy()
     expect(text()).toBe('mine and more')
     fireEvent.mouseDown(screen.getByRole('button', { name: 'Load it' }))
     fireEvent.click(screen.getByRole('button', { name: 'Load it' }))
@@ -83,7 +83,7 @@ describe('someone else saves the description', () => {
     const box = await ready()
     enter(box)
     arrive('theirs')
-    await screen.findByText(/saved a newer version/)
+    expect(screen.getByText(/saved a newer version/)).toBeTruthy()
     leave(box)
     await waitFor(() => expect(text()).toBe('theirs'))
     expect(onCommit).not.toHaveBeenCalled()
@@ -94,7 +94,7 @@ describe('someone else saves the description', () => {
     const box = await ready()
     type(box, ' and more')
     arrive('theirs')
-    await screen.findByText(/saved a newer version/)
+    expect(screen.getByText(/saved a newer version/)).toBeTruthy()
     leave(box)
     await waitFor(() => expect(onCommit).toHaveBeenCalledTimes(1))
     expect(onCommit.mock.calls[0][0]).toContain('mine and more')
@@ -110,7 +110,24 @@ describe('someone else saves the description', () => {
     const box = await ready()
     enter(box)
     view.rerender(<LiveDescription value="theirs" format="marker" onCommit={onCommit} />)
-    expect(await screen.findByText('Someone saved a newer version.')).toBeTruthy()
+    expect(screen.getByText('Someone saved a newer version.')).toBeTruthy()
+  })
+
+  it('draws their save of the text yours replaced, once yours has come back', async () => {
+    const { arrive, onCommit } = mount()
+    const box = await ready()
+    // Typed without the focus command, which focuses a frame later and, under load, after the blur below.
+    act(() => void box.editor.chain().insertContent(' and more').run())
+    leave(box)
+    await waitFor(() => expect(onCommit).toHaveBeenCalledTimes(1))
+    // The relay has answered, and the page catches up with your save.
+    await act(async () => void (await onCommit.mock.results[0].value))
+    arrive(onCommit.mock.calls[0][0])
+    await act(async () => {})
+    // Katerina saves her text back, word for word what yours replaced.
+    arrive('mine')
+    await act(async () => {})
+    expect(text()).toBe('mine')
   })
 
   it('does not take your own save coming back for someone else\'s', async () => {

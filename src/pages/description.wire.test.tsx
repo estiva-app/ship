@@ -19,11 +19,12 @@ import { stubLayout } from '@/test/inlineText'
 type Signed = { id: string; kind: number; tags: string[][] }
 
 const relay = vi.hoisted(() => {
-  const relay = { refusing: false, published: [] as Signed[] }
+  const relay = { refusing: false, published: [] as Signed[], sent: [] as Signed[] }
   globalThis.fetch = (async (url: RequestInfo | URL, init?: RequestInit) => {
     const path = new URL(String(url)).pathname
     if (init?.method === 'POST' && path.endsWith('/events')) {
       const event = JSON.parse(String(init.body)) as Signed
+      relay.sent.push(event)
       if (relay.refusing) return new Response(JSON.stringify({ accepted: false, event_id: event.id, message: 'blocked: archived' }), { status: 200 })
       relay.published.push(event)
       return new Response(JSON.stringify({ accepted: true, event_id: event.id }), { status: 200 })
@@ -103,12 +104,14 @@ const typeInto = (box: EditorBox, text: string) =>
 beforeEach(() => {
   relay.refusing = false
   relay.published.length = 0
+  relay.sent.length = 0
   showing(stateWith('Totals are off.'))
   vi.mocked(useDirectory).mockReturnValue({
     directory: new Map(),
-    nameOf: (pubkey: string) => (pubkey === KATERINA ? 'Katerina' : 'Someone'),
+    // As the real directory: a shortened key for someone with no profile name.
+    nameOf: (pubkey: string) => (pubkey === KATERINA ? 'Katerina' : `${pubkey.slice(0, 8)}…`),
     personOf: () => ({ name: 'Someone' }),
-    profileOf: () => undefined,
+    profileOf: (pubkey: string) => (pubkey === KATERINA ? { name: 'Katerina' } : undefined),
   } as never)
 })
 
@@ -121,7 +124,7 @@ describe('someone else saves the description while you are typing in it', () => 
       typeInto(box, ' By one cent.')
       showing(stateWith('Katerina rewrote it.', KATERINA))
       rerender(<App />)
-      expect(await screen.findByText('Katerina saved a newer version.')).toBeTruthy()
+      expect(screen.getByText('Katerina saved a newer version.')).toBeTruthy()
       expect(box.editor.getText()).toBe('Totals are off. By one cent.')
       fireEvent.mouseDown(screen.getByRole('button', { name: 'Load it' }))
       fireEvent.click(screen.getByRole('button', { name: 'Load it' }))
@@ -129,6 +132,14 @@ describe('someone else saves the description while you are typing in it', () => 
       expect(relay.published).toEqual([])
     })
   }
+
+  it('says "Someone", never a shortened key, when the saver has no profile name', async () => {
+    const { box, rerender } = await openDescription(`/issue/invoice-totals-${D_ISSUE}`)
+    typeInto(box, ' By one cent.')
+    showing(stateWith('Rewritten.', 'd'.repeat(64)))
+    rerender(<App />)
+    expect(screen.getByText('Someone saved a newer version.')).toBeTruthy()
+  })
 })
 
 describe('a description saved as you leave the page, refused by the relay', () => {
@@ -138,7 +149,9 @@ describe('a description saved as you leave the page, refused by the relay', () =
       const { box } = await openDescription(path)
       typeInto(box, ' By one cent.')
       goTo('/issues')
-      expect(await screen.findByText(`Your last changes to ${title} were not saved.`, {}, { timeout: 5000 })).toBeTruthy()
+      // The refusal's toast, in whichever words: then it must be the one that names the file.
+      await screen.findByText(/were not saved|Description rejected/, {}, { timeout: 5000 })
+      expect(screen.getByText(`Your last changes to ${title} were not saved.`)).toBeTruthy()
       expect(screen.queryByText(/Description rejected/)).toBeNull()
     })
   }
@@ -149,10 +162,10 @@ describe('a description saved as you leave the page, refused by the relay', () =
     typeInto(box, ' By one cent.')
     act(() => void fireEvent.blur(box))
     goTo('/issues')
-    await screen.findByText('Your last changes to Invoice totals were not saved.', {}, { timeout: 5000 })
-    await act(async () => {
-      await new Promise((settle) => setTimeout(settle, 300))
-    })
+    await screen.findByText(/were not saved|Description rejected/, {}, { timeout: 5000 })
+    await act(async () => {})
+    // One save reached the relay: the same text was not sent again as you left, so its refusal is said once.
+    expect(relay.sent).toHaveLength(1)
     expect(screen.getAllByText('Your last changes to Invoice totals were not saved.')).toHaveLength(1)
   })
 

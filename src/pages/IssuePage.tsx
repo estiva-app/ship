@@ -238,7 +238,8 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
         onDescribe={(value, contentFormat, left) =>
           act('Description', () => setIssueField(issue, 'description', value, 'Description', contentFormat), sayOnceLeft(say, issue.title || 'Untitled issue', left), () => refresh([issue.folder]))
         }
-        descriptionBy={issue.fields.description && issue.fields.description.by !== me ? directory.nameOf(issue.fields.description.by) : null}
+        // The profile's name only: with none the line says "Someone", as Leaf's does, never a shortened key.
+        descriptionBy={issue.fields.description && issue.fields.description.by !== me ? (directory.profileOf(issue.fields.description.by)?.name ?? null) : null}
         related={related}
         threads={threads}
         unread={unread}

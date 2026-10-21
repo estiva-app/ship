@@ -299,6 +299,8 @@ export function LiveDescription({
     with your own text unsaved after a refusal: it waits, and the line below
     says so. Never over a save that is still out.
   */
+  // Your save has come back: from now on the text it replaced is someone else's again, if they save it back.
+  if (superseded !== null && value === base) setSuperseded(null)
   const arrived = value !== base && value !== superseded
   if (arrived && !focused && !saving && !failed && !restored) setBase(value)
   const waiting = arrived && (focused || failed || restored)
@@ -380,7 +382,7 @@ export function LiveDescription({
             </Button>
           </FieldLine>
         )}
-        {failed &&<FieldLine tone="error">Could not save. Your text is still here.</FieldLine>}
+        {failed && <FieldLine tone="error">Could not save. Your text is still here.</FieldLine>}
       </div>
     </ReferenceProvider>
   )
