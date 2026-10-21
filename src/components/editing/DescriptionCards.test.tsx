@@ -12,7 +12,7 @@ vi.mock(import('@/api/foreign'), async (importOriginal) => ({ ...(await importOr
 
 import { addrToNaddr, toRenderTree } from '@estiva-app/protocol'
 import { LiveDescription } from './LiveDescription'
-import { MAX_LINKS_PER_DESCRIPTION, blockLineCards, linksInBlocks } from './DescriptionCards'
+import { LineCards, MAX_LINKS_PER_DESCRIPTION, blockLineCards, linksInBlocks } from './DescriptionCards'
 import { resolveForeign, type ForeignObject as ForeignObjectData } from '@/api/foreign'
 
 beforeAll(() => {
@@ -155,5 +155,30 @@ describe('a project\'s card after a description\'s line (5ebf2756)', () => {
     expect(card.textContent).toContain('1/2')
     const rows = [...card.querySelectorAll('a')].map((a) => a.textContent ?? '').filter((text) => text.includes('Issue'))
     expect(rows).toEqual([expect.stringContaining('Issue 2'), expect.stringContaining('Issue 1')])
+  })
+
+  // Decided 21 Oct (leaf#59): pickers while the text is read, words while it is edited.
+  it('has its Status picker while the description is read, and reads it as words while it is edited', () => {
+    const ISSUE = `30851:${'c'.repeat(64)}:one`
+    const uri = `nostr:${addrToNaddr(ISSUE)}`
+    const issue = {
+      ref: ISSUE,
+      address: ISSUE,
+      eventId: 'e'.repeat(64),
+      kind: 30851,
+      widget: 'row',
+      slots: { title: { value: 'Issue one' }, status: { value: 'Todo', colour: 'neutral', field: 'status' } },
+      meta: [],
+      comments: [],
+      actions: [{ id: 'set-issue-status', label: 'Change status', control: 'select', field: 'status', current: 'todo', options: [{ value: 'todo', label: 'Todo' }, { value: 'done', label: 'Done' }] }],
+      viaRecommendation: true,
+    } as unknown as ForeignObjectData
+    const cards = [{ uri, layout: 'detailed' as const }]
+    const read = render(<LineCards cards={cards} resolved={{ [uri]: issue }} />)
+    expect(screen.queryByRole('combobox', { name: 'Status' })).not.toBeNull()
+    read.unmount()
+    render(<LineCards cards={cards} resolved={{ [uri]: issue }} editing />)
+    expect(screen.queryByRole('combobox', { name: 'Status' })).toBeNull()
+    expect(screen.getByText('Todo')).toBeTruthy()
   })
 })

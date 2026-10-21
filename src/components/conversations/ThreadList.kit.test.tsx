@@ -51,7 +51,7 @@ const cardIssue = () =>
   })
 
 const { objects, applyCardAction } = vi.hoisted(() => ({
-  objects: { byReference: {} as Record<string, unknown> },
+  objects: { byReference: {} as Record<string, unknown>, parentArchive: {} as Record<string, { by: string; at: number; with: string } | undefined> },
   applyCardAction: vi.fn(async () => ({ ok: true as const })),
 }))
 vi.mock(import('@/api/foreign'), async (importOriginal) => ({
@@ -61,6 +61,7 @@ vi.mock(import('@/api/foreign'), async (importOriginal) => ({
     reference in objects.byReference || /^nostr:npub1/.test(reference) ? Promise.resolve((objects.byReference[reference] ?? null) as ForeignObject | null) : new Promise<never>(() => {}),
   ),
   applyCardAction,
+  parentArchiveOf: vi.fn(async (reference: string) => objects.parentArchive[reference]),
 }))
 vi.mock('@/components/editing/mentionables', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/components/editing/mentionables')>()),
@@ -81,6 +82,7 @@ const sentence = (c: HTMLElement) => c.querySelector('[data-message-text] p')?.t
 
 beforeEach(() => {
   applyCardAction.mockClear()
+  objects.parentArchive = {}
   objects.byReference = {
     [ref(SENTENCE_ISSUE)]: base(SENTENCE_ISSUE, 'Fix the sign-in'),
     [ref(PROJECT)]: base(PROJECT, 'Widgets 2'),
@@ -136,7 +138,7 @@ describe('the card under the comment', () => {
     show(THE_MESSAGE, { embeds: ITS_CARD })
     await userEvent.click(await screen.findByRole('combobox', { name: 'Status' }))
     await userEvent.click(await screen.findByRole('option', { name: /Done/ }))
-    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Status' }).textContent).toContain('Done'))
+    expect(screen.getByRole('combobox', { name: 'Status' }).textContent).toContain('Done')
     // The relay's answer is the file read again, here still Todo: the card shows that.
     answer({ ok: true })
     await waitFor(() => expect(screen.getByRole('combobox', { name: 'Status' }).textContent).toContain('Todo'))
@@ -148,6 +150,8 @@ describe('the card under the comment', () => {
     await userEvent.click(await screen.findByRole('combobox', { name: 'Status' }))
     await userEvent.click(await screen.findByRole('option', { name: /Done/ }))
     await waitFor(() => expect(c.querySelector('[data-card]')?.textContent).toContain('restricted: not a member'))
+    // The pick was not saved: the picker is back on what the file holds.
+    expect(screen.getByRole('combobox', { name: 'Status' }).textContent).toContain('Todo')
   })
 
   it('reads its values as words for an archived file, as its page does', async () => {
@@ -155,6 +159,15 @@ describe('the card under the comment', () => {
     const c = show(THE_MESSAGE, { embeds: ITS_CARD })
     await waitFor(() => expect(c.querySelector('[data-card]')?.textContent).toContain('Cards draw from the kit'))
     expect(screen.queryByRole('combobox', { name: 'Status' })).toBeNull()
+  })
+
+  it('reads its values as words for an issue whose project is archived, as Leaf’s card does', async () => {
+    objects.byReference[ref(CARD_ISSUE)] = { ...cardIssue(), parentRef: PROJECT }
+    objects.parentArchive[ref(CARD_ISSUE)] = { by: SHIP, at: 1, with: PROJECT }
+    const c = show(THE_MESSAGE, { embeds: ITS_CARD })
+    await waitFor(() => expect(c.querySelector('[data-card]')?.textContent).toContain('Cards draw from the kit'))
+    await waitFor(() => expect(screen.queryByRole('combobox', { name: 'Status' })).toBeNull())
+    expect(c.querySelector('[data-card]')?.textContent).toContain('Todo')
   })
 
   it('keeps the height it last drew at while it loads', () => {

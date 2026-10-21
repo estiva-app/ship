@@ -15,7 +15,7 @@ type Resolved = Record<string, ForeignObjectData | null | undefined>
  * card, as under a message (§13.6.2). Each holds its place while it loads, and
  * one that cannot be read draws nothing, as under a message.
  */
-export function LineCards({ cards, resolved }: { cards: readonly ReferenceCard[]; resolved: Resolved }) {
+export function LineCards({ cards, resolved, editing = false }: { cards: readonly ReferenceCard[]; resolved: Resolved; editing?: boolean }) {
   if (cards.length === 0) return null
   return (
     <div className="mt-2 flex flex-col gap-2" data-line-cards={cards.length}>
@@ -24,7 +24,7 @@ export function LineCards({ cards, resolved }: { cards: readonly ReferenceCard[]
         if (object === undefined) return <SkeletonBar key={`${card.uri}-${i}`} className="h-16 w-full" data-foreign-references="loading" />
         if (object === null) return null
         // The kit's row or card, as under a message (5ebf2756): one file draws one way wherever it is linked.
-        return <MessageCard key={`${card.uri}-${i}`} uri={card.uri} object={object} compact={card.layout !== 'detailed'} />
+        return <MessageCard key={`${card.uri}-${i}`} uri={card.uri} object={object} compact={card.layout !== 'detailed'} words={editing} />
       })}
     </div>
   )
@@ -96,6 +96,8 @@ export function EditorLineCards({ editor, resolved }: { editor: Editor | null; r
   const missing = [...new Set(slots.flatMap((slot) => slot.cards.map((card) => card.uri)))].filter((uri) => !(uri in resolved))
   const own = byReference(missing, useForeignObjects(missing))
   const all = missing.length ? { ...own, ...resolved } : resolved
+  // A writer reads in the editor: the cards have pickers until the text is being edited, then words (Decided 21 Oct).
+  const editing = useEditorState({ editor, selector: ({ editor: e }) => !!e?.isFocused }) ?? false
   // @estiva-escape(no-rebuilt-behaviour): each card goes into the slot ReferenceCards placed after its line, inside the editor's text; no part owns a place there, and a portal keeps Ship's providers around the card
-  return <>{slots.map((slot) => createPortal(<LineCards cards={slot.cards} resolved={all} />, slot.element, slot.key))}</>
+  return <>{slots.map((slot) => createPortal(<LineCards cards={slot.cards} resolved={all} editing={editing} />, slot.element, slot.key))}</>
 }
