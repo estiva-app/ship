@@ -30,7 +30,9 @@ export interface LiveHeaderProps {
   description: string
   format: ContentFormat
   /** The body, and the format tag the editor built it in — RIC-14. */
-  onDescribe: (value: string, contentFormat?: string) => Promise<boolean> | boolean
+  onDescribe: (value: string, contentFormat?: string, left?: () => boolean) => Promise<boolean> | boolean
+  /** Who saved the description last, by name, when it was not you: the "<name> saved a newer version" line (LTX-3). */
+  descriptionBy?: string | null
   nameOf?: (pubkey: string) => string
   /** Title and description as text only, for a reader who cannot write. */
   readOnly?: boolean

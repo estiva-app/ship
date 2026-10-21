@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import type { ContentFormat, Imeta } from '@estiva-app/protocol'
 import { LiveHeader } from './LiveHeader'
@@ -38,7 +38,10 @@ function Header({
   readOnly,
   issue,
   refuse,
+  theirs,
 }: {
+  /** Someone else's save of the description, arriving 2 s after the page opens — while you are in it, it waits with a line (LTX-3). */
+  theirs?: string
   title?: string
   summary?: string
   description?: string
@@ -51,6 +54,12 @@ function Header({
   const [summary, setSummary] = useState(s0)
   const [description, setDescription] = useState(d0)
   const [format, setFormat] = useState<ContentFormat>('marker')
+  const [by, setBy] = useState<string | null>(null)
+  useEffect(() => {
+    if (theirs === undefined) return
+    const arrives = setTimeout(() => (setDescription(theirs), setBy('Katerina')), 2000)
+    return () => clearTimeout(arrives)
+  }, [theirs])
   return (
     <LiveHeader
       title={title}
@@ -62,6 +71,7 @@ function Header({
       format={format}
       // The editor saves with its tag; the app reads that back as 'blocks' (contentFormatOf).
       onDescribe={(v, f) => (setDescription(v), setFormat(f === 'estiva-blocks-1' ? 'blocks' : 'marker'), true)}
+      descriptionBy={by}
       readOnly={readOnly}
       upload={pretendUpload}
     />
@@ -101,7 +111,25 @@ export const ReadOnly: Story = { args: { readOnly: true } }
 export const ReadOnlyNoSummary: Story = { args: { readOnly: true, summary: '' } }
 
 /** Change the summary and press Enter: the relay refuses it, the old one stays for everyone else, and your text stays where you wrote it with the reason under it. */
-export const SummaryRefused: Story = { args: { refuse: 'Too busy right now — try again in 14s.' } }
+/** Someone saves the description while you are in it (LTX-3, as Leaf's page): click into it within 2 s. Their text waits, a line says who saved it, and Load it shows theirs; leave with a change and yours is saved over it. */
+export const SomeoneSavedANewerVersion: Story = {
+  args: { theirs: '# Why this exists\n\nKaterina rewrote this while you were in it.' },
+  // In the description before theirs arrives; the editor is its own chunk, so it is waited for.
+  play: async ({ canvasElement }) => {
+    type Box = HTMLElement & { editor?: { commands: { focus: (at: string) => void; insertContent: (text: string) => void } } }
+    for (let tries = 0; tries < 30; tries++) {
+      const box = canvasElement.querySelector<Box>('[aria-label="Description"]')
+      if (box?.editor) {
+        box.editor.commands.focus('end')
+        box.editor.commands.insertContent(' And a line of mine.')
+        return
+      }
+      await new Promise((settle) => setTimeout(settle, 50))
+    }
+  },
+}
+
+export const SummaryRefused: Story ={ args: { refuse: 'Too busy right now — try again in 14s.' } }
 
 /** Links in the description open in a new tab on a click — a bare address and one with words. A click on plain text still places the caret. */
 export const WithLinks: Story = {

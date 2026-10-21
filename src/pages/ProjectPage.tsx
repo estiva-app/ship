@@ -55,7 +55,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { ProjectView } from '@/views/ProjectView'
 import { go, href, type ProjectTab, type ProjectView as ProjectViewName } from '../router'
-import { act, actInField, type Say } from './act'
+import { act, actInField, sayOnceLeft, type Say } from './act'
 import { hrefForIssue, rowFor } from './IssuesPage'
 import { MoveProject } from '@/components/MoveProject'
 import { ArchiveDialog } from '@/components/ArchiveDialog'
@@ -595,7 +595,10 @@ export function ProjectPage({
           summary: project.summary,
           // A refusal is said under the field, with your text still in it — not in a toast (SUM-4).
           onSummarize: (value) => actInField('Summary', () => setProjectField(project, 'summary', value, 'Summary'), refresh),
-          onDescribe: (value, contentFormat) => set('description', value, 'Description', contentFormat),
+          onDescribe: (value, contentFormat, left) =>
+            act('Description', () => setProjectField(project, 'description', value, 'Description', contentFormat), sayOnceLeft(say, project.title || 'Untitled project', left), refresh),
+          // The profile's name only: with none the line says "Someone", as Leaf's does, never a shortened key.
+          descriptionBy: project.fields.description && project.fields.description.by !== me ? (directory.profileOf(project.fields.description.by)?.name ?? null) : null,
         }}
         onAddIssue={() => setDialog('issue')}
         tab={tab}

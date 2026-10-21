@@ -15,7 +15,7 @@ import type { LiveHeaderProps } from './LiveHeader'
  * title to the summary, the summary to the start of the description (Linear's
  * behaviour, from the title to the description).
  */
-export default function HeaderEditing({ title, titlePlaceholder, onRename, summary, onSummarize, description, format, onDescribe, nameOf, upload, resolved, onCommentOnBlock, onCopyBlockLink, holdKey }: LiveHeaderProps & { resolved: Record<string, ForeignObjectData | null | undefined> }) {
+export default function HeaderEditing({ title, titlePlaceholder, onRename, summary, onSummarize, description, format, onDescribe, descriptionBy, nameOf, upload, resolved, onCommentOnBlock, onCopyBlockLink, holdKey }: LiveHeaderProps & { resolved: Record<string, ForeignObjectData | null | undefined> }) {
   const [body, setBody] = useState<Editor | null>(null)
   const summaryEditor = useRef<InlineTextHandle>(null)
   const toDescription = () => {
@@ -44,7 +44,7 @@ export default function HeaderEditing({ title, titlePlaceholder, onRename, summa
         />
         {onSummarize ? <LiveSummary ref={summaryEditor} value={summary ?? ''} onCommit={onSummarize} onEnter={toDescription} /> : <ReadingSummary value={summary ?? ''} />}
       </div>
-      <LiveDescription value={description} format={format} onCommit={onDescribe} nameOf={nameOf} resolved={resolved} onEditor={setBody} upload={upload} onCommentOnBlock={onCommentOnBlock} onCopyBlockLink={onCopyBlockLink} holdKey={holdKey} />
+      <LiveDescription value={description} format={format} onCommit={onDescribe} changedBy={descriptionBy} nameOf={nameOf} resolved={resolved} onEditor={setBody} upload={upload} onCommentOnBlock={onCommentOnBlock} onCopyBlockLink={onCopyBlockLink} holdKey={holdKey} />
     </div>
   )
 }
