@@ -74,10 +74,10 @@ export function hrefOf(object: ForeignObject): string {
   return referenceLink(object)?.href ?? safeLink(object.openUrl) ?? ''
 }
 
-function optionsOf(context: LinkedContext = {}): LinkedFromOptions {
+function optionsOf(context: LinkedContext = {}): LinkedFromOptions<ForeignObject> {
   return {
     // A row on the card is an interop child of the same object: the same rule finds where it opens.
-    hrefOf: (object) => hrefOf(object as ForeignObject),
+    hrefOf: (object) => hrefOf(object),
     previewText,
     ...context,
   }
