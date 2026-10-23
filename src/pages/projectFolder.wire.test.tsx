@@ -121,7 +121,7 @@ async function comment(path: string, text: string) {
 
 describe('an archived project offers no new issue until it is unarchived (PEEKM-2, Decided 2026-10-23)', () => {
   it('has no Add issue, where the same project unarchived has one', async () => {
-    const archived = { ...STATE.projects[0], fields: { archived: { value: 'true', by: AUTHOR, at: 2 } } }
+    const archived = { ...STATE.projects[0], fields: { archived: { value: 'true', by: AUTHOR, at: 2, format: 'marker' } } } as WorkspaceState['projects'][number]
     vi.mocked(useWorkspace).mockReturnValue({ state: { ...STATE, projects: [archived, STATE.projects[1]] }, error: null, loading: false, busy: false, refresh, live: false })
     goTo(`/project/billing-${D_PROJECT}`)
     const { unmount } = render(<App />)
