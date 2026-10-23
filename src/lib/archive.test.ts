@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { archivesOf, lockedReason, ownArchive } from './archive'
+import { archivedLine, archivesOf, lockedReason, ownArchive } from './archive'
 
 const A = 'a'.repeat(64)
 const B = 'b'.repeat(64)
@@ -74,8 +74,9 @@ describe('archivesOf — the cascade is read, never written', () => {
       with: { kind: 'folder', addr: '39000:r:team', id: 'team', title: 'Apiary' },
     })
     expect(archives.ofProject(OTHER_PROJECT)).toBeUndefined()
-    // …and its issues with it, through the project.
-    expect(archives.ofIssue({ addr: ISSUE })?.with).toEqual({ kind: 'project', addr: PROJECT, title: 'Hive' })
+    // …and its issues with it, naming what is actually archived: the team, not the project (PEEKM-2).
+    expect(archives.ofIssue({ addr: ISSUE })?.with).toEqual({ kind: 'folder', addr: '39000:r:team', id: 'team', title: 'Apiary' })
+    expect(archivedLine(archives.ofIssue({ addr: ISSUE }))).toBe('Unarchive the Folder to comment.')
   })
 
   it('a project also listed by a live team stays visible', () => {
@@ -87,6 +88,15 @@ describe('archivesOf — the cascade is read, never written', () => {
   it('a project no state lists is placed by its own Folder, as the sidebar places it', () => {
     const own = { id: 'own', archived: { by: A, at: 30 } }
     expect(archivesOf({ projects: [project(PROJECT)], issues: [], activity: [] }, [own]).ofProject(PROJECT)?.with?.id).toBe('own')
+  })
+})
+
+describe('archivedLine — the line in the comment box’s place, in every app’s words (PEEKM-2)', () => {
+  it('names the file itself, or what is archived above it, by its kind', () => {
+    expect(archivedLine(undefined)).toBeUndefined()
+    expect(archivedLine({ by: A, at: 10 })).toBe('Archived. Unarchive it to comment.')
+    const archives = archivesOf({ projects: [{ addr: PROJECT, title: 'Hive', fields: { archived: field('true') } }], issues: [{ addr: ISSUE, projectAddr: PROJECT, fields: {} }], activity: [] })
+    expect(archivedLine(archives.ofIssue({ addr: ISSUE }))).toBe('Unarchive the project to comment.')
   })
 })
 

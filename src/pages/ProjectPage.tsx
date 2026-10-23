@@ -600,7 +600,8 @@ export function ProjectPage({
           // The profile's name only: with none the line says "Someone", as Leaf's does, never a shortened key.
           descriptionBy: project.fields.description && project.fields.description.by !== me ? (directory.profileOf(project.fields.description.by)?.name ?? null) : null,
         }}
-        onAddIssue={() => setDialog('issue')}
+        // Nothing new under an archived project, its team's archive included, until it is unarchived (Decided 2026-10-23).
+        {...(archive ? {} : { onAddIssue: () => setDialog('issue') })}
         tab={tab}
         onTab={(next) => go({ name: 'project', d: project.id, slug: project.title, view, tab: next })}
         view={view}
@@ -729,7 +730,7 @@ export function ProjectPage({
         }}
       />
 
-      {dialog === 'issue' && (
+      {dialog === 'issue' && !archive && (
         <NewIssueDialog
           projects={[{ value: project.addr, label: project.title }]}
           project={{ addr: project.addr, title: project.title }}

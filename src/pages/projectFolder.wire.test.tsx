@@ -12,6 +12,7 @@
  * directory, the Folder listing reads, and the clock check.
  */
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorkspaceState } from '@/api'
 import { stubLayout } from '@/test/inlineText'
@@ -62,6 +63,8 @@ vi.mock('@/api/foreign', async (importOriginal) => ({
 }))
 
 import { useDirectory, useWorkspace } from '@/api'
+import { readFolders } from '@/api/foreign'
+import { reloadFolders } from '@/api/useFolders'
 import App from '@/App'
 
 const project = (id: string, title: string, contentFolder: string, key: string) =>
@@ -118,6 +121,56 @@ async function comment(path: string, text: string) {
   act(() => box.editor.commands.insertContent(text))
   fireEvent.click(main.getByRole('button', { name: 'Send' }))
 }
+
+describe('an archived project offers no new issue until it is unarchived (PEEKM-2, Decided 2026-10-23)', () => {
+  it('has no Add issue, where the same project unarchived has one', async () => {
+    const archived = { ...STATE.projects[0], fields: { archived: { value: 'true', by: AUTHOR, at: 2, format: 'marker' } } } as WorkspaceState['projects'][number]
+    vi.mocked(useWorkspace).mockReturnValue({ state: { ...STATE, projects: [archived, STATE.projects[1]] }, error: null, loading: false, busy: false, refresh, live: false })
+    goTo(`/project/billing-${D_PROJECT}`)
+    const { unmount } = render(<App />)
+    await screen.findByRole('button', { name: 'Unarchive project' })
+    expect(screen.queryByRole('button', { name: 'Add issue' })).toBeNull()
+    unmount()
+    vi.mocked(useWorkspace).mockReturnValue({ state: STATE, error: null, loading: false, busy: false, refresh, live: false })
+    goTo(`/project/billing-${D_PROJECT}`)
+    render(<App />)
+    expect(await screen.findByRole('button', { name: 'Add issue' })).toBeInTheDocument()
+  })
+
+  it('has no Add issue either when it is archived only with its team, every Folder listing it being archived', async () => {
+    const teams = [
+      { id: TEAM, name: 'Team', hasState: true, addresses: [PROJECT_ADDR, LOOSE_ADDR], archived: { by: AUTHOR, at: 3 } },
+      { id: OWN, name: 'Own', hasState: true, addresses: [] },
+    ]
+    vi.mocked(readFolders).mockResolvedValue(teams as Awaited<ReturnType<typeof readFolders>>)
+    try {
+      await reloadFolders()
+      goTo(`/project/billing-${D_PROJECT}`)
+      render(<App />)
+      await screen.findByText(/Archived with its Folder/)
+      expect(screen.queryByRole('button', { name: 'Add issue' })).toBeNull()
+    } finally {
+      vi.mocked(readFolders).mockResolvedValue([
+        { id: TEAM, name: 'Team', hasState: true, addresses: [PROJECT_ADDR, LOOSE_ADDR] },
+        { id: OWN, name: 'Own', hasState: true, addresses: [] },
+      ] as Awaited<ReturnType<typeof readFolders>>)
+      await reloadFolders()
+    }
+  })
+
+  it('an issue cannot be moved into it: the Project picker leaves it out, and keeps the live ones', async () => {
+    const D_ISSUE = 'c1d2e3f4-0000-4000-8000-000000000001'
+    const loose = { ...STATE.projects[1], fields: { archived: { value: 'true', by: AUTHOR, at: 2, format: 'marker' } } } as WorkspaceState['projects'][number]
+    const issue = { addr: `30851:${AUTHOR}:${D_ISSUE}`, id: D_ISSUE, author: AUTHOR, createdAt: 1, title: 'Rounding', description: '', descriptionFormat: 'marker', folder: OWN, projectAddr: STATE.projects[0].addr, ref: 'BIL-1', status: 'todo', fields: {} }
+    vi.mocked(useWorkspace).mockReturnValue({ state: { ...STATE, projects: [STATE.projects[0], loose], issues: [issue] } as unknown as WorkspaceState, error: null, loading: false, busy: false, refresh, live: false })
+    goTo(`/issue/rounding-${D_ISSUE}`)
+    render(<App />)
+    await userEvent.click(await screen.findByRole('combobox', { name: 'Project' }))
+    expect(await screen.findByRole('option', { name: 'Billing' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'No project' })).toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: 'Loose' })).toBeNull()
+  })
+})
 
 describe("a moved project's new work goes into its own Folder, not the one that lists it", () => {
   it('New issue on its page: the kind:30851 carries h = the project’s own Folder, and that Folder is re-read so it shows', async () => {

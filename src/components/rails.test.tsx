@@ -99,6 +99,41 @@ describe('IssueRail', () => {
   })
 })
 
+describe('IssueRail, archived only with its project (PEEKM-2, SPEC §6.5)', () => {
+  const rail = (archived: boolean, onProjectChange = vi.fn(), onArchive = vi.fn()) => (
+    <IssueRail
+      status="todo"
+      statuses={STATUSES}
+      onStatusChange={vi.fn()}
+      assignee=""
+      people={PEOPLE}
+      onAssigneeChange={vi.fn()}
+      project="30850:x:hive"
+      projects={[{ value: '', label: 'No project' }, { value: '30850:x:hive', label: 'Hive' }]}
+      onProjectChange={onProjectChange}
+      openedBy={{}}
+      openedAt={1}
+      archived={archived}
+      onArchive={onArchive}
+      onDelete={vi.fn()}
+      lockedReason={archived ? 'Unarchive to edit' : 'Unarchive its project to edit'}
+    />
+  )
+
+  it('keeps the move out and its own Archive offered, while status and assignee stay shut', () => {
+    render(rail(false))
+    expect(screen.getByRole('combobox', { name: 'Project' }).getAttribute('aria-disabled')).not.toBe('true')
+    expect(screen.getByRole('button', { name: 'Archive issue' }).getAttribute('aria-disabled')).toBe(null)
+    expect(screen.getByRole('combobox', { name: 'Status' }).getAttribute('aria-disabled')).toBe('true')
+  })
+
+  it('archived itself, the move is shut and Unarchive is offered', () => {
+    render(rail(true))
+    expect(screen.getByRole('combobox', { name: 'Project' }).getAttribute('aria-disabled')).toBe('true')
+    expect(screen.getByRole('button', { name: 'Unarchive issue' }).getAttribute('aria-disabled')).toBe(null)
+  })
+})
+
 describe('a write control that cannot succeed says why', () => {
   const REASON = 'You do not have write access to this Folder.'
 
@@ -204,33 +239,7 @@ describe('an archived file’s rail: its fields shut, Unarchive and Delete open 
     expect(onDelete).toHaveBeenCalledTimes(1)
   })
 
-  it('shuts Archive on an issue locked only by its project’s archive — archiving it again would be an edit', () => {
-    const onArchive = vi.fn()
-    render(
-      <IssueRail
-        status="planned"
-        statuses={STATUSES}
-        onStatusChange={vi.fn()}
-        assignee=""
-        people={PEOPLE}
-        onAssigneeChange={vi.fn()}
-        project=""
-        projects={[{ value: '', label: 'No project' }]}
-        onProjectChange={vi.fn()}
-        openedBy={{}}
-        openedAt={Math.floor(Date.now() / 1000)}
-        archived={false}
-        onArchive={onArchive}
-        onDelete={vi.fn()}
-        lockedReason="Unarchive its project to edit"
-      />,
-    )
-    const archive = screen.getByRole('button', { name: 'Archive issue' })
-    expect(archive.getAttribute('aria-disabled')).toBe('true')
-    fireEvent.click(archive)
-    expect(onArchive).not.toHaveBeenCalled()
-    expect(screen.getByRole('button', { name: 'Delete issue' }).getAttribute('aria-disabled')).toBe(null)
-  })
+  // Changed on purpose (PEEKM-2, SPEC §6.5): an issue archived only with its project keeps its own Archive — see "IssueRail, archived only with its project".
 
   it('shuts the project rail’s selects and Move, and leaves Unarchive and Delete working', () => {
     const onArchive = vi.fn()

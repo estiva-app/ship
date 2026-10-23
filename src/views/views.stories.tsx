@@ -150,7 +150,7 @@ const projectPage = (startTab: ProjectTab, startView: 'table' | 'board' = 'table
     return (
       <Shell current={{ projectAddr: '30850:a:rel' }}>
         <ProjectView
-          onAddIssue={fn()}
+          {...(archived ? {} : { onAddIssue: fn() })}
           crumbs={{ projectsHref: '#/projects', title }}
           header={{ title, summary, description, descriptionFormat: 'marker', archived, onRename: (v) => (setTitle(v), true), onSummarize: async (v) => (setSummary(v || undefined), true), onDescribe: (v) => (setDescription(v), true) }}
           tab={tab}

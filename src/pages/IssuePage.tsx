@@ -151,8 +151,9 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
   const history = useMemo(() => (issue ? historyFor(issue.addr, state, directory) : []), [issue, state, directory])
   const people = useMemo(() => railPeople(state, directory), [state, directory])
   const projects = useMemo(
-    () => [{ value: '', label: 'No project' }, ...state.projects.map((p) => ({ value: p.addr, label: p.title }))],
-    [state],
+    // No move into an archived project, a new child under it (SPEC §6.5); its own stays listed, and moving out stays offered.
+    () => [{ value: '', label: 'No project' }, ...state.projects.filter((p) => p.addr === issue?.projectAddr || !archives.ofProject(p.addr)).map((p) => ({ value: p.addr, label: p.title }))],
+    [state, archives, issue?.projectAddr],
   )
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [archiving, setArchiving] = useState(false)
@@ -199,7 +200,12 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
               archive={archive}
               nameOf={directory.nameOf}
               onUnarchive={unarchive}
-              {...(archive.with && project ? { onOpenParent: () => go({ name: 'project', d: project.id, slug: project.title, view: 'table' }) } : {})}
+              // Opens what is archived: the project, or the team it is archived with.
+              {...(archive.with?.kind === 'folder' && archive.with.id
+                ? { onOpenParent: () => go({ name: 'folder', id: archive.with!.id! }) }
+                : archive.with && project
+                  ? { onOpenParent: () => go({ name: 'project', d: project.id, slug: project.title, view: 'table' }) }
+                  : {})}
             />
           )
         }
