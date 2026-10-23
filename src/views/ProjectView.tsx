@@ -164,7 +164,7 @@ export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onVi
           />
         )}
         {onAddIssue && (
-          <Button variant="primary" onClick={onAddIssue} disabledReason={readOnlyReason ?? lockedReason}>
+          <Button variant="primary" onClick={onAddIssue} disabledReason={readOnlyReason}>
             Add issue
           </Button>
         )}

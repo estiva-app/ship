@@ -72,7 +72,8 @@ export function IssueRail({
         <Select value={assignee} onChange={onAssigneeChange} options={peopleOptions(people)} ariaLabel="Assignee" disabledReason={fieldsShut} />
       </Property>
       <Property layout="stacked" label="Project">
-        <Select value={project} onChange={onProjectChange} options={projects} ariaLabel="Project" disabledReason={fieldsShut} />
+        {/* Archived only with its project, a move out stays offered (SPEC §6.5): it is how the issue reopens. */}
+        <Select value={project} onChange={onProjectChange} options={projects} ariaLabel="Project" disabledReason={archived ? fieldsShut : readOnlyReason} />
       </Property>
       <Divider className="mx-0" />
       {/* The same shape as the three above (Katerina, 2026-09-08): the label
@@ -90,8 +91,8 @@ export function IssueRail({
       {/* The project rail's pair (FOL-46): archive, the reversible one, first. */}
       <div className="flex flex-col items-start gap-1">
         {onArchive && (
-          // Locked only by its project's archive, archiving it again is an edit; unarchiving its own never is.
-          <Button size="small" variant="muted" onClick={onArchive} disabledReason={archived ? readOnlyReason : fieldsShut}>
+          // Its own Archive and Unarchive stay offered whatever is archived above it (SPEC §6.5).
+          <Button size="small" variant="muted" onClick={onArchive} disabledReason={readOnlyReason}>
             {archived ? 'Unarchive issue' : 'Archive issue'}
           </Button>
         )}

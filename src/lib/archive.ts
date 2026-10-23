@@ -156,13 +156,14 @@ export function archivesOf(
         return archive && { by: archive.by, at: archive.at, ...(archive.resolution ? { resolution: archive.resolution } : {}), ...(archive.with ? { with: archive.with.addr } : {}) }
       },
     )
-    const project = projectAddr ? projects.get(projectAddr) : undefined
-    issues.set(
-      issue.addr,
-      ancestor && projectAddr
-        ? { ...ancestor, with: project?.with ?? { kind: 'project', addr: projectAddr, title: titleOf.get(projectAddr) ?? 'its project' } }
-        : undefined,
-    )
+    // Back to Ship's shape from the address interop named: a project, or the team its project is archived with.
+    const named = ancestor?.with
+    const withState: ArchiveState['with'] | undefined = !named
+      ? undefined
+      : titleOf.has(named)
+        ? { kind: 'project', addr: named, title: titleOf.get(named) || 'its project' }
+        : [...projects.values()].find((archive) => archive?.with?.addr === named)?.with
+    issues.set(issue.addr, ancestor && withState ? { ...ancestor, with: withState } : undefined)
   }
   return {
     ofProject: (addr) => projects.get(addr),

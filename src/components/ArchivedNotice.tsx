@@ -22,11 +22,13 @@ export interface ArchivedNoticeProps {
  * is a card with the reason inside it rather than loose under it.
  */
 export function ArchivedNotice({ archive, nameOf, onUnarchive, onOpenParent, readOnlyReason }: ArchivedNoticeProps) {
+  // A Folder is a proper noun in every app's copy.
+  const noun = archive.with?.kind === 'folder' ? 'Folder' : archive.with?.kind
   const line = archive.with
-    ? `Archived with its ${archive.with.kind} “${archive.with.title}” by ${nameOf(archive.by)}, ${ago(archive.at)}`
+    ? `Archived with its ${noun} “${archive.with.title}” by ${nameOf(archive.by)}, ${ago(archive.at)}`
     : `Archived by ${nameOf(archive.by)}, ${ago(archive.at)}`
   const action = archive.with
-    ? onOpenParent && { label: `Open ${archive.with.kind}`, onClick: onOpenParent }
+    ? onOpenParent && { label: `Open ${noun}`, onClick: onOpenParent }
     : onUnarchive && !readOnlyReason && { label: 'Unarchive', onClick: onUnarchive }
   return (
     <Card fill="surface" className="flex items-start gap-3 px-4 py-3">
