@@ -119,6 +119,21 @@ async function comment(path: string, text: string) {
   fireEvent.click(main.getByRole('button', { name: 'Send' }))
 }
 
+describe('an archived project offers no new issue until it is unarchived (PEEKM-2, Decided 2026-10-23)', () => {
+  it('has no Add issue, where the same project unarchived has one', async () => {
+    const archived = { ...STATE.projects[0], fields: { archived: { value: 'true', by: AUTHOR, at: 2 } } }
+    vi.mocked(useWorkspace).mockReturnValue({ state: { ...STATE, projects: [archived, STATE.projects[1]] }, error: null, loading: false, busy: false, refresh, live: false })
+    goTo(`/project/billing-${D_PROJECT}`)
+    const { unmount } = render(<App />)
+    await screen.findByRole('button', { name: 'Unarchive project' })
+    expect(screen.queryByRole('button', { name: 'Add issue' })).toBeNull()
+    unmount()
+    vi.mocked(useWorkspace).mockReturnValue({ state: STATE, error: null, loading: false, busy: false, refresh, live: false })
+    render(<App />)
+    expect(await screen.findByRole('button', { name: 'Add issue' })).toBeInTheDocument()
+  })
+})
+
 describe("a moved project's new work goes into its own Folder, not the one that lists it", () => {
   it('New issue on its page: the kind:30851 carries h = the project’s own Folder, and that Folder is re-read so it shows', async () => {
     await addIssue(`/project/billing-${D_PROJECT}`)

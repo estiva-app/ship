@@ -104,11 +104,12 @@ const projectView = (tab: 'overview' | 'activity', extra: Partial<ProjectViewPro
 )
 
 describe('ProjectView, archived (SHI-36)', () => {
-  it('draws the description without an editor and shuts Add issue, leaving Unarchive and Delete', () => {
-    render(projectView('overview', { lockedReason: 'Unarchive to edit' }))
+  // Changed on purpose (PEEKM-2, Decided 2026-10-23): no new issue is offered under an archived project, so the page passes no onAddIssue.
+  it('draws the description without an editor and offers no Add issue, leaving Unarchive and Delete', () => {
+    render(projectView('overview', { lockedReason: 'Unarchive to edit', onAddIssue: undefined }))
     expect(screen.getByText(/Move every Folder to the new relay/)).toBeInTheDocument()
     expect(screen.queryByRole('textbox', { name: 'Description' })).toBeNull()
-    expect(screen.getByRole('button', { name: 'Add issue' }).getAttribute('aria-disabled')).toBe('true')
+    expect(screen.queryByRole('button', { name: 'Add issue' })).toBeNull()
     for (const name of ['Unarchive project', 'Delete project']) expect(screen.getByRole('button', { name }).getAttribute('aria-disabled')).toBe(null)
   })
 

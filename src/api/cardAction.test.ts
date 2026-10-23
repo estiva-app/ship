@@ -29,6 +29,8 @@ const tampered = (change: Record<string, unknown>) => {
 let manifest = shipManifest
 const PROJECT = `30850:${SHIP}:5b1f0a8e-6c1d-4c55-9a0e-2f0d3c1b7e44`
 const root = signed({ pubkey: SHIP, created_at: 1_700_000_100, kind: 30851, tags: [['d', ISSUE.split(':')[2]], ['h', FOLDER], ['a', PROJECT], ['title', 'Cards draw from the kit']], content: '' }, '2')
+/** The project's root: an ancestor whose root cannot be read counts as not archived (SPEC §6.5). */
+const projectRoot = signed({ pubkey: SHIP, created_at: 1_700_000_050, kind: 30850, tags: [['d', PROJECT.split(':')[2]], ['h', FOLDER], ['title', 'Cards']], content: '' }, '4')
 /** Ship's archive of a file, as its page writes it. */
 const archiving = (address: string) => signed({ pubkey: SHIP, created_at: 1_700_000_200, kind: 1851, tags: [['a', address], ['field', 'archived'], ['value', 'true'], ['h', FOLDER]], content: '' }, '3')
 let changes: SignedEvent[] = []
@@ -38,7 +40,7 @@ vi.mock('./store', () => ({
     query: async (filters: { kinds?: number[] }[]) => {
       const kinds = filters.flatMap((f) => f.kinds ?? [])
       if (kinds.includes(31990)) return [manifest]
-      return [...(kinds.includes(30851) ? [root] : []), ...(kinds.includes(1851) ? changes : [])]
+      return [...(kinds.includes(30851) ? [root] : []), ...(kinds.includes(30850) ? [projectRoot] : []), ...(kinds.includes(1851) ? changes : [])]
     },
     publish: (event: SignedEvent) => publish(event),
   },

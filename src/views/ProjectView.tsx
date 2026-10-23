@@ -56,7 +56,7 @@ export interface ProjectViewProps {
     /** Who saved the description last, by name, when it was not you (LTX-3). */
     descriptionBy?: string | null
   }
-  /** "Add issue", at the right end of the tab row. */
+  /** "Add issue", at the right end of the tab row; none on an archived project, so no button. */
   onAddIssue?: () => void
   /** The open tab — in the URL. */
   tab: ProjectTab
@@ -163,9 +163,11 @@ export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onVi
             size="small"
           />
         )}
-        <Button variant="primary" onClick={onAddIssue} disabledReason={readOnlyReason ?? lockedReason}>
-          Add issue
-        </Button>
+        {onAddIssue && (
+          <Button variant="primary" onClick={onAddIssue} disabledReason={readOnlyReason ?? lockedReason}>
+            Add issue
+          </Button>
+        )}
       </div>
 
       {/* Both columns scroll in a ScrollArea (D40): the bar takes no width, so the 24px of padding read the same with a bar as without. */}

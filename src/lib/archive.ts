@@ -15,6 +15,8 @@
  *
  * Generic over the shapes it reads, so this file knows no kinds.
  */
+import { archivedAncestorOf } from '@estiva-app/interop'
+import { archivedLine as sharedArchivedLine } from '@estiva-app/ui'
 
 /** Ship wrote this note on every archive before FOL-46; it is not a resolution. */
 const PLACEHOLDER_NOTE = 'archived'
@@ -82,13 +84,13 @@ export function lockedReason(archive: ArchiveState | undefined): string | undefi
 /**
  * The line in the comment box's place on an archived file: it takes no new
  * comment or reaction, in every app (Miky, 2026-10-17, reversing SHI-36's
- * "comments stay open"). Ship's courtesy, as above.
+ * "comments stay open"). The words are estiva-ui's, the same in every app;
+ * Ship names what is archived by its kind.
+ *
+ * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-file-is-archived-with-the-closest-archived-file-above-it.md
  */
 export function archivedLine(archive: ArchiveState | undefined): string | undefined {
-  if (!archive) return undefined
-  if (archive.with?.kind === 'project') return 'Archived with its project. Unarchive the project to comment.'
-  if (archive.with?.kind === 'folder') return 'Archived with its Folder. Unarchive the Folder to comment.'
-  return 'Archived. Unarchive it to comment.'
+  return sharedArchivedLine(archive && (archive.with ? { with: archive.with.addr } : {}), archive?.with?.kind)
 }
 
 export interface Archives {
@@ -138,13 +140,28 @@ export function archivesOf(
   const issues = new Map<string, ArchiveState | undefined>()
   for (const issue of state.issues) {
     const own = ownArchive(issue, state.activity)
-    const project = issue.projectAddr ? projects.get(issue.projectAddr) : undefined
+    if (own) {
+      issues.set(issue.addr, own)
+      continue
+    }
+    // SPEC §6.5's walk, interop's: an issue's parent is its project, a project's
+    // is none in Ship's fold (its team stays Ship's own rule, above). `with` is
+    // what is actually archived — the team, when only the team is.
+    const projectAddr = issue.projectAddr
+    const ancestor = archivedAncestorOf(
+      issue.addr,
+      (addr) => (addr === issue.addr ? projectAddr : undefined),
+      (addr) => {
+        const archive = projects.get(addr)
+        return archive && { by: archive.by, at: archive.at, ...(archive.resolution ? { resolution: archive.resolution } : {}), ...(archive.with ? { with: archive.with.addr } : {}) }
+      },
+    )
+    const project = projectAddr ? projects.get(projectAddr) : undefined
     issues.set(
       issue.addr,
-      own ??
-        (project && issue.projectAddr
-          ? { ...project, with: { kind: 'project', addr: issue.projectAddr, title: titleOf.get(issue.projectAddr) ?? 'its project' } }
-          : undefined),
+      ancestor && projectAddr
+        ? { ...ancestor, with: project?.with ?? { kind: 'project', addr: projectAddr, title: titleOf.get(projectAddr) ?? 'its project' } }
+        : undefined,
     )
   }
   return {
