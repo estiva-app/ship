@@ -1,0 +1,33 @@
+import { Meta } from '@storybook/addon-docs/blocks'
+
+<Meta title="Primitives/MessageRow/Usage" />
+
+# MessageRow
+
+A line that is only a link to a file or a message: the package's row for that
+file, where the line was (SPEC §13.3).
+
+**Seen in** no story: a row draws a file read from the relay, which the stories' fake relay does not answer; `MessageText` and `LiveHeader` draw it in tests.
+
+## When
+
+- A sent message's line that holds only a link (`MessageText`).
+- A description's line that holds only a link, unless its writer chose Card (`DescriptionLink`, WBD-7).
+
+## When not
+
+- A link inside a sentence → **MessageChip**.
+- A link whose writer chose Card → **MessageCard**.
+
+## How
+
+```tsx
+import { MessageRow } from '@/components/ui/MessageLinks'
+
+<MessageRow uri={uri} object={resolved[uri]} opensAt={href} />
+```
+
+## What it owns
+
+- **The unreadable row**: a file you cannot read says so in the row's place, never blank.
+- **Where it opens**: the URL it was written as (WBM-11).

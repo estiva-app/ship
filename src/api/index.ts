@@ -57,6 +57,7 @@ installReadStateDiagnostic()
 export { unreadByThread } from './unreadFeed'
 export { useFeedJudges, type FeedFile } from './useFeedJudges'
 export {
+  addMentioned,
   archiveProject,
   archiveIssue,
   archiveFolder,

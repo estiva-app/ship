@@ -1,11 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { EditorContent, useEditor, type Editor } from '@tiptap/react'
-import StarterKit from '@tiptap/starter-kit'
-import { TableKit } from '@tiptap/extension-table'
-import { TextSelection } from '@tiptap/pm/state'
+import { useCallback, useEffect, useRef } from 'react'
+import type { Editor } from '@tiptap/react'
 import {
+  BLOCK_DOCUMENT_FORMAT,
   descriptionTextToBlockDocument,
   documentForEditing,
+  encodeNpub,
   publishableFromEditor,
   referenceOfLink,
   toEditorDocument,
@@ -13,71 +12,64 @@ import {
   type EditorDocument,
   type Imeta,
 } from '@estiva-app/protocol'
-import { FieldLine, FilePicker, richTextClassName } from '@estiva-app/ui'
-import {
-  Callout,
-  Checklist,
-  CodeBlockColours,
-  EditorBlockHandle,
-  EditorTableControls,
-  LinkChips,
-  PastedImages,
-  PastedMarkdown,
-  ReferenceCards,
-  ReferenceMenu,
-  ReferenceMenuView,
-  SelectionToolbar,
-  blockDropCursor,
-  isChecklistTick,
-  isReferenceMenuOpen,
-  isSuggestionOpen,
-} from '@estiva-app/ui/editor'
+import { newlyNamedPeople, peopleNamedInText, type FileText } from '@estiva-app/conversation'
+import { DocumentEditor, type DocumentCodec, type HeldTyping, type MentionPerson } from '@estiva-app/ui/editor'
 import { uploadAttachment } from '@/api/blobs'
+import { REFERENCE_COPY, fileSections, subscribeReferences } from '@/api/references'
 import { sessionEnded } from '@/auth/estivaId'
-import { heldText, releaseHeld, useHeldTyping } from '@/auth/heldTyping'
+import { heldText, registerHeld, releaseHeld } from '@/auth/heldTyping'
 import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
 import { askLinkValues, knownLinkValue } from '@/api/linkCards'
-import { Button } from '@/components/ui/Button'
-import { AttachmentNode, BlockId, ReferenceNode, ReferenceProvider, UnknownBlock } from '@/components/ui/editorSchema'
-import { LinkDecoration } from './linkDecoration'
 import { blockRows } from './blockRows'
-import { EditorLineCards, MAX_LINKS_PER_DESCRIPTION, useChipObjects } from './DescriptionCards'
-import { ShipSlashMenu, slashSections } from './slashMenu'
+import { DescriptionFile, DescriptionLink, DescriptionLinks, MAX_LINKS_PER_DESCRIPTION } from './descriptionLinks'
+import { useMentionPeople } from './mentionables'
 
 /**
- * The description as one surface that is always an editor (Katerina,
- * 29 September: findings E3–E6), replacing `DescriptionEditor` +
- * `DescriptionEditing`:
+ * A description's text as the shared editor reads and writes it. A link on
+ * words keeps its link through a save (§13.3, C23): every editor of a
+ * document's text is now the shared one (Peek edits none), the condition WBD-1
+ * set for turning it on.
+ */
+const CODEC: DocumentCodec = {
+  read: (value, format) => toEditorDocument(documentForEditing(value, format as ContentFormat), { links: true }),
+  write: (doc) => publishableFromEditor(doc as EditorDocument),
+}
+
+/** Where text typed as the sign-in ends is held until the passkey tap (AUT-4). */
+const HOLD: HeldTyping = { text: heldText, release: releaseHeld, register: registerHeld, ended: () => sessionEnded() !== null }
+
+/** `[`: files only, this Folder's first — an issue's project's issues — as a Leaf page offers its Folder's. */
+const REFERENCES = { sections: fileSections, subscribe: subscribeReferences, ariaLabel: REFERENCE_COPY.files, sectionLabel: REFERENCE_COPY.files }
+
+/** An app URL reads as the chip of what it names, and saves as the URL (Widgets, Miky 14 Oct). */
+const LINK_CHIPS = { referenceOf: (url: string) => referenceOfLink(url, knownLinkValue), ask: askLinkValues, limit: MAX_LINKS_PER_DESCRIPTION }
+
+/** Markdown pasted as plain text lands as the blocks it spells, tables and links on words included, read as the agent reads a description (LEAF-10). */
+const readMarkdown = (text: string) => toEditorDocument(descriptionTextToBlockDocument(text), { links: true })
+
+const uriOf = (person: MentionPerson) => (person.pubkey ? `nostr:${encodeNpub(person.pubkey)}` : null)
+
+/**
+ * An issue's or a project's description: the shared document editor every app
+ * writes a document with (`DocumentEditor`), so it does what a Leaf page does —
+ * `[` and `/` → Link to a file, `@` a person, a pasted app link its chip, alone
+ * on its line its row, and *Show as Card* its card in the row's place, drawn
+ * with the kit's chip, row and card as a message draws them. Comments on a
+ * selection are off: where Ship shows them is the next stage (Miky, 19 Oct).
+ * It saves when you leave it; someone else's save arrives as the editor says.
  *
- * - **No reading/writing switch.** The editor is there from the start, so a
- *   click lands in it and the caret goes where you clicked. No box, no fill,
- *   no row of buttons: attach and table are in the `/` menu (the package's
- *   `SuggestionMenu`), bold, italic, underline and code in the package's
- *   selection toolbar, and links are drawn while you type.
- * - **Saves when you leave:** on blur, and on unmount — switching tab or
- *   leaving the page. Never while typing: each save is a line in History.
- *   Escape leaves and keeps the text (Notion's Esc). A refused save keeps the
- *   text and says so.
- * - **Someone else's edit arrives** while you are not in it: it is loaded. While
- *   you are in it, it waits, and a line says who saved a newer version with
- *   "Load it", as Leaf's page does (LTX-3); leaving without having changed
- *   anything loads it, and leaving with a change saves yours over it — the last
- *   save wins. Your own save coming back is never mistaken for someone else's
- *   (Peek's RIC-13 lesson: an echo of your own edit must not overwrite newer
- *   text). A save refused after you left is the page's to say: `onCommit`'s
- *   `left` tells it, read when the relay answers.
+ * A save that names someone the text it was edited from did not adds them to
+ * the file (`onMention`), as the Add button does; the save itself carries no
+ * `p`, and a typo fix adds nobody.
  *
- *   why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-files-text-is-a-readable-snapshot.md
- *
- * Kept from `DescriptionEditing`: the block ids and unknown blocks that let
- * comments stay anchored (§13.6), tables, attachments uploaded before they are
- * inserted, the file dialog not counting as leaving, and the format tag the
- * editor built the document in (RIC-14).
+ * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/every-app-edits-a-document-with-one-shared-editor.md
+ * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-mention-in-a-files-text-adds-the-person-with-no-unread.md
  */
 export function LiveDescription({
   value,
   format,
   onCommit,
+  onMention,
   nameOf,
   resolved = {},
   onEditor,
@@ -86,6 +78,7 @@ export function LiveDescription({
   onCopyBlockLink,
   holdKey,
   changedBy = null,
+  readOnly = false,
 }: {
   value: string
   /** Where its unsaved text is held when the sign-in ends while it is open (AUT-4): the issue's or project's address. */
@@ -93,6 +86,8 @@ export function LiveDescription({
   format: ContentFormat
   /** `left()` is true once the description has gone from the page: a refusal then has no line under the field to say it. */
   onCommit: (value: string, contentFormat?: string, left?: () => boolean) => Promise<boolean> | boolean
+  /** Add the people a save names anew; answers the ones that could not be added, tried again at the next save that still names them. */
+  onMention?: (people: readonly string[]) => Promise<readonly string[]>
   /** The name in "<name> saved a newer version": who saved `value` last, when it was not you. */
   changedBy?: string | null
   nameOf?: (pubkey: string) => string
@@ -105,297 +100,73 @@ export function LiveDescription({
   onCommentOnBlock?: (blockId: string) => void
   /** The block menu's Copy link: the page's copy, which confirms it. */
   onCopyBlockLink?: (link: string) => void
+  /** Only read: an archived file's, or a reader's who cannot write. */
+  readOnly?: boolean
 }) {
-  const [failed, setFailed] = useState(false)
-  const [uploadError, setUploadError] = useState<string | null>(null)
-  const picker = useRef<HTMLInputElement>(null)
-  /*
-    True from the moment the file dialog is asked for until the window comes
-    back: the dialog takes focus, and a blur then must not save and leave
-    (SHI-2, DescriptionEditing's own guard).
-  */
-  const picking = useRef(false)
-  // Where a pasted picture goes: `attach`, set below once it exists.
-  const pasteTo = useRef<((files: File[]) => Promise<void>) | null>(null)
-  const openPicker = () => {
-    picking.current = true
-    const released = () => {
-      picking.current = false
-      window.removeEventListener('focus', released)
-    }
-    window.addEventListener('focus', released)
-    picker.current?.click()
-  }
-  // What was typed here when the sign-in last ended, back after the passkey tap and not yet saved (AUT-4).
-  // Not when it is what the page already has (a save that was out as the sign-in ended went through): only a save
-  // clears `restored`, a save of what is saved sends nothing, and someone else's save would wait behind it for good.
-  const [held] = useState(() => {
-    const doc = heldDocument(holdKey)
-    return doc && publishableFromEditor(doc).value !== value ? doc : null
-  })
-  const [empty, setEmpty] = useState(!held && value.trim() === '')
-  const [focused, setFocused] = useState(false)
-  /*
-    The text the editor holds as saved or loaded. A page value that differs is
-    someone else's save: loaded at once while you are not in the field, waiting
-    with a line while you are. `saved` is the same, for the editor's callbacks,
-    so a blur with nothing new is not a write.
-  */
-  const [base, setBase] = useState(value)
-  const saved = useRef(value)
-  /*
-    The page's value your own save replaced. Until your save comes back from the
-    relay the page may still hold the text before it, which is not someone else's.
-  */
-  const [superseded, setSuperseded] = useState<string | null>(null)
-  // A save out: nothing is loaded over the text it carries until the relay has answered.
-  const [saving, setSaving] = useState(false)
-  const committing = useRef(false)
-  // The page's value now, for the editor's callbacks.
-  const latest = useRef({ value, format })
-  useEffect(() => {
-    latest.current = { value, format }
-  }, [value, format])
-  // The text as last typed. Saving on the way out reads this, not the editor,
-  // which may already be torn down by then.
-  const typed = useRef<EditorDocument | null>(held)
-  const again = useRef(false)
   // The description has gone from the page: a refusal now is the page's to say.
   const left = useRef(false)
-  // Until the held text is saved, it is what is in the field: someone else's save waits behind it, as behind a refused one.
-  const [restored, setRestored] = useState(held !== null)
-  // The text the editor was last set to, so a `base` it already shows is not set again under the caret.
-  const shown = useRef(value)
-
-  useHeldTyping(holdKey, () => {
-    const doc = typed.current
-    return doc && publishableFromEditor(doc).value !== saved.current ? JSON.stringify(doc) : undefined
-  })
-
-  const save = useCallback(
-    async (doc: EditorDocument | null) => {
-      if (!doc) return
-      // A change made while a save is out — a block menu's Delete right after the press that blurred the field — goes next, not nowhere.
-      if (committing.current) {
-        again.current = true
-        return
-      }
-      const next = publishableFromEditor(doc)
-      if (next.value === saved.current) return
-      committing.current = true
-      setSaving(true)
-      // The last save wins: whatever the page holds as you save is replaced by yours.
-      const replaced = latest.current.value
-      try {
-        const ok = await onCommit(next.value, next.contentFormat, () => left.current)
-        if (!left.current) setFailed(!ok)
-        if (ok) {
-          // The editor already shows it, and may hold more typed since: `shown` keeps the effect below from setting it.
-          saved.current = next.value
-          shown.current = next.value
-          setSuperseded(replaced)
-          setBase(next.value)
-          setRestored(false)
-          if (holdKey) releaseHeld(holdKey)
-        }
-      } finally {
-        committing.current = false
-        setSaving(false)
-        // In `finally`, so a commit that throws still hands on the change waiting behind it.
-        // Only a change: leaving while a blur's save is out asks again for the same text, and a refusal would be said twice.
-        if (again.current) {
-          again.current = false
-          if (typed.current && publishableFromEditor(typed.current).value !== next.value) void latestSave.current(typed.current)
-        }
-      }
-    },
-    [onCommit, holdKey],
-  )
-  /*
-    The latest `save`, for the editor's `onBlur` (created once) and the unmount
-    below. A cleanup keyed on `save` ran on every render a page's inline
-    `onDescribe` caused, publishing mid-typing (MAN-9, found in Peek's copy).
-  */
-  const latestSave = useRef(save)
   useEffect(() => {
-    latestSave.current = save
-  }, [save])
-
-  const editor = useEditor(
-    {
-      extensions: [
-        // The drop line in the accent, where a dragged block will land (RIC-18, Katerina's review).
-        // The code block is the package's, coloured by language as it is when read (estiva-ui 0.64.0).
-        StarterKit.configure({ link: false, strike: false, heading: { levels: [1, 2, 3] }, dropcursor: blockDropCursor, codeBlock: false }),
-        CodeBlockColours,
-        TableKit.configure({ table: { resizable: false } }),
-        BlockId,
-        // A checklist item and a callout (RIC-19); without them a save drops the tick and the tone.
-        Checklist,
-        Callout,
-        ReferenceNode,
-        // The card a chip asks for, after its line (SPEC §13.3); drawn by `EditorLineCards` below.
-        ReferenceCards,
-        // A click on a chip, or a chip just pasted, offers Open and its card (Miky, 14 Oct, at /land); drawn by `ReferenceMenuView` below.
-        ReferenceMenu,
-        // An app URL reads as the chip of what it names, and saves as the URL (Widgets, Miky 14 Oct).
-        LinkChips.configure({ referenceOf: (url) => referenceOfLink(url, knownLinkValue), ask: askLinkValues, limit: MAX_LINKS_PER_DESCRIPTION }),
-        UnknownBlock,
-        AttachmentNode,
-        LinkDecoration.configure({ openOnClick: true }),
-        ShipSlashMenu(slashSections({ table: true, onFile: () => openPicker() })),
-        // A pasted picture is placed as `/` File places one (Katerina, 8 October); text on the clipboard stays text.
-        PastedImages.configure({
-          onImages: (pasted) => {
-            const take = pasteTo.current
-            if (!take) return false
-            void take(pasted)
-            return true
-          },
-        }),
-        // Markdown pasted as plain text lands as the blocks it spells, tables included, read as the agent reads a description (LEAF-10).
-        PastedMarkdown.configure({ read: (text) => toEditorDocument(descriptionTextToBlockDocument(text)) }),
-      ],
-      // Built once. A value coming back must not rebuild the editor under the caret; see the effect below.
-      content: held ?? toEditorDocument(documentForEditing(value, format)),
-      editorProps: {
-        attributes: { 'aria-label': 'Description', role: 'textbox', 'aria-multiline': 'true', class: richTextClassName('default', 'outline-none') },
-        handleKeyDown: (view, event) => {
-          if (event.key !== 'Escape') return false
-          // An open `/` list or chip menu closes first; the next Escape leaves (e33e9a4f, as the message box since f586437a).
-          if (isSuggestionOpen() || isReferenceMenuOpen(view.state)) return false
-          const { selection, tr } = view.state
-          // Words selected: the first Escape lets go of them, which also closes
-          // the formatting strip. Blurring with the strip open does not work —
-          // the closing Popover hands focus straight back.
-          if (!selection.empty) {
-            view.dispatch(tr.setSelection(TextSelection.create(tr.doc, selection.to)))
-            return true
-          }
-          view.dom.blur()
-          return true
-        },
-      },
-      onUpdate: ({ editor: e, transaction }) => {
-        typed.current = e.getJSON() as EditorDocument
-        setEmpty(e.isEmpty)
-        // A click on a box does not focus the field, so no blur will save it: one click ticks, and is saved (RIC-19, Miky 2026-10-13).
-        if (isChecklistTick(transaction)) void latestSave.current(typed.current)
-      },
-      onFocus: () => setFocused(true),
-      onBlur: () => {
-        // The file dialog is not leaving: you are still in the field, and what waits keeps waiting.
-        if (picking.current) return
-        setFocused(false)
-        // Yours, if you changed anything: it replaces what waited. If not, what waited is loaded as you leave (below).
-        void latestSave.current(typed.current)
-      },
-    },
-    [],
-  )
-
-  /*
-    Someone else's save. Not in the field: theirs is the text now. In it, or
-    with your own text unsaved after a refusal: it waits, and the line below
-    says so. Never over a save that is still out.
-  */
-  // Your save has come back: from now on the text it replaced is someone else's again, if they save it back.
-  if (superseded !== null && value === base) setSuperseded(null)
-  const arrived = value !== base && value !== superseded
-  if (arrived && !focused && !saving && !failed && !restored) setBase(value)
-  const waiting = arrived && (focused || failed || restored)
-
-  // The text the editor should hold, set into it when it changes — never under your own typing, which `shown` already holds.
-  useEffect(() => {
-    saved.current = base
-    if (!editor || editor.isDestroyed || base === shown.current) return
-    editor.commands.setContent(toEditorDocument(documentForEditing(base, latest.current.format)), { emitUpdate: false })
-    shown.current = base
-    typed.current = null
-    setEmpty(base.trim() === '')
-  }, [editor, base])
-
-  // "Load it": theirs replaces what you have not saved.
-  const load = () => {
-    setBase(latest.current.value)
-    setFailed(false)
-    setRestored(false)
-    if (holdKey) releaseHeld(holdKey)
-  }
-
-  /* `/` File: the upload first, then the block — its attributes are the relay's answers (SHI-2). */
-  const attach = async (chosen: File[]) => {
-    setUploadError(null)
-    try {
-      for (const file of chosen) {
-        const meta = await upload(file)
-        if (!editor || editor.isDestroyed) return
-        editor.chain().focus().insertContent({ type: 'attachment', attrs: { ...meta } }).run()
-      }
-    } catch (error) {
-      setUploadError(error instanceof Error ? error.message : String(error))
-    }
-  }
-  pasteTo.current = attach
-
-  useEffect(() => {
-    onEditor?.(editor)
-    return () => onEditor?.(null)
-  }, [editor, onEditor])
-
-  // Leaving the tab or the page unmounts this: save on the way out. Not when the sign-in ended: the save would be
-  // refused with nothing left on screen to say so, and the text is held on the device instead (AUT-4).
-  useEffect(
-    () => () => {
+    // Set again on mount: StrictMode mounts twice, and the first unmount must not count as leaving.
+    left.current = false
+    return () => {
       left.current = true
-      if (!sessionEnded()) void latestSave.current(typed.current)
+    }
+  }, [])
+  // Your last save, so the text the next one is edited from is read in the format it was written in.
+  const lastSave = useRef<FileText | null>(null)
+  // The people a save named whom the relay would not add: the next save that still names them tries again.
+  const unadded = useRef<readonly string[]>([])
+  const commit = useCallback(
+    async (next: string, contentFormat: string | undefined, editedFrom: string) => {
+      const from: FileText =
+        lastSave.current && lastSave.current.content === editedFrom
+          ? lastSave.current
+          : { content: editedFrom, ...(format === 'blocks' ? { format: BLOCK_DOCUMENT_FORMAT } : {}) }
+      const saved: FileText = { content: next, ...(contentFormat ? { format: contentFormat } : {}) }
+      const ok = await onCommit(next, contentFormat, () => left.current)
+      if (!ok) return false
+      lastSave.current = saved
+      if (onMention) {
+        const named = peopleNamedInText(saved)
+        const people = [...new Set([...newlyNamedPeople(saved, from), ...unadded.current.filter((person) => named.has(person))])]
+        unadded.current = people.length ? await onMention(people) : []
+      }
+      return true
     },
-    [],
+    [onCommit, onMention, format],
   )
-
-  const chips = useChipObjects(editor, resolved)
-
+  const people = useMentionPeople()
+  const mentions = { people: () => people, uriOf }
   return (
-    <ReferenceProvider value={{ resolved: chips, nameOf }}>
-      <div className="flex flex-col gap-1">
-        {/* The reading surface's own `-mx-2 px-2 py-1`, so nothing moves. The text cursor is the only sign it is editable. */}
-        {/* The handle sits in the gutter left of the text, so nothing moves (RIC-18). */}
-        <EditorBlockHandle editor={editor} actions={blockRows(onCommentOnBlock, onCopyBlockLink)}>
-          {/* A table's handles and ➕ bars while you point at it (RIC-21); the block handle stays the table's. */}
-          <EditorTableControls editor={editor}>
-            <EditorContent editor={editor} className="-mx-2 cursor-text px-2 py-1" data-description="editing" />
-          </EditorTableControls>
-          {/* Peek's composer pattern: muted words over an empty editor. */}
-          {empty && <span aria-hidden className="pointer-events-none absolute left-0 top-1 text-body-2 text-text-muted">Add a description…</span>}
-        </EditorBlockHandle>
-        <EditorLineCards editor={editor} resolved={chips} />
-        <SelectionToolbar editor={editor} marks={['bold', 'italic', 'underline', 'code']} />
-        <ReferenceMenuView editor={editor} />
-        <FilePicker ref={picker} multiple onPick={(files) => void attach(files)} />
-        {uploadError && <FieldLine tone="error">{uploadError}</FieldLine>}
-        {waiting && (
-          <FieldLine tone="helper">
-            {`${changedBy ?? 'Someone'} saved a newer version.`}{' '}
-            {/* Pressing it must not take focus from the field: that blur would save yours over theirs first. */}
-            <Button variant="muted" size="small" onMouseDown={(event) => event.preventDefault()} onClick={load}>
-              Load it
-            </Button>
-          </FieldLine>
+    // The page's own handle on the field (probes and the smoke test), as before the shared editor.
+    <div data-description={readOnly ? 'reading' : 'editing'}>
+      <DocumentEditor
+        value={value}
+        format={format}
+        codec={CODEC}
+        onCommit={commit}
+        label="Description"
+        placeholder="Add a description…"
+        readOnly={readOnly}
+        changedBy={changedBy ? { name: changedBy } : null}
+        hold={HOLD}
+        {...(holdKey ? { holdKey } : {})}
+        references={REFERENCES}
+        mentions={mentions}
+        linkChips={LINK_CHIPS}
+        // The attachment's attributes are the `imeta` fields exactly (§13.3).
+        upload={async (file) => ({ ...(await upload(file)) })}
+        readMarkdown={readMarkdown}
+        blockRows={blockRows(onCommentOnBlock, onCopyBlockLink)}
+        referenceView={DescriptionLink}
+        attachmentView={DescriptionFile}
+        wrap={(children, editor) => (
+          <DescriptionLinks editor={editor} resolved={resolved} nameOf={nameOf} readOnly={readOnly}>
+            {children}
+          </DescriptionLinks>
         )}
-        {failed && <FieldLine tone="error">Could not save. Your text is still here.</FieldLine>}
-      </div>
-    </ReferenceProvider>
+        {...(onEditor ? { onEditor } : {})}
+      />
+    </div>
   )
-}
-
-/** The editor's own document held for this place when the sign-in ended (AUT-4), block ids and all; `null` when none. */
-function heldDocument(key: string | undefined): EditorDocument | null {
-  const text = key ? heldText(key) : undefined
-  if (!text) return null
-  try {
-    const doc = JSON.parse(text) as EditorDocument
-    return doc?.type === 'doc' ? doc : null
-  } catch {
-    return null
-  }
 }

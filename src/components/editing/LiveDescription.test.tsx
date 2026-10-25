@@ -59,10 +59,13 @@ const pick = (container: HTMLElement, name = 'shot.png') =>
     target: { files: [new File(['x'], name, { type: 'image/png' })] },
   })
 
-/* `/`, then the File row — chosen the way the menu takes a pointer, on mousedown, so focus stays in the editor. */
+/*
+  `/`, then the Upload row — chosen the way the menu takes a pointer, on mousedown, so focus stays in the editor.
+  Changed on purpose (WBD-7): in the shared editor `/` → File opens `[`'s list, and Upload attaches a file.
+*/
 const slashFile = async (box: EditorBox) => {
   type(box, ' /')
-  fireEvent.mouseDown(await screen.findByRole('option', { name: /File/ }))
+  fireEvent.mouseDown(await screen.findByRole('option', { name: /Upload/ }))
 }
 
 const editing = (overrides: Partial<Parameters<typeof LiveDescription>[0]> = {}) => {

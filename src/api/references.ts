@@ -138,6 +138,22 @@ export function referenceSections(scope: MessageScope, query: string, nameOf?: (
 }
 
 /**
+ * What `[` offers in a description: files only, as a Leaf page's does — this
+ * Folder's first (an issue's project's issues), then the ones you read lately,
+ * then what the relay finds by title.
+ */
+export function fileSections(query: string): ReferenceSection[] {
+  const ranked = rankReferences({
+    messages: [],
+    files: [...folderFiles, ...recentFiles, ...search.hits(query)],
+    query,
+    ownKinds: [KIND.PROJECT, KIND.ISSUE],
+    exclude: openFile ? [openFile] : [],
+  })
+  return [{ label: REFERENCE_COPY.files, items: ranked.files.map(itemOf) }]
+}
+
+/**
  * The chip an edit or a draft opens a message or file reference as: the
  * caption `[` gave it, from the same scope (SHI-49). One it does not know stays
  * the box's `reference` chip, drawn by Ship's own view.

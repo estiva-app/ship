@@ -104,7 +104,7 @@ export const LongSummary: Story = { args: { summary: LONG_SUMMARY } }
 /** Nothing written yet: "Untitled issue", a quiet "Add a summary" and "Add a description…", muted, over empty editors. */
 export const Empty: Story = { args: { title: '', summary: '', description: '', issue: true } }
 
-/** A reader who cannot write, or an archived file: text, the summary not editable, and no editor is downloaded. */
+/** A reader who cannot write, or an archived file: the shared editor read only, its links drawn as a writer's are, and the summary not editable. */
 export const ReadOnly: Story = { args: { readOnly: true } }
 
 /** A reader, and no summary: nothing at all where it would be — no "Add a summary". */

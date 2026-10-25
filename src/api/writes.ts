@@ -1,5 +1,6 @@
 import type { Embed, Imeta, NostrTag, PartPointer, PublishResult } from '@estiva-app/protocol'
 import { addrToNaddr, partsOf } from '@estiva-app/protocol'
+import { MAX_MENTIONED_PEOPLE } from '@estiva-app/conversation'
 import type { Conversation, Issue, Project } from '../nostr/fold'
 import { clashes, explicitKey, keyOfRef, nextRef, projectKeys, suggestKey, takenKeys } from '../nostr/keys'
 import { RELAY_URL } from '../config'
@@ -76,6 +77,23 @@ async function publish(action: () => Promise<PublishResult>): Promise<WriteResul
 export function setMembership(target: { kind: 'issue'; issue: Issue } | { kind: 'project'; project: Project }, person: string, member: boolean): Promise<WriteResult> {
   const [file, folder] = target.kind === 'issue' ? [target.issue.addr, target.issue.folder] : [target.project.addr, target.project.contentFolder]
   return publish(() => store.setMembership({ folder, file, person, member }))
+}
+
+/**
+ * Add the people a description save names anew, as the Add button does (SPEC
+ * §11.8): one Add each, never for yourself, at most `MAX_MENTIONED_PEOPLE`.
+ * Answers the ones the relay refused, for the next save that still names them.
+ * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-mention-in-a-files-text-adds-the-person-with-no-unread.md
+ */
+export async function addMentioned(target: { kind: 'issue'; issue: Issue } | { kind: 'project'; project: Project }, people: readonly string[], me: string | undefined): Promise<string[]> {
+  const added = people.filter((person) => person !== me).slice(0, MAX_MENTIONED_PEOPLE)
+  const answers = await Promise.all(added.map((person) => setMembership(target, person, true)))
+  return added.filter((_, i) => {
+    const answer = answers[i]
+    if (answer.ok) return false
+    console.warn('[relay] mention add refused', answer.reason)
+    return true
+  })
 }
 
 /**
