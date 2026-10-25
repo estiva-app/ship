@@ -485,7 +485,8 @@ async function main() {
     w.__opened = ''
     w.open = (url: string) => ((w.__opened = url), null)
   })
-  await editor.locator('[data-href]').first().click()
+  // The shared editor's bare link (WBD-7), which Ship's own decoration marked `data-href` before it.
+  await editor.locator('[data-bare-link]').first().click()
   check(
     'a link in the description opens on a click',
     (await page.evaluate(() => (window as unknown as { __opened: string }).__opened)) === 'https://example.com/notes',
