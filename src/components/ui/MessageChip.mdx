@@ -1,0 +1,33 @@
+import { Meta } from '@storybook/addon-docs/blocks'
+
+<Meta title="Primitives/MessageChip/Usage" />
+
+# MessageChip
+
+A link to a file or a message in a sentence: the package's chip, filled with
+what Ship reads about that file, or a person's chip for an `npub`.
+
+**Seen in** no story: a chip draws a file read from the relay, which the stories' fake relay does not answer; `MessageText` and `LiveHeader` draw it in tests.
+
+## When
+
+- A reference in a sent message's text (`MessageText`).
+- A link in a sentence of an issue's or a project's description (`DescriptionLink`, WBD-7).
+
+## When not
+
+- A line that is only a link → **MessageRow**.
+- The card its writer chose → **MessageCard**.
+
+## How
+
+```tsx
+import { MessageChip } from '@/components/ui/MessageLinks'
+
+<MessageChip uri={uri} object={resolved[uri]} nameOf={nameOf} preview={!editing} opensAt={href} />
+```
+
+## What it owns
+
+- **The hover card**, off with `preview={false}`: in a list of previews, and in a description being edited, where a click is the chip menu's.
+- **Where it opens**: the URL it was written as, so a link to one block opens there (WBM-11).

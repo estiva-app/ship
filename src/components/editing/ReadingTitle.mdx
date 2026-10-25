@@ -1,0 +1,31 @@
+import { Meta } from '@storybook/addon-docs/blocks'
+
+<Meta title="Pages/ReadingTitle/Usage" />
+
+# ReadingTitle
+
+A project's or an issue's title as text, where the title editor would stand.
+
+**Seen in** [Pages/Title and description › Read only](?path=/story/pages-title-and-description--read-only).
+
+## When
+
+- A reader who cannot write, or an archived file (`HeaderEditing`, read only).
+- The reading surface shown while the editors' chunk loads (`LiveHeader`).
+
+## When not
+
+- Someone who can write → the title editor in `HeaderEditing`.
+
+## How
+
+```tsx
+import { ReadingTitle } from './ReadingTitle'
+
+<ReadingTitle title={title} placeholder="Untitled issue" />
+```
+
+## What it owns
+
+- **The placeholder**, muted, when there is no title.
+- **No Archived chip**: the Archived notice above it says so in words (Katerina, 30 September).
