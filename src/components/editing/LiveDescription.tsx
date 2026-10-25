@@ -105,12 +105,13 @@ export function LiveDescription({
 }) {
   // The description has gone from the page: a refusal now is the page's to say.
   const left = useRef(false)
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    // Set again on mount: StrictMode mounts twice, and the first unmount must not count as leaving.
+    left.current = false
+    return () => {
       left.current = true
-    },
-    [],
-  )
+    }
+  }, [])
   // Your last save, so the text the next one is edited from is read in the format it was written in.
   const lastSave = useRef<FileText | null>(null)
   // The people a save named whom the relay would not add: the next save that still names them tries again.

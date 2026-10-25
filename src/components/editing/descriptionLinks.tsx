@@ -1,12 +1,13 @@
 import { createContext, useContext, useEffect, useRef, type ReactNode } from 'react'
 import { useEditorState, type Editor } from '@tiptap/react'
-import { urlRunsIn, type Imeta, type RenderBlock } from '@estiva-app/protocol'
+import { urlRunsIn, type RenderBlock } from '@estiva-app/protocol'
 import type { AttachmentViewProps, ReferenceViewProps } from '@estiva-app/ui/editor'
 import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
 import { byReference, useForeignObjects } from '@/api/useForeignObjects'
 import { Attachment } from '@/components/ui/Attachment'
 import { MessageCard, MessageChip, MessageRow } from '@/components/ui/MessageLinks'
 import { Reference } from '@/components/ui/Reference'
+import { imetaFromAttrs } from '@/nostr/attachments'
 
 type Resolved = Record<string, ForeignObjectData | null | undefined>
 
@@ -121,5 +122,8 @@ function DescriptionCard({ uri, object, href, editing }: { uri: string; object: 
  */
 export function DescriptionFile({ attrs }: AttachmentViewProps) {
   const { readOnly } = useContext(Links)
-  return <Attachment file={attrs as unknown as Imeta} opens={readOnly} />
+  // The attributes are whoever saved last's: a block the protocol will not name as a file is not drawn as one (§13.3).
+  const file = imetaFromAttrs(attrs)
+  if (!file) return <span>{typeof attrs.filename === 'string' ? attrs.filename : 'attachment'}</span>
+  return <Attachment file={file} opens={readOnly} />
 }

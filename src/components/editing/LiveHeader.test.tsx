@@ -149,6 +149,23 @@ describe('LiveHeader draws its description (from Description.test.tsx)', () => {
     })
   }
 
+  // A reader's files open (WBD-7), so a block the protocol will not name as a file (§13.3: no hash here) is its name, not a file to open.
+  it('draws, for a reader, a file block missing a required field as its name, and a whole one as the file', async () => {
+    const file = { url: 'https://blossom.example/whole.pdf', m: 'application/pdf', x: 'a'.repeat(64), size: 1200, filename: 'whole.pdf' }
+    const doc = JSON.stringify({
+      type: 'doc',
+      content: [
+        { type: 'attachment', id: 'a1', attrs: { url: 'https://elsewhere.example/notes.pdf', m: 'application/pdf', size: 1200, filename: 'notes.pdf' } },
+        { type: 'attachment', id: 'a2', attrs: file },
+      ],
+    })
+    const box = await readEditor(doc, 'blocks')
+    await waitFor(() => expect(box.textContent).toContain('whole.pdf'))
+    expect(box.textContent).toContain('notes.pdf')
+    expect(screen.getByRole('button', { name: 'Download whole.pdf' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Download notes.pdf' })).toBeNull()
+  })
+
   // Changed on purpose: no click opens the editor — a writer has it from the start.
   it('gives the writer an editor that still holds the pointer, drawn as what it points at', async () => {
     /*
