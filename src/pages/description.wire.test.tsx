@@ -58,7 +58,7 @@ vi.mock('@/api/foreign', async (importOriginal) => ({
   readFolderListing: vi.fn(() => Promise.resolve([])),
 }))
 
-import { useDirectory, useWorkspace } from '@/api'
+import { me, useDirectory, useWorkspace } from '@/api'
 import App from '@/App'
 
 /** The workspace with the issue's and the project's description as `text`, saved last by `by`. */
@@ -215,6 +215,14 @@ describe('a mention in a description adds the person, as the Add button does (WB
       expect(addsOf(KATERINA)).toHaveLength(1)
     })
   }
+
+  it('names you beside someone else: their Add is written, and none for you', async () => {
+    const { box } = await openDescription(`/issue/invoice-totals-${D_ISSUE}`)
+    insertInto(box, [{ type: 'text', text: ' Ask ' }, { type: 'reference', attrs: { uri: KATERINA_URI } }, { type: 'text', text: ' and ' }, { type: 'reference', attrs: { uri: `nostr:${encodeNpub(me)}` } }])
+    leave(box)
+    await waitFor(() => expect(addsOf(KATERINA)).toHaveLength(1))
+    expect(addsOf(me)).toHaveLength(0)
+  })
 })
 
 describe('a link on words in a description (WBD-7)', () => {
