@@ -6,16 +6,19 @@ import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
 import { LiveDescription } from './LiveDescription'
 import { LiveSummary } from './LiveSummary'
 import { ReadingSummary } from './ReadingSummary'
+import { ReadingTitle } from './ReadingTitle'
 import type { LiveHeaderProps } from './LiveHeader'
 
 /**
  * The title, the summary and the description as editors — `LiveHeader`'s
- * writing half, in its own chunk so a reader never loads it. Each is edited
- * where it stands, as in a document, and Enter goes on down the page: the
- * title to the summary, the summary to the start of the description (Linear's
- * behaviour, from the title to the description).
+ * editor half, in its own chunk. Each is edited where it stands, as in a
+ * document, and Enter goes on down the page: the title to the summary, the
+ * summary to the start of the description (Linear's behaviour, from the title
+ * to the description). A reader who cannot write gets the title and summary as
+ * text and the description in the same editor, only read, so its links draw as
+ * a writer's do (WBD-7).
  */
-export default function HeaderEditing({ title, titlePlaceholder, onRename, summary, onSummarize, description, format, onDescribe, descriptionBy, nameOf, upload, resolved, onCommentOnBlock, onCopyBlockLink, holdKey }: LiveHeaderProps & { resolved: Record<string, ForeignObjectData | null | undefined> }) {
+export default function HeaderEditing({ title, titlePlaceholder, onRename, summary, onSummarize, description, format, onDescribe, onMention, descriptionBy, nameOf, upload, resolved, onCommentOnBlock, onCopyBlockLink, holdKey, readOnly = false }: LiveHeaderProps & { resolved: Record<string, ForeignObjectData | null | undefined> }) {
   const [body, setBody] = useState<Editor | null>(null)
   const summaryEditor = useRef<InlineTextHandle>(null)
   const toDescription = () => {
@@ -32,6 +35,12 @@ export default function HeaderEditing({ title, titlePlaceholder, onRename, summa
     // 16px between title and description (Katerina, 29 September: "a bit more" than the 8px pages had), and the
     // summary 4px under the title, between them (the short-summary prototype's ShipFilePage).
     <div className="flex flex-col gap-4">
+      {readOnly ? (
+        <div className="flex flex-col gap-1">
+          <ReadingTitle title={title} placeholder={titlePlaceholder} />
+          <ReadingSummary value={summary ?? ''} />
+        </div>
+      ) : (
       <div className="flex flex-col gap-1">
         {/* The title: no box (Katerina, 29 September, findings E1 and E2), now the package's. */}
         <InlineText
@@ -44,7 +53,10 @@ export default function HeaderEditing({ title, titlePlaceholder, onRename, summa
         />
         {onSummarize ? <LiveSummary ref={summaryEditor} value={summary ?? ''} onCommit={onSummarize} onEnter={toDescription} /> : <ReadingSummary value={summary ?? ''} />}
       </div>
-      <LiveDescription value={description} format={format} onCommit={onDescribe} changedBy={descriptionBy} nameOf={nameOf} resolved={resolved} onEditor={setBody} upload={upload} onCommentOnBlock={onCommentOnBlock} onCopyBlockLink={onCopyBlockLink} holdKey={holdKey} />
+      )}
+      {readOnly && description.trim() === '' ? null : (
+        <LiveDescription value={description} format={format} onCommit={onDescribe} onMention={onMention} changedBy={descriptionBy} nameOf={nameOf} resolved={resolved} onEditor={setBody} upload={upload} onCommentOnBlock={onCommentOnBlock} onCopyBlockLink={onCopyBlockLink} holdKey={holdKey} readOnly={readOnly} />
+      )}
     </div>
   )
 }

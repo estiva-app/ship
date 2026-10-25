@@ -5,7 +5,7 @@ import { useCallback, useMemo, useState } from 'react'
 import { ArchiveDialog } from '@/components/ArchiveDialog'
 import { ArchivedNotice } from '@/components/ArchivedNotice'
 import { archivedLine, lockedReason, ownArchive, type Archives } from '@/lib/archive'
-import { ISSUE_STATUSES, lookupStatus, archiveIssue, commentsOn, deleteIssue, deleteMessage, editMessage, react, reply, setIssueField, unreact, startConversation, type DirectoryView, type FolderState, type WorkspaceState, threadContext, fileContext, useMergedReadState, useFeedJudges, unreadByThread } from '@/api'
+import { ISSUE_STATUSES, lookupStatus, addMentioned, archiveIssue, commentsOn, deleteIssue, deleteMessage, editMessage, react, reply, setIssueField, unreact, startConversation, type DirectoryView, type FolderState, type WorkspaceState, threadContext, fileContext, useMergedReadState, useFeedJudges, unreadByThread } from '@/api'
 import { me } from '@/api'
 import { MEMBER_FIELD_PREFIX, memberOfField } from '@estiva-app/conversation'
 import { useRelated } from '@/api/useRelated'
@@ -244,6 +244,8 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
         onDescribe={(value, contentFormat, left) =>
           act('Description', () => setIssueField(issue, 'description', value, 'Description', contentFormat), sayOnceLeft(say, issue.title || 'Untitled issue', left), () => refresh([issue.folder]))
         }
+        // Whoever a save names anew is added to the issue, as the Add button does (WBD-7).
+        onMention={(people) => addMentioned({ kind: 'issue', issue }, people, me)}
         // The profile's name only: with none the line says "Someone", as Leaf's does, never a shortened key.
         descriptionBy={issue.fields.description && issue.fields.description.by !== me ? (directory.profileOf(issue.fields.description.by)?.name ?? null) : null}
         related={related}

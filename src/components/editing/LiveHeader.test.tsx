@@ -92,6 +92,12 @@ const write = async (description: string, format: Format = 'marker') => {
 /** The description's area on the reading surface: the block under the title row. */
 const readDescription = (c: HTMLElement) => c.querySelector('[data-description="reading"]') as HTMLElement
 
+/* A reader once the editor has arrived: the same shared editor, only read (WBD-7). `findBy` for the lazy chunk, as `write`. */
+const readEditor = async (description: string, format: Format = 'marker') => {
+  render(header(description, format, true))
+  return screen.findByRole('textbox', { name: 'Description' }, { timeout: 5000 })
+}
+
 describe('LiveHeader draws its description (from Description.test.tsx)', () => {
   /*
     RIC-9 asserted that no `naddr1` appeared in the prose at all, because every
@@ -121,38 +127,27 @@ describe('LiveHeader draws its description (from Description.test.tsx)', () => {
     expect(c.textContent).not.toContain(NADDR.slice(6))
   })
 
-  it('draws the card a writer chose after the line that holds its chip, and none for a chip with none', async () => {
-    vi.mocked(resolveForeign).mockImplementation(async () => ISSUE)
-    const doc = JSON.stringify({
-      type: 'doc',
-      content: [
-        { type: 'paragraph', id: 'p1', content: [{ type: 'text', text: 'Blocked by ' }, { type: 'text', text: NADDR, marks: [{ type: 'reference', attrs: { uri: NADDR, embed: 'detailed' } }] }] },
-        { type: 'paragraph', id: 'p2', content: [{ type: 'text', text: 'after' }] },
-        { type: 'paragraph', id: 'p3', content: [{ type: 'text', text: NADDR, marks: [{ type: 'reference', attrs: { uri: NADDR } }] }] },
-      ],
+  // Changed on purpose (WBD-7, the documents rule of SPEC §13.3): a card is drawn in the row's place of a link alone on
+  // its line whose writer chose Card, and a lone link with none is its row — for a reader as for a writer.
+  for (const [who, show] of [['a reader', readEditor], ['a writer', write]] as const) {
+    it(`draws, for ${who}, the card a writer chose in its lone link's place, and the row of a lone link with none`, async () => {
+      vi.mocked(resolveForeign).mockImplementation(async () => ISSUE)
+      const doc = JSON.stringify({
+        type: 'doc',
+        content: [
+          { type: 'paragraph', id: 'p1', content: [{ type: 'text', text: NADDR, marks: [{ type: 'reference', attrs: { uri: NADDR, embed: 'detailed' } }] }] },
+          { type: 'paragraph', id: 'p2', content: [{ type: 'text', text: 'after' }] },
+          { type: 'paragraph', id: 'p3', content: [{ type: 'text', text: NADDR, marks: [{ type: 'reference', attrs: { uri: NADDR } }] }] },
+        ],
+      })
+      const box = await show(doc, 'blocks')
+      await waitFor(() => expect(box.querySelector('[data-block-id="p1"] [data-card="detailed"]')).not.toBeNull())
+      expect(box.querySelector('[data-block-id="p1"] [data-card]')?.textContent).toContain('The probe issue')
+      await waitFor(() => expect(box.querySelector('[data-block-id="p3"] [data-link-row]')?.textContent).toContain('The probe issue'))
+      expect(box.querySelectorAll('[data-card]')).toHaveLength(1)
+      vi.mocked(resolveForeign).mockImplementation(async () => null)
     })
-    const c = read(doc, 'blocks')
-    await waitFor(() => expect(c.querySelectorAll('[data-card]')).toHaveLength(1))
-    const card = c.querySelector('[data-card]')!
-    expect(card.getAttribute('data-card')).toBe('detailed')
-    // After the first paragraph, before the second: under its line, not under the description.
-    const first = c.querySelector('[data-block-id="p1"]')!
-    const second = c.querySelector('[data-block-id="p2"]')!
-    expect(first.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(card.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    vi.mocked(resolveForeign).mockImplementation(async () => null)
-  })
-
-  it('draws the chosen card in the editor too, after its line', async () => {
-    vi.mocked(resolveForeign).mockImplementation(async () => ISSUE)
-    const doc = JSON.stringify({
-      type: 'doc',
-      content: [{ type: 'paragraph', id: 'p1', content: [{ type: 'text', text: NADDR, marks: [{ type: 'reference', attrs: { uri: NADDR, embed: 'compact' } }] }] }],
-    })
-    const editor = await write(doc, 'blocks')
-    await waitFor(() => expect(editor.querySelector('[data-reference-cards] [data-card]')?.getAttribute('data-card')).toBe('compact'))
-    vi.mocked(resolveForeign).mockImplementation(async () => null)
-  })
+  }
 
   // Changed on purpose: no click opens the editor — a writer has it from the start.
   it('gives the writer an editor that still holds the pointer, drawn as what it points at', async () => {
@@ -170,8 +165,8 @@ describe('LiveHeader draws its description (from Description.test.tsx)', () => {
     const editor = await write(`See ${NADDR} for the detail.`)
     expect(editor.textContent).toContain('See')
     expect(editor.textContent).toContain('for the detail.')
-    // A node view is a React portal, so it lands a tick after the editor does.
-    await waitFor(() => expect(editor.querySelector('[data-reference]')).not.toBeNull())
+    // A node view is a React portal, so it lands a tick after the editor does; the kit's chip, unavailable here.
+    await waitFor(() => expect(editor.querySelector('[data-node-view-wrapper]')?.textContent).toContain('not available'))
     // Not the 200-character pointer, which is what a textarea showed.
     expect(editor.textContent!.length).toBeLessThan(NADDR.length)
   })
@@ -181,18 +176,18 @@ describe('LiveHeader draws its description (from Description.test.tsx)', () => {
     expect(document.body.textContent).toContain('Add a description…')
   })
 
-  it('offers no edit affordance to a reader who cannot write', async () => {
-    const c = read('text')
-    // No focusable surface either: a reader who cannot write gets no way in (D37).
-    expect(c.querySelector('[tabindex="0"]')).toBeNull()
-    expect(c.querySelector('[contenteditable]')).toBeNull()
-    // And clicking the prose does nothing: the affordance is the only way in,
-    // so removing it has to remove the capability rather than only the button.
-    fireEvent.click(screen.getByText('text'))
-    // Given the time the editor's chunk takes to arrive, so an absent editor is the answer and not the moment before it.
-    await new Promise((r) => setTimeout(r, 300))
-    expect(screen.queryByRole('textbox', { name: 'Description' })).toBeNull()
+  // Changed on purpose (WBD-7): a reader's description is the shared editor, only read, so its links draw as a
+  // writer's do. What holds is that nothing can be written: no editable surface, no title field, and a save is never made.
+  it('lets a reader who cannot write type nothing and save nothing', async () => {
+    const onDescribe = vi.fn(() => true)
+    render(<LiveHeader title="Relay Migration" titlePlaceholder="Untitled" onRename={vi.fn(() => true)} description="text" format="marker" onDescribe={onDescribe} readOnly />)
+    const box = await screen.findByRole('textbox', { name: 'Description' }, { timeout: 5000 })
+    expect(box.getAttribute('contenteditable')).toBe('false')
+    expect(document.querySelector('[contenteditable="true"]')).toBeNull()
     expect(screen.queryByRole('textbox', { name: 'Title' })).toBeNull()
+    fireEvent.click(screen.getByText('text'))
+    fireEvent.blur(box)
+    expect(onDescribe).not.toHaveBeenCalled()
   })
 })
 
@@ -206,7 +201,7 @@ describe('LiveHeader draws its description (from Description.test.tsx)', () => {
  * was only visible by opening the page.
  */
 describe.each([
-  ['a reader', async (description: string, format?: Format) => readDescription(read(description, format))],
+  ['a reader', readEditor],
   ['a writer', write],
 ] as const)('LiveHeader draws its description for %s (from ProjectHeader.test.tsx)', (_who, show) => {
   it('renders structure as elements', async () => {
@@ -247,7 +242,7 @@ describe.each([
     const c = await show(`Tracked in ${NADDR} for now.`)
     expect(c.textContent).toContain('Tracked in')
     expect(c.textContent).toContain('for now.')
-    await waitFor(() => expect(c.querySelector('[data-reference]')).not.toBeNull())
+    await waitFor(() => expect(c.querySelector('[data-node-view-wrapper]')?.textContent).toContain('not available'))
   })
 })
 

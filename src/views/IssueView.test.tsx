@@ -108,7 +108,8 @@ describe('ProjectView, archived (SHI-36)', () => {
   it('draws the description without an editor and offers no Add issue, leaving Unarchive and Delete', () => {
     render(projectView('overview', { lockedReason: 'Unarchive to edit', onAddIssue: undefined }))
     expect(screen.getByText(/Move every Folder to the new relay/)).toBeInTheDocument()
-    expect(screen.queryByRole('textbox', { name: 'Description' })).toBeNull()
+    // Changed on purpose (WBD-7): the description is the shared editor, only read, so nothing in it can be written.
+    expect(document.querySelector('[contenteditable="true"]')).toBeNull()
     expect(screen.queryByRole('button', { name: 'Add issue' })).toBeNull()
     for (const name of ['Unarchive project', 'Delete project']) expect(screen.getByRole('button', { name }).getAttribute('aria-disabled')).toBe(null)
   })

@@ -23,6 +23,7 @@ import {
 
   unreact,
   assignMissingRefs,
+  addMentioned,
   setProjectField,
   startConversation,
   workFolder,
@@ -597,6 +598,8 @@ export function ProjectPage({
           onSummarize: (value) => actInField('Summary', () => setProjectField(project, 'summary', value, 'Summary'), refresh),
           onDescribe: (value, contentFormat, left) =>
             act('Description', () => setProjectField(project, 'description', value, 'Description', contentFormat), sayOnceLeft(say, project.title || 'Untitled project', left), refresh),
+          // Whoever a save names anew is added to the project, as the Add button does (WBD-7).
+          onMention: (people) => addMentioned({ kind: 'project', project }, people, me),
           // The profile's name only: with none the line says "Someone", as Leaf's does, never a shortened key.
           descriptionBy: project.fields.description && project.fields.description.by !== me ? (directory.profileOf(project.fields.description.by)?.name ?? null) : null,
         }}

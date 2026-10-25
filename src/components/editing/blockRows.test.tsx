@@ -58,6 +58,8 @@ describe('a reader who cannot edit', () => {
     const onComment = vi.fn()
     render(<LiveHeader title="T" titlePlaceholder="Untitled" onRename={() => true} description={DESCRIPTION} format="blocks" onDescribe={() => true} readOnly onCommentOnBlock={onComment} />)
     const user = userEvent.setup()
+    // A reader's description is the shared editor, only read (WBD-7): its block handle, once the editor has arrived.
+    await screen.findByRole('textbox', { name: 'Description' }, { timeout: 5000 })
     // jsdom lays nothing out: every top is 0, so the pointer is on the last block.
     await user.hover(screen.getByText('second part'))
     const handle = screen.getByRole('button', { name: 'Block menu' })

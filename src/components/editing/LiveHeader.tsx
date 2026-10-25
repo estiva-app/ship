@@ -6,16 +6,18 @@ import { useLinkValues } from '@/api/linkCards'
 import { referenceOfValue } from '@/components/conversations/shared'
 import { blockRows, linkedBlock } from './blockRows'
 import { ReadingSummary } from './ReadingSummary'
-import { blockLineCards, linksInBlocks } from './DescriptionCards'
+import { linksInBlocks } from './descriptionLinks'
+import { ReadingTitle } from './ReadingTitle'
 import { ShipRichText } from '@/components/ui/ShipRichText'
 import { byReference, useForeignObjects } from '@/api/useForeignObjects'
 import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
 
 /*
   The editors are their own chunk, as `DescriptionEditing` was: ProseMirror and
-  the schema are about 128 kB gzipped against an app that was 125 kB in all, and
-  a reader must never download them. A writer gets them in the background; until
-  they land the page shows the reading surface, which is the same pixels.
+  the schema are about 128 kB gzipped, so the page's first paint never waits for
+  them. Since WBD-7 a reader gets them too, in the background: the description
+  is read in the same shared editor it is written in. Until they land the page
+  shows the reading surface.
 */
 const HeaderEditing = lazy(() => import('./HeaderEditing'))
 
@@ -31,6 +33,8 @@ export interface LiveHeaderProps {
   format: ContentFormat
   /** The body, and the format tag the editor built it in — RIC-14. */
   onDescribe: (value: string, contentFormat?: string, left?: () => boolean) => Promise<boolean> | boolean
+  /** Add the people a description save names anew to the file, as the Add button does; answers who could not be added. */
+  onMention?: (people: readonly string[]) => Promise<readonly string[]>
   /** Who saved the description last, by name, when it was not you: the "<name> saved a newer version" line (LTX-3). */
   descriptionBy?: string | null
   nameOf?: (pubkey: string) => string
@@ -118,10 +122,10 @@ function useLinkedBlock(description: string, format: ContentFormat, readOnly: bo
  * write in the same place. Enter in the title moves you into the description;
  * each saves when you leave it.
  *
- * A pointer is its chip wherever it was written, alone on its line too, and a
- * card is drawn after its line only where the writer chose one (SPEC §13.3,
- * Widgets): the editor's slots, or `blockLineCards` when only read. A reader
- * who cannot write gets text and no editor.
+ * The description is the shared document editor, for a reader who cannot
+ * write too, only read (WBD-7): a link in a sentence is its chip, alone on its
+ * line its row, and its card in the row's place where the writer chose one
+ * (SPEC §13.3).
  */
 export function LiveHeader(props: LiveHeaderProps) {
   const { description, format, nameOf, readOnly = false } = props
@@ -152,21 +156,16 @@ export function LiveHeader(props: LiveHeaderProps) {
           {missing === 'detached' ? 'That part of the description was removed.' : 'That link is to a part of the description, which is no longer written in parts.'}
         </Banner>
       )}
-      {readOnly ? (
-        reading
-      ) : (
-        <Suspense fallback={reading}>
-          <HeaderEditing {...props} resolved={resolved} />
-        </Suspense>
-      )}
+      <Suspense fallback={reading}>
+        <HeaderEditing {...props} resolved={resolved} />
+      </Suspense>
     </div>
   )
 }
 
 /**
- * The same page as text: for a reader who cannot write, and for a writer in
- * the moment before the editor arrives. Laid out exactly as the editors are,
- * so nothing moves when they replace it.
+ * The same page as text, in the moment before the editors arrive. Laid out as
+ * the editors are; a link alone on its line is its chip here until then.
  */
 function ReadingHeader({ title, titlePlaceholder, summary, onSummarize, description, format, nameOf, readOnly, resolved, resolveLink, onCommentOnBlock, onCopyBlockLink }: LiveHeaderProps & { resolved: Record<string, ForeignObjectData | null | undefined>; resolveLink: LinkResolver }) {
   const empty = description.trim() === ''
@@ -174,8 +173,7 @@ function ReadingHeader({ title, titlePlaceholder, summary, onSummarize, descript
     <div className="flex flex-col gap-4">
       {/* The title and the summary under it, 4px apart; the description 16px below (the short-summary prototype's ShipFilePage). */}
       <div className="flex flex-col gap-1">
-        {/* No "Archived" chip beside the title: the Archived notice above it says so in words (Katerina, 30 September). */}
-        <h1 className={title ? '-mx-2 px-2 py-1 text-h2 text-text-primary' : '-mx-2 px-2 py-1 text-h2 text-text-muted'}>{title || titlePlaceholder}</h1>
+        <ReadingTitle title={title} placeholder={titlePlaceholder} />
         {/* For a writer this is the moment before the editors arrive: the summary waits, unclickable, so nothing typed is
             lost when HeaderEditing replaces this header. */}
         <ReadingSummary value={summary ?? ''} waiting={!readOnly && !!onSummarize} />
@@ -186,7 +184,7 @@ function ReadingHeader({ title, titlePlaceholder, summary, onSummarize, descript
         ) : (
           // A reader gets the handle too, with Copy link and Comment (Miky, RIC-18 kickoff); the editing rows need the editor.
           <BlockHandle actions={blockRows(onCommentOnBlock, onCopyBlockLink)}>
-            <ShipRichText value={description} format={format} nameOf={nameOf} resolved={resolved} resolveLink={resolveLink} renderAfter={(block) => blockLineCards(block, resolved)} />
+            <ShipRichText value={description} format={format} nameOf={nameOf} resolved={resolved} resolveLink={resolveLink} />
           </BlockHandle>
         )}
       </div>
