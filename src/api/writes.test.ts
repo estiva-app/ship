@@ -242,6 +242,28 @@ describe('the card a comment sent from Ship carries (WBM-7, SPEC §13.6.2)', () 
     await editMessage('issue-folder', 'm1', see(LINKED), { before: 'no link', here: ISSUE.addr }, [file])
     expect(s.editMessage).toHaveBeenLastCalledWith(expect.objectContaining({ body: see(LINKED), files: [file] }))
   })
+
+  /* An edit is the whole new message (SPEC §6.8): one with no files takes them all off, so every edit lists the files it keeps. */
+  const kept = { url: `/media/${'b'.repeat(64)}.png`, m: 'image/png', x: 'b'.repeat(64), size: 40, dim: '800x600', filename: 'shot.png' }
+
+  it('an edit of the words only still lists the files the message has', async () => {
+    s.editMessage.mockResolvedValue({ ok: true })
+    await editMessage('issue-folder', 'm1', 'reworded', { before: 'worded', here: ISSUE.addr, files: [kept] })
+    expect(s.editMessage).toHaveBeenLastCalledWith(expect.objectContaining({ body: 'reworded', files: [kept] }))
+  })
+
+  it('✕ on a sent card still lists the files the message has', async () => {
+    s.editMessage.mockResolvedValue({ ok: true })
+    await editMessage('issue-folder', 'm1', 'drawn', { before: see(LINKED), embeds: [{ value: LINKED, layout: 'detailed' }], here: ISSUE.addr, remove: LINKED, files: [kept] })
+    expect(s.editMessage).toHaveBeenLastCalledWith(expect.objectContaining({ embeds: [{ value: LINKED, layout: 'none' }], files: [kept] }))
+  })
+
+  it('files changed in the box replace the ones the message had', async () => {
+    s.editMessage.mockResolvedValue({ ok: true })
+    const added = { url: `/media/${'c'.repeat(64)}.pdf`, m: 'application/pdf', x: 'c'.repeat(64), size: 9, filename: 'new.pdf' }
+    await editMessage('issue-folder', 'm1', 'worded', { before: 'worded', here: ISSUE.addr, files: [kept] }, [kept, added])
+    expect(s.editMessage).toHaveBeenLastCalledWith(expect.objectContaining({ files: [kept, added] }))
+  })
 })
 
 describe('creating a project', () => {

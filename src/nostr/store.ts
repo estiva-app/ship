@@ -647,7 +647,11 @@ export class Store {
     body: string
     /** The message's whole `embed` set after the edit, when it changes it (SPEC §13.6.2); omitted, the set stays. */
     embeds?: readonly Embed[]
-    /** The message's whole file set after the edit, when it changes it (§6.8, CON-5); omitted, the set stays. */
+    /**
+     * The message's whole file set after the edit (§6.8): every file it keeps,
+     * changed or not, since an edit is the whole new message. The callers list
+     * it on every edit; omitted, the edit carries no `imeta`.
+     */
     files?: readonly Imeta[]
   }): Promise<PublishResult> {
     assertFolderId(args.folder)
