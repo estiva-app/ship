@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { archiveFolder, me, renameFolder } from '@/api'
-import { folderArchiveImpact, readFolder, type FolderContents, type FolderSummary } from '@/api/foreign'
+import { folderArchiveImpact, loadQuery, readFolder, type FolderContents, type FolderSummary } from '@/api/foreign'
 import { ArchiveDialog } from '@/components/ArchiveDialog'
 import { ArchivedNotice } from '@/components/ArchivedNotice'
 import { reloadFolders } from '@/api/useFolders'
@@ -68,7 +68,9 @@ export function FolderPage({ id, folders, nameOf = (pubkey) => `${pubkey.slice(0
       }
       // The channel's name is the title and its only home (SPEC §3.2), so there is nothing to read first.
       return act('Rename', () => renameFolder({ id: contents.id }, name), say, async () => {
-        const [next] = await Promise.allSettled([readFolder(contents.id), reloadFolders()])
+        // One load for the read-back: the Folder and the listing ask for each change once between them (APP-2).
+        const read = loadQuery()
+        const [next] = await Promise.allSettled([readFolder(contents.id, read), reloadFolders(read)])
         if (next.status === 'fulfilled') {
           if (next.value.id === shown.current) setContents(next.value)
         } else {
@@ -90,7 +92,8 @@ export function FolderPage({ id, folders, nameOf = (pubkey) => `${pubkey.slice(0
   const isFolderAdmin = !!contents?.admins?.includes(me)
   const canArchive = !!contents?.channel && isFolderAdmin
   const reread = useCallback(async () => {
-    const [next] = await Promise.allSettled([readFolder(id), reloadFolders()])
+    const read = loadQuery()
+    const [next] = await Promise.allSettled([readFolder(id, read), reloadFolders(read)])
     if (next.status === 'fulfilled' && next.value.id === shown.current) setContents(next.value)
   }, [id])
   const askToArchive = useCallback(async () => {
