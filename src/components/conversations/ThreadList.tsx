@@ -13,7 +13,7 @@ import { BlockAnchorNote } from '@/components/ui/BlockAnchorNote'
 import { MessagePart } from '@/components/ui/MessageLinks'
 import { ConfirmDeleteMessage, NewSinceHere, useThreadReactions, useThreadReferences, type ConversationsProps, type MessageData, type ThreadData } from '@/components/ConversationThread'
 import type { ActivityProps } from '@/components/Activity'
-import { PLACE_ICON, RELATION, Time, type Answer, type MentionListViewProps, type Picks, type ThreadListViewProps } from './shared'
+import { PLACE_ICON, RELATION, sameFiles, Time, type Answer, type MentionListViewProps, type Picks, type ThreadListViewProps } from './shared'
 import { MessageText } from './MessageText'
 import { messageScope, referenceCaptions, referenceSections } from '@/api/references'
 import { PartCard } from '@/components/ui/PartCard'
@@ -78,7 +78,8 @@ interface MessageProps {
   onToggleReaction?: (emoji: string, mine?: string) => Promise<Answer>
   onDelete?: () => Promise<boolean | void> | boolean | void
   /** Publish an edit; with `removeCard`, ✕ on that file's sent card, the text left as it is. */
-  onEdit?: (body: string, removeCard?: string) => Promise<Answer>
+  /** Save an edit; `files` only when it changed them — the whole set after it. */
+  onEdit?: (body: string, removeCard?: string, files?: readonly Imeta[]) => Promise<Answer>
   /** What `[` offers in its edit box, and the captions its references open with. */
   references?: (query: string) => ReturnType<typeof referenceSections>
   captions?: ReturnType<typeof referenceCaptions>
@@ -165,14 +166,15 @@ function Message({ message, resolved, here, nameOf, viewer, reactions, onToggleR
       {editing && onEdit ? (
         <Box
           kind="edit"
-          editing={{ body: message.body, urgent: message.urgent, holdKey: editHold, onCancel: () => setEditing(false) }}
+          editing={{ body: message.body, urgent: message.urgent, files: message.files, holdKey: editHold, onCancel: () => setEditing(false) }}
           references={references}
           captions={captions}
           resolved={resolved}
           nameOf={nameOf}
           here={here}
           drafts={drafts}
-          onSend={(body) => onEdit(body)}
+          // The files only when the edit changed them: an edit with no `imeta` leaves the message's as they are.
+          onSend={(body, files) => (sameFiles(files, message.files ?? []) ? onEdit(body) : onEdit(body, undefined, files))}
         />
       ) : (
         <>
@@ -257,7 +259,7 @@ interface ThreadProps {
   reactionsBy?: Record<string, readonly Reaction[]>
   onReact?: (messageId: string, emoji: string, mine?: string) => Promise<Answer>
   onDeleteMessage?: (messageId: string) => Promise<boolean | void> | boolean | void
-  onEditMessage?: (messageId: string, body: string, removeCard?: string) => Promise<Answer>
+  onEditMessage?: (messageId: string, body: string, removeCard?: string, files?: readonly Imeta[]) => Promise<Answer>
   upload?: (file: File) => Promise<Imeta>
   drafts?: DraftStore
   viewer?: string
@@ -304,7 +306,7 @@ function Thread({ thread, pageThreads, onReply, disabledReason, unread, stillUnr
       reactions: reactionsBy?.[message.id],
       onToggleReaction: writable && onReact ? (emoji: string, mine?: string) => onReact(message.id, emoji, mine) : undefined,
       onDelete: offered && onDeleteMessage ? () => onDeleteMessage(message.id) : undefined,
-      onEdit: offered && onEditMessage ? (...edit: [body: string, removeCard?: string]) => onEditMessage(message.id, ...edit) : undefined,
+      onEdit: offered && onEditMessage ? (...edit: [body: string, removeCard?: string, files?: readonly Imeta[]]) => onEditMessage(message.id, ...edit) : undefined,
     }
   }
 

@@ -27,7 +27,7 @@ import {
   projectAddr,
   type CommentRef,
 } from './events'
-import { findNaddrs, naddrToAddr, buildReaction, buildEdit, buildDeletion as buildEventDeletion } from '@estiva-app/protocol'
+import { findNaddrs, naddrToAddr, buildReaction, buildEdit, buildDeletion as buildEventDeletion, imetaTag } from '@estiva-app/protocol'
 import { planArchiveFolder, planCreateFolder, planDeleteFolder, planMoveFromFolders, planPlaceFile, planRenameFolder, planUnlistFile, type FolderRef, type MovableFile, type MoveRefusal } from '@estiva-app/interop'
 import { foldFolder, type FolderState } from './fold'
 import { buildMembershipChange, decorationsOf, foldAttachments, foldEdits, foldEmbeds, URGENT_TAG, type Decorations, type EditFold, type QueryFn } from '@estiva-app/conversation'
@@ -647,6 +647,8 @@ export class Store {
     body: string
     /** The message's whole `embed` set after the edit, when it changes it (SPEC §13.6.2); omitted, the set stays. */
     embeds?: readonly Embed[]
+    /** The message's whole file set after the edit, when it changes it (§6.8, CON-5); omitted, the set stays. */
+    files?: readonly Imeta[]
   }): Promise<PublishResult> {
     assertFolderId(args.folder)
     return this.publish(
@@ -655,6 +657,7 @@ export class Store {
         targetEventId: args.messageEventId,
         body: args.body,
         embeds: args.embeds,
+        mediaTags: args.files?.map(imetaTag),
       }),
     )
   }

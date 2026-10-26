@@ -234,6 +234,14 @@ describe('the card a comment sent from Ship carries (WBM-7, SPEC §13.6.2)', () 
     await editMessage('issue-folder', 'm1', `${see(LINKED)}, edited`, { before: see(LINKED), embeds: [{ value: LINKED, layout: 'none' }], here: ISSUE.addr })
     expect(s.editMessage).toHaveBeenLastCalledWith(expect.objectContaining({ embeds: undefined }))
   })
+
+  // The store signs these into the 40003's `imeta` (scripts/attachments.test.ts); here, that the card path hands them on.
+  it('an edit naming a link keeps the files the box saved with it (PEEKM-4)', async () => {
+    s.editMessage.mockResolvedValue({ ok: true })
+    const file = { url: `/media/${'a'.repeat(64)}.pdf`, m: 'application/pdf', x: 'a'.repeat(64), size: 900, filename: 'brief.pdf' }
+    await editMessage('issue-folder', 'm1', see(LINKED), { before: 'no link', here: ISSUE.addr }, [file])
+    expect(s.editMessage).toHaveBeenLastCalledWith(expect.objectContaining({ body: see(LINKED), files: [file] }))
+  })
 })
 
 describe('creating a project', () => {

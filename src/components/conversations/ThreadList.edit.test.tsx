@@ -15,7 +15,12 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { Editor } from '@tiptap/react'
-import { encodeNevent, encodeNpub } from '@estiva-app/protocol'
+import { encodeNevent, encodeNpub, type Imeta } from '@estiva-app/protocol'
+
+// The edit box uploads through Ship's own upload, which needs a relay; a test answers for it.
+vi.mock('@/api/blobs', async (original) => ({ ...(await original<typeof import('@/api/blobs')>()), uploadAttachment: vi.fn() }))
+
+import { uploadAttachment } from '@/api/blobs'
 import { ThreadListView } from './ThreadList'
 import type { ThreadData } from '@/components/ConversationThread'
 import type { ThreadListViewProps } from './shared'
@@ -192,6 +197,54 @@ describe('the edit control', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(onEditMessage).not.toHaveBeenCalled()
     expect(screen.queryByRole('textbox', { name: 'Edit message' })).toBeNull()
+  })
+})
+
+/*
+  A file added or taken off while editing (Miky, 26 Oct, PEEKM-4): the save
+  writes the whole set, so the box offers it. The write itself — a 40003 with
+  the set as `imeta` — is `scripts/attachments.test.ts`.
+*/
+describe('the files of a message being edited', () => {
+  const SHA = 'a'.repeat(64)
+  const NEW = 'c'.repeat(64)
+  const kept: Imeta = { url: `/media/${SHA}.pdf`, m: 'application/pdf', x: SHA, size: 900, filename: 'brief.pdf' }
+  const added: Imeta = { url: `/media/${NEW}.txt`, m: 'text/plain', x: NEW, size: 1, filename: 'notes.txt' }
+  const withFile: ThreadData = { ...thread, root: { ...thread.root, files: [kept] } }
+  // The edit box's own picker (what `/` → Upload opens), not the writing box's under the list.
+  const picker = () =>
+    [...document.querySelectorAll('input[type="file"]')].find((input) => input.parentElement?.querySelector('[aria-label="Edit message"]')) as HTMLInputElement
+
+  it('shows the message’s own, and saves one added with them, the whole set', async () => {
+    vi.mocked(uploadAttachment).mockResolvedValue(added)
+    const onEditMessage = vi.fn(async (): Promise<true | string> => true)
+    open({ threads: [withFile], onEditMessage })
+    await openEditor()
+    expect(screen.getByText('brief.pdf')).toBeTruthy()
+    await act(async () => void fireEvent.change(picker(), { target: { files: [new File(['x'], 'notes.txt', { type: 'text/plain' })] } }))
+    await screen.findByText('notes.txt')
+    await waitFor(() => expect(save().disabled).toBe(false))
+    fireEvent.click(save())
+    await waitFor(() => expect(onEditMessage).toHaveBeenCalledWith('root-1', 'Blocked on the Stripe key.', undefined, [kept, added]))
+  })
+
+  it('leaves the files out of an edit that did not touch them', async () => {
+    const onEditMessage = vi.fn(async (): Promise<true | string> => true)
+    open({ threads: [withFile], onEditMessage })
+    const box = await openEditor()
+    replace(box, 'Key is in 1Password.')
+    fireEvent.click(save())
+    await waitFor(() => expect(onEditMessage).toHaveBeenCalledWith('root-1', 'Key is in 1Password.'))
+  })
+
+  it('will not take the last one off, and says so under the box', async () => {
+    const onEditMessage = vi.fn(async (): Promise<true | string> => true)
+    open({ threads: [withFile], onEditMessage })
+    await openEditor()
+    fireEvent.click(screen.getByRole('button', { name: /Remove brief\.pdf/ }))
+    fireEvent.click(save())
+    expect(await screen.findByText(/the last file cannot be taken off a message yet/)).toBeTruthy()
+    expect(onEditMessage).not.toHaveBeenCalled()
   })
 })
 

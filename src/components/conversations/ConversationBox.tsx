@@ -16,7 +16,7 @@ import { useMentionPeople } from '@/components/editing/mentionables'
 import { MessageCard, MessagePart } from '@/components/ui/MessageLinks'
 import { PartCard } from '@/components/ui/PartCard'
 import { Reference } from '@/components/ui/Reference'
-import { referenceOfValue, type Answer, type Picks } from './shared'
+import { referenceOfValue, sameFiles, type Answer, type Picks } from './shared'
 
 /**
  * Ship's comment box: estiva-ui's `CommentBox`, the one box every app writes a
@@ -102,8 +102,8 @@ export interface ConversationBoxProps {
   /** Why nothing can be written here: the line in the box's place. */
   closed?: string
   autoFocus?: boolean
-  /** Editing a sent message: its text and urgent tags, where its unsaved words are held through a sign-in ending (AUT-4), and how to stop. */
-  editing?: { body: string; urgent?: readonly string[]; holdKey?: string; onCancel: () => void }
+  /** Editing a sent message: its text, urgent tags and files, where its unsaved words are held through a sign-in ending (AUT-4), and how to stop. */
+  editing?: { body: string; urgent?: readonly string[]; files?: readonly Imeta[]; holdKey?: string; onCancel: () => void }
   className?: string
 }
 
@@ -161,11 +161,14 @@ export function ConversationBox({ kind, onSend, references, captions, nameOf, re
     // An edit makes nobody urgent (CON-24), and keeps the message's cards by its own rule (`cardEditOf`).
     // An edit with no words is refused here (Delete removes a message), and an unchanged one closes with nothing published.
     if (editing && !text) return { accepted: false, reason: 'a message needs words; Delete removes it' }
-    const unchanged = editing && text === editing.body.trim()
+    // A file can be added or taken off while editing (Miky, 26 Oct, PEEKM-4): the whole set rides the edit as `imeta`.
+    // An edit with no `imeta` leaves the set as it was, so no edit can take the last one off.
+    if (editing && attached.length === 0 && (editing.files?.length ?? 0) > 0) return { accepted: false, reason: 'the last file cannot be taken off a message yet' }
+    const unchanged = editing && text === editing.body.trim() && sameFiles(attached, editing.files ?? [])
     const answer = unchanged
       ? true
       : editing
-        ? await onSend(withoutNewUrgency(text, editing.body), [], {})
+        ? await onSend(withoutNewUrgency(text, editing.body), attached, {})
         : await onSend(text, attached, { urgent, embeds: embedsToSend({ card: shown.card }, new Set()) })
     // The box writes the sentence round the reason ("Not sent: … . Your text is back in the box."), so the reason's own full stop goes.
     if (answer !== true) return { accepted: false, reason: answer.replace(/\.+$/, '') }
@@ -177,14 +180,21 @@ export function ConversationBox({ kind, onSend, references, captions, nameOf, re
   }
 
   const chipContext = useMemo(() => ({ resolved, nameOf }), [resolved, nameOf])
+  // The message's own files show in the edit box, and can be taken off; more can be added, since the save writes them.
+  const [editFiles] = useState<BoxFile[] | undefined>(() =>
+    // Named as a sent message names it (`Attachment`).
+    editing?.files?.map((file, i) => ({ id: `kept-${i}`, name: file.filename ?? file.alt ?? 'file', size: file.size, contentType: file.m, state: 'ready', value: file })),
+  )
   const edit = editing && opened
     ? {
         body: opened,
+        files: editFiles,
+        writesFiles: true,
         onCancel: () => {
           if (holdKey) releaseHeld(holdKey)
           editing.onCancel()
         },
-        onSave: (body: JSONContent) => send(body),
+        onSave: (body: JSONContent, files: BoxFile[]) => send(body, files),
       }
     : undefined
 
