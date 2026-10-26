@@ -638,6 +638,8 @@ export function editMessage(folder: string, messageEventId: string, body: string
   // Files left as they were still ride the edit: an edit is the whole new message, and one with none takes them off.
   // why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/an-edit-is-the-whole-new-message.md
   const files = changedFiles ?? card?.files
+  // With the message not in hand its files are unknown, and an edit listing none would take them off.
+  if (!card && !changedFiles) return Promise.resolve(refused('The message could not be read, so the edit was not sent. Try again.'))
   return publish(async () => {
     if (!card) return store.editMessage({ folder, messageEventId, body, files })
     if (card.remove) {

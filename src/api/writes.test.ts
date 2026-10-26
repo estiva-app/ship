@@ -258,6 +258,12 @@ describe('the card a comment sent from Ship carries (WBM-7, SPEC §13.6.2)', () 
     expect(s.editMessage).toHaveBeenLastCalledWith(expect.objectContaining({ embeds: [{ value: LINKED, layout: 'none' }], files: [kept] }))
   })
 
+  it('an edit of a message not in hand is refused, since an edit listing no files would take them off', async () => {
+    s.editMessage.mockClear()
+    expect(await editMessage('issue-folder', 'm1', 'reworded')).toMatchObject({ ok: false, reason: expect.stringContaining('could not be read') })
+    expect(s.editMessage).not.toHaveBeenCalled()
+  })
+
   it('files changed in the box replace the ones the message had', async () => {
     s.editMessage.mockResolvedValue({ ok: true })
     const added = { url: `/media/${'c'.repeat(64)}.pdf`, m: 'application/pdf', x: 'c'.repeat(64), size: 9, filename: 'new.pdf' }
