@@ -15,7 +15,7 @@ vi.mock('./store', () => ({
   },
 }))
 vi.mock('./clock', () => ({ clockProblem: vi.fn() }))
-vi.mock('./foreign', () => ({ readFolders: vi.fn(), readFolderListing: vi.fn() }))
+vi.mock('./foreign', () => ({ readFolders: vi.fn(), readFolderListing: vi.fn(), loadQuery: () => async () => [] }))
 
 import { clockProblem } from './clock'
 import { readFolderListing, readFolders } from './foreign'
@@ -272,7 +272,7 @@ describe('moving a project', () => {
     s.moveProject.mockResolvedValue({ added: { ok: true }, removed: [{ folder: FROM.id, result: { ok: true } }] })
     expect(await moveProject(PROJECT, [FROM], TO)).toEqual({ ok: true })
     // The source's listing, read at the move (SPEC §3.3); the planner puts the project in it when its card did not resolve.
-    expect(readFolderListing).toHaveBeenCalledWith(FROM.id)
+    expect(readFolderListing).toHaveBeenCalledWith(FROM.id, expect.any(Function))
     expect(s.moveProject).toHaveBeenCalledWith({
       project: PROJECT.addr,
       from: [FROM],

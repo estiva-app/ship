@@ -2,6 +2,7 @@ import { useEffect, useSyncExternalStore } from 'react'
 import { createRetryingRead } from '@estiva-app/platform'
 import { readFolders } from './foreign'
 import type { FolderSummary } from './foreign'
+import type { QueryFn } from '@estiva-app/interop'
 
 /**
  * The Folders a person navigates by — the teams (SHI-25): the ones with state
@@ -47,16 +48,23 @@ const listing = createRetryingRead<FolderSummary[]>({ retryable })
 /**
  * Read the Folders again, now — after a write that changed what one lists, a
  * project moved (FOL-7). The held listing stays on screen until the answer
- * lands, and a failure keeps it, as a first read's would.
+ * lands, and a failure keeps it, as a first read's would. `read` is the load
+ * a Folder's own read-back shares, so the two ask for each change once (APP-2).
  */
-export function reloadFolders(): Promise<void> {
-  return listing.reload(readFolders)
+export function reloadFolders(read?: QueryFn): Promise<void> {
+  // Only the first attempt: a retry seconds later is another load and reads afresh.
+  let shared = read
+  return listing.reload(() => {
+    const load = shared
+    shared = undefined
+    return readFolders(load)
+  })
 }
 
 export function useFolders(): FolderSummary[] | undefined {
   const snapshot = useSyncExternalStore(listing.subscribe, listing.snapshot)
   useEffect(() => {
-    void listing.ensure(readFolders)
+    void listing.ensure(() => readFolders())
   }, [])
   if (snapshot.value) return snapshot.value
   return snapshot.error !== undefined && !snapshot.retrying ? [] : undefined

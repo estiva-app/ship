@@ -10,7 +10,7 @@ const query = vi.fn()
 vi.mock('./store', () => ({ relay: { query: (filters: unknown[]) => query(filters) } }))
 
 import { encodeNevent } from '@estiva-app/protocol'
-import { isEventReference, resolveForeign } from './foreign'
+import { isEventReference, loadQuery, readFolder, readFolders, resolveForeign } from './foreign'
 
 const AUTHOR = 'a'.repeat(64)
 const KIND = 30850
@@ -234,6 +234,55 @@ describe('resolveForeign — a Folder, as its chip and as its card (SPEC §3.2)'
       const card = await resolveForeign(FOLDER_ADDRESS, { folderFiles: true })
       expect(card?.slots.title?.value).toBe('Estiva HQ')
       expect(card?.children?.map((file) => file.slots.title?.value)).toEqual(['A second project', 'A project'])
+    } finally {
+      world.splice(world.length - folder.length, folder.length)
+    }
+  })
+})
+
+describe('readFolder and readFolders — one load asks for each change once (APP-2)', () => {
+  const RELAY = 'c'.repeat(64)
+  const FOLDER = '5d1f3c2a-7e4b-4c1d-9a2e-3b6f8c0d1e2f'
+  const SECOND = `${KIND}:${AUTHOR}:p2`
+  const folder = [
+    event({ kind: 39000, pubkey: RELAY, tags: [['d', FOLDER], ['name', 'Team']] }),
+    event({ kind: 30890, pubkey: RELAY, tags: [['d', FOLDER], ['a', ADDRESS], ['a', SECOND]] }),
+    event({ kind: KIND, tags: [['d', 'p2'], ['title', 'A second project'], ['h', FOLDER]] }),
+    // A saved description on each: the changes a listing and a Folder's contents both read.
+    event({ kind: 1851, tags: [['a', ADDRESS], ['field', 'description'], ['value', 'Text'], ['h', FOLDER]] }),
+    event({ kind: 1851, tags: [['a', SECOND], ['field', 'description'], ['value', 'Text'], ['h', FOLDER]] }),
+  ]
+
+  /** How many times the relay was asked for each file's changes. */
+  const changeAsks = () => {
+    const counts = new Map<string, number>()
+    for (const [filters] of query.mock.calls as [Record<string, unknown>[]][])
+      for (const filter of filters)
+        if ((filter.kinds as number[] | undefined)?.includes(1851))
+          for (const value of (filter['#a'] as string[] | undefined) ?? []) counts.set(value, (counts.get(value) ?? 0) + 1)
+    return counts
+  }
+
+  it('asks once between the listing and the Folder read in the same load, and lists the same files', async () => {
+    world.push(...folder)
+    try {
+      const read = loadQuery()
+      const [contents, listing] = await Promise.all([readFolder(FOLDER, read), readFolders(read)])
+      expect(contents.files.map((file) => file.address)).toEqual([ADDRESS, SECOND])
+      expect(listing.find((f) => f.id === FOLDER)?.addresses).toEqual([ADDRESS, SECOND])
+      expect(changeAsks().get(ADDRESS)).toBe(1)
+      expect(changeAsks().get(SECOND)).toBe(1)
+    } finally {
+      world.splice(world.length - folder.length, folder.length)
+    }
+  })
+
+  it('asks again in the next load, so a change made since is read', async () => {
+    world.push(...folder)
+    try {
+      await readFolder(FOLDER)
+      await readFolder(FOLDER)
+      expect(changeAsks().get(ADDRESS)).toBe(2)
     } finally {
       world.splice(world.length - folder.length, folder.length)
     }

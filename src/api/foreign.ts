@@ -20,6 +20,7 @@ import {
   resolveActingManifest,
   conversationCountsOf,
   archiveImpact,
+  createLoadQuery,
   createPeopleCache,
   createProjectionCache,
   listFolders,
@@ -33,6 +34,7 @@ import {
   type FolderContents,
   type FolderSummary,
   type ForeignObject,
+  type QueryFn,
 } from '@estiva-app/interop'
 
 /** Chain-walking, from the runtime — one implementation, not one per consumer. */
@@ -53,6 +55,17 @@ export type { ForeignObject, ResolvedSlot, FolderContents, FolderSummary } from 
  */
 const query = (filters: Record<string, unknown>[]): Promise<SignedEvent[]> =>
   relay.query(filters as never)
+
+/**
+ * One load of Folder reads (APP-2): a Folder listing and the Folders' contents
+ * read through the same one ask the relay for each file's changes once between
+ * them, and join a read already in flight. Make one per load — an action's
+ * read-back, a move's listings — and drop it, so the next load reads afresh.
+ * Never held at module scope: it never sees a change made after its read.
+ */
+export function loadQuery(): QueryFn {
+  return createLoadQuery(query)
+}
 
 /**
  * Resolve a `nostr:naddr…` (or a bare `kind:pubkey:d`) to a foreign object.
@@ -234,8 +247,8 @@ export async function applyCardAction(args: { reference: string; actionId: strin
  * this one read (`lib/ownKinds.ts`), and a Folder holding something neither app
  * has heard of still arrives through the widget chain like everything else.
  */
-export function readFolder(id: string): Promise<FolderContents> {
-  return resolveFolderContents(id, query, profiles.viaRelay(query), manifests)
+export function readFolder(id: string, read: QueryFn = loadQuery()): Promise<FolderContents> {
+  return resolveFolderContents(id, read, profiles.viaRelay(query), manifests)
 }
 
 /**
@@ -244,8 +257,8 @@ export function readFolder(id: string): Promise<FolderContents> {
  * Archived files included: a topic archived under a project, or every file
  * under an archived project, moves with it (SHI-37).
  */
-export async function readFolderListing(id: string): Promise<FolderContents['files']> {
-  return (await resolveFolderContents(id, query, async () => ({}), manifests, { includeArchived: true })).files
+export async function readFolderListing(id: string, read: QueryFn = loadQuery()): Promise<FolderContents['files']> {
+  return (await resolveFolderContents(id, read, async () => ({}), manifests, { includeArchived: true })).files
 }
 
 /**
@@ -329,8 +342,8 @@ export async function readRelated(folder: string, address: string): Promise<Rela
 }
 
 /** Every Folder this identity can see, for the sidebar. */
-export function readFolders(): Promise<FolderSummary[]> {
-  return listFolders(query)
+export function readFolders(read: QueryFn = loadQuery()): Promise<FolderSummary[]> {
+  return listFolders(read)
 }
 
 /**
@@ -341,7 +354,7 @@ export function readFolders(): Promise<FolderSummary[]> {
  * saves reading it again and names where a file stays visible.
  */
 export async function folderArchiveImpact(channel: string, folders?: FolderSummary[]): Promise<{ hides: string[]; staysVisible: string[] }> {
-  const impact = await archiveImpact(channel, query, { folders, cache: manifests })
+  const impact = await archiveImpact(channel, loadQuery(), { folders, cache: manifests })
   const hides = impact.hides.map(({ kind, count }) => countOf(kind, count))
   const byFolder = new Map<string, number>()
   for (const file of impact.staysVisible) {

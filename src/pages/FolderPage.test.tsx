@@ -32,6 +32,7 @@ const readFolder = vi.fn()
 vi.mock('@/api/foreign', async () => ({
   pickWidget: (await vi.importActual<typeof import('@estiva-app/interop')>('@estiva-app/interop')).pickWidget,
   readFolder: (id: string) => readFolder(id),
+  loadQuery: () => async () => [],
 }))
 
 const file = (over: Partial<Record<string, unknown>> = {}) => ({

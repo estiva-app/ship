@@ -5,7 +5,7 @@ import type { Conversation, Issue, Project } from '../nostr/fold'
 import { clashes, explicitKey, keyOfRef, nextRef, projectKeys, suggestKey, takenKeys } from '../nostr/keys'
 import { RELAY_URL } from '../config'
 import { clockProblem } from './clock'
-import { readFolderListing, readFolders } from './foreign'
+import { loadQuery, readFolderListing, readFolders } from './foreign'
 import { knownLinkValue, linkReferenceTagsFor } from './linkCards'
 import { partTagsFor, urlsIn } from './part'
 import { linkResolverFor } from '../lib/linksNamingCards'
@@ -234,7 +234,9 @@ export async function moveProject(
     // What each source lists beneath the project moves with it (SPEC §3.3): one read per source, at the moment of the move.
     // Unread, a move would leave what is under the project behind, so nothing is sent.
     const sources = from.filter((folder) => folder.id !== to.id && folder.hasState)
-    const read = await Promise.all(sources.map((folder) => readFolderListing(folder.id).catch(() => null)))
+    // One load across the sources: a file listed in two of them has its changes asked for once (APP-2).
+    const load = loadQuery()
+    const read = await Promise.all(sources.map((folder) => readFolderListing(folder.id, load).catch(() => null)))
     if (read.some((files) => files === null)) return refused('the Folder it is in could not be read, so nothing was moved. Try again')
     const listings = new Map(sources.map((folder, i) => [folder.id, read[i]!] as const))
     const { refused: unsafe, added, removed } = await store.moveProject({ project: project.addr, from, to, listings })
