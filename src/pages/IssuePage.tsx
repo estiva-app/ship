@@ -324,12 +324,12 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
           author or the NIP-OA owner of an authoring agent, and no client can
           evaluate the second half — same reasoning as the deletion above.
         */
-        onEditMessage={(messageId, body, removeCard) => {
+        onEditMessage={(messageId, body, removeCard, files) => {
           const folder = folderOfMessage(state, messageId)
           if (!folder) {
             return Promise.resolve('That message has no Folder to publish an edit into.')
           }
-          return actInField(removeCard ? 'Remove card' : 'Edit', () => editMessage(folder, messageId, body, cardEditOf(state, messageId, removeCard)), () => refresh([folder]))
+          return actInField(removeCard ? 'Remove card' : 'Edit', () => editMessage(folder, messageId, body, cardEditOf(state, messageId, removeCard), files), () => refresh([folder]))
         }}
         onReplyInActivity={(threadId, body, files, picks) => {
           const conversation = state.conversations.find((c) => c.id === threadId)

@@ -634,9 +634,9 @@ export function deleteMessage(messageEventId: string): Promise<WriteResult> {
  * target's effective author or the NIP-OA owner of an authoring agent, and no
  * client can evaluate the second half. Same reasoning as `deleteMessage`.
  */
-export function editMessage(folder: string, messageEventId: string, body: string, card?: CardEdit): Promise<WriteResult> {
+export function editMessage(folder: string, messageEventId: string, body: string, card?: CardEdit, files?: readonly Imeta[]): Promise<WriteResult> {
   return publish(async () => {
-    if (!card) return store.editMessage({ folder, messageEventId, body })
+    if (!card) return store.editMessage({ folder, messageEventId, body, files })
     if (card.remove) {
       // ✕ on a sent card: the text as it was, byte for byte, so the message is not marked edited (§7.2.1).
       return store.editMessage({ folder, messageEventId, body: card.before, embeds: withoutCard(card.embeds, card.remove) })
@@ -646,7 +646,8 @@ export function editMessage(folder: string, messageEventId: string, body: string
     const [after, before] = [linkResolverFor(body, knownLinkValue), linkResolverFor(card.before, knownLinkValue)]
     const resolveLink = (url: string) => after(url) ?? before(url)
     const embeds = embedsToEdit(card.before, body, card.embeds, { resolveLink, parts: card.parts, here: card.here })
-    return store.editMessage({ folder, messageEventId, body, embeds })
+    // The files ride the same edit as the text and the cards, so neither can race the other.
+    return store.editMessage({ folder, messageEventId, body, embeds, files })
   })
 }
 

@@ -6,11 +6,13 @@
  * skips a malformed tag rather than half-reading it, which is what keeps a
  * missing `size` from rendering as a zero-byte file.
  */
-import type { SignedEvent } from '@estiva-app/protocol'
+import type { Relay, SignedEvent, UnsignedEvent } from '@estiva-app/protocol'
 import { imetaTag } from '@estiva-app/protocol'
 import { foldAttachments } from '@estiva-app/conversation'
 import { attachmentsInDocument } from '../src/nostr/attachments'
 import { KIND } from '../src/nostr/kinds'
+import { Store } from '../src/nostr/store'
+import type { Signer } from '../src/nostr/signer'
 
 let passed = 0
 const check = (label: string, ok: boolean) => {
@@ -210,4 +212,26 @@ const FULL = { url: `/media/${SHA}.png`, m: 'image/png', x: SHA, size: 4096 }
   check('  …nor an empty value', attachmentsInDocument('', BLOCKS).length === 0)
   check('unparseable JSON is answered with nothing, not a throw', attachmentsInDocument('{oops', BLOCKS).length === 0)
 }
+// ── An edit's files, as Ship signs them (PEEKM-4) ──────────────────────────────
+//
+// A file added or taken off while editing rides the edit as the whole `imeta`
+// set, which the fold above reads; an edit that left the files alone carries
+// none, so the set stays.
+{
+  const sent: UnsignedEvent[] = []
+  const relay = { publish: async (event: SignedEvent) => (sent.push(event), { ok: true }) } as unknown as Relay
+  const signer = { pubkey: 'ab'.repeat(32), sign: async (unsigned: UnsignedEvent) => ({ ...unsigned, id: 'x', sig: 'y' }) } as unknown as Signer
+  const store = new Store(relay, signer)
+  const FOLDER = '11111111-1111-4111-8111-111111111111'
+  const imetas = (event: UnsignedEvent) => event.tags.filter((t) => t[0] === 'imeta')
+
+  await store.editMessage({ folder: FOLDER, messageEventId: 'd'.repeat(64), body: 'with two files', files: [meta, metaOf(OTHER)] })
+  check('an edit that changed the files is a kind:40003 carrying the whole set as imeta', sent[0].kind === 40003 && imetas(sent[0]).length === 2)
+  check('  …each tag naming its blob', imetas(sent[0]).map((t) => t.find((part) => part.startsWith('x '))).join() === `x ${SHA},x ${OTHER}`)
+  check('  …and the result folds to that set', foldAttachments([{ ...sent[0], id: 'f'.repeat(64), created_at: 2 } as SignedEvent])['d'.repeat(64)]?.length === 2)
+
+  await store.editMessage({ folder: FOLDER, messageEventId: 'd'.repeat(64), body: 'words only' })
+  check('an edit that left the files alone carries no imeta', sent[1].kind === 40003 && imetas(sent[1]).length === 0)
+}
+
 console.log(`\n${passed} checks passed.\n`)

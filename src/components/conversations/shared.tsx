@@ -91,6 +91,9 @@ export interface Picks {
  */
 export type Answer = true | string
 
+/** Whether an edit left a message's files as they were: the same blobs, in the same order. */
+export const sameFiles = (a: readonly Imeta[], b: readonly Imeta[]) => a.length === b.length && a.every((file, i) => file.x === b[i].x)
+
 /**
  * How a conversation elsewhere is related, in words for a screen reader —
  * "Mentioned in" is SPEC §6.4's phrase. A mention stays quieter than a
