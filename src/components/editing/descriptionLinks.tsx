@@ -1,13 +1,12 @@
 import { createContext, useContext, useEffect, useRef, type ReactNode } from 'react'
 import { useEditorState, type Editor } from '@tiptap/react'
-import { urlRunsIn, type RenderBlock } from '@estiva-app/protocol'
+import { imetaFromAttrs, urlRunsIn, type RenderBlock } from '@estiva-app/protocol'
 import type { AttachmentViewProps, ReferenceViewProps } from '@estiva-app/ui/editor'
 import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
 import { byReference, useForeignObjects } from '@/api/useForeignObjects'
 import { Attachment } from '@/components/ui/Attachment'
 import { MessageCard, MessageChip, MessageRow } from '@/components/ui/MessageLinks'
 import { Reference } from '@/components/ui/Reference'
-import { imetaFromAttrs } from '@/nostr/attachments'
 
 type Resolved = Record<string, ForeignObjectData | null | undefined>
 

@@ -205,8 +205,8 @@ export function folderOfMessage(state: FolderState, messageId: string): string |
 /**
  * What an edit of one message needs to keep its cards right (SPEC §13.6.2): its
  * whole text as it stands, its own reference included (the drawn body leaves
- * that out), its folded cards and parts, and the file its conversation is on.
- * With `remove`, the edit is ✕ on that file's card.
+ * that out), its folded cards, parts and files, and the file its conversation
+ * is on. With `remove`, the edit is ✕ on that file's card.
  */
 export function cardEditOf(state: WorkspaceState, messageId: string, remove?: string): CardEdit | undefined {
   for (const conversation of state.conversations) {
@@ -218,6 +218,7 @@ export function cardEditOf(state: WorkspaceState, messageId: string, remove?: st
         parts: state.parts[messageId],
         here: message.anchor ?? conversation.root.anchor ?? conversation.about[0],
         remove,
+        files: state.attachments[messageId.toLowerCase()],
       }
     }
   }

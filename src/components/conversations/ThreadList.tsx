@@ -13,7 +13,7 @@ import { BlockAnchorNote } from '@/components/ui/BlockAnchorNote'
 import { MessagePart } from '@/components/ui/MessageLinks'
 import { ConfirmDeleteMessage, NewSinceHere, useThreadReactions, useThreadReferences, type ConversationsProps, type MessageData, type ThreadData } from '@/components/ConversationThread'
 import type { ActivityProps } from '@/components/Activity'
-import { PLACE_ICON, RELATION, sameFiles, Time, type Answer, type MentionListViewProps, type Picks, type ThreadListViewProps } from './shared'
+import { PLACE_ICON, RELATION, Time, type Answer, type MentionListViewProps, type Picks, type ThreadListViewProps } from './shared'
 import { MessageText } from './MessageText'
 import { messageScope, referenceCaptions, referenceSections } from '@/api/references'
 import { PartCard } from '@/components/ui/PartCard'
@@ -173,8 +173,8 @@ function Message({ message, resolved, here, nameOf, viewer, reactions, onToggleR
           nameOf={nameOf}
           here={here}
           drafts={drafts}
-          // The files only when the edit changed them: an edit with no `imeta` leaves the message's as they are.
-          onSend={(body, files) => (sameFiles(files, message.files ?? []) ? onEdit(body) : onEdit(body, undefined, files))}
+          // Every file the box still holds, changed or not: an edit is the whole new message.
+          onSend={(body, files) => onEdit(body, undefined, files)}
         />
       ) : (
         <>

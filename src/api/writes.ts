@@ -636,12 +636,17 @@ export function deleteMessage(messageEventId: string): Promise<WriteResult> {
  * target's effective author or the NIP-OA owner of an authoring agent, and no
  * client can evaluate the second half. Same reasoning as `deleteMessage`.
  */
-export function editMessage(folder: string, messageEventId: string, body: string, card?: CardEdit, files?: readonly Imeta[]): Promise<WriteResult> {
+export function editMessage(folder: string, messageEventId: string, body: string, card?: CardEdit, changedFiles?: readonly Imeta[]): Promise<WriteResult> {
+  // Files left as they were still ride the edit: an edit is the whole new message, and one with none takes them off.
+  // why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/an-edit-is-the-whole-new-message.md
+  const files = changedFiles ?? card?.files
+  // With the message not in hand its files are unknown, and an edit listing none would take them off.
+  if (!card && !changedFiles) return Promise.resolve(refused('The message could not be read, so the edit was not sent. Try again.'))
   return publish(async () => {
     if (!card) return store.editMessage({ folder, messageEventId, body, files })
     if (card.remove) {
       // ✕ on a sent card: the text as it was, byte for byte, so the message is not marked edited (§7.2.1).
-      return store.editMessage({ folder, messageEventId, body: card.before, embeds: withoutCard(card.embeds, card.remove) })
+      return store.editMessage({ folder, messageEventId, body: card.before, embeds: withoutCard(card.embeds, card.remove), files })
     }
     // Asked before the rule reads them, as at send: what the old text named and what the new one names first.
     await linkReferenceTagsFor([...urlsIn(card.before), ...urlsIn(body)])
@@ -669,4 +674,6 @@ export interface CardEdit {
   here?: string
   /** The file whose sent card ✕ removes. */
   remove?: string
+  /** Its files, folded over earlier edits: what an edit that does not change them lists again. */
+  files?: readonly Imeta[]
 }

@@ -13,7 +13,7 @@ import { foldFolder } from '../nostr/fold'
 import { anchorIndex } from '../nostr/references'
 import type { WorkspaceState } from '../nostr/store'
 import type { DirectoryView } from '@/api'
-import { ACTIVITY_HORIZON, activityFor, subFileThreads } from './ProjectPage'
+import { ACTIVITY_HORIZON, activityFor, cardEditOf, subFileThreads } from './ProjectPage'
 
 const FOLDER = 'ffffffff-0000-0000-0000-000000000000'
 const PROJECT = `30850:${'a'.repeat(64)}:the-project`
@@ -62,5 +62,15 @@ describe("a project's Activity (PEE-26)", () => {
   it('keeps every issue thread out of the stream, not only the most recent ACTIVITY_HORIZON', () => {
     const many = workspace(Array.from({ length: ACTIVITY_HORIZON + 5 }, (_, n) => onIssue(`i${n}`)))
     expect(subFileThreads(many, new Set([ISSUE])).size).toBe(ACTIVITY_HORIZON + 5)
+  })
+})
+
+describe('what an edit of one message is built from', () => {
+  // An edit is the whole new message (SPEC §6.8): an edit that leaves the files as they were still lists them.
+  it("hands on the message's files as the workspace folded them", () => {
+    const state = { ...workspace([onIssue('i1')]), embeds: {}, parts: {} }
+    const shot = { url: `/media/${'d'.repeat(64)}.png`, m: 'image/png', x: 'd'.repeat(64), size: 40, filename: 'shot.png' }
+    state.attachments = { i1: [shot] }
+    expect(cardEditOf(state, 'i1')?.files).toEqual([shot])
   })
 })
