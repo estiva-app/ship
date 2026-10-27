@@ -28,7 +28,7 @@ vi.mock(import('@/api/part'), async (importOriginal) => ({
 vi.mock(import('@/api/foreign'), async (importOriginal) => ({ ...(await importOriginal()), resolveForeign: vi.fn(async () => null) }))
 
 import { MessageText } from './MessageText'
-import { declaredManifests } from '@/api/handoff'
+import { links } from '@/api/linkCards'
 import { relay } from '@/api/store'
 
 const object = { ref: ADDRESS, address: ADDRESS, kind: 30842, appName: 'Leaf', noun: 'page', openUrl: `https://leaf.estiva.app/o/${ADDRESS}`, slots: { title: { value: 'Plan the launch' } }, meta: [], actions: [] } as never
@@ -101,7 +101,8 @@ describe('an address on another Estiva app’s host opens as written', () => {
 
   beforeEach(async () => {
     vi.spyOn(relay, 'query').mockResolvedValue([manifest('ship', 'ship.estiva.app'), manifest('leaf', 'leaf.estiva.app')] as never)
-    await declaredManifests()
+    // The link reader reads the manifests, and with them the hosts, when it is first asked about a link.
+    await links.answerOf(LEAF_ISSUE)
     answers.set(LEAF_ISSUE, ISSUE)
   })
 

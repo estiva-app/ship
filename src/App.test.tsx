@@ -92,6 +92,7 @@ const STATE: WorkspaceState = {
   parts: {},
   embeds: {},
   folders: [],
+  events: [],
 }
 
 const refresh = vi.fn().mockResolvedValue(undefined)

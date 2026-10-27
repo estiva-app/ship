@@ -62,6 +62,7 @@ const STATE = {
   parts: {},
   embeds: {},
   folders: [],
+  events: [],
 } as unknown as WorkspaceState
 
 beforeEach(() => {

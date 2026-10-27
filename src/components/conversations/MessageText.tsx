@@ -1,24 +1,16 @@
 import type { ReactNode } from 'react'
-import { findNaddrs, linksAsReferences, pointerToAddress, referenceToPointer, toRenderTree, type Embed, type PartPointer } from '@estiva-app/protocol'
+import { linksAsReferences, toRenderTree, valuesIn, type Embed, type PartPointer } from '@estiva-app/protocol'
 import { RichText } from '@estiva-app/ui'
 import type { ForeignObject } from '@/api/foreign'
 import { knownLinkValue } from '@/api/linkCards'
-import { shownParts } from '@/api/part'
+import { MAX_PARTS_PER_MESSAGE, urlNamesAddress } from '@/api/part'
+import { linksIn } from '@estiva-app/interop'
 import { MessageCard, MessageChip, MessagePart, MessageRow } from '@/components/ui/MessageLinks'
 import { PartCard } from '@/components/ui/PartCard'
 import { drawAttachment } from '@/components/ui/ShipRichText'
 import { placeLines, ROW_BLOCK, type RowLine } from '@/lib/messageLines'
 import { linkResolverFor } from '@/lib/linksNamingCards'
 import { MESSAGE_FORMAT, cardsOf, referenceOfValue } from './shared'
-
-/** The address a `nostr:` pointer names, or undefined for an event or a malformed one. */
-function addressOf(reference: string): string | undefined {
-  try {
-    return pointerToAddress(referenceToPointer(reference))
-  } catch {
-    return undefined
-  }
-}
 
 /**
  * A message's text with its links, then the cards its author chose and the
@@ -59,10 +51,15 @@ export function MessageText({
   /** ✕ on a sent card, by its file: offered on your own message only, as Edit is (Decided 19 Oct, WBM-7). */
   onRemoveCard?: (value: string) => void
 }) {
-  // A block of another object, live (SPEC §13.6.1, COM-2), while the body still names it.
-  const parts = preview ? [] : shownParts(partTags, body, new Set(findNaddrs(body).map(addressOf).filter((a): a is string => !!a)))
   // What each app link names by §7.7; a link to one block names its file, so it is that file's chip, the block live under the message (WBM-11).
   const claimed = linkResolverFor(body, knownLinkValue)
+  // A block of another object, live (SPEC §13.6.1, COM-2), while the latest words still name its file: by a `nostr:`
+  // reference, or by a link whose path ends in its `d`, as Peek draws it — answered or not, since only a message's
+  // first eight links are asked about. An edit carries no `part`, and taking the link out takes the block.
+  const tree = preview || !partTags?.length ? [] : toRenderTree(body, MESSAGE_FORMAT)
+  const named = new Set(valuesIn(tree, () => undefined))
+  const urls = linksIn(tree)
+  const parts = (partTags ?? []).filter((part) => named.has(part.address) || urls.some((url) => urlNamesAddress(url, part.address))).slice(0, MAX_PARTS_PER_MESSAGE)
   // A bare link reads as that file's link once what it names has come back and can be read; until then, and for good
   // when it cannot, it stays the URL it was written as (OPT-18).
   const resolveLink = (url: string) => {

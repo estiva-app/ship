@@ -108,29 +108,6 @@ export function commentsOn(
 }
 
 /**
- * Conversations that merely *name* the object, wherever they were written.
- *
- * The reverse half of RIC-12: not *"what does this body refer to"* but *"what
- * refers to this object"*. A thread in a Peek topic that names a Ship issue
- * belongs here, on the issue, and reaches it through the same tag data both apps
- * have been publishing for months — nothing new is written to the relay.
- *
- * **This list is what the reader can see, never what exists.** A mentioning
- * conversation in a Folder they cannot read is absent — no count, no locked row,
- * no placeholder — so two people open the same object and honestly see different
- * numbers, and neither is told. §6.4 accepts that deliberately: showing a global
- * count would leak the existence of a private discussion. A caller must not
- * present the length as authoritative.
- */
-export function mentionsOf(
-  conversations: readonly Conversation[],
-  address: string,
-  anchors: AnchorIndex,
-): Conversation[] {
-  return conversations.filter((c) => attachmentOf(c, address, anchors) === 'mention')
-}
-
-/**
  * Comments on **any** of a set of objects, each paired with the one it is about
  * — the sub-file roll-up half of Activity (CON-9).
  *

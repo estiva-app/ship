@@ -16,7 +16,7 @@
  */
 import { foldFolder } from '../src/nostr/fold'
 import { conversationsAbout } from '../src/nostr/fold'
-import { attachmentOf, commentsOn, commentsOnAny, mentionsOf, anchorIndex } from '../src/nostr/references'
+import { attachmentOf, commentsOn, commentsOnAny, anchorIndex } from '../src/nostr/references'
 import { findNaddrs, naddrToAddr } from '@estiva-app/protocol'
 import type { SignedEvent } from '@estiva-app/protocol'
 
@@ -97,10 +97,6 @@ const late = [
     '  …so it is absent from the object’s own discussion',
     commentsOn(state.conversations, POINTED_AT, anchors).length === 0,
   )
-  check(
-    '  …and present under Mentioned in',
-    mentionsOf(state.conversations, POINTED_AT, anchors).length === 1,
-  )
 }
 
 // ── Ship's own comment, which must not be demoted ───────────────────────────
@@ -113,7 +109,6 @@ const late = [
 
   check('a tagged root is the object’s own comment', attachmentOf(thread, ISSUE, anchors) === 'comment')
   check('  …and appears in the comments list', commentsOn(state.conversations, ISSUE, anchors).length === 1)
-  check('  …and not also under mentions', mentionsOf(state.conversations, ISSUE, anchors).length === 0)
 
   /*
     The reason subtraction cannot do this job. `startConversation` puts the
@@ -230,7 +225,6 @@ const late = [
   check('a 1111 root is a comment on its `A`', attachmentOf(thread, FILE, anchors) === 'comment')
   check('  …and only a mention of any other `a` it carries', attachmentOf(thread, ISSUE, anchors) === 'mention')
   check('  …so it is absent from the issue’s own discussion', commentsOn(state.conversations, ISSUE, anchors).length === 0)
-  check('  …and present under Mentioned in', mentionsOf(state.conversations, ISSUE, anchors).length === 1)
 }
 
 {

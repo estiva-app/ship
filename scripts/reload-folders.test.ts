@@ -9,7 +9,7 @@
  * it did not ask about is kept rather than lost.
  */
 import { publicKeyFromSecret, signEvent, type Relay, type SignedEvent, type UnsignedEvent } from '@estiva-app/protocol'
-import { Store, foldWorkspace } from '../src/nostr/store'
+import { Store, foldWorkspace, type WorkspaceState } from '../src/nostr/store'
 import { buildChange, buildIssue, buildProject, issueAddr, projectAddr } from '../src/nostr/events'
 import type { Signer } from '../src/nostr/signer'
 
@@ -79,10 +79,10 @@ check(
 check('the deleted issue is gone', !afterDeleteState.issues.some((issue) => issue.title === 'A two'))
 check('the other issue in A is still there', afterDeleteState.issues.some((issue) => issue.title === 'A one'))
 check("B's issue keeps its status without B being read", statusOf(afterDeleteState, 'B one') === 'done', statusOf(afterDeleteState, 'B one'))
-check(
-  'folds the same as a fresh loadAll',
-  JSON.stringify(afterDeleteState) === JSON.stringify(await store.loadAll()),
-)
+// The fold, and the same events in any order: a reload replaces one Folder's slice of them, and loadAll reads a
+// record twice (discovery, then its Folder).
+const foldOf = ({ events, ...state }: WorkspaceState) => JSON.stringify({ ...state, events: [...new Set(events.map((event) => event.id))].sort() })
+check('folds the same as a fresh loadAll', foldOf(afterDeleteState) === foldOf(await store.loadAll()))
 
 // A status change in A arrives.
 held = [...held, sign(buildChange(ME, at(), { target: issueAddr(ME, 'a1'), field: 'status', value: 'in_progress', folder: A }))]

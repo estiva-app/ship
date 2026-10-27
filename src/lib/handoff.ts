@@ -109,23 +109,6 @@ export function samePathOn(owner: Manifest, word: string, ref: string, query?: s
 }
 
 /** Only an `https:` link is followed off the page; anything else is no link. */
-/**
- * Every origin some manifest declares `urls` on — each its own `web` origin
- * (SPEC §7.7) — where a chip opens the address as written (LTX-6).
- * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-files-path-is-the-same-on-every-apps-host.md
- */
-export function declaredOriginsOf(manifests: readonly Manifest[]): string[] {
-  const origins = new Set<string>()
-  for (const { pattern } of manifests.flatMap((manifest) => urlPatternsOf(manifest))) {
-    try {
-      origins.add(new URL(pattern).origin)
-    } catch {
-      // Not a URL: it declares no host.
-    }
-  }
-  return [...origins]
-}
-
 export function safeLink(url: string | undefined): string | undefined {
   if (!url) return undefined
   try {

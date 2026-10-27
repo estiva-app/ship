@@ -28,7 +28,7 @@ import {
   type CommentRef,
 } from './events'
 import { findNaddrs, naddrToAddr, buildReaction, buildEdit, buildDeletion as buildEventDeletion, imetaTag } from '@estiva-app/protocol'
-import { planArchiveFolder, planCreateFolder, planDeleteFolder, planMoveFromFolders, planPlaceFile, planRenameFolder, planUnlistFile, type FolderRef, type MovableFile, type MoveRefusal } from '@estiva-app/interop'
+import { planArchiveFolder, planCreateFolder, planDeleteFolder, planMoveFromFolders, planPlaceFile, planRenameFolder, planUnlistFile, readMentionedIn, type FolderRef, type MovableFile, type MoveRefusal } from '@estiva-app/interop'
 import { foldFolder, type FolderState } from './fold'
 import { buildMembershipChange, decorationsOf, foldAttachments, foldEdits, foldEmbeds, URGENT_TAG, type Decorations, type EditFold, type QueryFn } from '@estiva-app/conversation'
 import { anchorIndex, type AnchorIndex } from './references'
@@ -150,6 +150,12 @@ export interface WorkspaceState extends FolderState {
    * `useLiveWorkspace`.
    */
   folders: string[]
+  /**
+   * The events this was folded from, as the relay answered them: what the
+   * shared "Mentioned in" reader (interop's `mentionedInOf`) reads, since it
+   * needs each message's edits and tags, which the fold does not keep.
+   */
+  events: readonly SignedEvent[]
 }
 
 /**
@@ -191,6 +197,7 @@ function read(events: SignedEvent[], folders: string[]): WorkspaceState {
     // and then nothing would ever subscribe to it — so it would stay empty and
     // silent, which is indistinguishable from working.
     folders: [...new Set(folders)],
+    events,
   }
 }
 
@@ -218,6 +225,14 @@ export function foldWorkspace(snapshot: WorkspaceEvents): WorkspaceState {
 function folderOfEvent(event: SignedEvent): string | undefined {
   return event.tags.find((t) => t[0] === 'h')?.[1]
 }
+
+/**
+ * Mentioned in's read across the relay (PEEKM-7) draws the threads of at most
+ * this many messages from Folders Ship does not load, the newest first, and
+ * reads one page of each thread's replies and of their edits.
+ */
+export const MAX_MENTION_THREADS = 24
+const MENTION_THREAD_PAGE = 500
 
 export class Store {
   constructor(
@@ -653,17 +668,24 @@ export class Store {
      * it on every edit; omitted, the edit carries no `imeta`.
      */
     files?: readonly Imeta[]
+    /**
+     * The `a` and `q` tags the new words earn, already resolved (`links.tagsFor`
+     * with `edit`): an edit says what the message links now (§6.8). Never a
+     * `p`, an `urgent` or a `part`.
+     * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/an-edit-says-what-the-message-links-now.md
+     */
+    linkTags?: readonly NostrTag[]
   }): Promise<PublishResult> {
     assertFolderId(args.folder)
-    return this.publish(
-      buildEdit(this.signer.pubkey, Date.now(), {
-        channelUuid: args.folder,
-        targetEventId: args.messageEventId,
-        body: args.body,
-        embeds: args.embeds,
-        mediaTags: args.files?.map(imetaTag),
-      }),
-    )
+    const edit = buildEdit(this.signer.pubkey, Date.now(), {
+      channelUuid: args.folder,
+      targetEventId: args.messageEventId,
+      body: args.body,
+      embeds: args.embeds,
+      mediaTags: args.files?.map(imetaTag),
+    })
+    const linkTags = (args.linkTags ?? []).filter((t) => t[0] === 'a' || t[0] === 'q').map((t) => [...t])
+    return this.publish({ ...edit, tags: [...edit.tags, ...linkTags] })
   }
 
   async createIssue(args: {
@@ -709,9 +731,7 @@ export class Store {
     files?: readonly Imeta[]
     /** Who the composer's urgent picks name — CON-25. */
     urgent?: readonly string[]
-    /** The block links' `part` tags, already resolved — COM-2. See `buildConversationMessage`. */
-    partTags?: readonly NostrTag[]
-    /** The body's app links' `a` and `q` tags, already resolved — OPT-19. See `buildConversationMessage`. */
+    /** The `a`, `q` and `part` tags the body earns, already resolved — PEEKM-7. See `buildConversationMessage`. */
     linkTags?: readonly NostrTag[]
     /** The card it asks for under it (SPEC §13.6.2) — `embedsToSend`. */
     embeds?: readonly Embed[]
@@ -727,7 +747,6 @@ export class Store {
         blockId: args.blockId,
         files: args.files,
         urgent: args.urgent,
-        partTags: args.partTags,
         linkTags: args.linkTags,
         embeds: args.embeds,
       }),
@@ -1101,6 +1120,63 @@ export class Store {
     return this.relay.queryAll(
       folders.map((folder) => ({ kinds: FOLDER_KINDS, '#h': [folder] })),
     )
+  }
+
+  /**
+   * Every message that may list under `address`'s Mentioned in, wherever it was
+   * written, and the thread it sits in — PEEKM-7.
+   *
+   * The workspace read holds only the Folders Ship loads, so a Peek topic
+   * message or a Leaf comment on a document that links an issue never reaches
+   * it. This is the shared reader's own read across the relay (interop's
+   * `readMentionedIn`: the candidates by `#a`, the messages their edits edit,
+   * every edit of each), and then, for a candidate in a Folder outside `known`,
+   * its thread — the root, the messages under it and their edits — so the row
+   * draws as a thread. Raw events, for a local fold beside the workspace's; the
+   * links are asked by the page's reader, so none is asked here.
+   *
+   * Bounded, since anyone who can write where the viewer reads can tag the
+   * address: the newest {@link MAX_MENTION_THREADS} threads, one page each of
+   * replies and edits. A reply counts only in its root's own Folder — an `e`
+   * naming a root from elsewhere does not put a message in that conversation.
+   *
+   * Throws when a read is refused: the caller keeps what it held.
+   */
+  async mentionThreads(address: string, known: readonly string[] = []): Promise<SignedEvent[]> {
+    const read = new Map<string, SignedEvent>()
+    const keep = (events: SignedEvent[]) => {
+      for (const event of events) read.set(event.id, event)
+      return events
+    }
+    const query: QueryFn = async (filters) => keep(await this.relay.query(filters as never))
+    await readMentionedIn(query, address, { commentKinds: [KIND.COMMENT] })
+    const loaded = new Set(known)
+    const outside = foldFolder([...read.values()], referencedAddresses)
+      .conversations.filter((conversation) => !loaded.has(conversation.root.folder))
+      .sort((a, b) => b.lastAt - a.lastAt)
+      .slice(0, MAX_MENTION_THREADS)
+    if (!outside.length) return [...read.values()]
+    const folderOf = new Map(outside.map((conversation) => [conversation.id, conversation.root.folder]))
+    const roots = [...folderOf.keys()]
+    const messages = [KIND.MESSAGE, KIND.COMMENT]
+    const answered = await this.relay.queryAll(
+      [
+        { ids: roots, kinds: messages, limit: roots.length },
+        { kinds: messages, '#e': roots, limit: MENTION_THREAD_PAGE },
+        { kinds: [KIND.COMMENT], '#E': roots, limit: MENTION_THREAD_PAGE },
+      ],
+      { maxPages: 1 },
+    )
+    const thread = keep(
+      answered.filter(
+        (event) =>
+          folderOf.has(event.id) ||
+          event.tags.some((tag) => (tag[0] === 'e' || tag[0] === 'E') && folderOf.has(tag[1]) && folderOf.get(tag[1]) === folderOfEvent(event)),
+      ),
+    )
+    const ids = [...new Set(thread.map((event) => event.id))]
+    if (ids.length) keep(await this.relay.queryAll([{ kinds: [KIND.MESSAGE_EDIT], '#e': ids, limit: MENTION_THREAD_PAGE }], { maxPages: 1 }))
+    return [...read.values()]
   }
 
   /**

@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { SignedEvent } from '@estiva-app/protocol'
-import { appNameOf, declaredOriginsOf, lookupFor, manifestOfLink, safeLink, samePathOn } from '@/lib/handoff'
-import { rememberDeclaredOrigins } from '@/lib/referenceLink'
+import { appNameOf, lookupFor, manifestOfLink, safeLink, samePathOn } from '@/lib/handoff'
 import { isOwnKind } from '@/lib/ownKinds'
 import { resolveForeign, type ForeignObject } from './foreign'
 import { relay } from './store'
@@ -46,8 +45,6 @@ export function declaredManifests(): Promise<SignedEvent[]> {
   manifests ??= relay.query([{ kinds: [31990], limit: 500 }] as never).then(
     (found) => {
       if (found.length === 0) manifests = null
-      // The same read answers which hosts a chip may open as written (LTX-6); render reads it, where it cannot await.
-      rememberDeclaredOrigins(declaredOriginsOf(found))
       return found
     },
     (error: unknown) => {

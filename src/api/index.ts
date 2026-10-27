@@ -17,6 +17,7 @@ import { naddrToAddr } from '@estiva-app/protocol'
 export type { Change, Conversation, FolderState, Issue, Message, Project } from '../nostr/fold'
 export type { WorkspaceEvents, WorkspaceState } from '../nostr/store'
 export { foldWorkspace } from '../nostr/store'
+export { useMentionsElsewhere } from './mentionsElsewhere'
 export type { Directory, Profile } from '../nostr/profiles'
 export { initials } from '../nostr/profiles'
 export { ISSUE_STATUSES, PROJECT_STATUSES, lookupStatus, type VocabEntry } from '../nostr/kinds'
@@ -31,7 +32,7 @@ export { keyProblem, projectKeys, suggestKey, takenKeys } from '../nostr/keys'
   itself to be about the object with one that named it in passing, and the
   second attaches permanently and by accident.
 */
-export { commentsOn, commentsOnAny, mentionsOf, attachmentOf, type Attachment, type AnchorIndex } from '../nostr/references'
+export { commentsOn, commentsOnAny, attachmentOf, type Attachment, type AnchorIndex } from '../nostr/references'
 /* Edits, attachments and reactions — SPEC §6.6, §6.8. The folds and the
    horizon are `@estiva-app/conversation`'s (CON-5); the hook that calls them
    is the app's. */

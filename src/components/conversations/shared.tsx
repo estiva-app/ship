@@ -40,17 +40,17 @@ export function cardsOf(blocks: readonly RenderBlock[], embeds: readonly Embed[]
   }
   // Only a URL that itself names that file, as a chip checks (LTX-6 security review).
   const writtenUrl = new Map<string, string>()
-  const urlsIn = (bs: readonly RenderBlock[]) => {
+  const noteWrittenUrls = (bs: readonly RenderBlock[]) => {
     for (const block of bs) {
       for (const run of block.inline ?? []) {
         const names = resolveLink && run.reference && /^https?:\/\//i.test(run.text) && referenceOfLink(run.text, resolveLink) === run.reference
         const value = names && run.reference ? valueOfReference(run.reference) : undefined
         if (value && !writtenUrl.has(value)) writtenUrl.set(value, run.text)
       }
-      if (block.children) urlsIn(block.children)
+      if (block.children) noteWrittenUrls(block.children)
     }
   }
-  urlsIn(blocks)
+  noteWrittenUrls(blocks)
   return cardsIn(embeds, blocks, parts, resolveLink).flatMap((card) => {
     const reference = written.get(card.value) ?? referenceOfValue(card.value)
     const opensAt = writtenUrl.get(card.value)

@@ -14,8 +14,8 @@
  * interval while the tab is visible, and when the tab comes back.
  */
 import { useEffect, useState } from 'react'
-import { absenceOf, partTag, resolvePart, type Block, type NostrTag, type PartPointer, type SignedEvent } from '@estiva-app/protocol'
-import { blockUrlOf, matchObjectUrl, urlPatternsOf } from '@estiva-app/interop'
+import { absenceOf, resolvePart, type Block, type PartPointer, type SignedEvent } from '@estiva-app/protocol'
+import { blockUrlOf, urlPatternsOf } from '@estiva-app/interop'
 import { pausedForMs } from '@/lib/relayBudget'
 import { resolveForeign, type ForeignObject } from './foreign'
 import { declaredManifests } from './handoff'
@@ -35,6 +35,20 @@ const FIRST_RETRY_MS = 3_000
 
 /** At most this many blocks are drawn live in one message (SPEC §13.6.1); the rest stay links. */
 export const MAX_PARTS_PER_MESSAGE = 6
+
+/**
+ * Whether a pasted app link names this address: its path ends in the object's
+ * `d`. Peek's `urlNames`, and the draw rule for a part (SPEC §13.6.1): a part
+ * draws while the words still hold a link to its file, whether or not the
+ * link reader was asked about that link — it asks about a message's first
+ * eight only, and the writer tags parts for up to 24 (ship#340's review).
+ */
+export function urlNamesAddress(url: string, address: string): boolean {
+  const d = address.split(':')[2] ?? ''
+  if (d.length < 8) return false
+  const path = url.split(/[?#]/)[0].replace(/\/+$/, '')
+  return path.endsWith(`-${d}`) || path.endsWith(`/${d}`)
+}
 
 /** What a part draws. The five states of `resolvePart`, plus waiting. */
 export type PartView =
@@ -218,80 +232,3 @@ export function resetParts(): void {
   links.clear()
 }
 
-/** The http(s) links in a text, as written. Trailing punctuation is the sentence's, not the link's. */
-export function urlsIn(text: string): string[] {
-  return (text.match(/https?:\/\/[^\s<>"'`]+/g) ?? []).map((url) => url.replace(/[.,;:!?)\]]+$/, ''))
-}
-
-/**
- * Whether a pasted app link names this address: its path ends in the address's
- * `d` (§7.2 puts the identity last, `…/<slug>-<d>`), and that `d` is long enough
- * to be one. A `d` comes from somebody's tag, so a short one would otherwise
- * match half the links in the body. Peek's `urlNames`.
- */
-export function urlNames(url: string, address: string): boolean {
-  const d = address.split(':')[2] ?? ''
-  if (d.length < 8) return false
-  const path = url.split(/[?#]/)[0].replace(/\/+$/, '')
-  return path.endsWith(`-${d}`) || path.endsWith(`/${d}`)
-}
-
-/**
- * The parts a message draws: its `part` tags, only while the body still names
- * that object — an edit carries no `part`, and a person who took the link out
- * meant the card to go with it — and at most {@link MAX_PARTS_PER_MESSAGE}.
- * The body names it by a pasted app link, whose path ends in the object's `d`,
- * or by a `nostr:` pointer whose address the caller supplies.
- */
-export function shownParts(parts: readonly PartPointer[] | undefined, body: string, named: ReadonlySet<string> = new Set()): PartPointer[] {
-  if (!parts?.length) return []
-  const urls = urlsIn(body)
-  return parts.filter(({ address }) => named.has(address) || urls.some((url) => urlNames(url, address))).slice(0, MAX_PARTS_PER_MESSAGE)
-}
-
-/**
- * The tags a message earns for the block links pasted into it — SPEC §13.6.1:
- * a `part` per object, the first link's block (`partsOf` reads only the first
- * tag for an address), and an `a` beside it unless that object is the one the
- * message is on, whose `a` it already carries (NIP-22). Resolved at send rather
- * than in the composer because a URL is prose until it is sent and the address
- * needs the relay: the link names a `d`, not who wrote it.
- *
- * A link that names no block, or that nothing resolves, earns nothing; the
- * body still has it.
- */
-export async function partTagsFor(body: string, own?: string): Promise<NostrTag[]> {
-  const urls = [...new Set(urlsIn(body))]
-  if (urls.length === 0) return []
-  let shapes
-  try {
-    shapes = await urlShapes()
-  } catch {
-    return []
-  }
-  // The first link's block per object, so one read per object, all at once.
-  const first = new Map<string, { kinds?: number[]; identifier: string; block: string }>()
-  for (const url of urls) {
-    const hit = matchObjectUrl(url, shapes)
-    if (!hit || hit.by !== 'd' || hit.block === undefined) continue
-    // A path on another app's host can read as several kinds (SPEC §7.7, LTX-6): the lookup asks under each.
-    const kinds = hit.kinds ?? (hit.kind === undefined ? undefined : [hit.kind])
-    const key = `${kinds?.join(',') ?? ''}:${hit.identifier}`
-    if (!first.has(key)) first.set(key, { kinds, identifier: hit.identifier, block: hit.block })
-  }
-  const found = await Promise.all(
-    [...first.values()].map(async (hit) => {
-      const filter: Record<string, unknown> = { '#d': [hit.identifier], limit: 10 }
-      if (hit.kinds) filter.kinds = hit.kinds
-      const events = await query([filter]).catch(() => [] as SignedEvent[])
-      // A link names a `d`, not who wrote it. When two authors hold that `d`,
-      // anyone could have published the second, so the link earns nothing
-      // rather than pointing every reader at whichever one came back.
-      const authors = new Set(events.map((e) => `${e.kind}:${e.pubkey}`))
-      return authors.size === 1 ? { address: `${[...authors][0]}:${hit.identifier}`, block: hit.block } : undefined
-    }),
-  )
-  const parts = new Map<string, string>()
-  for (const part of found) if (part && !parts.has(part.address)) parts.set(part.address, part.block)
-  return [...parts].flatMap(([address, block]) => (address === own ? [partTag(address, block)] : [['a', address], partTag(address, block)]))
-}

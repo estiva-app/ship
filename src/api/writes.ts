@@ -1,15 +1,14 @@
-import type { Embed, Imeta, NostrTag, PartPointer, PublishResult } from '@estiva-app/protocol'
-import { addrToNaddr, partsOf } from '@estiva-app/protocol'
-import { MAX_MENTIONED_PEOPLE } from '@estiva-app/conversation'
+import type { Embed, Imeta, NostrTag, PublishResult } from '@estiva-app/protocol'
+import { addrToNaddr, toRenderTree } from '@estiva-app/protocol'
+import { MAX_MENTIONED_PEOPLE, boxLinksOf, embedsToEdit, embedsToSend, namedBefore, withoutCard } from '@estiva-app/conversation'
+import { linksIn, MAX_LINKS_ASKED, within, type OwnPlace } from '@estiva-app/interop'
 import type { Conversation, Issue, Project } from '../nostr/fold'
 import { clashes, explicitKey, keyOfRef, nextRef, projectKeys, suggestKey, takenKeys } from '../nostr/keys'
 import { RELAY_URL } from '../config'
 import { clockProblem } from './clock'
 import { loadQuery, readFolderListing, readFolders } from './foreign'
-import { knownLinkValue, linkReferenceTagsFor } from './linkCards'
-import { partTagsFor, urlsIn } from './part'
+import { links } from './linkCards'
 import { linkResolverFor } from '../lib/linksNamingCards'
-import { embedsToEdit, embedsToSend, withoutCard } from '../lib/messageCard'
 import { store } from './store'
 
 /**
@@ -397,8 +396,21 @@ export function setIssueField(issue: Issue, field: 'title' | 'description' | 'su
  * readers count the same links. The shared box says (COMM-7): the card it
  * showed under itself, unless ✕ took it off, comes in as `embeds`.
  */
-function cardToSend(body: string, partTags: readonly NostrTag[], here: string | undefined): Embed[] {
-  return embedsToSend(body, { resolveLink: linkResolverFor(body, knownLinkValue), parts: partsOf({ tags: partTags.map((tag) => [...tag]) }), here })
+function cardToSend(body: string, here: string | undefined): Embed[] {
+  return embedsToSend(boxLinksOf(body, { resolveLink: linkResolverFor(body, links.known), blockOf: links.knownBlock, here }), new Set())
+}
+
+/**
+ * The `a`, `q` and `part` tags a message's words earn (SPEC §13.1, §13.6.1):
+ * every file and message it names, by a `nostr:` reference or an app link the
+ * reader answers, never the file it is on nor the message it answers. A URL in
+ * code names nothing, and `[A](B)` names B only. An edit asks with `edit` and
+ * gets the `a`/`q` its new words earn, never a `part` (nor a `p` or `urgent`,
+ * which are not read from here).
+ * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/an-edit-says-what-the-message-links-now.md
+ */
+function tagsEarnedBy(body: string, own: OwnPlace, edit = false): Promise<NostrTag[]> {
+  return links.tagsFor(toRenderTree(body, 'marker'), own, { edit })
 }
 
 /**
@@ -412,14 +424,13 @@ export function startConversation(args: { folder: string; about: string; withRef
   return publish(async () => {
     // A pasted block link shows that block (SPEC §13.6.1, COM-2); a pasted app link is a mention, as a `nostr:`
     // reference is (SPEC §13.1, OPT-19).
-    const [partTags, linkTags] = await Promise.all([partTagsFor(args.body, args.about), linkReferenceTagsFor(urlsIn(args.body))])
+    const linkTags = await tagsEarnedBy(args.body, { file: args.about })
     return store.postMessage({
       folder: args.folder,
       body: args.body,
       about: args.about,
-      partTags,
       linkTags,
-      embeds: args.embeds ? [...args.embeds] : cardToSend(args.body, partTags, args.about),
+      embeds: args.embeds ? [...args.embeds] : cardToSend(args.body, args.about),
       // SPEC §13.6 — present only when the author was commenting on one block.
       blockId: args.blockId,
       aboutRef: args.withReference ? `nostr:${addrToNaddr(args.about, [RELAY_URL])}` : undefined,
@@ -442,15 +453,15 @@ export function startConversation(args: { folder: string; about: string; withRef
 export function reply(conversation: Conversation, fallbackFolder: string, body: string, files?: readonly Imeta[], urgent?: readonly string[], embeds?: readonly Embed[]): Promise<WriteResult> {
   const { root } = conversation
   return publish(async () => {
-    // A pasted block link shows that block (SPEC §13.6.1, COM-2); a comment's own file keeps its one `a`.
-    const [partTags, linkTags] = await Promise.all([partTagsFor(body, root.anchor), linkReferenceTagsFor(urlsIn(body))])
+    // A pasted block link shows that block (SPEC §13.6.1, COM-2); a comment's own file keeps its one `a`, and the
+    // message it answers is its `e`, not a `q`.
+    const linkTags = await tagsEarnedBy(body, { file: root.anchor, parent: conversation.id })
     return store.postMessage({
       folder: root.folder || fallbackFolder,
       body,
-      partTags,
       linkTags,
       // The box's card, but never the thread's own file: a reply under "Mentioned in" is read on another page than its own.
-      embeds: embeds ? embeds.filter((embed) => embed.value !== (root.anchor ?? conversation.about[0])) : cardToSend(body, partTags, root.anchor ?? conversation.about[0]),
+      embeds: embeds ? embeds.filter((embed) => embed.value !== (root.anchor ?? conversation.about[0])) : cardToSend(body, root.anchor ?? conversation.about[0]),
       ...(root.anchor
         ? {
             replyToComment: {
@@ -640,21 +651,27 @@ export function editMessage(folder: string, messageEventId: string, body: string
   // Files left as they were still ride the edit: an edit is the whole new message, and one with none takes them off.
   // why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/an-edit-is-the-whole-new-message.md
   const files = changedFiles ?? card?.files
-  // With the message not in hand its files are unknown, and an edit listing none would take them off.
-  if (!card && !changedFiles) return Promise.resolve(refused('The message could not be read, so the edit was not sent. Try again.'))
+  // With the message not in hand, its file and the message it answers are unknown: the edit could `q` its own parent
+  // or tag its own file, and with no files listed it would take them off. Every message a page draws is in hand,
+  // Activity's rows read from elsewhere included, so this is a message the page never read.
+  if (!card) return Promise.resolve(refused('The message could not be read, so the edit was not sent. Try again.'))
   return publish(async () => {
-    if (!card) return store.editMessage({ folder, messageEventId, body, files })
     if (card.remove) {
       // ✕ on a sent card: the text as it was, byte for byte, so the message is not marked edited (§7.2.1).
-      return store.editMessage({ folder, messageEventId, body: card.before, embeds: withoutCard(card.embeds, card.remove), files })
+      const linkTags = await tagsEarnedBy(card.before, card.own, true)
+      return store.editMessage({ folder, messageEventId, body: card.before, embeds: withoutCard(card.embeds, card.remove), files, linkTags })
     }
-    // Asked before the rule reads them, as at send: what the old text named and what the new one names first.
-    await linkReferenceTagsFor([...urlsIn(card.before), ...urlsIn(body)])
-    const [after, before] = [linkResolverFor(body, knownLinkValue), linkResolverFor(card.before, knownLinkValue)]
-    const resolveLink = (url: string) => after(url) ?? before(url)
-    const embeds = embedsToEdit(card.before, body, card.embeds, { resolveLink, parts: card.parts, here: card.here })
+    // An edit says what the message links now: the whole `a`/`q` set its new words earn (asked first, as at send).
+    // The old words are asked about too, as long as the new ones at most, so the card rule reads what they named.
+    const [linkTags] = await Promise.all([
+      tagsEarnedBy(body, card.own, true),
+      within(links.ask(linksIn(toRenderTree(card.before, 'marker')).slice(0, MAX_LINKS_ASKED)), 5000),
+    ])
+    const [after, before] = [linkResolverFor(body, links.known), linkResolverFor(card.before, links.known)]
+    const read = { resolveLink: (url: string) => after(url) ?? before(url), blockOf: links.knownBlock, here: card.here }
+    const embeds = embedsToEdit(boxLinksOf(body, { ...read, previous: namedBefore(card.before, read) }), new Set(), card.embeds)
     // The files ride the same edit as the text and the cards, so neither can race the other.
-    return store.editMessage({ folder, messageEventId, body, embeds, files })
+    return store.editMessage({ folder, messageEventId, body, embeds, files, linkTags })
   })
 }
 
@@ -668,10 +685,10 @@ export interface CardEdit {
   before: string
   /** Its `embed` set, folded over earlier edits. */
   embeds?: readonly Embed[]
-  /** Its `part` pointers, as sent. */
-  parts?: readonly PartPointer[]
   /** The file whose conversation it is in: it never gets a card there. */
   here?: string
+  /** The file it is a comment on and the message it answers: an edit's `a`/`q` never name either. */
+  own: OwnPlace
   /** The file whose sent card ✕ removes. */
   remove?: string
   /** Its files, folded over earlier edits: what an edit that does not change them lists again. */

@@ -24,10 +24,10 @@ import { buildManifest, manifestContent } from '../src/nostr/manifest'
 import { KIND } from '../src/nostr/kinds'
 import { foldFolder } from '../src/nostr/fold'
 import { foldAttachments, messageReference } from '@estiva-app/conversation'
-import { addrToNaddr, encodeNpub } from '@estiva-app/protocol'
+import { addrToNaddr, encodeNpub, toRenderTree } from '@estiva-app/protocol'
 import { directoryFrom, initials, parseProfile } from '../src/nostr/profiles'
 import type { SignedEvent } from '@estiva-app/protocol'
-import { actionProblems } from '@estiva-app/interop'
+import { actionProblems, linkTagsOf } from '@estiva-app/interop'
 
 let failures = 0
 function check(label: string, condition: boolean, detail = '') {
@@ -502,20 +502,21 @@ const standIn = buildConversationMessage(PK, Date.now(), {
 check('  …no p when the comment’s author is not known', tag(standIn, 'p') === undefined)
 
 // A pasted block link's tags — COM-2, SPEC §13.6.1: `part` always, its `a`
-// only when no other tag already names that object.
+// only when no other tag already names that object. The link reader resolves
+// them (`linkTags`); the builder writes them, never the object it is on twice.
 const PARTED = `30851:${PK}:p9`
 const partTags = [['a', PARTED], ['part', PARTED, 'b1']]
-const partChat = buildConversationMessage(PK, Date.now(), { folder: CONTENT, body: 'see link', partTags })
+const partChat = buildConversationMessage(PK, Date.now(), { folder: CONTENT, body: 'see link', linkTags: partTags })
 check('a block link carries its part', JSON.stringify(partChat.tags.filter((t) => t[0] === 'part')) === JSON.stringify([['part', PARTED, 'b1']]))
 check('  …and its a', partChat.tags.filter((t) => t[0] === 'a' && t[1] === PARTED).length === 1)
 const partOnOwn = buildConversationMessage(PK, Date.now(), {
   folder: CONTENT,
   body: 'see link',
   replyToComment: { id: 'c1', anchor: PARTED },
-  partTags: [['part', PARTED, 'b1']],
+  linkTags: [['part', PARTED, 'b1']],
 })
 check('  …a reply about that object keeps no lowercase a', tag(partOnOwn, 'a') === undefined && tag(partOnOwn, 'part') === PARTED)
-const partNamedTwice = buildConversationMessage(PK, Date.now(), { folder: CONTENT, body: 'see link', about: PARTED, partTags })
+const partNamedTwice = buildConversationMessage(PK, Date.now(), { folder: CONTENT, body: 'see link', about: PARTED, linkTags: partTags })
 check('  …and one a, not two, when the message is about it', partNamedTwice.tags.filter((t) => t[0] === 'a' && t[1] === PARTED).length === 1)
 
 // A pasted app link's tags — OPT-19, SPEC §13.1: an `a` or a `q` per object a
@@ -527,7 +528,7 @@ const linkChat = buildConversationMessage(PK, Date.now(), { folder: CONTENT, bod
 check('a pasted app link earns its a and its q', linkChat.tags.some((t) => t[0] === 'a' && t[1] === LINKED) && linkChat.tags.some((t) => t[0] === 'q' && t[1] === LINKED_MSG))
 const linkOnOwn = buildConversationMessage(PK, Date.now(), { folder: CONTENT, body: 'see link', replyToComment: { id: LINKED_MSG, anchor: LINKED }, linkTags })
 check('  …a reply about that object adds no a for it, and quotes not the comment it answers', tag(linkOnOwn, 'a') === undefined && linkOnOwn.tags.every((t) => !(t[0] === 'q' && t[1] === LINKED_MSG)))
-const linkAndPart = buildConversationMessage(PK, Date.now(), { folder: CONTENT, body: `nostr:${addrToNaddr(LINKED)} link`, linkTags, partTags: [['a', LINKED], ['part', LINKED, 'b1']] })
+const linkAndPart = buildConversationMessage(PK, Date.now(), { folder: CONTENT, body: `nostr:${addrToNaddr(LINKED)} link`, linkTags: [...linkTags, ['a', LINKED], ['part', LINKED, 'b1']] })
 check('  …one a, when a nostr: reference and a block link name it too', linkAndPart.tags.filter((t) => t[0] === 'a' && t[1] === LINKED).length === 1)
 
 // The card a message asks for — SPEC §13.6.2, WBM-7: `["embed", V, "detailed"]` on all three paths.
@@ -546,15 +547,17 @@ const MSG = 'd'.repeat(64)
 const ADDR_ELSEWHERE = `30851:${PK}:i2`
 const earning = `nostr:${encodeNpub(BOB)} see ${messageReference(MSG, 9)} and nostr:${addrToNaddr(ADDR_ELSEWHERE)}`
 const values = (event: { tags: string[][] }, name: string) => event.tags.filter((t) => t[0] === name).map((t) => t[1])
-const chatEarns = buildConversationMessage(PK, Date.now(), { folder: CONTENT, body: earning, urgent: [BOB, OTHER] })
+// The `a`/`q` half is the link reader's (PEEKM-7), read here with no app link answered; the builder writes it.
+const earnedLinks = linkTagsOf(toRenderTree(earning, 'marker'), {}, () => undefined)
+const chatEarns = buildConversationMessage(PK, Date.now(), { folder: CONTENT, body: earning, urgent: [BOB, OTHER], linkTags: earnedLinks })
 check('a chat message names who it mentions as p (§13.1)', JSON.stringify(values(chatEarns, 'p')) === JSON.stringify([BOB]))
 check('  …urgent only for an urgent pick its body names', JSON.stringify(values(chatEarns, 'urgent')) === JSON.stringify([BOB]))
 check('  …an a for the address it names, a q for the message it references', JSON.stringify(values(chatEarns, 'a')) === JSON.stringify([ADDR_ELSEWHERE]) && JSON.stringify(values(chatEarns, 'q')) === JSON.stringify([MSG]))
-const commentEarns = buildConversationMessage(PK, Date.now(), { folder: CONTENT, body: earning, about: ISSUE_ADDR2, urgent: [BOB] })
+const commentEarns = buildConversationMessage(PK, Date.now(), { folder: CONTENT, body: earning, about: ISSUE_ADDR2, urgent: [BOB], linkTags: earnedLinks })
 check('a comment keeps the object’s p first, then the people its body names', JSON.stringify(values(commentEarns, 'p')) === JSON.stringify([PK, BOB]))
 check('  …its own a, then every other address the body names (§6.4)', JSON.stringify(values(commentEarns, 'a')) === JSON.stringify([ISSUE_ADDR2, ADDR_ELSEWHERE]))
 check('  …and a q and an urgent, as chat does', JSON.stringify(values(commentEarns, 'q')) === JSON.stringify([MSG]) && JSON.stringify(values(commentEarns, 'urgent')) === JSON.stringify([BOB]))
-const replyEarns = buildConversationMessage(PK, Date.now(), { folder: CONTENT, body: earning, replyToComment: { id: MSG, anchor: ISSUE_ADDR2, author: OTHER } })
+const replyEarns = buildConversationMessage(PK, Date.now(), { folder: CONTENT, body: earning, replyToComment: { id: MSG, anchor: ISSUE_ADDR2, author: OTHER }, linkTags: earnedLinks })
 check('a reply does not quote the comment it answers: that is its e', values(replyEarns, 'q').length === 0 && tag(replyEarns, 'e') === MSG)
 check('  …and still names the people and the other address', values(replyEarns, 'p').includes(BOB) && JSON.stringify(values(replyEarns, 'a')) === JSON.stringify([ADDR_ELSEWHERE]))
 check('a message that names nothing earns nothing', ['q', 'urgent', 'a'].every((name) => values(plain, name).length === 0) && values(plain, 'p').length === 0)

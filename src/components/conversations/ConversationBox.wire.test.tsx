@@ -71,6 +71,7 @@ const STATE = {
   parts: {},
   embeds: {},
   folders: [],
+  events: [],
 } as unknown as WorkspaceState
 
 const tags = (event: Signed, name: string) => event.tags.filter((t) => t[0] === name).map((t) => t[1])

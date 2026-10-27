@@ -2,7 +2,10 @@ import { IconLinkOff } from '@tabler/icons-react'
 import { newestDrawn, useMarkRead, useShownThreads } from '@/lib/useMarkRead'
 import { useNewSince } from '@/lib/useNewSince'
 import { ownConversations, recordChannel } from '@/lib/ownConversation'
-import { pointerToAddress, referenceToPointer, resolveBlockAnchor, type ContentFormat, type Embed, type PartPointer } from '@estiva-app/protocol'
+import { pointerToAddress, referenceToPointer, resolveBlockAnchor, toRenderTree, type ContentFormat, type Embed, type LinkResolver, type PartPointer, type SignedEvent } from '@estiva-app/protocol'
+import { linksIn, mentionedInOf } from '@estiva-app/interop'
+import { knownLinkValue, links, useAskLinks } from '@/api/linkCards'
+import { MAX_LINKS_PER_MESSAGE } from '@/lib/linksNamingCards'
 import type { AttachmentIndex, EditIndex } from '@/api'
 import { signedIn } from '@/auth/estivaId'
 import { useReopenHeld } from '@/auth/heldTyping'
@@ -34,15 +37,17 @@ import {
   useFeedJudges,
   unreadByThread,
   commentsOn,
-  mentionsOf,
+  attachmentOf,
   commentsOnAny,
+  foldWorkspace,
+  useMentionsElsewhere,
   type CardEdit,
   type DirectoryView,
   type FolderState,
   type WorkspaceState,
 } from '@/api'
 import { useRelated } from '@/api/useRelated'
-import { MEMBER_FIELD_PREFIX } from '@estiva-app/conversation'
+import { editTargetOf, MEMBER_FIELD_PREFIX } from '@estiva-app/conversation'
 import { Members } from '@/components/Members'
 import { membershipActions } from './membership'
 import { useReferencePage } from '@/api/references'
@@ -215,8 +220,8 @@ export function cardEditOf(state: WorkspaceState, messageId: string, remove?: st
       return {
         before: state.edits[messageId]?.body ?? message.body,
         embeds: state.embeds[messageId],
-        parts: state.parts[messageId],
         here: message.anchor ?? conversation.root.anchor ?? conversation.about[0],
+        own: { file: message.anchor ?? conversation.root.anchor, parent: message.parentId },
         remove,
         files: state.attachments[messageId.toLowerCase()],
       }
@@ -266,6 +271,14 @@ export function placeOf(folder: string, state: FolderState): { where?: string; w
  * conversation, read on the issue. It shows on neither the project's
  * Activity nor its stream (`subFileThreads` keeps it out of the stream).
  *
+ * **Which threads: the shared rule (PEEKM-7).** A thread is listed while one
+ * of its messages' latest words link this file — by a `nostr:` reference or
+ * an app link the link reader answers, an edit's words counting — as Peek's
+ * Mentioned in reads it (interop's `mentionedInOf`). A link not answered yet
+ * keeps a message whose latest version points at the file by `a` listed until
+ * it is. `resolveLink` and `unanswered` are the reader's, unless a test says.
+ * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/an-edit-says-what-the-message-links-now.md
+ *
  * Ordered by last activity, which is the order `foldConversations` already
  * leaves them in.
  *
@@ -279,16 +292,26 @@ export function placeOf(folder: string, state: FolderState): { where?: string; w
  */
 export function activityFor(
   addr: string,
-  state: WorkspaceState,
+  workspace: WorkspaceState,
   directory: DirectoryView,
   archives?: Archives,
+  resolveLink: LinkResolver = knownLinkValue,
+  unanswered: (url: string) => boolean = (url) => !links.answered(url),
+  elsewhere: readonly SignedEvent[] = [],
 ): { items: ActivityItem[]; truncated: number } {
+  // A mention written in a Folder Ship does not load — a Peek topic, a Leaf document — is read across the relay (PEEKM-7).
+  const state = withElsewhere(workspace, elsewhere)
   // A thread on an archived file takes no reply or reaction here either (Decided 2026-10-17: none, in every app).
   const closedOn = (file: string | undefined) => {
     if (!file || !archives) return undefined
     return archivedLine(file.startsWith(`${KIND.PROJECT}:`) ? archives.ofProject(file) : archives.ofIssue({ addr: file }))
   }
-  const mentions: ActivityItem[] = mentionsOf(state.conversations, addr, state.anchors).map((conversation) => {
+  const listed = mentionedIn(addr, state, resolveLink, unanswered)
+  // A thread is listed for a message in it the shared rule lists, but never the file's own discussion.
+  const threads = state.conversations.filter(
+    (conversation) => attachmentOf(conversation, addr, state.anchors) !== 'comment' && [conversation.root, ...conversation.replies].some((message) => listed.has(message.id)),
+  )
+  const mentions: ActivityItem[] = threads.map((conversation) => {
     const closed = closedOn(conversation.root.anchor ?? conversation.about[0])
     return {
       thread: threadFor(conversation, directory, undefined, addr, state.edits, state.attachments, state.urgent, state.parts, state.embeds),
@@ -299,6 +322,121 @@ export function activityFor(
   })
   return { items: mentions.slice(0, ACTIVITY_HORIZON), truncated: Math.max(0, mentions.length - ACTIVITY_HORIZON) }
 }
+
+/**
+ * The ids of the messages that list under a file's Mentioned in, by the shared
+ * rule (interop's `mentionedInOf`), over every event the workspace read. A
+ * comment on the file itself is its conversation, not a mention: Ship's
+ * comments are `kind:1111` only (CON-20 migrated the `kind:9` ones, and the
+ * manifest declares no `alsoRead`).
+ * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/activity-lists-only-mentions-from-elsewhere.md
+ */
+function mentionedIn(addr: string, state: WorkspaceState, resolveLink: LinkResolver, unanswered: (url: string) => boolean): Set<string> {
+  return new Set(mentionedInOf(pointingAt(state.events, addr), addr, resolveLink, [KIND.COMMENT], unanswered).map(({ event }) => event.id))
+}
+
+let pointed: { events: readonly SignedEvent[]; addr: string; out: SignedEvent[] } | undefined
+
+/**
+ * The few events `mentionedInOf` reads for one file, out of the whole
+ * workspace: what points at it by `a`, the messages its edits edit, and every
+ * edit of each. Kept for the last workspace read, so a link's answer coming
+ * back reads a handful of events again, not every one the workspace holds.
+ */
+function pointingAt(events: readonly SignedEvent[], addr: string): SignedEvent[] {
+  if (pointed?.events === events && pointed.addr === addr) return pointed.out
+  const at = new Set(events.filter((event) => event.tags.some((t) => t[0] === 'a' && t[1] === addr)))
+  // An edit naming no target points at nothing: kept out, or every other target-less edit would match it.
+  const ids = new Set([...at].flatMap((event) => (event.kind === KIND.MESSAGE_EDIT ? (editTargetOf(event) ?? []) : [event.id.toLowerCase()])))
+  const out = events.filter((event) => at.has(event) || ids.has(event.id.toLowerCase()) || (event.kind === KIND.MESSAGE_EDIT && ids.has(editTargetOf(event) ?? '')))
+  pointed ={ events, addr, out }
+  return out
+}
+
+/**
+ * The read to run after an edit, a delete or a reply: the message's Folder
+ * when the workspace loads it, else Activity's read from elsewhere
+ * (`useMentionsElsewhere`). Refreshing a Folder the workspace does not hold
+ * would load all of it into the workspace — a Peek topic's whole history in
+ * the sidebar, the live socket and every page — for one message.
+ */
+export function refreshAfter(workspace: WorkspaceState, folder: string | undefined, refresh: (folders?: string[]) => Promise<void>, rereadElsewhere: () => void): Promise<void> {
+  if (folder && !workspace.folders.includes(folder)) {
+    rereadElsewhere()
+    return Promise.resolve()
+  }
+  return refresh(folder ? [folder] : undefined)
+}
+
+let merged: { workspace: WorkspaceState; elsewhere: readonly SignedEvent[]; state: WorkspaceState } | undefined
+
+/**
+ * The workspace with the mentions read across the relay folded in, for
+ * Activity only (PEEKM-7). An event the workspace already holds is its own;
+ * nothing new means the workspace as it is. Kept for the last pair, so the
+ * page folds once per read rather than once per draw.
+ *
+ * Only the new events are folded: they are whole threads in Folders the
+ * workspace does not hold (`Store.mentionThreads`), so nothing in them edits
+ * or answers a message the workspace folded, and every index beside the fold
+ * is by message id. Folding the whole workspace again cost ~150 ms a refresh
+ * at 11K events.
+ *
+ * What the read brought that names a workspace message is the workspace's to
+ * fold, so it is left out: an edit of one (the workspace's own read holds its
+ * edits, and a partial set would put back what a later edit removed), and a
+ * message whose `e` names one — a reply counts only in its root's own Folder,
+ * and folded here it would be a second conversation with the workspace one's id.
+ */
+export function withElsewhere(workspace: WorkspaceState, elsewhere: readonly SignedEvent[]): WorkspaceState {
+  if (!elsewhere.length) return workspace
+  if (merged?.workspace === workspace && merged.elsewhere === elsewhere) return merged.state
+  const held = new Set(workspace.events.map((event) => event.id.toLowerCase()))
+  const extra = elsewhere.filter(
+    (event) => !held.has(event.id.toLowerCase()) && !(event.kind === KIND.MESSAGE_EDIT && held.has(editTargetOf(event) ?? '')),
+  )
+  const more = extra.length ? foldWorkspace({ events: extra, folders: [] }) : undefined
+  const state: WorkspaceState = more
+    ? {
+        ...workspace,
+        conversations: [...workspace.conversations, ...more.conversations.filter((conversation) => !held.has(conversation.id.toLowerCase()))].sort(
+          (a, b) => b.lastAt - a.lastAt,
+        ),
+        anchors: { ...workspace.anchors, ...more.anchors },
+        edits: { ...workspace.edits, ...more.edits },
+        attachments: { ...workspace.attachments, ...more.attachments },
+        urgent: { ...workspace.urgent, ...more.urgent },
+        parts: { ...workspace.parts, ...more.parts },
+        embeds: { ...workspace.embeds, ...more.embeds },
+        events: [...workspace.events, ...extra],
+      }
+    : workspace
+  merged = { workspace, elsewhere, state }
+  return state
+}
+
+/**
+ * Ask the link reader about every link in the latest words of a message that
+ * could list under `addr`, and draw again as the answers come back: what the
+ * links name decides whether it lists. Returns the reader's version, for a
+ * memo of `activityFor` to depend on.
+ */
+export function useMentionLinks(addr: string | undefined, state: WorkspaceState, elsewhere: readonly SignedEvent[] = []): number {
+  const urls = useMemo(() => {
+    if (!addr) return []
+    // Read as if every link named the file, so each candidate holding one is kept to ask about.
+    const candidates = mentionedInOf(pointingAt(withElsewhere(state, elsewhere).events, addr), addr, () => addr, [KIND.COMMENT])
+    // The first links of each message, as a drawn message asks, newest messages first, and a ceiling over all:
+    // each answer can cost a relay read. A link past either stays unasked, and keeps its message listed by its `a`.
+    const asked = new Set(candidates.flatMap(({ body }) => linksIn(toRenderTree(body, 'marker')).slice(0, MAX_LINKS_PER_MESSAGE)))
+    return [...asked].slice(0, MAX_MENTION_LINKS_ASKED)
+  }, [addr, state, elsewhere])
+  // Asked again when the reader says a failed one may be (`useAskLinks`).
+  return useAskLinks(urls)
+}
+
+/** How many links one file's Mentioned in asks about in all: six messages' worth, its newest. */
+const MAX_MENTION_LINKS_ASKED = 6 * MAX_LINKS_PER_MESSAGE
 
 /**
  * The ids of the threads rooted at one of these files: a project's issue
@@ -421,10 +559,15 @@ export function ProjectPage({
       })
   }, [project, state, directory, archives])
 
+  const { events: elsewhere, reread: rereadElsewhere } = useMentionsElsewhere(project?.addr, state)
+  const linksAnswered = useMentionLinks(project?.addr, state, elsewhere)
   const activity = useMemo(
-    () => (project ? activityFor(project.addr, state, directory, archives) : { items: [], truncated: 0 }),
-    [project, state, directory, archives],
+    () => (project ? activityFor(project.addr, state, directory, archives, undefined, undefined, elsewhere) : { items: [], truncated: 0 }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a link's answer coming back reads the list again
+    [project, state, directory, archives, linksAnswered, elsewhere],
   )
+  // A row Activity read from elsewhere is edited, deleted and replied to in its own Folder, as any other.
+  const acting = withElsewhere(state, elsewhere)
 
   /*
     The project's OWN conversation — CON-9, and this line changed with it.
@@ -674,8 +817,8 @@ export function ProjectPage({
           a refusal, which keeps the confirm dialog open behind the banner.
         */
         onDeleteMessage={(messageId) => {
-          const folder = folderOfMessage(state, messageId)
-          return act('Delete', () => deleteMessage(messageId), say, () => refresh(folder ? [folder] : undefined))
+          const folder = folderOfMessage(acting, messageId)
+          return act('Delete', () => deleteMessage(messageId), say, () => refreshAfter(state, folder, refresh, rereadElsewhere))
         }}
         /*
           Editing a comment — CON-4.
@@ -696,16 +839,16 @@ export function ProjectPage({
           evaluate the second half — same reasoning as the deletion above.
         */
         onEditMessage={(messageId, body, removeCard, files) => {
-          const folder = folderOfMessage(state, messageId)
+          const folder = folderOfMessage(acting, messageId)
           if (!folder) {
             return Promise.resolve('That message has no Folder to publish an edit into.')
           }
-          return actInField(removeCard ? 'Remove card' : 'Edit', () => editMessage(folder, messageId, body, cardEditOf(state, messageId, removeCard), files), () => refresh([folder]))
+          return actInField(removeCard ? 'Remove card' : 'Edit', () => editMessage(folder, messageId, body, cardEditOf(acting, messageId, removeCard), files), () => refreshAfter(state, folder, refresh, rereadElsewhere))
         }}
         onReplyInActivity={(threadId, body, files, picks) => {
-          const conversation = state.conversations.find((c) => c.id === threadId)
+          const conversation = acting.conversations.find((c) => c.id === threadId)
           if (!conversation?.root.folder) return Promise.resolve('That conversation has no Folder to reply into.')
-          return actInField('Reply', () => reply(conversation, conversation.root.folder, body, files, picks?.urgent, picks?.embeds), () => refresh([conversation.root.folder]))
+          return actInField('Reply', () => reply(conversation, conversation.root.folder, body, files, picks?.urgent, picks?.embeds), () => refreshAfter(state, conversation.root.folder, refresh, rereadElsewhere))
         }}
         rail={{
           status: project.status,
