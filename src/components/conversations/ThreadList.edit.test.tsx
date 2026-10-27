@@ -114,7 +114,7 @@ describe('the edit control', () => {
     const box = await openEditor()
     replace(box, 'Key is in 1Password.')
     fireEvent.click(save())
-    await waitFor(() => expect(onEditMessage).toHaveBeenCalledWith('root-1', 'Key is in 1Password.'))
+    await waitFor(() => expect(onEditMessage).toHaveBeenCalledWith('root-1', 'Key is in 1Password.', undefined, []))
   })
 
   /* The package Form (UIG-7): the keys every form has. Enter in the text is a
@@ -130,7 +130,7 @@ describe('the edit control', () => {
     expect(box.querySelectorAll('p')).toHaveLength(2)
     expect(onEditMessage).not.toHaveBeenCalled()
     fireEvent.keyDown(box, { key: 'Enter', ctrlKey: true })
-    await waitFor(() => expect(onEditMessage).toHaveBeenCalledWith('root-1', 'Key is in 1Password.'))
+    await waitFor(() => expect(onEditMessage).toHaveBeenCalledWith('root-1', 'Key is in 1Password.', undefined, []))
   })
 
   /* Nothing to publish, and a no-op edit would still cost an event that every
@@ -228,13 +228,13 @@ describe('the files of a message being edited', () => {
     await waitFor(() => expect(onEditMessage).toHaveBeenCalledWith('root-1', 'Blocked on the Stripe key.', undefined, [kept, added]))
   })
 
-  it('leaves the files out of an edit that did not touch them', async () => {
+  it('lists the files again on an edit that did not touch them, since an edit is the whole new message', async () => {
     const onEditMessage = vi.fn(async (): Promise<true | string> => true)
     open({ threads: [withFile], onEditMessage })
     const box = await openEditor()
     replace(box, 'Key is in 1Password.')
     fireEvent.click(save())
-    await waitFor(() => expect(onEditMessage).toHaveBeenCalledWith('root-1', 'Key is in 1Password.'))
+    await waitFor(() => expect(onEditMessage).toHaveBeenCalledWith('root-1', 'Key is in 1Password.', undefined, [kept]))
   })
 
   it('will not take the last one off, and says so under the box', async () => {

@@ -67,7 +67,7 @@ describe("a project's Activity (PEE-26)", () => {
 
 describe('what an edit of one message is built from', () => {
   // An edit is the whole new message (SPEC §6.8): an edit that leaves the files as they were still lists them.
-  it("hands on the message's files as they stand, the latest edit's set over its own", () => {
+  it("hands on the message's files as the workspace folded them", () => {
     const state = { ...workspace([onIssue('i1')]), embeds: {}, parts: {} }
     const shot = { url: `/media/${'d'.repeat(64)}.png`, m: 'image/png', x: 'd'.repeat(64), size: 40, filename: 'shot.png' }
     state.attachments = { i1: [shot] }

@@ -568,7 +568,7 @@ check('  …whose root carries the anchor a reply copies', replied[0]?.root.anch
 check('a kind:9 carries no anchor, so its thread gets a kind:9 reply', convo.conversations.find((c) => c.root.id === 'm1')?.root.anchor === undefined)
 
 /*
-  Attaching a file — SHI-2, the other end of `attachments.ts`.
+  Attaching a file — SHI-2, the other end of `attachmentsInDocument`.
 
   Checked as a round trip rather than by reading the tag back by hand: the
   producer and the reader are two halves of the same feature and this is the

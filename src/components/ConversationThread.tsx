@@ -42,7 +42,7 @@ import type { Answer, Picks } from '@/components/conversations/shared'
  * **The screenshots half is answered too, now that there is something to
  * draw.** It could not be, at first: Peek's outbox published `content` and
  * nothing else, so an attachment stayed in Convex storage and never reached the
- * relay. peek#177 puts an `imeta` tag on the message (CON-12), `attachments.ts`
+ * relay. peek#177 puts an `imeta` tag on the message (CON-12), `foldAttachments`
  * reads it back, and `Attachment` fetches the bytes — which it must, because
  * media GET is authenticated and an `<img src>` answers 401.
  */
@@ -86,7 +86,7 @@ export interface MessageData {
   /**
    * Files attached to this message, from its `imeta` tags — CON-12, SHI-1.
    *
-   * Read beside the fold (`attachments.ts`) rather than off `Message`, for the
+   * Read beside the fold (`foldAttachments`) rather than off `Message`, for the
    * same reason as `editedAt`: `foldFolder` is a two-repo contract and a new
    * field on `Message` turns both repos red. `threadFor` supplies it.
    */

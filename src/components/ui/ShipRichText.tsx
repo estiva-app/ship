@@ -2,9 +2,8 @@ import type { ForeignObject } from '@/api/foreign'
 import { RichText as PackageRichText, type RichTextBlock, type RichTextSize } from '@estiva-app/ui'
 import { Attachment } from './Attachment'
 import { Reference } from './Reference'
-import { imetaFromAttrs } from '../../nostr/attachments'
 import type { ReactNode } from 'react'
-import { linksAsReferences, referenceOfLink, toRenderTree, type ContentFormat, type LinkResolver, type RenderBlock } from '@estiva-app/protocol'
+import { imetaFromAttrs, linksAsReferences, referenceOfLink, toRenderTree, type ContentFormat, type LinkResolver, type RenderBlock } from '@estiva-app/protocol'
 
 /**
  * A body, drawn — SPEC §13.

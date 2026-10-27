@@ -21,7 +21,9 @@ import { clockProblem } from './clock'
 import { readFolderListing, readFolders } from './foreign'
 import { store } from './store'
 import { archiveProject, createFolder, createIssue, createProject, deleteProject, editMessage, moveProject, renameFolder, reply, setIssueField, setProjectField, startConversation } from './writes'
-import { addrToNaddr } from '@estiva-app/protocol'
+import { addrToNaddr, type Relay, type SignedEvent, type UnsignedEvent } from '@estiva-app/protocol'
+import { Store } from '../nostr/store'
+import type { Signer } from '../nostr/signer'
 
 const s = store as unknown as Record<string, ReturnType<typeof vi.fn>>
 const PK = 'ab'.repeat(32)
@@ -235,40 +237,66 @@ describe('the card a comment sent from Ship carries (WBM-7, SPEC §13.6.2)', () 
     expect(s.editMessage).toHaveBeenLastCalledWith(expect.objectContaining({ embeds: undefined }))
   })
 
-  // The store signs these into the 40003's `imeta` (scripts/attachments.test.ts); here, that the card path hands them on.
+  /*
+    An edit is the whole new message (SPEC §6.8): one with no files takes them all off, so every edit lists the files it keeps.
+    Asserted on the signed 40003: the mocked store hands the call to a real `Store` whose relay keeps what it was sent.
+  */
+  const signed = () => {
+    const sent: SignedEvent[] = []
+    const relay = { publish: async (event: SignedEvent) => (sent.push(event), { ok: true }) } as unknown as Relay
+    const signer = { pubkey: PK, sign: async (unsigned: UnsignedEvent) => ({ ...unsigned, id: 'e'.repeat(64), sig: '0'.repeat(128) }) } as unknown as Signer
+    const real = new Store(relay, signer)
+    s.editMessage.mockImplementation((args: Parameters<Store['editMessage']>[0]) => real.editMessage(args))
+    const imetas = () => sent.at(-1)!.tags.filter((t) => t[0] === 'imeta')
+    return { sent, imetas }
+  }
+  const MSG = 'd'.repeat(64)
+  const kept = { url: `/media/${'b'.repeat(64)}.png`, m: 'image/png', x: 'b'.repeat(64), size: 40, dim: '800x600', filename: 'shot.png' }
+  const KEPT_TAG = ['imeta', `url /media/${'b'.repeat(64)}.png`, 'm image/png', `x ${'b'.repeat(64)}`, 'size 40', 'dim 800x600', 'filename shot.png']
+
   it('an edit naming a link keeps the files the box saved with it (PEEKM-4)', async () => {
-    s.editMessage.mockResolvedValue({ ok: true })
+    const { sent, imetas } = signed()
     const file = { url: `/media/${'a'.repeat(64)}.pdf`, m: 'application/pdf', x: 'a'.repeat(64), size: 900, filename: 'brief.pdf' }
-    await editMessage('issue-folder', 'm1', see(LINKED), { before: 'no link', here: ISSUE.addr }, [file])
-    expect(s.editMessage).toHaveBeenLastCalledWith(expect.objectContaining({ body: see(LINKED), files: [file] }))
+    await editMessage(TEAM.folder, MSG, see(LINKED), { before: 'no link', here: ISSUE.addr }, [file])
+    expect(sent.at(-1)).toMatchObject({ kind: 40003, content: see(LINKED) })
+    expect(imetas()).toEqual([['imeta', `url /media/${'a'.repeat(64)}.pdf`, 'm application/pdf', `x ${'a'.repeat(64)}`, 'size 900', 'filename brief.pdf']])
   })
 
-  /* An edit is the whole new message (SPEC §6.8): one with no files takes them all off, so every edit lists the files it keeps. */
-  const kept = { url: `/media/${'b'.repeat(64)}.png`, m: 'image/png', x: 'b'.repeat(64), size: 40, dim: '800x600', filename: 'shot.png' }
-
   it('an edit of the words only still lists the files the message has', async () => {
-    s.editMessage.mockResolvedValue({ ok: true })
-    await editMessage('issue-folder', 'm1', 'reworded', { before: 'worded', here: ISSUE.addr, files: [kept] })
-    expect(s.editMessage).toHaveBeenLastCalledWith(expect.objectContaining({ body: 'reworded', files: [kept] }))
+    const { sent, imetas } = signed()
+    expect(await editMessage(TEAM.folder, MSG, 'reworded', { before: 'worded', here: ISSUE.addr, files: [kept] })).toEqual({ ok: true })
+    expect(sent.at(-1)).toMatchObject({ kind: 40003, content: 'reworded' })
+    expect(imetas()).toEqual([KEPT_TAG])
+  })
+
+  it('a words-only edit lists a file back with every field it was sent with, blurhash and fallbacks included', async () => {
+    const { imetas } = signed()
+    const rich = { ...kept, blurhash: 'LKO2?U%2Tw=w', fallback: ['https://a.example/x.png', 'https://b.example/x.png'] }
+    await editMessage(TEAM.folder, MSG, 'reworded', { before: 'worded', here: ISSUE.addr, files: [rich] })
+    expect(imetas()).toEqual([[
+      'imeta', `url /media/${'b'.repeat(64)}.png`, 'm image/png', `x ${'b'.repeat(64)}`, 'size 40', 'dim 800x600',
+      'blurhash LKO2?U%2Tw=w', 'fallback https://a.example/x.png', 'fallback https://b.example/x.png', 'filename shot.png',
+    ]])
   })
 
   it('✕ on a sent card still lists the files the message has', async () => {
-    s.editMessage.mockResolvedValue({ ok: true })
-    await editMessage('issue-folder', 'm1', 'drawn', { before: see(LINKED), embeds: [{ value: LINKED, layout: 'detailed' }], here: ISSUE.addr, remove: LINKED, files: [kept] })
-    expect(s.editMessage).toHaveBeenLastCalledWith(expect.objectContaining({ embeds: [{ value: LINKED, layout: 'none' }], files: [kept] }))
+    const { sent, imetas } = signed()
+    await editMessage(TEAM.folder, MSG, 'drawn', { before: see(LINKED), embeds: [{ value: LINKED, layout: 'detailed' }], here: ISSUE.addr, remove: LINKED, files: [kept] })
+    expect(sent.at(-1)!.tags).toContainEqual(['embed', LINKED, 'none'])
+    expect(imetas()).toEqual([KEPT_TAG])
   })
 
   it('an edit of a message not in hand is refused, since an edit listing no files would take them off', async () => {
-    s.editMessage.mockClear()
-    expect(await editMessage('issue-folder', 'm1', 'reworded')).toMatchObject({ ok: false, reason: expect.stringContaining('could not be read') })
-    expect(s.editMessage).not.toHaveBeenCalled()
+    const { sent } = signed()
+    expect(await editMessage(TEAM.folder, MSG, 'reworded')).toMatchObject({ ok: false, reason: expect.stringContaining('could not be read') })
+    expect(sent).toEqual([])
   })
 
   it('files changed in the box replace the ones the message had', async () => {
-    s.editMessage.mockResolvedValue({ ok: true })
+    const { imetas } = signed()
     const added = { url: `/media/${'c'.repeat(64)}.pdf`, m: 'application/pdf', x: 'c'.repeat(64), size: 9, filename: 'new.pdf' }
-    await editMessage('issue-folder', 'm1', 'worded', { before: 'worded', here: ISSUE.addr, files: [kept] }, [kept, added])
-    expect(s.editMessage).toHaveBeenLastCalledWith(expect.objectContaining({ files: [kept, added] }))
+    await editMessage(TEAM.folder, MSG, 'worded', { before: 'worded', here: ISSUE.addr, files: [kept] }, [kept, added])
+    expect(imetas()).toEqual([KEPT_TAG, ['imeta', `url /media/${'c'.repeat(64)}.pdf`, 'm application/pdf', `x ${'c'.repeat(64)}`, 'size 9', 'filename new.pdf']])
   })
 })
 

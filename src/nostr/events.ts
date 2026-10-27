@@ -10,6 +10,7 @@
  */
 import {
   addr,
+  attachmentsInDocument,
   buildMessage,
   embedTagsOf,
   imetaTag,
@@ -23,7 +24,6 @@ import {
 } from '@estiva-app/protocol'
 import { buildComment, buildReply, mentionTagsFor, quoteTagsFor, referenceTagsFor, urgentTagsFor, type CommentRef } from '@estiva-app/conversation'
 import { KIND } from './kinds'
-import { attachmentsInDocument } from './attachments'
 import { manifestContent } from './manifest'
 import { summaryText } from './summary'
 
