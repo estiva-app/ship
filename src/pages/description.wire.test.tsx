@@ -76,6 +76,7 @@ const stateWith = (text: string, by = AUTHOR, format: 'marker' | 'blocks' = 'mar
     parts: {},
     embeds: {},
     folders: [],
+    events: [],
   } as unknown as WorkspaceState
 }
 const showing = (state: WorkspaceState) =>

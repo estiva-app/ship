@@ -85,7 +85,7 @@ describe('writtenLinkOf', () => {
     }
   })
 
-  const DECLARED = ['https://leaf.estiva.app', 'https://peek.estiva.app', SHIP]
+  const DECLARED = new Set(['https://leaf.estiva.app', 'https://peek.estiva.app', SHIP])
   const ISSUE_ROUTE = '/issue/plan-x'
 
   it('Ship’s own file written on another declared host opens there as written, block or not (LTX-6)', () => {

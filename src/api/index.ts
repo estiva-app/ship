@@ -31,7 +31,7 @@ export { keyProblem, projectKeys, suggestKey, takenKeys } from '../nostr/keys'
   itself to be about the object with one that named it in passing, and the
   second attaches permanently and by accident.
 */
-export { commentsOn, commentsOnAny, mentionsOf, attachmentOf, type Attachment, type AnchorIndex } from '../nostr/references'
+export { commentsOn, commentsOnAny, attachmentOf, type Attachment, type AnchorIndex } from '../nostr/references'
 /* Edits, attachments and reactions — SPEC §6.6, §6.8. The folds and the
    horizon are `@estiva-app/conversation`'s (CON-5); the hook that calls them
    is the app's. */

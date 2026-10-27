@@ -156,14 +156,14 @@ describe('conversations', () => {
     await startConversation({ folder: 'issue-folder', about: ISSUE.addr, withReference: true, body: 'hi' })
     expect(s.postMessage).toHaveBeenLastCalledWith(expect.objectContaining({ folder: 'issue-folder', body: 'hi', about: ISSUE.addr, aboutRef: expect.stringMatching(/^nostr:naddr1/) }))
     await startConversation({ folder: 'content-folder', about: PROJECT.addr, withReference: false, body: 'hi' })
-    expect(s.postMessage).toHaveBeenLastCalledWith({ folder: 'content-folder', body: 'hi', about: PROJECT.addr, aboutRef: undefined, partTags: [], linkTags: [], embeds: [] })
+    expect(s.postMessage).toHaveBeenLastCalledWith({ folder: 'content-folder', body: 'hi', about: PROJECT.addr, aboutRef: undefined, linkTags: [], embeds: [] })
   })
 
   it("a reply goes to the thread's own Folder, anchored to its root", async () => {
     s.postMessage.mockResolvedValue({ ok: true })
     const conversation = { id: 'root-id', root: { id: 'root-id', author: 'a', createdAt: 1, body: 'x', folder: 'thread-folder', about: [] }, replies: [], about: [], createdAt: 1, lastAt: 1 }
     await reply(conversation, 'fallback', 'yes')
-    expect(s.postMessage).toHaveBeenCalledWith({ folder: 'thread-folder', body: 'yes', replyTo: { rootId: 'root-id', parentId: 'root-id' }, partTags: [], linkTags: [], embeds: [] })
+    expect(s.postMessage).toHaveBeenCalledWith({ folder: 'thread-folder', body: 'yes', replyTo: { rootId: 'root-id', parentId: 'root-id' }, linkTags: [], embeds: [] })
     await reply({ ...conversation, root: { ...conversation.root, folder: '' } }, 'fallback', 'yes')
     expect(s.postMessage).toHaveBeenLastCalledWith(expect.objectContaining({ folder: 'fallback' }))
   })
@@ -173,7 +173,7 @@ describe('conversations', () => {
     const root = { id: 'root-id', author: 'a', createdAt: 1, body: 'x', folder: 'thread-folder', about: [ISSUE.addr], anchor: ISSUE.addr }
     const conversation = { id: 'root-id', root, replies: [], about: [ISSUE.addr], createdAt: 1, lastAt: 1 }
     await reply(conversation, 'fallback', 'yes')
-    expect(s.postMessage).toHaveBeenLastCalledWith({ folder: 'thread-folder', body: 'yes', replyToComment: { id: 'root-id', anchor: ISSUE.addr, author: 'a' }, partTags: [], linkTags: [], embeds: [] })
+    expect(s.postMessage).toHaveBeenLastCalledWith({ folder: 'thread-folder', body: 'yes', replyToComment: { id: 'root-id', anchor: ISSUE.addr, author: 'a' }, linkTags: [], embeds: [] })
     // The comment is outside the read and a reply stands in: its author is not the comment's.
     await reply({ ...conversation, root: { ...root, id: 'stand-in', author: 'b' } }, 'fallback', 'yes')
     expect(s.postMessage).toHaveBeenLastCalledWith(expect.objectContaining({ replyToComment: { id: 'root-id', anchor: ISSUE.addr, author: undefined } }))
@@ -210,14 +210,14 @@ describe('the card a comment sent from Ship carries (WBM-7, SPEC §13.6.2)', () 
     expect(s.postMessage).toHaveBeenLastCalledWith(expect.objectContaining({ embeds: [{ value: LINKED, layout: 'detailed' }] }))
   })
 
-  it('✕ on a sent card sends the text as it was, that card none and the other kept', async () => {
+  it('✕ on a sent card sends the text as it was, that card none and the other kept, and the links that text names', async () => {
     s.editMessage.mockResolvedValue({ ok: true })
     const before = `${see(LINKED)}\n\nnostr:${addrToNaddr(ISSUE.addr)}`
     const embeds = [
       { value: LINKED, layout: 'detailed' as const },
       { value: PROJECT.addr, layout: 'detailed' as const },
     ]
-    await editMessage('issue-folder', 'm1', 'the drawn body, own reference left out', { before, embeds, here: ISSUE.addr, remove: LINKED })
+    await editMessage('issue-folder', 'm1', 'the drawn body, own reference left out', { before, embeds, here: ISSUE.addr, own: { file: ISSUE.addr }, remove: LINKED })
     expect(s.editMessage).toHaveBeenLastCalledWith({
       folder: 'issue-folder',
       messageEventId: 'm1',
@@ -226,14 +226,16 @@ describe('the card a comment sent from Ship carries (WBM-7, SPEC §13.6.2)', () 
         { value: LINKED, layout: 'none' },
         { value: PROJECT.addr, layout: 'detailed' },
       ],
+      // An edit says what the message links now; the file it is on is its `A`, not a mention.
+      linkTags: [['a', LINKED]],
     })
   })
 
   it('an edit adding the first link adds its card; an edit after ✕ leaves the set as it is', async () => {
     s.editMessage.mockResolvedValue({ ok: true })
-    await editMessage('issue-folder', 'm1', see(LINKED), { before: 'no link', here: ISSUE.addr })
+    await editMessage('issue-folder', 'm1', see(LINKED), { before: 'no link', here: ISSUE.addr, own: { file: ISSUE.addr } })
     expect(s.editMessage).toHaveBeenLastCalledWith(expect.objectContaining({ body: see(LINKED), embeds: [{ value: LINKED, layout: 'detailed' }] }))
-    await editMessage('issue-folder', 'm1', `${see(LINKED)}, edited`, { before: see(LINKED), embeds: [{ value: LINKED, layout: 'none' }], here: ISSUE.addr })
+    await editMessage('issue-folder', 'm1', `${see(LINKED)}, edited`, { before: see(LINKED), embeds: [{ value: LINKED, layout: 'none' }], here: ISSUE.addr, own: { file: ISSUE.addr } })
     expect(s.editMessage).toHaveBeenLastCalledWith(expect.objectContaining({ embeds: undefined }))
   })
 
@@ -257,14 +259,14 @@ describe('the card a comment sent from Ship carries (WBM-7, SPEC §13.6.2)', () 
   it('an edit naming a link keeps the files the box saved with it (PEEKM-4)', async () => {
     const { sent, imetas } = signed()
     const file = { url: `/media/${'a'.repeat(64)}.pdf`, m: 'application/pdf', x: 'a'.repeat(64), size: 900, filename: 'brief.pdf' }
-    await editMessage(TEAM.folder, MSG, see(LINKED), { before: 'no link', here: ISSUE.addr }, [file])
+    await editMessage(TEAM.folder, MSG, see(LINKED), { before: 'no link', here: ISSUE.addr, own: { file: ISSUE.addr } }, [file])
     expect(sent.at(-1)).toMatchObject({ kind: 40003, content: see(LINKED) })
     expect(imetas()).toEqual([['imeta', `url /media/${'a'.repeat(64)}.pdf`, 'm application/pdf', `x ${'a'.repeat(64)}`, 'size 900', 'filename brief.pdf']])
   })
 
   it('an edit of the words only still lists the files the message has', async () => {
     const { sent, imetas } = signed()
-    expect(await editMessage(TEAM.folder, MSG, 'reworded', { before: 'worded', here: ISSUE.addr, files: [kept] })).toEqual({ ok: true })
+    expect(await editMessage(TEAM.folder, MSG, 'reworded', { before: 'worded', here: ISSUE.addr, own: { file: ISSUE.addr }, files: [kept] })).toEqual({ ok: true })
     expect(sent.at(-1)).toMatchObject({ kind: 40003, content: 'reworded' })
     expect(imetas()).toEqual([KEPT_TAG])
   })
@@ -272,7 +274,7 @@ describe('the card a comment sent from Ship carries (WBM-7, SPEC §13.6.2)', () 
   it('a words-only edit lists a file back with every field it was sent with, blurhash and fallbacks included', async () => {
     const { imetas } = signed()
     const rich = { ...kept, blurhash: 'LKO2?U%2Tw=w', fallback: ['https://a.example/x.png', 'https://b.example/x.png'] }
-    await editMessage(TEAM.folder, MSG, 'reworded', { before: 'worded', here: ISSUE.addr, files: [rich] })
+    await editMessage(TEAM.folder, MSG, 'reworded', { before: 'worded', here: ISSUE.addr, own: { file: ISSUE.addr }, files: [rich] })
     expect(imetas()).toEqual([[
       'imeta', `url /media/${'b'.repeat(64)}.png`, 'm image/png', `x ${'b'.repeat(64)}`, 'size 40', 'dim 800x600',
       'blurhash LKO2?U%2Tw=w', 'fallback https://a.example/x.png', 'fallback https://b.example/x.png', 'filename shot.png',
@@ -281,7 +283,7 @@ describe('the card a comment sent from Ship carries (WBM-7, SPEC §13.6.2)', () 
 
   it('✕ on a sent card still lists the files the message has', async () => {
     const { sent, imetas } = signed()
-    await editMessage(TEAM.folder, MSG, 'drawn', { before: see(LINKED), embeds: [{ value: LINKED, layout: 'detailed' }], here: ISSUE.addr, remove: LINKED, files: [kept] })
+    await editMessage(TEAM.folder, MSG, 'drawn', { before: see(LINKED), embeds: [{ value: LINKED, layout: 'detailed' }], here: ISSUE.addr, own: { file: ISSUE.addr }, remove: LINKED, files: [kept] })
     expect(sent.at(-1)!.tags).toContainEqual(['embed', LINKED, 'none'])
     expect(imetas()).toEqual([KEPT_TAG])
   })
@@ -294,7 +296,7 @@ describe('the card a comment sent from Ship carries (WBM-7, SPEC §13.6.2)', () 
 
   it('every file taken off in the box goes out as an edit listing none, not the ones the message had', async () => {
     const { sent, imetas } = signed()
-    expect(await editMessage(TEAM.folder, MSG, 'worded', { before: 'worded', here: ISSUE.addr, files: [kept] }, [])).toEqual({ ok: true })
+    expect(await editMessage(TEAM.folder, MSG, 'worded', { before: 'worded', here: ISSUE.addr, own: { file: ISSUE.addr }, files: [kept] }, [])).toEqual({ ok: true })
     expect(sent.at(-1)).toMatchObject({ kind: 40003, content: 'worded' })
     expect(imetas()).toEqual([])
   })
@@ -302,7 +304,7 @@ describe('the card a comment sent from Ship carries (WBM-7, SPEC §13.6.2)', () 
   it('files changed in the box replace the ones the message had', async () => {
     const { imetas } = signed()
     const added = { url: `/media/${'c'.repeat(64)}.pdf`, m: 'application/pdf', x: 'c'.repeat(64), size: 9, filename: 'new.pdf' }
-    await editMessage(TEAM.folder, MSG, 'worded', { before: 'worded', here: ISSUE.addr, files: [kept] }, [kept, added])
+    await editMessage(TEAM.folder, MSG, 'worded', { before: 'worded', here: ISSUE.addr, own: { file: ISSUE.addr }, files: [kept] }, [kept, added])
     expect(imetas()).toEqual([KEPT_TAG, ['imeta', `url /media/${'c'.repeat(64)}.pdf`, 'm application/pdf', `x ${'c'.repeat(64)}`, 'size 9', 'filename new.pdf']])
   })
 })

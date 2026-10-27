@@ -10,7 +10,7 @@ import { useWorkspacePeople } from '@/components/editing/mentionables'
 import { cardShapeOf, noteCardShape, type CardShape } from '@/lib/cardShapes'
 import { hrefOf, linkedKindOf, linkStateOf, notAvailable } from '@/lib/linked'
 import { isOwnKind } from '@/lib/ownKinds'
-import { writtenLinkOf } from '@/lib/referenceLink'
+import { writtenLink } from '@/api/linkCards'
 import { noteCardAvailability, rememberedUnavailable } from '@/lib/unavailableCards'
 import { KIND } from '@/nostr/kinds'
 import { href } from '@/router'
@@ -52,7 +52,7 @@ function LinkClicks({ block = false, children }: { block?: boolean; children: Re
 
 /** A file's link state, opening at the block a link to one block was written for (§13.6.1). */
 function openingAt(link: LinkState, written: string | undefined): LinkState {
-  const block = link.state === 'ready' ? writtenLinkOf(written, link.linked.href) : undefined
+  const block = link.state === 'ready' ? writtenLink(written, link.linked.href) : undefined
   return block && link.state === 'ready' ? { ...link, linked: { ...link.linked, href: block.href } } : link
 }
 

@@ -38,7 +38,8 @@ vi.mock(import('@/api/foreign'), async (importOriginal) => ({
 // resolves to nothing, and nothing else names anything.
 const ISSUE_URL = `https://ship.estiva.app/issue/the-probe-issue-${ISSUE.split(':')[2]}`
 const GONE_URL = 'https://ship.estiva.app/issue/gone-0d6a0a3e-7a4e-4c39-9f0b-5d1c7e2a9b11'
-vi.mock('@/api/linkCards', () => {
+vi.mock('@/api/linkCards', async () => {
+  const { writtenLinkOf } = await import('@/lib/referenceLink')
   // Hoisted above the constants, so spelled out again.
   const pk = 'b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46'
   const named = new Map([
@@ -51,6 +52,8 @@ vi.mock('@/api/linkCards', () => {
     askLinkValues: () => Promise.resolve(),
     knownBlockOf: () => undefined,
     linksChanged: () => () => {},
+    // No manifest read here, so no other host is declared.
+    writtenLink: (url: string | undefined, opens: string | undefined) => writtenLinkOf(url, opens, window.location.origin),
     useLinkValues: (urls: readonly string[]) => new Map(urls.flatMap((asked) => (named.has(asked) ? [[asked, named.get(asked)!] as const] : []))),
   }
 })

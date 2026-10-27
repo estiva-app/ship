@@ -7,7 +7,7 @@
  * must also stay out of the project's own stream, which is what CON-9 bought
  * and PEE-26 keeps — so both halves are asserted here.
  */
-import { findNaddrs, naddrToAddr, type SignedEvent } from '@estiva-app/protocol'
+import { addrToNaddr, findNaddrs, naddrToAddr, type SignedEvent } from '@estiva-app/protocol'
 import { describe, expect, it } from 'vitest'
 import { foldFolder } from '../nostr/fold'
 import { anchorIndex } from '../nostr/references'
@@ -34,10 +34,10 @@ const event = (id: string, tags: string[][], content = ''): SignedEvent =>
 
 const onIssue = (id: string) => event(id, [['A', ISSUE], ['a', ISSUE], ['K', '30851']], 'On the issue.')
 /** A comment on some other file that names the project. */
-const mention = (id: string) => event(id, [['A', `30851:${'c'.repeat(64)}:elsewhere`], ['a', PROJECT]], 'See the project.')
+const mention = (id: string) => event(id, [['A', `30851:${'c'.repeat(64)}:elsewhere`], ['a', PROJECT]], `See nostr:${addrToNaddr(PROJECT)}.`)
 
 function workspace(events: SignedEvent[]): WorkspaceState {
-  return { ...foldFolder(events, refs), anchors: anchorIndex(events), edits: {}, attachments: {} } as WorkspaceState
+  return { ...foldFolder(events, refs), anchors: anchorIndex(events), edits: {}, attachments: {}, events } as unknown as WorkspaceState
 }
 
 const directory = {
@@ -62,6 +62,41 @@ describe("a project's Activity (PEE-26)", () => {
   it('keeps every issue thread out of the stream, not only the most recent ACTIVITY_HORIZON', () => {
     const many = workspace(Array.from({ length: ACTIVITY_HORIZON + 5 }, (_, n) => onIssue(`i${n}`)))
     expect(subFileThreads(many, new Set([ISSUE])).size).toBe(ACTIVITY_HORIZON + 5)
+  })
+})
+
+/*
+  Mentioned in follows a message's latest words (PEEKM-7): an edit that swaps
+  one app link for another moves the comment from the first file's Activity to
+  the second's, as the edit's own `a` says and its words confirm.
+  why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/an-edit-says-what-the-message-links-now.md
+*/
+describe("an issue's Mentioned in, after an edit swaps the link (PEEKM-7)", () => {
+  const ELSEWHERE = `30851:${'c'.repeat(64)}:elsewhere`
+  const FIRST = `30851:${'a'.repeat(64)}:first-issue`
+  const SECOND = `30851:${'a'.repeat(64)}:second-issue`
+  const linkTo = (d: string) => `https://ship.estiva.app/issue/plan-${d}`
+  const named = new Map([
+    [linkTo('first-issue'), FIRST],
+    [linkTo('second-issue'), SECOND],
+  ])
+  const resolveLink = (url: string) => named.get(url)
+  const M1 = '1'.repeat(64)
+  const sent = event(M1, [['A', ELSEWHERE], ['a', ELSEWHERE], ['K', '30851'], ['a', FIRST]], `See ${linkTo('first-issue')}`)
+  const edit = { ...event('2'.repeat(64), [['e', M1], ['a', SECOND]], `See ${linkTo('second-issue')} instead`), kind: 40003 }
+  const state = workspace([sent, edit])
+  const listed = (file: string) => activityFor(file, state, directory, undefined, resolveLink, () => false).items.map((i) => i.thread.id)
+
+  it('lists the comment under the file its edited words link', () => {
+    expect(listed(SECOND)).toEqual([M1])
+  })
+
+  it('no longer lists it under the file the edit took the link to away', () => {
+    expect(listed(FIRST)).toEqual([])
+  })
+
+  it('never lists it under the file it is a comment on', () => {
+    expect(listed(ELSEWHERE)).toEqual([])
   })
 })
 

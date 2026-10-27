@@ -150,6 +150,12 @@ export interface WorkspaceState extends FolderState {
    * `useLiveWorkspace`.
    */
   folders: string[]
+  /**
+   * The events this was folded from, as the relay answered them: what the
+   * shared "Mentioned in" reader (interop's `mentionedInOf`) reads, since it
+   * needs each message's edits and tags, which the fold does not keep.
+   */
+  events: readonly SignedEvent[]
 }
 
 /**
@@ -191,6 +197,7 @@ function read(events: SignedEvent[], folders: string[]): WorkspaceState {
     // and then nothing would ever subscribe to it — so it would stay empty and
     // silent, which is indistinguishable from working.
     folders: [...new Set(folders)],
+    events,
   }
 }
 
@@ -653,17 +660,24 @@ export class Store {
      * it on every edit; omitted, the edit carries no `imeta`.
      */
     files?: readonly Imeta[]
+    /**
+     * The `a` and `q` tags the new words earn, already resolved (`links.tagsFor`
+     * with `edit`): an edit says what the message links now (§6.8). Never a
+     * `p`, an `urgent` or a `part`.
+     * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/an-edit-says-what-the-message-links-now.md
+     */
+    linkTags?: readonly NostrTag[]
   }): Promise<PublishResult> {
     assertFolderId(args.folder)
-    return this.publish(
-      buildEdit(this.signer.pubkey, Date.now(), {
-        channelUuid: args.folder,
-        targetEventId: args.messageEventId,
-        body: args.body,
-        embeds: args.embeds,
-        mediaTags: args.files?.map(imetaTag),
-      }),
-    )
+    const edit = buildEdit(this.signer.pubkey, Date.now(), {
+      channelUuid: args.folder,
+      targetEventId: args.messageEventId,
+      body: args.body,
+      embeds: args.embeds,
+      mediaTags: args.files?.map(imetaTag),
+    })
+    const linkTags = (args.linkTags ?? []).filter((t) => t[0] === 'a' || t[0] === 'q').map((t) => [...t])
+    return this.publish({ ...edit, tags: [...edit.tags, ...linkTags] })
   }
 
   async createIssue(args: {
@@ -709,9 +723,7 @@ export class Store {
     files?: readonly Imeta[]
     /** Who the composer's urgent picks name — CON-25. */
     urgent?: readonly string[]
-    /** The block links' `part` tags, already resolved — COM-2. See `buildConversationMessage`. */
-    partTags?: readonly NostrTag[]
-    /** The body's app links' `a` and `q` tags, already resolved — OPT-19. See `buildConversationMessage`. */
+    /** The `a`, `q` and `part` tags the body earns, already resolved — PEEKM-7. See `buildConversationMessage`. */
     linkTags?: readonly NostrTag[]
     /** The card it asks for under it (SPEC §13.6.2) — `embedsToSend`. */
     embeds?: readonly Embed[]
@@ -727,7 +739,6 @@ export class Store {
         blockId: args.blockId,
         files: args.files,
         urgent: args.urgent,
-        partTags: args.partTags,
         linkTags: args.linkTags,
         embeds: args.embeds,
       }),

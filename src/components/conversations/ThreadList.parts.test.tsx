@@ -13,6 +13,11 @@ vi.mock(import('@/api/part'), async (importOriginal) => ({
   usePart: ({ address }: { address: string }) => views.get(address) ?? { state: 'loading' },
 }))
 vi.mock(import('@/api/foreign'), async (importOriginal) => ({ ...(await importOriginal()), resolveForeign: vi.fn(async () => null) }))
+// The link reader has answered that the pasted link names the issue (`api/linkCards`, with its own test).
+vi.mock(import('@/api/linkCards'), async (importOriginal) => ({
+  ...(await importOriginal()),
+  knownLinkValue: (url: string) => (url.includes('b4ea696a-d4a2-4833-8f2a-6aa1e2f3c4d5') ? `30851:${'f'.repeat(64)}:b4ea696a-d4a2-4833-8f2a-6aa1e2f3c4d5` : undefined),
+}))
 
 import { ThreadList } from './ThreadList'
 import type { ThreadData } from '@/components/ConversationThread'

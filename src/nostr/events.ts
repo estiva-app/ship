@@ -22,7 +22,7 @@ import {
   type ThreadRef,
   type UnsignedEvent,
 } from '@estiva-app/protocol'
-import { buildComment, buildReply, mentionTagsFor, quoteTagsFor, referenceTagsFor, urgentTagsFor, type CommentRef } from '@estiva-app/conversation'
+import { buildComment, buildReply, mentionTagsFor, urgentTagsFor, type CommentRef } from '@estiva-app/conversation'
 import { KIND } from './kinds'
 import { manifestContent } from './manifest'
 import { summaryText } from './summary'
@@ -396,15 +396,11 @@ export function buildConversationMessage(
     /** The people the composer's urgent picks name, by pubkey — SPEC §13.1, CON-25. */
     urgent?: readonly string[]
     /**
-     * The `part` tags (and their `a`) for the block links pasted into the body —
-     * SPEC §13.6.1, COM-2. Resolved before this is called (`partTagsFor`),
-     * because a link names a `d` and the address needs the relay.
-     */
-    partTags?: readonly NostrTag[]
-    /**
-     * The `a` and `q` tags for the app links in the body — SPEC §13.1, OPT-19:
-     * a link is a mention as a `nostr:` reference is. Resolved before this is
-     * called (`linkReferenceTagsFor`), for the reason `partTags` is.
+     * The `a`, `q` and `part` tags the body earns — SPEC §13.1, §13.6.1: an `a`
+     * per file and a `q` per message it names, by a `nostr:` reference or an
+     * app link, and a `part` per file a block link names. Resolved before this
+     * is called (the link reader's `tagsFor`, PEEKM-7), because a link names a
+     * `d` and the address needs the relay.
      */
     linkTags?: readonly NostrTag[]
     /** The card the message asks for under it, one `embed` per file (SPEC §13.6.2) — `embedsToSend`. */
@@ -416,23 +412,21 @@ export function buildConversationMessage(
 
   /*
     The tags the body earns (CON-25), the ones Peek appends: a `p` per person it
-    names, an `urgent` beside each urgent one, an `a` per other address it names
-    (§6.4), and a `q` per message it references (§13.1). Until CON-25 Ship wrote
-    none, so a mention notified nobody and a file named in a Ship comment was
-    missing from that file's Mentioned in.
+    names, an `urgent` beside each urgent one, then what `linkTags` says it
+    links (§6.4, §13.1). Until CON-25 Ship wrote none, so a mention notified
+    nobody and a file named in a Ship comment was missing from that file's
+    Mentioned in. The object this is on (or answers) is never named twice.
   */
   const earned = (own: { address?: string; event?: string }): NostrTag[] => {
-    const references = [...referenceTagsFor(args.body, own.address), ...quoteTagsFor(args.body, own.event)]
-    const named = new Set(references.map((t) => `${t[0]}:${t[1]}`))
-    // A link's `a` or `q`, unless the object is the one this is on (or answers), or something else already earned it.
-    const linked = [...(args.linkTags ?? []), ...(args.partTags ?? [])].filter((t) => {
+    const named = new Set<string>()
+    const linked = (args.linkTags ?? []).filter((t) => {
       if (t[0] !== 'a' && t[0] !== 'q') return true
       const key = `${t[0]}:${t[1]}`
       if (t[1] === (t[0] === 'a' ? own.address : own.event) || named.has(key)) return false
       named.add(key)
       return true
     })
-    return [...urgentTagsFor(args.body, args.urgent), ...references, ...linked]
+    return [...urgentTagsFor(args.body, args.urgent), ...linked]
   }
 
   // A comment, or a reply to one, is a NIP-22 `kind:1111`; chat — a message in

@@ -17,7 +17,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { IssueView } from '@/views/IssueView'
 import { go, href, type IssueTab } from '../router'
 import { act, actInField, sayOnceLeft, type Say } from './act'
-import { activityFor, cardEditOf, copyText, folderOfMessage, railPeople, threadFor } from './ProjectPage'
+import { activityFor, cardEditOf, copyText, folderOfMessage, railPeople, threadFor, useMentionLinks } from './ProjectPage'
 import { useReferencePage } from '@/api/references'
 
 /**
@@ -108,9 +108,11 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
   */
   const conversations = useMemo(() => (issue ? commentsOn(state.conversations, issue.addr, state.anchors) : []), [issue, state])
   /* Activity is where else this issue was mentioned (PEE-26). */
+  const linksAnswered = useMentionLinks(issue?.addr, state)
   const activity = useMemo(
     () => (issue ? activityFor(issue.addr, state, directory, archives) : { items: [], truncated: 0 }),
-    [issue, state, directory, archives],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a link's answer coming back reads the list again
+    [issue, state, directory, archives, linksAnswered],
   )
   /* An issue's comments are its own stream, keyed on its address — SPEC §11.1
      (FOL-16) — so reading it advances that address and one `thread:` context

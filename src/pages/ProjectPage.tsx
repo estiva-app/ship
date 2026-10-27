@@ -2,7 +2,9 @@ import { IconLinkOff } from '@tabler/icons-react'
 import { newestDrawn, useMarkRead, useShownThreads } from '@/lib/useMarkRead'
 import { useNewSince } from '@/lib/useNewSince'
 import { ownConversations, recordChannel } from '@/lib/ownConversation'
-import { pointerToAddress, referenceToPointer, resolveBlockAnchor, type ContentFormat, type Embed, type PartPointer } from '@estiva-app/protocol'
+import { pointerToAddress, referenceToPointer, resolveBlockAnchor, toRenderTree, type ContentFormat, type Embed, type LinkResolver, type PartPointer } from '@estiva-app/protocol'
+import { linksIn, mentionedInOf } from '@estiva-app/interop'
+import { knownLinkValue, links, useLinksAnswered } from '@/api/linkCards'
 import type { AttachmentIndex, EditIndex } from '@/api'
 import { signedIn } from '@/auth/estivaId'
 import { useReopenHeld } from '@/auth/heldTyping'
@@ -34,7 +36,7 @@ import {
   useFeedJudges,
   unreadByThread,
   commentsOn,
-  mentionsOf,
+  attachmentOf,
   commentsOnAny,
   type CardEdit,
   type DirectoryView,
@@ -215,8 +217,8 @@ export function cardEditOf(state: WorkspaceState, messageId: string, remove?: st
       return {
         before: state.edits[messageId]?.body ?? message.body,
         embeds: state.embeds[messageId],
-        parts: state.parts[messageId],
         here: message.anchor ?? conversation.root.anchor ?? conversation.about[0],
+        own: { file: message.anchor ?? conversation.root.anchor, parent: message.parentId },
         remove,
         files: state.attachments[messageId.toLowerCase()],
       }
@@ -266,6 +268,14 @@ export function placeOf(folder: string, state: FolderState): { where?: string; w
  * conversation, read on the issue. It shows on neither the project's
  * Activity nor its stream (`subFileThreads` keeps it out of the stream).
  *
+ * **Which threads: the shared rule (PEEKM-7).** A thread is listed while one
+ * of its messages' latest words link this file — by a `nostr:` reference or
+ * an app link the link reader answers, an edit's words counting — as Peek's
+ * Mentioned in reads it (interop's `mentionedInOf`). A link not answered yet
+ * keeps a message whose latest version points at the file by `a` listed until
+ * it is. `resolveLink` and `unanswered` are the reader's, unless a test says.
+ * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/an-edit-says-what-the-message-links-now.md
+ *
  * Ordered by last activity, which is the order `foldConversations` already
  * leaves them in.
  *
@@ -282,13 +292,20 @@ export function activityFor(
   state: WorkspaceState,
   directory: DirectoryView,
   archives?: Archives,
+  resolveLink: LinkResolver = knownLinkValue,
+  unanswered: (url: string) => boolean = (url) => !links.answered(url),
 ): { items: ActivityItem[]; truncated: number } {
   // A thread on an archived file takes no reply or reaction here either (Decided 2026-10-17: none, in every app).
   const closedOn = (file: string | undefined) => {
     if (!file || !archives) return undefined
     return archivedLine(file.startsWith(`${KIND.PROJECT}:`) ? archives.ofProject(file) : archives.ofIssue({ addr: file }))
   }
-  const mentions: ActivityItem[] = mentionsOf(state.conversations, addr, state.anchors).map((conversation) => {
+  const listed = mentionedIn(addr, state, resolveLink, unanswered)
+  // A thread is listed for a message in it the shared rule lists, but never the file's own discussion.
+  const threads = state.conversations.filter(
+    (conversation) => attachmentOf(conversation, addr, state.anchors) !== 'comment' && [conversation.root, ...conversation.replies].some((message) => listed.has(message.id)),
+  )
+  const mentions: ActivityItem[] = threads.map((conversation) => {
     const closed = closedOn(conversation.root.anchor ?? conversation.about[0])
     return {
       thread: threadFor(conversation, directory, undefined, addr, state.edits, state.attachments, state.urgent, state.parts, state.embeds),
@@ -298,6 +315,39 @@ export function activityFor(
     }
   })
   return { items: mentions.slice(0, ACTIVITY_HORIZON), truncated: Math.max(0, mentions.length - ACTIVITY_HORIZON) }
+}
+
+/**
+ * The ids of the messages that list under a file's Mentioned in, by the shared
+ * rule (interop's `mentionedInOf`), over every event the workspace read. A
+ * comment on the file itself is its conversation, not a mention: Ship's
+ * comments are `kind:1111` only (CON-20 migrated the `kind:9` ones, and the
+ * manifest declares no `alsoRead`).
+ * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/activity-lists-only-mentions-from-elsewhere.md
+ */
+function mentionedIn(addr: string, state: WorkspaceState, resolveLink: LinkResolver, unanswered: (url: string) => boolean): Set<string> {
+  return new Set(mentionedInOf(state.events, addr, resolveLink, [KIND.COMMENT], unanswered).map(({ event }) => event.id))
+}
+
+/**
+ * Ask the link reader about every link in the latest words of a message that
+ * could list under `addr`, and draw again as the answers come back: what the
+ * links name decides whether it lists. Returns the reader's version, for a
+ * memo of `activityFor` to depend on.
+ */
+export function useMentionLinks(addr: string | undefined, state: WorkspaceState): number {
+  const version = useLinksAnswered()
+  const key = useMemo(() => {
+    if (!addr) return ''
+    // Read as if every link named the file, so each candidate holding one is kept to ask about.
+    const candidates = mentionedInOf(state.events, addr, () => addr, [KIND.COMMENT])
+    return [...new Set(candidates.flatMap(({ body }) => linksIn(toRenderTree(body, 'marker'))))].join('\n')
+  }, [addr, state.events])
+  useEffect(() => {
+    // A failed read is said as a change later, and the version moves then.
+    if (key) void links.ask(key.split('\n')).catch(() => {})
+  }, [key])
+  return version
 }
 
 /**
@@ -421,9 +471,11 @@ export function ProjectPage({
       })
   }, [project, state, directory, archives])
 
+  const linksAnswered = useMentionLinks(project?.addr, state)
   const activity = useMemo(
     () => (project ? activityFor(project.addr, state, directory, archives) : { items: [], truncated: 0 }),
-    [project, state, directory, archives],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a link's answer coming back reads the list again
+    [project, state, directory, archives, linksAnswered],
   )
 
   /*
