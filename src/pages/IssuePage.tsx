@@ -17,7 +17,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { IssueView } from '@/views/IssueView'
 import { go, href, type IssueTab } from '../router'
 import { act, actInField, sayOnceLeft, type Say } from './act'
-import { activityFor, cardEditOf, copyText, folderOfMessage, railPeople, threadFor, useMentionLinks, withElsewhere } from './ProjectPage'
+import { activityFor, cardEditOf, copyText, folderOfMessage, railPeople, refreshAfter, threadFor, useMentionLinks, withElsewhere } from './ProjectPage'
 import { useReferencePage } from '@/api/references'
 
 /**
@@ -108,7 +108,7 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
   */
   const conversations = useMemo(() => (issue ? commentsOn(state.conversations, issue.addr, state.anchors) : []), [issue, state])
   /* Activity is where else this issue was mentioned (PEE-26). */
-  const elsewhere = useMentionsElsewhere(issue?.addr, state)
+  const { events: elsewhere, reread: rereadElsewhere } = useMentionsElsewhere(issue?.addr, state)
   const linksAnswered = useMentionLinks(issue?.addr, state, elsewhere)
   const activity = useMemo(
     () => (issue ? activityFor(issue.addr, state, directory, archives, undefined, undefined, elsewhere) : { items: [], truncated: 0 }),
@@ -309,7 +309,7 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
         */
         onDeleteMessage={(messageId) => {
           const folder = folderOfMessage(acting, messageId)
-          return act('Delete', () => deleteMessage(messageId), say, () => refresh(folder ? [folder] : undefined))
+          return act('Delete', () => deleteMessage(messageId), say, () => refreshAfter(state, folder, refresh, rereadElsewhere))
         }}
         /*
           Editing a comment — CON-4.
@@ -334,12 +334,12 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
           if (!folder) {
             return Promise.resolve('That message has no Folder to publish an edit into.')
           }
-          return actInField(removeCard ? 'Remove card' : 'Edit', () => editMessage(folder, messageId, body, cardEditOf(acting, messageId, removeCard), files), () => refresh([folder]))
+          return actInField(removeCard ? 'Remove card' : 'Edit', () => editMessage(folder, messageId, body, cardEditOf(acting, messageId, removeCard), files), () => refreshAfter(state, folder, refresh, rereadElsewhere))
         }}
         onReplyInActivity={(threadId, body, files, picks) => {
           const conversation = acting.conversations.find((c) => c.id === threadId)
           if (!conversation?.root.folder) return Promise.resolve('That conversation has no Folder to reply into.')
-          return actInField('Reply', () => reply(conversation, conversation.root.folder, body, files, picks?.urgent, picks?.embeds), () => refresh([conversation.root.folder]))
+          return actInField('Reply', () => reply(conversation, conversation.root.folder, body, files, picks?.urgent, picks?.embeds), () => refreshAfter(state, conversation.root.folder, refresh, rereadElsewhere))
         }}
         history={history}
         rail={{

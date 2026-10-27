@@ -353,6 +353,21 @@ function pointingAt(events: readonly SignedEvent[], addr: string): SignedEvent[]
   return out
 }
 
+/**
+ * The read to run after an edit, a delete or a reply: the message's Folder
+ * when the workspace loads it, else Activity's read from elsewhere
+ * (`useMentionsElsewhere`). Refreshing a Folder the workspace does not hold
+ * would load all of it into the workspace — a Peek topic's whole history in
+ * the sidebar, the live socket and every page — for one message.
+ */
+export function refreshAfter(workspace: WorkspaceState, folder: string | undefined, refresh: (folders?: string[]) => Promise<void>, rereadElsewhere: () => void): Promise<void> {
+  if (folder && !workspace.folders.includes(folder)) {
+    rereadElsewhere()
+    return Promise.resolve()
+  }
+  return refresh(folder ? [folder] : undefined)
+}
+
 let merged: { workspace: WorkspaceState; elsewhere: readonly SignedEvent[]; state: WorkspaceState } | undefined
 
 /**
@@ -366,17 +381,27 @@ let merged: { workspace: WorkspaceState; elsewhere: readonly SignedEvent[]; stat
  * or answers a message the workspace folded, and every index beside the fold
  * is by message id. Folding the whole workspace again cost ~150 ms a refresh
  * at 11K events.
+ *
+ * What the read brought that names a workspace message is the workspace's to
+ * fold, so it is left out: an edit of one (the workspace's own read holds its
+ * edits, and a partial set would put back what a later edit removed), and a
+ * message whose `e` names one — a reply counts only in its root's own Folder,
+ * and folded here it would be a second conversation with the workspace one's id.
  */
 export function withElsewhere(workspace: WorkspaceState, elsewhere: readonly SignedEvent[]): WorkspaceState {
   if (!elsewhere.length) return workspace
   if (merged?.workspace === workspace && merged.elsewhere === elsewhere) return merged.state
-  const held = new Set(workspace.events.map((event) => event.id))
-  const extra = elsewhere.filter((event) => !held.has(event.id))
+  const held = new Set(workspace.events.map((event) => event.id.toLowerCase()))
+  const extra = elsewhere.filter(
+    (event) => !held.has(event.id.toLowerCase()) && !(event.kind === KIND.MESSAGE_EDIT && held.has(editTargetOf(event) ?? '')),
+  )
   const more = extra.length ? foldWorkspace({ events: extra, folders: [] }) : undefined
   const state: WorkspaceState = more
     ? {
         ...workspace,
-        conversations: [...workspace.conversations, ...more.conversations].sort((a, b) => b.lastAt - a.lastAt),
+        conversations: [...workspace.conversations, ...more.conversations.filter((conversation) => !held.has(conversation.id.toLowerCase()))].sort(
+          (a, b) => b.lastAt - a.lastAt,
+        ),
         anchors: { ...workspace.anchors, ...more.anchors },
         edits: { ...workspace.edits, ...more.edits },
         attachments: { ...workspace.attachments, ...more.attachments },
@@ -534,7 +559,7 @@ export function ProjectPage({
       })
   }, [project, state, directory, archives])
 
-  const elsewhere = useMentionsElsewhere(project?.addr, state)
+  const { events: elsewhere, reread: rereadElsewhere } = useMentionsElsewhere(project?.addr, state)
   const linksAnswered = useMentionLinks(project?.addr, state, elsewhere)
   const activity = useMemo(
     () => (project ? activityFor(project.addr, state, directory, archives, undefined, undefined, elsewhere) : { items: [], truncated: 0 }),
@@ -793,7 +818,7 @@ export function ProjectPage({
         */
         onDeleteMessage={(messageId) => {
           const folder = folderOfMessage(acting, messageId)
-          return act('Delete', () => deleteMessage(messageId), say, () => refresh(folder ? [folder] : undefined))
+          return act('Delete', () => deleteMessage(messageId), say, () => refreshAfter(state, folder, refresh, rereadElsewhere))
         }}
         /*
           Editing a comment — CON-4.
@@ -818,12 +843,12 @@ export function ProjectPage({
           if (!folder) {
             return Promise.resolve('That message has no Folder to publish an edit into.')
           }
-          return actInField(removeCard ? 'Remove card' : 'Edit', () => editMessage(folder, messageId, body, cardEditOf(acting, messageId, removeCard), files), () => refresh([folder]))
+          return actInField(removeCard ? 'Remove card' : 'Edit', () => editMessage(folder, messageId, body, cardEditOf(acting, messageId, removeCard), files), () => refreshAfter(state, folder, refresh, rereadElsewhere))
         }}
         onReplyInActivity={(threadId, body, files, picks) => {
           const conversation = acting.conversations.find((c) => c.id === threadId)
           if (!conversation?.root.folder) return Promise.resolve('That conversation has no Folder to reply into.')
-          return actInField('Reply', () => reply(conversation, conversation.root.folder, body, files, picks?.urgent, picks?.embeds), () => refresh([conversation.root.folder]))
+          return actInField('Reply', () => reply(conversation, conversation.root.folder, body, files, picks?.urgent, picks?.embeds), () => refreshAfter(state, conversation.root.folder, refresh, rereadElsewhere))
         }}
         rail={{
           status: project.status,

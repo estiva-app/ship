@@ -15,7 +15,7 @@ import { foldFolder } from '../nostr/fold'
 import { anchorIndex } from '../nostr/references'
 import { foldWorkspace, type WorkspaceState } from '../nostr/store'
 import type { DirectoryView } from '@/api'
-import { ACTIVITY_HORIZON, activityFor, cardEditOf, folderOfMessage, subFileThreads, useMentionLinks, withElsewhere } from './ProjectPage'
+import { ACTIVITY_HORIZON, activityFor, cardEditOf, refreshAfter, subFileThreads, useMentionLinks, withElsewhere } from './ProjectPage'
 
 const FOLDER = 'ffffffff-0000-0000-0000-000000000000'
 const PROJECT = `30850:${'a'.repeat(64)}:the-project`
@@ -152,15 +152,33 @@ describe("an issue's Activity lists mentions written in Folders Ship does not lo
     expect(listed([peek, unlinked, unlink])).toEqual([peek.id])
   })
 
-  it('edits, deletes and replies to a listed Peek message in its topic, not refused for want of a Folder', () => {
-    const acting = withElsewhere(state, [peek, leaf])
-    // Edit and Delete publish into the message's own Folder; an edit with no card in hand is refused.
-    expect(folderOfMessage(acting, peek.id)).toBe(TOPIC)
-    expect(cardEditOf(acting, peek.id)?.before).toBe(`Look at ${ref}`)
-    // A reply to the Leaf comment answers it on its document, in its Folder.
-    const thread = acting.conversations.find((c) => c.id === leaf.id)
-    expect(thread?.root.folder).toBe(DOC_FOLDER)
-    expect(thread?.root.anchor).toBe(DOC)
+  // Edit and Reply on these rows are asserted at the wire in activityElsewhere.wire.test.ts.
+
+  it('an edit, a delete or a reply on a row from a topic reads that row again, and never loads the topic into the workspace', async () => {
+    const refresh = vi.fn(async () => {})
+    const reread = vi.fn()
+    await refreshAfter(state, TOPIC, refresh, reread)
+    expect(refresh).not.toHaveBeenCalled()
+    expect(reread).toHaveBeenCalledTimes(1)
+    await refreshAfter(state, FOLDER, refresh, reread)
+    expect(refresh).toHaveBeenCalledWith([FOLDER])
+    expect(reread).toHaveBeenCalledTimes(1)
+  })
+
+  it('a message from a topic whose e names a thread in a loaded Folder makes no second conversation with that id', () => {
+    const root = inFolder(FOLDER, '3'.repeat(64), 9, [], `Kicking off ${ref}`)
+    const loaded = foldWorkspace({ events: [root], folders: [FOLDER] })
+    const stray = inFolder(TOPIC, '2'.repeat(64), 9, [['e', root.id, '', 'root'], ['a', ISSUE]], `Re ${ref}`)
+    const acting = withElsewhere(loaded, [root, stray])
+    expect(acting.conversations.filter((c) => c.id === root.id).map((c) => c.root.folder)).toEqual([FOLDER])
+  })
+
+  it("an older edit of a loaded message, read from elsewhere, does not bring back words the workspace's newer edit replaced", () => {
+    const message = inFolder(FOLDER, '3'.repeat(64), 9, [], 'first words')
+    const older = { ...inFolder(FOLDER, '1'.repeat(64), 40003, [['e', message.id]], 'middle words'), created_at: message.created_at + 10 }
+    const newer = { ...inFolder(FOLDER, '0'.repeat(64), 40003, [['e', message.id]], 'last words'), created_at: message.created_at + 20 }
+    const loaded = foldWorkspace({ events: [message, newer], folders: [FOLDER] })
+    expect(cardEditOf(withElsewhere(loaded, [older]), message.id)?.before).toBe('last words')
   })
 })
 
@@ -184,16 +202,16 @@ describe("what an issue's Mentioned in asks the link reader about", () => {
     return urls
   }
 
-  it('asks about at most the first eight links of a message packed with thirty, its first one included', () => {
-    const asked = askedFor([packed('p1', 30, 0)])
-    expect(asked.has('https://ship.estiva.app/issue/x-0')).toBe(true)
-    expect(asked.size).toBeLessThanOrEqual(8)
+  const urlsOf = (n: number, from: number) => linksOf(n, from).split(' ')
+
+  it('asks about the first eight links of a message packed with thirty, and none after them', () => {
+    expect([...askedFor([packed('p1', 30, 0)])].sort()).toEqual(urlsOf(8, 0).sort())
   })
 
-  it('asks about no more than 48 links over ten packed messages, however many they hold', () => {
+  it('asks about every link of the six newest of ten packed messages, and none of the four oldest', () => {
+    // Message n holds links 100 + 8n … 100 + 8n + 7, and the later the message, the newer.
     const asked = askedFor(Array.from({ length: 10 }, (_, n) => packed(`q${n}`, 8, 100 + n * 8)))
-    expect(asked.size).toBeGreaterThan(0)
-    expect(asked.size).toBeLessThanOrEqual(48)
+    expect([...asked].sort()).toEqual(urlsOf(48, 100 + 4 * 8).sort())
   })
 })
 

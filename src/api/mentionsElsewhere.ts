@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { SignedEvent } from '@estiva-app/protocol'
 import type { WorkspaceState } from '../nostr/store'
 import { store } from './store'
@@ -25,13 +25,28 @@ export const MENTIONS_ELSEWHERE_GAP_MS = 15_000
  * refreshes costs one more read, not one each. A refused or failed read keeps
  * what was held: the rows from Ship's own Folders never depended on it, and
  * the ones it brought stay until a read says otherwise.
+ *
+ * `reread` is for an edit, a delete or a reply the person just made on a row
+ * this read brought: its Folder is not the workspace's, so refreshing the
+ * workspace would load that whole Folder into it. It reads now, past the gap
+ * — one read, the person's own — or straight after the one still out.
  */
-export function useMentionsElsewhere(addr: string | undefined, state: WorkspaceState): readonly SignedEvent[] {
+export function useMentionsElsewhere(addr: string | undefined, state: WorkspaceState): { events: readonly SignedEvent[]; reread: () => void } {
   const [held, setHeld] = useState<{ addr: string; events: readonly SignedEvent[] }>()
-  const run = useRef<{ addr?: string; folders: readonly string[]; busy: boolean; again: boolean; last: number; timer?: ReturnType<typeof setTimeout> }>({
+  const run = useRef<{
+    addr?: string
+    folders: readonly string[]
+    busy: boolean
+    again: boolean
+    now: boolean
+    last: number
+    timer?: ReturnType<typeof setTimeout>
+    schedule?: () => void
+  }>({
     folders: [],
     busy: false,
     again: false,
+    now: false,
     last: 0,
   })
   useEffect(() => {
@@ -40,18 +55,20 @@ export function useMentionsElsewhere(addr: string | undefined, state: WorkspaceS
     r.folders = state.folders
     if (r.addr !== addr) {
       clearTimeout(r.timer)
-      Object.assign(r, { addr, again: false, last: 0, timer: undefined })
+      Object.assign(r, { addr, again: false, now: false, last: 0, timer: undefined })
     }
     const schedule = () => {
       if (r.busy) r.again = true
-      else if (r.timer === undefined) r.timer = setTimeout(read, Math.max(0, r.last + MENTIONS_ELSEWHERE_GAP_MS - Date.now()))
+      else if (r.timer === undefined) r.timer = setTimeout(read, r.now ? 0 : Math.max(0, r.last + MENTIONS_ELSEWHERE_GAP_MS - Date.now()))
     }
+    r.schedule = schedule
     // The file open now, not the one this effect ran for: a read still out for the last file hands its turn on.
     const read = () => {
       r.timer = undefined
       const target = r.addr
       if (!target) return
       r.busy = true
+      r.now = false
       r.last = Date.now()
       store
         .mentionThreads(target, r.folders)
@@ -77,7 +94,17 @@ export function useMentionsElsewhere(addr: string | undefined, state: WorkspaceS
       r.addr = undefined
     }
   }, [])
-  return held && held.addr === addr ? held.events : NONE
+  const reread = useCallback(() => {
+    const r = run.current
+    r.now = true
+    if (r.busy) r.again = true
+    else {
+      clearTimeout(r.timer)
+      r.timer = undefined
+      r.schedule?.()
+    }
+  }, [])
+  return { events: held && held.addr === addr ? held.events : NONE, reread }
 }
 
 function sameEvents(a: readonly SignedEvent[], b: readonly SignedEvent[]): boolean {
