@@ -26,7 +26,8 @@
 import { randomUUID } from 'node:crypto'
 import { Relay } from '@estiva-app/protocol'
 import { secretKeySigner } from '../src/nostr/signer'
-import { addrToNaddr } from '@estiva-app/protocol'
+import { addrToNaddr, toRenderTree } from '@estiva-app/protocol'
+import { linkTagsOf, mentionedInOf } from '@estiva-app/interop'
 import { Store } from '../src/nostr/store'
 import { conversationsAbout, foldFolder } from '../src/nostr/fold'
 import { KIND } from '../src/nostr/kinds'
@@ -290,14 +291,21 @@ async function main() {
   const unrelated = afterUnrelated
     .filter((e) => e.kind === KIND.MESSAGE)
     .find((e) => e.content.startsWith('Anyone looking'))!
+  const mentionBody = `that is ${`nostr:${addrToNaddr(webhook.addr, [RELAY_URL])}`}`
   await must('and later mentions the issue in a reply', () =>
     ravi.store.postMessage({
       folder,
-      body: `that is ${`nostr:${addrToNaddr(webhook.addr, [RELAY_URL])}`}`,
+      body: mentionBody,
       replyTo: { rootId: unrelated.id, parentId: unrelated.id },
+      // The `a` its words earn, as the app sends it (PEEKM-7): what every app's Mentioned in reads by.
+      linkTags: linkTagsOf(toRenderTree(mentionBody, 'marker'), {}, () => undefined),
     }),
   )
   const afterMention = await ravi.store.loadFolder(folder)
+  check(
+    "the reply lists under the issue's Mentioned in, by the shared reader",
+    mentionedInOf(afterMention.events, webhook.addr, undefined, [KIND.COMMENT]).some((m) => m.event.content === mentionBody),
+  )
   const pulled = conversationsAbout(afterMention.conversations, webhook.addr)
   check('a mention mid-thread attaches the WHOLE conversation', pulled.length === 1)
   check(
