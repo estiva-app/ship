@@ -211,24 +211,21 @@ describe('the card a comment sent from Ship carries (WBM-7, SPEC §13.6.2)', () 
   })
 
   it('✕ on a sent card sends the text as it was, that card none and the other kept, and the links that text names', async () => {
-    s.editMessage.mockResolvedValue({ ok: true })
+    const { sent } = signed()
     const before = `${see(LINKED)}\n\nnostr:${addrToNaddr(ISSUE.addr)}`
     const embeds = [
       { value: LINKED, layout: 'detailed' as const },
       { value: PROJECT.addr, layout: 'detailed' as const },
     ]
-    await editMessage('issue-folder', 'm1', 'the drawn body, own reference left out', { before, embeds, here: ISSUE.addr, own: { file: ISSUE.addr }, remove: LINKED })
-    expect(s.editMessage).toHaveBeenLastCalledWith({
-      folder: 'issue-folder',
-      messageEventId: 'm1',
-      body: before,
-      embeds: [
-        { value: LINKED, layout: 'none' },
-        { value: PROJECT.addr, layout: 'detailed' },
-      ],
-      // An edit says what the message links now; the file it is on is its `A`, not a mention.
-      linkTags: [['a', LINKED]],
-    })
+    await editMessage(TEAM.folder, MSG, 'the drawn body, own reference left out', { before, embeds, here: ISSUE.addr, own: { file: ISSUE.addr }, remove: LINKED })
+    const edit = sent.at(-1)!
+    expect(edit).toMatchObject({ kind: 40003, content: before })
+    expect(edit.tags.filter((t) => t[0] === 'embed')).toEqual([
+      ['embed', LINKED, 'none'],
+      ['embed', PROJECT.addr, 'detailed'],
+    ])
+    // An edit says what the message links now; the file it is on is its `A`, not a mention.
+    expect(edit.tags.filter((t) => t[0] === 'a' || t[0] === 'q')).toEqual([['a', LINKED]])
   })
 
   it('an edit adding the first link adds its card; an edit after ✕ leaves the set as it is', async () => {

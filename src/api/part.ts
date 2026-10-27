@@ -36,6 +36,20 @@ const FIRST_RETRY_MS = 3_000
 /** At most this many blocks are drawn live in one message (SPEC §13.6.1); the rest stay links. */
 export const MAX_PARTS_PER_MESSAGE = 6
 
+/**
+ * Whether a pasted app link names this address: its path ends in the object's
+ * `d`. Peek's `urlNames`, and the draw rule for a part (SPEC §13.6.1): a part
+ * draws while the words still hold a link to its file, whether or not the
+ * link reader was asked about that link — it asks about a message's first
+ * eight only, and the writer tags parts for up to 24 (ship#340's review).
+ */
+export function urlNamesAddress(url: string, address: string): boolean {
+  const d = address.split(':')[2] ?? ''
+  if (d.length < 8) return false
+  const path = url.split(/[?#]/)[0].replace(/\/+$/, '')
+  return path.endsWith(`-${d}`) || path.endsWith(`/${d}`)
+}
+
 /** What a part draws. The five states of `resolvePart`, plus waiting. */
 export type PartView =
   | { state: 'loading' }

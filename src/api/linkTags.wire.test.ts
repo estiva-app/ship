@@ -93,10 +93,21 @@ describe('an edit says what the message links now', () => {
     expect(values(edit, 'a')).toEqual([`30851:${PK}:${d(6)}`])
   })
 
-  it('an edit that takes every link out carries none', async () => {
-    await editMessage(FOLDER, 'c'.repeat(64), 'never mind', { before: `see ${issueAt(5)}`, here: ISSUE, own: { file: ISSUE }, files: [] })
+  it('an edit handed p, part and urgent tags signs only the a and q: it never notifies again or claims a block part', async () => {
+    const BOB = 'd'.repeat(64)
+    const X = `30851:${PK}:${d(7)}`
+    const Y = 'f'.repeat(64)
+    const linkTags = [['a', X], ['q', Y], ['p', BOB], ['part', X, 'p1'], ['urgent', BOB]]
+    await wire.store.editMessage({ folder: FOLDER, messageEventId: 'c'.repeat(64), body: 'edited', linkTags })
     const edit = wire.sent.at(-1)!
     expect(edit.kind).toBe(40003)
-    expect(edit.tags.filter((t) => t[0] === 'a' || t[0] === 'q')).toEqual([])
+    expect(edit.tags.filter((t) => ['a', 'q', 'p', 'part', 'urgent'].includes(t[0]))).toEqual([['a', X], ['q', Y]])
+  })
+
+  it('an edit that takes one of two links out carries only the one its words still link', async () => {
+    await editMessage(FOLDER, 'c'.repeat(64), `just ${issueAt(6)}`, { before: `see ${issueAt(5)} and ${issueAt(6)}`, here: ISSUE, own: { file: ISSUE }, files: [] })
+    const edit = wire.sent.at(-1)!
+    expect(edit.kind).toBe(40003)
+    expect(edit.tags.filter((t) => t[0] === 'a' || t[0] === 'q')).toEqual([['a', `30851:${PK}:${d(6)}`]])
   })
 })

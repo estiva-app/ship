@@ -57,6 +57,20 @@ describe("a project's Activity (PEE-26)", () => {
     expect(items.map((i) => [i.thread.id, i.relation])).toEqual([['m1', 'mention']])
   })
 
+  it("leaves out the project's own thread when a reply in it links the project", () => {
+    const root = event('p1', [['A', PROJECT], ['a', PROJECT], ['K', '30850']], 'On the project.')
+    // A Peek reply in the project's topic: a kind:9 under the comment, pointing at the project and linking it.
+    const reply = { ...event('p2', [['e', 'p1', '', 'root'], ['a', PROJECT]], `Back to nostr:${addrToNaddr(PROJECT)}`), kind: 9 }
+    const { items } = activityFor(PROJECT, workspace([root, reply, mention('m2')]), directory, undefined, undefined, () => false)
+    expect(items.map((i) => i.thread.id)).toEqual(['m2'])
+  })
+
+  it('leaves out a comment that points at the project by a but whose words do not link it', () => {
+    const pointing = event('n1', [['A', `30851:${'c'.repeat(64)}:elsewhere`], ['a', PROJECT]], 'Nothing linked here.')
+    const { items } = activityFor(PROJECT, workspace([pointing, mention('m3')]), directory, undefined, undefined, () => false)
+    expect(items.map((i) => i.thread.id)).toEqual(['m3'])
+  })
+
   it("still keeps the issue's thread out of the project's stream", () => {
     expect([...subFileThreads(state, new Set([ISSUE]))]).toEqual(['i1'])
   })
