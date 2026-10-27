@@ -1,13 +1,13 @@
 import { createContext, useContext } from 'react'
-import { decodeNpub, findNostrUris } from '@estiva-app/protocol'
+import { mentionablePeople } from '@estiva-app/conversation'
 import { Avatar } from '@estiva-app/ui'
 import type { MentionPerson } from '@estiva-app/ui/editor'
 import type { People } from '@estiva-app/interop'
 import type { DirectoryView } from '@/api/useDirectory'
 
 /**
- * What Ship's `@` and `!@` offer — CON-25 — and how `[` captions a message
- * (`snippetOf`); `[`'s sections are `@/api/references` (PEE-21). Kept apart from the triggers
+ * What Ship's `@` and `!@` offer — CON-25; `[`'s sections, and how it captions
+ * a message, are `@/api/references` (PEE-21). Kept apart from the triggers
  * (`composerTriggers.tsx`) because the page draws these and must not load the
  * editor to do it (RIC-14): only types come from `@estiva-app/ui/editor`.
  */
@@ -35,33 +35,17 @@ export function workspacePeople(pubkeys: readonly string[], directory: Pick<Dire
 
 /**
  * The people as the package's list draws them: a name, a face, and the key the
- * body is written with. Only those with a profile, as Peek's `mentionablePeopleOf`:
- * the roster also lists keys that are not people (an app's manifest key), and a
- * shortened key is nobody a person can pick.
+ * body is written with. `pubkeys` is the roster (or, with none, the snapshot's
+ * people); which of them `@` offers, and in what order, is the shared rule
+ * Peek and Leaf use too (`mentionablePeople`, PEEKM-6).
  */
-export function mentionPeople(pubkeys: readonly string[], directory: Pick<DirectoryView, 'nameOf' | 'personOf' | 'profileOf'>): MentionPerson[] {
-  return pubkeys
-    // A profile with no name is still a shortened key on screen; Peek drops it too.
-    .filter((pubkey) => directory.profileOf(pubkey)?.name !== undefined)
-    .map((pubkey) => {
-      const name = directory.nameOf(pubkey)
-      return { id: pubkey, name, pubkey, avatar: <Avatar size={32} src={directory.personOf(pubkey).picture} name={name} /> }
-    })
-    .sort((a, b) => a.name.localeCompare(b.name))
-}
-
-/** A message's opening words as a caption: marks stripped, a person by name, any other pointer dropped. */
-export function snippetOf(body: string, nameOf?: (pubkey: string) => string): string {
-  // The URIs are found case-insensitively and returned lowercased, so they are replaced the same way.
-  const text = body.replace(/nostr:[a-z0-9]+/gi, (uri) => {
-    const found = findNostrUris(uri)[0]
-    if (!found?.startsWith('nostr:npub1')) return found ? '' : uri
-    try {
-      return `@${nameOf?.(decodeNpub(found.slice('nostr:'.length))) ?? 'someone'}`
-    } catch {
-      return '' // A malformed key is prose, and not worth a caption.
-    }
-  })
-  // Marker text's line prefixes (`#`, `>`, `-`, `1.`), not every leading digit.
-  return text.replace(/\*\*|__|[*`]/g, '').replace(/^\s*(?:#{1,6}|>|[-*]|\d+\.)\s+/gm, '').replace(/\s+/g, ' ').trim()
+export function mentionPeople(pubkeys: readonly string[], me: string, directory: Pick<DirectoryView, 'nameOf' | 'personOf' | 'profileOf'>): MentionPerson[] {
+  // A profile with no name is still a shortened key on screen, and nobody a person can pick.
+  const named = pubkeys.flatMap((pubkey) => (directory.profileOf(pubkey)?.name !== undefined ? [{ pubkey, name: directory.nameOf(pubkey) }] : []))
+  return mentionablePeople(named, null, me).map(({ pubkey, name }) => ({
+    id: pubkey,
+    name,
+    pubkey,
+    avatar: <Avatar size={32} src={directory.personOf(pubkey).picture} name={name} />,
+  }))
 }

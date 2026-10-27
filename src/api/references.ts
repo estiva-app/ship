@@ -20,16 +20,29 @@ import {
   FILE_TIER,
   MESSAGE_TIER,
   messageReference,
+  openingWords,
   rankReferences,
   referenceSearch,
   type ReferenceCandidate,
 } from '@estiva-app/conversation'
 import { decodeNevent } from '@estiva-app/protocol'
 import type { CaptionedItem, ReferenceTriggerOptions } from '@estiva-app/ui/editor'
-import { snippetOf } from '@/components/editing/mentionables'
 import type { MessageData, ThreadData } from '@/components/ConversationThread'
 import { KIND } from '@/nostr/kinds'
 import { fileCandidatesOf, searchFiles, type ForeignObject } from './foreign'
+import { short } from './people'
+
+/**
+ * A message's opening words, read as in Peek and Leaf (PEEKM-6). Ship's
+ * `nameOf` answers a key it cannot name with its own short form; the caption
+ * says such a person as §13.1's shortened `npub`, as the other two do.
+ */
+function captionOf(body: string, nameOf?: (pubkey: string) => string): string {
+  return openingWords(body, (pubkey) => {
+    const name = nameOf?.(pubkey)
+    return name === short(pubkey) ? undefined : name
+  })
+}
 
 export type ReferenceSection = ReturnType<NonNullable<ReferenceTriggerOptions['sections']>>[number]
 
@@ -75,7 +88,7 @@ function messageCandidate(message: MessageData, tier: number, nameOf?: (pubkey: 
     type: 'message' as const,
     kind: message.kind ?? CHAT_KIND,
     title: message.author.name ?? 'Someone',
-    caption: snippetOf(message.body, nameOf),
+    caption: captionOf(message.body, nameOf),
     search: message.body,
     tier,
     at: message.at,
@@ -170,7 +183,7 @@ export function referenceCaptions(scope: MessageScope, nameOf?: (pubkey: string)
         return undefined
       }
       const message = [...scope.here, ...parent].flatMap((thread) => [thread.root, ...thread.replies]).find((m) => m.id === id)
-      return message ? { label: message.author.name ?? 'Someone', snippet: snippetOf(message.body, nameOf) } : undefined
+      return message ? { label: message.author.name ?? 'Someone', snippet: captionOf(message.body, nameOf) } : undefined
     }
     const file = [...folderFiles, ...recentFiles].find((candidate) => candidate.uri.toLowerCase() === `nostr:${bare}`)
     return file ? { label: file.title, snippet: '' } : undefined

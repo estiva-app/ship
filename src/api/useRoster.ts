@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import type { SignedEvent } from '@estiva-app/protocol'
+import { KIND_MEMBERSHIP_LIST, rosterOf } from '@estiva-app/conversation'
 import { relay } from './store'
-import { KIND_MEMBERSHIP_LIST, rosterOf } from './people'
 
-let asked: Promise<string[] | null> | undefined
+let asked: Promise<ReadonlySet<string> | null> | undefined
 
 /**
  * The workspace's members, read once per tab — what `@` offers (CON-25). One
@@ -11,8 +11,8 @@ let asked: Promise<string[] | null> | undefined
  * `undefined` while it loads, `null` on a relay that keeps none or a read that
  * failed: the caller falls back to the people in the snapshot.
  */
-export function useRoster(): string[] | null | undefined {
-  const [roster, setRoster] = useState<string[] | null | undefined>(undefined)
+export function useRoster(): ReadonlySet<string> | null | undefined {
+  const [roster, setRoster] = useState<ReadonlySet<string> | null | undefined>(undefined)
   useEffect(() => {
     let live = true
     asked ??= relay
