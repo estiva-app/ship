@@ -39,7 +39,13 @@ function relayOver(events: SignedEvent[], refuse = false) {
     if (refuse) return Promise.reject(new Error('restricted: rate-limited'))
     return Promise.resolve(events.filter((e) => filters.some((f) => matches(e, f))))
   }
-  return { relay: { query, queryAll: query } as unknown as Relay, asked }
+  /** How many pages each `queryAll` may read: unset is every page. */
+  const pages: (number | undefined)[] = []
+  const queryAll = (filters: Filter[], options?: { maxPages?: number }) => {
+    pages.push(options?.maxPages)
+    return query(filters)
+  }
+  return { relay: { query, queryAll } as unknown as Relay, asked, pages }
 }
 
 const directory = {
@@ -77,6 +83,28 @@ describe('a Peek thread that links the issue, in a topic Ship does not load (PEE
     const { relay, asked } = relayOver([own])
     await store(relay).mentionThreads(ISSUE, [FOLDER])
     expect(asked.flat().some((f) => 'ids' in f || '#E' in f)).toBe(false)
+  })
+
+  it('reads the threads of only the newest mentions from elsewhere, one page each, however many tag the issue', async () => {
+    const many = Array.from({ length: 40 }, (_, n) =>
+      event(`9${String(n).padStart(63, '0')}`, 9, TOPIC, [['a', ISSUE]], `Spam ${n} nostr:${addrToNaddr(ISSUE)}`),
+    )
+    const { relay, asked, pages } = relayOver(many)
+    await store(relay).mentionThreads(ISSUE, state.folders)
+    const threadRead = asked.flat().find((f) => 'ids' in f)
+    const newest = many.slice(-24).map((e) => e.id)
+    expect([...(threadRead?.ids as string[])].sort()).toEqual(newest.sort())
+    expect(asked.flat().filter((f) => '#e' in f || '#E' in f).every((f) => typeof f.limit === 'number')).toBe(true)
+    expect(pages.length).toBeGreaterThan(0)
+    expect(pages.every((p) => p === 1)).toBe(true)
+  })
+
+  it('leaves out a message from another Folder whose e names the thread’s root: it is not a reply there', async () => {
+    const elsewhere = event('7'.repeat(64), 9, FOLDER, [['e', root.id, '', 'root']], 'Posted as if in the topic')
+    const { relay } = relayOver([root, mention, reply, elsewhere])
+    const read = await store(relay).mentionThreads(ISSUE, [])
+    expect(read.map((e) => e.id)).toContain(reply.id)
+    expect(read.map((e) => e.id)).not.toContain(elsewhere.id)
   })
 
   it('throws on a refused read, so the page keeps what it held', async () => {

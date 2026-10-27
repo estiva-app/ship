@@ -226,6 +226,14 @@ function folderOfEvent(event: SignedEvent): string | undefined {
   return event.tags.find((t) => t[0] === 'h')?.[1]
 }
 
+/**
+ * Mentioned in's read across the relay (PEEKM-7) draws the threads of at most
+ * this many messages from Folders Ship does not load, the newest first, and
+ * reads one page of each thread's replies and of their edits.
+ */
+export const MAX_MENTION_THREADS = 24
+const MENTION_THREAD_PAGE = 500
+
 export class Store {
   constructor(
     private readonly relay: Relay,
@@ -1127,6 +1135,11 @@ export class Store {
    * draws as a thread. Raw events, for a local fold beside the workspace's; the
    * links are asked by the page's reader, so none is asked here.
    *
+   * Bounded, since anyone who can write where the viewer reads can tag the
+   * address: the newest {@link MAX_MENTION_THREADS} threads, one page each of
+   * replies and edits. A reply counts only in its root's own Folder — an `e`
+   * naming a root from elsewhere does not put a message in that conversation.
+   *
    * Throws when a read is refused: the caller keeps what it held.
    */
   async mentionThreads(address: string, known: readonly string[] = []): Promise<SignedEvent[]> {
@@ -1138,20 +1151,31 @@ export class Store {
     const query: QueryFn = async (filters) => keep(await this.relay.query(filters as never))
     await readMentionedIn(query, address, { commentKinds: [KIND.COMMENT] })
     const loaded = new Set(known)
-    const roots = foldFolder([...read.values()], referencedAddresses)
+    const outside = foldFolder([...read.values()], referencedAddresses)
       .conversations.filter((conversation) => !loaded.has(conversation.root.folder))
-      .map((conversation) => conversation.id)
-    if (!roots.length) return [...read.values()]
+      .sort((a, b) => b.lastAt - a.lastAt)
+      .slice(0, MAX_MENTION_THREADS)
+    if (!outside.length) return [...read.values()]
+    const folderOf = new Map(outside.map((conversation) => [conversation.id, conversation.root.folder]))
+    const roots = [...folderOf.keys()]
     const messages = [KIND.MESSAGE, KIND.COMMENT]
+    const answered = await this.relay.queryAll(
+      [
+        { ids: roots, kinds: messages, limit: roots.length },
+        { kinds: messages, '#e': roots, limit: MENTION_THREAD_PAGE },
+        { kinds: [KIND.COMMENT], '#E': roots, limit: MENTION_THREAD_PAGE },
+      ],
+      { maxPages: 1 },
+    )
     const thread = keep(
-      await this.relay.queryAll([
-        { ids: roots, kinds: messages },
-        { kinds: messages, '#e': roots },
-        { kinds: [KIND.COMMENT], '#E': roots },
-      ]),
+      answered.filter(
+        (event) =>
+          folderOf.has(event.id) ||
+          event.tags.some((tag) => (tag[0] === 'e' || tag[0] === 'E') && folderOf.has(tag[1]) && folderOf.get(tag[1]) === folderOfEvent(event)),
+      ),
     )
     const ids = [...new Set(thread.map((event) => event.id))]
-    if (ids.length) keep(await this.relay.queryAll([{ kinds: [KIND.MESSAGE_EDIT], '#e': ids }]))
+    if (ids.length) keep(await this.relay.queryAll([{ kinds: [KIND.MESSAGE_EDIT], '#e': ids, limit: MENTION_THREAD_PAGE }], { maxPages: 1 }))
     return [...read.values()]
   }
 
