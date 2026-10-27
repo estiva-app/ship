@@ -25,7 +25,6 @@ import { beginSignIn, beginSignOut, signInAvailable, signedIn } from './auth/est
 import { identifierFromRef, type FolderSummary } from '@estiva-app/interop'
 import { archivesOf, type Archives } from '@/lib/archive'
 import { MentionPeopleProvider, WorkspacePeopleProvider, mentionPeople, workspacePeople } from '@/components/editing/mentionables'
-import { mentionableIn } from '@/api/people'
 import { useRoster } from '@/api/useRoster'
 import { go, href, navigateTo, replace, useRoute, type Route } from './router'
 
@@ -100,14 +99,14 @@ function Shell() {
 
   // Names and faces for everyone in the snapshot; re-read in full on navigation.
   const people = useMemo(() => (state ? peopleIn(state, me) : [me]), [state])
-  // `@` offers the workspace's members, so their names are looked up too (CON-25).
+  // `@` offers the workspace's members, so their names are looked up too (CON-25); with no roster, the people in the snapshot.
   const roster = useRoster()
-  const mentionKeys = useMemo(() => mentionableIn(roster ?? null, people, me), [roster, people])
+  const mentionKeys = useMemo(() => [...(roster ?? people)], [roster, people])
   const named = useMemo(() => [...new Set([...people, ...mentionKeys])], [people, mentionKeys])
   const directory = useDirectory(named, href(route))
   // By its two lookups, which change only when a profile arrives: the view itself is a new object every render.
   const { nameOf, personOf, profileOf } = directory
-  const mentionable = useMemo(() => mentionPeople(mentionKeys, { nameOf, personOf, profileOf }), [mentionKeys, nameOf, personOf, profileOf])
+  const mentionable = useMemo(() => mentionPeople(mentionKeys, me, { nameOf, personOf, profileOf }), [mentionKeys, nameOf, personOf, profileOf])
   // Whom a linked issue's card offers as its assignee: the people the issue page's own picker draws from.
   const cardPeople = useMemo(() => workspacePeople(people, { profileOf }), [people, profileOf])
 
