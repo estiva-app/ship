@@ -4,7 +4,8 @@ import { useNewSince } from '@/lib/useNewSince'
 import { ownConversations, recordChannel } from '@/lib/ownConversation'
 import { pointerToAddress, referenceToPointer, resolveBlockAnchor, toRenderTree, type ContentFormat, type Embed, type LinkResolver, type PartPointer, type SignedEvent } from '@estiva-app/protocol'
 import { linksIn, mentionedInOf } from '@estiva-app/interop'
-import { knownLinkValue, links, useLinksAnswered } from '@/api/linkCards'
+import { knownLinkValue, links, useAskLinks } from '@/api/linkCards'
+import { MAX_LINKS_PER_MESSAGE } from '@/lib/linksNamingCards'
 import type { AttachmentIndex, EditIndex } from '@/api'
 import { signedIn } from '@/auth/estivaId'
 import { useReopenHeld } from '@/auth/heldTyping'
@@ -376,19 +377,21 @@ function withElsewhere(workspace: WorkspaceState, elsewhere: readonly SignedEven
  * memo of `activityFor` to depend on.
  */
 export function useMentionLinks(addr: string | undefined, state: WorkspaceState, elsewhere: readonly SignedEvent[] = []): number {
-  const version = useLinksAnswered()
-  const key = useMemo(() => {
-    if (!addr) return ''
+  const urls = useMemo(() => {
+    if (!addr) return []
     // Read as if every link named the file, so each candidate holding one is kept to ask about.
     const candidates = mentionedInOf(pointingAt(withElsewhere(state, elsewhere).events, addr), addr, () => addr, [KIND.COMMENT])
-    return [...new Set(candidates.flatMap(({ body }) => linksIn(toRenderTree(body, 'marker'))))].join('\n')
+    // The first links of each message, as a drawn message asks, newest messages first, and a ceiling over all:
+    // each answer can cost a relay read. A link past either stays unasked, and keeps its message listed by its `a`.
+    const asked = new Set(candidates.flatMap(({ body }) => linksIn(toRenderTree(body, 'marker')).slice(0, MAX_LINKS_PER_MESSAGE)))
+    return [...asked].slice(0, MAX_MENTION_LINKS_ASKED)
   }, [addr, state, elsewhere])
-  useEffect(() => {
-    // A failed read is said as a change later, and the version moves then.
-    if (key) void links.ask(key.split('\n')).catch(() => {})
-  }, [key])
-  return version
+  // Asked again when the reader says a failed one may be (`useAskLinks`).
+  return useAskLinks(urls)
 }
+
+/** How many links one file's Mentioned in asks about in all: six messages' worth, its newest. */
+const MAX_MENTION_LINKS_ASKED = 6 * MAX_LINKS_PER_MESSAGE
 
 /**
  * The ids of the threads rooted at one of these files: a project's issue

@@ -8,12 +8,14 @@
  * and PEE-26 keeps — so both halves are asserted here.
  */
 import { addrToNaddr, findNaddrs, naddrToAddr, type SignedEvent } from '@estiva-app/protocol'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { renderHook } from '@testing-library/react'
+import { links } from '@/api/linkCards'
 import { foldFolder } from '../nostr/fold'
 import { anchorIndex } from '../nostr/references'
 import { foldWorkspace, type WorkspaceState } from '../nostr/store'
 import type { DirectoryView } from '@/api'
-import { ACTIVITY_HORIZON, activityFor, cardEditOf, subFileThreads } from './ProjectPage'
+import { ACTIVITY_HORIZON, activityFor, cardEditOf, subFileThreads, useMentionLinks } from './ProjectPage'
 
 const FOLDER = 'ffffffff-0000-0000-0000-000000000000'
 const PROJECT = `30850:${'a'.repeat(64)}:the-project`
@@ -134,6 +136,34 @@ describe("an issue's Activity lists mentions written in Folders Ship does not lo
 
   it('drops a message once an edit took the link out', () => {
     expect(listed([peek, unlinked, unlink])).toEqual([peek.id])
+  })
+})
+
+/*
+  Each link a viewer's page asks about can cost a relay read, so a comment
+  packed with app links must not spend every viewer's quota (ship#340's
+  security review): the first eight of a message, as a drawn message asks, and
+  a ceiling over the whole list.
+*/
+describe("what an issue's Mentioned in asks the link reader about", () => {
+  const linksOf = (n: number, from: number) => Array.from({ length: n }, (_, i) => `https://ship.estiva.app/issue/x-${from + i}`).join(' ')
+  const packed = (id: string, n: number, from: number) => event(id, [['A', `30851:${'c'.repeat(64)}:elsewhere`], ['a', ISSUE]], linksOf(n, from))
+  const askedFor = (events: SignedEvent[]) => {
+    const ask = vi.spyOn(links, 'ask').mockResolvedValue(undefined)
+    const answered = vi.spyOn(links, 'answered').mockReturnValue(false)
+    renderHook(() => useMentionLinks(ISSUE, foldWorkspace({ events, folders: [FOLDER] })))
+    const urls = new Set(ask.mock.calls.flatMap(([asked]) => asked))
+    ask.mockRestore()
+    answered.mockRestore()
+    return urls
+  }
+
+  it('asks about the first eight links of a message packed with them, not every one', () => {
+    expect(askedFor([packed('p1', 30, 0)]).size).toBe(8)
+  })
+
+  it('asks about no more than 48 links over the whole list', () => {
+    expect(askedFor(Array.from({ length: 10 }, (_, n) => packed(`q${n}`, 8, 100 + n * 8))).size).toBe(48)
   })
 })
 

@@ -42,18 +42,45 @@ export function useLinksAnswered(): number {
   return useSyncExternalStore(links.changed, links.version)
 }
 
+/** How often one link is asked about in a tab: the first ask and the reader's retries (interop's three). */
+const ASKS_PER_LINK = 4
+const asks = new Map<string, number>()
+const asking = new Set<string>()
+
+/**
+ * Ask what each of these links names, and ask again when the reader says a
+ * failed one may be asked again: its retry only says so (`changed`), it asks
+ * nothing itself, so a link whose first read was refused (a 429 on load) stayed
+ * raw until the page was reloaded. Each link is asked at most `ASKS_PER_LINK`
+ * times a tab, so an answer about another link never makes a failing one cost
+ * another relay read. Returns the reader's version.
+ */
+export function useAskLinks(urls: readonly string[]): number {
+  const version = useLinksAnswered()
+  const key = urls.join('\n')
+  useEffect(() => {
+    if (!key) return
+    for (const url of key.split('\n')) {
+      if (links.answered(url) || asking.has(url) || (asks.get(url) ?? 0) >= ASKS_PER_LINK) continue
+      asks.set(url, (asks.get(url) ?? 0) + 1)
+      asking.add(url)
+      // A failed read is said as a change later (the reader's retry), and this effect asks again then.
+      void links
+        .ask([url])
+        .catch(() => {})
+        .finally(() => asking.delete(url))
+    }
+  }, [key, version])
+  return version
+}
+
 /**
  * Ask what each of these links names, and draw again as the answers come back.
  * Returns the values known so far, by URL — the objects whose cards the surface
  * resolves with the rest of its references.
  */
 export function useLinkValues(urls: readonly string[]): ReadonlyMap<string, string> {
-  useLinksAnswered()
-  const key = urls.join('\n')
-  useEffect(() => {
-    // A failed read is said as a change later (the reader's retry), and this asks again then.
-    if (key) void links.ask(key.split('\n')).catch(() => {})
-  }, [key])
+  useAskLinks(urls)
   const out = new Map<string, string>()
   for (const url of urls) {
     const value = links.known(url)

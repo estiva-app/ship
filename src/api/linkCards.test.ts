@@ -6,13 +6,13 @@
  * for the `d`.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { renderHook, waitFor } from '@testing-library/react'
+import { act, renderHook, waitFor } from '@testing-library/react'
 
 const PK = 'b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46'
 const SQUATTER = 'c562b90f3680a8a4bfc1ab3c8b14e0b7c2d1e7b2c1a9e6d0f7b3a4c5d6e7f809'
 const D = 'f78c3b96-2a3b-4d92-910a-ac25aba672cd'
 
-const held = vi.hoisted(() => ({ authors: [] as string[], others: [] as { kind: number; pubkey: string }[], queries: 0 }))
+const held = vi.hoisted(() => ({ authors: [] as string[], others: [] as { kind: number; pubkey: string }[], queries: 0, refuse: 0 }))
 
 // Each manifest declares `urls` on its own `web` origin only (SPEC §7.7). A wiki reads `/issue/` as its own kind.
 const manifest = (web: string, ...urls: string[][]) => ({ kind: 31990, pubkey: 'c'.repeat(64), tags: [['web', web, 'naddr'], ...urls], content: '{}', created_at: 1, id: 'm'.repeat(64), sig: '' })
@@ -28,6 +28,7 @@ vi.mock('./store', () => ({
     // Answers by kind, as the relay does.
     query: async (filters: { '#d': string[]; kinds?: number[] }[]) => {
       held.queries++
+      if (held.refuse > 0 && held.refuse--) throw new Error('rate-limited: too many requests')
       const events = [...held.authors.map((pubkey) => ({ kind: 30851, pubkey })), ...held.others]
       return events.filter((event) => !filters[0].kinds || filters[0].kinds.includes(event.kind)).map((event) => ({ ...event, tags: [['d', filters[0]['#d'][0]]] }))
     },
@@ -81,6 +82,22 @@ describe('a link a card depends on', () => {
     const swapped = `https://leaf.estiva.app/issue/seven-${D}`
     const { result } = renderHook(() => useLinkValues([swapped]))
     await waitFor(() => expect(result.current.get(swapped)).toBe(`30023:${PK}:${D}`))
+  })
+
+  it('names the issue after its first read was refused, once the reader says to ask again (ship#340 review)', async () => {
+    vi.useFakeTimers()
+    try {
+      held.authors = [PK]
+      held.refuse = 1
+      const { result } = renderHook(() => useLinkValues([url('retried')]))
+      await act(() => vi.advanceTimersByTimeAsync(0))
+      expect(result.current.size).toBe(0)
+      // interop's reader says a failed link may be asked again after 5 s; the hook asks then.
+      await act(() => vi.advanceTimersByTimeAsync(5000))
+      expect(result.current.get(url('retried'))).toBe(`30851:${PK}:${D}`)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('names nothing for another host, and asks the relay nothing for it', async () => {
