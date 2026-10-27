@@ -79,8 +79,9 @@ check(
 check('the deleted issue is gone', !afterDeleteState.issues.some((issue) => issue.title === 'A two'))
 check('the other issue in A is still there', afterDeleteState.issues.some((issue) => issue.title === 'A one'))
 check("B's issue keeps its status without B being read", statusOf(afterDeleteState, 'B one') === 'done', statusOf(afterDeleteState, 'B one'))
-// The fold, not the order its events came back in: a reload replaces one Folder's slice of them.
-const foldOf = ({ events: _, ...state }: WorkspaceState) => JSON.stringify(state)
+// The fold, and the same events in any order: a reload replaces one Folder's slice of them, and loadAll reads a
+// record twice (discovery, then its Folder).
+const foldOf = ({ events, ...state }: WorkspaceState) => JSON.stringify({ ...state, events: [...new Set(events.map((event) => event.id))].sort() })
 check('folds the same as a fresh loadAll', foldOf(afterDeleteState) === foldOf(await store.loadAll()))
 
 // A status change in A arrives.
