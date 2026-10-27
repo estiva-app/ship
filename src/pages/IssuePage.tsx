@@ -17,7 +17,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { IssueView } from '@/views/IssueView'
 import { go, href, type IssueTab } from '../router'
 import { act, actInField, sayOnceLeft, type Say } from './act'
-import { activityFor, cardEditOf, copyText, folderOfMessage, railPeople, threadFor, useMentionLinks } from './ProjectPage'
+import { activityFor, cardEditOf, copyText, folderOfMessage, railPeople, threadFor, useMentionLinks, withElsewhere } from './ProjectPage'
 import { useReferencePage } from '@/api/references'
 
 /**
@@ -115,6 +115,8 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
     // eslint-disable-next-line react-hooks/exhaustive-deps -- a link's answer coming back reads the list again
     [issue, state, directory, archives, linksAnswered, elsewhere],
   )
+  // A row Activity read from elsewhere is edited, deleted and replied to in its own Folder, as any other.
+  const acting = withElsewhere(state, elsewhere)
   /* An issue's comments are its own stream, keyed on its address — SPEC §11.1
      (FOL-16) — so reading it advances that address and one `thread:` context
      per discussion, and never the project's channel: §11.2, and doing it the
@@ -306,7 +308,7 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
           a refusal, which keeps the confirm dialog open behind the banner.
         */
         onDeleteMessage={(messageId) => {
-          const folder = folderOfMessage(state, messageId)
+          const folder = folderOfMessage(acting, messageId)
           return act('Delete', () => deleteMessage(messageId), say, () => refresh(folder ? [folder] : undefined))
         }}
         /*
@@ -328,14 +330,14 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
           evaluate the second half — same reasoning as the deletion above.
         */
         onEditMessage={(messageId, body, removeCard, files) => {
-          const folder = folderOfMessage(state, messageId)
+          const folder = folderOfMessage(acting, messageId)
           if (!folder) {
             return Promise.resolve('That message has no Folder to publish an edit into.')
           }
-          return actInField(removeCard ? 'Remove card' : 'Edit', () => editMessage(folder, messageId, body, cardEditOf(state, messageId, removeCard), files), () => refresh([folder]))
+          return actInField(removeCard ? 'Remove card' : 'Edit', () => editMessage(folder, messageId, body, cardEditOf(acting, messageId, removeCard), files), () => refresh([folder]))
         }}
         onReplyInActivity={(threadId, body, files, picks) => {
-          const conversation = state.conversations.find((c) => c.id === threadId)
+          const conversation = acting.conversations.find((c) => c.id === threadId)
           if (!conversation?.root.folder) return Promise.resolve('That conversation has no Folder to reply into.')
           return actInField('Reply', () => reply(conversation, conversation.root.folder, body, files, picks?.urgent, picks?.embeds), () => refresh([conversation.root.folder]))
         }}

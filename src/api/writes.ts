@@ -651,13 +651,11 @@ export function editMessage(folder: string, messageEventId: string, body: string
   // Files left as they were still ride the edit: an edit is the whole new message, and one with none takes them off.
   // why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/an-edit-is-the-whole-new-message.md
   const files = changedFiles ?? card?.files
-  // With the message not in hand its files are unknown, and an edit listing none would take them off.
-  if (!card && !changedFiles) return Promise.resolve(refused('The message could not be read, so the edit was not sent. Try again.'))
+  // With the message not in hand, its file and the message it answers are unknown: the edit could `q` its own parent
+  // or tag its own file, and with no files listed it would take them off. Every message a page draws is in hand,
+  // Activity's rows read from elsewhere included, so this is a message the page never read.
+  if (!card) return Promise.resolve(refused('The message could not be read, so the edit was not sent. Try again.'))
   return publish(async () => {
-    // With the message not in hand, its file and the message it answers are unknown, but the edit still says what its
-    // new words link: an edit with none says they link nothing, and readers drop it from every Mentioned in. Its own
-    // file, if the words link it, is tagged too; a reader never lists a comment under the file it is on (`anchorsOf`).
-    if (!card) return store.editMessage({ folder, messageEventId, body, files, linkTags: await tagsEarnedBy(body, {}, true) })
     if (card.remove) {
       // ✕ on a sent card: the text as it was, byte for byte, so the message is not marked edited (§7.2.1).
       const linkTags = await tagsEarnedBy(card.before, card.own, true)

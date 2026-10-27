@@ -346,9 +346,10 @@ let pointed: { events: readonly SignedEvent[]; addr: string; out: SignedEvent[] 
 function pointingAt(events: readonly SignedEvent[], addr: string): SignedEvent[] {
   if (pointed?.events === events && pointed.addr === addr) return pointed.out
   const at = new Set(events.filter((event) => event.tags.some((t) => t[0] === 'a' && t[1] === addr)))
-  const ids = new Set([...at].map((event) => (event.kind === KIND.MESSAGE_EDIT ? editTargetOf(event) : event.id.toLowerCase())))
-  const out = events.filter((event) => at.has(event) || ids.has(event.id.toLowerCase()) || (event.kind === KIND.MESSAGE_EDIT && ids.has(editTargetOf(event))))
-  pointed = { events, addr, out }
+  // An edit naming no target points at nothing: kept out, or every other target-less edit would match it.
+  const ids = new Set([...at].flatMap((event) => (event.kind === KIND.MESSAGE_EDIT ? (editTargetOf(event) ?? []) : [event.id.toLowerCase()])))
+  const out = events.filter((event) => at.has(event) || ids.has(event.id.toLowerCase()) || (event.kind === KIND.MESSAGE_EDIT && ids.has(editTargetOf(event) ?? '')))
+  pointed ={ events, addr, out }
   return out
 }
 
@@ -360,7 +361,7 @@ let merged: { workspace: WorkspaceState; elsewhere: readonly SignedEvent[]; stat
  * nothing new means the workspace as it is. Kept for the last pair, so the
  * page folds once per read rather than once per draw.
  */
-function withElsewhere(workspace: WorkspaceState, elsewhere: readonly SignedEvent[]): WorkspaceState {
+export function withElsewhere(workspace: WorkspaceState, elsewhere: readonly SignedEvent[]): WorkspaceState {
   if (!elsewhere.length) return workspace
   if (merged?.workspace === workspace && merged.elsewhere === elsewhere) return merged.state
   const held = new Set(workspace.events.map((event) => event.id))
@@ -521,6 +522,8 @@ export function ProjectPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- a link's answer coming back reads the list again
     [project, state, directory, archives, linksAnswered, elsewhere],
   )
+  // A row Activity read from elsewhere is edited, deleted and replied to in its own Folder, as any other.
+  const acting = withElsewhere(state, elsewhere)
 
   /*
     The project's OWN conversation — CON-9, and this line changed with it.
@@ -770,7 +773,7 @@ export function ProjectPage({
           a refusal, which keeps the confirm dialog open behind the banner.
         */
         onDeleteMessage={(messageId) => {
-          const folder = folderOfMessage(state, messageId)
+          const folder = folderOfMessage(acting, messageId)
           return act('Delete', () => deleteMessage(messageId), say, () => refresh(folder ? [folder] : undefined))
         }}
         /*
@@ -792,14 +795,14 @@ export function ProjectPage({
           evaluate the second half — same reasoning as the deletion above.
         */
         onEditMessage={(messageId, body, removeCard, files) => {
-          const folder = folderOfMessage(state, messageId)
+          const folder = folderOfMessage(acting, messageId)
           if (!folder) {
             return Promise.resolve('That message has no Folder to publish an edit into.')
           }
-          return actInField(removeCard ? 'Remove card' : 'Edit', () => editMessage(folder, messageId, body, cardEditOf(state, messageId, removeCard), files), () => refresh([folder]))
+          return actInField(removeCard ? 'Remove card' : 'Edit', () => editMessage(folder, messageId, body, cardEditOf(acting, messageId, removeCard), files), () => refresh([folder]))
         }}
         onReplyInActivity={(threadId, body, files, picks) => {
-          const conversation = state.conversations.find((c) => c.id === threadId)
+          const conversation = acting.conversations.find((c) => c.id === threadId)
           if (!conversation?.root.folder) return Promise.resolve('That conversation has no Folder to reply into.')
           return actInField('Reply', () => reply(conversation, conversation.root.folder, body, files, picks?.urgent, picks?.embeds), () => refresh([conversation.root.folder]))
         }}

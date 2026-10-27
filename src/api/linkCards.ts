@@ -44,16 +44,24 @@ export function useLinksAnswered(): number {
 
 /** How often one link is asked about in a tab: the first ask and the reader's retries (interop's three). */
 const ASKS_PER_LINK = 4
+/**
+ * How long a failed link waits before it is asked again: just under the
+ * reader's own retry (5, 10, 20 s), so its `changed` finds the wait over while
+ * another link's answer, a moment after the failure, does not.
+ */
+const RETRY_WAIT_MS = 4000
 const asks = new Map<string, number>()
 const asking = new Set<string>()
+const waitUntil = new Map<string, number>()
 
 /**
  * Ask what each of these links names, and ask again when the reader says a
  * failed one may be asked again: its retry only says so (`changed`), it asks
  * nothing itself, so a link whose first read was refused (a 429 on load) stayed
- * raw until the page was reloaded. Each link is asked at most `ASKS_PER_LINK`
- * times a tab, so an answer about another link never makes a failing one cost
- * another relay read. Returns the reader's version.
+ * raw until the page was reloaded. A failed link waits out its back-off, and
+ * each link is asked at most `ASKS_PER_LINK` times a tab, so an answer about
+ * another link never makes a failing one cost another relay read. Returns the
+ * reader's version.
  */
 export function useAskLinks(urls: readonly string[]): number {
   const version = useLinksAnswered()
@@ -62,12 +70,14 @@ export function useAskLinks(urls: readonly string[]): number {
     if (!key) return
     for (const url of key.split('\n')) {
       if (links.answered(url) || asking.has(url) || (asks.get(url) ?? 0) >= ASKS_PER_LINK) continue
-      asks.set(url, (asks.get(url) ?? 0) + 1)
+      if (Date.now() < (waitUntil.get(url) ?? 0)) continue
+      const asked = (asks.get(url) ?? 0) + 1
+      asks.set(url, asked)
       asking.add(url)
       // A failed read is said as a change later (the reader's retry), and this effect asks again then.
       void links
         .ask([url])
-        .catch(() => {})
+        .catch(() => waitUntil.set(url, Date.now() + RETRY_WAIT_MS * 2 ** (asked - 1)))
         .finally(() => asking.delete(url))
     }
   }, [key, version])

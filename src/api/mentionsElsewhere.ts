@@ -56,7 +56,8 @@ export function useMentionsElsewhere(addr: string | undefined, state: WorkspaceS
       store
         .mentionThreads(target, r.folders)
         .then((events) => {
-          if (r.addr === target) setHeld({ addr: target, events })
+          // The same events as held keep the held array, so Activity does not fold the workspace again for nothing.
+          if (r.addr === target) setHeld((before) => (before?.addr === target && sameEvents(before.events, events) ? before : { addr: target, events }))
         })
         .catch(() => {})
         .finally(() => {
@@ -77,4 +78,10 @@ export function useMentionsElsewhere(addr: string | undefined, state: WorkspaceS
     }
   }, [])
   return held && held.addr === addr ? held.events : NONE
+}
+
+function sameEvents(a: readonly SignedEvent[], b: readonly SignedEvent[]): boolean {
+  if (a.length !== b.length) return false
+  const ids = new Set(a.map((event) => event.id))
+  return b.every((event) => ids.has(event.id))
 }

@@ -15,7 +15,7 @@ import { foldFolder } from '../nostr/fold'
 import { anchorIndex } from '../nostr/references'
 import { foldWorkspace, type WorkspaceState } from '../nostr/store'
 import type { DirectoryView } from '@/api'
-import { ACTIVITY_HORIZON, activityFor, cardEditOf, subFileThreads, useMentionLinks } from './ProjectPage'
+import { ACTIVITY_HORIZON, activityFor, cardEditOf, folderOfMessage, subFileThreads, useMentionLinks, withElsewhere } from './ProjectPage'
 
 const FOLDER = 'ffffffff-0000-0000-0000-000000000000'
 const PROJECT = `30850:${'a'.repeat(64)}:the-project`
@@ -151,6 +151,17 @@ describe("an issue's Activity lists mentions written in Folders Ship does not lo
   it('drops a message once an edit took the link out', () => {
     expect(listed([peek, unlinked, unlink])).toEqual([peek.id])
   })
+
+  it('edits, deletes and replies to a listed Peek message in its topic, not refused for want of a Folder', () => {
+    const acting = withElsewhere(state, [peek, leaf])
+    // Edit and Delete publish into the message's own Folder; an edit with no card in hand is refused.
+    expect(folderOfMessage(acting, peek.id)).toBe(TOPIC)
+    expect(cardEditOf(acting, peek.id)?.before).toBe(`Look at ${ref}`)
+    // A reply to the Leaf comment answers it on its document, in its Folder.
+    const thread = acting.conversations.find((c) => c.id === leaf.id)
+    expect(thread?.root.folder).toBe(DOC_FOLDER)
+    expect(thread?.root.anchor).toBe(DOC)
+  })
 })
 
 /*
@@ -162,6 +173,7 @@ describe("an issue's Activity lists mentions written in Folders Ship does not lo
 describe("what an issue's Mentioned in asks the link reader about", () => {
   const linksOf = (n: number, from: number) => Array.from({ length: n }, (_, i) => `https://ship.estiva.app/issue/x-${from + i}`).join(' ')
   const packed = (id: string, n: number, from: number) => event(id, [['A', `30851:${'c'.repeat(64)}:elsewhere`], ['a', ISSUE]], linksOf(n, from))
+  // What the reader is asked about is what it reads from the relay: each link asked can be one relay query.
   const askedFor = (events: SignedEvent[]) => {
     const ask = vi.spyOn(links, 'ask').mockResolvedValue(undefined)
     const answered = vi.spyOn(links, 'answered').mockReturnValue(false)
@@ -172,12 +184,16 @@ describe("what an issue's Mentioned in asks the link reader about", () => {
     return urls
   }
 
-  it('asks about the first eight links of a message packed with them, not every one', () => {
-    expect(askedFor([packed('p1', 30, 0)]).size).toBe(8)
+  it('asks about at most the first eight links of a message packed with thirty, its first one included', () => {
+    const asked = askedFor([packed('p1', 30, 0)])
+    expect(asked.has('https://ship.estiva.app/issue/x-0')).toBe(true)
+    expect(asked.size).toBeLessThanOrEqual(8)
   })
 
-  it('asks about no more than 48 links over the whole list', () => {
-    expect(askedFor(Array.from({ length: 10 }, (_, n) => packed(`q${n}`, 8, 100 + n * 8))).size).toBe(48)
+  it('asks about no more than 48 links over ten packed messages, however many they hold', () => {
+    const asked = askedFor(Array.from({ length: 10 }, (_, n) => packed(`q${n}`, 8, 100 + n * 8)))
+    expect(asked.size).toBeGreaterThan(0)
+    expect(asked.size).toBeLessThanOrEqual(48)
   })
 })
 

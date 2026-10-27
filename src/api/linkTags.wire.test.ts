@@ -85,12 +85,20 @@ describe('an edit says what the message links now', () => {
     expect(edit.tags.filter((t) => t[0] === 'p' || t[0] === 'urgent' || t[0] === 'part')).toEqual([])
   })
 
-  it('an edit of a message not in hand, with its files changed, still carries the a its new words earn', async () => {
-    const result = await editMessage(FOLDER, 'c'.repeat(64), `now about ${issueAt(6)}`, undefined, [])
-    expect(result).toEqual({ ok: true })
+  it('an edit of a message not in hand is refused and signs nothing, so it cannot quote its own parent', async () => {
+    const PARENT = 'a'.repeat(64)
+    const before = wire.sent.length
+    const result = await editMessage(FOLDER, 'c'.repeat(64), `now about ${messageReference(PARENT, 1111)}`, undefined, [])
+    expect(result).toMatchObject({ ok: false })
+    expect(wire.sent.length).toBe(before)
+  })
+
+  it('an edit that takes every link out carries none, so the message leaves every Mentioned in', async () => {
+    await editMessage(FOLDER, 'c'.repeat(64), 'never mind', { before: `see ${issueAt(5)} and ${issueAt(6)}`, here: ISSUE, own: { file: ISSUE }, files: [] })
     const edit = wire.sent.at(-1)!
     expect(edit.kind).toBe(40003)
-    expect(values(edit, 'a')).toEqual([`30851:${PK}:${d(6)}`])
+    expect(edit.content).toBe('never mind')
+    expect(edit.tags.filter((t) => t[0] === 'a' || t[0] === 'q')).toEqual([])
   })
 
   it('an edit handed p, part and urgent tags signs only the a and q: it never notifies again or claims a block part', async () => {

@@ -94,13 +94,13 @@ describe('a pasted block link', () => {
     expect(card!.compareDocumentPosition(c.querySelector('[data-message] .break-words')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
-  it('draws the block of a link past the first eight, which the link reader is never asked about, as Peek does', () => {
-    // The reader answers nothing for this issue: only the first eight links of a message are asked about.
+  it('draws the block of a link the link reader has not answered, from the link naming its file, as Peek does', () => {
+    // The reader answers nothing for this issue (a link past a message's first eight is never asked about), yet the
+    // words still link the part's file, so its block draws.
     const LATE = 'c0ffee00-d4a2-4833-8f2a-6aa1e2f3c4d5'
     const late = `30851:${'f'.repeat(64)}:${LATE}`
     views.set(late, { state: 'unreadable' })
-    const others = Array.from({ length: 8 }, (_, n) => `https://example.com/page-${n}`).join(' ')
-    const body = `${others} https://ship.estiva.app/issue/later-${LATE}#block-p2`
+    const body = `https://ship.estiva.app/issue/later-${LATE}#block-p2`
     const c = render(<ThreadList threads={[{ ...thread(body), root: { ...thread(body).root, parts: [{ address: late, block: 'p2' }] } }]} onStart={async () => true} onReply={async () => true} />).container
     expect(c.querySelector('[data-part]')).not.toBeNull()
   })

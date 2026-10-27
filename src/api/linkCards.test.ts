@@ -12,7 +12,17 @@ const PK = 'b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46'
 const SQUATTER = 'c562b90f3680a8a4bfc1ab3c8b14e0b7c2d1e7b2c1a9e6d0f7b3a4c5d6e7f809'
 const D = 'f78c3b96-2a3b-4d92-910a-ac25aba672cd'
 
-const held = vi.hoisted(() => ({ authors: [] as string[], others: [] as { kind: number; pubkey: string }[], queries: 0, refuse: 0 }))
+const held = vi.hoisted(() => ({
+  authors: [] as string[],
+  others: [] as { kind: number; pubkey: string }[],
+  queries: 0,
+  refuse: 0,
+  // Reads refused by `d`, and every `d` asked, in order.
+  refuseD: new Map<string, number>(),
+  asked: [] as string[],
+  // How long the relay takes to answer a `d`, in ms.
+  slowD: new Map<string, number>(),
+}))
 
 // Each manifest declares `urls` on its own `web` origin only (SPEC §7.7). A wiki reads `/issue/` as its own kind.
 const manifest = (web: string, ...urls: string[][]) => ({ kind: 31990, pubkey: 'c'.repeat(64), tags: [['web', web, 'naddr'], ...urls], content: '{}', created_at: 1, id: 'm'.repeat(64), sig: '' })
@@ -28,7 +38,16 @@ vi.mock('./store', () => ({
     // Answers by kind, as the relay does.
     query: async (filters: { '#d': string[]; kinds?: number[] }[]) => {
       held.queries++
+      const d = filters[0]['#d'][0]
+      held.asked.push(d)
+      const slow = held.slowD.get(d)
+      if (slow) await new Promise((resolve) => setTimeout(resolve, slow))
       if (held.refuse > 0 && held.refuse--) throw new Error('rate-limited: too many requests')
+      const refused = held.refuseD.get(d) ?? 0
+      if (refused > 0) {
+        held.refuseD.set(d, refused - 1)
+        throw new Error('rate-limited: too many requests')
+      }
       const events = [...held.authors.map((pubkey) => ({ kind: 30851, pubkey })), ...held.others]
       return events.filter((event) => !filters[0].kinds || filters[0].kinds.includes(event.kind)).map((event) => ({ ...event, tags: [['d', filters[0]['#d'][0]]] }))
     },
@@ -96,6 +115,34 @@ describe('a link a card depends on', () => {
       await act(() => vi.advanceTimersByTimeAsync(5000))
       expect(result.current.get(url('retried'))).toBe(`30851:${PK}:${D}`)
     } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('does not ask a refused link again when another link answers, only when the reader says to (ship#340 review)', async () => {
+    vi.useFakeTimers()
+    try {
+      held.authors = [PK]
+      held.asked = []
+      const failing = 'a1b2c3d4-0000-4000-8000-000000000001'
+      // Refused twice: an early second ask (on the other link's answer) would spend the retry's answer.
+      held.refuseD.set(failing, 2)
+      // The other link answers a moment after the refusal, as a relay under load does.
+      held.slowD.set(D, 300)
+      const refused = `https://ship.estiva.app/issue/refused-${failing}`
+      const { result } = renderHook(() => useLinkValues([refused, url('answers')]))
+      await act(() => vi.advanceTimersByTimeAsync(1000))
+      expect(result.current.get(url('answers'))).toBe(`30851:${PK}:${D}`)
+      expect(held.asked.filter((d) => d === failing)).toHaveLength(1)
+      // The reader's retries say so at 5 s and 10 s after each failure; the second answers.
+      await act(() => vi.advanceTimersByTimeAsync(5000))
+      expect(held.asked.filter((d) => d === failing)).toHaveLength(2)
+      await act(() => vi.advanceTimersByTimeAsync(10000))
+      expect(result.current.get(refused)).toBe(`30851:${PK}:${failing}`)
+      expect(held.asked.filter((d) => d === failing)).toHaveLength(3)
+    } finally {
+      held.refuseD.clear()
+      held.slowD.clear()
       vi.useRealTimers()
     }
   })
