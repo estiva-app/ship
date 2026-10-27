@@ -654,9 +654,10 @@ export function editMessage(folder: string, messageEventId: string, body: string
   // With the message not in hand its files are unknown, and an edit listing none would take them off.
   if (!card && !changedFiles) return Promise.resolve(refused('The message could not be read, so the edit was not sent. Try again.'))
   return publish(async () => {
-    // With the message not in hand, its file and the message it answers are unknown, so the edit names no links
-    // rather than name its own file as a mention; readers confirm a mention against the words either way.
-    if (!card) return store.editMessage({ folder, messageEventId, body, files })
+    // With the message not in hand, its file and the message it answers are unknown, but the edit still says what its
+    // new words link: an edit with none says they link nothing, and readers drop it from every Mentioned in. Its own
+    // file, if the words link it, is tagged too; a reader never lists a comment under the file it is on (`anchorsOf`).
+    if (!card) return store.editMessage({ folder, messageEventId, body, files, linkTags: await tagsEarnedBy(body, {}, true) })
     if (card.remove) {
       // ✕ on a sent card: the text as it was, byte for byte, so the message is not marked edited (§7.2.1).
       const linkTags = await tagsEarnedBy(card.before, card.own, true)

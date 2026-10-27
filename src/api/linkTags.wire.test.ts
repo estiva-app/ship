@@ -85,6 +85,14 @@ describe('an edit says what the message links now', () => {
     expect(edit.tags.filter((t) => t[0] === 'p' || t[0] === 'urgent' || t[0] === 'part')).toEqual([])
   })
 
+  it('an edit of a message not in hand, with its files changed, still carries the a its new words earn', async () => {
+    const result = await editMessage(FOLDER, 'c'.repeat(64), `now about ${issueAt(6)}`, undefined, [])
+    expect(result).toEqual({ ok: true })
+    const edit = wire.sent.at(-1)!
+    expect(edit.kind).toBe(40003)
+    expect(values(edit, 'a')).toEqual([`30851:${PK}:${d(6)}`])
+  })
+
   it('an edit that takes every link out carries none', async () => {
     await editMessage(FOLDER, 'c'.repeat(64), 'never mind', { before: `see ${issueAt(5)}`, here: ISSUE, own: { file: ISSUE }, files: [] })
     const edit = wire.sent.at(-1)!
