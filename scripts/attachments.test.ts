@@ -94,19 +94,26 @@ function editOf(target: string, at: number, files: string[], id?: string): Signe
 {
   const root = message({ tags: [imetaTag(meta)] })
   const out = foldAttachments([root, editOf(root.id, 1_700_000_100, [])])
-  check('an edit without imeta leaves the set as it was', out[root.id]?.length === 1 && out[root.id]?.[0].x === SHA)
+  // An edit is the whole new message (SPEC §6.8): one with no imeta takes every file off.
+  check('an edit without imeta takes every file off', out[root.id] === undefined)
 }
 
 {
   const root = message({ tags: [imetaTag(meta)] })
-  // Out of order on purpose, and the latest carries none: it must not clear.
+  // Out of order on purpose: the latest edit is the set, whichever arrives first.
   const out = foldAttachments([
-    editOf(root.id, 1_700_000_300, []),
-    editOf(root.id, 1_700_000_200, [THIRD]),
+    editOf(root.id, 1_700_000_300, [THIRD]),
+    editOf(root.id, 1_700_000_200, []),
     root,
     editOf(root.id, 1_700_000_100, [OTHER]),
   ])
-  check('the latest edit carrying imeta wins over an earlier one', out[root.id]?.length === 1 && out[root.id]?.[0].x === THIRD)
+  check('the latest edit wins over an earlier one, even one that took the files off', out[root.id]?.length === 1 && out[root.id]?.[0].x === THIRD)
+}
+
+{
+  const root = message({ tags: [imetaTag(meta)] })
+  const out = foldAttachments([editOf(root.id, 1_700_000_200, []), root, editOf(root.id, 1_700_000_100, [THIRD])])
+  check('the latest edit taking the files off clears an earlier edit’s set', out[root.id] === undefined)
 }
 
 {

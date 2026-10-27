@@ -292,6 +292,13 @@ describe('the card a comment sent from Ship carries (WBM-7, SPEC §13.6.2)', () 
     expect(sent).toEqual([])
   })
 
+  it('every file taken off in the box goes out as an edit listing none, not the ones the message had', async () => {
+    const { sent, imetas } = signed()
+    expect(await editMessage(TEAM.folder, MSG, 'worded', { before: 'worded', here: ISSUE.addr, files: [kept] }, [])).toEqual({ ok: true })
+    expect(sent.at(-1)).toMatchObject({ kind: 40003, content: 'worded' })
+    expect(imetas()).toEqual([])
+  })
+
   it('files changed in the box replace the ones the message had', async () => {
     const { imetas } = signed()
     const added = { url: `/media/${'c'.repeat(64)}.pdf`, m: 'application/pdf', x: 'c'.repeat(64), size: 9, filename: 'new.pdf' }
