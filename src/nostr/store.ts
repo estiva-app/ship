@@ -106,7 +106,7 @@ export interface WorkspaceState extends FolderState {
   edits: Record<string, EditFold>
   /**
    * Message id → the files it carries: its own `imeta`, replaced by the
-   * latest edit carrying any (CON-12, §6.8).
+   * latest edit's, an edit with none taking them all off (CON-12, §6.8).
    *
    * Beside the fold for the same reason as `edits`: a `files` field on
    * `Message` would walk into the conformance test's union of keys and turn

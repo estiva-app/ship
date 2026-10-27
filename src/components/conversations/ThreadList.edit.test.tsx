@@ -237,14 +237,14 @@ describe('the files of a message being edited', () => {
     await waitFor(() => expect(onEditMessage).toHaveBeenCalledWith('root-1', 'Key is in 1Password.', undefined, [kept]))
   })
 
-  it('will not take the last one off, and says so under the box', async () => {
+  it('takes the last one off: the edit saves with no files (SPEC §6.8)', async () => {
     const onEditMessage = vi.fn(async (): Promise<true | string> => true)
     open({ threads: [withFile], onEditMessage })
     await openEditor()
     fireEvent.click(screen.getByRole('button', { name: /Remove brief\.pdf/ }))
     fireEvent.click(save())
-    expect(await screen.findByText(/the last file cannot be taken off a message yet/)).toBeTruthy()
-    expect(onEditMessage).not.toHaveBeenCalled()
+    await waitFor(() => expect(onEditMessage).toHaveBeenCalledWith('root-1', 'Blocked on the Stripe key.', undefined, []))
+    expect(screen.queryByText(/cannot be taken off/)).toBeNull()
   })
 })
 

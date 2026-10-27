@@ -161,9 +161,8 @@ export function ConversationBox({ kind, onSend, references, captions, nameOf, re
     // An edit makes nobody urgent (CON-24), and keeps the message's cards by its own rule (`cardEditOf`).
     // An edit with no words is refused here (Delete removes a message), and an unchanged one closes with nothing published.
     if (editing && !text) return { accepted: false, reason: 'a message needs words; Delete removes it' }
-    // A file can be added or taken off while editing (Miky, 26 Oct, PEEKM-4): the whole set rides the edit as `imeta`.
-    // An edit with no `imeta` leaves the set as it was, so no edit can take the last one off.
-    if (editing && attached.length === 0 && (editing.files?.length ?? 0) > 0) return { accepted: false, reason: 'the last file cannot be taken off a message yet' }
+    // A file can be added or taken off while editing (Miky, 26 Oct, PEEKM-4): the whole set rides the edit as `imeta`,
+    // and an edit with none takes every file off (SPEC §6.8).
     const unchanged = editing && text === editing.body.trim() && sameFiles(attached, editing.files ?? [])
     const answer = unchanged
       ? true
