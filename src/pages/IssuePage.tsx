@@ -6,7 +6,7 @@ import { ArchiveDialog } from '@/components/ArchiveDialog'
 import { ArchivedNotice } from '@/components/ArchivedNotice'
 import { archivedLine, lockedReason, ownArchive, type Archives } from '@/lib/archive'
 import { ISSUE_STATUSES, lookupStatus, addMentioned, archiveIssue, commentsOn, deleteIssue, deleteMessage, editMessage, react, reply, setIssueField, unreact, startConversation, type DirectoryView, type FolderState, type WorkspaceState, threadContext, fileContext, useMergedReadState, useFeedJudges, unreadByThread } from '@/api'
-import { me } from '@/api'
+import { me, useMentionsElsewhere } from '@/api'
 import { MEMBER_FIELD_PREFIX, memberOfField } from '@estiva-app/conversation'
 import { useRelated } from '@/api/useRelated'
 import { Members } from '@/components/Members'
@@ -108,11 +108,12 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
   */
   const conversations = useMemo(() => (issue ? commentsOn(state.conversations, issue.addr, state.anchors) : []), [issue, state])
   /* Activity is where else this issue was mentioned (PEE-26). */
-  const linksAnswered = useMentionLinks(issue?.addr, state)
+  const elsewhere = useMentionsElsewhere(issue?.addr, state)
+  const linksAnswered = useMentionLinks(issue?.addr, state, elsewhere)
   const activity = useMemo(
-    () => (issue ? activityFor(issue.addr, state, directory, archives) : { items: [], truncated: 0 }),
+    () => (issue ? activityFor(issue.addr, state, directory, archives, undefined, undefined, elsewhere) : { items: [], truncated: 0 }),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- a link's answer coming back reads the list again
-    [issue, state, directory, archives, linksAnswered],
+    [issue, state, directory, archives, linksAnswered, elsewhere],
   )
   /* An issue's comments are its own stream, keyed on its address — SPEC §11.1
      (FOL-16) — so reading it advances that address and one `thread:` context

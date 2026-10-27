@@ -11,7 +11,7 @@ import { addrToNaddr, findNaddrs, naddrToAddr, type SignedEvent } from '@estiva-
 import { describe, expect, it } from 'vitest'
 import { foldFolder } from '../nostr/fold'
 import { anchorIndex } from '../nostr/references'
-import type { WorkspaceState } from '../nostr/store'
+import { foldWorkspace, type WorkspaceState } from '../nostr/store'
 import type { DirectoryView } from '@/api'
 import { ACTIVITY_HORIZON, activityFor, cardEditOf, subFileThreads } from './ProjectPage'
 
@@ -97,6 +97,43 @@ describe("an issue's Mentioned in, after an edit swaps the link (PEEKM-7)", () =
 
   it('never lists it under the file it is a comment on', () => {
     expect(listed(ELSEWHERE)).toEqual([])
+  })
+})
+
+/*
+  Mentioned in lists a comment wherever it was written (PEEKM-7): a Peek topic
+  message and a Leaf comment on a document sit in Folders Ship never loads, so
+  Activity lists them from the relay's read of every message pointing at the
+  file (`useMentionsElsewhere`), handed to `activityFor` beside the workspace.
+*/
+describe("an issue's Activity lists mentions written in Folders Ship does not load (PEEKM-7)", () => {
+  const TOPIC = '70000000-0000-0000-0000-000000000000'
+  const DOC_FOLDER = 'd0000000-0000-0000-0000-000000000000'
+  const DOC = `30842:${'d'.repeat(64)}:a-document`
+  const url = 'https://ship.estiva.app/issue/plan-the-issue'
+  const resolveLink = (link: string) => (link === url ? ISSUE : undefined)
+  const inFolder = (folder: string, id: string, kind: number, tags: string[][], content: string) =>
+    ({ ...event(id, tags, content), kind, tags: [['h', folder], ...tags] }) as SignedEvent
+  const ref = `nostr:${addrToNaddr(ISSUE)}`
+  const peek = inFolder(TOPIC, '9'.repeat(64), 9, [['a', ISSUE]], `Look at ${ref}`)
+  const leaf = inFolder(DOC_FOLDER, '7'.repeat(64), 1111, [['A', DOC], ['a', DOC], ['K', '30842'], ['a', ISSUE]], `Tracked in ${ref}`)
+  const byUrl = inFolder(TOPIC, '6'.repeat(64), 9, [['a', ISSUE]], `Also ${url}`)
+  const unlinked = inFolder(TOPIC, '5'.repeat(64), 9, [['a', ISSUE]], `Was ${ref}`)
+  const unlink = { ...inFolder(TOPIC, '4'.repeat(64), 40003, [['e', unlinked.id]], 'Was nothing'), created_at: unlinked.created_at + 60 }
+  // Ship loaded only the issue's own Folder, where its comment sits.
+  const state = foldWorkspace({ events: [onIssue('i1')], folders: [FOLDER] })
+  const listed = (elsewhere: SignedEvent[]) => activityFor(ISSUE, state, directory, undefined, resolveLink, () => false, elsewhere).items.map((i) => i.thread.id)
+
+  it('lists a Peek topic message and a Leaf comment on a document that link the issue', () => {
+    expect(listed([peek, leaf]).sort()).toEqual([peek.id, leaf.id].sort())
+  })
+
+  it('lists a message that links the issue by its app link only', () => {
+    expect(listed([byUrl])).toEqual([byUrl.id])
+  })
+
+  it('drops a message once an edit took the link out', () => {
+    expect(listed([peek, unlinked, unlink])).toEqual([peek.id])
   })
 })
 

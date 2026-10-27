@@ -28,7 +28,7 @@ import {
   type CommentRef,
 } from './events'
 import { findNaddrs, naddrToAddr, buildReaction, buildEdit, buildDeletion as buildEventDeletion, imetaTag } from '@estiva-app/protocol'
-import { planArchiveFolder, planCreateFolder, planDeleteFolder, planMoveFromFolders, planPlaceFile, planRenameFolder, planUnlistFile, type FolderRef, type MovableFile, type MoveRefusal } from '@estiva-app/interop'
+import { planArchiveFolder, planCreateFolder, planDeleteFolder, planMoveFromFolders, planPlaceFile, planRenameFolder, planUnlistFile, readMentionedIn, type FolderRef, type MovableFile, type MoveRefusal } from '@estiva-app/interop'
 import { foldFolder, type FolderState } from './fold'
 import { buildMembershipChange, decorationsOf, foldAttachments, foldEdits, foldEmbeds, URGENT_TAG, type Decorations, type EditFold, type QueryFn } from '@estiva-app/conversation'
 import { anchorIndex, type AnchorIndex } from './references'
@@ -1112,6 +1112,47 @@ export class Store {
     return this.relay.queryAll(
       folders.map((folder) => ({ kinds: FOLDER_KINDS, '#h': [folder] })),
     )
+  }
+
+  /**
+   * Every message that may list under `address`'s Mentioned in, wherever it was
+   * written, and the thread it sits in — PEEKM-7.
+   *
+   * The workspace read holds only the Folders Ship loads, so a Peek topic
+   * message or a Leaf comment on a document that links an issue never reaches
+   * it. This is the shared reader's own read across the relay (interop's
+   * `readMentionedIn`: the candidates by `#a`, the messages their edits edit,
+   * every edit of each), and then, for a candidate in a Folder outside `known`,
+   * its thread — the root, the messages under it and their edits — so the row
+   * draws as a thread. Raw events, for a local fold beside the workspace's; the
+   * links are asked by the page's reader, so none is asked here.
+   *
+   * Throws when a read is refused: the caller keeps what it held.
+   */
+  async mentionThreads(address: string, known: readonly string[] = []): Promise<SignedEvent[]> {
+    const read = new Map<string, SignedEvent>()
+    const keep = (events: SignedEvent[]) => {
+      for (const event of events) read.set(event.id, event)
+      return events
+    }
+    const query: QueryFn = async (filters) => keep(await this.relay.query(filters as never))
+    await readMentionedIn(query, address, { commentKinds: [KIND.COMMENT] })
+    const loaded = new Set(known)
+    const roots = foldFolder([...read.values()], referencedAddresses)
+      .conversations.filter((conversation) => !loaded.has(conversation.root.folder))
+      .map((conversation) => conversation.id)
+    if (!roots.length) return [...read.values()]
+    const messages = [KIND.MESSAGE, KIND.COMMENT]
+    const thread = keep(
+      await this.relay.queryAll([
+        { ids: roots, kinds: messages },
+        { kinds: messages, '#e': roots },
+        { kinds: [KIND.COMMENT], '#E': roots },
+      ]),
+    )
+    const ids = [...new Set(thread.map((event) => event.id))]
+    if (ids.length) keep(await this.relay.queryAll([{ kinds: [KIND.MESSAGE_EDIT], '#e': ids }]))
+    return [...read.values()]
   }
 
   /**

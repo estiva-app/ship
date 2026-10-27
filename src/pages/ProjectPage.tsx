@@ -2,7 +2,7 @@ import { IconLinkOff } from '@tabler/icons-react'
 import { newestDrawn, useMarkRead, useShownThreads } from '@/lib/useMarkRead'
 import { useNewSince } from '@/lib/useNewSince'
 import { ownConversations, recordChannel } from '@/lib/ownConversation'
-import { pointerToAddress, referenceToPointer, resolveBlockAnchor, toRenderTree, type ContentFormat, type Embed, type LinkResolver, type PartPointer } from '@estiva-app/protocol'
+import { pointerToAddress, referenceToPointer, resolveBlockAnchor, toRenderTree, type ContentFormat, type Embed, type LinkResolver, type PartPointer, type SignedEvent } from '@estiva-app/protocol'
 import { linksIn, mentionedInOf } from '@estiva-app/interop'
 import { knownLinkValue, links, useLinksAnswered } from '@/api/linkCards'
 import type { AttachmentIndex, EditIndex } from '@/api'
@@ -38,13 +38,15 @@ import {
   commentsOn,
   attachmentOf,
   commentsOnAny,
+  foldWorkspace,
+  useMentionsElsewhere,
   type CardEdit,
   type DirectoryView,
   type FolderState,
   type WorkspaceState,
 } from '@/api'
 import { useRelated } from '@/api/useRelated'
-import { MEMBER_FIELD_PREFIX } from '@estiva-app/conversation'
+import { editTargetOf, MEMBER_FIELD_PREFIX } from '@estiva-app/conversation'
 import { Members } from '@/components/Members'
 import { membershipActions } from './membership'
 import { useReferencePage } from '@/api/references'
@@ -289,12 +291,15 @@ export function placeOf(folder: string, state: FolderState): { where?: string; w
  */
 export function activityFor(
   addr: string,
-  state: WorkspaceState,
+  workspace: WorkspaceState,
   directory: DirectoryView,
   archives?: Archives,
   resolveLink: LinkResolver = knownLinkValue,
   unanswered: (url: string) => boolean = (url) => !links.answered(url),
+  elsewhere: readonly SignedEvent[] = [],
 ): { items: ActivityItem[]; truncated: number } {
+  // A mention written in a Folder Ship does not load — a Peek topic, a Leaf document — is read across the relay (PEEKM-7).
+  const state = withElsewhere(workspace, elsewhere)
   // A thread on an archived file takes no reply or reaction here either (Decided 2026-10-17: none, in every app).
   const closedOn = (file: string | undefined) => {
     if (!file || !archives) return undefined
@@ -326,7 +331,42 @@ export function activityFor(
  * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/activity-lists-only-mentions-from-elsewhere.md
  */
 function mentionedIn(addr: string, state: WorkspaceState, resolveLink: LinkResolver, unanswered: (url: string) => boolean): Set<string> {
-  return new Set(mentionedInOf(state.events, addr, resolveLink, [KIND.COMMENT], unanswered).map(({ event }) => event.id))
+  return new Set(mentionedInOf(pointingAt(state.events, addr), addr, resolveLink, [KIND.COMMENT], unanswered).map(({ event }) => event.id))
+}
+
+let pointed: { events: readonly SignedEvent[]; addr: string; out: SignedEvent[] } | undefined
+
+/**
+ * The few events `mentionedInOf` reads for one file, out of the whole
+ * workspace: what points at it by `a`, the messages its edits edit, and every
+ * edit of each. Kept for the last workspace read, so a link's answer coming
+ * back reads a handful of events again, not every one the workspace holds.
+ */
+function pointingAt(events: readonly SignedEvent[], addr: string): SignedEvent[] {
+  if (pointed?.events === events && pointed.addr === addr) return pointed.out
+  const at = new Set(events.filter((event) => event.tags.some((t) => t[0] === 'a' && t[1] === addr)))
+  const ids = new Set([...at].map((event) => (event.kind === KIND.MESSAGE_EDIT ? editTargetOf(event) : event.id.toLowerCase())))
+  const out = events.filter((event) => at.has(event) || ids.has(event.id.toLowerCase()) || (event.kind === KIND.MESSAGE_EDIT && ids.has(editTargetOf(event))))
+  pointed = { events, addr, out }
+  return out
+}
+
+let merged: { workspace: WorkspaceState; elsewhere: readonly SignedEvent[]; state: WorkspaceState } | undefined
+
+/**
+ * The workspace with the mentions read across the relay folded in, for
+ * Activity only (PEEKM-7). An event the workspace already holds is its own;
+ * nothing new means the workspace as it is. Kept for the last pair, so the
+ * page folds once per read rather than once per draw.
+ */
+function withElsewhere(workspace: WorkspaceState, elsewhere: readonly SignedEvent[]): WorkspaceState {
+  if (!elsewhere.length) return workspace
+  if (merged?.workspace === workspace && merged.elsewhere === elsewhere) return merged.state
+  const held = new Set(workspace.events.map((event) => event.id))
+  const extra = elsewhere.filter((event) => !held.has(event.id))
+  const state = extra.length ? foldWorkspace({ events: [...workspace.events, ...extra], folders: workspace.folders }) : workspace
+  merged = { workspace, elsewhere, state }
+  return state
 }
 
 /**
@@ -335,14 +375,14 @@ function mentionedIn(addr: string, state: WorkspaceState, resolveLink: LinkResol
  * links name decides whether it lists. Returns the reader's version, for a
  * memo of `activityFor` to depend on.
  */
-export function useMentionLinks(addr: string | undefined, state: WorkspaceState): number {
+export function useMentionLinks(addr: string | undefined, state: WorkspaceState, elsewhere: readonly SignedEvent[] = []): number {
   const version = useLinksAnswered()
   const key = useMemo(() => {
     if (!addr) return ''
     // Read as if every link named the file, so each candidate holding one is kept to ask about.
-    const candidates = mentionedInOf(state.events, addr, () => addr, [KIND.COMMENT])
+    const candidates = mentionedInOf(pointingAt(withElsewhere(state, elsewhere).events, addr), addr, () => addr, [KIND.COMMENT])
     return [...new Set(candidates.flatMap(({ body }) => linksIn(toRenderTree(body, 'marker'))))].join('\n')
-  }, [addr, state.events])
+  }, [addr, state, elsewhere])
   useEffect(() => {
     // A failed read is said as a change later, and the version moves then.
     if (key) void links.ask(key.split('\n')).catch(() => {})
@@ -471,11 +511,12 @@ export function ProjectPage({
       })
   }, [project, state, directory, archives])
 
-  const linksAnswered = useMentionLinks(project?.addr, state)
+  const elsewhere = useMentionsElsewhere(project?.addr, state)
+  const linksAnswered = useMentionLinks(project?.addr, state, elsewhere)
   const activity = useMemo(
-    () => (project ? activityFor(project.addr, state, directory, archives) : { items: [], truncated: 0 }),
+    () => (project ? activityFor(project.addr, state, directory, archives, undefined, undefined, elsewhere) : { items: [], truncated: 0 }),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- a link's answer coming back reads the list again
-    [project, state, directory, archives, linksAnswered],
+    [project, state, directory, archives, linksAnswered, elsewhere],
   )
 
   /*
