@@ -360,13 +360,32 @@ let merged: { workspace: WorkspaceState; elsewhere: readonly SignedEvent[]; stat
  * Activity only (PEEKM-7). An event the workspace already holds is its own;
  * nothing new means the workspace as it is. Kept for the last pair, so the
  * page folds once per read rather than once per draw.
+ *
+ * Only the new events are folded: they are whole threads in Folders the
+ * workspace does not hold (`Store.mentionThreads`), so nothing in them edits
+ * or answers a message the workspace folded, and every index beside the fold
+ * is by message id. Folding the whole workspace again cost ~150 ms a refresh
+ * at 11K events.
  */
 export function withElsewhere(workspace: WorkspaceState, elsewhere: readonly SignedEvent[]): WorkspaceState {
   if (!elsewhere.length) return workspace
   if (merged?.workspace === workspace && merged.elsewhere === elsewhere) return merged.state
   const held = new Set(workspace.events.map((event) => event.id))
   const extra = elsewhere.filter((event) => !held.has(event.id))
-  const state = extra.length ? foldWorkspace({ events: [...workspace.events, ...extra], folders: workspace.folders }) : workspace
+  const more = extra.length ? foldWorkspace({ events: extra, folders: [] }) : undefined
+  const state: WorkspaceState = more
+    ? {
+        ...workspace,
+        conversations: [...workspace.conversations, ...more.conversations].sort((a, b) => b.lastAt - a.lastAt),
+        anchors: { ...workspace.anchors, ...more.anchors },
+        edits: { ...workspace.edits, ...more.edits },
+        attachments: { ...workspace.attachments, ...more.attachments },
+        urgent: { ...workspace.urgent, ...more.urgent },
+        parts: { ...workspace.parts, ...more.parts },
+        embeds: { ...workspace.embeds, ...more.embeds },
+        events: [...workspace.events, ...extra],
+      }
+    : workspace
   merged = { workspace, elsewhere, state }
   return state
 }
