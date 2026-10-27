@@ -1,7 +1,7 @@
 import type { Embed, Imeta, NostrTag, PublishResult } from '@estiva-app/protocol'
 import { addrToNaddr, toRenderTree } from '@estiva-app/protocol'
 import { MAX_MENTIONED_PEOPLE, boxLinksOf, embedsToEdit, embedsToSend, namedBefore, withoutCard } from '@estiva-app/conversation'
-import type { OwnPlace } from '@estiva-app/interop'
+import { linksIn, MAX_LINKS_ASKED, within, type OwnPlace } from '@estiva-app/interop'
 import type { Conversation, Issue, Project } from '../nostr/fold'
 import { clashes, explicitKey, keyOfRef, nextRef, projectKeys, suggestKey, takenKeys } from '../nostr/keys'
 import { RELAY_URL } from '../config'
@@ -664,7 +664,10 @@ export function editMessage(folder: string, messageEventId: string, body: string
     }
     // An edit says what the message links now: the whole `a`/`q` set its new words earn (asked first, as at send).
     // The old words are asked about too, as long as the new ones at most, so the card rule reads what they named.
-    const [linkTags] = await Promise.all([tagsEarnedBy(body, card.own, true), tagsEarnedBy(card.before, card.own, true)])
+    const [linkTags] = await Promise.all([
+      tagsEarnedBy(body, card.own, true),
+      within(links.ask(linksIn(toRenderTree(card.before, 'marker')).slice(0, MAX_LINKS_ASKED)), 5000),
+    ])
     const [after, before] = [linkResolverFor(body, links.known), linkResolverFor(card.before, links.known)]
     const read = { resolveLink: (url: string) => after(url) ?? before(url), blockOf: links.knownBlock, here: card.here }
     const embeds = embedsToEdit(boxLinksOf(body, { ...read, previous: namedBefore(card.before, read) }), new Set(), card.embeds)
