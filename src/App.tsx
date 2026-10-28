@@ -112,7 +112,7 @@ function Shell() {
   const cardPeople = useMemo(() => workspacePeople(people, { profileOf }), [people, profileOf])
 
   useCanonicalPath(route)
-  useInbound(route, say)
+  useInbound(route, say, clear)
   /* Read markers are debounced, so the last few of a session would be lost when
      the tab goes away. `visibilitychange` is the one mobile browsers reliably
      fire when a tab is backgrounded or killed (CRO-8). */
@@ -361,21 +361,26 @@ function useCanonicalPath(route: Route) {
  * right surface, or on the issue list with a reason. `replace`, not `go`:
  * Back should not bounce off a route that immediately redirects again.
  */
-function useInbound(route: Route, say: (text: string, tone?: 'ok' | 'error') => void) {
-  // Bumped to ask again after a busy relay; reset whenever the route changes.
-  const [attempt, setAttempt] = useState(0)
-  const saidBusy = useRef(false)
+function useInbound(route: Route, say: (text: string, tone?: 'ok' | 'error') => void, clear: () => void) {
+  /* Bumped to ask a busy relay again. Tied to the link it is for, so another
+     link starts at 0 without a reset that would run the read twice. */
+  const [attempt, setAttempt] = useState<{ naddr: string; n: number } | null>(null)
+  const naddr = route.name === 'inbound' ? route.naddr : null
+  const n = attempt && attempt.naddr === naddr ? attempt.n : 0
+  // The link the busy banner was said for, so it is said once and taken down when that link lands.
+  const saidBusyFor = useRef<string | null>(null)
   useEffect(() => {
-    setAttempt(0)
-    saidBusy.current = false
-  }, [route])
-  useEffect(() => {
-    if (route.name !== 'inbound') return
+    if (naddr === null) return
     let cancelled = false
     let retry: ReturnType<typeof setTimeout> | undefined
-    resolveInbound(route.naddr)
+    resolveInbound(naddr)
       .then((found) => {
         if (cancelled) return
+        // The relay answered: the busy banner is no longer true (SHI-12 — no red over a correct page).
+        if (saidBusyFor.current === naddr) {
+          saidBusyFor.current = null
+          clear()
+        }
         if (!found) {
           say('Could not resolve that reference — you may not have access to its Folder.', 'error')
           return replace({ name: 'issues' })
@@ -398,11 +403,12 @@ function useInbound(route: Route, say: (text: string, tone?: 'ok' | 'error') => 
           issue list with a false reason.
         */
         if (isRelayBusy(reason)) {
-          if (!saidBusy.current) say('Too busy right now — try again shortly.', 'error')
-          saidBusy.current = true
-          retry = setTimeout(() => setAttempt((n) => n + 1), INBOUND_BUSY_RETRY_MS)
+          if (saidBusyFor.current !== naddr) say('Too busy right now — try again shortly.', 'error')
+          saidBusyFor.current = naddr
+          retry = setTimeout(() => setAttempt({ naddr, n: n + 1 }), INBOUND_BUSY_RETRY_MS)
           return
         }
+        if (saidBusyFor.current === naddr) saidBusyFor.current = null
         say('That reference is not a valid nostr address.', 'error')
         replace({ name: 'issues' })
       })
@@ -414,7 +420,7 @@ function useInbound(route: Route, say: (text: string, tone?: 'ok' | 'error') => 
       cancelled = true
       clearTimeout(retry)
     }
-  }, [route, say, attempt])
+  }, [naddr, say, clear, n])
 }
 
 /** How long an inbound link waits before asking a busy relay again (APP-9). */

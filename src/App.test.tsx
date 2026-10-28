@@ -177,6 +177,30 @@ describe('App — the shell around the route', () => {
         await vi.advanceTimersByTimeAsync(10_000)
       })
       await waitFor(() => expect(location.pathname).toBe(`/issue/${D('12')}`))
+      // The relay answered, so the busy words come down: no red over a correct page (SHI-12).
+      expect(screen.queryByText('Too busy right now — try again shortly.')).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('asks the relay once for a new link opened while an earlier one waited on a busy relay', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      vi.mocked(resolveInbound).mockImplementation(async (naddr) => {
+        if (naddr === 'naddr1first') throw new RelayBusyError(503)
+        return { addr: `30851:x:${D('13')}`, kind: 'issue' }
+      })
+      goTo('/o/naddr1first')
+      render(<App />)
+      await waitFor(() => expect(screen.getByText('Too busy right now — try again shortly.')).toBeInTheDocument())
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10_000)
+      })
+
+      act(() => goTo('/o/naddr1second'))
+      await waitFor(() => expect(location.pathname).toBe(`/issue/${D('13')}`))
+      expect(vi.mocked(resolveInbound).mock.calls.filter(([naddr]) => naddr === 'naddr1second')).toHaveLength(1)
     } finally {
       vi.useRealTimers()
     }
