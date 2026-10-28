@@ -68,6 +68,22 @@ export function loadQuery(): QueryFn {
 }
 
 /**
+ * The page's first load, shared by the workspace's first read and the
+ * sidebar's first listing, so a change is read once between them (APP-4): the
+ * workspace reads every change, and the listing's change reads are answered
+ * from that. Paged, as the workspace read must be. Each takes it once and every
+ * later read makes its own, so it is dropped once both have it.
+ */
+const firstLoadFor = new Set(['workspace', 'listing'])
+let firstLoadQuery: QueryFn | undefined
+export function firstLoad(reader: 'workspace' | 'listing'): QueryFn | undefined {
+  if (!firstLoadFor.delete(reader)) return undefined
+  const read = (firstLoadQuery ??= createLoadQuery((filters) => relay.queryAll(filters as never), { paged: true }))
+  if (!firstLoadFor.size) firstLoadQuery = undefined
+  return read
+}
+
+/**
  * Resolve a `nostr:naddr…` (or a bare `kind:pubkey:d`) to a foreign object.
  *
  * Returns null when the reference is malformed or no app claims the kind — both

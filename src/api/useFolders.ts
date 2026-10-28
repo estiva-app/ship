@@ -1,6 +1,6 @@
 import { useEffect, useSyncExternalStore } from 'react'
 import { createRetryingRead } from '@estiva-app/platform'
-import { readFolders } from './foreign'
+import { firstLoad, readFolders } from './foreign'
 import type { FolderSummary } from './foreign'
 import type { QueryFn } from '@estiva-app/interop'
 
@@ -64,7 +64,8 @@ export function reloadFolders(read?: QueryFn): Promise<void> {
 export function useFolders(): FolderSummary[] | undefined {
   const snapshot = useSyncExternalStore(listing.subscribe, listing.snapshot)
   useEffect(() => {
-    void listing.ensure(() => readFolders())
+    // The first attempt shares the page's first load with the workspace read; a retry reads afresh.
+    void listing.ensure(() => readFolders(firstLoad('listing')))
   }, [])
   if (snapshot.value) return snapshot.value
   return snapshot.error !== undefined && !snapshot.retrying ? [] : undefined

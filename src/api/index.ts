@@ -87,6 +87,7 @@ export {
 } from './writes'
 export { clockProblem } from './clock'
 import { signer, store } from './store'
+import { firstLoad } from './foreign'
 import { groupReactions, type EditFold, type Reaction } from '@estiva-app/conversation'
 import type { Imeta } from '@estiva-app/protocol'
 
@@ -97,7 +98,7 @@ import type { Imeta } from '@estiva-app/protocol'
  * `foldWorkspace`.
  */
 export function loadAllEvents(): Promise<WorkspaceEvents> {
-  return store.loadAllEvents()
+  return store.loadAllEvents(firstLoad('workspace'))
 }
 
 /** Re-read only `folders`, keeping the rest of `previous` — PER-17, see `Store.reloadFolders`. */
