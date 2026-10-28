@@ -11,7 +11,7 @@
  * scripts and checks use, still reads every Folder's.
  */
 import { publicKeyFromSecret, signEvent, type Relay, type SignedEvent, type UnsignedEvent } from '@estiva-app/protocol'
-import { Store, foldWorkspace, holdsThreads } from '../src/nostr/store'
+import { Store, foldWorkspace, type ThreadsWanted, type WorkspaceEvents } from '../src/nostr/store'
 import { buildConversationMessage, buildIssue, buildProject, issueAddr, projectAddr } from '../src/nostr/events'
 import { conversationsAbout } from '../src/nostr/fold'
 import type { Signer } from '../src/nostr/signer'
@@ -76,20 +76,25 @@ const THREADS: number[] = [KIND.MESSAGE, KIND.COMMENT, KIND.MESSAGE_EDIT]
 const askedThreadsOf = (folder: string) =>
   asked.flat().some((filter) => (filter['#h'] as string[] | undefined)?.includes(folder) && (filter.kinds as number[]).some((kind) => THREADS.includes(kind)))
 const has = (events: readonly SignedEvent[], event: SignedEvent) => events.some((e) => e.id === event.id)
+// Read off the result, not the store's own predicate: on code without them, every claim below fails as itself.
+const holdsThreads = (read: WorkspaceEvents, wanted: ThreadsWanted) =>
+  wanted.folders.every((folder) => read.threadsAt?.[folder] !== undefined) && wanted.about.every((addr) => !!read.mentionsOf?.includes(addr))
+const readThreads = (previous: WorkspaceEvents, wanted: ThreadsWanted): Promise<WorkspaceEvents> =>
+  typeof store.readThreads === 'function' ? store.readThreads(previous, wanted) : Promise.resolve(previous)
 
 // The issue page of a1: its own Folder's conversation, nothing else's.
 const loaded = await store.loadAllEvents(undefined, (folder) => folder === A)
 check("a load reads the wanted Folder's conversation", has(loaded.events, onA1))
 check("and no other Folder's", !has(loaded.events, onB1) && !has(loaded.events, mentionsA1))
 check('nor asks any other Folder for one', !askedThreadsOf(B) && !askedThreadsOf(C))
-check('and says which Folders it holds', JSON.stringify(Object.keys(loaded.threadsAt)) === JSON.stringify([A]), JSON.stringify(Object.keys(loaded.threadsAt)))
+check('and says which Folders it holds', JSON.stringify(Object.keys(loaded.threadsAt ?? {})) === JSON.stringify([A]), JSON.stringify(Object.keys(loaded.threadsAt ?? {})))
 check('while every Folder still gives its projects and issues', foldWorkspace(loaded).issues.length === 2 && foldWorkspace(loaded).projects.length === 3)
 
 const wanted = { folders: [A], about: [A1] }
 check('it does not yet hold the mentions of a1', !holdsThreads(loaded, wanted))
 
 asked = []
-const withMentions = await store.readThreads(loaded, wanted)
+const withMentions = await readThreads(loaded, wanted)
 check('the Folder mentioning a1 is read for its conversation', has(withMentions.events, mentionsA1) && askedThreadsOf(C))
 check('a Folder that does not mention it is not', !has(withMentions.events, onB1) && !askedThreadsOf(B))
 check('the wanted Folder is not read again', !askedThreadsOf(A))
@@ -97,7 +102,7 @@ check('and now it holds them', holdsThreads(withMentions, wanted))
 check("a1's count is today's: its comment and the mention", conversationsAbout(foldWorkspace(withMentions).conversations, A1).length === 2)
 
 asked = []
-const again = await store.readThreads(withMentions, wanted)
+const again = await readThreads(withMentions, wanted)
 check('asking for what is held reads no Folder', !askedThreadsOf(A) && !askedThreadsOf(C) && again.events.length === withMentions.events.length)
 
 // Live: B changes. Its conversation is not held, so its re-read does not start reading one.
@@ -112,7 +117,7 @@ check('and what was held stays held', holdsThreads(reloaded, wanted))
 
 // The Issues page: every Folder's, after the rows.
 asked = []
-const everything = await store.readThreads(reloaded, { folders: [A, B, C], about: [] })
+const everything = await readThreads(reloaded, { folders: [A, B, C], about: [] })
 check("every Folder's conversation, once asked for", has(everything.events, onB1) && has(everything.events, lateOnB1))
 check('without asking again for the ones held', !askedThreadsOf(A) && !askedThreadsOf(C))
 

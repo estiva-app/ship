@@ -105,7 +105,7 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
     its project's for what `[` offers, and every Folder holding a comment on it
     or a mention of it, for its conversation and Activity.
   */
-  const threadsHeld = useThreads(state, issue ? [issue.folder, ...(project ? [project.contentFolder] : [])] : [], issue ? [issue.addr] : [])
+  const held = useThreads(state, issue ? [issue.folder, ...(project ? [project.contentFolder] : [])] : [], issue ? [issue.addr] : [])
 
   /*
     The object's own discussion — CON-7. `conversationsAbout` returned the union
@@ -139,7 +139,8 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
      it, so marking there cleared Peek's dot for comments nobody had seen. */
   const [shownThreads, onThreadShown] = useShownThreads()
   const drawn = useMemo(() => newestDrawn(conversations, shownThreads), [conversations, shownThreads])
-  const fileContexts = useMemo(() => (tab === 'activity' ? [fileContext(issue?.addr)] : []), [issue, tab])
+  // Nor while its conversations are on the way (APP-5): with none drawn, the mark would be the clock's.
+  const fileContexts = useMemo(() => (tab === 'activity' && held.all ? [fileContext(issue?.addr)] : []), [issue, tab, held.all])
   useMarkRead(fileContexts, drawn.rootsAt)
   useMarkRead(tab === 'activity' ? shownThreads.map(threadContext) : [], drawn.repliesAt)
   const threads = useMemo(
@@ -262,7 +263,8 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
         descriptionBy={issue.fields.description && issue.fields.description.by !== me ? (directory.profileOf(issue.fields.description.by)?.name ?? null) : null}
         related={related}
         threads={threads}
-        conversationsLoading={!threadsHeld}
+        conversationsLoading={!held.folders}
+        mentionsLoading={!held.all}
         unread={unread}
         stillUnread={stillUnread}
         onThreadShown={onThreadShown}

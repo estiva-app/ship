@@ -1466,16 +1466,18 @@ export class Store {
     for (const folder of folders) assertFolderId(folder)
     if (!folders.length) return []
     const at = Date.now()
+    // Decided once, before the read: what is noted as held is what was asked, whatever the screen wants by the answer.
+    const asked = new Map(folders.map((folder) => [folder, [...kindsFor(kinds, folder)]]))
     // One filter per Folder, and the relay clamps per filter — so this gets the
     // ceiling for each Folder rather than sharing one across all of them.
     const events = await read(
       folders.map((folder) => {
-        const asked = [...kindsFor(kinds, folder)]
-        return since[folder] === undefined ? { kinds: asked, '#h': [folder] } : { kinds: asked, '#h': [folder], since: since[folder] }
+        const of = asked.get(folder) ?? []
+        return since[folder] === undefined ? { kinds: of, '#h': [folder] } : { kinds: of, '#h': [folder], since: since[folder] }
       }),
     )
     for (const folder of foldersOf(events)) if (folders.includes(folder)) readAt[folder] = at
-    if (threadsAt) for (const folder of folders) if (kindsFor(kinds, folder).includes(KIND.COMMENT)) threadsAt[folder] = at
+    if (threadsAt) for (const [folder, of] of asked) if (of.includes(KIND.COMMENT)) threadsAt[folder] = at
     return events
   }
 

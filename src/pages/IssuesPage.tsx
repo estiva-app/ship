@@ -55,7 +55,7 @@ export function IssuesPage({ state, directory, archives, say, refresh }: { state
   useReopenHeld(NEW_ISSUE_HOLD, () => setAdding(true))
   const live = useMemo(() => state.issues.filter((issue) => !archives.ofIssue(issue)), [state, archives])
   // A row counts its issue's conversations wherever they are, so every Folder's, read after the rows draw (APP-5).
-  const counted = useThreads(state, state.folders)
+  const counted = useThreads(state, state.folders).all
   const rows = useMemo(() => live.map((issue) => rowFor(issue, state, directory, counted)), [live, state, directory, counted])
   const mine = useMemo(() => new Set(live.filter((issue) => issue.assignee === me).map((issue) => issue.addr)), [live])
   const projectOptions = useMemo(

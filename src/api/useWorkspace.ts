@@ -190,8 +190,9 @@ export function useWorkspace(opened?: Opened): Workspace {
   const wantThreads = useCallback(
     (next: ThreadsWanted): void => {
       wanted.current = next
-      // Before the first whole read there is nothing to add to: that read brings them.
-      if (!events.current || holdsThreads(events.current, next) || asking.current === next) return
+      // Before the first whole read there is nothing to add to, and while one runs it brings them: a read
+      // started here would throw that one away, and with it a Folder this reader has lost since.
+      if (!events.current || inFlight.current || holdsThreads(events.current, next) || asking.current === next) return
       asking.current = next
       // Queued behind the Folder re-reads, as they are behind each other, so neither drops the other's events.
       const run = scoped.current.then(() => {

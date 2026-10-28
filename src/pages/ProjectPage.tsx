@@ -547,15 +547,10 @@ export function ProjectPage({
   /*
     The conversations this page draws, read for it (APP-5): its own Folders,
     and every Folder holding a comment on it or a mention of it, for its
-    conversation, Activity and the Activity tab's mark. The Issues tab counts
-    each issue's conversations wherever they are, as the Issues page does, so
-    there every Folder's — after the rows draw.
+    conversation, Activity and the Activity tab's mark. Its board and table
+    draw no counts, so no other Folder's.
   */
-  const threadsHeld = useThreads(
-    state,
-    !project ? [] : tab === 'issues' ? state.folders : [project.contentFolder, ...(record ? [record] : [])],
-    project ? [project.addr] : [],
-  )
+  const held = useThreads(state, project ? [project.contentFolder, ...(record ? [record] : [])] : [], project ? [project.addr] : [])
 
   const issues = useMemo<IssuesTableRow[]>(() => {
     if (!project) return []
@@ -569,9 +564,9 @@ export function ProjectPage({
       .map((issue) => {
         // Who follows an issue is not an update to it (SHI-31): a Join or an Add does not move it up the table.
         const touched = state.activity.filter((change) => change.target === issue.addr && !change.field.startsWith(MEMBER_FIELD_PREFIX)).at(-1)
-        return { ...rowFor(issue, state, directory, threadsHeld), openedBy: directory.personOf(issue.author), at: touched?.createdAt ?? issue.createdAt }
+        return { ...rowFor(issue, state, directory), openedBy: directory.personOf(issue.author), at: touched?.createdAt ?? issue.createdAt }
       })
-  }, [project, state, directory, archives, threadsHeld])
+  }, [project, state, directory, archives])
 
   const { events: elsewhere, reread: rereadElsewhere } = useMentionsElsewhere(project?.addr, state)
   const linksAnswered = useMentionLinks(project?.addr, state, elsewhere)
@@ -631,7 +626,8 @@ export function ProjectPage({
   const [shownThreads, onThreadShown] = useShownThreads()
   const drawn = useMemo(() => newestDrawn(conversations, shownThreads), [conversations, shownThreads])
   // Only on Activity, where the feed is drawn: Overview and Issues read nothing (66b31c4b, Miky 2026-10-06).
-  const streams = useMemo(() => (tab === 'activity' ? [channelContext(record), fileContext(project?.addr)] : []), [record, project, tab])
+  // Nor while its conversations are on the way (APP-5): with none drawn, the mark would be the clock's.
+  const streams = useMemo(() => (tab === 'activity' && held.all ? [channelContext(record), fileContext(project?.addr)] : []), [record, project, tab, held.all])
   useMarkRead(streams, drawn.rootsAt)
   useMarkRead(tab === 'activity' ? shownThreads.map(threadContext) : [], drawn.repliesAt)
   const threads = useMemo(
@@ -771,7 +767,8 @@ export function ProjectPage({
         hrefFor={hrefForIssue}
         related={related}
         threads={threads}
-        conversationsLoading={!threadsHeld}
+        conversationsLoading={!held.folders}
+        mentionsLoading={!held.all}
         unread={unread}
         stillUnread={stillUnread}
         onThreadShown={onThreadShown}

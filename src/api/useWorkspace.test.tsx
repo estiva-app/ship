@@ -443,9 +443,9 @@ describe('useWorkspace — conversations are read for the screen that draws them
     const whole = pendingRead()
     vi.mocked(loadAllEvents).mockReturnValueOnce(whole.promise)
     const { result } = renderHook(() => useWorkspace())
-    act(() => result.current.wantThreads(WANTED))
-    const asks = vi.mocked(loadAllEvents).mock.calls[0][0]
-    expect([asks(FOLDER), asks(OTHER)]).toEqual([true, false])
+    act(() => result.current.wantThreads?.(WANTED))
+    const asks = vi.mocked(loadAllEvents).mock.calls[0][0] as ((folder: string) => boolean) | undefined
+    expect([asks?.(FOLDER), asks?.(OTHER)]).toEqual([true, false])
     await act(async () => whole.release(stateWith('whole')))
   })
 
@@ -461,7 +461,7 @@ describe('useWorkspace — conversations are read for the screen that draws them
       seen.push(statusOf(workspace.state))
       return workspace
     })
-    act(() => result.current.wantThreads(WANTED))
+    act(() => result.current.wantThreads?.(WANTED))
 
     await act(async () => whole.release(first))
     await waitFor(() => expect(statusOf(result.current.state)).toBe('with threads'))
@@ -469,19 +469,35 @@ describe('useWorkspace — conversations are read for the screen that draws them
     expect(seen).not.toContain('whole')
   })
 
-  it('reads a screen asked for after the whole read once, however often it draws', async () => {
-    vi.mocked(holdsThreads).mockImplementation(holdsIfThreaded)
-    vi.mocked(loadAllEvents).mockResolvedValueOnce(stateWith('whole'))
-    const threads = pendingRead()
-    // The whole read is asked before any screen wants anything, so it brings none.
-    vi.mocked(readThreads).mockReturnValueOnce(threads.promise)
+  it('leaves a screen asked for during a whole read to that read, rather than throwing it away', async () => {
+    vi.mocked(holdsThreads).mockImplementation(holdsIfThreaded).mockReturnValueOnce(true)
+    const poll = pendingRead()
+    vi.mocked(loadAllEvents).mockResolvedValueOnce(stateWith('whole')).mockReturnValueOnce(poll.promise)
+    vi.mocked(readThreads).mockResolvedValue(stateWith('with threads'))
     const { result } = renderHook(() => useWorkspace())
-    // No screen asked yet: the whole read lands as it is.
-    vi.mocked(holdsThreads).mockReturnValueOnce(true)
     await waitFor(() => expect(statusOf(result.current.state)).toBe('whole'))
 
-    act(() => result.current.wantThreads(WANTED))
-    act(() => result.current.wantThreads(WANTED))
+    act(() => void result.current.refresh())
+    act(() => result.current.wantThreads?.(WANTED))
+    expect(readThreads).not.toHaveBeenCalled()
+    // The read that was running lands — say, without a Folder this reader lost — and brings the screen's own.
+    const polled = stateWith('polled')
+    await act(async () => poll.release(polled))
+    await waitFor(() => expect(statusOf(result.current.state)).toBe('with threads'))
+    expect(readThreads).toHaveBeenCalledExactlyOnceWith(polled, WANTED)
+  })
+
+  it('reads a screen asked for after the whole read once, however often it draws', async () => {
+    // No screen asked yet, so the whole read lands as it is; after it, only `readThreads` brings them.
+    vi.mocked(holdsThreads).mockImplementation(holdsIfThreaded).mockReturnValueOnce(true)
+    vi.mocked(loadAllEvents).mockResolvedValueOnce(stateWith('whole'))
+    const threads = pendingRead()
+    vi.mocked(readThreads).mockReturnValueOnce(threads.promise)
+    const { result } = renderHook(() => useWorkspace())
+    await waitFor(() => expect(statusOf(result.current.state)).toBe('whole'))
+
+    act(() => result.current.wantThreads?.(WANTED))
+    act(() => result.current.wantThreads?.(WANTED))
     await waitFor(() => expect(readThreads).toHaveBeenCalledTimes(1))
     await act(async () => threads.release(stateWith('with threads')))
     expect(statusOf(result.current.state)).toBe('with threads')
