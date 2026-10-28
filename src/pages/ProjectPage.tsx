@@ -47,6 +47,7 @@ import {
   type WorkspaceState,
 } from '@/api'
 import { useRelated } from '@/api/useRelated'
+import { useThreads } from '@/api/useThreads'
 import { editTargetOf, MEMBER_FIELD_PREFIX } from '@estiva-app/conversation'
 import { Members } from '@/components/Members'
 import { membershipActions } from './membership'
@@ -542,6 +543,19 @@ export function ProjectPage({
   const [dialog, setDialog] = useState<'issue' | 'delete' | 'move' | 'archive' | null>(null)
   const newIssueHold = project && `new-issue:${project.addr}`
   useReopenHeld(newIssueHold, () => setDialog('issue'))
+  const record = recordChannel(project?.contentFolder, teams)
+  /*
+    The conversations this page draws, read for it (APP-5): its own Folders,
+    and every Folder holding a comment on it or a mention of it, for its
+    conversation, Activity and the Activity tab's mark. The Issues tab counts
+    each issue's conversations wherever they are, as the Issues page does, so
+    there every Folder's — after the rows draw.
+  */
+  const threadsHeld = useThreads(
+    state,
+    !project ? [] : tab === 'issues' ? state.folders : [project.contentFolder, ...(record ? [record] : [])],
+    project ? [project.addr] : [],
+  )
 
   const issues = useMemo<IssuesTableRow[]>(() => {
     if (!project) return []
@@ -555,9 +569,9 @@ export function ProjectPage({
       .map((issue) => {
         // Who follows an issue is not an update to it (SHI-31): a Join or an Add does not move it up the table.
         const touched = state.activity.filter((change) => change.target === issue.addr && !change.field.startsWith(MEMBER_FIELD_PREFIX)).at(-1)
-        return { ...rowFor(issue, state, directory), openedBy: directory.personOf(issue.author), at: touched?.createdAt ?? issue.createdAt }
+        return { ...rowFor(issue, state, directory, threadsHeld), openedBy: directory.personOf(issue.author), at: touched?.createdAt ?? issue.createdAt }
       })
-  }, [project, state, directory, archives])
+  }, [project, state, directory, archives, threadsHeld])
 
   const { events: elsewhere, reread: rereadElsewhere } = useMentionsElsewhere(project?.addr, state)
   const linksAnswered = useMentionLinks(project?.addr, state, elsewhere)
@@ -589,7 +603,6 @@ export function ProjectPage({
     () => (project ? subFileThreads(state, new Set(state.issues.filter((issue) => issue.projectAddr === project.addr).map((issue) => issue.addr))) : new Set<string>()),
     [project, state],
   )
-  const record = recordChannel(project?.contentFolder, teams)
   const conversations = useMemo(
     () =>
       project
@@ -758,6 +771,7 @@ export function ProjectPage({
         hrefFor={hrefForIssue}
         related={related}
         threads={threads}
+        conversationsLoading={!threadsHeld}
         unread={unread}
         stillUnread={stillUnread}
         onThreadShown={onThreadShown}

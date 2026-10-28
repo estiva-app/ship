@@ -3,7 +3,7 @@ import type { WorkspaceEvents, WorkspaceState } from '../nostr/store'
 import { useRefresh } from '../lib/useRefresh'
 import { isRateLimited, isRelayBusy, pausedForMs, relayBudget } from '../lib/relayBudget'
 import { useLiveWorkspace } from './liveWorkspace'
-import { foldWorkspace, loadAllEvents, loadOpened, reloadFolders } from './index'
+import { foldWorkspace, holdsThreads, loadAllEvents, loadOpened, readThreads, reloadFolders, type ThreadsWanted } from './index'
 
 /** What the relay's "retry in Ns" can fall short of its window by: it rounds down to whole seconds. */
 const ROUNDED_DOWN_MS = 1_000
@@ -59,6 +59,12 @@ export interface Workspace {
    */
   refresh: (folders?: string[]) => Promise<void>
   /**
+   * The conversations the screen draws (APP-5): read now if they are not
+   * held, and with every whole read from then on. The last call wins — one
+   * screen at a time. See `useThreads`.
+   */
+  wantThreads: (wanted: ThreadsWanted) => void
+  /**
    * The socket is delivering, so the poll is standing down (PER-3).
    *
    * `false` also covers the build with no sign-in, which has no socket at all
@@ -89,6 +95,12 @@ export interface Workspace {
  * whole one and is shown until the whole one lands (APP-4; Miky, 28 Oct): on
  * 28 Oct the whole read took 5–6 s and the opened page's own 0.4–0.7 s. Only
  * the tab's first route counts; a later page waits for the whole read.
+ *
+ * Conversations are read only for the screen that draws them (APP-5): the
+ * whole read asks each Folder the screen wants for its messages, comments and
+ * edits as it reads it, and the rest for none; whatever it missed — a Folder
+ * named after the read began, the Folders mentioning the screen's file — is
+ * read before it lands, so a screen never loses its conversations to a poll.
  */
 export function useWorkspace(opened?: Opened): Workspace {
   const first = useRef(opened)
@@ -102,6 +114,9 @@ export function useWorkspace(opened?: Opened): Workspace {
   /** The last applied read, unfolded — what a Folder-scoped re-read keeps. */
   const events = useRef<WorkspaceEvents | null>(null)
   const scoped = useRef<Promise<void>>(Promise.resolve())
+  const wanted = useRef<ThreadsWanted>({ folders: [], about: [] })
+  /** The wanted conversations being read now, so a screen drawing again does not ask twice. */
+  const asking = useRef<ThreadsWanted | null>(null)
 
   /**
    * One read, always a new one.
@@ -162,7 +177,34 @@ export function useWorkspace(opened?: Opened): Workspace {
     return run
   }, [])
 
-  const read = useCallback((): Promise<void> => start(loadAllEvents, true), [start])
+  const read = useCallback(
+    (): Promise<void> =>
+      start(async () => {
+        // Asked of each Folder as it is read, so a screen that asked while the read ran still gets its own.
+        const whole = await loadAllEvents((folder) => wanted.current.folders.includes(folder))
+        return holdsThreads(whole, wanted.current) ? whole : readThreads(whole, wanted.current)
+      }, true),
+    [start],
+  )
+
+  const wantThreads = useCallback(
+    (next: ThreadsWanted): void => {
+      wanted.current = next
+      // Before the first whole read there is nothing to add to: that read brings them.
+      if (!events.current || holdsThreads(events.current, next) || asking.current === next) return
+      asking.current = next
+      // Queued behind the Folder re-reads, as they are behind each other, so neither drops the other's events.
+      const run = scoped.current.then(() => {
+        const held = events.current
+        return held && !holdsThreads(held, next) ? start(() => readThreads(held, next), false) : undefined
+      })
+      scoped.current = run
+      void run.finally(() => {
+        if (asking.current === next) asking.current = null
+      })
+    },
+    [start],
+  )
 
   /**
    * Re-read only the Folders that changed — PER-17.
@@ -284,6 +326,7 @@ export function useWorkspace(opened?: Opened): Workspace {
     loading: state === null && !busy,
     busy: busy && state === null,
     refresh: reread,
+    wantThreads,
     live,
   }
 }

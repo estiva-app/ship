@@ -11,6 +11,8 @@ vi.mock('./index', () => ({
   loadAllEvents: vi.fn(),
   loadOpened: vi.fn(),
   reloadFolders: vi.fn(),
+  readThreads: vi.fn(),
+  holdsThreads: () => true,
   foldWorkspace: (read: unknown) => read,
 }))
 vi.mock('./liveWorkspace', () => ({ useLiveWorkspace: () => ({ relayState: 'live', live: true }) }))

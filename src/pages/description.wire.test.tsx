@@ -80,7 +80,7 @@ const stateWith = (text: string, by = AUTHOR, format: 'marker' | 'blocks' = 'mar
   } as unknown as WorkspaceState
 }
 const showing = (state: WorkspaceState) =>
-  vi.mocked(useWorkspace).mockReturnValue({ state, partial: false, error: null, loading: false, busy: false, refresh: vi.fn().mockResolvedValue(undefined), live: false })
+  vi.mocked(useWorkspace).mockReturnValue({ state, partial: false, error: null, loading: false, busy: false, refresh: vi.fn().mockResolvedValue(undefined), wantThreads: () => {}, live: false })
 
 const goTo = (path: string) => act(() => {
   history.replaceState(null, '', path)

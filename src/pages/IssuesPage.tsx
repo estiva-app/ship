@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ISSUE_STATUSES, conversationsAbout, createIssue, me, type DirectoryView, type FolderState } from '@/api'
+import { ISSUE_STATUSES, conversationsAbout, createIssue, me, type DirectoryView, type FolderState, type WorkspaceState } from '@/api'
 import type { IssueRowData } from '@/components/IssueRow'
 import { NewIssueDialog } from '@/components/NewIssueDialog'
 import { IssuesView, type IssuesScope } from '@/views/IssuesView'
@@ -7,12 +7,16 @@ import type { Archives } from '@/lib/archive'
 import { href } from '../router'
 import { type Say } from './act'
 import { useReopenHeld } from '@/auth/heldTyping'
+import { useThreads } from '@/api/useThreads'
 
 /** Where the Issues page's New issue dialog holds its fields through a passkey trip (AUT-4). */
 const NEW_ISSUE_HOLD = 'new-issue'
 
-/** One issue as the list draws it — status and assignee read off the fold, never recomputed. */
-export function rowFor(issue: FolderState['issues'][number], state: FolderState, directory: DirectoryView): IssueRowData {
+/**
+ * One issue as the list draws it — status and assignee read off the fold, never recomputed.
+ * `counted` is false while the conversations are on the way (APP-5): the row then draws no count.
+ */
+export function rowFor(issue: FolderState['issues'][number], state: FolderState, directory: DirectoryView, counted = true): IssueRowData {
   const parent = issue.projectAddr ? state.projects.find((p) => p.addr === issue.projectAddr) : undefined
   return {
     addr: issue.addr,
@@ -27,7 +31,7 @@ export function rowFor(issue: FolderState['issues'][number], state: FolderState,
     assignee: issue.assignee ? directory.personOf(issue.assignee) : undefined,
     openedBy: directory.personOf(issue.author),
     at: issue.createdAt,
-    conversations: conversationsAbout(state.conversations, issue.addr).length,
+    conversations: counted ? conversationsAbout(state.conversations, issue.addr).length : undefined,
   }
 }
 
@@ -45,12 +49,14 @@ export const hrefForIssue = (issue: { id: string; title?: string }) =>
  * team (FOL-46); a link still opens it. An archived project is not offered for
  * a new issue.
  */
-export function IssuesPage({ state, directory, archives, say, refresh }: { state: FolderState; directory: DirectoryView; archives: Archives; say: Say; refresh: () => Promise<void> }) {
+export function IssuesPage({ state, directory, archives, say, refresh }: { state: WorkspaceState; directory: DirectoryView; archives: Archives; say: Say; refresh: () => Promise<void> }) {
   const [scope, setScope] = useState<IssuesScope>('all')
   const [adding, setAdding] = useState(false)
   useReopenHeld(NEW_ISSUE_HOLD, () => setAdding(true))
   const live = useMemo(() => state.issues.filter((issue) => !archives.ofIssue(issue)), [state, archives])
-  const rows = useMemo(() => live.map((issue) => rowFor(issue, state, directory)), [live, state, directory])
+  // A row counts its issue's conversations wherever they are, so every Folder's, read after the rows draw (APP-5).
+  const counted = useThreads(state, state.folders)
+  const rows = useMemo(() => live.map((issue) => rowFor(issue, state, directory, counted)), [live, state, directory, counted])
   const mine = useMemo(() => new Set(live.filter((issue) => issue.assignee === me).map((issue) => issue.addr)), [live])
   const projectOptions = useMemo(
     () => state.projects.filter((p) => !archives.ofProject(p.addr)).map((p) => ({ value: p.addr, label: p.title })),

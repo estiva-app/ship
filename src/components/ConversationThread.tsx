@@ -262,6 +262,8 @@ export type UnreadByThread = Readonly<Record<string, readonly string[]>>
 
 export interface ConversationsProps {
   threads: ThreadData[]
+  /** The threads are still on the way (APP-5): drawn as loading, never as "No conversations yet". */
+  loading?: boolean
   /**
    * Which messages were new to the reader when the page opened: the divider goes
    * above each thread's first, and a thread holding a new reply opens by itself.

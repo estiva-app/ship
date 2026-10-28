@@ -25,6 +25,7 @@ import { beginSignIn, beginSignOut, signInAvailable, signedIn } from './auth/est
 import { identifierFromRef, type FolderSummary } from '@estiva-app/interop'
 import { naddrToAddr } from '@estiva-app/protocol'
 import type { Opened } from '@/api/useWorkspace'
+import { ThreadsContext } from '@/api/useThreads'
 import { archivesOf, type Archives } from '@/lib/archive'
 import { MentionPeopleProvider, WorkspacePeopleProvider, mentionPeople, workspacePeople } from '@/components/editing/mentionables'
 import { useRoster } from '@/api/useRoster'
@@ -59,7 +60,7 @@ export default function App() {
 
 function Shell() {
   const route = useRoute()
-  const { state, partial, error, loading, busy, refresh } = useWorkspace(openedBy(route))
+  const { state, partial, error, loading, busy, refresh, wantThreads } = useWorkspace(openedBy(route))
   const folders = useFolders()
   // The teams: what the sidebar lists, what a new project is filed into (FOL-2).
   const teams = useMemo(() => (folders ? topLevelFolders(folders) : undefined), [folders])
@@ -208,7 +209,10 @@ function Shell() {
       {/* Everyone `@` and `!@` offer in any message box on the page (CON-25). */}
       <MentionPeopleProvider value={mentionable}>
         <WorkspacePeopleProvider value={cardPeople}>
-          <Page route={route} state={partial && !opens(route, state) ? null : state} loading={loading || partial} directory={directory} teams={teams} folders={folders} archives={archives} say={say} refresh={refresh} />
+          {/* Each page asks for the conversations it draws (APP-5). */}
+          <ThreadsContext.Provider value={wantThreads}>
+            <Page route={route} state={partial && !opens(route, state) ? null : state} loading={loading || partial} directory={directory} teams={teams} folders={folders} archives={archives} say={say} refresh={refresh} />
+          </ThreadsContext.Provider>
         </WorkspacePeopleProvider>
       </MentionPeopleProvider>
       {movingProject && teams && <MoveProject project={movingProject} teams={teams} say={say} onClose={() => setMoving(null)} />}
