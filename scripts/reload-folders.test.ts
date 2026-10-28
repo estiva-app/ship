@@ -29,7 +29,8 @@ const A = '11111111-1111-4111-8111-111111111111'
 const B = '22222222-2222-4222-8222-222222222222'
 const C = '33333333-3333-4333-8333-333333333333'
 
-let clock = 1_780_000_000_000
+// Recent, as the relay would only have taken them: a re-read looks back about half an hour.
+let clock = Date.now() - 600_000
 const at = () => (clock += 1000)
 
 const projectA = sign(buildProject(ME, at(), { projectId: 'pa', title: 'Alpha', folder: A }))
@@ -48,6 +49,7 @@ function matches(event: SignedEvent, filter: Record<string, unknown>): boolean {
   if (kinds && !kinds.includes(event.kind)) return false
   const h = filter['#h'] as string[] | undefined
   if (h && !event.tags.some((t) => t[0] === 'h' && h.includes(t[1]))) return false
+  if (typeof filter.since === 'number' && event.created_at < filter.since) return false
   return true
 }
 
@@ -77,7 +79,7 @@ check('loadAll reads discovery, then both Folders', asked.length === 3, `${asked
 check('loadAll is the fold of loadAllEvents', JSON.stringify(await store.loadAll()) === JSON.stringify(foldWorkspace(full)))
 
 
-// Delete one issue in A, then re-read A only.
+// Someone else deletes an issue in A, then A only is re-read.
 held = held.filter((event) => event !== issueA2)
 asked = []
 const afterDelete = await store.reloadFolders(full, [A])
@@ -88,18 +90,25 @@ check(
   asked[0]?.length === 1 && JSON.stringify(asked[0]?.[0]?.['#h']) === JSON.stringify([A]),
   JSON.stringify(asked[0]),
 )
-check('the deleted issue is gone', !afterDeleteState.issues.some((issue) => issue.title === 'A two'))
+check(
+  "without the relay's clock, it looks back the relay's ±900 s further on this computer's",
+  asked[0]?.[0]?.since === Math.floor((full.readAt?.[A] ?? NaN) / 1000) - 960 - 900,
+  JSON.stringify(asked[0]),
+)
+check("someone else's deletion is not seen by a re-read since a time", afterDeleteState.issues.some((issue) => issue.title === 'A two'))
+check('and is gone on the next whole read', !(await store.loadAll()).issues.some((issue) => issue.title === 'A two'))
 check('the other issue in A is still there', afterDeleteState.issues.some((issue) => issue.title === 'A one'))
 check("B's issue keeps its status without B being read", statusOf(afterDeleteState, 'B one') === 'done', statusOf(afterDeleteState, 'B one'))
-// The fold, and the same events in any order: a reload replaces one Folder's slice of them, and loadAll reads a
-// record twice (discovery, then its Folder).
-const foldOf = ({ events, ...state }: WorkspaceState) => JSON.stringify({ ...state, events: [...new Set(events.map((event) => event.id))].sort() })
-check('folds the same as a fresh loadAll', foldOf(afterDeleteState) === foldOf(await store.loadAll()))
 
 // A status change in A arrives.
+const base = await store.loadAllEvents()
 held = [...held, sign(buildChange(ME, at(), { target: issueAddr(ME, 'a1'), field: 'status', value: 'in_progress', folder: A }))]
-const afterChange = foldWorkspace(await store.reloadFolders(afterDelete, [A]))
+const afterChange = foldWorkspace(await store.reloadFolders(base, [A]))
 check('a change in the re-read Folder shows', statusOf(afterChange, 'A one') === 'in_progress', statusOf(afterChange, 'A one'))
+// The fold, and the same events in any order: a reload merges into one Folder's slice of them, and loadAll reads a
+// record twice (discovery, then its Folder).
+const foldOf = ({ events, ...state }: WorkspaceState) => JSON.stringify({ ...state, events: [...new Set(events.map((event) => event.id))].sort() })
+check('folds the same as a fresh loadAll', foldOf(afterChange) === foldOf(await store.loadAll()))
 
 // An issue filed into a Folder nothing had read yet: widening fetches it.
 held = [
@@ -117,13 +126,11 @@ check('without re-reading A or B', asked.every((filters) => filters.every((f) =>
 asked = []
 await store.reloadFolders(full, [])
 check('no Folders is no query', asked.length === 0)
-check("without the relay's clock, a re-read reads whole Folders", asked.length === 0 && !JSON.stringify(full).includes('"since"'))
 
 /*
   APP-4: with the relay's clock known, a re-read asks only for what is new.
 
-  The relay here honours `since`, and applies a deletion published to it, as
-  Buzz does. "Now" events are dated by the real clock, since `readAt` is.
+  The relay here applies a deletion published to it, as Buzz does. "Now" events are dated by the real clock, since `readAt` is.
 */
 const nowAt = () => Date.now()
 const SKEW_MS = 120_000
@@ -131,9 +138,7 @@ let published: SignedEvent[] = []
 const liveRelay = {
   async queryAll(filters: Record<string, unknown>[]) {
     asked.push(filters)
-    return held.filter((event) =>
-      filters.some((filter) => matches(event, filter) && (filter.since === undefined || event.created_at >= (filter.since as number))),
-    )
+    return held.filter((event) => filters.some((filter) => matches(event, filter)))
   },
   async publish(event: SignedEvent) {
     published.push(event)

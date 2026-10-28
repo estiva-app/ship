@@ -236,6 +236,14 @@ export interface WorkspaceEvents {
  */
 const COMMIT_FLOOR_SECS = 960
 
+/**
+ * How far this computer's clock may be from the relay's while the relay still
+ * takes its writes (buzz `max_timestamp_drift_secs`, ±900 s). A re-read whose
+ * relay clock is unknown looks back this much further. In a browser it is
+ * always unknown today: the relay does not expose its `date` header.
+ */
+const RELAY_DRIFT_SECS = 900
+
 /** `kind:pubkey:d` for an addressable event, which a newer version replaces. */
 function addressOf(event: SignedEvent): string | undefined {
   if (event.kind < 30000 || event.kind >= 40000) return undefined
@@ -321,7 +329,7 @@ export class Store {
     readonly signer: Signer,
     /**
      * This computer's clock minus the relay's, in milliseconds, or `null` when
-     * unknown. Without it a re-read reads whole Folders, as it did before APP-4.
+     * unknown — see `RELAY_DRIFT_SECS`.
      */
     private readonly clockSkewMs: () => Promise<number | null> = () => Promise.resolve(null),
   ) {}
@@ -1110,8 +1118,11 @@ export class Store {
     const roots = await this.widen(await read([{ kinds: [KIND.PROJECT] }, { kinds: [KIND.ISSUE] }]), fetched, {}, read, FOLDER_KINDS_BUT_CHANGES)
     // Then again with them, in case a change names a Folder the roots alone did not.
     const all = await this.widen([...roots.events, ...(await changes)], fetched, {}, read, FOLDER_KINDS_BUT_CHANGES)
+    // Only the changes in Folders read, as the Folder reads gave them: the rest are other apps' (a Leaf document's).
+    const folders = new Set(all.folders)
+    const events = all.events.filter((event) => event.kind !== KIND.CHANGE || folders.has(folderOfEvent(event) ?? ''))
     // Every Folder as read when the load began: its changes were read from then on.
-    return { ...all, readAt: Object.fromEntries(all.folders.map((folder) => [folder, at])) }
+    return { events, folders: all.folders, readAt: Object.fromEntries(all.folders.map((folder) => [folder, at])) }
   }
 
   /** A query for one load (`createLoadQuery`, paged): see `loadAllEvents`. */
@@ -1129,8 +1140,9 @@ export class Store {
    * events dated from its last read minus `COMMIT_FLOOR_SECS` on the relay's
    * clock, and the answer is merged into what was kept: an edit, a change or a
    * replaced record arrives as a new event either way. What this tab deleted
-   * is dropped (`Deletions`). A Folder not read before, or any Folder while the
-   * relay's clock is unknown, is read whole as PER-17 did.
+   * is dropped (`Deletions`). While the relay's clock is unknown it looks back
+   * `RELAY_DRIFT_SECS` further on this computer's. A Folder not read before is
+   * read whole, as PER-17 did.
    *
    * Then the same widening pass runs, so a Folder this change introduced — an
    * issue filed into one not read before — is fetched rather than folded
@@ -1148,7 +1160,7 @@ export class Store {
     const since: Record<string, number> = {}
     for (const folder of scope) {
       const at = previous.readAt[folder]
-      if (skew !== null && at !== undefined) since[folder] = Math.floor((at - skew) / 1000) - COMMIT_FLOOR_SECS
+      if (at !== undefined) since[folder] = Math.floor((at - (skew ?? 0)) / 1000) - COMMIT_FLOOR_SECS - (skew === null ? RELAY_DRIFT_SECS : 0)
     }
     const kept = previous.events.filter((event) => {
       const folder = folderOfEvent(event)
