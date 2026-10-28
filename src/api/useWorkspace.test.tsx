@@ -376,16 +376,41 @@ describe('useWorkspace — the opened page draws from its own read first (APP-4)
     expect(result.current.partial).toBe(false)
   })
 
+  it('starts the whole read only once the opened page has answered, so the two do not share the connection', async () => {
+    const own = pendingRead()
+    vi.mocked(loadOpened).mockReturnValueOnce(own.promise)
+    vi.mocked(loadAllEvents).mockResolvedValueOnce(stateWith('whole'))
+    const { result } = renderHook(() => useWorkspace(OPENED))
+    await act(async () => {})
+    expect(loadAllEvents).not.toHaveBeenCalled()
+
+    await act(async () => own.release(stateWith('own')))
+    expect(loadAllEvents).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(statusOf(result.current.state)).toBe('whole'))
+  })
+
+  it('still reads the whole workspace when the opened page cannot be read', async () => {
+    vi.mocked(loadOpened).mockRejectedValueOnce(new Error('relay answered 500'))
+    vi.mocked(loadAllEvents).mockResolvedValueOnce(stateWith('whole'))
+    const { result } = renderHook(() => useWorkspace(OPENED))
+    await waitFor(() => expect(statusOf(result.current.state)).toBe('whole'))
+    expect(result.current.error).toBeNull()
+  })
+
   it('never puts the opened read over a whole read that landed first', async () => {
     const own = pendingRead()
     vi.mocked(loadAllEvents).mockResolvedValueOnce(stateWith('whole'))
     vi.mocked(loadOpened).mockReturnValueOnce(own.promise)
     const { result } = renderHook(() => useWorkspace(OPENED))
+    // Shown the tab before the opened page answered: the poll reads the whole workspace at once.
+    act(() => void handers.poll?.())
     await waitFor(() => expect(statusOf(result.current.state)).toBe('whole'))
 
     await act(async () => own.release(stateWith('own')))
     expect(statusOf(result.current.state)).toBe('whole')
     expect(result.current.partial).toBe(false)
+    // …and the opened page's answer does not start a second whole read.
+    expect(loadAllEvents).toHaveBeenCalledTimes(1)
   })
 
   it('watches no Folder live until the whole read lands, so a change there does not restart it', async () => {

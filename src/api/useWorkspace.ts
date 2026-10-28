@@ -265,29 +265,38 @@ export function useWorkspace(opened?: Opened): Workspace {
       return mounted.current && !events.current && document.visibilityState === 'visible'
     }
     const firstRead = async (): Promise<void> => {
+      // A focus may have read the whole workspace while the opened page was being read.
+      if (events.current) return
       await poll()
       if (!events.current && (await whenClear())) await firstRead()
     }
-    void firstRead()
     /* Shown only while no whole read has landed, and never kept as one: a
        re-read keeps `events`, and this holds one Folder. Any other failure
        leaves the page to the whole read, as before. */
     const opened = first.current
-    const openedRead = (): Promise<void> =>
-      opened
-        ? loadOpened(opened).then(
-            (own) => {
-              if (!mounted.current || events.current) return
-              setState(foldWorkspace(own))
-              setPartial(true)
-            },
-            async (reason: unknown) => {
-              if (!isRateLimited(reason instanceof Error ? reason.message : String(reason))) return
-              if (!events.current && (await whenClear())) await openedRead()
-            },
-          )
-        : Promise.resolve()
-    void openedRead()
+    const openedRead = (asked: Promise<WorkspaceEvents>): Promise<void> =>
+      asked.then(
+        (own) => {
+          if (!mounted.current || events.current) return
+          setState(foldWorkspace(own))
+          setPartial(true)
+        },
+        async (reason: unknown) => {
+          if (!isRateLimited(reason instanceof Error ? reason.message : String(reason))) return
+          if (opened && !events.current && (await whenClear())) await openedRead(loadOpened(opened))
+        },
+      )
+    /* The opened page's read goes alone, and the whole read starts when it
+       has answered (APP-4). Side by side, its 0.3 MB shared the connection
+       with the whole read's 10 MB pages of changes and finished with them,
+       then waited out their parse: drawn at 1.7–2.7 s on 28 Oct, though its
+       own answers took 0.4 s. A refusal or a failure answers too: the whole
+       read then goes as before. */
+    if (opened) {
+      const asked = loadOpened(opened)
+      void openedRead(asked)
+      void asked.then(firstRead, firstRead)
+    } else void firstRead()
     return () => {
       mounted.current = false
     }

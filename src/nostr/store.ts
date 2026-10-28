@@ -375,6 +375,9 @@ function folderOfEvent(event: SignedEvent): string | undefined {
 export const MAX_MENTION_THREADS = 24
 const MENTION_THREAD_PAGE = 500
 
+/** The opened page's records by `d`, one request (`loadOpened`): one per author, so far fewer than this. */
+const OPENED_RECORDS_LIMIT = 100
+
 export class Store {
   /** What this tab deleted, which a re-read since a time cannot learn — see `reloadFolders`. */
   private readonly deleted = new Deletions()
@@ -1213,9 +1216,16 @@ export class Store {
    *
    * Not for a re-read: `readAt` is empty, so nothing here is kept as read. Its
    * Folders' conversations are read with it, and `threadsAt` says so (APP-5).
+   *
+   * A record by `d` is one request, not paged: the relay keeps one per author
+   * and address, so the answer is a handful. Paged, the tab's first query
+   * spent a second round trip confirming that (`queryAll` has seen no page
+   * yet), about 0.2 s before the page could draw.
    */
   async loadOpened(opened: { kind: 'project' | 'issue'; d: string }): Promise<WorkspaceEvents> {
-    let events = await this.queryAll([{ kinds: [opened.kind === 'project' ? KIND.PROJECT : KIND.ISSUE], '#d': [opened.d] }])
+    const byD = (kind: number, ds: string[]): Promise<SignedEvent[]> =>
+      this.relay.query([{ kinds: [kind], '#d': ds, limit: OPENED_RECORDS_LIMIT }])
+    let events = await byD(opened.kind === 'project' ? KIND.PROJECT : KIND.ISSUE, [opened.d])
     const read = new Set<string>()
     const threadsAt: Record<string, number> = {}
     for (let round = 0; round < 3; round++) {
@@ -1229,7 +1239,7 @@ export class Store {
       for (const folder of folders) read.add(folder)
       const [inFolders, records] = await Promise.all([
         this.readFolderEvents(folders, {}, {}, this.queryAll, FOLDER_KINDS, threadsAt),
-        missing.length ? this.queryAll([{ kinds: [KIND.PROJECT], '#d': missing }]) : Promise.resolve([]),
+        missing.length ? byD(KIND.PROJECT, missing) : Promise.resolve([]),
       ])
       events = mergeRead(events, [...inFolders, ...records])
     }
