@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { WorkspaceEvents, WorkspaceState } from '../nostr/store'
 import { useRefresh } from '../lib/useRefresh'
-import { isRateLimited, isRelayBusy } from '../lib/relayBudget'
+import { isRateLimited, isRelayBusy, pausedForMs, relayBudget } from '../lib/relayBudget'
 import { useLiveWorkspace } from './liveWorkspace'
 import { foldWorkspace, loadAllEvents, loadOpened, reloadFolders } from './index'
+
+/** What the relay's "retry in Ns" can fall short of its window by: it rounds down to whole seconds. */
+const ROUNDED_DOWN_MS = 1_000
 
 /** The project or issue the tab was opened on, read first so its page draws before the workspace — APP-4. */
 export interface Opened {
@@ -204,24 +207,48 @@ export function useWorkspace(opened?: Opened): Workspace {
 
   useEffect(() => {
     mounted.current = true
-    void read()
-    /* Shown only while no whole read has landed, and never kept as one: a
-       re-read keeps `events`, and this holds one Folder. A failure leaves the
-       page to the whole read, as before. */
-    if (first.current) {
-      loadOpened(first.current).then(
-        (own) => {
-          if (!mounted.current || events.current) return
-          setState(foldWorkspace(own))
-          setPartial(true)
-        },
-        () => undefined,
-      )
+    /* Nothing on screen yet and the relay refused on quota: ask again the
+       moment its stated wait ends. The poll skips its ticks while paused and
+       reads on the first one after, up to a whole interval late — 25 s to a
+       project on 28 Oct, the relay having said 11 (APP-4). A busy relay
+       records no pause, so it keeps the poll's pace (APP-9). The relay
+       rounds its wait down, so asking at once was refused again a moment
+       before its window reset: a second is added. A hidden tab does not ask:
+       nobody is looking, and the poll reads when it is shown. */
+    const whenClear = async (): Promise<boolean> => {
+      if (pausedForMs() === 0) return false
+      await relayBudget.whenClear()
+      await new Promise((resolve) => setTimeout(resolve, ROUNDED_DOWN_MS))
+      return mounted.current && !events.current && document.visibilityState === 'visible'
     }
+    const firstRead = async (): Promise<void> => {
+      await poll()
+      if (!events.current && (await whenClear())) await firstRead()
+    }
+    void firstRead()
+    /* Shown only while no whole read has landed, and never kept as one: a
+       re-read keeps `events`, and this holds one Folder. Any other failure
+       leaves the page to the whole read, as before. */
+    const opened = first.current
+    const openedRead = (): Promise<void> =>
+      opened
+        ? loadOpened(opened).then(
+            (own) => {
+              if (!mounted.current || events.current) return
+              setState(foldWorkspace(own))
+              setPartial(true)
+            },
+            async (reason: unknown) => {
+              if (!isRateLimited(reason instanceof Error ? reason.message : String(reason))) return
+              if (!events.current && (await whenClear())) await openedRead()
+            },
+          )
+        : Promise.resolve()
+    void openedRead()
     return () => {
       mounted.current = false
     }
-  }, [read])
+  }, [poll])
 
   /*
     The socket triggers `reread` with the Folders it saw change, not `poll`.
