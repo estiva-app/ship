@@ -105,6 +105,67 @@ check('without re-reading A or B', asked.every((filters) => filters.every((f) =>
 asked = []
 await store.reloadFolders(full, [])
 check('no Folders is no query', asked.length === 0)
+check("without the relay's clock, a re-read reads whole Folders", asked.length === 0 && !JSON.stringify(full).includes('"since"'))
+
+/*
+  APP-4: with the relay's clock known, a re-read asks only for what is new.
+
+  The relay here honours `since`, and applies a deletion published to it, as
+  Buzz does. "Now" events are dated by the real clock, since `readAt` is.
+*/
+const nowAt = () => Date.now()
+const SKEW_MS = 120_000
+let published: SignedEvent[] = []
+const liveRelay = {
+  async queryAll(filters: Record<string, unknown>[]) {
+    asked.push(filters)
+    return held.filter((event) =>
+      filters.some((filter) => matches(event, filter) && (filter.since === undefined || event.created_at >= (filter.since as number))),
+    )
+  },
+  async publish(event: SignedEvent) {
+    published.push(event)
+    if (event.kind === 5) {
+      const target = event.tags.find((t) => t[0] === 'a')?.[1]
+      held = held.filter((e) => `${e.kind}:${e.pubkey}:${e.tags.find((t) => t[0] === 'd')?.[1]}` !== target)
+    }
+    return { ok: true, eventId: event.id }
+  },
+} as unknown as Relay
+const signer = { pubkey: ME, sign: async (unsigned: UnsignedEvent) => sign(unsigned) } as unknown as Signer
+const live = new Store(liveRelay, signer, async () => SKEW_MS)
+
+held = [projectA, issueA1, issueA2, sign(buildIssue(ME, nowAt(), { issueId: 'a3', title: 'A three', folder: A, projectAddr: projectAddr(ME, 'pa') }))]
+const first = await live.loadAllEvents()
+check('a whole read notes when it read each Folder', typeof first.readAt?.[A] === 'number')
+
+held = [...held, sign(buildChange(ME, nowAt(), { target: issueAddr(ME, 'a1'), field: 'status', value: 'in_progress', folder: A }))]
+asked = []
+const second = await live.reloadFolders(first, [A])
+const since = asked[0]?.[0]?.since
+check(
+  "a re-read asks for Folder A since its last read, less the relay's commit floor, on the relay's clock",
+  asked.length === 1 && since === Math.floor(((first.readAt?.[A] ?? NaN) - SKEW_MS) / 1000) - 960,
+  JSON.stringify(asked),
+)
+const secondState = foldWorkspace(second)
+check('a change made since shows', statusOf(secondState, 'A one') === 'in_progress', statusOf(secondState, 'A one'))
+check('what the re-read did not return again is kept', secondState.issues.some((issue) => issue.title === 'A two'))
+check('an event both reads returned is held once', second.events.filter((e) => e.tags.some((t) => t[1] === 'a3')).length === 1)
+
+// A re-signed issue record is a new version of it: only the newest is kept.
+const a3 = (e: SignedEvent) => e.kind === issueA1.kind && e.tags.some((t) => t[0] === 'd' && t[1] === 'a3')
+held = [...held.filter((e) => !a3(e)), sign(buildIssue(ME, nowAt() + 1000, { issueId: 'a3', title: 'A three, again', folder: A, projectAddr: projectAddr(ME, 'pa') }))]
+const third = await live.reloadFolders(second, [A])
+check('a replaced record keeps only its newest version', third.events.filter(a3).length === 1, `${third.events.filter(a3).length} versions`)
+check('and shows it', foldWorkspace(third).issues.some((issue) => issue.title === 'A three, again'))
+
+// A deletion this tab made: the relay never returns the issue again, and a re-read since a time cannot say so.
+await live.deleteIssue({ folder: A, issue: issueAddr(ME, 'a2') })
+check('the deletion reaches the relay', published.some((e) => e.kind === 5 && e.tags.some((t) => t[0] === 'a' && t[1] === issueAddr(ME, 'a2'))))
+const fourth = foldWorkspace(await live.reloadFolders(third, [A]))
+check('an issue this tab deleted is gone after the re-read', !fourth.issues.some((issue) => issue.title === 'A two'))
+check('and the others stay', fourth.issues.some((issue) => issue.title === 'A one') && fourth.issues.some((issue) => issue.title === 'A three, again'))
 
 if (failures) {
   console.error(`\n${failures} failed`)

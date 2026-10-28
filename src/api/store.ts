@@ -3,6 +3,7 @@ import { isRateLimited, noteRateLimited } from '@/lib/relayBudget'
 import { estivaIdSigner, localSigner, type Signer } from '../nostr/signer'
 import { Store } from '../nostr/store'
 import { ID_CONFIG, RELAY_URL } from '../config'
+import { relayClockSkew } from './clock'
 import { heldBearer, heldToken, renew } from '../auth/estivaId'
 
 /**
@@ -81,4 +82,4 @@ const fetchReportingQuota: FetchLike = async (url, init) => {
 
 export const relay = new Relay(RELAY_URL, signer, { fetch: fetchReportingQuota })
 
-export const store = new Store(relay, signer)
+export const store = new Store(relay, signer, relayClockSkew)

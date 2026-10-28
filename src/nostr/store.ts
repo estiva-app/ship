@@ -215,10 +215,83 @@ export interface WorkspaceEvents {
   events: SignedEvent[]
   /** Every Folder the read fetched. See `WorkspaceState.folders`. */
   folders: string[]
+  /**
+   * When each Folder was last read, in milliseconds on this computer's clock —
+   * so a re-read asks only for what came after (APP-4). A Folder missing here
+   * is read whole.
+   */
+  readAt: Record<string, number>
+}
+
+/**
+ * How far before the relay's own clock an event it accepts can be dated, in
+ * seconds. The relay refuses to commit an event whose `created_at` is older
+ * than its commit time minus this (buzz `replica_fence.rs`,
+ * `DEFAULT_CREATED_AT_FLOOR_SECS`; the ingest envelope is ±900 s), so a read
+ * with `since` this far before the last read's start misses nothing committed
+ * after it.
+ */
+const COMMIT_FLOOR_SECS = 960
+
+/** `kind:pubkey:d` for an addressable event, which a newer version replaces. */
+function addressOf(event: SignedEvent): string | undefined {
+  if (event.kind < 30000 || event.kind >= 40000) return undefined
+  return `${event.kind}:${event.pubkey}:${event.tags.find((t) => t[0] === 'd')?.[1] ?? ''}`
+}
+
+/**
+ * Kept events and a re-read's answer as one read: each event once, and only
+ * the newest version of a record — what the relay answers for a whole Folder.
+ * A tie keeps the lower id, as NIP-01 does.
+ */
+function mergeRead(kept: readonly SignedEvent[], fresh: readonly SignedEvent[]): SignedEvent[] {
+  const byId = new Map<string, SignedEvent>()
+  for (const event of [...kept, ...fresh]) byId.set(event.id, event)
+  const newest = new Map<string, SignedEvent>()
+  for (const event of byId.values()) {
+    const address = addressOf(event)
+    if (!address) continue
+    const held = newest.get(address)
+    if (!held || event.created_at > held.created_at || (event.created_at === held.created_at && event.id < held.id)) {
+      newest.set(address, event)
+    }
+  }
+  return [...byId.values()].filter((event) => {
+    const address = addressOf(event)
+    return !address || newest.get(address) === event
+  })
+}
+
+/**
+ * The `kind:5`s this tab published, by target (NIP-09: an id, or an address up
+ * to the deletion's time). A re-read since a time returns what is new, never
+ * what is gone, so these are dropped from what it keeps. Someone else's
+ * deletion shows on the next whole read — on load or focus — because the
+ * socket does not deliver `kind:5`.
+ */
+class Deletions {
+  private readonly ids = new Set<string>()
+  private readonly addresses = new Map<string, number>()
+
+  note(deletion: SignedEvent) {
+    for (const [name, value] of deletion.tags) {
+      if (name === 'e' && value) this.ids.add(value)
+      if (name === 'a' && value) this.addresses.set(value, Math.max(this.addresses.get(value) ?? 0, deletion.created_at))
+    }
+  }
+
+  drop(events: SignedEvent[]): SignedEvent[] {
+    if (!this.ids.size && !this.addresses.size) return events
+    return events.filter((event) => {
+      if (this.ids.has(event.id)) return false
+      const address = addressOf(event)
+      return !address || (this.addresses.get(address) ?? -1) < event.created_at
+    })
+  }
 }
 
 /** Fold a workspace read. `loadAll` is `foldWorkspace(await loadAllEvents())`. */
-export function foldWorkspace(snapshot: WorkspaceEvents): WorkspaceState {
+export function foldWorkspace(snapshot: Pick<WorkspaceEvents, 'events' | 'folders'>): WorkspaceState {
   return read(snapshot.events, snapshot.folders)
 }
 
@@ -235,9 +308,17 @@ export const MAX_MENTION_THREADS = 24
 const MENTION_THREAD_PAGE = 500
 
 export class Store {
+  /** What this tab deleted, which a re-read since a time cannot learn — see `reloadFolders`. */
+  private readonly deleted = new Deletions()
+
   constructor(
     private readonly relay: Relay,
     readonly signer: Signer,
+    /**
+     * This computer's clock minus the relay's, in milliseconds, or `null` when
+     * unknown. Without it a re-read reads whole Folders, as it did before APP-4.
+     */
+    private readonly clockSkewMs: () => Promise<number | null> = () => Promise.resolve(null),
   ) {}
 
   /**
@@ -249,7 +330,10 @@ export class Store {
    * with an Estiva account.
    */
   private async publish(unsigned: UnsignedEvent): Promise<PublishResult> {
-    return this.relay.publish(await this.signer.sign(unsigned))
+    const signed = await this.signer.sign(unsigned)
+    const result = await this.relay.publish(signed)
+    if (result.ok && signed.kind === KIND.DELETION) this.deleted.note(signed)
+    return result
   }
 
   /**
@@ -1007,36 +1091,50 @@ export class Store {
       { kinds: [KIND.PROJECT] },
       { kinds: [KIND.ISSUE] },
     ])
-    return this.widen(events, new Set())
+    return this.widen(events, new Set(), {})
   }
 
   /**
    * Re-read only `folders`, keeping the rest of a previous read as it was —
-   * PER-17.
+   * PER-17 — and from each only what is new since it was last read (APP-4).
    *
-   * Every event of the previous read that carries one of these `h` is dropped
-   * and the Folders are read again, so a deletion, an edit or a replaced record
-   * in them shows exactly as `loadAll` would show it. Then the same widening
-   * pass runs, so a Folder this change introduced — an issue filed into one
-   * not read before — is fetched rather than folded without its changes.
+   * PER-17 dropped a Folder and read all of it again, which was about 577 ms
+   * when it was written. By 28 Oct one live event re-read 15–39 MB, five times
+   * in 20 s of a tab nobody touched. So a Folder read before is asked only for
+   * events dated from its last read minus `COMMIT_FLOOR_SECS` on the relay's
+   * clock, and the answer is merged into what was kept: an edit, a change or a
+   * replaced record arrives as a new event either way. What this tab deleted
+   * is dropped (`Deletions`). A Folder not read before, or any Folder while the
+   * relay's clock is unknown, is read whole as PER-17 did.
+   *
+   * Then the same widening pass runs, so a Folder this change introduced — an
+   * issue filed into one not read before — is fetched rather than folded
+   * without its changes.
    *
    * What it cannot see is anything *outside* those Folders: a global project
    * record (`buzz-channel`, no `h`) or a Folder the discovery query would newly
-   * turn up. A write to either needs `loadAll`, which is why the app still
-   * reads everything on load and on focus.
+   * turn up, nor someone else's deletion. Those need `loadAll`, which is why
+   * the app still reads everything on load and on focus.
    */
   async reloadFolders(previous: WorkspaceEvents, folders: string[]): Promise<WorkspaceEvents> {
     const scope = new Set(folders)
     if (!scope.size) return previous
+    const skew = await this.clockSkewMs()
+    const since: Record<string, number> = {}
+    for (const folder of scope) {
+      const at = previous.readAt[folder]
+      if (skew !== null && at !== undefined) since[folder] = Math.floor((at - skew) / 1000) - COMMIT_FLOOR_SECS
+    }
     const kept = previous.events.filter((event) => {
       const folder = folderOfEvent(event)
-      return !folder || !scope.has(folder)
+      return !folder || !scope.has(folder) || since[folder] !== undefined
     })
-    const fresh = await this.rawFolders([...scope])
-    return this.widen([...kept, ...fresh], new Set([...previous.folders, ...scope]))
+    const readAt = { ...previous.readAt }
+    const fresh = await this.readFolderEvents([...scope], readAt, since)
+    return this.widen(this.deleted.drop(mergeRead(kept, fresh)), new Set([...previous.folders, ...scope]), readAt)
   }
 
-  private async widen(events: SignedEvent[], fetched: Set<string>): Promise<WorkspaceEvents> {
+  private async widen(events: SignedEvent[], fetched: Set<string>, readAt: Record<string, number>): Promise<WorkspaceEvents> {
     /**
      * Widen until no new Folder appears.
      *
@@ -1080,10 +1178,10 @@ export class Store {
       }
       if (!wanted.size) break
       for (const folder of wanted) fetched.add(folder)
-      events = [...events, ...(await this.rawFolders([...wanted]))]
+      events = [...events, ...(await this.readFolderEvents([...wanted], readAt))]
     }
 
-    return { events, folders: [...fetched] }
+    return { events, folders: [...fetched], readAt }
   }
 
   /**
@@ -1113,13 +1211,28 @@ export class Store {
    * requests to 3 against production.
    */
   async rawFolders(folders: string[]): Promise<SignedEvent[]> {
+    return this.readFolderEvents(folders, {})
+  }
+
+  /**
+   * `rawFolders`, noting in `readAt` when each Folder was read, and asking a
+   * Folder in `since` only for events from that time (seconds, relay clock).
+   * Stamped before the request goes out, so the next `since` covers anything
+   * committed while it was answered.
+   */
+  private async readFolderEvents(folders: string[], readAt: Record<string, number>, since: Record<string, number> = {}): Promise<SignedEvent[]> {
     for (const folder of folders) assertFolderId(folder)
     if (!folders.length) return []
+    const at = Date.now()
     // One filter per Folder, and the relay clamps per filter — so this gets the
     // ceiling for each Folder rather than sharing one across all of them.
-    return this.relay.queryAll(
-      folders.map((folder) => ({ kinds: FOLDER_KINDS, '#h': [folder] })),
+    const events = await this.relay.queryAll(
+      folders.map((folder) =>
+        since[folder] === undefined ? { kinds: FOLDER_KINDS, '#h': [folder] } : { kinds: FOLDER_KINDS, '#h': [folder], since: since[folder] },
+      ),
     )
+    for (const folder of folders) readAt[folder] = at
+    return events
   }
 
   /**
