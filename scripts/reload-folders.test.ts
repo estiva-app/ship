@@ -10,7 +10,7 @@
  */
 import { publicKeyFromSecret, signEvent, type Relay, type SignedEvent, type UnsignedEvent } from '@estiva-app/protocol'
 import { Store, foldWorkspace, type WorkspaceState } from '../src/nostr/store'
-import { buildChange, buildIssue, buildProject, issueAddr, projectAddr } from '../src/nostr/events'
+import { buildChange, buildDeletion, buildIssue, buildProject, issueAddr, projectAddr } from '../src/nostr/events'
 import type { Signer } from '../src/nostr/signer'
 import { KIND } from '../src/nostr/kinds'
 import { createLoadQuery, type QueryFn } from '@estiva-app/interop'
@@ -44,7 +44,13 @@ const doneB1 = sign(buildChange(ME, at(), { target: issueAddr(ME, 'b1'), field: 
 let held: SignedEvent[] = [projectA, projectB, issueA1, issueA2, issueB1, doneB1]
 let asked: Record<string, unknown>[][] = []
 
+/** Folders this reader was removed from: Buzz answers a read of them with nothing. */
+let removedFrom = new Set<string>()
+
 function matches(event: SignedEvent, filter: Record<string, unknown>): boolean {
+  if (event.tags.some((t) => t[0] === 'h' && removedFrom.has(t[1]))) return false
+  const ids = filter.ids as string[] | undefined
+  if (ids && !ids.includes(event.id)) return false
   const kinds = filter.kinds as number[] | undefined
   if (kinds && !kinds.includes(event.kind)) return false
   const h = filter['#h'] as string[] | undefined
@@ -79,8 +85,10 @@ check('loadAll reads discovery, then both Folders', asked.length === 3, `${asked
 check('loadAll is the fold of loadAllEvents', JSON.stringify(await store.loadAll()) === JSON.stringify(foldWorkspace(full)))
 
 
-// Someone else deletes an issue in A, then A only is re-read.
-held = held.filter((event) => event !== issueA2)
+// Someone else deletes an issue in A, then A only is re-read. The relay drops the issue and keeps the kind:5 in A.
+const OTHER_SECRET = '0'.repeat(63) + '2'
+const deletionOfA2 = signEvent(buildDeletion(publicKeyFromSecret(OTHER_SECRET), Date.now(), { target: issueAddr(ME, 'a2'), folder: A }), OTHER_SECRET)
+held = [...held.filter((event) => event !== issueA2), deletionOfA2]
 asked = []
 const afterDelete = await store.reloadFolders(full, [A])
 const afterDeleteState = foldWorkspace(afterDelete)
@@ -90,13 +98,14 @@ check(
   asked[0]?.length === 1 && JSON.stringify(asked[0]?.[0]?.['#h']) === JSON.stringify([A]),
   JSON.stringify(asked[0]),
 )
+const newestRead = Math.max(...full.events.map((event) => event.created_at))
 check(
-  "without the relay's clock, it looks back the relay's ±900 s further on this computer's",
-  asked[0]?.[0]?.since === Math.floor((full.readAt?.[A] ?? NaN) / 1000) - 960 - 900,
+  "without the relay's clock, it looks back the relay's ±900 s further, and from no later than the newest event read allows",
+  asked[0]?.[0]?.since === Math.min(Math.floor((full.readAt?.[A] ?? NaN) / 1000) - 960 - 900, newestRead - 900 - 960 - 60),
   JSON.stringify(asked[0]),
 )
-check("someone else's deletion is not seen by a re-read since a time", afterDeleteState.issues.some((issue) => issue.title === 'A two'))
-check('and is gone on the next whole read', !(await store.loadAll()).issues.some((issue) => issue.title === 'A two'))
+check("someone else's deletion is seen by a re-read since a time", !afterDeleteState.issues.some((issue) => issue.title === 'A two'))
+check('and the deletion is not folded as an event', !afterDelete.events.some((event) => event.kind === KIND.DELETION))
 check('the other issue in A is still there', afterDeleteState.issues.some((issue) => issue.title === 'A one'))
 check("B's issue keeps its status without B being read", statusOf(afterDeleteState, 'B one') === 'done', statusOf(afterDeleteState, 'B one'))
 
@@ -183,6 +192,30 @@ check('the deletion reaches the relay', published.some((e) => e.kind === 5 && e.
 const fourth = foldWorkspace(await live.reloadFolders(third, [A]))
 check('an issue this tab deleted is gone after the re-read', !fourth.issues.some((issue) => issue.title === 'A two'))
 check('and the others stay', fourth.issues.some((issue) => issue.title === 'A one') && fourth.issues.some((issue) => issue.title === 'A three, again'))
+
+// Nothing new in A: one event it held, asked for by id, says it is quiet, and what it held stays.
+// (Read "an hour from now", so A's events are all older than the re-read asks for.)
+const loaded = await live.loadAllEvents()
+const quietBase = { ...loaded, readAt: { ...loaded.readAt, [A]: Date.now() + 3_600_000 } }
+asked = []
+const quiet = foldWorkspace(await live.reloadFolders(quietBase, [A]))
+check('a quiet Folder costs the re-read and one probe by id', asked.length === 2 && Array.isArray(asked[1]?.[0]?.ids), JSON.stringify(asked))
+check('and keeps what it held', quiet.issues.some((issue) => issue.title === 'A one'))
+
+// Removed from A: the relay answers its re-read and the probe with nothing, and what the tab held from A goes.
+removedFrom = new Set([A])
+const removed = await live.reloadFolders(quietBase, [A])
+check('a Folder this reader was removed from is dropped at its next re-read', !foldWorkspace(removed).issues.some((issue) => issue.title === 'A one'), JSON.stringify(foldWorkspace(removed).issues.map((i) => i.title)))
+check('and is read whole once it can be read again', removed.readAt[A] === undefined)
+removedFrom = new Set()
+
+// This computer's clock two hours ahead, the relay's unknown: a change made since the last read still arrives.
+const fast = new Store(liveRelay, signer)
+const fastFirst = await fast.loadAllEvents()
+const twoHoursAhead = { ...fastFirst, readAt: Object.fromEntries(Object.keys(fastFirst.readAt).map((folder) => [folder, Date.now() + 7_200_000])) }
+held = [...held, sign(buildChange(ME, nowAt(), { target: issueAddr(ME, 'a1'), field: 'status', value: 'done', folder: A }))]
+const fastState = foldWorkspace(await fast.reloadFolders(twoHoursAhead, [A]))
+check('a computer clock far ahead of the relay still gets a change made since', statusOf(fastState, 'A one') === 'done', statusOf(fastState, 'A one'))
 
 if (failures) {
   console.error(`\n${failures} failed`)
