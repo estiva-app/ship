@@ -1182,7 +1182,7 @@ export class Store {
       const at = previous.readAt[folder]
       if (at === undefined) continue
       const local = Math.floor((at - (skew ?? 0)) / 1000) - COMMIT_FLOOR_SECS - (skew === null ? RELAY_DRIFT_SECS : 0)
-      since[folder] = skew === null ? Math.min(local, latest) : local
+      since[folder] = skew === null && newest ? Math.max(0, Math.min(local, latest)) : local
     }
     const kept = previous.events.filter((event) => {
       const folder = folderOfEvent(event)
