@@ -204,7 +204,10 @@ export function useWorkspace(): Workspace {
 
   // The interval stands down while the socket delivers; `visibilitychange` and
   // `focus` still fire, because a tab that was hidden has had no frames either.
-  useRefresh(poll, { interval: !live })
+  // Until a read lands the socket watches no Folder, so a live socket delivers
+  // nothing: a first read the relay was too busy for is asked again by the poll,
+  // or the busy banner's "clears on its own" never comes true (APP-9).
+  useRefresh(poll, { interval: !live || state === null })
 
   return {
     state,
