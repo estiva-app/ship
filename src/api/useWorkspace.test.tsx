@@ -217,9 +217,9 @@ describe('useWorkspace — the socket delivers and the poll becomes a fallback (
   it('stands the poll down while the socket is live', async () => {
     live.current = true
     vi.mocked(loadAllEvents).mockResolvedValue(stateWith('todo'))
-    renderHook(() => useWorkspace())
-    await waitFor(() => expect(refreshMock).toHaveBeenCalled())
-    // `interval: false`. The poll stops being how anything arrives.
+    const { result } = renderHook(() => useWorkspace())
+    await waitFor(() => expect(result.current.state).not.toBeNull())
+    // `interval: false` once a read has given the socket its Folders. The poll stops being how anything arrives.
     expect(refreshMock).toHaveBeenLastCalledWith(false)
   })
 
