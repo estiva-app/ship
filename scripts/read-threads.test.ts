@@ -97,13 +97,13 @@ asked = []
 const withMentions = await readThreads(loaded, wanted)
 check('the Folder mentioning a1 is read for its conversation', has(withMentions.events, mentionsA1) && askedThreadsOf(C))
 check('a Folder that does not mention it is not', !has(withMentions.events, onB1) && !askedThreadsOf(B))
-check('the wanted Folder is not read again', !askedThreadsOf(A))
+check('only the mentioning Folder is asked: the wanted one is not read again', askedThreadsOf(C) && !askedThreadsOf(A))
 check('and now it holds them', holdsThreads(withMentions, wanted))
 check("a1's count is today's: its comment and the mention", conversationsAbout(foldWorkspace(withMentions).conversations, A1).length === 2)
 
 asked = []
 const again = await readThreads(withMentions, wanted)
-check('asking for what is held reads no Folder', !askedThreadsOf(A) && !askedThreadsOf(C) && again.events.length === withMentions.events.length)
+check('asking for what is held reads no Folder, and it stays held', holdsThreads(again, wanted) && !askedThreadsOf(A) && !askedThreadsOf(C) && again.events.length === withMentions.events.length)
 
 // Live: B changes. Its conversation is not held, so its re-read does not start reading one.
 const lateOnB1 = sign(buildConversationMessage(ME, Date.now(), { folder: B, body: 'later on b1', about: B1 }))
@@ -119,7 +119,7 @@ check('and what was held stays held', holdsThreads(reloaded, wanted))
 asked = []
 const everything = await readThreads(reloaded, { folders: [A, B, C], about: [] })
 check("every Folder's conversation, once asked for", has(everything.events, onB1) && has(everything.events, lateOnB1))
-check('without asking again for the ones held', !askedThreadsOf(A) && !askedThreadsOf(C))
+check('asking only the Folder not yet held, not again for the ones held', askedThreadsOf(B) && !askedThreadsOf(A) && !askedThreadsOf(C))
 
 // Scripts and checks read everything, as before.
 const all = await store.loadAll()
