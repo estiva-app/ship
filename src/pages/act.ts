@@ -1,5 +1,5 @@
 import type { WriteResult } from '@/api'
-import { isRateLimited, retryHintMs } from '@/lib/relayBudget'
+import { isRateLimited, isRelayBusy, retryHintMs } from '@/lib/relayBudget'
 
 export type Say = (text: string, tone?: 'ok' | 'error') => void
 
@@ -55,8 +55,10 @@ export async function act(
       — rate-limited: quota exceeded; retry in 14s" describes a working relay
       declining to answer *right now* as though it had judged the message and
       said no. The relay tells us how long it wants; say that instead.
+      A relay that stayed busy through protocol's quiet retries is the same
+      wait, with no hint of how long (APP-9).
     */
-    if (isRateLimited(result.reason)) {
+    if (isRateLimited(result.reason) || isRelayBusy(result.reason)) {
       const wait = retryHintMs(result.reason)
       say(wait ? `Too busy right now — try again in ${Math.ceil(wait / 1000)}s.` : 'Too busy right now — try again shortly.', 'error')
       return false

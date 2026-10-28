@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { WorkspaceEvents, WorkspaceState } from '../nostr/store'
 import { useRefresh } from '../lib/useRefresh'
-import { isRateLimited } from '../lib/relayBudget'
+import { isRateLimited, isRelayBusy } from '../lib/relayBudget'
 import { useLiveWorkspace } from './liveWorkspace'
 import { foldWorkspace, loadAllEvents, reloadFolders } from './index'
 
@@ -115,8 +115,11 @@ export function useWorkspace(): Workspace {
 
           The stale state is kept either way. This only decides whether a person
           is told about a wait they cannot act on. SHI-12.
+
+          A relay that stayed busy through protocol's quiet retries is the same
+          kind of wait (APP-9), and the next poll asks again.
         */
-        if (isRateLimited(text)) {
+        if (isRateLimited(text) || isRelayBusy(reason)) {
           // Recorded rather than swallowed: with a workspace on screen this
           // stays invisible, and without one it is the only thing that can
           // explain the empty page.

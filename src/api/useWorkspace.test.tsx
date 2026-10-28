@@ -1,5 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { RelayBusyError } from '@estiva-app/protocol'
 
 // The fold is the identity here, so a test hands the hook a state directly and
 // reads it back — what is under test is which read runs, not what it folds to.
@@ -176,6 +177,39 @@ describe('useWorkspace — a quota refusal is a wait, not a broken relay (SHI-12
     const { result } = renderHook(() => useWorkspace())
 
     await waitFor(() => expect(result.current.error).toMatch(/relay_membership_required/))
+  })
+})
+
+/*
+  APP-9: protocol's `Relay.query` throws a `RelayBusyError` once its quiet
+  retries run out. That is a wait, like a quota refusal: no red error over a
+  workspace that is still correct, and the info banner ("The relay is busy —
+  waiting to load the workspace", App.tsx, keyed on `busy`) before there is one.
+*/
+describe('useWorkspace — a relay that stays busy is a wait, not a broken relay (APP-9)', () => {
+  it('keeps the last good workspace on screen with no error banner', async () => {
+    vi.mocked(loadAllEvents).mockResolvedValueOnce(stateWith('in_progress')).mockRejectedValueOnce(new RelayBusyError(503))
+
+    const { result } = renderHook(() => useWorkspace())
+    await waitFor(() => expect(statusOf(result.current.state)).toBe('in_progress'))
+
+    await act(async () => {
+      await result.current.refresh()
+    })
+
+    expect(result.current.error).toBeNull()
+    expect(result.current.busy).toBe(false)
+    expect(statusOf(result.current.state)).toBe('in_progress')
+  })
+
+  it('says the relay is busy, not an error, when the first read finds it busy', async () => {
+    vi.mocked(loadAllEvents).mockRejectedValue(new RelayBusyError(502))
+
+    const { result } = renderHook(() => useWorkspace())
+
+    await waitFor(() => expect(result.current.busy).toBe(true))
+    expect(result.current.error).toBeNull()
+    expect(result.current.loading).toBe(false)
   })
 })
 
