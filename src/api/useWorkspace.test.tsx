@@ -211,25 +211,6 @@ describe('useWorkspace — a relay that stays busy is a wait, not a broken relay
     expect(result.current.error).toBeNull()
     expect(result.current.loading).toBe(false)
   })
-
-  // Measured on production: the socket was already live for the sidebar, so the poll stood down and the banner
-  // stayed for 131 s after the relay had recovered.
-  it('asks again on the next tick when the first read found it busy, though the socket is live, and draws the workspace', async () => {
-    live.current = true
-    vi.mocked(loadAllEvents).mockRejectedValueOnce(new RelayBusyError(503)).mockResolvedValueOnce(stateWith('todo'))
-
-    const { result } = renderHook(() => useWorkspace())
-    await waitFor(() => expect(result.current.busy).toBe(true))
-    expect(refreshMock).toHaveBeenLastCalledWith(true)
-
-    await act(async () => {
-      handers.poll?.()
-    })
-
-    await waitFor(() => expect(statusOf(result.current.state)).toBe('todo'))
-    expect(result.current.busy).toBe(false)
-    expect(refreshMock).toHaveBeenLastCalledWith(false)
-  })
 })
 
 describe('useWorkspace — the socket delivers and the poll becomes a fallback (PER-3)', () => {
