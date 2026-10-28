@@ -7,12 +7,26 @@ import { RelayBusyError } from '@estiva-app/protocol'
   `useRefresh` to test which read runs; this file checks that a read is asked
   again on a tick at all, with the socket live (APP-9).
 */
-vi.mock('./index', () => ({ loadAllEvents: vi.fn(), reloadFolders: vi.fn(), foldWorkspace: (read: unknown) => read }))
+vi.mock('./index', () => ({
+  loadAllEvents: vi.fn(),
+  loadOpened: vi.fn(),
+  reloadFolders: vi.fn(),
+  foldWorkspace: (read: unknown) => read,
+}))
 vi.mock('./liveWorkspace', () => ({ useLiveWorkspace: () => ({ relayState: 'live', live: true }) }))
 
-import { loadAllEvents } from './index'
+import { loadAllEvents, loadOpened } from './index'
 import { REFRESH_MS } from '../lib/useRefresh'
+import { noteRateLimited, resetRelayBudget } from '../lib/relayBudget'
 import { useWorkspace } from './useWorkspace'
+
+const QUOTA = 'rate-limited: quota exceeded; retry in 11s'
+
+/** A read the relay refused on quota, recorded as the transport records every 429. */
+async function refusedOnQuota(): Promise<never> {
+  noteRateLimited(QUOTA)
+  throw new Error(QUOTA)
+}
 
 const workspace = (folders: string[]) => ({ projects: [{ addr: 'p', status: 'todo' }], issues: [], activity: [], conversations: [], folders })
 
@@ -26,9 +40,57 @@ async function tick(ms: number) {
 beforeEach(() => {
   vi.useFakeTimers()
   vi.mocked(loadAllEvents).mockReset()
+  vi.mocked(loadOpened).mockReset()
 })
 afterEach(() => {
+  resetRelayBudget()
   vi.useRealTimers()
+})
+
+describe('useWorkspace — a first read refused on quota asks again when the wait ends (APP-4)', () => {
+  // Measured on production, 28 Oct: refused 1.3 s in with "retry in 11s", the project drew at 24.9 s — the
+  // poll's first tick after the pause, a whole interval past the relay's wait.
+  it('draws the workspace once the relay says it may, not on the next tick after', async () => {
+    vi.mocked(loadAllEvents)
+      .mockImplementationOnce(refusedOnQuota)
+      .mockResolvedValue(workspace(['11111111-1111-4111-8111-111111111111']) as never)
+
+    const { result } = renderHook(() => useWorkspace())
+    await tick(0)
+    expect(result.current.busy).toBe(true)
+
+    await tick(10_500)
+    expect(loadAllEvents).toHaveBeenCalledTimes(1)
+
+    await tick(600)
+    expect(loadAllEvents).toHaveBeenCalledTimes(2)
+    expect(result.current.state?.projects).toHaveLength(1)
+  })
+
+  it('draws the opened project from its own Folder once the wait ends, while the whole read is still out', async () => {
+    vi.mocked(loadOpened)
+      .mockImplementationOnce(refusedOnQuota)
+      .mockResolvedValue(workspace(['22222222-2222-4222-8222-222222222222']) as never)
+    vi.mocked(loadAllEvents).mockImplementationOnce(refusedOnQuota).mockReturnValue(new Promise(() => {}))
+
+    const { result } = renderHook(() => useWorkspace({ kind: 'project', d: 'p' }))
+    await tick(0)
+    expect(result.current.state).toBeNull()
+
+    await tick(11_100)
+    expect(loadOpened).toHaveBeenCalledTimes(2)
+    expect(result.current.partial).toBe(true)
+    expect(result.current.state?.projects).toHaveLength(1)
+  })
+
+  it('leaves a relay that is busy, not over quota, to the poll', async () => {
+    vi.mocked(loadAllEvents).mockRejectedValueOnce(new RelayBusyError(503)).mockResolvedValue(workspace([]) as never)
+
+    renderHook(() => useWorkspace())
+    await tick(0)
+    await tick(REFRESH_MS - 100)
+    expect(loadAllEvents).toHaveBeenCalledTimes(1)
+  })
 })
 
 describe('useWorkspace — a socket that watches no Folder leaves the poll on (APP-9)', () => {

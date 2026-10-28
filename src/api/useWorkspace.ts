@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { WorkspaceEvents, WorkspaceState } from '../nostr/store'
 import { useRefresh } from '../lib/useRefresh'
-import { isRateLimited, isRelayBusy } from '../lib/relayBudget'
+import { isRateLimited, isRelayBusy, pausedForMs, relayBudget } from '../lib/relayBudget'
 import { useLiveWorkspace } from './liveWorkspace'
 import { foldWorkspace, loadAllEvents, loadOpened, reloadFolders } from './index'
 
@@ -204,24 +204,44 @@ export function useWorkspace(opened?: Opened): Workspace {
 
   useEffect(() => {
     mounted.current = true
-    void read()
-    /* Shown only while no whole read has landed, and never kept as one: a
-       re-read keeps `events`, and this holds one Folder. A failure leaves the
-       page to the whole read, as before. */
-    if (first.current) {
-      loadOpened(first.current).then(
-        (own) => {
-          if (!mounted.current || events.current) return
-          setState(foldWorkspace(own))
-          setPartial(true)
-        },
-        () => undefined,
-      )
+    /* Nothing on screen yet and the relay refused on quota: ask again the
+       moment its stated wait ends. The poll skips its ticks while paused and
+       reads on the first one after, up to a whole interval late — 25 s to a
+       project on 28 Oct, the relay having said 11 (APP-4). A busy relay
+       records no pause, so it keeps the poll's pace (APP-9). */
+    const whenClear = async (): Promise<boolean> => {
+      if (pausedForMs() === 0) return false
+      await relayBudget.whenClear()
+      return mounted.current && !events.current
     }
+    const firstRead = async (): Promise<void> => {
+      await poll()
+      if (!events.current && (await whenClear())) await firstRead()
+    }
+    void firstRead()
+    /* Shown only while no whole read has landed, and never kept as one: a
+       re-read keeps `events`, and this holds one Folder. Any other failure
+       leaves the page to the whole read, as before. */
+    const opened = first.current
+    const openedRead = (): Promise<void> =>
+      opened
+        ? loadOpened(opened).then(
+            (own) => {
+              if (!mounted.current || events.current) return
+              setState(foldWorkspace(own))
+              setPartial(true)
+            },
+            async (reason: unknown) => {
+              if (!isRateLimited(reason instanceof Error ? reason.message : String(reason))) return
+              if (!events.current && (await whenClear())) await openedRead()
+            },
+          )
+        : Promise.resolve()
+    void openedRead()
     return () => {
       mounted.current = false
     }
-  }, [read])
+  }, [poll])
 
   /*
     The socket triggers `reread` with the Folders it saw change, not `poll`.
