@@ -23,6 +23,8 @@ import { ProjectsPage } from '@/pages/ProjectsPage'
 import { ID_CONFIG, RELAY_URL } from './config'
 import { beginSignIn, beginSignOut, signInAvailable, signedIn } from './auth/estivaId'
 import { identifierFromRef, type FolderSummary } from '@estiva-app/interop'
+import { naddrToAddr } from '@estiva-app/protocol'
+import type { Opened } from '@/api/useWorkspace'
 import { archivesOf, type Archives } from '@/lib/archive'
 import { MentionPeopleProvider, WorkspacePeopleProvider, mentionPeople, workspacePeople } from '@/components/editing/mentionables'
 import { useRoster } from '@/api/useRoster'
@@ -57,7 +59,7 @@ export default function App() {
 
 function Shell() {
   const route = useRoute()
-  const { state, partial, error, loading, busy, refresh } = useWorkspace(route.name === 'project' || route.name === 'issue' ? { kind: route.name, d: route.d } : undefined)
+  const { state, partial, error, loading, busy, refresh } = useWorkspace(openedBy(route))
   const folders = useFolders()
   // The teams: what the sidebar lists, what a new project is filed into (FOL-2).
   const teams = useMemo(() => (folders ? topLevelFolders(folders) : undefined), [folders])
@@ -221,6 +223,25 @@ const SKELETON: Partial<Record<Route['name'], PageSkeletonShape>> = {
   issues: 'list',
   project: 'page',
   issue: 'page',
+}
+
+/**
+ * The project or issue the route opens, read before the whole workspace (APP-4):
+ * its own page, or a `/o/<naddr>` — Peek's Open link — whose address already
+ * names it while `useInbound` resolves it.
+ */
+function openedBy(route: Route): Opened | undefined {
+  if (route.name === 'project' || route.name === 'issue') return { kind: route.name, d: route.d }
+  if (route.name !== 'inbound') return undefined
+  try {
+    const addr = naddrToAddr(route.naddr)
+    const d = identifierFromRef(addr)
+    if (d && addr.startsWith('30850:')) return { kind: 'project', d }
+    if (d && addr.startsWith('30851:')) return { kind: 'issue', d }
+  } catch {
+    // A malformed link: `useInbound` says so.
+  }
+  return undefined
 }
 
 /** The opened page's own read holds what this route shows; any other route waits for the whole workspace (APP-4). */

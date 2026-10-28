@@ -177,7 +177,10 @@ export function useWorkspace(opened?: Opened): Workspace {
   const reread = useCallback(
     (folders?: string[]): Promise<void> => {
       if (!folders) return read()
-      const next = scoped.current.then(() => {
+      const next = scoped.current.then(async () => {
+        // A write on the opened page before the whole read lands (APP-4): let
+        // that read land rather than start a second, then re-read this Folder on it.
+        if (!events.current && inFlight.current) await inFlight.current
         const previous = events.current
         return previous ? start(() => reloadFolders(previous, folders), false) : read()
       })

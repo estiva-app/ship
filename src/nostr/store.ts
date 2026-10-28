@@ -1143,23 +1143,36 @@ export class Store {
    * The opened project or issue, read before the whole workspace (APP-4).
    *
    * Its record by `d`, which finds a global project record too, then its own
-   * Folder whole — and for an issue its project's record, for the page's
-   * breadcrumb. The page draws from this while `loadAllEvents` runs. An issue
-   * of the project filed in another Folder joins its list when that lands
-   * (Miky, 28 Oct). On 28 Oct the whole read took 5–6 s and this 0.4–0.7 s.
+   * Folder whole — and for an issue its project's record and that project's
+   * own Folder, which holds the project's archive and renames: an issue under
+   * an archived project is read-only (an-archived-file-is-read-only-in-every-app).
+   * Usually the issue's own Folder, so two round trips; an issue filed
+   * elsewhere, or moved (the move is a change in the issue's Folder), takes
+   * one or two more. The page draws from this while `loadAllEvents` runs. An
+   * issue of the project filed in another Folder joins its list when that
+   * lands (Miky, 28 Oct). On 28 Oct the whole read took 5–6 s and this 0.4–0.7 s.
    *
    * Not for a re-read: `readAt` is empty, so nothing here is kept as read.
    */
   async loadOpened(opened: { kind: 'project' | 'issue'; d: string }): Promise<WorkspaceEvents> {
-    const roots = await this.queryAll([{ kinds: [opened.kind === 'project' ? KIND.PROJECT : KIND.ISSUE], '#d': [opened.d] }])
-    const state = foldFolder(roots, referencedAddresses)
-    const folders = [...new Set([...state.projects.map((project) => project.contentFolder), ...state.issues.map((issue) => issue.folder)].filter(Boolean))]
-    const parents = [...new Set(state.issues.flatMap((issue) => (issue.projectAddr ? [issue.projectAddr.split(':').slice(2).join(':')] : [])))]
-    const [inFolders, projects] = await Promise.all([
-      this.readFolderEvents(folders, {}),
-      parents.length ? this.queryAll([{ kinds: [KIND.PROJECT], '#d': parents }]) : Promise.resolve([]),
-    ])
-    return { events: mergeRead(roots, [...inFolders, ...projects]), folders, readAt: {} }
+    let events = await this.queryAll([{ kinds: [opened.kind === 'project' ? KIND.PROJECT : KIND.ISSUE], '#d': [opened.d] }])
+    const read = new Set<string>()
+    for (let round = 0; round < 3; round++) {
+      const state = foldFolder(events, referencedAddresses)
+      const issues = opened.kind === 'issue' ? state.issues.filter((issue) => issue.id === opened.d) : []
+      const parents = new Set(issues.flatMap((issue) => (issue.projectAddr ? [issue.projectAddr] : [])))
+      const projects = state.projects.filter((project) => (opened.kind === 'project' ? project.id === opened.d : parents.has(project.addr)))
+      const folders = [...new Set([...projects.map((project) => project.contentFolder), ...issues.map((issue) => issue.folder)])].filter((folder) => folder && !read.has(folder))
+      const missing = [...parents].filter((addr) => !projects.some((project) => project.addr === addr)).map((addr) => addr.split(':').slice(2).join(':'))
+      if (!folders.length && !missing.length) break
+      for (const folder of folders) read.add(folder)
+      const [inFolders, records] = await Promise.all([
+        this.readFolderEvents(folders, {}),
+        missing.length ? this.queryAll([{ kinds: [KIND.PROJECT], '#d': missing }]) : Promise.resolve([]),
+      ])
+      events = mergeRead(events, [...inFolders, ...records])
+    }
+    return { events, folders: [...read], readAt: {} }
   }
 
   /** A query for one load (`createLoadQuery`, paged): see `loadAllEvents`. */

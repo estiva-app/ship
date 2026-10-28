@@ -397,6 +397,30 @@ describe('useWorkspace — the opened page draws from its own read first (APP-4)
     expect(handers.watched).toEqual(['11111111-1111-4111-8111-111111111111'])
   })
 
+  it('lets a write on the opened page wait for the whole read, then re-reads only its Folder', async () => {
+    const FOLDER = '22222222-2222-4222-8222-222222222222'
+    const whole = pendingRead()
+    vi.mocked(loadAllEvents).mockReturnValueOnce(whole.promise).mockResolvedValue(stateWith('read again'))
+    vi.mocked(loadOpened).mockResolvedValueOnce(stateWith('own'))
+    vi.mocked(reloadFolders).mockResolvedValueOnce(stateWith('written'))
+    const { result } = renderHook(() => useWorkspace(OPENED))
+    await waitFor(() => expect(result.current.partial).toBe(true))
+
+    let wrote!: Promise<void>
+    act(() => {
+      wrote = result.current.refresh([FOLDER])
+    })
+    const first = stateWith('whole')
+    await act(async () => {
+      whole.release(first)
+      await wrote
+    })
+    // One whole read, not a second one started by the write and thrown away by it.
+    expect(loadAllEvents).toHaveBeenCalledTimes(1)
+    expect(reloadFolders).toHaveBeenCalledExactlyOnceWith(first, [FOLDER])
+    expect(statusOf(result.current.state)).toBe('written')
+  })
+
   it('reads only the whole workspace when the tab opens on any other page', async () => {
     vi.mocked(loadAllEvents).mockResolvedValue(stateWith('whole'))
     const { result } = renderHook(() => useWorkspace())

@@ -2,7 +2,7 @@ import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorkspaceState } from '@/api'
-import { RelayBusyError } from '@estiva-app/protocol'
+import { RelayBusyError, addrToNaddr } from '@estiva-app/protocol'
 
 const { ME, OTHER } = vi.hoisted(() => ({ ME: 'e'.repeat(64), OTHER: 'f'.repeat(64) }))
 
@@ -309,6 +309,13 @@ describe('opened on a project, before the whole read lands', () => {
     const nav = within(container.querySelector('nav, aside') as HTMLElement)
     expect(nav.queryByRole('link', { name: /^Live/ })).toBeNull()
     expect(nav.getByRole('link', { name: /^Issues/ })).toHaveTextContent(/^Issues$/)
+  })
+
+  it("reads an issue opened from Peek's link first, before the link resolves", () => {
+    vi.mocked(resolveInbound).mockReturnValue(new Promise(() => {}))
+    goTo(`/o/${addrToNaddr(`30851:${'a'.repeat(64)}:${D('11')}`)}`)
+    render(<App />)
+    expect(useWorkspace).toHaveBeenCalledWith({ kind: 'issue', d: D('11') })
   })
 
   it('shows another page as still loading rather than as the one Folder read', () => {

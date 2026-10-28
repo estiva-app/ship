@@ -40,6 +40,11 @@ const held: SignedEvent[] = [
   sign(buildIssue(ME, at(), { issueId: 'c1', title: 'C one', folder: C, projectAddr: projectAddr(ME, 'pa') })),
   sign(buildIssue(ME, at(), { issueId: 'b1', title: 'B one', folder: B, projectAddr: projectAddr(ME, 'pb') })),
   sign(buildChange(ME, at(), { target: issueAddr(ME, 'b1'), field: 'status', value: 'in_progress', folder: B })),
+  // Alpha is archived — a change in Alpha's own Folder, not in C, where c1 sits.
+  sign(buildChange(ME, at(), { target: projectAddr(ME, 'pa'), field: 'archived', value: 'true', folder: A })),
+  // b2 was filed under Beta and moved to Alpha: the move is a change in b2's own Folder.
+  sign(buildIssue(ME, at(), { issueId: 'b2', title: 'B two', folder: B, projectAddr: projectAddr(ME, 'pb') })),
+  sign(buildChange(ME, at(), { target: issueAddr(ME, 'b2'), field: 'project', value: projectAddr(ME, 'pa'), folder: B })),
 ]
 let asked: Record<string, unknown>[][] = []
 
@@ -73,12 +78,28 @@ check('and is kept as read nowhere, so no re-read starts from it', Object.keys(p
 
 asked = []
 const issue = foldWorkspace(await store.loadOpened({ kind: 'issue', d: 'b1' }))
-check('an opened issue is there with its status', issue.issues.length === 1 && issue.issues[0].status === 'in_progress', JSON.stringify(issue.issues))
+check('an opened issue is there with its status', issue.issues.find((i) => i.id === 'b1')?.status === 'in_progress', JSON.stringify(issue.issues))
 check("and its project's record, for the breadcrumb", issue.projects.map((p) => p.title).join() === 'Beta', JSON.stringify(issue.projects.map((p) => p.title)))
 check('it asked only its own Folder', foldersAsked().join() === B, JSON.stringify(asked))
 
+/*
+  An issue under an archived project is read-only in every app
+  (an-archived-file-is-read-only-in-every-app): the archive is a change in the
+  project's own Folder, so an issue filed elsewhere must read that Folder too,
+  or its page opens editable for the seconds before the whole read lands.
+*/
 asked = []
-const missing = foldWorkspace(await store.loadOpened({ kind: 'issue', d: 'nothing-here' }))
+const elsewhere = foldWorkspace(await store.loadOpened({ kind: 'issue', d: 'c1' }))
+check('an issue filed outside its project\'s Folder still reads that project as archived', elsewhere.projects.find((p) => p.title === 'Alpha')?.archived === true, JSON.stringify(elsewhere.projects))
+check('by reading the project\'s own Folder after the issue\'s', foldersAsked().join() === [C, A].join(), JSON.stringify(asked))
+
+asked = []
+const moved = foldWorkspace(await store.loadOpened({ kind: 'issue', d: 'b2' }))
+const b2 = moved.issues.find((i) => i.title === 'B two')
+check('a moved issue reads the project it was moved to, archived, not the one it was filed under', b2?.projectAddr === projectAddr(ME, 'pa') && moved.projects.find((p) => p.addr === b2.projectAddr)?.archived === true, JSON.stringify(moved.projects))
+
+asked = []
+const missing =foldWorkspace(await store.loadOpened({ kind: 'issue', d: 'nothing-here' }))
 check('a d nobody holds reads nothing more, and folds empty', missing.issues.length === 0 && asked.length === 1, JSON.stringify(asked))
 
 if (failures) {
