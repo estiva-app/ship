@@ -47,6 +47,7 @@ import {
   type WorkspaceState,
 } from '@/api'
 import { useRelated } from '@/api/useRelated'
+import { useThreads } from '@/api/useThreads'
 import { editTargetOf, MEMBER_FIELD_PREFIX } from '@estiva-app/conversation'
 import { Members } from '@/components/Members'
 import { membershipActions } from './membership'
@@ -542,6 +543,14 @@ export function ProjectPage({
   const [dialog, setDialog] = useState<'issue' | 'delete' | 'move' | 'archive' | null>(null)
   const newIssueHold = project && `new-issue:${project.addr}`
   useReopenHeld(newIssueHold, () => setDialog('issue'))
+  const record = recordChannel(project?.contentFolder, teams)
+  /*
+    The conversations this page draws, read for it (APP-5): its own Folders,
+    and every Folder holding a comment on it or a mention of it, for its
+    conversation, Activity and the Activity tab's mark. Its board and table
+    draw no counts, so no other Folder's.
+  */
+  const held = useThreads(state, project ? [project.contentFolder, ...(record ? [record] : [])] : [], project ? [project.addr] : [])
 
   const issues = useMemo<IssuesTableRow[]>(() => {
     if (!project) return []
@@ -589,7 +598,6 @@ export function ProjectPage({
     () => (project ? subFileThreads(state, new Set(state.issues.filter((issue) => issue.projectAddr === project.addr).map((issue) => issue.addr))) : new Set<string>()),
     [project, state],
   )
-  const record = recordChannel(project?.contentFolder, teams)
   const conversations = useMemo(
     () =>
       project
@@ -618,7 +626,8 @@ export function ProjectPage({
   const [shownThreads, onThreadShown] = useShownThreads()
   const drawn = useMemo(() => newestDrawn(conversations, shownThreads), [conversations, shownThreads])
   // Only on Activity, where the feed is drawn: Overview and Issues read nothing (66b31c4b, Miky 2026-10-06).
-  const streams = useMemo(() => (tab === 'activity' ? [channelContext(record), fileContext(project?.addr)] : []), [record, project, tab])
+  // Nor while its conversations are on the way (APP-5): with none drawn, the mark would be the clock's.
+  const streams = useMemo(() => (tab === 'activity' && held.all ? [channelContext(record), fileContext(project?.addr)] : []), [record, project, tab, held.all])
   useMarkRead(streams, drawn.rootsAt)
   useMarkRead(tab === 'activity' ? shownThreads.map(threadContext) : [], drawn.repliesAt)
   const threads = useMemo(
@@ -758,6 +767,8 @@ export function ProjectPage({
         hrefFor={hrefForIssue}
         related={related}
         threads={threads}
+        conversationsLoading={!held.folders}
+        mentionsLoading={!held.all}
         unread={unread}
         stillUnread={stillUnread}
         onThreadShown={onThreadShown}

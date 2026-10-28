@@ -1,7 +1,7 @@
 import { Fragment, Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from 'react'
 import { IconDotsVertical, IconMessage2, IconX } from '@tabler/icons-react'
 import type { Imeta } from '@estiva-app/protocol'
-import { AddReactionButton, Avatar, Button, Card, EmptyState, FieldLine, IconButton, Menu, MenuItem, ReactionRow, SkeletonBar, WithTooltip } from '@estiva-app/ui'
+import { AddReactionButton, Avatar, Button, Card, EmptyState, FieldLine, IconButton, Menu, MenuItem, ReactionRow, SkeletonBar, SkeletonList, WithTooltip } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
 import { ago } from '@/lib/time'
 import { draftKeys, type DraftStore } from '@/lib/drafts'
@@ -399,7 +399,9 @@ export function ThreadListView(props: ThreadListViewProps) {
         resolved={props.resolved}
         here={about}
       />
-      {threads.length ? (
+      {props.loading ? (
+        <SkeletonList rows={2} />
+      ) : threads.length ? (
         <ol className="flex flex-col gap-3">
           {threads.map((thread) => (
             <li key={thread.id}>
@@ -424,6 +426,7 @@ export function ThreadListView(props: ThreadListViewProps) {
 export function MentionListView(props: MentionListViewProps) {
   const { items, truncated = 0, className } = props
   const pageThreads = useMemo(() => items.map((item) => item.thread), [items])
+  if (props.loading) return <SkeletonList rows={2} />
   if (!items.length) return <EmptyState scope="section" className={className} message="No related conversations yet." />
   return (
     <div className={cn('flex flex-col gap-3', className)}>

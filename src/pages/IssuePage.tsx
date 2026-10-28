@@ -9,6 +9,7 @@ import { ISSUE_STATUSES, lookupStatus, addMentioned, archiveIssue, commentsOn, d
 import { me, useMentionsElsewhere } from '@/api'
 import { MEMBER_FIELD_PREFIX, memberOfField } from '@estiva-app/conversation'
 import { useRelated } from '@/api/useRelated'
+import { useThreads } from '@/api/useThreads'
 import { Members } from '@/components/Members'
 import { membershipActions } from './membership'
 import type { HistoryEntry } from '@/components/History'
@@ -99,6 +100,12 @@ function changeInWords(field: string, value: string, previous: string | undefine
 export function IssuePage({ state, directory, archives, d, tab, say, refresh }: { state: WorkspaceState; directory: DirectoryView; /** What is archived, and what with — FOL-46. */ archives: Archives; /** The object's `d`, which is all a §7.2 URL carries. */ d: string; /** The open tab — Overview or Activity. */ tab: IssueTab; say: Say; refresh: (folders?: string[]) => Promise<void> }) {
   const issue = state.issues.find((candidate) => candidate.id === d)
   const project = issue?.projectAddr ? state.projects.find((candidate) => candidate.addr === issue.projectAddr) : undefined
+  /*
+    The conversations this page draws, read for it (APP-5): its own Folder's,
+    its project's for what `[` offers, and every Folder holding a comment on it
+    or a mention of it, for its conversation and Activity.
+  */
+  const held = useThreads(state, issue ? [issue.folder, ...(project ? [project.contentFolder] : [])] : [], issue ? [issue.addr] : [])
 
   /*
     The object's own discussion — CON-7. `conversationsAbout` returned the union
@@ -132,7 +139,8 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
      it, so marking there cleared Peek's dot for comments nobody had seen. */
   const [shownThreads, onThreadShown] = useShownThreads()
   const drawn = useMemo(() => newestDrawn(conversations, shownThreads), [conversations, shownThreads])
-  const fileContexts = useMemo(() => (tab === 'activity' ? [fileContext(issue?.addr)] : []), [issue, tab])
+  // Nor while its conversations are on the way (APP-5): with none drawn, the mark would be the clock's.
+  const fileContexts = useMemo(() => (tab === 'activity' && held.all ? [fileContext(issue?.addr)] : []), [issue, tab, held.all])
   useMarkRead(fileContexts, drawn.rootsAt)
   useMarkRead(tab === 'activity' ? shownThreads.map(threadContext) : [], drawn.repliesAt)
   const threads = useMemo(
@@ -255,6 +263,8 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
         descriptionBy={issue.fields.description && issue.fields.description.by !== me ? (directory.profileOf(issue.fields.description.by)?.name ?? null) : null}
         related={related}
         threads={threads}
+        conversationsLoading={!held.folders}
+        mentionsLoading={!held.all}
         unread={unread}
         stillUnread={stillUnread}
         onThreadShown={onThreadShown}

@@ -72,6 +72,8 @@ export interface ActivityItem {
 
 export interface ActivityProps {
   items: ActivityItem[]
+  /** The threads are still on the way (APP-5): drawn as loading, never as none. */
+  loading?: boolean
   /** The address of the file the page is on: its links here keep their chip and draw no card (Miky, WID-3). */
   about?: string
   /** The viewer's pubkey, for §6.5's Edit and Delete rule — see `ConversationsProps.viewer`. */

@@ -82,7 +82,9 @@ check("a listing's change read in the same load is answered from it", asked.leng
 asked = []
 await store.loadAllEvents()
 check('loadAll reads discovery, then both Folders', asked.length === 3, `${asked.length} queries`)
-check('loadAll is the fold of loadAllEvents', JSON.stringify(await store.loadAll()) === JSON.stringify(foldWorkspace(full)))
+// When each Folder's conversation was read (APP-5) is the clock's; which Folders, the fold's.
+const threadFolders = ({ threadsAt, ...state }: WorkspaceState) => JSON.stringify({ ...state, threadsAt: Object.keys(threadsAt ?? {}).sort() })
+check('loadAll is the fold of loadAllEvents', threadFolders(await store.loadAll()) === threadFolders(foldWorkspace(full)))
 
 
 // Someone else deletes an issue in A, then A only is re-read. The relay drops the issue and keeps the kind:5 in A.
@@ -116,7 +118,8 @@ const afterChange = foldWorkspace(await store.reloadFolders(base, [A]))
 check('a change in the re-read Folder shows', statusOf(afterChange, 'A one') === 'in_progress', statusOf(afterChange, 'A one'))
 // The fold, and the same events in any order: a reload merges into one Folder's slice of them, and loadAll reads a
 // record twice (discovery, then its Folder).
-const foldOf = ({ events, ...state }: WorkspaceState) => JSON.stringify({ ...state, events: [...new Set(events.map((event) => event.id))].sort() })
+const foldOf = ({ events, threadsAt, ...state }: WorkspaceState) =>
+  JSON.stringify({ ...state, threadsAt: Object.keys(threadsAt ?? {}).sort(), events: [...new Set(events.map((event) => event.id))].sort() })
 check('folds the same as a fresh loadAll', foldOf(afterChange) === foldOf(await store.loadAll()))
 
 // An issue filed into a Folder nothing had read yet: widening fetches it.

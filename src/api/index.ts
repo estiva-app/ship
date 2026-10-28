@@ -10,12 +10,13 @@
  * Components import from '@/api'. A component importing '@/nostr/...' is a
  * boundary violation, whatever it does.
  */
-import type { WorkspaceEvents } from '../nostr/store'
+import type { ThreadsWanted, WorkspaceEvents } from '../nostr/store'
 import type { Directory } from '../nostr/profiles'
 import { naddrToAddr } from '@estiva-app/protocol'
 
 export type { Change, Conversation, FolderState, Issue, Message, Project } from '../nostr/fold'
-export type { WorkspaceEvents, WorkspaceState } from '../nostr/store'
+export type { ThreadsWanted, WorkspaceEvents, WorkspaceState } from '../nostr/store'
+export { holdsThreads } from '../nostr/store'
 export { foldWorkspace } from '../nostr/store'
 export { useMentionsElsewhere } from './mentionsElsewhere'
 export type { Directory, Profile } from '../nostr/profiles'
@@ -93,12 +94,17 @@ import type { Imeta } from '@estiva-app/protocol'
 
 
 /**
- * Everything the reader can see: projects, issues, their changes and threads —
- * unfolded, so a later read can replace one Folder's part of it. Fold it with
- * `foldWorkspace`.
+ * Everything the reader can see: projects, issues, their changes, and the
+ * conversations of the Folders `threads` names (APP-5) — unfolded, so a later
+ * read can replace one Folder's part of it. Fold it with `foldWorkspace`.
  */
-export function loadAllEvents(): Promise<WorkspaceEvents> {
-  return store.loadAllEvents(firstLoad('workspace'))
+export function loadAllEvents(threads: (folder: string) => boolean): Promise<WorkspaceEvents> {
+  return store.loadAllEvents(firstLoad('workspace'), threads)
+}
+
+/** `previous` with the conversations a screen draws — APP-5, see `Store.readThreads`. */
+export function readThreads(previous: WorkspaceEvents, wanted: ThreadsWanted): Promise<WorkspaceEvents> {
+  return store.readThreads(previous, wanted)
 }
 
 /** The opened project or issue and its own Folder, before the whole workspace — APP-4, see `Store.loadOpened`. */

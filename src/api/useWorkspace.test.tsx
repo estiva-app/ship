@@ -4,7 +4,7 @@ import { RelayBusyError } from '@estiva-app/protocol'
 
 // The fold is the identity here, so a test hands the hook a state directly and
 // reads it back — what is under test is which read runs, not what it folds to.
-vi.mock('./index', () => ({ loadAllEvents: vi.fn(), loadOpened: vi.fn(), reloadFolders: vi.fn(), foldWorkspace: (read: unknown) => read }))
+vi.mock('./index', () => ({ loadAllEvents: vi.fn(), loadOpened: vi.fn(), reloadFolders: vi.fn(), readThreads: vi.fn(), holdsThreads: vi.fn(), foldWorkspace: (read: unknown) => read }))
 
 /**
  * The socket, stubbed so this file keeps testing the read machinery.
@@ -36,7 +36,7 @@ import type { WorkspaceEvents, WorkspaceState } from '../nostr/store'
 
 /** With the fold mocked to the identity, a read and the state it folds to are one object. */
 type Read = WorkspaceState & WorkspaceEvents
-import { loadAllEvents, loadOpened, reloadFolders } from './index'
+import { holdsThreads, loadAllEvents, loadOpened, readThreads, reloadFolders } from './index'
 import { useWorkspace } from './useWorkspace'
 
 /**
@@ -67,6 +67,9 @@ beforeEach(() => {
   vi.mocked(loadAllEvents).mockReset()
   vi.mocked(loadOpened).mockReset()
   vi.mocked(reloadFolders).mockReset()
+  vi.mocked(readThreads).mockReset()
+  // Every read holds the conversations asked for, unless a test says otherwise (APP-5).
+  vi.mocked(holdsThreads).mockReset().mockReturnValue(true)
   refreshMock.mockReset()
   live.current = false
   handers.onChange = null
@@ -426,5 +429,78 @@ describe('useWorkspace — the opened page draws from its own read first (APP-4)
     const { result } = renderHook(() => useWorkspace())
     await waitFor(() => expect(result.current.state).not.toBeNull())
     expect(loadOpened).not.toHaveBeenCalled()
+  })
+})
+
+describe('useWorkspace — conversations are read for the screen that draws them (APP-5)', () => {
+  const FOLDER = '11111111-1111-4111-8111-111111111111'
+  const OTHER = '22222222-2222-4222-8222-222222222222'
+  const WANTED = { folders: [FOLDER], about: ['30851:x:i'] }
+  // A whole read brings no conversation the screen wants; `readThreads` brings them.
+  const holdsIfThreaded = (read: unknown) => statusOf(read as WorkspaceState) === 'with threads'
+
+  it('asks each Folder the screen wants for its conversation, and no other', async () => {
+    const whole = pendingRead()
+    vi.mocked(loadAllEvents).mockReturnValueOnce(whole.promise)
+    const { result } = renderHook(() => useWorkspace())
+    act(() => result.current.wantThreads?.(WANTED))
+    const asks = vi.mocked(loadAllEvents).mock.calls[0][0] as ((folder: string) => boolean) | undefined
+    expect([asks?.(FOLDER), asks?.(OTHER)]).toEqual([true, false])
+    await act(async () => whole.release(stateWith('whole')))
+  })
+
+  it('never draws a whole read without the conversations the screen draws, so a poll does not empty them', async () => {
+    vi.mocked(holdsThreads).mockImplementation(holdsIfThreaded)
+    const whole = pendingRead()
+    const first = stateWith('whole')
+    vi.mocked(loadAllEvents).mockReturnValueOnce(whole.promise)
+    vi.mocked(readThreads).mockResolvedValueOnce(stateWith('with threads'))
+    const seen: (string | undefined)[] = []
+    const { result } = renderHook(() => {
+      const workspace = useWorkspace()
+      seen.push(statusOf(workspace.state))
+      return workspace
+    })
+    act(() => result.current.wantThreads?.(WANTED))
+
+    await act(async () => whole.release(first))
+    await waitFor(() => expect(statusOf(result.current.state)).toBe('with threads'))
+    expect(readThreads).toHaveBeenCalledExactlyOnceWith(first, WANTED)
+    expect(seen).not.toContain('whole')
+  })
+
+  it('leaves a screen asked for during a whole read to that read, rather than throwing it away', async () => {
+    vi.mocked(holdsThreads).mockImplementation(holdsIfThreaded).mockReturnValueOnce(true)
+    const poll = pendingRead()
+    vi.mocked(loadAllEvents).mockResolvedValueOnce(stateWith('whole')).mockReturnValueOnce(poll.promise)
+    vi.mocked(readThreads).mockResolvedValue(stateWith('with threads'))
+    const { result } = renderHook(() => useWorkspace())
+    await waitFor(() => expect(statusOf(result.current.state)).toBe('whole'))
+
+    act(() => void result.current.refresh())
+    act(() => result.current.wantThreads?.(WANTED))
+    expect(readThreads).not.toHaveBeenCalled()
+    // The read that was running lands — say, without a Folder this reader lost — and brings the screen's own.
+    const polled = stateWith('polled')
+    await act(async () => poll.release(polled))
+    await waitFor(() => expect(statusOf(result.current.state)).toBe('with threads'))
+    expect(readThreads).toHaveBeenCalledExactlyOnceWith(polled, WANTED)
+  })
+
+  it('reads a screen asked for after the whole read once, however often it draws', async () => {
+    // No screen asked yet, so the whole read lands as it is; after it, only `readThreads` brings them.
+    vi.mocked(holdsThreads).mockImplementation(holdsIfThreaded).mockReturnValueOnce(true)
+    vi.mocked(loadAllEvents).mockResolvedValueOnce(stateWith('whole'))
+    const threads = pendingRead()
+    vi.mocked(readThreads).mockReturnValueOnce(threads.promise)
+    const { result } = renderHook(() => useWorkspace())
+    await waitFor(() => expect(statusOf(result.current.state)).toBe('whole'))
+
+    act(() => result.current.wantThreads?.(WANTED))
+    act(() => result.current.wantThreads?.(WANTED))
+    await waitFor(() => expect(readThreads).toHaveBeenCalledTimes(1))
+    await act(async () => threads.release(stateWith('with threads')))
+    expect(statusOf(result.current.state)).toBe('with threads')
+    expect(readThreads).toHaveBeenCalledTimes(1)
   })
 })
