@@ -73,14 +73,29 @@ export function loadQuery(): QueryFn {
  * workspace reads every change, and the listing's change reads are answered
  * from that. Paged, as the workspace read must be. Each takes it once and every
  * later read makes its own, so it is dropped once both have it.
+ *
+ * The listing asks nothing until the workspace has taken it: the workspace
+ * asks for every change the moment it starts, and a listing asking first reads
+ * its changes itself — 27.6 MB more on 28 Oct, once the workspace read began
+ * only after the opened page's own read. The sidebar waits for the whole read
+ * anyway.
  */
 const firstLoadFor = new Set(['workspace', 'listing'])
 let firstLoadQuery: QueryFn | undefined
+let workspaceTook: () => void = () => undefined
+const workspaceStarted = new Promise<void>((resolve) => (workspaceTook = resolve))
 export function firstLoad(reader: 'workspace' | 'listing'): QueryFn | undefined {
   if (!firstLoadFor.delete(reader)) return undefined
   const read = (firstLoadQuery ??= createLoadQuery((filters) => relay.queryAll(filters as never), { paged: true }))
   if (!firstLoadFor.size) firstLoadQuery = undefined
-  return read
+  if (reader === 'workspace') {
+    workspaceTook()
+    return read
+  }
+  return async (filters) => {
+    await workspaceStarted
+    return read(filters)
+  }
 }
 
 /**
