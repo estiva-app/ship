@@ -79,7 +79,7 @@ const comments = () => published.filter((event) => event.kind === 1111)
 
 beforeEach(() => {
   published.length = 0
-  vi.mocked(useWorkspace).mockReturnValue({ state: STATE, error: null, loading: false, busy: false, refresh: vi.fn(async () => {}), live: false })
+  vi.mocked(useWorkspace).mockReturnValue({ state: STATE, partial: false, error: null, loading: false, busy: false, refresh: vi.fn(async () => {}), live: false })
   vi.mocked(useDirectory).mockReturnValue({ directory: new Map(), nameOf: () => 'Someone', personOf: () => ({ name: 'Someone' }), profileOf: () => undefined })
 })
 

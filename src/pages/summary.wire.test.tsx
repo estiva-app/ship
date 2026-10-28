@@ -82,7 +82,7 @@ const sent = (kind: number) => published.filter((event) => event.kind === kind)
 
 beforeEach(() => {
   published.length = 0
-  vi.mocked(useWorkspace).mockReturnValue({ state: STATE, error: null, loading: false, busy: false, refresh: vi.fn().mockResolvedValue(undefined), live: false })
+  vi.mocked(useWorkspace).mockReturnValue({ state: STATE, partial: false, error: null, loading: false, busy: false, refresh: vi.fn().mockResolvedValue(undefined), live: false })
   vi.mocked(useDirectory).mockReturnValue({ directory: new Map(), nameOf: () => 'Someone', personOf: () => ({ name: 'Someone' }), profileOf: () => undefined })
 })
 

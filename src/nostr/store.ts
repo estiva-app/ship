@@ -1139,6 +1139,29 @@ export class Store {
     return { events, folders: all.folders, readAt: Object.fromEntries([...foldersOf(events)].filter((folder) => folders.has(folder)).map((folder) => [folder, at])) }
   }
 
+  /**
+   * The opened project or issue, read before the whole workspace (APP-4).
+   *
+   * Its record by `d`, which finds a global project record too, then its own
+   * Folder whole — and for an issue its project's record, for the page's
+   * breadcrumb. The page draws from this while `loadAllEvents` runs. An issue
+   * of the project filed in another Folder joins its list when that lands
+   * (Miky, 28 Oct). On 28 Oct the whole read took 5–6 s and this 0.4–0.7 s.
+   *
+   * Not for a re-read: `readAt` is empty, so nothing here is kept as read.
+   */
+  async loadOpened(opened: { kind: 'project' | 'issue'; d: string }): Promise<WorkspaceEvents> {
+    const roots = await this.queryAll([{ kinds: [opened.kind === 'project' ? KIND.PROJECT : KIND.ISSUE], '#d': [opened.d] }])
+    const state = foldFolder(roots, referencedAddresses)
+    const folders = [...new Set([...state.projects.map((project) => project.contentFolder), ...state.issues.map((issue) => issue.folder)].filter(Boolean))]
+    const parents = [...new Set(state.issues.flatMap((issue) => (issue.projectAddr ? [issue.projectAddr.split(':').slice(2).join(':')] : [])))]
+    const [inFolders, projects] = await Promise.all([
+      this.readFolderEvents(folders, {}),
+      parents.length ? this.queryAll([{ kinds: [KIND.PROJECT], '#d': parents }]) : Promise.resolve([]),
+    ])
+    return { events: mergeRead(roots, [...inFolders, ...projects]), folders, readAt: {} }
+  }
+
   /** A query for one load (`createLoadQuery`, paged): see `loadAllEvents`. */
   private loadQuery(): QueryFn {
     return createLoadQuery((filters) => this.relay.queryAll(filters as never), { paged: true })

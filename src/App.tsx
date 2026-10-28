@@ -56,8 +56,8 @@ export default function App() {
 }
 
 function Shell() {
-  const { state, error, loading, busy, refresh } = useWorkspace()
   const route = useRoute()
+  const { state, partial, error, loading, busy, refresh } = useWorkspace(route.name === 'project' || route.name === 'issue' ? { kind: route.name, d: route.d } : undefined)
   const folders = useFolders()
   // The teams: what the sidebar lists, what a new project is filed into (FOL-2).
   const teams = useMemo(() => (folders ? topLevelFolders(folders) : undefined), [folders])
@@ -122,11 +122,11 @@ function Shell() {
   // holds moves to the next free one (SPEC §6.1, SHI-4). A no-op until this tab
   // has claimed something.
   useEffect(() => {
-    if (!state || !signedIn()) return
+    if (!state || partial || !signedIn()) return
     void settleClaims(state).then((results) => {
       if (results.length) void refresh()
     })
-  }, [state, refresh])
+  }, [state, partial, refresh])
 
   const copyKey = useCallback(async () => {
     try {
@@ -182,11 +182,15 @@ function Shell() {
 
          Folders are read separately and are not part of `state`, so they do
          not gate `loading`: the folder list arrives on its own schedule and an
-         empty one is not the workspace still coming. */
+         empty one is not the workspace still coming.
+
+         While only the opened page is read (APP-4) the sidebar is still
+         waiting, so it draws as it does with no state: its counts are of the
+         whole workspace. */
       nav={
         <ShipSidebar
           {...sidebarProps(
-            state,
+            partial ? null : state,
             route,
             (teams ?? []).map((f) => ({ id: f.id, name: f.name, addresses: f.addresses })),
             archives,
@@ -194,7 +198,7 @@ function Shell() {
           onOpenFolder={(folder) => go({ name: 'folder', id: folder.id })}
           {...(teams?.length ? { onMoveProject: (project: SidebarProject) => setMoving(project.addr) } : {})}
           onNewFolder={() => setCreatingFolder(true)}
-          loading={!state && loading}
+          loading={(!state && loading) || partial}
           foldersLoading={folders === undefined}
         />
       }
@@ -202,7 +206,7 @@ function Shell() {
       {/* Everyone `@` and `!@` offer in any message box on the page (CON-25). */}
       <MentionPeopleProvider value={mentionable}>
         <WorkspacePeopleProvider value={cardPeople}>
-          <Page route={route} state={state} loading={loading} directory={directory} teams={teams} folders={folders} archives={archives} say={say} refresh={refresh} />
+          <Page route={route} state={partial && !opens(route, state) ? null : state} loading={loading || partial} directory={directory} teams={teams} folders={folders} archives={archives} say={say} refresh={refresh} />
         </WorkspacePeopleProvider>
       </MentionPeopleProvider>
       {movingProject && teams && <MoveProject project={movingProject} teams={teams} say={say} onClose={() => setMoving(null)} />}
@@ -217,6 +221,13 @@ const SKELETON: Partial<Record<Route['name'], PageSkeletonShape>> = {
   issues: 'list',
   project: 'page',
   issue: 'page',
+}
+
+/** The opened page's own read holds what this route shows; any other route waits for the whole workspace (APP-4). */
+function opens(route: Route, state: WorkspaceState | null): boolean {
+  if (route.name === 'project') return !!state?.projects.some((project) => project.id === route.d)
+  if (route.name === 'issue') return !!state?.issues.some((issue) => issue.id === route.d)
+  return false
 }
 
 /** Which page the route names; an inbound reference shows nothing until it resolves. */
