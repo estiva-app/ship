@@ -90,6 +90,16 @@ check('nor asks any other Folder for one', !askedThreadsOf(B) && !askedThreadsOf
 check('and says which Folders it holds', JSON.stringify(Object.keys(loaded.threadsAt ?? {})) === JSON.stringify([A]), JSON.stringify(Object.keys(loaded.threadsAt ?? {})))
 check('while every Folder still gives its projects and issues', foldWorkspace(loaded).issues.length === 2 && foldWorkspace(loaded).projects.length === 3)
 
+// The screen changes while the Folders are read: B becomes wanted once its read is on the way, and that read never asked for its conversation.
+let wantB = false
+const flipping: Parameters<typeof store.loadAllEvents>[0] = async (filters) => {
+  const answer = relay.queryAll(filters)
+  if (filters.some((filter) => filter['#h'])) wantB = true
+  return answer
+}
+const raced = await store.loadAllEvents(flipping, (folder) => folder === A || (folder === B && wantB))
+check('a Folder wanted only after its read went out is not noted as holding its conversation', raced.threadsAt?.[A] !== undefined && raced.threadsAt?.[B] === undefined && !has(raced.events, onB1), JSON.stringify(Object.keys(raced.threadsAt ?? {})))
+
 const wanted = { folders: [A], about: [A1] }
 check('it does not yet hold the mentions of a1', !holdsThreads(loaded, wanted))
 
