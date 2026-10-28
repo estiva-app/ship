@@ -213,12 +213,13 @@ export function useWorkspace(opened?: Opened): Workspace {
        project on 28 Oct, the relay having said 11 (APP-4). A busy relay
        records no pause, so it keeps the poll's pace (APP-9). The relay
        rounds its wait down, so asking at once was refused again a moment
-       before its window reset: a second is added. */
+       before its window reset: a second is added. A hidden tab does not ask:
+       nobody is looking, and the poll reads when it is shown. */
     const whenClear = async (): Promise<boolean> => {
       if (pausedForMs() === 0) return false
       await relayBudget.whenClear()
       await new Promise((resolve) => setTimeout(resolve, ROUNDED_DOWN_MS))
-      return mounted.current && !events.current
+      return mounted.current && !events.current && document.visibilityState === 'visible'
     }
     const firstRead = async (): Promise<void> => {
       await poll()

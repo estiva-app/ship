@@ -83,6 +83,26 @@ describe('useWorkspace — a first read refused on quota asks again when the wai
     expect(result.current.state?.projects).toHaveLength(1)
   })
 
+  it('does not ask again in a hidden tab, and reads when the tab is shown', async () => {
+    vi.mocked(loadAllEvents)
+      .mockImplementationOnce(refusedOnQuota)
+      .mockResolvedValue(workspace(['11111111-1111-4111-8111-111111111111']) as never)
+    const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
+
+    const { result } = renderHook(() => useWorkspace())
+    await tick(0)
+    await tick(REFRESH_MS * 3)
+    expect(loadAllEvents).toHaveBeenCalledTimes(1)
+
+    visibility.mockReturnValue('visible')
+    await act(async () => {
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+    await tick(0)
+    expect(result.current.state?.projects).toHaveLength(1)
+    visibility.mockRestore()
+  })
+
   it('leaves a relay that is busy, not over quota, to the poll', async () => {
     vi.mocked(loadAllEvents).mockRejectedValueOnce(new RelayBusyError(503)).mockResolvedValue(workspace([]) as never)
 
