@@ -2,7 +2,7 @@ import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorkspaceState } from '@/api'
-import { RelayBusyError } from '@estiva-app/protocol'
+import { RelayBusyError, addrToNaddr } from '@estiva-app/protocol'
 
 const { ME, OTHER } = vi.hoisted(() => ({ ME: 'e'.repeat(64), OTHER: 'f'.repeat(64) }))
 
@@ -107,7 +107,7 @@ beforeEach(() => {
   goTo('/')
   refresh.mockClear()
   for (const write of [createProject, createIssue, setIssueField, archiveProject, deleteProject, deleteIssue, startConversation]) vi.mocked(write).mockReset()
-  vi.mocked(useWorkspace).mockReturnValue({ state: STATE, error: null, loading: false, busy: false, refresh , live: false })
+  vi.mocked(useWorkspace).mockReturnValue({ state: STATE, partial: false, error: null, loading: false, busy: false, refresh , live: false })
   vi.mocked(useDirectory).mockReturnValue({
     directory: new Map(),
     nameOf: (k: string) => (k === ME ? 'Me Myself' : 'Someone'),
@@ -140,7 +140,7 @@ describe('App — the shell around the route', () => {
   })
 
   it('shows the read error as a banner and keeps the shell', () => {
-    vi.mocked(useWorkspace).mockReturnValue({ state: STATE, error: 'relay refused', loading: false, busy: false, refresh: async () => {} , live: false })
+    vi.mocked(useWorkspace).mockReturnValue({ state: STATE, partial: false, error: 'relay refused', loading: false, busy: false, refresh: async () => {} , live: false })
     render(<App />)
     expect(screen.getByText(/Could not read from the relay — relay refused/)).toBeInTheDocument()
     expect(within(screen.getByRole('banner')).getByText('Me Myself')).toBeInTheDocument()
@@ -291,6 +291,42 @@ describe('Issues page — rows from the fold', () => {
   })
 })
 
+/*
+  APP-4 (Miky, 28 Oct): an opened project or issue draws from its own read,
+  and the sidebar's counts and the other lists wait for the whole workspace,
+  as placeholders.
+*/
+describe('opened on a project, before the whole read lands', () => {
+  const OWN: WorkspaceState = { ...STATE, projects: [STATE.projects[0]], issues: STATE.issues.slice(0, 2) }
+
+  it('draws the project from its own read while the sidebar still waits', async () => {
+    goTo(`/project/live-${LIVE}`)
+    vi.mocked(useWorkspace).mockReturnValue({ state: OWN, partial: true, error: null, loading: false, busy: false, refresh, live: false })
+    const { container } = render(<App />)
+    const main = within(screen.getByRole('main'))
+    expect(await main.findByRole('textbox', { name: 'Title' })).toHaveTextContent('Live')
+    // The sidebar lists no project and counts nothing: one Folder's issues are not the workspace's.
+    const nav = within(container.querySelector('nav, aside') as HTMLElement)
+    expect(nav.queryByRole('link', { name: /^Live/ })).toBeNull()
+    expect(nav.getByRole('link', { name: /^Issues/ })).toHaveTextContent(/^Issues$/)
+  })
+
+  it("reads an issue opened from Peek's link first, before the link resolves", () => {
+    vi.mocked(resolveInbound).mockReturnValue(new Promise(() => {}))
+    goTo(`/o/${addrToNaddr(`30851:${'a'.repeat(64)}:${D('11')}`)}`)
+    render(<App />)
+    expect(useWorkspace).toHaveBeenCalledWith({ kind: 'issue', d: D('11') })
+  })
+
+  it('shows another page as still loading rather than as the one Folder read', () => {
+    goTo('/issues')
+    vi.mocked(useWorkspace).mockReturnValue({ state: OWN, partial: true, error: null, loading: false, busy: false, refresh, live: false })
+    const { container } = render(<App />)
+    expect(container.querySelector('[data-loading="workspace"]')).not.toBeNull()
+    expect(within(screen.getByRole('main')).queryByText('issue 11')).toBeNull()
+  })
+})
+
 describe('Project page — one project from the fold', () => {
   it('draws the table with Updated from the last change, the Folder threads, the rail — and offers Delete to a non-author', async () => {
     goTo(`/project/live-${LIVE}`)
@@ -365,7 +401,7 @@ describe('Project page — one project from the fold', () => {
     const archivedAt = STATE.projects.find((p) => p.id === OLD)!
     vi.mocked(useWorkspace).mockReturnValue({
       state: { ...STATE, activity: [...STATE.activity, { id: 'c'.repeat(64), author: OTHER, createdAt: 1, target: archivedAt.addr, field: 'archived', value: 'true', format: 'marker', note: 'Replaced by Live.' }] },
-      error: null, loading: false, busy: false, refresh, live: false,
+      partial: false, error: null, loading: false, busy: false, refresh, live: false,
     })
     goTo(`/project/old-${OLD}`)
     render(<App />)
@@ -509,7 +545,7 @@ describe('Issue page — one issue from the fold', () => {
  */
 describe('before the first read lands', () => {
   it('shows a skeleton rather than an empty page', () => {
-    vi.mocked(useWorkspace).mockReturnValue({ state: null, error: null, loading: true, busy: false, refresh , live: false })
+    vi.mocked(useWorkspace).mockReturnValue({ state: null, partial: false, error: null, loading: true, busy: false, refresh , live: false })
     const { container } = render(<App />)
     expect(container.querySelector('[data-loading="workspace"]')).not.toBeNull()
   })
@@ -520,7 +556,7 @@ describe('before the first read lands', () => {
     leaves nothing to distinguish "busy" from "stopped".
   */
   it('says the relay is busy when there is nothing on screen yet', () => {
-    vi.mocked(useWorkspace).mockReturnValue({ state: null, error: null, loading: false, busy: true, refresh , live: false })
+    vi.mocked(useWorkspace).mockReturnValue({ state: null, partial: false, error: null, loading: false, busy: true, refresh , live: false })
     render(<App />)
     expect(screen.getByText(/The relay is busy/)).toBeInTheDocument()
     // Not the error banner: nothing is broken.
@@ -528,7 +564,7 @@ describe('before the first read lands', () => {
   })
 
   it('says nothing about quota once the workspace is on screen', () => {
-    vi.mocked(useWorkspace).mockReturnValue({ state: STATE, error: null, loading: false, busy: false, refresh , live: false })
+    vi.mocked(useWorkspace).mockReturnValue({ state: STATE, partial: false, error: null, loading: false, busy: false, refresh , live: false })
     render(<App />)
     expect(screen.queryByText(/The relay is busy/)).toBeNull()
   })
@@ -542,13 +578,13 @@ describe('before the first read lands', () => {
   */
   it('draws a Folder page without waiting for the workspace', () => {
     goTo(`/app/folder/${D('90')}`)
-    vi.mocked(useWorkspace).mockReturnValue({ state: null, error: null, loading: true, busy: false, refresh, live: false })
+    vi.mocked(useWorkspace).mockReturnValue({ state: null, partial: false, error: null, loading: true, busy: false, refresh, live: false })
     const { container, unmount } = render(<App />)
     expect(container.querySelector('[data-loading="workspace"]')).toBeNull()
     expect(container.querySelector('[data-loading="folder"]')).not.toBeNull()
     unmount()
 
-    vi.mocked(useWorkspace).mockReturnValue({ state: null, error: null, loading: false, busy: true, refresh, live: false })
+    vi.mocked(useWorkspace).mockReturnValue({ state: null, partial: false, error: null, loading: false, busy: true, refresh, live: false })
     const busy = render(<App />).container
     expect(busy.querySelector('[data-loading="folder"]')).not.toBeNull()
   })

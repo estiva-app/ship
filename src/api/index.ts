@@ -101,6 +101,11 @@ export function loadAllEvents(): Promise<WorkspaceEvents> {
   return store.loadAllEvents(firstLoad('workspace'))
 }
 
+/** The opened project or issue and its own Folder, before the whole workspace — APP-4, see `Store.loadOpened`. */
+export function loadOpened(opened: { kind: 'project' | 'issue'; d: string }): Promise<WorkspaceEvents> {
+  return store.loadOpened(opened)
+}
+
 /** Re-read only `folders`, keeping the rest of `previous` — PER-17, see `Store.reloadFolders`. */
 export function reloadFolders(previous: WorkspaceEvents, folders: string[]): Promise<WorkspaceEvents> {
   return store.reloadFolders(previous, folders)

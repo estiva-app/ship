@@ -4,7 +4,7 @@ import { RelayBusyError } from '@estiva-app/protocol'
 
 // The fold is the identity here, so a test hands the hook a state directly and
 // reads it back — what is under test is which read runs, not what it folds to.
-vi.mock('./index', () => ({ loadAllEvents: vi.fn(), reloadFolders: vi.fn(), foldWorkspace: (read: unknown) => read }))
+vi.mock('./index', () => ({ loadAllEvents: vi.fn(), loadOpened: vi.fn(), reloadFolders: vi.fn(), foldWorkspace: (read: unknown) => read }))
 
 /**
  * The socket, stubbed so this file keeps testing the read machinery.
@@ -14,10 +14,11 @@ vi.mock('./index', () => ({ loadAllEvents: vi.fn(), reloadFolders: vi.fn(), fold
  * poll does with `live`.
  */
 const live = { current: false }
-const handers: { onChange: ((folders?: string[]) => void) | null; poll?: () => void } = { onChange: null }
+const handers: { onChange: ((folders?: string[]) => void) | null; poll?: () => void; watched?: string[] } = { onChange: null }
 vi.mock('./liveWorkspace', () => ({
-  useLiveWorkspace: (_folders: string[], onChange: (folders?: string[]) => void) => {
+  useLiveWorkspace: (folders: string[], onChange: (folders?: string[]) => void) => {
     handers.onChange = onChange
+    handers.watched = folders
     return { relayState: live.current ? 'live' : 'off', live: live.current }
   },
 }))
@@ -35,7 +36,7 @@ import type { WorkspaceEvents, WorkspaceState } from '../nostr/store'
 
 /** With the fold mocked to the identity, a read and the state it folds to are one object. */
 type Read = WorkspaceState & WorkspaceEvents
-import { loadAllEvents, reloadFolders } from './index'
+import { loadAllEvents, loadOpened, reloadFolders } from './index'
 import { useWorkspace } from './useWorkspace'
 
 /**
@@ -64,6 +65,7 @@ const statusOf = (state: WorkspaceState | null) => (state?.projects[0] as { stat
 
 beforeEach(() => {
   vi.mocked(loadAllEvents).mockReset()
+  vi.mocked(loadOpened).mockReset()
   vi.mocked(reloadFolders).mockReset()
   refreshMock.mockReset()
   live.current = false
@@ -351,5 +353,78 @@ describe('useWorkspace — the socket delivers and the poll becomes a fallback (
     vi.mocked(loadAllEvents).mockResolvedValue(stateWith('todo'))
     const { result } = renderHook(() => useWorkspace())
     await waitFor(() => expect(result.current.live).toBe(true))
+  })
+})
+
+describe('useWorkspace — the opened page draws from its own read first (APP-4)', () => {
+  const OPENED = { kind: 'project', d: 'pa' } as const
+
+  it('shows the opened page before the whole read lands, then the whole read', async () => {
+    const whole = pendingRead()
+    vi.mocked(loadAllEvents).mockReturnValueOnce(whole.promise)
+    vi.mocked(loadOpened).mockResolvedValueOnce(stateWith('own'))
+    const { result } = renderHook(() => useWorkspace(OPENED))
+    await waitFor(() => expect(statusOf(result.current.state)).toBe('own'))
+    expect(result.current.partial).toBe(true)
+    expect(loadOpened).toHaveBeenCalledWith(OPENED)
+
+    await act(async () => whole.release(stateWith('whole')))
+    expect(statusOf(result.current.state)).toBe('whole')
+    expect(result.current.partial).toBe(false)
+  })
+
+  it('never puts the opened read over a whole read that landed first', async () => {
+    const own = pendingRead()
+    vi.mocked(loadAllEvents).mockResolvedValueOnce(stateWith('whole'))
+    vi.mocked(loadOpened).mockReturnValueOnce(own.promise)
+    const { result } = renderHook(() => useWorkspace(OPENED))
+    await waitFor(() => expect(statusOf(result.current.state)).toBe('whole'))
+
+    await act(async () => own.release(stateWith('own')))
+    expect(statusOf(result.current.state)).toBe('whole')
+    expect(result.current.partial).toBe(false)
+  })
+
+  it('watches no Folder live until the whole read lands, so a change there does not restart it', async () => {
+    const whole = pendingRead()
+    vi.mocked(loadAllEvents).mockReturnValueOnce(whole.promise)
+    vi.mocked(loadOpened).mockResolvedValueOnce(stateWith('own'))
+    const { result } = renderHook(() => useWorkspace(OPENED))
+    await waitFor(() => expect(result.current.partial).toBe(true))
+    expect(handers.watched).toEqual([])
+
+    await act(async () => whole.release(stateWith('whole')))
+    expect(handers.watched).toEqual(['11111111-1111-4111-8111-111111111111'])
+  })
+
+  it('lets a write on the opened page wait for the whole read, then re-reads only its Folder', async () => {
+    const FOLDER = '22222222-2222-4222-8222-222222222222'
+    const whole = pendingRead()
+    vi.mocked(loadAllEvents).mockReturnValueOnce(whole.promise).mockResolvedValue(stateWith('read again'))
+    vi.mocked(loadOpened).mockResolvedValueOnce(stateWith('own'))
+    vi.mocked(reloadFolders).mockResolvedValueOnce(stateWith('written'))
+    const { result } = renderHook(() => useWorkspace(OPENED))
+    await waitFor(() => expect(result.current.partial).toBe(true))
+
+    let wrote!: Promise<void>
+    act(() => {
+      wrote = result.current.refresh([FOLDER])
+    })
+    const first = stateWith('whole')
+    await act(async () => {
+      whole.release(first)
+      await wrote
+    })
+    // One whole read, not a second one started by the write and thrown away by it.
+    expect(loadAllEvents).toHaveBeenCalledTimes(1)
+    expect(reloadFolders).toHaveBeenCalledExactlyOnceWith(first, [FOLDER])
+    expect(statusOf(result.current.state)).toBe('written')
+  })
+
+  it('reads only the whole workspace when the tab opens on any other page', async () => {
+    vi.mocked(loadAllEvents).mockResolvedValue(stateWith('whole'))
+    const { result } = renderHook(() => useWorkspace())
+    await waitFor(() => expect(result.current.state).not.toBeNull())
+    expect(loadOpened).not.toHaveBeenCalled()
   })
 })

@@ -3,11 +3,24 @@ import type { WorkspaceEvents, WorkspaceState } from '../nostr/store'
 import { useRefresh } from '../lib/useRefresh'
 import { isRateLimited, isRelayBusy } from '../lib/relayBudget'
 import { useLiveWorkspace } from './liveWorkspace'
-import { foldWorkspace, loadAllEvents, reloadFolders } from './index'
+import { foldWorkspace, loadAllEvents, loadOpened, reloadFolders } from './index'
+
+/** The project or issue the tab was opened on, read first so its page draws before the workspace — APP-4. */
+export interface Opened {
+  kind: 'project' | 'issue'
+  d: string
+}
 
 export interface Workspace {
-  /** `null` until the first read completes. */
+  /** `null` until the first read completes, or the opened page's own read — see `partial`. */
   state: WorkspaceState | null
+  /**
+   * `state` is only the opened project or issue and its own Folder, while the
+   * whole read runs (APP-4). Its page draws from it; everything else — the
+   * sidebar's counts, the other lists — waits as it does with no state, and
+   * nothing that judges the whole workspace (a ref claim) reads it.
+   */
+  partial: boolean
   /** The last read's failure, or `null`. A stale `state` is kept alongside it. */
   error: string | null
   /**
@@ -68,9 +81,16 @@ export interface Workspace {
  *
  * A read that fails keeps the last good state on screen and records the
  * reason, rather than blanking the app.
+ *
+ * Opened on a project or issue, that page's own read runs beside the first
+ * whole one and is shown until the whole one lands (APP-4; Miky, 28 Oct): on
+ * 28 Oct the whole read took 5–6 s and the opened page's own 0.4–0.7 s. Only
+ * the tab's first route counts; a later page waits for the whole read.
  */
-export function useWorkspace(): Workspace {
+export function useWorkspace(opened?: Opened): Workspace {
+  const first = useRef(opened)
   const [state, setState] = useState<WorkspaceState | null>(null)
+  const [partial, setPartial] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const inFlight = useRef<Promise<void> | null>(null)
@@ -97,6 +117,7 @@ export function useWorkspace(): Workspace {
         if (!mounted.current || ticket !== latest.current) return
         events.current = next
         setState(foldWorkspace(next))
+        setPartial(false)
         setError(null)
         setBusy(false)
       })
@@ -156,7 +177,10 @@ export function useWorkspace(): Workspace {
   const reread = useCallback(
     (folders?: string[]): Promise<void> => {
       if (!folders) return read()
-      const next = scoped.current.then(() => {
+      const next = scoped.current.then(async () => {
+        // A write on the opened page before the whole read lands (APP-4): let
+        // that read land rather than start a second, then re-read this Folder on it.
+        if (!events.current && inFlight.current) await inFlight.current
         const previous = events.current
         return previous ? start(() => reloadFolders(previous, folders), false) : read()
       })
@@ -181,6 +205,19 @@ export function useWorkspace(): Workspace {
   useEffect(() => {
     mounted.current = true
     void read()
+    /* Shown only while no whole read has landed, and never kept as one: a
+       re-read keeps `events`, and this holds one Folder. A failure leaves the
+       page to the whole read, as before. */
+    if (first.current) {
+      loadOpened(first.current).then(
+        (own) => {
+          if (!mounted.current || events.current) return
+          setState(foldWorkspace(own))
+          setPartial(true)
+        },
+        () => undefined,
+      )
+    }
     return () => {
       mounted.current = false
     }
@@ -200,7 +237,9 @@ export function useWorkspace(): Workspace {
     opens before there is a Folder set to subscribe to. Discovery derives that
     set while reading; there is no index to consult.
   */
-  const { live } = useLiveWorkspace(state?.folders ?? [], reread)
+  // Not on the opened page's own read: a change there before the whole read
+  // lands would re-read the whole workspace again, and that read brings it.
+  const { live } = useLiveWorkspace(partial ? [] : (state?.folders ?? []), reread)
 
   // The interval stands down while the socket delivers; `visibilitychange` and
   // `focus` still fire, because a tab that was hidden has had no frames either.
@@ -213,6 +252,7 @@ export function useWorkspace(): Workspace {
 
   return {
     state,
+    partial,
     error,
     loading: state === null && !busy,
     busy: busy && state === null,
