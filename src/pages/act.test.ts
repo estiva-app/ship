@@ -8,6 +8,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { act } from './act'
 import { resetRelayBudget } from '@/lib/relayBudget'
+import { RELAY_BUSY_MESSAGE } from '@estiva-app/protocol'
 
 beforeEach(() => resetRelayBudget())
 
@@ -56,6 +57,13 @@ describe('act', () => {
     await act('Reaction', refusedWith('rate-limited: quota exceeded; retry in 14s'), (t) => said.push(t))
     expect(said[0]).toBe('Too busy right now — try again in 14s.')
     expect(said[0]).not.toContain('rejected')
+  })
+
+  // APP-9: protocol's publish answers `{ ok: false, reason: RELAY_BUSY_MESSAGE }` once its quiet retries run out.
+  it('reports a relay that stayed busy as busy, not as the write rejected', async () => {
+    const said: string[] = []
+    expect(await act('Status', refusedWith(RELAY_BUSY_MESSAGE), (t) => said.push(t))).toBe(false)
+    expect(said).toEqual(['Too busy right now — try again shortly.'])
   })
 
   it('still says something useful when the relay gives no wait', async () => {

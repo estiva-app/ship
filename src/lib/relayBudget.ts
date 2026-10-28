@@ -38,8 +38,23 @@
  * here already imports.
  */
 import { createRelayBudget } from '@estiva-app/platform'
+import { RELAY_BUSY_MESSAGE, RelayBusyError } from '@estiva-app/protocol'
 
 export { DEFAULT_BACKOFF_MS, isRateLimited, retryHintMs } from '@estiva-app/platform'
+
+/**
+ * The relay stayed busy through protocol's quiet retries (APP-9): a read's
+ * `RelayBusyError`, or a write refused with protocol's busy words. Like a
+ * quota refusal it is a wait, not a broken relay or a judgement on the write,
+ * so it goes down the same paths (SHI-12).
+ *
+ * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-busy-relay-says-it-is-busy.md
+ */
+export function isRelayBusy(reason: unknown): boolean {
+  if (reason instanceof RelayBusyError) return true
+  const text = reason instanceof Error ? reason.message : String(reason)
+  return text.includes(RELAY_BUSY_MESSAGE)
+}
 
 /** This tab's budget. */
 export const relayBudget = createRelayBudget()

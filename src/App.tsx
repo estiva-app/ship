@@ -26,6 +26,7 @@ import { identifierFromRef, type FolderSummary } from '@estiva-app/interop'
 import { archivesOf, type Archives } from '@/lib/archive'
 import { MentionPeopleProvider, WorkspacePeopleProvider, mentionPeople, workspacePeople } from '@/components/editing/mentionables'
 import { useRoster } from '@/api/useRoster'
+import { isRelayBusy } from '@/lib/relayBudget'
 import { go, href, navigateTo, replace, useRoute, type Route } from './router'
 
 /**
@@ -111,7 +112,7 @@ function Shell() {
   const cardPeople = useMemo(() => workspacePeople(people, { profileOf }), [people, profileOf])
 
   useCanonicalPath(route)
-  useInbound(route, say)
+  useInbound(route, say, clear)
   /* Read markers are debounced, so the last few of a session would be lost when
      the tab goes away. `visibilitychange` is the one mobile browsers reliably
      fire when a tab is backgrounded or killed (CRO-8). */
@@ -360,13 +361,26 @@ function useCanonicalPath(route: Route) {
  * right surface, or on the issue list with a reason. `replace`, not `go`:
  * Back should not bounce off a route that immediately redirects again.
  */
-function useInbound(route: Route, say: (text: string, tone?: 'ok' | 'error') => void) {
+function useInbound(route: Route, say: (text: string, tone?: 'ok' | 'error') => void, clear: () => void) {
+  /* Bumped to ask a busy relay again. Tied to the link it is for, so another
+     link starts at 0 without a reset that would run the read twice. */
+  const [attempt, setAttempt] = useState<{ naddr: string; n: number } | null>(null)
+  const naddr = route.name === 'inbound' ? route.naddr : null
+  const n = attempt && attempt.naddr === naddr ? attempt.n : 0
+  // The link the busy banner was said for, so it is said once and taken down when that link lands.
+  const saidBusyFor = useRef<string | null>(null)
   useEffect(() => {
-    if (route.name !== 'inbound') return
+    if (naddr === null) return
     let cancelled = false
-    resolveInbound(route.naddr)
+    let retry: ReturnType<typeof setTimeout> | undefined
+    resolveInbound(naddr)
       .then((found) => {
         if (cancelled) return
+        // The relay answered: the busy banner is no longer true (SHI-12 — no red over a correct page).
+        if (saidBusyFor.current === naddr) {
+          saidBusyFor.current = null
+          clear()
+        }
         if (!found) {
           say('Could not resolve that reference — you may not have access to its Folder.', 'error')
           return replace({ name: 'issues' })
@@ -380,17 +394,34 @@ function useInbound(route: Route, say: (text: string, tone?: 'ok' | 'error') => 
         }
         replace(found.kind === 'project' ? { name: 'project', d, view: 'table' } : { name: 'issue', d })
       })
-      .catch(() => {
+      .catch((reason: unknown) => {
         if (cancelled) return
+        /*
+          A relay that stayed busy through protocol's quiet retries has not
+          judged the address (APP-9): keep the route, say so once, and ask
+          again. Declaring a good link invalid would send the person to the
+          issue list with a false reason.
+        */
+        if (isRelayBusy(reason)) {
+          if (saidBusyFor.current !== naddr) say('Too busy right now — try again shortly.', 'error')
+          saidBusyFor.current = naddr
+          retry = setTimeout(() => setAttempt({ naddr, n: n + 1 }), INBOUND_BUSY_RETRY_MS)
+          return
+        }
+        if (saidBusyFor.current === naddr) saidBusyFor.current = null
         say('That reference is not a valid nostr address.', 'error')
         replace({ name: 'issues' })
       })
       .finally(() => {
         // `replace` does not fire hashchange; tell the router by hand.
-        if (!cancelled) dispatchEvent(new HashChangeEvent('hashchange'))
+        if (!cancelled && retry === undefined) dispatchEvent(new HashChangeEvent('hashchange'))
       })
     return () => {
       cancelled = true
+      clearTimeout(retry)
     }
-  }, [route, say])
+  }, [naddr, say, clear, n])
 }
+
+/** How long an inbound link waits before asking a busy relay again (APP-9). */
+const INBOUND_BUSY_RETRY_MS = 10_000

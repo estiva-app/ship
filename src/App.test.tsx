@@ -2,6 +2,7 @@ import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorkspaceState } from '@/api'
+import { RelayBusyError } from '@estiva-app/protocol'
 
 const { ME, OTHER } = vi.hoisted(() => ({ ME: 'e'.repeat(64), OTHER: 'f'.repeat(64) }))
 
@@ -152,6 +153,57 @@ describe('App — the shell around the route', () => {
     // The address it resolved to becomes a §7.2 path — the `d` alone.
     await waitFor(() => expect(location.pathname).toBe(`/issue/${D('11')}`))
     expect(resolveInbound).toHaveBeenCalledWith('naddr1abc')
+  })
+
+  /*
+    APP-9: a relay that stayed busy through protocol's quiet retries throws a
+    `RelayBusyError`. That says nothing about the link, so it is not "not a
+    valid nostr address": the route stays, the person reads that it is busy,
+    and the link lands once the relay answers.
+  */
+  it('keeps an inbound reference, says the relay is busy, and lands it once the relay answers', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      vi.mocked(resolveInbound).mockRejectedValue(new RelayBusyError(503))
+      goTo('/o/naddr1busy')
+      render(<App />)
+      await waitFor(() => expect(screen.getByText('Too busy right now — try again shortly.')).toBeInTheDocument())
+      expect(screen.queryByText(/not a valid nostr address/)).toBeNull()
+      expect(location.pathname).toBe('/o/naddr1busy')
+
+      // The relay answers again; the next ask lands the link.
+      vi.mocked(resolveInbound).mockResolvedValue({ addr: `30851:x:${D('12')}`, kind: 'issue' })
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10_000)
+      })
+      await waitFor(() => expect(location.pathname).toBe(`/issue/${D('12')}`))
+      // The relay answered, so the busy words come down: no red over a correct page (SHI-12).
+      expect(screen.queryByText('Too busy right now — try again shortly.')).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('asks the relay once for a new link opened while an earlier one waited on a busy relay', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      vi.mocked(resolveInbound).mockImplementation(async (naddr) => {
+        if (naddr === 'naddr1first') throw new RelayBusyError(503)
+        return { addr: `30851:x:${D('13')}`, kind: 'issue' }
+      })
+      goTo('/o/naddr1first')
+      render(<App />)
+      await waitFor(() => expect(screen.getByText('Too busy right now — try again shortly.')).toBeInTheDocument())
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10_000)
+      })
+
+      act(() => goTo('/o/naddr1second'))
+      await waitFor(() => expect(location.pathname).toBe(`/issue/${D('13')}`))
+      expect(vi.mocked(resolveInbound).mock.calls.filter(([naddr]) => naddr === 'naddr1second')).toHaveLength(1)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('falls back to the issue list, with a reason, when the reference cannot be resolved', async () => {
