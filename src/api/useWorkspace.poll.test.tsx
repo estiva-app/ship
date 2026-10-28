@@ -59,7 +59,7 @@ describe('useWorkspace — a first read refused on quota asks again when the wai
     await tick(0)
     expect(result.current.busy).toBe(true)
 
-    await tick(10_500)
+    await tick(11_500)
     expect(loadAllEvents).toHaveBeenCalledTimes(1)
 
     await tick(600)
@@ -77,7 +77,7 @@ describe('useWorkspace — a first read refused on quota asks again when the wai
     await tick(0)
     expect(result.current.state).toBeNull()
 
-    await tick(11_100)
+    await tick(12_100)
     expect(loadOpened).toHaveBeenCalledTimes(2)
     expect(result.current.partial).toBe(true)
     expect(result.current.state?.projects).toHaveLength(1)

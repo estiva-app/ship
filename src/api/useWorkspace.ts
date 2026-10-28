@@ -5,6 +5,9 @@ import { isRateLimited, isRelayBusy, pausedForMs, relayBudget } from '../lib/rel
 import { useLiveWorkspace } from './liveWorkspace'
 import { foldWorkspace, loadAllEvents, loadOpened, reloadFolders } from './index'
 
+/** What the relay's "retry in Ns" can fall short of its window by: it rounds down to whole seconds. */
+const ROUNDED_DOWN_MS = 1_000
+
 /** The project or issue the tab was opened on, read first so its page draws before the workspace — APP-4. */
 export interface Opened {
   kind: 'project' | 'issue'
@@ -208,10 +211,13 @@ export function useWorkspace(opened?: Opened): Workspace {
        moment its stated wait ends. The poll skips its ticks while paused and
        reads on the first one after, up to a whole interval late — 25 s to a
        project on 28 Oct, the relay having said 11 (APP-4). A busy relay
-       records no pause, so it keeps the poll's pace (APP-9). */
+       records no pause, so it keeps the poll's pace (APP-9). The relay
+       rounds its wait down, so asking at once was refused again a moment
+       before its window reset: a second is added. */
     const whenClear = async (): Promise<boolean> => {
       if (pausedForMs() === 0) return false
       await relayBudget.whenClear()
+      await new Promise((resolve) => setTimeout(resolve, ROUNDED_DOWN_MS))
       return mounted.current && !events.current
     }
     const firstRead = async (): Promise<void> => {
