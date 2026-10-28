@@ -28,7 +28,7 @@ import {
   type CommentRef,
 } from './events'
 import { findNaddrs, naddrToAddr, buildReaction, buildEdit, buildDeletion as buildEventDeletion, imetaTag } from '@estiva-app/protocol'
-import { planArchiveFolder, planCreateFolder, planDeleteFolder, planMoveFromFolders, planPlaceFile, planRenameFolder, planUnlistFile, readMentionedIn, type FolderRef, type MovableFile, type MoveRefusal } from '@estiva-app/interop'
+import { createLoadQuery, planArchiveFolder, planCreateFolder, planDeleteFolder, planMoveFromFolders, planPlaceFile, planRenameFolder, planUnlistFile, readMentionedIn, type FolderRef, type MovableFile, type MoveRefusal } from '@estiva-app/interop'
 import { foldFolder, type FolderState } from './fold'
 import { buildMembershipChange, decorationsOf, foldAttachments, foldEdits, foldEmbeds, URGENT_TAG, type Decorations, type EditFold, type QueryFn } from '@estiva-app/conversation'
 import { anchorIndex, type AnchorIndex } from './references'
@@ -55,6 +55,9 @@ const FOLDER_KINDS = [
   // needing a second query addressed by target (CON-4).
   KIND.MESSAGE_EDIT,
 ]
+
+/** A Folder's kinds in a load, whose changes come from one read of the whole kind — see `loadAllEvents`. */
+const FOLDER_KINDS_BUT_CHANGES = FOLDER_KINDS.filter((kind) => kind !== KIND.CHANGE)
 
 /**
  * Turn `nostr:naddr…` in a message body into addresses.
@@ -310,6 +313,8 @@ const MENTION_THREAD_PAGE = 500
 export class Store {
   /** What this tab deleted, which a re-read since a time cannot learn — see `reloadFolders`. */
   private readonly deleted = new Deletions()
+  /** Every filter paged to its end, outside any load: a re-read must see what changed since one. */
+  private readonly queryAll: QueryFn = (filters) => this.relay.queryAll(filters as never)
 
   constructor(
     private readonly relay: Relay,
@@ -1071,8 +1076,20 @@ export class Store {
     return foldWorkspace(await this.loadAllEvents())
   }
 
-  /** `loadAll` without the fold, for a caller that will re-read part of it — see `reloadFolders`. */
-  async loadAllEvents(): Promise<WorkspaceEvents> {
+  /**
+   * `loadAll` without the fold, for a caller that will re-read part of it — see
+   * `reloadFolders`.
+   *
+   * **Each change is read once** (APP-4). Every change this reader can see is
+   * one read of the whole kind, beside discovery rather than inside it, and the
+   * Folder reads leave changes out. On 28 Oct the Folder reads carried 37.9 MB
+   * of changes in one 43 MB answer that held the page up for about 4 s, and
+   * the sidebar's listing read 26.4 MB of the same changes again by `#a`.
+   * `read` is a load query (`createLoadQuery`, paged): pass the one the listing
+   * reads through and the listing's change reads are answered from this one.
+   */
+  async loadAllEvents(read: QueryFn = this.loadQuery()): Promise<WorkspaceEvents> {
+    const at = Date.now()
     /*
       Two discovery queries, not one, and the second is the whole of SHI-7.
 
@@ -1087,11 +1104,19 @@ export class Store {
       report already used to *count* them. The count was honest and the read
       was not; this closes that gap.
     */
-    const events = await this.relay.queryAll([
-      { kinds: [KIND.PROJECT] },
-      { kinds: [KIND.ISSUE] },
-    ])
-    return this.widen(events, new Set(), {})
+    const changes = read([{ kinds: [KIND.CHANGE] }])
+    // Widened first without the changes, so the Folder reads need not wait for them.
+    const fetched = new Set<string>()
+    const roots = await this.widen(await read([{ kinds: [KIND.PROJECT] }, { kinds: [KIND.ISSUE] }]), fetched, {}, read, FOLDER_KINDS_BUT_CHANGES)
+    // Then again with them, in case a change names a Folder the roots alone did not.
+    const all = await this.widen([...roots.events, ...(await changes)], fetched, {}, read, FOLDER_KINDS_BUT_CHANGES)
+    // Every Folder as read when the load began: its changes were read from then on.
+    return { ...all, readAt: Object.fromEntries(all.folders.map((folder) => [folder, at])) }
+  }
+
+  /** A query for one load (`createLoadQuery`, paged): see `loadAllEvents`. */
+  private loadQuery(): QueryFn {
+    return createLoadQuery((filters) => this.relay.queryAll(filters as never), { paged: true })
   }
 
   /**
@@ -1134,7 +1159,13 @@ export class Store {
     return this.widen(this.deleted.drop(mergeRead(kept, fresh)), new Set([...previous.folders, ...scope]), readAt)
   }
 
-  private async widen(events: SignedEvent[], fetched: Set<string>, readAt: Record<string, number>): Promise<WorkspaceEvents> {
+  private async widen(
+    events: SignedEvent[],
+    fetched: Set<string>,
+    readAt: Record<string, number>,
+    read: QueryFn = this.queryAll,
+    kinds: readonly number[] = FOLDER_KINDS,
+  ): Promise<WorkspaceEvents> {
     /**
      * Widen until no new Folder appears.
      *
@@ -1178,7 +1209,7 @@ export class Store {
       }
       if (!wanted.size) break
       for (const folder of wanted) fetched.add(folder)
-      events = [...events, ...(await this.readFolderEvents([...wanted], readAt))]
+      events = [...events, ...(await this.readFolderEvents([...wanted], readAt, {}, read, kinds))]
     }
 
     return { events, folders: [...fetched], readAt }
@@ -1220,15 +1251,21 @@ export class Store {
    * Stamped before the request goes out, so the next `since` covers anything
    * committed while it was answered.
    */
-  private async readFolderEvents(folders: string[], readAt: Record<string, number>, since: Record<string, number> = {}): Promise<SignedEvent[]> {
+  private async readFolderEvents(
+    folders: string[],
+    readAt: Record<string, number>,
+    since: Record<string, number> = {},
+    read: QueryFn = this.queryAll,
+    kinds: readonly number[] = FOLDER_KINDS,
+  ): Promise<SignedEvent[]> {
     for (const folder of folders) assertFolderId(folder)
     if (!folders.length) return []
     const at = Date.now()
     // One filter per Folder, and the relay clamps per filter — so this gets the
     // ceiling for each Folder rather than sharing one across all of them.
-    const events = await this.relay.queryAll(
+    const events = await read(
       folders.map((folder) =>
-        since[folder] === undefined ? { kinds: FOLDER_KINDS, '#h': [folder] } : { kinds: FOLDER_KINDS, '#h': [folder], since: since[folder] },
+        since[folder] === undefined ? { kinds: [...kinds], '#h': [folder] } : { kinds: [...kinds], '#h': [folder], since: since[folder] },
       ),
     )
     for (const folder of folders) readAt[folder] = at

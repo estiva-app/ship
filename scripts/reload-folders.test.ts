@@ -12,6 +12,8 @@ import { publicKeyFromSecret, signEvent, type Relay, type SignedEvent, type Unsi
 import { Store, foldWorkspace, type WorkspaceState } from '../src/nostr/store'
 import { buildChange, buildIssue, buildProject, issueAddr, projectAddr } from '../src/nostr/events'
 import type { Signer } from '../src/nostr/signer'
+import { KIND } from '../src/nostr/kinds'
+import { createLoadQuery, type QueryFn } from '@estiva-app/interop'
 
 let failures = 0
 function check(label: string, condition: boolean, detail = '') {
@@ -57,13 +59,23 @@ const relay = {
 } as unknown as Relay
 
 const store = new Store(relay, { pubkey: ME } as unknown as Signer)
-
-const full = await store.loadAllEvents()
-check('loadAll reads discovery, then both Folders', asked.length === 2, `${asked.length} queries`)
-check('loadAll is the fold of loadAllEvents', JSON.stringify(await store.loadAll()) === JSON.stringify(foldWorkspace(full)))
-
 const statusOf = (state: ReturnType<typeof foldWorkspace>, title: string) =>
   state.issues.find((issue) => issue.title === title)?.status
+
+const read = createLoadQuery(relay.queryAll.bind(relay) as QueryFn, { paged: true })
+const full = await store.loadAllEvents(read)
+const changeReads = asked.flat().filter((filter) => (filter.kinds as number[]).includes(KIND.CHANGE))
+check('a load reads changes once, as the whole kind', changeReads.length === 1 && Object.keys(changeReads[0]).join() === 'kinds', JSON.stringify(changeReads))
+check('beside discovery, then both Folders', asked.length === 3 && asked[2].length === 2, JSON.stringify(asked))
+check("B's issue has its status from that read", statusOf(foldWorkspace(full), 'B one') === 'done', statusOf(foldWorkspace(full), 'B one'))
+asked = []
+const listed = await read([{ kinds: [KIND.CHANGE], '#a': [issueAddr(ME, 'b1')], limit: 1000 }])
+check("a listing's change read in the same load is answered from it", asked.length === 0 && listed.length === 1, JSON.stringify(asked))
+asked = []
+await store.loadAllEvents()
+check('loadAll reads discovery, then both Folders', asked.length === 3, `${asked.length} queries`)
+check('loadAll is the fold of loadAllEvents', JSON.stringify(await store.loadAll()) === JSON.stringify(foldWorkspace(full)))
+
 
 // Delete one issue in A, then re-read A only.
 held = held.filter((event) => event !== issueA2)

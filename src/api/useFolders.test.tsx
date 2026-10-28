@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { FolderSummary } from './foreign'
 
 const readFolders = vi.fn<() => Promise<FolderSummary[]>>()
-vi.mock('./foreign', () => ({ readFolders: () => readFolders() }))
+vi.mock('./foreign', () => ({ readFolders: () => readFolders(), firstLoad: () => undefined }))
 
 const { useFolders } = await import('./useFolders')
 
