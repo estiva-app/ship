@@ -76,10 +76,10 @@ describe('a pasted block link', () => {
   })
 
   // Deleted, or not this reader's to see, read the same, as in Peek (Miky, 15 Oct): the relay answers both alike.
-  it('says only "not available." for a deleted object and for one the reader may not see, alike', () => {
+  it('says only "not available" for a deleted object and for one the reader may not see, alike', () => {
     const deleted = show(LINK, { state: 'deleted' }).querySelector('[data-part="deleted"]')?.textContent
     const unreadable = show(LINK, { state: 'unreadable' }).querySelector('[data-part="unreadable"]')?.textContent
-    expect(deleted).toMatch(/not available\.$/)
+    expect(deleted).toMatch(/not available$/)
     expect(unreadable).toBe(deleted)
   })
 

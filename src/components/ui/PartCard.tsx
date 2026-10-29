@@ -1,5 +1,5 @@
 import { serializeBlockDocument } from '@estiva-app/protocol'
-import { Button, PartCard as KitPartCard, ShowMore, thingKindOf } from '@estiva-app/ui'
+import { Button, PartCard as KitPartCard, thingKindOf } from '@estiva-app/ui'
 import { IconExternalLink } from '@tabler/icons-react'
 import { usePart, type PartView } from '@/api/part'
 import type { ForeignObject } from '@/api/foreign'
@@ -88,13 +88,13 @@ export function PartCardView({ view, address, block, nameOf }: { view: PartView;
   ) : undefined
   return (
     <div data-part="resolved" data-part-address={address} data-part-block={block}>
-      <KitPartCard {...frame}>
-        {/* An attachment is never cut (no height reaches Infinity): its card is
-            already the thumbnail, and a click on it opens the full picture as it
-            does on a message's own. ShowMore still draws the row for Open in. */}
-        <ShowMore surface="inset" maxHeight={view.block.type === 'attachment' ? Infinity : CUT_AT} action={openIn}>
-          <ShipRichText value={serializeBlockDocument({ type: 'doc', content: [view.block] })} format="blocks" size="small" nameOf={nameOf} />
-        </ShowMore>
+      {/* The kit's PartCard draws Show more and Open in on one row under the
+          block, outside its quote bar (ui 0.91.1; Katerina, 30 Oct). An
+          attachment is never cut (no height reaches Infinity): its card is
+          already the thumbnail, and a click on it opens the full picture as it
+          does on a message's own. */}
+      <KitPartCard {...frame} action={openIn} maxHeight={view.block.type === 'attachment' ? Infinity : CUT_AT}>
+        <ShipRichText value={serializeBlockDocument({ type: 'doc', content: [view.block] })} format="blocks" size="small" nameOf={nameOf} />
       </KitPartCard>
     </div>
   )

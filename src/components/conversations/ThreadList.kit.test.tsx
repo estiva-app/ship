@@ -183,19 +183,19 @@ describe('the card under the comment', () => {
   it('says "not available." for a file the reader cannot read, and draws that row at once the next time', async () => {
     objects.byReference[ref(CARD_ISSUE)] = null
     const first = show(THE_MESSAGE, { embeds: ITS_CARD })
-    await waitFor(() => expect(first.querySelector('[data-card]')?.textContent).toBe('Issue — not available.'))
+    await waitFor(() => expect(first.querySelector('[data-card]')?.textContent).toBe('Issue not available'))
     first.remove()
     // Next open, before the relay answers: the one-line row from the first paint, not a card's height.
     delete objects.byReference[ref(CARD_ISSUE)]
     const again = show(THE_MESSAGE, { embeds: ITS_CARD })
-    expect(again.querySelector('[data-card]')?.textContent).toBe('Issue — not available.')
+    expect(again.querySelector('[data-card]')?.textContent).toBe('Issue not available')
     noteCardAvailability(ref(CARD_ISSUE).replace(/^nostr:/, ''), true)
   })
 
   it('names another app’s file it cannot read by what its address says, with a way to open it in its app', async () => {
     objects.byReference[ref(TOPIC)] = { ...base(TOPIC, ''), unreachable: true, appName: 'Peek', openUrl: `https://peek.estiva.app/o/${TOPIC}` }
     const c = show(ref(TOPIC), { embeds: [{ value: TOPIC, layout: 'detailed' }] })
-    await waitFor(() => expect(c.querySelector('[data-card]')?.textContent).toContain('Topic — not available.'))
+    await waitFor(() => expect(c.querySelector('[data-card]')?.textContent).toContain('Topic not available'))
     expect(c.querySelector('[data-card]')?.textContent).toContain('Open in Peek')
   })
 })

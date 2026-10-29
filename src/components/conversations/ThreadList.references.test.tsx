@@ -48,7 +48,7 @@ describe('a comment that points at an object', () => {
   it('draws a mid-sentence pointer in place, keeping the sentence', async () => {
     const c = show(thread(`Fixed in ${NADDR} yesterday.`))
     // Nothing resolves here: the chip says so in its type's word (Miky, 15 Oct), inside the sentence.
-    await waitFor(() => expect(c.querySelector('[data-message-text] p')?.textContent).toBe('Fixed in Issue, not available yesterday.'))
+    await waitFor(() => expect(c.querySelector('[data-message-text] p')?.textContent).toBe('Fixed in Issue not available yesterday.'))
     // Never the 200-character pointer the author typed.
     expect(c.textContent).not.toContain(NADDR)
   })
@@ -61,7 +61,7 @@ describe('a comment that points at an object', () => {
   */
   it('does not render a pointer-only body as an empty message', async () => {
     const c = show(thread(NADDR))
-    await waitFor(() => expect(c.querySelector('[data-link-row]')?.textContent).toBe('Issue — not available.'))
+    await waitFor(() => expect(c.querySelector('[data-link-row]')?.textContent).toBe('Issue not available'))
     expect(c.textContent).not.toContain(NADDR)
   })
 
@@ -69,7 +69,7 @@ describe('a comment that points at an object', () => {
   it('renders a pointer in a reply, not only in the root', async () => {
     const c = show(thread('Have a look at this.', `Here: ${NADDR}`))
     fireEvent.click(screen.getByRole('button', { name: '1 reply' }))
-    await waitFor(() => expect(c.querySelector('[data-message="r1"] [data-message-text]')?.textContent).toBe('Here: Issue, not available'))
+    await waitFor(() => expect(c.querySelector('[data-message="r1"] [data-message-text]')?.textContent).toBe('Here: Issue not available'))
     expect(c.textContent?.match(/not available/g)).toHaveLength(1)
   })
 
