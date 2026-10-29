@@ -27,6 +27,7 @@ import { naddrToAddr } from '@estiva-app/protocol'
 import type { Opened } from '@/api/useWorkspace'
 import { ThreadsContext } from '@/api/useThreads'
 import { archivesOf, type Archives } from '@/lib/archive'
+import { useSidebarFold } from '@/lib/sidebarFold'
 import { MentionPeopleProvider, WorkspacePeopleProvider, mentionPeople, workspacePeople } from '@/components/editing/mentionables'
 import { useRoster } from '@/api/useRoster'
 import { isRelayBusy } from '@/lib/relayBudget'
@@ -131,6 +132,8 @@ function Shell() {
     })
   }, [state, partial, refresh])
 
+  const [navOpen, setNavOpen] = useSidebarFold()
+
   const copyKey = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(me)
@@ -143,6 +146,8 @@ function Shell() {
   return (
     <AppShell
       logo="Estiva Ship"
+      navOpen={navOpen}
+      onNavOpenChange={setNavOpen}
       identity={
         <IdentityMenu
           me={{ name: directory.nameOf(me), picture: directory.personOf(me).picture }}
