@@ -30,36 +30,36 @@ describe('✕ on a sent comment’s card', () => {
   it('is offered to its author and asks for the edit that removes that card', async () => {
     const onEditMessage = vi.fn(async (): Promise<true | string> => true)
     render(<ThreadList threads={[thread('detailed')]} onStart={noop} onReply={noop} viewer={BOB} onEditMessage={onEditMessage} />)
-    fireEvent.click(await screen.findByRole('button', { name: 'Remove card' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Remove' }))
     expect(onEditMessage).toHaveBeenCalledWith('t1', `see ${NADDR}`, ADDR)
   })
 
   it('is not offered on somebody else’s comment', async () => {
     const { container } = render(<ThreadList threads={[thread('detailed')]} onStart={noop} onReply={noop} viewer={'c'.repeat(64)} onEditMessage={vi.fn(async (): Promise<true | string> => true)} />)
     await waitFor(() => expect(container.querySelector('[data-card="detailed"]')).not.toBeNull())
-    expect(screen.queryByRole('button', { name: 'Remove card' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Remove' })).toBeNull()
   })
 
   it('is not offered while writing here is not possible, as Edit is not', async () => {
     const { container } = render(<ThreadList threads={[thread('detailed')]} onStart={noop} onReply={noop} viewer={BOB} onEditMessage={vi.fn(async (): Promise<true | string> => true)} disabledReason="This issue is archived." />)
     await waitFor(() => expect(container.querySelector('[data-card="detailed"]')).not.toBeNull())
-    expect(screen.queryByRole('button', { name: 'Remove card' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Remove' })).toBeNull()
   })
 
   it('is not offered again until the first ✕ has been written and read back', async () => {
     let done = () => {}
     const onEditMessage = vi.fn(() => new Promise<true | string>((resolve) => (done = () => resolve(true))))
     render(<ThreadList threads={[thread('detailed')]} onStart={noop} onReply={noop} viewer={BOB} onEditMessage={onEditMessage} />)
-    fireEvent.click(await screen.findByRole('button', { name: 'Remove card' }))
-    await waitFor(() => expect(screen.queryByRole('button', { name: 'Remove card' })).toBeNull())
+    fireEvent.click(await screen.findByRole('button', { name: 'Remove' }))
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Remove' })).toBeNull())
     done()
-    await screen.findByRole('button', { name: 'Remove card' })
+    await screen.findByRole('button', { name: 'Remove' })
     expect(onEditMessage).toHaveBeenCalledTimes(1)
   })
 
   it('is not offered on an old compact card, drawn as its row', async () => {
     const { container } = render(<ThreadList threads={[thread('compact')]} onStart={noop} onReply={noop} viewer={BOB} onEditMessage={vi.fn(async (): Promise<true | string> => true)} />)
     await waitFor(() => expect(container.querySelector('[data-card="compact"]')).not.toBeNull())
-    expect(screen.queryByRole('button', { name: 'Remove card' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Remove' })).toBeNull()
   })
 })
