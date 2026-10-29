@@ -72,7 +72,8 @@ const show = (t: ThreadData) => render(<ThreadList threads={[t]} onStart={noop} 
 const cards = (c: HTMLElement) => [...c.querySelectorAll('[data-cards] [data-card]')].map((e) => [e.getAttribute('data-card-value'), e.getAttribute('data-card')])
 const bare = (reference: string) => reference.replace(/^nostr:/, '')
 const sentence = (c: HTMLElement) => c.querySelector('[data-message-text] p')?.textContent
-const rows = (c: HTMLElement) => [...c.querySelectorAll('[data-message-text] [data-link-row]')].map((row) => row.textContent)
+// A row's title, its link: since ui 0.91.0 a row has a second line under it (its key and what it is).
+const rows = (c: HTMLElement) => [...c.querySelectorAll('[data-message-text] [data-link-row]')].map((row) => row.querySelector('a')?.textContent)
 
 describe('a message that asks for a card', () => {
   it('draws compact as the row, under the sentence, and keeps the chip', async () => {

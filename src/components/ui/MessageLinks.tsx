@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { KIND_BARE_FILE } from '@estiva-app/interop'
-import { CardUnder, FieldLine, LinkChip, LinkRow, loadingShapeOf, type LinkState, type LinkedConversation, type LoadingShape } from '@estiva-app/ui'
+import { AttachedCard, FieldLine, LinkChip, LinkRow, loadingShapeOf, type LinkState, type LinkedConversation, type LoadingShape } from '@estiva-app/ui'
 import { applyCardAction, resolveForeign, type ForeignObject } from '@/api/foreign'
 import { resolveFailed } from '@/api/useForeignObjects'
 import { isReadableFolder, useFolderFiles } from '@/api/useFolderFiles'
@@ -289,7 +289,7 @@ function CardBox({
   return (
     <LinkClicks block>
       <div ref={box} data-card={compact ? 'compact' : 'detailed'} data-card-value={naddr} style={loadingShape?.height ? { minHeight: loadingShape.height } : undefined}>
-        {compact ? <LinkRow link={link} /> : <CardUnder link={link} onRemove={onRemove} revealOnHover />}
+        {compact ? <LinkRow link={link} /> : <AttachedCard link={link} onRemove={onRemove} />}
         {error && (
           <FieldLine tone="error" className="mt-1">
             {error}
