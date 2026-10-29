@@ -29,12 +29,12 @@
     "seed:peek": "tsx scripts/seed-for-peek.ts"
   },
   "dependencies": {
-    "@estiva-app/conversation": "^0.21.0",
+    "@estiva-app/conversation": "^0.23.1",
     "@estiva-app/identity": "^0.3.0",
     "@estiva-app/interop": "^0.70.0",
     "@estiva-app/platform": "^0.4.0",
     "@estiva-app/protocol": "^0.46.1",
-    "@estiva-app/ui": "^0.91.1",
+    "@estiva-app/ui": "^0.91.2",
     "@tabler/icons-react": "^3.41.1",
     "@tiptap/extension-code-block-lowlight": "^3.31.3",
     "@tiptap/extension-mention": "^3.31.3",
