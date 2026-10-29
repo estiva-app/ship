@@ -12,6 +12,12 @@ import { RELAY_URL } from '../config'
  * burst of writes costs one request.
  */
 const LIMIT_MS = 10 * 60 * 1000
+/**
+ * A read is signed too (NIP-98), and the relay allows its signature only
+ * ±60 s — so a clock off by more than that fails every read before any write
+ * is tried, and the read's failure is what a person sees (SHI-53).
+ */
+export const READ_LIMIT_MS = 60 * 1000
 const REMEMBER_MS = 5 * 60 * 1000
 
 let known: { skewMs: number; at: number } | null = null
@@ -41,10 +47,19 @@ export function forgetClockSkew() {
  * `null` when it is safe to sign; otherwise the sentence to show instead of
  * publishing. A skew the relay would still accept passes.
  */
-export async function clockProblem(): Promise<string | null> {
+export async function clockProblem(limitMs = LIMIT_MS): Promise<string | null> {
   const skew = await relayClockSkew()
-  if (skew === null || Math.abs(skew) <= LIMIT_MS) return null
-  const minutes = Math.round(Math.abs(skew) / 60_000)
+  if (skew === null || Math.abs(skew) <= limitMs) return null
+  const minutes = Math.max(1, Math.round(Math.abs(skew) / 60_000))
   const direction = skew > 0 ? 'ahead of' : 'behind'
-  return `This computer's clock is ${minutes} minutes ${direction} the relay's — the relay would refuse anything signed now. Set the clock and try again.`
+  return `This computer's clock is ${minutes} ${minutes === 1 ? 'minute' : 'minutes'} ${direction} the relay's — the relay would refuse anything signed now. Set the clock and try again.`
+}
+
+/**
+ * The clock sentence for a read that just failed, or `null` when the clock is
+ * not why. Measured afresh: a remembered skew may predate the clock changing.
+ */
+export async function readClockProblem(): Promise<string | null> {
+  forgetClockSkew()
+  return clockProblem(READ_LIMIT_MS)
 }

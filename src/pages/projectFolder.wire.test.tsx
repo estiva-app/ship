@@ -99,7 +99,7 @@ const refresh = vi.fn()
 beforeEach(() => {
   published.length = 0
   refresh.mockReset().mockResolvedValue(undefined)
-  vi.mocked(useWorkspace).mockReturnValue({ state: STATE, partial: false, error: null, loading: false, busy: false, refresh, wantThreads: () => {}, live: false })
+  vi.mocked(useWorkspace).mockReturnValue({ state: STATE, partial: false, error: null, clock: null, loading: false, busy: false, refresh, wantThreads: () => {}, live: false })
   vi.mocked(useDirectory).mockReturnValue({ directory: new Map(), nameOf: () => 'Someone', personOf: () => ({ name: 'Someone' }), profileOf: () => undefined })
 })
 
@@ -126,13 +126,13 @@ async function comment(path: string, text: string) {
 describe('an archived project offers no new issue until it is unarchived (PEEKM-2, Decided 2026-10-23)', () => {
   it('has no Add issue, where the same project unarchived has one', async () => {
     const archived = { ...STATE.projects[0], fields: { archived: { value: 'true', by: AUTHOR, at: 2, format: 'marker' } } } as WorkspaceState['projects'][number]
-    vi.mocked(useWorkspace).mockReturnValue({ state: { ...STATE, projects: [archived, STATE.projects[1]] }, partial: false, error: null, loading: false, busy: false, refresh, wantThreads: () => {}, live: false })
+    vi.mocked(useWorkspace).mockReturnValue({ state: { ...STATE, projects: [archived, STATE.projects[1]] }, partial: false, error: null, clock: null, loading: false, busy: false, refresh, wantThreads: () => {}, live: false })
     goTo(`/project/billing-${D_PROJECT}`)
     const { unmount } = render(<App />)
     await screen.findByRole('button', { name: 'Unarchive project' })
     expect(screen.queryByRole('button', { name: 'Add issue' })).toBeNull()
     unmount()
-    vi.mocked(useWorkspace).mockReturnValue({ state: STATE, partial: false, error: null, loading: false, busy: false, refresh, wantThreads: () => {}, live: false })
+    vi.mocked(useWorkspace).mockReturnValue({ state: STATE, partial: false, error: null, clock: null, loading: false, busy: false, refresh, wantThreads: () => {}, live: false })
     goTo(`/project/billing-${D_PROJECT}`)
     render(<App />)
     expect(await screen.findByRole('button', { name: 'Add issue' })).toBeInTheDocument()
@@ -163,7 +163,7 @@ describe('an archived project offers no new issue until it is unarchived (PEEKM-
     const D_ISSUE = 'c1d2e3f4-0000-4000-8000-000000000001'
     const loose = { ...STATE.projects[1], fields: { archived: { value: 'true', by: AUTHOR, at: 2, format: 'marker' } } } as WorkspaceState['projects'][number]
     const issue = { addr: `30851:${AUTHOR}:${D_ISSUE}`, id: D_ISSUE, author: AUTHOR, createdAt: 1, title: 'Rounding', description: '', descriptionFormat: 'marker', folder: OWN, projectAddr: STATE.projects[0].addr, ref: 'BIL-1', status: 'todo', fields: {} }
-    vi.mocked(useWorkspace).mockReturnValue({ state: { ...STATE, projects: [STATE.projects[0], loose], issues: [issue] } as unknown as WorkspaceState, partial: false, error: null, loading: false, busy: false, refresh, wantThreads: () => {}, live: false })
+    vi.mocked(useWorkspace).mockReturnValue({ state: { ...STATE, projects: [STATE.projects[0], loose], issues: [issue] } as unknown as WorkspaceState, partial: false, error: null, clock: null, loading: false, busy: false, refresh, wantThreads: () => {}, live: false })
     goTo(`/issue/rounding-${D_ISSUE}`)
     render(<App />)
     await userEvent.click(await screen.findByRole('combobox', { name: 'Project' }))

@@ -57,7 +57,7 @@ const state = (mentions: boolean) =>
     mentionsOf: mentions ? [ISSUE_ADDR] : [],
   }) as unknown as WorkspaceState
 
-const workspace = (mentions: boolean) => ({ state: state(mentions), partial: false, error: null, loading: false, busy: false, refresh: vi.fn().mockResolvedValue(undefined), wantThreads: () => {}, live: false })
+const workspace = (mentions: boolean) => ({ state: state(mentions), partial: false, error: null, clock: null, loading: false, busy: false, refresh: vi.fn().mockResolvedValue(undefined), wantThreads: () => {}, live: false })
 const markedIssue = () => vi.mocked(markRead).mock.calls.filter(([contexts]) => contexts.includes(fileContext(ISSUE_ADDR)))
 
 beforeEach(() => {

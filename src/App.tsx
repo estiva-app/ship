@@ -61,7 +61,7 @@ export default function App() {
 
 function Shell() {
   const route = useRoute()
-  const { state, partial, error, loading, busy, refresh, wantThreads } = useWorkspace(openedBy(route))
+  const { state, partial, error, clock, loading, busy, refresh, wantThreads } = useWorkspace(openedBy(route))
   const folders = useFolders()
   // The teams: what the sidebar lists, what a new project is filed into (FOL-2).
   const teams = useMemo(() => (folders ? topLevelFolders(folders) : undefined), [folders])
@@ -166,7 +166,9 @@ function Shell() {
         />
       }
       banner={
-        error ? (
+        clock ? (
+          <Banner tone="error">{clock}</Banner>
+        ) : error ? (
           <Banner tone="error">{`Could not read from the relay — ${error}`}</Banner>
         ) : busy ? (
           /*

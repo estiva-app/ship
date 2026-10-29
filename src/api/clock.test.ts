@@ -34,6 +34,11 @@ describe('the relay clock check', () => {
     expect(await clockProblem()).toMatch(/25 minutes behind the relay/)
   })
 
+  it('says one minute in the singular', async () => {
+    vi.stubGlobal('fetch', relaySays('2026-08-28T09:58:50Z'))
+    expect(await clockProblem(60_000)).toMatch(/clock is 1 minute ahead of the relay's/)
+  })
+
   it('does not block a write when the check cannot be made', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')))
     expect(await clockProblem()).toBeNull()
