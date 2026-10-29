@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { WorkspaceEvents, WorkspaceState } from '../nostr/store'
 import { useRefresh } from '../lib/useRefresh'
 import { isRateLimited, isRelayBusy, pausedForMs, relayBudget } from '../lib/relayBudget'
+import { forgetClockSkew, readClockProblem } from './clock'
 import { useLiveWorkspace } from './liveWorkspace'
 import { foldWorkspace, holdsThreads, loadAllEvents, loadOpened, readThreads, reloadFolders, type ThreadsWanted } from './index'
 
@@ -29,6 +30,12 @@ export interface Workspace {
   partial: boolean
   /** The last read's failure, or `null`. A stale `state` is kept alongside it. */
   error: string | null
+  /**
+   * The clock sentence when the last read failed because this computer's
+   * clock is off, or `null`. Said instead of `error`, which is then the
+   * relay's NIP-98 wording (SHI-53).
+   */
+  clock: string | null
   /**
    * The first read has not landed yet — distinct from an empty workspace.
    *
@@ -110,6 +117,8 @@ export function useWorkspace(opened?: Opened): Workspace {
   const [state, setState] = useState<WorkspaceState | null>(null)
   const [partial, setPartial] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [clock, setClock] = useState<string | null>(null)
+  const clockSaid = useRef(false)
   const [busy, setBusy] = useState(false)
   const inFlight = useRef<Promise<void> | null>(null)
   const latest = useRef(0)
@@ -140,6 +149,10 @@ export function useWorkspace(opened?: Opened): Workspace {
         setState(foldWorkspace(next))
         setPartial(false)
         setError(null)
+        // Set right: the skew a write would reuse is the wrong one now.
+        if (clockSaid.current) forgetClockSkew()
+        clockSaid.current = false
+        setClock(null)
         setBusy(false)
       })
       .catch((reason: unknown) => {
@@ -169,6 +182,13 @@ export function useWorkspace(opened?: Opened): Workspace {
           return
         }
         setError(text)
+        // A wrong clock fails every read first, and only its sentence says what to do (SHI-53).
+        // Not awaited: a caller waiting on the read need not wait for the clock too.
+        void readClockProblem().then((sentence) => {
+          if (!mounted.current || ticket !== latest.current) return
+          clockSaid.current = sentence !== null
+          setClock(sentence)
+        })
       })
       .finally(() => {
         // Only if it is still ours: a newer read may already have claimed it.
@@ -348,6 +368,7 @@ export function useWorkspace(opened?: Opened): Workspace {
     state,
     partial,
     error,
+    clock,
     loading: state === null && !busy,
     busy: busy && state === null,
     refresh: reread,

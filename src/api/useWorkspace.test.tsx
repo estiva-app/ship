@@ -73,7 +73,13 @@ beforeEach(() => {
   refreshMock.mockReset()
   live.current = false
   handers.onChange = null
+  // A failed read asks the relay its clock (SHI-53); no test reaches the network.
+  vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')))
 })
+
+/** The relay's root, answering with its clock `offsetMs` from this computer's. */
+const relayClockAt = (offsetMs: number) =>
+  vi.fn(async () => ({ headers: { get: (name: string) => (name === 'date' ? new Date(Date.now() + offsetMs).toUTCString() : null) } }))
 
 describe('useWorkspace — a read a write is waiting on must have begun after the write', () => {
   /*
@@ -182,6 +188,54 @@ describe('useWorkspace — a quota refusal is a wait, not a broken relay (SHI-12
     const { result } = renderHook(() => useWorkspace())
 
     await waitFor(() => expect(result.current.error).toMatch(/relay_membership_required/))
+  })
+})
+
+describe('useWorkspace — a read refused for a wrong clock says the clock (SHI-53)', () => {
+  const refusedForClock = new Error('query failed: NIP-98 created_at out of range (delta: 1200s)')
+
+  it('says how far off the clock is when the relay\'s clock is 20 minutes behind', async () => {
+    vi.stubGlobal('fetch', relayClockAt(-20 * 60_000))
+    vi.mocked(loadAllEvents).mockRejectedValue(refusedForClock)
+
+    const { result } = renderHook(() => useWorkspace())
+
+    await waitFor(() => expect(result.current.clock).toMatch(/clock is 20 minutes ahead of the relay's/))
+  })
+
+  it('says it from two minutes off, where reads already fail and writes would still pass', async () => {
+    vi.stubGlobal('fetch', relayClockAt(2 * 60_000))
+    vi.mocked(loadAllEvents).mockRejectedValue(refusedForClock)
+
+    const { result } = renderHook(() => useWorkspace())
+
+    await waitFor(() => expect(result.current.clock).toMatch(/clock is 2 minutes behind the relay's/))
+  })
+
+  it('keeps the relay\'s own words when the clock is right', async () => {
+    vi.stubGlobal('fetch', relayClockAt(0))
+    vi.mocked(loadAllEvents).mockRejectedValue(new Error('query failed: relay_membership_required'))
+
+    const { result } = renderHook(() => useWorkspace())
+
+    await waitFor(() => expect(result.current.error).toMatch(/relay_membership_required/))
+    // The measurement's answer lands after its fetch; settle it before looking.
+    await waitFor(() => expect(vi.mocked(fetch)).toHaveBeenCalled())
+    await act(async () => {})
+    expect(result.current.clock).toBeNull()
+  })
+
+  it('stops saying it once a read succeeds', async () => {
+    vi.stubGlobal('fetch', relayClockAt(-20 * 60_000))
+    vi.mocked(loadAllEvents).mockRejectedValueOnce(refusedForClock).mockResolvedValue(stateWith('todo'))
+
+    const { result } = renderHook(() => useWorkspace())
+    await waitFor(() => expect(result.current.clock).not.toBeNull())
+
+    await act(() => result.current.refresh())
+
+    expect(result.current.clock).toBeNull()
+    expect(result.current.error).toBeNull()
   })
 })
 

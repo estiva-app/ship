@@ -66,7 +66,7 @@ const STATE = {
 } as unknown as WorkspaceState
 
 beforeEach(() => {
-  vi.mocked(useWorkspace).mockReturnValue({ state: STATE, partial: false, error: null, loading: false, busy: false, refresh: vi.fn(async () => {}), wantThreads: () => {}, live: false })
+  vi.mocked(useWorkspace).mockReturnValue({ state: STATE, partial: false, error: null, clock: null, loading: false, busy: false, refresh: vi.fn(async () => {}), wantThreads: () => {}, live: false })
   vi.mocked(useDirectory).mockReturnValue({
     directory: new Map(),
     nameOf: (k: string) => NAMES[k] ?? k.slice(0, 8),
