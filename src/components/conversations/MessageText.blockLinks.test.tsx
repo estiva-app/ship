@@ -35,7 +35,8 @@ const object = { ref: ADDRESS, address: ADDRESS, kind: 30842, appName: 'Leaf', n
 const PART = [{ address: ADDRESS, block: 'p1' }]
 const show = (body: string, parts?: typeof PART) => render(<MessageText body={body} parts={parts} resolved={{ [REFERENCE]: object }} />).container
 const part = (c: HTMLElement) => c.querySelector('[data-part]')
-const rows = (c: HTMLElement) => [...c.querySelectorAll('[data-link-row]')].map((row) => row.textContent)
+// A row's title, its link: since ui 0.91.0 a row has a second line under it (its key and what it is).
+const rows = (c: HTMLElement) => [...c.querySelectorAll('[data-link-row]')].map((row) => row.querySelector('a')?.textContent)
 
 beforeEach(() => {
   answers.clear()

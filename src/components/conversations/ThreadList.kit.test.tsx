@@ -77,7 +77,8 @@ import { noteCardAvailability } from '@/lib/unavailableCards'
 const thread = (body: string, embeds?: Embed[]): ThreadData => ({ id: 't1', root: { id: 't1', author: { name: 'Ann' }, at: 1000, body, by: 'ann', embeds }, replies: [] })
 const noop = async (): Promise<true> => true
 const show = (body: string, { embeds, about }: { embeds?: Embed[]; about?: string } = {}) => render(<ThreadList threads={[thread(body, embeds)]} onStart={noop} onReply={noop} about={about} />).container
-const rows = (c: HTMLElement) => [...c.querySelectorAll('[data-message-text] [data-link-row]')].map((row) => row.textContent)
+// A row's title, its link: since ui 0.91.0 a row has a second line under it (its key and what it is).
+const rows = (c: HTMLElement) => [...c.querySelectorAll('[data-message-text] [data-link-row]')].map((row) => row.querySelector('a')?.textContent)
 const sentence = (c: HTMLElement) => c.querySelector('[data-message-text] p')?.textContent
 
 beforeEach(() => {
