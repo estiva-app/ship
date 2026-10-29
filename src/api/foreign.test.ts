@@ -7,7 +7,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
   above it should have to know.
 */
 const query = vi.fn()
-vi.mock('./store', () => ({ relay: { query: (filters: unknown[]) => query(filters) } }))
+const queryAll = vi.fn()
+vi.mock('./store', () => ({ relay: { query: (filters: unknown[]) => query(filters), queryAll: (filters: unknown[]) => queryAll(filters) } }))
 
 import { encodeNevent } from '@estiva-app/protocol'
 import { isEventReference, loadQuery, readFolder, readFolders, resolveForeign } from './foreign'
@@ -286,5 +287,27 @@ describe('readFolder and readFolders — one load asks for each change once (APP
     } finally {
       world.splice(world.length - folder.length, folder.length)
     }
+  })
+})
+
+describe('firstLoad — the sidebar listing reads its changes from the workspace read (APP-4)', () => {
+  it('asks nothing until the workspace read has started, then is answered from its read of every change', async () => {
+    vi.resetModules()
+    const { firstLoad } = await import('./foreign')
+    const change = event({ kind: 1851, tags: [['a', ADDRESS]] })
+    let answer!: (events: unknown[]) => void
+    queryAll.mockReset().mockReturnValueOnce(new Promise((resolve) => (answer = resolve)))
+
+    const listing = firstLoad('listing')!
+    const listed = listing([{ kinds: [1851], '#a': [ADDRESS], limit: 1000 }])
+    await Promise.resolve()
+    expect(queryAll).not.toHaveBeenCalled()
+
+    const workspace = firstLoad('workspace')!
+    const whole = workspace([{ kinds: [1851] }])
+    answer([change])
+    expect(await whole).toEqual([change])
+    expect(await listed).toEqual([change])
+    expect(queryAll).toHaveBeenCalledExactlyOnceWith([{ kinds: [1851] }])
   })
 })

@@ -50,17 +50,26 @@ let asked: Record<string, unknown>[][] = []
 
 const tagIn = (event: SignedEvent, name: string, values: unknown) => Array.isArray(values) && event.tags.some((t) => t[0] === name && values.includes(t[1]))
 
+/** The asks sent as one request (`query`), not paged (`queryAll`), which spends a confirming round trip on a fresh relay. */
+let single: Record<string, unknown>[][] = []
+const answer = (filters: Record<string, unknown>[]) =>
+  held.filter((event) =>
+    filters.some(
+      (filter) =>
+        (!filter.kinds || (filter.kinds as number[]).includes(event.kind)) &&
+        (!filter['#h'] || tagIn(event, 'h', filter['#h'])) &&
+        (!filter['#d'] || tagIn(event, 'd', filter['#d'])),
+    ),
+  )
 const relay = {
   async queryAll(filters: Record<string, unknown>[]) {
     asked.push(filters)
-    return held.filter((event) =>
-      filters.some(
-        (filter) =>
-          (!filter.kinds || (filter.kinds as number[]).includes(event.kind)) &&
-          (!filter['#h'] || tagIn(event, 'h', filter['#h'])) &&
-          (!filter['#d'] || tagIn(event, 'd', filter['#d'])),
-      ),
-    )
+    return answer(filters)
+  },
+  async query(filters: Record<string, unknown>[]) {
+    asked.push(filters)
+    single.push(filters)
+    return answer(filters)
   },
 } as unknown as Relay
 
@@ -74,6 +83,7 @@ check('with the issues in its own Folder, and their status', projectState.issues
 check("and nothing from another Folder: its issue filed elsewhere comes with the whole read", projectState.issues.length === 1, JSON.stringify(projectState.issues.map((i) => i.title)))
 check('it asked only its own Folder', foldersAsked().join() === A, JSON.stringify(asked))
 check('in two round trips', asked.length === 2, `${asked.length}`)
+check('its record by d in one request, not paged', single.length === 1 && single[0][0]['#d']?.toString() === 'pa' && typeof single[0][0].limit === 'number', JSON.stringify(single))
 check('and is kept as read nowhere, so no re-read starts from it', Object.keys(project.readAt).length === 0)
 
 asked = []

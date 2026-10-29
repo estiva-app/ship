@@ -8,6 +8,9 @@ import { foldWorkspace, holdsThreads, loadAllEvents, loadOpened, readThreads, re
 /** What the relay's "retry in Ns" can fall short of its window by: it rounds down to whole seconds. */
 const ROUNDED_DOWN_MS = 1_000
 
+/** How long the opened page's read goes alone before the whole read starts anyway: a stalled read must not hold the rest back. */
+const OPENED_ALONE_MS = 2_000
+
 /** The project or issue the tab was opened on, read first so its page draws before the workspace — APP-4. */
 export interface Opened {
   kind: 'project' | 'issue'
@@ -265,31 +268,52 @@ export function useWorkspace(opened?: Opened): Workspace {
       return mounted.current && !events.current && document.visibilityState === 'visible'
     }
     const firstRead = async (): Promise<void> => {
+      // A focus may have read the whole workspace while the opened page was being read.
+      if (events.current) return
       await poll()
       if (!events.current && (await whenClear())) await firstRead()
     }
-    void firstRead()
     /* Shown only while no whole read has landed, and never kept as one: a
        re-read keeps `events`, and this holds one Folder. Any other failure
        leaves the page to the whole read, as before. */
     const opened = first.current
-    const openedRead = (): Promise<void> =>
-      opened
-        ? loadOpened(opened).then(
-            (own) => {
-              if (!mounted.current || events.current) return
-              setState(foldWorkspace(own))
-              setPartial(true)
-            },
-            async (reason: unknown) => {
-              if (!isRateLimited(reason instanceof Error ? reason.message : String(reason))) return
-              if (!events.current && (await whenClear())) await openedRead()
-            },
-          )
-        : Promise.resolve()
-    void openedRead()
+    const openedRead = (asked: Promise<WorkspaceEvents>): Promise<void> =>
+      asked.then(
+        (own) => {
+          if (!mounted.current || events.current) return
+          setState(foldWorkspace(own))
+          setPartial(true)
+        },
+        async (reason: unknown) => {
+          if (!isRateLimited(reason instanceof Error ? reason.message : String(reason))) return
+          if (opened && !events.current && (await whenClear())) await openedRead(loadOpened(opened))
+        },
+      )
+    /* The opened page's read goes alone, and the whole read starts when it
+       has answered (APP-4). Side by side, its 0.3 MB shared the connection
+       with the whole read's 10 MB pages of changes and finished with them,
+       then waited out their parse: drawn at 1.7–2.7 s on 28 Oct, though its
+       own answers took 0.4 s. A refusal or a failure answers too: the whole
+       read then goes as before. So does a read that has not answered in
+       OPENED_ALONE_MS: the relay's queries carry no timeout, and a stalled
+       one would otherwise leave the sidebar and every list unread. */
+    let alone: ReturnType<typeof setTimeout> | undefined
+    if (opened) {
+      const asked = loadOpened(opened)
+      void openedRead(asked)
+      let started = false
+      const startWhole = (): void => {
+        clearTimeout(alone)
+        if (started) return
+        started = true
+        void firstRead()
+      }
+      alone = setTimeout(startWhole, OPENED_ALONE_MS)
+      void asked.then(startWhole, startWhole)
+    } else void firstRead()
     return () => {
       mounted.current = false
+      clearTimeout(alone)
     }
   }, [poll])
 
