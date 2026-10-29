@@ -26,6 +26,12 @@ export const Paragraph: Story = {
   args: { view: { state: 'resolved', object, link: LINK, block: { type: 'paragraph', id: 'p1', content: text('We ship on Friday, after the relay migration is checked on production.') } as never } },
 }
 
+/**
+ * A table cell with its paragraph. Every block carries an id (§13.3), a table's rows and cells too, as the editor
+ * writes them: without one the body does not read as blocks and draws as its raw text.
+ */
+const cell = (id: string, t: string) => ({ type: 'tableCell', id, content: [{ type: 'paragraph', id: `${id}-p`, content: text(t) }] })
+
 export const LongTable: Story = {
   args: {
     view: {
@@ -37,10 +43,8 @@ export const LongTable: Story = {
         id: 'p1',
         content: Array.from({ length: 10 }, (_, i) => ({
           type: 'tableRow',
-          content: [
-            { type: 'tableCell', content: [{ type: 'paragraph', content: text(`Step ${i + 1}`) }] },
-            { type: 'tableCell', content: [{ type: 'paragraph', content: text(i < 4 ? 'Done' : 'To do') }] },
-          ],
+          id: `r${i}`,
+          content: [cell(`r${i}-a`, `Step ${i + 1}`), cell(`r${i}-b`, i < 4 ? 'Done' : 'To do')],
         })),
       } as never,
     },
