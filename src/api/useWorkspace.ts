@@ -8,6 +8,9 @@ import { foldWorkspace, holdsThreads, loadAllEvents, loadOpened, readThreads, re
 /** What the relay's "retry in Ns" can fall short of its window by: it rounds down to whole seconds. */
 const ROUNDED_DOWN_MS = 1_000
 
+/** How long the opened page's read goes alone before the whole read starts anyway: a stalled read must not hold the rest back. */
+const OPENED_ALONE_MS = 2_000
+
 /** The project or issue the tab was opened on, read first so its page draws before the workspace — APP-4. */
 export interface Opened {
   kind: 'project' | 'issue'
@@ -291,14 +294,26 @@ export function useWorkspace(opened?: Opened): Workspace {
        with the whole read's 10 MB pages of changes and finished with them,
        then waited out their parse: drawn at 1.7–2.7 s on 28 Oct, though its
        own answers took 0.4 s. A refusal or a failure answers too: the whole
-       read then goes as before. */
+       read then goes as before. So does a read that has not answered in
+       OPENED_ALONE_MS: the relay's queries carry no timeout, and a stalled
+       one would otherwise leave the sidebar and every list unread. */
+    let alone: ReturnType<typeof setTimeout> | undefined
     if (opened) {
       const asked = loadOpened(opened)
       void openedRead(asked)
-      void asked.then(firstRead, firstRead)
+      let started = false
+      const startWhole = (): void => {
+        clearTimeout(alone)
+        if (started) return
+        started = true
+        void firstRead()
+      }
+      alone = setTimeout(startWhole, OPENED_ALONE_MS)
+      void asked.then(startWhole, startWhole)
     } else void firstRead()
     return () => {
       mounted.current = false
+      clearTimeout(alone)
     }
   }, [poll])
 

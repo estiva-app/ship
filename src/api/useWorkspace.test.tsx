@@ -389,6 +389,23 @@ describe('useWorkspace — the opened page draws from its own read first (APP-4)
     await waitFor(() => expect(statusOf(result.current.state)).toBe('whole'))
   })
 
+  it('starts the whole read anyway when the opened page has not answered in 2 s, so a stalled read does not leave the sidebar unread', async () => {
+    vi.useFakeTimers()
+    try {
+      vi.mocked(loadOpened).mockReturnValueOnce(pendingRead().promise)
+      vi.mocked(loadAllEvents).mockResolvedValueOnce(stateWith('whole'))
+      const { result } = renderHook(() => useWorkspace(OPENED))
+      await act(async () => vi.advanceTimersByTimeAsync(1_900))
+      expect(loadAllEvents).not.toHaveBeenCalled()
+
+      await act(async () => vi.advanceTimersByTimeAsync(200))
+      expect(loadAllEvents).toHaveBeenCalledTimes(1)
+      expect(statusOf(result.current.state)).toBe('whole')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('still reads the whole workspace when the opened page cannot be read', async () => {
     vi.mocked(loadOpened).mockRejectedValueOnce(new Error('relay answered 500'))
     vi.mocked(loadAllEvents).mockResolvedValueOnce(stateWith('whole'))
