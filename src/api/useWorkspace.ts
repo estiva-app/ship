@@ -118,6 +118,7 @@ export function useWorkspace(opened?: Opened): Workspace {
   const [partial, setPartial] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [clock, setClock] = useState<string | null>(null)
+  const clockSaid = useRef(false)
   const [busy, setBusy] = useState(false)
   const inFlight = useRef<Promise<void> | null>(null)
   const latest = useRef(0)
@@ -148,11 +149,10 @@ export function useWorkspace(opened?: Opened): Workspace {
         setState(foldWorkspace(next))
         setPartial(false)
         setError(null)
-        setClock((was) => {
-          // Set right: the skew a write would reuse is the wrong one now.
-          if (was) forgetClockSkew()
-          return null
-        })
+        // Set right: the skew a write would reuse is the wrong one now.
+        if (clockSaid.current) forgetClockSkew()
+        clockSaid.current = false
+        setClock(null)
         setBusy(false)
       })
       .catch((reason: unknown) => {
@@ -183,8 +183,11 @@ export function useWorkspace(opened?: Opened): Workspace {
         }
         setError(text)
         // A wrong clock fails every read first, and only its sentence says what to do (SHI-53).
-        return readClockProblem().then((sentence) => {
-          if (mounted.current && ticket === latest.current) setClock(sentence)
+        // Not awaited: a caller waiting on the read need not wait for the clock too.
+        void readClockProblem().then((sentence) => {
+          if (!mounted.current || ticket !== latest.current) return
+          clockSaid.current = sentence !== null
+          setClock(sentence)
         })
       })
       .finally(() => {

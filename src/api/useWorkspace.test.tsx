@@ -219,7 +219,9 @@ describe('useWorkspace — a read refused for a wrong clock says the clock (SHI-
     const { result } = renderHook(() => useWorkspace())
 
     await waitFor(() => expect(result.current.error).toMatch(/relay_membership_required/))
+    // The measurement's answer lands after its fetch; settle it before looking.
     await waitFor(() => expect(vi.mocked(fetch)).toHaveBeenCalled())
+    await act(async () => {})
     expect(result.current.clock).toBeNull()
   })
 
