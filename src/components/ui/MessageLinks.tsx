@@ -140,7 +140,9 @@ export function conversationHref(object: ForeignObject): string {
 function useConversationOf(object: ForeignObject | null | undefined): LinkedConversation | undefined {
   const ready = object && !object.unreachable ? object : undefined
   const said = useCardConversation(ready && ready.kind !== KIND_BARE_FILE ? ready.address : undefined)
-  return ready && said ? { count: said.count, href: conversationHref(ready), unread: said.unread } : undefined
+  const href = ready ? conversationHref(ready) : ''
+  // Only where there is a conversation to open.
+  return ready && said && href ? { count: said.count, href, unread: said.unread } : undefined
 }
 
 /**

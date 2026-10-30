@@ -5,10 +5,11 @@ import * as RelatedStories from './Related.stories'
 
 # Related
 
-The foreign files somebody placed under this project or issue — RFC 0.5 §10.7,
-*nesting is by intent* — as quiet rows (Katerina, 29 September). Every row is
-whatever the other app's projection says, and nothing here knows what any app
-is.
+The files somebody placed under this project or issue — RFC 0.5 §10.7,
+*nesting is by intent* — each as the kit's row (**ForeignObject**, always the
+row here), the widget a message draws, so a file looks the same everywhere
+Ship shows it (Katerina, 30 Oct). Every row is whatever the other app's
+projection says, and nothing here knows what any app is.
 
 <Canvas of={RelatedStories.Topics} />
 
@@ -16,18 +17,14 @@ is.
 
 - On an object's Overview tab, under a line and an **AppSection** titled
   "Related", with `hasRelated` deciding whether any of it is drawn at all.
-- One level, in the Folder's order. A sub-topic under a related topic is that
-  topic's to show.
+- In the Folder's order, with what is placed under a file nested beneath it.
 
 ## When not
 
 - For an empty, successful read. It draws nothing — heading included — because
   a heading over nothing on every page is noise rather than honesty.
-- For a file this reader may not see. It never arrives: the folder read drops
-  it by design, and the count is the disclosure. There is no "unavailable" row
-  here and there should not be one.
 
-No alternative: in both cases nothing is drawn, on purpose.
+No alternative: nothing is drawn, on purpose.
 
 ## How
 
@@ -49,11 +46,10 @@ import { Related, hasRelated } from '@/components/Related'
 
 ## What it owns
 
-- **Every state a row can be in**: the app's name after the title, a subtitle
-  and the meta on a second line, the status and the comment count in columns
-  that line up, a message as a face and its words, an object's own list nested
-  under it, and one this reader may not open said so.
-
+- **The nesting**: an object's own list and what was placed under a file,
+  beneath it, one line down their left, at any depth.
+- **The count it read**, handed to each row, which draws the kit's count
+  opening the conversation; none for nobody having spoken yet.
 - **The failed-read line.** A read that did not come back must never look like
   "nothing is placed under this".
 - **The rule that empty and failed are different sentences**, which is why the

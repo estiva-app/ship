@@ -30,16 +30,21 @@ export interface ForeignObjectProps {
    * query per listing); a Related section does.
    */
   conversations?: number
+  /** Always the row, whatever the manifest hints: a list of files under another (Related). */
+  row?: boolean
 }
 
-export function ForeignObject({ object, conversations }: ForeignObjectProps) {
-  const widget = pickWidget(object.widget, IMPLEMENTED, 'card') === 'card' ? 'card' : 'row'
-  const conversation = conversations !== undefined && conversations > 0 && !object.unreachable ? { count: conversations, href: conversationHref(object) } : undefined
+export function ForeignObject({ object, conversations, row = false }: ForeignObjectProps) {
+  const picked = pickWidget(object.widget, IMPLEMENTED, 'card')
+  const widget = row || picked !== 'card' ? 'row' : 'card'
+  // The count opens the conversation: only where there is one to open.
+  const opens = object.unreachable ? '' : conversationHref(object)
+  const conversation = conversations !== undefined && conversations > 0 && opens ? { count: conversations, href: opens } : undefined
   // Its reference names it by kind before anything is read: the words "not available" falls back on.
   const link = linkStateOf((object.address && referenceOfValue(object.address)) || object.ref, object, conversation ? { conversation } : {})
   return (
     <LinkClicks block>
-      <div data-foreign-object={object.ref} data-widget={widget} data-state={object.unreachable ? 'unreachable' : undefined}>
+      <div data-foreign-object={object.ref} data-widget={picked === 'message' ? 'message' : widget} data-state={object.unreachable ? 'unreachable' : undefined}>
         {widget === 'card' ? <LinkCard link={link} /> : <LinkRow link={link} />}
       </div>
     </LinkClicks>
