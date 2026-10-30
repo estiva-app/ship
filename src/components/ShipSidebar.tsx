@@ -44,7 +44,9 @@ import { linkTo } from '@/router'
  *
  * The two groups fold (Katerina, 2026-09-09): each is a `CollapsibleSection`,
  * and this browser remembers how you left it under the keys below. A closed
- * group stays closed even on one of its own routes — the reader closed it.
+ * group stays closed on its own routes — the reader closed it — except that
+ * opening a project or an issue opens the team holding it, once (Katerina,
+ * 30 October: opening a file shows where it lives; the package's tree does it).
  *
  * Desktop only: the narrow-screen drawer is parked (ruling A5).
  */
@@ -108,6 +110,14 @@ export interface ShipSidebarProps {
   onNewFolder?: () => void
   /** Which entry the route is on. A project's `addr` marks its own row. */
   current: 'issues' | 'projects' | { projectAddr: string } | { folderId: string }
+  /**
+   * The issue open, when the route is one. "Issues" stays the marked entry, and
+   * the team holding the issue's project opens onto the project's row without
+   * marking it: the issue is not a row here (Katerina, 30 October, choice A).
+   * Once per issue, as the package's tree opens onto any current row: a team
+   * closed by hand after that stays closed until another issue opens.
+   */
+  openIssue?: { addr: string; projectAddr: string }
   /** The first workspace read has not landed, so the project list is unknown
    *  rather than empty — SHI-20. Shows placeholder rows in its place. */
   loading?: boolean
@@ -120,7 +130,7 @@ export interface ShipSidebarProps {
   className?: string
 }
 
-export function ShipSidebar({ openIssues, issuesHref, projectsHref, projects, folders = [], onOpenFolder, onMoveProject, onNewFolder, current, loading = false, foldersLoading = false, className }: ShipSidebarProps) {
+export function ShipSidebar({ openIssues, issuesHref, projectsHref, projects, folders = [], onOpenFolder, onMoveProject, onNewFolder, current, openIssue, loading = false, foldersLoading = false, className }: ShipSidebarProps) {
   /*
     Both branches of `current` are objects now, so `typeof current === 'object'`
     no longer distinguishes them — it was correct while a project route was the
@@ -202,7 +212,8 @@ export function ShipSidebar({ openIssues, issuesHref, projectsHref, projects, fo
         title={pending ? undefined : 'Folders'}
         titleActions={onNewFolder ? [{ icon: <IconPlus size={16} stroke={1.5} />, tooltip: 'New folder', onClick: onNewFolder }] : undefined}
         groups={groups}
-        selected={isProject ? current.projectAddr : undefined}
+        selected={isProject ? current.projectAddr : openIssue?.addr}
+        selectedParent={openIssue?.projectAddr}
         onSelect={(selected, event) => linkTo(selected.href).onClick(event)}
         storageKey={STORAGE_KEY}
       />

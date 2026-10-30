@@ -135,6 +135,30 @@ describe('ShipSidebar', () => {
     expect(screen.getByRole('button', { name: 'f1' })).toBeInTheDocument()
   })
 
+  /*
+    Katerina, 30 October, choice A: an issue is under Issues, so Issues stays
+    the marked entry; the team holding its project opens onto the project's
+    row, unmarked, even a team closed by hand.
+  */
+  it('on an issue, Issues stays marked and the team holding its project opens, though closed by hand', () => {
+    window.localStorage.setItem('ship.sidebar.team.peek', 'closed')
+    render(
+      <ShipSidebar
+        openIssues={0}
+        issuesHref="#/"
+        projectsHref="#/projects"
+        projects={filed}
+        folders={teams}
+        current="issues"
+        openIssue={{ addr: '30851:x:issue', projectAddr: '30850:x:one' }}
+      />,
+    )
+    expect(screen.getByRole('button', { name: 'Peek' })).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('link', { name: /^Issues/ })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('link', { name: /^One/ })).not.toHaveAttribute('aria-current')
+    window.localStorage.removeItem('ship.sidebar.team.peek')
+  })
+
   it('marks a project route on its row and nothing on a folder route', () => {
     render(
       <ShipSidebar openIssues={0} issuesHref="#/" projectsHref="#/projects" projects={filed} folders={teams} current={{ folderId: 'peek' }} />,
