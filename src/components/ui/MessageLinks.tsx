@@ -34,7 +34,7 @@ const isModified = (event: MouseEvent) => event.button !== 0 || event.metaKey ||
  * them to `AppProvider`'s `navigate`. With `follows` off, a click opens
  * nothing: in a box being written in, it is not a way out of the draft.
  */
-function LinkClicks({ block = false, follows = true, children }: { block?: boolean; follows?: boolean; children: ReactNode }) {
+export function LinkClicks({ block = false, follows = true, children }: { block?: boolean; follows?: boolean; children: ReactNode }) {
   const onClickCapture = (event: MouseEvent<HTMLElement>) => {
     const anchor = (event.target as Element).closest('a')
     if (anchor && !follows) {
@@ -124,7 +124,7 @@ export function MessageRow({
 }
 
 /** Where a file's comment count opens: a Ship file's Activity tab, anyone else's file in its own app. */
-function conversationHref(object: ForeignObject): string {
+export function conversationHref(object: ForeignObject): string {
   if (!isOwnKind(object.kind) || !object.address) return hrefOf(object)
   const d = object.address.split(':').slice(2).join(':')
   const title = object.slots.title

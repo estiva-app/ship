@@ -1,0 +1,39 @@
+import { Meta } from '@storybook/addon-docs/blocks'
+
+<Meta title="Primitives/LinkClicks/Usage" />
+
+# LinkClicks
+
+Where a click on a link inside the kit's link widgets goes: another app's
+address in a new tab, Ship's own through the router.
+
+**Seen in** no story of its own: it draws nothing, and wraps the chips, rows and cards **MessageChip**, **MessageRow**, **MessageCard** and **ForeignObject** draw.
+
+## When
+
+- Around a kit link widget Ship draws (`LinkChip`, `LinkRow`, `LinkCard`,
+  `AttachedCard`, a part), so another app's file opens in a new tab, as the
+  card's own "Open in …" does.
+- With `follows={false}` in a box being written in: a click there opens
+  nothing, since it is not a way out of the draft.
+
+## When not
+
+- A link of Ship's own outside the link widgets → `linkTo`, or a package part
+  that takes `href` under `AppProvider`'s `navigate`.
+
+## How
+
+```tsx
+import { LinkClicks } from '@/components/ui/MessageLinks'
+
+<LinkClicks block>
+  <LinkRow link={link} />
+</LinkClicks>
+```
+
+## What it owns
+
+- **A new tab, `noopener`**, for an address on another origin: a stranger
+  published it into a shared relay. A modified click is left to the browser.
+- **Nothing followed** with `follows={false}`.

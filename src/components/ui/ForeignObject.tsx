@@ -1,267 +1,47 @@
-import { Card, Link } from '@estiva-app/ui'
-import { cn } from '@/lib/cn'
-import { safeLink } from '@/lib/handoff'
-import { thisObject, typeLabelOf } from '@/lib/typeLabel'
-import { Avatar } from './Avatar'
-import { Chip } from './Chip'
-import { ConversationCount } from './ConversationCount'
-import { EmptyState } from './EmptyState'
-import { Person } from './Person'
-import { StatusLabel } from './StatusLabel'
-import { ShipRichText } from './ShipRichText'
+import { referenceOfValue } from '@/components/conversations/shared'
+import { LinkCard, LinkRow } from '@estiva-app/ui'
 import { pickWidget } from '@/api/foreign'
-import type { ForeignObject as ForeignObjectData, ResolvedSlot } from '@/api/foreign'
+import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
+import { linkStateOf } from '@/lib/linked'
+import { conversationHref, LinkClicks } from './MessageLinks'
 
 /**
- * Another app's object, drawn in Ship's design language.
+ * A file Ship lists by itself — a Folder's own projects and issues, the file a
+ * hand-off page names — as the kit's row or card, the same widgets a message
+ * draws (Katerina, 30 Oct, widget review 52): its key and title, its kind's
+ * tile and word, its state, its comments when the caller read them, and "not
+ * available" in the row's or the card's place, with the way to open it where
+ * it lives, for a file this reader may not see.
  *
- * **The rule this file exists to honour** (RFC 0.4 §13.1): the owner defines
- * the projection, the consumer decides how it looks. Everything here is
- * layout; not one line knows what Peek is, and if it ever needs to, the
- * projection layer has failed rather than this component being incomplete.
+ * **The owner defines the projection, the consumer decides how it looks**
+ * (RFC 0.4 §13.1): nothing here knows what Peek is. The manifest's widget hint
+ * picks row or card; a message, and anything this consumer does not implement,
+ * draws the row, which the kit draws as a person's words for a message.
  *
- * What arrives is a title, some secondary values, maybe a status, maybe a list
- * of children, and a widget *hint*. What does not arrive is layout — an owner
- * who could specify that would be designing Ship's product.
- *
- * ## A foreign message's body is formatted, small
- *
- * Ship's rule is that a body is "untrusted text from other people and other
- * apps: rendered as text, never as markup". It used to be shown raw, because
- * RIC-1 had not decided the format and a parser here would have been a third
- * private dialect (RFC 0.4 §14.2). It has decided: `toRenderTree` resolves the
- * body, and the package's `RichText` draws it as text, in the `small` size an
- * item inside a card takes (Katerina, 28 September, UIG-30). Nothing is ever
- * set as markup.
- */
-
-/**
- * The widget types this consumer implements. A chain must terminate in one of
- * the four RFC 0.4 §13.3 closes; the extra entry here is what Ship adds.
+ * Its values are words: a listing is not where a file is changed.
  */
 const IMPLEMENTED = ['message', 'card', 'row'] as const
-
-/*
-  The walking itself lives in the runtime, not here — PRO-7.
-
-  Ship had its own copy of this for about an hour, which is exactly how the two
-  implementations §13.3 warns about get created: they agree until a chain has
-  three entries and then quietly disagree. The consumer says what it implements
-  and the runtime does the rest.
-*/
-
-function Dot() {
-  return <span aria-hidden className="text-text-muted">·</span>
-}
-
-/** A slot's value, as a person when the manifest says it is one. */
-function SlotValue({ slot, people }: { slot: ResolvedSlot; people?: ForeignObjectData['people'] }) {
-  if (slot.isPubkey) {
-    const profile = people?.[slot.value]
-    // Never the key on screen. Nobody has published a kind:0 for most pubkeys,
-    // and an em dash is the same mark a property with no value uses.
-    return <Person name={profile?.displayName} picture={profile?.picture} size={16} />
-  }
-  return <span className="truncate">{slot.value}</span>
-}
 
 export interface ForeignObjectProps {
   object: ForeignObjectData
   /**
-   * Comments addressed to this object, from `conversationCountsOf` — drawn on
-   * a card or a row when the caller has asked for it. Not on the object
-   * itself, because a folder listing deliberately does not fetch it (one more
-   * query per listing) and a Related section does: the count is the section's
-   * to ask for, the widget's to draw.
+   * How many conversations are on it, when the caller read that: drawn as the
+   * kit's count, opening them. A Folder listing does not read it (one more
+   * query per listing); a Related section does.
    */
   conversations?: number
-  /**
-   * The layout a message's author chose for this card (SPEC §13.6.2, OPT-16):
-   * `row` for compact, `card` for detailed. It replaces the manifest's
-   * `widget`, except for a message, which is drawn as a quoted message either
-   * way (§7.6). Omitted, the manifest decides, as in a Folder listing.
-   */
-  layout?: 'row' | 'card'
-  className?: string
 }
 
-/**
- * Another app's item, mentioned here, drawn as a card in each of its six
- * states, so "you cannot see this" never looks like "this is empty".
- *
- * The six states a foreign object has, and why they are not two.
- *
- * A gated read returns *nothing* — the same nothing as an object with no
- * content — so "you cannot see this" and "this is empty" arrive identically
- * from the relay and must never look identical on screen. `unreachable` is the
- * resolver telling us which one it was.
- */
-export function ForeignObject({ object, conversations, layout, className }: ForeignObjectProps) {
-  if (object.unreachable) {
-    const open = safeLink(object.openUrl)
-    return (
-      <Card
-        fill="surface"
-        unreadable
-        className={cn('p-3', className)}
-        data-foreign-object={object.ref}
-        data-state="unreachable"
-      >
-        {/* The words' look on a box inside the card: Card draws the frame only (UIG-9). */}
-        <div className="text-body-2 text-text-muted">
-          You may not have access to {thisObject(object)}.
-          {open && (
-            <>
-              {' '}
-              <span className="text-text-secondary">
-                <Link href={open} variant="underlined">
-                  Open it there
-                </Link>
-              </span>
-              .
-            </>
-          )}
-        </div>
-      </Card>
-    )
-  }
-
-  const picked = pickWidget(object.widget, IMPLEMENTED, 'card')
-  const widget = layout && picked !== 'message' ? layout : picked
-  return widget === 'message' ? (
-    <ForeignMessage object={object} className={className} />
-  ) : (
-    <ForeignCard object={object} row={widget === 'row'} conversations={conversations} className={className} />
-  )
-}
-
-/**
- * A message: a face, a name, a body. None of `card`/`row`/`table`/`stat`
- * describes one, which is exactly why the chain exists.
- *
- * Labelled by its type and opened where it lives, as every other card is: the
- * same type chip, and the whole message a link to the object's `openUrl`
- * (a chat message opens in the app declaring the conversation aspect).
- * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-file-is-labelled-by-its-type-not-its-app.md
- * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-chat-message-belongs-to-the-protocol.md
- */
-function ForeignMessage({ object, className }: ForeignObjectProps) {
-  const author = object.slots.title
-  const profile = author?.isPubkey ? object.people?.[author.value] : undefined
-  const label = typeLabelOf(object)
-  // The link is another app's manifest's, so only an `https:` one is followed;
-  // with none, the message is still drawn, and does not light up as if it led somewhere.
-  const href = safeLink(object.openUrl)
+export function ForeignObject({ object, conversations }: ForeignObjectProps) {
+  const widget = pickWidget(object.widget, IMPLEMENTED, 'card') === 'card' ? 'card' : 'row'
+  const conversation = conversations !== undefined && conversations > 0 && !object.unreachable ? { count: conversations, href: conversationHref(object) } : undefined
+  // Its reference names it by kind before anything is read: the words "not available" falls back on.
+  const link = linkStateOf((object.address && referenceOfValue(object.address)) || object.ref, object, conversation ? { conversation } : {})
   return (
-    <Card
-      href={href}
-      fill="none"
-      hover={href ? 'fill' : 'none'}
-      quietUntilHover
-      className={cn('flex gap-2 px-2 py-1.5', className)}
-      data-foreign-object={object.ref}
-      data-widget="message"
-    >
-      <Avatar name={profile?.displayName} src={profile?.picture} size={24} />
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2 text-caption text-text-muted">
-          <span className={cn('min-w-0 flex-1 truncate', profile?.displayName ? 'text-text-secondary' : 'text-text-muted')}>
-            {profile?.displayName ?? '—'}
-          </span>
-          {label && <Chip label={label} />}
-        </div>
-        {/*
-          Formatted, never markup. See the note at the top of this file. Every
-          pointer is its chip, alone on its line too, and never a card: a card
-          inside a card's body would let two objects that card each other nest
-          forever (SPEC §13.3).
-        */}
-        {object.slots.body && (
-          <ShipRichText value={object.slots.body.value} format={object.slots.body.format ?? 'marker'} size="small" />
-        )}
+    <LinkClicks block>
+      <div data-foreign-object={object.ref} data-widget={widget} data-state={object.unreachable ? 'unreachable' : undefined}>
+        {widget === 'card' ? <LinkCard link={link} /> : <LinkRow link={link} />}
       </div>
-    </Card>
-  )
-}
-
-function ForeignCard({ object, row, conversations, className }: ForeignObjectProps & { row?: boolean }) {
-  const { slots, meta, children } = object
-  const body = (
-    <>
-      <div className="flex items-start gap-2">
-        <span className="min-w-0 flex-1 truncate text-body-2-strong text-text-primary">
-          {/* `title` is the one required slot, so there is always something to
-              name the object with — which is what makes ignoring an unknown
-              slot safe rather than merely tolerable (§13.3). */}
-          {slots.title?.value ?? 'Untitled'}
-        </span>
-        {/*
-          The count before the chip — what is said about the file, then whose
-          it is — the same order an issue row keeps.
-
-          Centred on each other in a group of their own (Katerina, 22
-          September). The row is `items-start`, so the count, which is 14.4px
-          against the chip's 20, floated 2.6px above it; aligning the whole row
-          instead would move the title, which is meant to sit at the top of a
-          card whose subtitle may wrap.
-        */}
-        <span className="flex shrink-0 items-center gap-2">
-          {conversations !== undefined && <ConversationCount count={conversations} unit="comment" />}
-          {typeLabelOf(object) && <Chip label={typeLabelOf(object)!} />}
-        </span>
-      </div>
-      {slots.subtitle && (
-        <p className="line-clamp-2 break-words text-body-2 text-text-secondary">{slots.subtitle.value}</p>
-      )}
-      {(slots.status || meta.length > 0) && (
-        <div className="flex flex-wrap items-center gap-2.5 text-caption text-text-muted">
-          {slots.status && (
-            /*
-              By the colour, not the value — UIG-18. The projection replaced
-              the raw status with its label before it reached here, so passing
-              the value drew a plain circle for every app, Ship's own objects
-              included. See `StatusLabel`'s `colour`.
-            */
-            <StatusLabel value={slots.status.value} label={slots.status.value} colour={slots.status.colour} size="small" />
-          )}
-          {meta.map((entry, i) => (
-            <span key={i} className="flex min-w-0 items-center gap-1.5">
-              {i > 0 || slots.status ? <Dot /> : null}
-              {entry.label && <span>{entry.label}</span>}
-              <SlotValue slot={entry} people={object.people} />
-            </span>
-          ))}
-        </div>
-      )}
-      {/*
-        The `list` slot. Children are resolved through *their own* projection,
-        so this renders each with the same component rather than a reduced copy
-        — which is what makes "a card with its children underneath" compose
-        instead of being a special case.
-
-        `children === undefined` means no list was declared; `[]` means one was
-        and nothing matched. Those are different sentences and this draws
-        neither the same way as the other.
-
-        A line between the children, and none above the first (Katerina, 22
-        September): the card's own edge already says where its contents begin.
-      */}
-      {children && children.length > 0 && (
-        <div className="mt-1 flex flex-col divide-y divide-border-default">
-          {children.map((child) => (
-            <ForeignObject key={child.ref} object={child} />
-          ))}
-        </div>
-      )}
-      {children?.length === 0 && <EmptyState scope="section" message="Nothing in it yet." className="mt-1" />}
-    </>
-  )
-
-  const layout = cn('flex flex-col gap-2 p-3', row && 'py-2', className)
-
-  return (
-    <Card href={safeLink(object.openUrl)} fill="surface" className={layout} data-foreign-object={object.ref} data-widget={row ? 'row' : 'card'}>
-      {body}
-    </Card>
+    </LinkClicks>
   )
 }

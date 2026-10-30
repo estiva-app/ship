@@ -3,7 +3,9 @@ import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
 import { ForeignObject } from './ForeignObject'
 
 /*
-  The six states, because the six are the component (SPEC §13.3, RFC 0.4 §13.1).
+  A file Ship lists by itself, as the kit's row or card (Katerina, 30 Oct,
+  widget review 52): the widget its manifest hints, and "not available" in its
+  place for a file this reader may not see (SPEC §13.3, RFC 0.4 §13.1).
 
   Everything here is the shape the runtime hands over — a title, some secondary
   values, maybe a status, maybe children, and a widget hint. Nothing is looked
@@ -39,7 +41,7 @@ const meta = {
 export default meta
 type Story = StoryObj<typeof meta>
 
-/** The default close of the chain: a title, a line under it, a status and the values the manifest declared. */
+/** The default close of the chain, as the kit's card: its tile, title and kind, its summary, its status and owner as words, and the comments the caller read. */
 export const Card: Story = {
   args: {
     object: obj({
@@ -51,12 +53,12 @@ export const Card: Story = {
   },
 }
 
-/** `row` — the same card, tighter, for a list of them. */
+/** `row` — the kit's row, for a list of them. */
 export const Row: Story = {
   args: { object: obj({ widget: 'row', slots: { title: { value: 'Design review' } } }) },
 }
 
-/** `message` — a face, a name, a body and its type chip; the whole message opens it where it lives. None of card/row/table/stat describes one, which is why the chain exists. */
+/** `message` — the kit's row for words a person wrote: their face, their name and the words; it opens where it lives. None of card/row/table/stat describes one, which is why the chain exists. */
 export const Message: Story = {
   args: {
     object: obj({
@@ -70,12 +72,12 @@ export const Message: Story = {
   },
 }
 
-/** You may not read it. A gated read and an empty object arrive identically from the relay and must never look identical here. */
+/** You may not read it: "not available" in the card's place, with the way to open it in its app. A gated read and an empty object arrive identically from the relay and must never look identical here. */
 export const Unreachable: Story = {
-  args: { object: obj({ unreachable: true, openUrl: 'https://peek.estiva.app/t/x' }) },
+  args: { object: obj({ unreachable: true, noun: 'topic', openUrl: 'https://peek.estiva.app/t/x' }) },
 }
 
-/** A `list` slot: every child is resolved through its own projection, so it is drawn with this same component. */
+/** A `list` slot: the card lists the files inside it, each opening on its own. */
 export const WithChildren: Story = {
   args: {
     object: obj({
@@ -111,12 +113,8 @@ export const FolderWithFiles: Story = {
   },
 }
 
-/** A list declared and empty. "This holds nothing" and "this holds no list" are different sentences. */
-export const EmptyList: Story = {
-  args: { object: obj({ slots: { title: { value: 'Relay Migration' } }, children: [] }) },
-}
 
-/** A kind nobody here has heard of, falling through the chain to `card`. Not one line below knows what Peek is. */
+/** A kind nobody here has heard of, falling through the chain to `card`. Not one line here knows what Peek is. */
 export const UnknownWidget: Story = {
   args: { object: obj({ appName: 'Tide table', kind: 30911, widget: ['tideboard', 'card'], slots: { title: { value: 'Spring tides' } } }) },
 }
