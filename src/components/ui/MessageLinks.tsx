@@ -146,7 +146,7 @@ export function MessageCard({
   object: ForeignObject | null | undefined
   /** An old message's `compact` card: the file's row under the message, as it drew before the kit. */
   compact?: boolean
-  /** Its values as words, no pickers: a card in text being edited (Decided 21 Oct, as in a Leaf page). */
+  /** Its values as words, no pickers: where the reader cannot act — a closed conversation, a description only read (Katerina, 30 Oct). */
   words?: boolean
   /** ✕ on the card, offered to its message's author (Decided 19 Oct, WBM-7): the message then asks for no card. */
   onRemove?: () => void

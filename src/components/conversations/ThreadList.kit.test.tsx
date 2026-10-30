@@ -162,6 +162,13 @@ describe('the card under the comment', () => {
     expect(screen.queryByRole('combobox', { name: 'Status' })).toBeNull()
   })
 
+  it('reads its values as words where nobody can write: an archived file’s conversation, or signed out', async () => {
+    const c = render(<ThreadList threads={[thread(THE_MESSAGE, ITS_CARD)]} onStart={noop} onReply={noop} disabledReason="This issue is archived." />).container
+    await waitFor(() => expect(c.querySelector('[data-card]')?.textContent).toContain('Cards draw from the kit'))
+    expect(screen.queryByRole('combobox', { name: 'Status' })).toBeNull()
+    expect(c.querySelector('[data-card]')?.textContent).toContain('Todo')
+  })
+
   it('reads its values as words for an issue whose project is archived, as Leaf’s card does', async () => {
     objects.byReference[ref(CARD_ISSUE)] = { ...cardIssue(), parentRef: PROJECT }
     objects.parentArchive[ref(CARD_ISSUE)] = { by: SHIP, at: 1, with: PROJECT }

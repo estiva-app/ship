@@ -149,6 +149,32 @@ describe('LiveHeader draws its description (from Description.test.tsx)', () => {
     })
   }
 
+  // Katerina, 30 Oct: a card in a document keeps its pickers while the caret is in the text too, and is words only
+  // where the reader cannot act (a description only read: an archived file's).
+  const WITH_STATUS: ForeignObject = {
+    ...ISSUE,
+    slots: { title: { value: 'The probe issue' }, status: { value: 'Todo', colour: 'neutral', field: 'status' } },
+    actions: [{ id: 'set-issue-status', label: 'Change status', control: 'select', field: 'status', current: 'todo', options: [{ value: 'todo', label: 'Todo', colour: 'neutral' }, { value: 'done', label: 'Done', colour: 'green' }] }],
+  }
+  const CARDED = JSON.stringify({ type: 'doc', content: [{ type: 'paragraph', id: 'p1', content: [{ type: 'text', text: NADDR, marks: [{ type: 'reference', attrs: { uri: NADDR, embed: 'detailed' } }] }] }, { type: 'paragraph', id: 'p2', content: [{ type: 'text', text: 'after' }] }] })
+
+  it('keeps a card’s pickers for a writer with the caret in the text', async () => {
+    vi.mocked(resolveForeign).mockImplementation(async () => WITH_STATUS)
+    const box = await write(CARDED, 'blocks')
+    box.focus()
+    await waitFor(() => expect(box.querySelector('[data-card]')?.textContent).toContain('The probe issue'))
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Status' })).toBeTruthy())
+    vi.mocked(resolveForeign).mockImplementation(async () => null)
+  })
+
+  it('draws a card’s values as words for a reader who cannot act on it', async () => {
+    vi.mocked(resolveForeign).mockImplementation(async () => WITH_STATUS)
+    const box = await readEditor(CARDED, 'blocks')
+    await waitFor(() => expect(box.querySelector('[data-card]')?.textContent).toContain('Todo'))
+    expect(screen.queryByRole('combobox', { name: 'Status' })).toBeNull()
+    vi.mocked(resolveForeign).mockImplementation(async () => null)
+  })
+
   // A reader's files open (WBD-7), so a block the protocol will not name as a file (§13.3: no hash here) is its name, not a file to open.
   it('draws, for a reader, a file block missing a required field as its name, and a whole one as the file', async () => {
     const file = { url: 'https://blossom.example/whole.pdf', m: 'application/pdf', x: 'a'.repeat(64), size: 1200, filename: 'whole.pdf' }

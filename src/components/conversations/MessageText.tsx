@@ -32,6 +32,7 @@ export function MessageText({
   preview = false,
   between,
   onRemoveCard,
+  words = false,
 }: {
   body: string
   /** The cards its author asked for, after edits (SPEC §13.6.2). */
@@ -50,6 +51,8 @@ export function MessageText({
   between?: ReactNode
   /** ✕ on a sent card, by its file: offered on your own message only, as Edit is (Decided 19 Oct, WBM-7). */
   onRemoveCard?: (value: string) => void
+  /** Its cards' values as words, no pickers: the reader cannot act here — an archived file's conversation, or signed out (Katerina, 30 Oct). */
+  words?: boolean
 }) {
   // What each app link names by §7.7; a link to one block names its file, so it is that file's chip, the block live under the message (WBM-11).
   const claimed = linkResolverFor(body, knownLinkValue)
@@ -104,6 +107,7 @@ export function MessageText({
               compact={card.layout !== 'detailed'}
               onRemove={onRemoveCard && card.layout === 'detailed' ? () => onRemoveCard(card.value) : undefined}
               opensAt={card.opensAt}
+              words={words}
             />
           ))}
         </div>

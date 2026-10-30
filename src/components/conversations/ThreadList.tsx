@@ -87,9 +87,11 @@ interface MessageProps {
   drafts?: DraftStore
   /** A first message's second row: the replies button. */
   footer?: React.ReactNode
+  /** Nothing can be written here (an archived file, signed out): its cards' values read as words. */
+  closed?: boolean
 }
 
-function Message({ message, resolved, here, nameOf, viewer, reactions, onToggleReaction, onDelete, onEdit, references, captions, repliesLeftBehind = 0, drafts, footer }: MessageProps) {
+function Message({ message, resolved, here, nameOf, viewer, reactions, onToggleReaction, onDelete, onEdit, references, captions, repliesLeftBehind = 0, drafts, footer, closed = false }: MessageProps) {
   const [editing, setEditing] = useState(false)
   // An edit open when the sign-in ended opens again after the passkey tap, with what was typed (AUT-4).
   const editHold = `edit:${message.id}`
@@ -188,6 +190,7 @@ function Message({ message, resolved, here, nameOf, viewer, reactions, onToggleR
             here={here}
             between={<FileAttachments files={message.files} />}
             onRemoveCard={removeCard}
+            words={closed}
           />
           {/* Row one: the package's pills, then its add button (her note 4, Linear's order); none yet, the add button alone. Where nobody may write, the pills only. */}
           {reactions?.length ? (
@@ -297,9 +300,10 @@ function Thread({ thread, pageThreads, onReply, disabledReason, unread, stillUnr
     setFocusReply(!open)
     setOpen(!open)
   }
-  const common = { resolved, here, nameOf, viewer, drafts, references, captions }
-  // Closed (an archived file, signed out): no React, Edit or Delete, as the box is a line (Decided 2026-10-17).
+  // Closed (an archived file, signed out): no React, Edit or Delete, as the box is a line (Decided 2026-10-17), and a
+  // card's values are words, not pickers (Katerina, 30 Oct).
   const writable = !disabledReason
+  const common = { resolved, here, nameOf, viewer, drafts, references, captions, closed: !writable }
   const toolsFor = (message: MessageData) => {
     const offered = writable && offersEditAndDelete({ viewer, author: message.by ?? '' })
     return {

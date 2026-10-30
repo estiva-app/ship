@@ -41,19 +41,17 @@ export function linksInBlocks(blocks: readonly RenderBlock[]): string[] {
 interface DescriptionLinksValue {
   resolved: Resolved
   nameOf?: (pubkey: string) => string
-  /** The text has the caret: a card's values are words then, as in a Leaf page (Decided 21 Oct). */
-  focused: boolean
-  /** Only read: its files open. */
+  /** Only read: its files open, and a card's values are words, since this reader cannot act here. */
   readOnly: boolean
 }
 
-const Links = createContext<DescriptionLinksValue>({ resolved: {}, focused: false, readOnly: false })
+const Links = createContext<DescriptionLinksValue>({ resolved: {}, readOnly: false })
 
 /**
  * Every link the description's editor holds, read once and handed to each one,
- * with the people's names and whether the text has the caret. A link put in
- * since the description was saved — a URL that became its chip while typing, a
- * `[` pick — is read here, not left loading until the save.
+ * with the people's names. A link put in since the description was saved — a
+ * URL that became its chip while typing, a `[` pick — is read here, not left
+ * loading until the save.
  */
 export function DescriptionLinks({ editor, resolved, nameOf, readOnly, children }: { editor: Editor | null; resolved: Resolved; nameOf?: (pubkey: string) => string; readOnly: boolean; children: ReactNode }) {
   const key = useEditorState({
@@ -67,11 +65,10 @@ export function DescriptionLinks({ editor, resolved, nameOf, readOnly, children 
       return [...uris].join('\n')
     },
   })
-  const focused = useEditorState({ editor, selector: ({ editor: ed }) => !!ed?.isFocused }) ?? false
   const missing = (key ? key.split('\n') : []).filter((uri) => !(uri in resolved))
   const own = byReference(missing, useForeignObjects(missing))
   const all = missing.length ? { ...own, ...resolved } : resolved
-  return <Links.Provider value={{ resolved: all, nameOf, focused, readOnly }}>{children}</Links.Provider>
+  return <Links.Provider value={{ resolved: all, nameOf, readOnly }}>{children}</Links.Provider>
 }
 
 /**
@@ -85,22 +82,26 @@ export function DescriptionLink({ uri, href, place = 'chip', editing = false }: 
   const { resolved, nameOf } = useContext(Links)
   if (/^nostr:npub1/i.test(uri)) return <Reference uri={uri} nameOf={nameOf} />
   const object = resolved[uri]
-  if (place === 'card') return <DescriptionCard uri={uri} object={object} href={href} editing={editing} />
+  if (place === 'card') return <DescriptionCard uri={uri} object={object} href={href} />
   if (place === 'row') return <MessageRow uri={uri} object={object} opensAt={href} />
   // A URL whose file has not come back, or cannot be read, reads as the URL it was written as (WBM-11).
   if (href && (!object || object.unreachable)) return <span>{href}</span>
   return <MessageChip uri={uri} object={object} nameOf={nameOf} preview={!editing} opensAt={href} />
 }
 
-/** The card its writer chose, pickers included, its values words while the text has the caret. */
-function DescriptionCard({ uri, object, href, editing }: { uri: string; object: ForeignObjectData | null | undefined; href?: string; editing: boolean }) {
-  const { focused } = useContext(Links)
+/**
+ * The card its writer chose, its pickers live while the caret is in the text too (Katerina, 30 Oct, against the
+ * record a-card-changes-what-a-files-app-shares's "words while the text is edited"). Words only where the reader
+ * cannot act: a description only read.
+ */
+function DescriptionCard({ uri, object, href }: { uri: string; object: ForeignObjectData | null | undefined; href?: string }) {
+  const { readOnly } = useContext(Links)
   const card = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const element = card.current
     if (!element) return
-    // ProseMirror sees a press before React does and takes the caret into the text, turning the card to words under
-    // the pointer, its picker gone before it opened. It leaves alone a press whose default is prevented (as Leaf's).
+    // ProseMirror sees a press before React does and takes the caret into the text, closing the picker before it
+    // opened. It leaves alone a press whose default is prevented (as Leaf's). Goes once the kit's BlockNodes does it.
     const keep = (event: MouseEvent) => {
       if (event.target instanceof Element && event.target.closest('button, [role="combobox"]')) event.preventDefault()
     }
@@ -109,7 +110,7 @@ function DescriptionCard({ uri, object, href, editing }: { uri: string; object: 
   }, [])
   return (
     <div ref={card}>
-      <MessageCard uri={uri} object={object} opensAt={href} words={editing && focused} />
+      <MessageCard uri={uri} object={object} opensAt={href} words={readOnly} />
     </div>
   )
 }
