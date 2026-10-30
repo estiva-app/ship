@@ -13,15 +13,13 @@ it shows, drawn by the kit and by the rule Peek's messages follow.
 
 - The body of a comment or a reply (`ThreadList`, the Activity tab, "Mentioned
   in").
-- A preview of a message, with `preview` (Related's message rows): its links
-  as chips only.
 
 ## When not
 
-- A description → **ShipRichText** with its line cards: a description's links
-  keep their own rule.
-- A block document body in a preview → **ShipRichText**: a message is marker
-  text.
+- A description → **LiveHeader**, whose links draw by the document rule
+  (**DescriptionLink**): the card its writer chose, in the row's place.
+- A message listed as a file (Related, a Folder) → **ForeignObject**, the kit's
+  row of its writer's words.
 
 ## How
 
@@ -42,3 +40,7 @@ import { MessageText } from '@/components/conversations/MessageText'
   stays where it was written.
 - **A bare app link reads as its file's link** only once what it names has
   come back and can be read; otherwise it stays the URL as written.
+- **No hover card on a chip whose file's card is under the message**, which
+  it would cover (Katerina, 30 Oct).
+- **`words`**: its cards' values as words where nobody can write here (an
+  archived file's conversation, signed out).

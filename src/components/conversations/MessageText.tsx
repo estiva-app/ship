@@ -29,7 +29,6 @@ export function MessageText({
   resolved,
   nameOf,
   here,
-  preview = false,
   between,
   onRemoveCard,
   words = false,
@@ -45,8 +44,6 @@ export function MessageText({
   nameOf?: (pubkey: string) => string
   /** The address of the file this conversation is on: no card for it there, its chip stays (WID-3). */
   here?: string
-  /** A preview of the message (Related's rows): its links as chips only — no row, no card, no part (Decided 16 Oct). */
-  preview?: boolean
   /** Drawn between the text and the cards: the message's files. */
   between?: ReactNode
   /** ✕ on a sent card, by its file: offered on your own message only, as Edit is (Decided 19 Oct, WBM-7). */
@@ -59,7 +56,7 @@ export function MessageText({
   // A block of another object, live (SPEC §13.6.1, COM-2), while the latest words still name its file: by a `nostr:`
   // reference, or by a link whose path ends in its `d`, as Peek draws it — answered or not, since only a message's
   // first eight links are asked about. An edit carries no `part`, and taking the link out takes the block.
-  const tree = preview || !partTags?.length ? [] : toRenderTree(body, MESSAGE_FORMAT)
+  const tree = !partTags?.length ? [] : toRenderTree(body, MESSAGE_FORMAT)
   const named = new Set(valuesIn(tree, () => undefined))
   const urls = linksIn(tree)
   const parts = (partTags ?? []).filter((part) => named.has(part.address) || urls.some((url) => urlNamesAddress(url, part.address))).slice(0, MAX_PARTS_PER_MESSAGE)
@@ -73,27 +70,27 @@ export function MessageText({
   }
   const blocks = linksAsReferences(toRenderTree(body, MESSAGE_FORMAT), resolveLink)
   const isHere = (value: string) => !!here && value.toLowerCase() === here.toLowerCase()
-  const cards = preview ? [] : cardsOf(blocks, embeds, parts, claimed).filter((card) => !isHere(card.value))
-  const placed = preview ? undefined : placeLines(blocks, { cards, parts, resolveLink, stayChip: isHere })
+  const cards = cardsOf(blocks, embeds, parts, claimed).filter((card) => !isHere(card.value))
+  const placed = placeLines(blocks, { cards, parts, resolveLink, stayChip: isHere })
   const shown = cards.filter((card) => card.layout !== 'none')
   // A chip whose file's card is already under the message shows no hover card: it would cover that card (Katerina, 30 Oct).
   const carded = new Set(shown.map((card) => card.value.toLowerCase()))
   const hasCard = (reference: string) => carded.has(valueOfReference(reference)?.toLowerCase() ?? '')
   // A link to one block opens at the block (`opensAt`, the URL as written); any other where its file opens.
-  const chip = (reference: string, written?: string) => <MessageChip uri={reference} object={resolved?.[reference]} nameOf={nameOf} urgent={urgent} preview={!preview && !hasCard(reference)} opensAt={written} />
+  const chip = (reference: string, written?: string) => <MessageChip uri={reference} object={resolved?.[reference]} nameOf={nameOf} urgent={urgent} preview={!hasCard(reference)} opensAt={written} />
   const row = (line: RowLine) => <MessageRow uri={line.reference} object={resolved?.[line.reference]} unreadable={line.unreadable} opensAt={line.url} />
   return (
     <>
       {blocks.length > 0 && (
         <div className="break-words" data-message-text>
           <RichText
-            blocks={placed?.blocks ?? blocks}
+            blocks={placed.blocks}
             renderReference={(reference, run) => {
-              const line = placed?.rowRuns.get(run)
+              const line = placed.rowRuns.get(run)
               return line ? row(line) : chip(reference, run.text)
             }}
             renderBlock={(block) => {
-              const line = block.type === ROW_BLOCK ? placed?.rowOf(block) : undefined
+              const line = block.type === ROW_BLOCK ? placed.rowOf(block) : undefined
               return line ? row(line) : drawAttachment(block)
             }}
           />

@@ -53,7 +53,7 @@ const REACTION_OPTIONS = REACTION_EMOJI.map(({ emoji, name }) => ({ emoji, label
  * **Everything production's `Conversations` and `Activity` do is kept, part for
  * part**: the same props (`ConversationsProps`, `ActivityProps`) and reads
  * (`useThreadReferences`, `useThreadReactions`); files (`Attachments`, the
- * signed fetch); linked items (`ForeignObject`, a skeleton while they resolve);
+ * signed fetch); linked files (the kit's chips, rows and cards, keeping their shape while they resolve);
  * the note on a comment about one block; mentions by name; "edited" with when;
  * the reactions and their horizon line; "New since you last read this", with a
  * thread holding an unread reply opening by itself; the delete question with the

@@ -5,8 +5,8 @@
  * chip, a line that is only a link to a file is that file's row, a person or a
  * Folder alone stays a chip, and the file its author chose gets the card under
  * the comment — which any reader may change from (Decided 16 Oct). The file a
- * conversation is on draws no card there (WID-3), and a preview draws chips
- * only. The write itself is asserted at the wire in `api/cardAction.test.ts`.
+ * conversation is on draws no card there (WID-3). The write itself is
+ * asserted at the wire in `api/cardAction.test.ts`.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
@@ -263,16 +263,6 @@ describe('where the comment is shown', () => {
     } finally {
       vi.useRealTimers()
     }
-  })
-
-  it('draws a preview’s links as chips only: no row, no card, no picker', async () => {
-    const resolved = Object.fromEntries(Object.entries(objects.byReference)) as Record<string, ForeignObject>
-    const c = render(<MessageText body={THE_MESSAGE} embeds={ITS_CARD} resolved={resolved} preview />).container
-    expect(c.querySelector('[data-card]')).toBeNull()
-    expect(rows(c)).toEqual([])
-    expect(c.textContent).toContain('Widgets 2')
-    expect(c.textContent).toContain('Cards draw from the kit')
-    expect(screen.queryByRole('combobox')).toBeNull()
   })
 })
 
