@@ -19,6 +19,16 @@ import { encodeNevent, encodeNpub, type Imeta } from '@estiva-app/protocol'
 
 // The edit box uploads through Ship's own upload, which needs a relay; a test answers for it.
 vi.mock('@/api/blobs', async (original) => ({ ...(await original<typeof import('@/api/blobs')>()), uploadAttachment: vi.fn() }))
+// What a reference in the box names: the message the SHI-49 test quotes, nothing else; the lookup itself is `useForeignObjects`'.
+const QUOTED_ID = 'f'.repeat(64)
+vi.mock('@/api/foreign', async (original) => ({
+  ...(await original<typeof import('@/api/foreign')>()),
+  resolveForeign: vi.fn(async (reference: string) =>
+    reference.startsWith('nostr:nevent1')
+      ? { ref: QUOTED_ID, eventId: QUOTED_ID, kind: 9, widget: 'message', appName: 'Peek', openUrl: 'https://peek.estiva.app/o/x', slots: { title: { value: 'a'.repeat(64), isPubkey: true }, body: { value: 'The key is rotated.' } }, people: { ['a'.repeat(64)]: { displayName: 'Ann Lee' } }, meta: [], comments: [], actions: [], viaRecommendation: true }
+      : null,
+  ),
+}))
 
 import { uploadAttachment } from '@/api/blobs'
 import { ThreadListView } from './ThreadList'
@@ -169,7 +179,8 @@ describe('the edit control', () => {
     expect(await screen.findByText(/Not saved: blocked: not your message/)).toBeInTheDocument()
   })
 
-  /* SHI-49: the edit box showed a message reference as "nevent1…" and a person as "npub1…". */
+  /* SHI-49: the edit box showed a message reference as "nevent1…" and a person as "npub1…". Changed on purpose (Katerina,
+     30 Oct, widget review 16): a message `[` knows draws as the kit's chip, its writer and words, not the caption it was picked with. */
   it('opens a message reference and a person as chips, not as their nostr: text', async () => {
     const ANN = 'a'.repeat(64)
     const quoted: ThreadData = { id: 'f'.repeat(64), root: { id: 'f'.repeat(64), author: { name: 'Ann' }, at: 1_756_000_000, body: 'The key is rotated.', by: ANN }, replies: [] }
@@ -177,7 +188,7 @@ describe('the edit control', () => {
     open({ onEditMessage: vi.fn(async (): Promise<true | string> => true), threads: [{ ...thread, root: { ...thread.root, body } }, quoted], nameOf: (pubkey) => (pubkey === ANN ? 'Ann Lee' : 'Someone') })
     const box = await openEditor()
     expect(box.textContent).not.toMatch(/nevent1|npub1|nostr:/)
-    expect(box.textContent).toContain('The key is rotated.')
+    await waitFor(() => expect(box.textContent).toContain('The key is rotated.'))
     expect(box.textContent).toContain('Ann Lee')
   })
 

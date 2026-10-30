@@ -29,9 +29,10 @@ describe('HandoffPage', () => {
     render(<HandoffPage word="topic" fileRef="x-d" />)
     expect(screen.getByText('Who will extract the conversation package')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Open in Peek' })).toHaveAttribute('href', 'https://peek.estiva.app/o/naddr1topic')
-    // The card names the file by its type, as the kit's card does (a-file-is-labelled-by-its-type-not-its-app), never the projection's "File".
+    // A type with no name is called by its app's name (record a-file-is-labelled-by-its-type-not-its-app, ui 0.92): the
+    // app the link goes to, never the projection's "File".
     expect(screen.queryByText('File')).not.toBeInTheDocument()
-    expect(screen.getByText(/Topic/)).toBeInTheDocument()
+    expect(screen.getByText('Peek')).toBeInTheDocument()
   })
 
   it('draws one way to open an unreachable file, the card’s own', () => {

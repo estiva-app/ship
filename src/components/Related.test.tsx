@@ -71,7 +71,7 @@ describe('Related', () => {
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Related' })).toBeInTheDocument())
     expect(screen.getByText('Design review')).toBeInTheDocument()
     // The kit's count, opening the conversation (Katerina, 30 Oct, widget review 52).
-    expect(screen.getByRole('link', { name: /comments — open the conversation/ }).textContent).toContain('3')
+    expect(screen.getByRole('link', { name: /3 comments — open the conversation/ })).toBeInTheDocument()
     // Read from the object's own Folder, filtered to the object — the two
     // arguments the page hands over, nothing else.
     expect(readRelated).toHaveBeenCalledWith('f1', PROJECT)
@@ -93,7 +93,7 @@ describe('Related', () => {
     await waitFor(() => expect(screen.getByText('Spring tides')).toBeInTheDocument())
     // Drawn as a row, as every Related file is, whatever its manifest hints.
     expect(document.querySelector('[data-widget="row"]')).toBeTruthy()
-    expect(screen.getByRole('link', { name: /comments — open the conversation/ }).textContent).toContain('1')
+    expect(screen.getByRole('link', { name: /1 comment — open the conversation/ })).toBeInTheDocument()
   })
 
   it('nothing placed here: no heading, and the state is read — not unread', async () => {
