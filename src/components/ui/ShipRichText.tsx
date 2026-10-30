@@ -2,8 +2,7 @@ import type { ForeignObject } from '@/api/foreign'
 import { RichText as PackageRichText, type RichTextBlock, type RichTextSize } from '@estiva-app/ui'
 import { Attachment } from './Attachment'
 import { Reference } from './Reference'
-import type { ReactNode } from 'react'
-import { imetaFromAttrs, linksAsReferences, referenceOfLink, toRenderTree, type ContentFormat, type LinkResolver, type RenderBlock } from '@estiva-app/protocol'
+import { imetaFromAttrs, toRenderTree, type ContentFormat } from '@estiva-app/protocol'
 
 /**
  * A body, drawn — SPEC §13.
@@ -23,7 +22,8 @@ import { imetaFromAttrs, linksAsReferences, referenceOfLink, toRenderTree, type 
  * **The look is the package's** (UIG-30, Katerina, 28 September): Peek and Ship
  * had drawn the same tree two ways, and one design now draws both. What is
  * Ship's is what a word points at — a person or an item (`Reference`) and a
- * file (`Attachment`) — and what a description draws after a line, its cards.
+ * file (`Attachment`). Inside it every reference is its chip, never a row or a
+ * card: two objects that card each other would nest forever (§13.3).
  */
 export function ShipRichText({
   value,
@@ -32,8 +32,6 @@ export function ShipRichText({
   nameOf,
   resolved,
   urgent,
-  renderAfter,
-  resolveLink,
 }: {
   value: string
   format: ContentFormat
@@ -50,38 +48,15 @@ export function ShipRichText({
   resolved?: Record<string, ForeignObject | null | undefined>
   /** A message's urgent keys, which draw their person chips urgent — SPEC §13.1, CON-24. */
   urgent?: readonly string[]
-  /**
-   * Draws after a line of the text — where a description's chip asks for its
-   * card (SPEC §13.3; `blockLineCards`). Only a page's own description passes
-   * it: inside a card's body every reference is its chip, never a card, or two
-   * objects that card each other nest forever. A reference alone on its line
-   * is its chip too, as in a message (OPT-18).
-   */
-  renderAfter?: (block: RenderBlock) => ReactNode
-  /**
-   * What each app link names (§7.7), so a bare link draws as the chip of what
-   * it names, as Peek draws it (`linksAsReferences`, OPT-18) — in a message,
-   * and in a description, where a URL keeps the card its writer chose (SPEC
-   * §13.3, Widgets). A link on words stays a link, and one not answered yet
-   * stays the URL.
-   */
-  resolveLink?: LinkResolver
 }) {
-  const tree = toRenderTree(value, format)
-  const blocks = resolveLink ? linksAsReferences(tree, resolveLink) : tree
+  const blocks = toRenderTree(value, format)
   if (blocks.length === 0) return null
   return (
     <PackageRichText
       blocks={blocks}
       size={size}
-      // A link to one block opens at the block (WBM-11): the run keeps the URL as written. Only a run whose words are
-      // that URL, resolved to this same file: a stored reference's words are its author's (security review).
-      renderReference={(reference, run) => (
-        <Reference uri={reference} object={resolved?.[reference]} nameOf={nameOf} urgent={urgent} opensAt={resolveLink && referenceOfLink(run.text, resolveLink) === reference ? run.text : undefined} />
-      )}
+      renderReference={(reference) => <Reference uri={reference} object={resolved?.[reference]} nameOf={nameOf} urgent={urgent} />}
       renderBlock={drawAttachment}
-      // The package's block is the protocol's, handed back.
-      renderAfter={renderAfter ? (block) => renderAfter(block as RenderBlock) : undefined}
     />
   )
 }
