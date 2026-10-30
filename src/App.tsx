@@ -342,6 +342,8 @@ export function sidebarProps(
           ? // Another app's file is none of the sidebar's places, so none is lit.
             { projectAddr: '' }
           : route.name === 'projects' ? ('projects' as const) : ('issues' as const)
+  // An issue is under Issues; its project's team opens onto the project's row, unmarked (Katerina, 30 October).
+  const issue = route.name === 'issue' ? state?.issues.find((i) => i.id === route.d) : undefined
   return {
     openIssues,
     issuesHref: href({ name: 'issues' }),
@@ -349,6 +351,7 @@ export function sidebarProps(
     projects: active,
     folders,
     current,
+    openIssue: issue?.projectAddr ? { addr: issue.addr, projectAddr: issue.projectAddr } : undefined,
   }
 }
 
