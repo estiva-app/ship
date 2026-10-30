@@ -56,7 +56,7 @@ function captionOf(body: string, nameOf?: (pubkey: string) => string): string {
 export type ReferenceSection = ReturnType<NonNullable<ReferenceTriggerOptions['sections']>>[number]
 
 /** The section headings; Files are drawn above Messages (`referenceSectionsOf`). */
-export const REFERENCE_COPY = { ariaLabel: 'Messages and files', messages: 'Messages', files: 'Files' }
+export const REFERENCE_COPY = { ariaLabel: 'Files and messages', messages: 'Messages', files: 'Files' }
 
 /** How many recently read files are looked up — a few more than the section shows. */
 const RECENT_LIMIT = 12
