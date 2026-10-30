@@ -28,6 +28,7 @@ import type { Opened } from '@/api/useWorkspace'
 import { ThreadsContext } from '@/api/useThreads'
 import { archivesOf, type Archives } from '@/lib/archive'
 import { useSidebarFold } from '@/lib/sidebarFold'
+import { pageTitleOf, useTabTitle } from '@/lib/tabTitle'
 import { MentionPeopleProvider, WorkspacePeopleProvider, mentionPeople, workspacePeople } from '@/components/editing/mentionables'
 import { useRoster } from '@/api/useRoster'
 import { isRelayBusy } from '@/lib/relayBudget'
@@ -67,6 +68,7 @@ function Shell() {
   const teams = useMemo(() => (folders ? topLevelFolders(folders) : undefined), [folders])
   // What is archived, and what with (FOL-46): read against every Folder, archived teams included.
   const archives = useMemo(() => (state ? archivesOf(state, folders ?? []) : undefined), [state, folders])
+  useTabTitle(pageTitleOf(route, state, folders))
   const { showToast } = useToast()
   const { banner, say, clear } = useBanner(showToast)
   // The project a sidebar row's "Move to Folder…" was chosen on (FOL-7), by address.

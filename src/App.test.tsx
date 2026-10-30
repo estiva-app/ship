@@ -134,6 +134,29 @@ describe('sidebarProps — the old app\'s counting rules', () => {
   })
 })
 
+describe('App — the browser tab names the page, then Ship (SFX-2)', () => {
+  it('names a list page by its heading, and an issue by its ref and title', async () => {
+    goTo('/issues')
+    const { unmount } = render(<App />)
+    await waitFor(() => expect(document.title).toBe('Issues – Ship'))
+    unmount()
+    goTo(`/issue/${D('14')}`)
+    render(<App />)
+    await waitFor(() => expect(document.title).toBe('X-4 issue 14 – Ship'))
+  })
+
+  it('says only Ship while the page loads, not the title of the page before', async () => {
+    goTo(`/issue/${D('14')}`)
+    const { unmount } = render(<App />)
+    await waitFor(() => expect(document.title).toBe('X-4 issue 14 – Ship'))
+    unmount()
+    vi.mocked(useWorkspace).mockReturnValue({ state: null, partial: false, error: null, clock: null, loading: true, busy: false, refresh, wantThreads: () => {}, live: false })
+    goTo(`/issue/${D('11')}`)
+    render(<App />)
+    await waitFor(() => expect(document.title).toBe('Ship'))
+  })
+})
+
 describe('App — the shell around the route', () => {
   it('shows the viewer by name, the counts from the relay, and canonicalises an empty hash', async () => {
     render(<App />)
