@@ -39,9 +39,11 @@ const file = (over: Partial<Data> = {}): Data =>
     kind: 30840,
     widget: 'card',
     appName: 'File',
+    openUrl: 'https://peek.estiva.app/o/naddr1topic',
     slots: { title: { value: 'Design review' } },
     meta: [],
     comments: [],
+    actions: [],
     parentRef: PROJECT,
     ...over,
   }) as Data
@@ -68,7 +70,8 @@ describe('Related', () => {
     render(<Page folder="f1" address={PROJECT} />)
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Related' })).toBeInTheDocument())
     expect(screen.getByText('Design review')).toBeInTheDocument()
-    expect(screen.getByLabelText('3 comments')).toBeInTheDocument()
+    // The kit's count, opening the conversation (Katerina, 30 Oct, widget review 52).
+    expect(screen.getByRole('link', { name: /3 comments — open the conversation/ })).toBeInTheDocument()
     // Read from the object's own Folder, filtered to the object — the two
     // arguments the page hands over, nothing else.
     expect(readRelated).toHaveBeenCalledWith('f1', PROJECT)
@@ -78,7 +81,7 @@ describe('Related', () => {
     readRelated.mockResolvedValue({ files: [file()], counts: { '30840:pk:t1': 0 } })
     render(<Page folder="f1" address={PROJECT} />)
     await waitFor(() => expect(screen.getByText('Design review')).toBeInTheDocument())
-    expect(screen.queryByLabelText(/comment/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /open the conversation/ })).not.toBeInTheDocument()
   })
 
   it('any kind, not only 30840 — a file from an app nobody here has heard of is Related too', async () => {
@@ -88,8 +91,9 @@ describe('Related', () => {
     })
     render(<Page folder="f1" address={PROJECT} />)
     await waitFor(() => expect(screen.getByText('Spring tides')).toBeInTheDocument())
-    expect(document.querySelector('[data-widget="card"]')).toBeTruthy()
-    expect(screen.getByLabelText('1 comment')).toBeInTheDocument()
+    // Drawn as a row, as every Related file is, whatever its manifest hints.
+    expect(document.querySelector('[data-widget="row"]')).toBeTruthy()
+    expect(screen.getByRole('link', { name: /1 comment — open the conversation/ })).toBeInTheDocument()
   })
 
   it('nothing placed here: no heading, and the state is read — not unread', async () => {
@@ -161,13 +165,12 @@ describe('hasRelated', () => {
   })
 
   // A preview of a message draws its links as chips only (Decided 16 Oct): no row, no card, and the row stays the one link.
-  it('draws a message row’s links as chips, and the row still opens the message', async () => {
+  // Changed on purpose (Katerina, 30 Oct, widget review 52): a message is the kit's row of its writer's words, its links
+  // read as words, never a raw address; the row is still the one link, opening the message.
+  it('draws a message row as its writer’s words, its links as words, and the row still opens the message', async () => {
     const issue = '30851:cb77583ed45cac74ce4e46c626c1edada0204a6fc4c91f9c7be230b5af36156c:c0b27d90-d5b9-40e7-8078-865ab36a421c'
     const { addrToNaddr } = await import('@estiva-app/protocol')
     const reference = `nostr:${addrToNaddr(issue, [])}`
-    resolveForeign.mockImplementation(async (asked) =>
-      asked === reference ? file({ ref: issue, address: issue, kind: 30851, widget: 'row', appName: 'Ship', slots: { title: { value: 'Fix the sign-in' } }, actions: [] }) : null,
-    )
     const message = file({
       ref: 'm1',
       widget: 'message',
@@ -176,9 +179,10 @@ describe('hasRelated', () => {
     } as Partial<Data>)
     readRelated.mockResolvedValue({ files: [file({ children: [message] })], counts: {} })
     const { container } = render(<Page folder="f1" address={PROJECT} />)
-    await waitFor(() => expect(container.querySelector('[data-widget="message"]')?.textContent).toContain('Fix the sign-in'))
+    await waitFor(() => expect(container.querySelector('[data-widget="message"]')?.textContent).toContain('see'))
     const row = container.querySelector('[data-widget="message"]')!
-    expect(row.querySelector('[data-link-row], [data-card]')).toBeNull()
+    expect(row.textContent).toContain('Issue')
+    expect(row.textContent).not.toContain('naddr1')
     expect(row.querySelector('a a')).toBeNull()
     expect(row.querySelector('a[href="https://peek.estiva.app/message/m1"]')).not.toBeNull()
   })

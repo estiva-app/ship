@@ -5,55 +5,42 @@ import * as ReferenceStories from './Reference.stories'
 
 # Reference
 
-A `nostr:` pointer drawn where it was written, as a chip one line high. One
-component for every kind of reference, on purpose: a person and a project are
-the same idea pointed at two things, and drawing them with two unrelated
-mechanisms is how the display-name mention drifted away from the projection
-layer in the first place.
+A person named in text — a `nostr:npub` reference — as the package's person
+chip, with the name the workspace directory gives. What stays of Ship's own
+chip: a file or a message named in text is the kit's **LinkChip**, through
+**MessageChip**, in a box being written in too (Katerina, 30 Oct).
 
-<Canvas of={ReferenceStories.Object} />
+<Canvas of={ReferenceStories.Person} />
 
 ## When
 
-- Inside a body, wherever the parser says a run is a reference. What it draws
-  depends on what the URI turns out to name, not on the caller knowing in
-  advance.
-- For anything it cannot resolve. A reference to something outside this
-  workspace still says a reference is there — never blank.
+- A person a body names, wherever the parser says a run is a `nostr:npub`
+  reference: a sent message, a description, a box being written in.
+  **MessageChip** hands a person here itself.
 
 ## When not
 
-- Never pattern-match a name back out of text. Nothing here has to recognise a
-  name, which is why it works for a body Ship did not write.
-- For an object that should be a card with its own states → **ForeignObject**.
+- A file or a message → **MessageChip** (the kit's LinkChip): its key, its
+  title cut short, its status as its mark.
+- Never pattern-match a name back out of text: `@Ada` typed as words stays
+  words.
 
 ## How
 
 ```tsx
 import { Reference } from '@/components/ui/Reference'
 
-<Reference uri={run.reference} object={resolved[run.reference]} nameOf={nameOf} />
+<Reference uri={run.reference} nameOf={nameOf} urgent={message.urgent} />
 ```
-
-- `object` is passed in, not resolved here: a body's references are resolved
-  once for the whole body, so the same object cannot appear in two states on
-  one screen.
-- `undefined` means still resolving and `null` means resolved to nothing. They
-  are different facts, drawn the same way, because neither is something a
-  reader can act on.
 
 ## What it owns
 
-- **Person, object, unresolved** — and which of the three a URI turns out to be.
-- **A chip that names something leads to it.** One of Ship's own objects opens
-  here through the router; another app's opens at the `openUrl` its manifest
-  gave, in a new tab. A person stays a label, because Ship has no page for one.
-- **The 24-character cut and the tooltip that carries the whole label**, on
-  hover and on keyboard focus. A mention is a word in a sentence; the whole
-  title is a sentence of its own.
-- **The click stops at the chip**, because the surface under it may open on a
-  click of its own, and a mention followed is not a description edited.
+- **The directory's name**: `@Ada Lovelace`, in the urgent tone for someone
+  the message names urgently (CON-24).
+- **Never blank, never the whole key**: somebody the directory cannot name is
+  a short key, quiet, with the whole address on hover (§13.1).
+- **A label, not a link**: Ship has no page for a person.
 
 ## Props
 
-<Controls of={ReferenceStories.Object} />
+<Controls of={ReferenceStories.Person} />

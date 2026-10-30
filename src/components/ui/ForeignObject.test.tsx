@@ -1,14 +1,22 @@
+/**
+ * A file Ship lists by itself, as the kit's row or card (Katerina, 30 Oct,
+ * widget review 52): what a reader sees of it, and that "cannot see it" never
+ * reads as "it is empty". The widgets' own looks are the kit's, tested there.
+ */
 import { describe, expect, it } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import { ForeignObject } from './ForeignObject'
 import type { ForeignObject as Data } from '@/api/foreign'
 
+const PK = 'a'.repeat(64)
 const base = (over: Partial<Data> = {}): Data => ({
-  ref: '39000:relay:uuid',
+  ref: `30840:${PK}:uuid`,
+  address: `30840:${PK}:uuid`,
   eventId: 'e'.repeat(64),
-  kind: 39000,
+  kind: 30840,
   widget: 'card',
   appName: 'Peek',
+  openUrl: 'https://peek.estiva.app/o/naddr1topic',
   slots: { title: { value: 'design' } },
   meta: [],
   comments: [],
@@ -18,168 +26,72 @@ const base = (over: Partial<Data> = {}): Data => ({
 })
 
 describe('ForeignObject', () => {
-  it('renders a message as a person and a body, not as a titled card', () => {
-    render(
-      <ForeignObject
-        object={base({
-          kind: 9,
-          widget: ['message', 'card'],
-          slots: { title: { value: 'a'.repeat(64), isPubkey: true }, body: { value: 'hello there' } },
-          people: { ['a'.repeat(64)]: { displayName: 'Miky' } },
-        })}
-      />,
-    )
-    expect(screen.getByText('Miky')).toBeInTheDocument()
-    expect(screen.getByText('hello there')).toBeInTheDocument()
-  })
-
-  it.each(['card', 'row'] as const)('labels a linked chat message "Message" and opens it in its app, laid out as a %s', (layout) => {
-    // ship#310's probe as QA-1: a kind-9 message linked from an issue drew no
-    // type label and clicking it went nowhere (a-file-is-labelled-by-its-type).
+  it('draws a message as a person and their words, opening it in its app', () => {
     const openUrl = 'https://peek.estiva.app/o/nevent1qqs'
     render(
       <ForeignObject
-        layout={layout}
         object={base({
           ref: 'f'.repeat(64),
-          kind: 9,
-          widget: 'message',
-          noun: 'message',
-          openUrl,
-          slots: { title: { value: 'a'.repeat(64), isPubkey: true }, body: { value: 'QA-2 checking in' } },
-          people: { ['a'.repeat(64)]: { displayName: 'QA-2' } },
-        })}
-      />,
-    )
-    const link = screen.getByRole('link')
-    expect(within(link).getByText('Message')).toBeInTheDocument()
-    expect(link.getAttribute('href')).toBe(openUrl)
-    expect(link.textContent).toContain('QA-2 checking in')
-  })
-
-  it('labels a linked comment "Comment", by its type and not its app', () => {
-    render(
-      <ForeignObject
-        object={base({
-          kind: 1111,
-          widget: 'message',
-          noun: 'comment',
-          openUrl: 'https://peek.estiva.app/o/nevent1qqs',
-          slots: { title: { value: 'a'.repeat(64), isPubkey: true }, body: { value: 'looks right' } },
-          people: { ['a'.repeat(64)]: { displayName: 'QA-2' } },
-        })}
-      />,
-    )
-    expect(within(screen.getByRole('link')).getByText('Comment')).toBeInTheDocument()
-    expect(screen.queryByText('Peek')).not.toBeInTheDocument()
-  })
-
-  it.each([
-    ['no link', undefined],
-    ['a link that is not https', 'search-ms:query=nevent1qqs'],
-  ])('draws a linked message with %s as a message that leads nowhere', (_case, openUrl) => {
-    // The link is written by whichever app's manifest declares conversations,
-    // so only an `https:` one is followed (safeLink, as the handoff page does).
-    render(
-      <ForeignObject
-        object={base({
-          kind: 9,
-          widget: 'message',
-          noun: 'message',
-          openUrl,
-          slots: { title: { value: 'a'.repeat(64), isPubkey: true }, body: { value: 'QA-2 checking in' } },
-          people: { ['a'.repeat(64)]: { displayName: 'QA-2' } },
-        })}
-      />,
-    )
-    expect(screen.getByText('QA-2 checking in')).toBeInTheDocument()
-    expect(screen.getByText('Message')).toBeInTheDocument()
-    expect(screen.queryByRole('link')).not.toBeInTheDocument()
-  })
-
-  it('draws a body formatted and small, and markup in it stays text', () => {
-    // Formatted since UIG-30 (Katerina, 28 September): the package's RichText,
-    // small. Ship's discipline survives it: a tag another app wrote is text.
-    render(
-      <ForeignObject
-        object={base({
+          address: undefined,
           kind: 9,
           widget: ['message', 'card'],
-          slots: { title: { value: 'a'.repeat(64), isPubkey: true }, body: { value: '**bold** and `code` and <b>not bold</b>' } },
+          noun: 'message',
+          openUrl,
+          slots: { title: { value: PK, isPubkey: true }, body: { value: 'hello there' } },
+          people: { [PK]: { displayName: 'Miky' } },
         })}
       />,
     )
-    expect(document.querySelector('strong')?.textContent).toBe('bold')
-    expect(document.querySelector('code')?.textContent).toBe('code')
-    expect(document.querySelector('b')).toBeNull()
-    expect(document.body.textContent).toContain('<b>not bold</b>')
-    expect(document.querySelector('[data-rich-text]')?.className).toContain('text-caption')
+    expect(screen.getByRole('link', { name: 'Miky' }).getAttribute('href')).toBe(openUrl)
+    expect(screen.getByText('hello there')).toBeInTheDocument()
   })
 
-  it('renders an unknown widget rather than refusing', () => {
-    render(<ForeignObject object={base({ widget: ['hologram'] })} />)
-    expect(screen.getByText('design')).toBeInTheDocument()
+  it('draws the card or the row its manifest asks for, and a widget it does not know rather than refusing', () => {
+    const { container, rerender } = render(<ForeignObject object={base()} />)
+    expect(container.querySelector('[data-widget="card"]')?.textContent).toContain('design')
+    rerender(<ForeignObject object={base({ widget: 'row' })} />)
+    expect(container.querySelector('[data-widget="row"]')?.textContent).toContain('design')
+    rerender(<ForeignObject object={base({ widget: ['hologram'] })} />)
+    expect(container.querySelector('[data-foreign-object]')?.textContent).toContain('design')
+  })
+
+  it('labels the file by its type', () => {
+    render(<ForeignObject object={base({ noun: 'topic' })} />)
+    expect(screen.getByText(/Topic/)).toBeInTheDocument()
   })
 
   it('never puts a raw pubkey on screen when nobody published a name', () => {
-    render(
-      <ForeignObject
-        object={base({
-          meta: [{ label: 'Lead', value: 'b'.repeat(64), isPubkey: true }],
-        })}
-      />,
-    )
-    expect(screen.queryByText('b'.repeat(64))).toBeNull()
+    render(<ForeignObject object={base({ meta: [{ label: 'Lead', value: 'b'.repeat(64), isPubkey: true }] })} />)
+    expect(document.body.textContent).not.toContain('b'.repeat(64))
   })
 
-  it('distinguishes "cannot see it" from "it is empty"', () => {
+  it('says "not available" for a file this reader may not see, with the way to open it where it lives — never as an empty one', () => {
     // The relay answers both with nothing. A screen that draws one state for
     // both quietly lies, and the reader cannot tell which they are looking at.
-    const { rerender } = render(<ForeignObject object={base({ unreachable: true })} />)
-    expect(screen.getByText(/may not have access/i)).toBeInTheDocument()
-
-    rerender(<ForeignObject object={base({ children: [] })} />)
-    expect(screen.queryByText(/may not have access/i)).toBeNull()
-    expect(screen.getByText(/nothing in it yet/i)).toBeInTheDocument()
+    const { rerender } = render(<ForeignObject object={base({ noun: 'topic', unreachable: true })} />)
+    expect(screen.getByText('Topic not available')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Open in Peek/ }).getAttribute('href')).toBe('https://peek.estiva.app/o/naddr1topic')
+    rerender(<ForeignObject object={base({ noun: 'topic', children: [] })} />)
+    expect(screen.queryByText(/not available/)).toBeNull()
+    expect(screen.getByText('design')).toBeInTheDocument()
   })
 
-  it('labels the object by its type, and by its app only when it declares none (PRO-24)', () => {
-    const { rerender } = render(<ForeignObject object={base({ noun: 'topic' })} />)
-    expect(screen.getByText('Topic')).toBeInTheDocument()
-    expect(screen.queryByText('Peek')).toBeNull()
-
-    rerender(<ForeignObject object={base()} />)
-    expect(screen.getByText('Peek')).toBeInTheDocument()
-
-    rerender(<ForeignObject object={base({ noun: 'topic', unreachable: true })} />)
-    expect(screen.getByText(/may not have access to this topic\./i)).toBeInTheDocument()
-  })
-
-  it('says nothing about a list that was never declared', () => {
-    render(<ForeignObject object={base({ children: undefined })} />)
-    expect(screen.queryByText(/nothing in it yet/i)).toBeNull()
-  })
-
-  it('renders children through their own projection', () => {
+  it('lists the files inside a card, each opening on its own', () => {
     render(
       <ForeignObject
         object={base({
-          children: [
-            base({
-              ref: 'child-1',
-              kind: 9,
-              widget: ['message', 'card'],
-              slots: { title: { value: 'c'.repeat(64), isPubkey: true }, body: { value: 'first' } },
-              people: { ['c'.repeat(64)]: { displayName: 'Ana' } },
-            }),
-          ],
+          children: [base({ ref: `30851:${PK}:child`, address: `30851:${PK}:child`, kind: 30851, widget: 'row', openUrl: 'https://ship.estiva.app/issue/child', slots: { title: { value: 'A child issue' } } })],
         })}
       />,
     )
-    // The parent is a card; the child is drawn as a message, from its own
-    // declaration rather than the parent's.
     expect(screen.getByText('design')).toBeInTheDocument()
-    expect(screen.getByText('Ana')).toBeInTheDocument()
-    expect(screen.getByText('first')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /A child issue/ })).toBeInTheDocument()
+  })
+
+  it('draws the comment count the caller read, opening the conversation, and none when it read none', () => {
+    const { rerender } = render(<ForeignObject object={base({ widget: 'row' })} conversations={4} />)
+    expect(screen.getByRole('link', { name: /comments — open the conversation/ }).textContent).toContain('4')
+    rerender(<ForeignObject object={base({ widget: 'row' })} />)
+    expect(screen.queryByRole('link', { name: /open the conversation/ })).toBeNull()
   })
 })

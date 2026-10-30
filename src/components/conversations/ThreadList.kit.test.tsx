@@ -5,11 +5,11 @@
  * chip, a line that is only a link to a file is that file's row, a person or a
  * Folder alone stays a chip, and the file its author chose gets the card under
  * the comment — which any reader may change from (Decided 16 Oct). The file a
- * conversation is on draws no card there (WID-3), and a preview draws chips
- * only. The write itself is asserted at the wire in `api/cardAction.test.ts`.
+ * conversation is on draws no card there (WID-3). The write itself is
+ * asserted at the wire in `api/cardAction.test.ts`.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { addrToNaddr, encodeNpub, type Embed } from '@estiva-app/protocol'
 import type { ForeignObject } from '@/api/foreign'
@@ -51,18 +51,26 @@ const cardIssue = () =>
   })
 
 const { objects, applyCardAction } = vi.hoisted(() => ({
-  objects: { byReference: {} as Record<string, unknown>, parentArchive: {} as Record<string, { by: string; at: number; with: string } | undefined> },
+  objects: { byReference: {} as Record<string, unknown>, parentArchive: {} as Record<string, { by: string; at: number; with: string } | undefined>, said: undefined as { count: number; unread: boolean } | undefined, deleted: new Set<string>() },
   applyCardAction: vi.fn(async () => ({ ok: true as const })),
 }))
 vi.mock(import('@/api/foreign'), async (importOriginal) => ({
   ...(await importOriginal()),
-  // A file with no entry is never answered: the card waits, as on a slow relay. A person is not a file.
+  // A file with no entry is never answered: the card waits, as on a slow relay. A person is not a file. `FAILS`: the read throws (a 429).
   resolveForeign: vi.fn((reference: string) =>
-    reference in objects.byReference || /^nostr:npub1/.test(reference) ? Promise.resolve((objects.byReference[reference] ?? null) as ForeignObject | null) : new Promise<never>(() => {}),
+    objects.byReference[reference] === 'FAILS'
+      ? Promise.reject(new Error('rate-limited'))
+      : reference in objects.byReference || /^nostr:npub1/.test(reference)
+        ? Promise.resolve((objects.byReference[reference] ?? null) as ForeignObject | null)
+        : new Promise<never>(() => {}),
   ),
   applyCardAction,
   parentArchiveOf: vi.fn(async (reference: string) => objects.parentArchive[reference]),
 }))
+// Whether a file read back empty was deleted: never unless a test says (the read itself is `absence.test`'s).
+vi.mock('@/api/absence', () => ({ useDeleted: (reference: string, absent: boolean) => absent && objects.deleted.has(reference) }))
+// What was said about a file: none unless a test says (the read itself is `useCardConversation.test`'s).
+vi.mock('@/api/useCardConversation', () => ({ useCardConversation: (address: string | undefined) => (address ? objects.said : undefined) }))
 vi.mock('@/components/editing/mentionables', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/components/editing/mentionables')>()),
   useWorkspacePeople: () => ({ [ADA]: { displayName: 'Ada Lovelace' }, [BRUNO]: { displayName: 'Bruno Ferreira' } }),
@@ -71,7 +79,8 @@ vi.mock('@/components/editing/mentionables', async (importOriginal) => ({
 import { ThreadList } from './ThreadList'
 import { MessageText } from './MessageText'
 import type { ThreadData } from '@/components/ConversationThread'
-import { noteCardShape } from '@/lib/cardShapes'
+import { AppProvider } from '@estiva-app/ui'
+import { cardShapes } from '@/lib/cardShapes'
 import { noteCardAvailability } from '@/lib/unavailableCards'
 
 const thread = (body: string, embeds?: Embed[]): ThreadData => ({ id: 't1', root: { id: 't1', author: { name: 'Ann' }, at: 1000, body, by: 'ann', embeds }, replies: [] })
@@ -84,6 +93,8 @@ const sentence = (c: HTMLElement) => c.querySelector('[data-message-text] p')?.t
 beforeEach(() => {
   applyCardAction.mockClear()
   objects.parentArchive = {}
+  objects.said = undefined
+  objects.deleted.clear()
   objects.byReference = {
     [ref(SENTENCE_ISSUE)]: base(SENTENCE_ISSUE, 'Fix the sign-in'),
     [ref(PROJECT)]: base(PROJECT, 'Widgets 2'),
@@ -103,6 +114,15 @@ describe('where a link sits decides how it draws', () => {
     expect(rows(c)).toEqual(['Widgets 2'])
     // The carded issue's own line draws nothing: no row, no chip.
     expect(c.textContent?.match(/Cards draw from the kit/g)).toHaveLength(1)
+  })
+
+  it('gives a row its comment count, opening the file’s conversation, as its card has', async () => {
+    objects.said = { count: 3, unread: false }
+    const c = show(`${ref(PROJECT)}`)
+    await waitFor(() => expect(rows(c)).toEqual(['Widgets 2']))
+    const count = within(c.querySelector('[data-link-row]') as HTMLElement).getByRole('link', { name: /comments — open the conversation/ })
+    expect(count.textContent).toContain('3')
+    expect(count.getAttribute('href')).toMatch(/activity/)
   })
 
   it('draws a bullet or numbered line that is only a link as a row, keeping its bullet', async () => {
@@ -162,6 +182,13 @@ describe('the card under the comment', () => {
     expect(screen.queryByRole('combobox', { name: 'Status' })).toBeNull()
   })
 
+  it('reads its values as words where nobody can write: an archived file’s conversation, or signed out', async () => {
+    const c = render(<ThreadList threads={[thread(THE_MESSAGE, ITS_CARD)]} onStart={noop} onReply={noop} disabledReason="This issue is archived." />).container
+    await waitFor(() => expect(c.querySelector('[data-card]')?.textContent).toContain('Cards draw from the kit'))
+    expect(screen.queryByRole('combobox', { name: 'Status' })).toBeNull()
+    expect(c.querySelector('[data-card]')?.textContent).toContain('Todo')
+  })
+
   it('reads its values as words for an issue whose project is archived, as Leaf’s card does', async () => {
     objects.byReference[ref(CARD_ISSUE)] = { ...cardIssue(), parentRef: PROJECT }
     objects.parentArchive[ref(CARD_ISSUE)] = { by: SHIP, at: 1, with: PROJECT }
@@ -173,7 +200,7 @@ describe('the card under the comment', () => {
 
   it('keeps the height it last drew at while it loads', () => {
     delete objects.byReference[ref(CARD_ISSUE)]
-    noteCardShape(ref(CARD_ISSUE).replace(/^nostr:/, ''), { subtitle: false, summary: true, rows: 0, latest: false, ring: false, footer: 'pickers', height: 134 })
+    cardShapes.note(ref(CARD_ISSUE).replace(/^nostr:/, ''), { subtitle: false, summary: true, rows: 0, latest: false, ring: false, footer: 'pickers', height: 134 })
     const c = show(THE_MESSAGE, { embeds: ITS_CARD })
     const card = c.querySelector<HTMLElement>('[data-card="detailed"]')
     expect(card?.style.minHeight).toBe('134px')
@@ -192,10 +219,37 @@ describe('the card under the comment', () => {
     noteCardAvailability(ref(CARD_ISSUE).replace(/^nostr:/, ''), true)
   })
 
-  it('names another app’s file it cannot read by what its address says, with a way to open it in its app', async () => {
+  // SPEC §13.6.1, "deleted is not not-permitted" (Katerina, 30 Oct, widget review 56).
+  it('says "deleted" for a file a trusted deletion names, on its card and its chip, and "not available" for the rest', async () => {
+    objects.byReference[ref(CARD_ISSUE)] = null
+    objects.byReference[ref(SENTENCE_ISSUE)] = null
+    objects.deleted.add(ref(CARD_ISSUE))
+    objects.deleted.add(ref(SENTENCE_ISSUE))
+    const c = show(THE_MESSAGE, { embeds: ITS_CARD })
+    await waitFor(() => expect(c.querySelector('[data-card]')?.textContent).toBe('Issue deleted'))
+    expect(sentence(c)).toBe('Look at Issue deleted today.')
+    objects.deleted.clear()
+    const other = show(THE_MESSAGE, { embeds: ITS_CARD })
+    await waitFor(() => expect(other.querySelector('[data-card]')?.textContent).toBe('Issue not available'))
+    cleanup()
+    noteCardAvailability(ref(CARD_ISSUE).replace(/^nostr:/, ''), true)
+  })
+
+  it('says "not available." when its read fails with nothing remembered, never nothing, and does not remember it', async () => {
+    objects.byReference[ref(CARD_ISSUE)] = 'FAILS'
+    const first = show(THE_MESSAGE, { embeds: ITS_CARD })
+    await waitFor(() => expect(first.querySelector('[data-card]')?.textContent).toBe('Issue not available'))
+    first.remove()
+    // A failed read is not an answer: the next open waits for the card, at a card's height, not the one-line row.
+    delete objects.byReference[ref(CARD_ISSUE)]
+    const again = show(THE_MESSAGE, { embeds: ITS_CARD })
+    expect(again.querySelector('[data-card] [aria-busy="true"]')).not.toBeNull()
+  })
+
+  it('names another app’s file it cannot read by its app, its type having no name, with a way to open it there', async () => {
     objects.byReference[ref(TOPIC)] = { ...base(TOPIC, ''), unreachable: true, appName: 'Peek', openUrl: `https://peek.estiva.app/o/${TOPIC}` }
     const c = show(ref(TOPIC), { embeds: [{ value: TOPIC, layout: 'detailed' }] })
-    await waitFor(() => expect(c.querySelector('[data-card]')?.textContent).toContain('Topic not available'))
+    await waitFor(() => expect(c.querySelector('[data-card]')?.textContent).toContain('Peek not available'))
     expect(c.querySelector('[data-card]')?.textContent).toContain('Open in Peek')
   })
 })
@@ -208,22 +262,40 @@ describe('where the comment is shown', () => {
     expect(rows(c)).toEqual(['Widgets 2'])
   })
 
-  it('draws a preview’s links as chips only: no row, no card, no picker', async () => {
-    const resolved = Object.fromEntries(Object.entries(objects.byReference)) as Record<string, ForeignObject>
-    const c = render(<MessageText body={THE_MESSAGE} embeds={ITS_CARD} resolved={resolved} preview />).container
-    expect(c.querySelector('[data-card]')).toBeNull()
-    expect(rows(c)).toEqual([])
-    expect(c.textContent).toContain('Widgets 2')
-    expect(c.textContent).toContain('Cards draw from the kit')
-    expect(screen.queryByRole('combobox')).toBeNull()
+  it('shows no hover card on a chip whose card is already under the message; another chip still has one', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      const resolved = Object.fromEntries(Object.entries(objects.byReference)) as Record<string, ForeignObject>
+      const c = render(<MessageText body={`See ${ref(CARD_ISSUE)} and ${ref(SENTENCE_ISSUE)}.`} embeds={ITS_CARD} resolved={resolved} />).container
+      await waitFor(() => expect(c.querySelector('[data-card]')?.textContent).toContain('Cards draw from the kit'))
+      const said = (words: string) => c.ownerDocument.body.textContent?.split(words).length ?? 0
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+      const [carded, other] = [...c.querySelectorAll<HTMLAnchorElement>('[data-message-text] a')]
+      const before = said('Cards draw from the kit')
+      await user.hover(carded)
+      await act(async () => void vi.advanceTimersByTime(1000))
+      expect(said('Cards draw from the kit')).toBe(before)
+      await user.unhover(carded)
+      const otherBefore = said('Fix the sign-in')
+      await user.hover(other)
+      await act(async () => void vi.advanceTimersByTime(1000))
+      expect(said('Fix the sign-in')).toBeGreaterThan(otherBefore)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 
 describe('a click on a link', () => {
+  // The kit's AppProvider does it since ui 0.92 (Ship's own click capture went with it), as the app's root gives it a router.
   it('opens another app’s file in a new tab, never in Ship’s', async () => {
     const open = vi.spyOn(window, 'open').mockReturnValue(null)
     objects.byReference[ref(TOPIC)] = { ...base(TOPIC, 'Weekly notes'), appName: 'Peek', openUrl: `https://peek.estiva.app/o/${TOPIC}` }
-    const c = show(`Look at ${ref(TOPIC)} today.`)
+    const c = render(
+      <AppProvider navigate={vi.fn()}>
+        <ThreadList threads={[thread(`Look at ${ref(TOPIC)} today.`)]} onStart={noop} onReply={noop} />
+      </AppProvider>,
+    ).container
     await waitFor(() => expect(sentence(c)).toBe('Look at Weekly notes today.'))
     fireEvent.click(c.querySelector('[data-message-text] a') as HTMLAnchorElement)
     expect(open).toHaveBeenCalledWith(`https://peek.estiva.app/o/${TOPIC}`, '_blank', 'noopener,noreferrer')

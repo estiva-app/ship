@@ -236,6 +236,34 @@ describe('the card a comment sent from Ship carries (WBM-7, SPEC §13.6.2)', () 
     expect(s.editMessage).toHaveBeenLastCalledWith(expect.objectContaining({ embeds: undefined }))
   })
 
+  it('an edit adding the first link, its card taken off with ✕ in the edit box, writes no card (item 37)', async () => {
+    const { sent } = signed()
+    await editMessage(TEAM.folder, MSG, see(LINKED), { before: 'no link', here: ISSUE.addr, own: { file: ISSUE.addr }, dropped: LINKED })
+    expect(sent.at(-1)).toMatchObject({ kind: 40003, content: see(LINKED) })
+    expect(sent.at(-1)!.tags.filter((t) => t[0] === 'embed')).toEqual([])
+  })
+
+  it('✕ in the edit box on the message’s own card sets it none, the rest kept; kept, the set is left as it was (item 36)', async () => {
+    const { sent } = signed()
+    const embeds = [
+      { value: LINKED, layout: 'detailed' as const },
+      { value: PROJECT.addr, layout: 'none' as const },
+    ]
+    await editMessage(TEAM.folder, MSG, `${see(LINKED)}, reworded`, { before: see(LINKED), embeds, here: ISSUE.addr, own: { file: ISSUE.addr }, dropped: LINKED })
+    expect(sent.at(-1)!.tags.filter((t) => t[0] === 'embed')).toEqual([
+      ['embed', LINKED, 'none'],
+      ['embed', PROJECT.addr, 'none'],
+    ])
+    await editMessage(TEAM.folder, MSG, `${see(LINKED)}, reworded again`, { before: see(LINKED), embeds, here: ISSUE.addr, own: { file: ISSUE.addr } })
+    expect(sent.at(-1)!.tags.filter((t) => t[0] === 'embed')).toEqual([])
+  })
+
+  it('an edit putting back a link whose card was taken off gives it no card again (item 36)', async () => {
+    const { sent } = signed()
+    await editMessage(TEAM.folder, MSG, see(LINKED), { before: 'no link now', embeds: [{ value: LINKED, layout: 'none' }], here: ISSUE.addr, own: { file: ISSUE.addr } })
+    expect(sent.at(-1)!.tags.filter((t) => t[0] === 'embed')).toEqual([])
+  })
+
   /*
     An edit is the whole new message (SPEC §6.8): one with no files takes them all off, so every edit lists the files it keeps.
     Asserted on the signed 40003: the mocked store hands the call to a real `Store` whose relay keeps what it was sent.

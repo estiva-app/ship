@@ -6,9 +6,10 @@ import { Related } from './Related'
  * What somebody placed under a project or an issue from another app — RFC 0.5
  * §10.7, drawn under a "Related" heading on the object's page.
  *
- * The rows are `<ForeignObject>` cards, so what is Related's own here is the
- * count before the app chip — comments addressed to the file, from
- * `conversationCountsOf` — and the one line it says when the read failed.
+ * Each file is the kit's row (`ForeignObject`, always the row here), so what is
+ * Related's own is the nesting, the count it read — conversations on the file,
+ * from `conversationCountsOf`, drawn as the kit's count opening them — and the
+ * one line it says when the read failed.
  * The bare-file topic is the first thing this section was built for: no
  * owner, the built-in manifest names it "File", and its `kind:1111`s carry
  * `#a`, so the count is the discussion.
@@ -21,6 +22,7 @@ const file = (over: Partial<ForeignObject>): ForeignObject =>
     kind: 30840,
     widget: 'card',
     appName: 'Peek',
+    openUrl: 'https://peek.estiva.app/o/naddr1topic',
     noun: 'topic',
     slots: {},
     meta: [],
@@ -54,7 +56,7 @@ const meta = {
 export default meta
 type Story = StoryObj<typeof meta>
 
-/** Two topics under a project: one with seven comments, one nobody has spoken in yet — which draws no badge, because a zero is not "no discussion". */
+/** Two topics under a project: one with seven conversations, one nobody has spoken in yet — which draws no count. */
 export const Topics: Story = {}
 
 /** Any kind, not only the bare file — a record from an app nobody here has heard of, through the fallback chain. */
@@ -62,7 +64,7 @@ export const AnyKind: Story = { args: { related: { files: [TOPIC, TIDE], inside:
 
 /**
  * A sub-topic under the related topic, and one under that (FOL-4): indented
- * beneath, each still a card that opens in its own app.
+ * beneath, each still a row that opens in its own app.
  */
 export const Nested: Story = {
   args: {
@@ -78,11 +80,11 @@ export const Nested: Story = {
 export const Failed: Story = { args: { related: 'failed' } }
 
 /**
- * Every state a row can be in, as quiet rows (Katerina, 29 September): the
- * app's name after the title; a subtitle and the meta on a second line; the
- * status and the comment count in columns that line up; a message drawn as a
- * face and its words; an object's own list nested under it; and one this
- * reader may not see, said so.
+ * Every state a row can be in, as the kit's rows (Katerina, 30 Oct): the kind's
+ * tile, the title, its type on the line under it; its state and its comment
+ * count on the title's line; an
+ * object's own list nested under it; and one this reader may not see, as the
+ * kit's "not available" row with the way to open it in its app.
  */
 export const EveryState: Story = {
   args: {

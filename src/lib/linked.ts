@@ -1,7 +1,9 @@
 import type { LinkState, Linked, LinkedConversation, LinkedFromOptions, LinkedKind } from '@estiva-app/ui'
 import { linkStateFrom, linkedFrom } from '@estiva-app/ui'
 import type { ForeignObject, People } from '@estiva-app/interop'
-import { decodeNpub, referenceToPointer, stripInlineFormatting } from '@estiva-app/protocol'
+import { openingWords } from '@estiva-app/conversation'
+import { referenceToPointer } from '@estiva-app/protocol'
+import { knownLinkValue } from '@/api/linkCards'
 import { referenceLink } from './referenceLink'
 import { safeLink } from './handoff'
 import { thingKindOfUri } from './thingKind'
@@ -35,24 +37,14 @@ export function linkedKindOf(uri: string): LinkedKind {
   return thingKindOfUri(uri) ?? 'file'
 }
 
-const NOSTR_REFERENCE = /nostr:(?:npub1|nprofile1|nevent1|note1|naddr1)[a-z0-9]+/gi
-
-/** A message's words for a one-line preview: marks stripped, a reference read as its chip would say it. */
+/**
+ * A message's words for a one-line preview, as every app reads them (the
+ * conversation package's `openingWords`): marks stripped, a reference read as
+ * its chip would say it, and a bare app URL Ship has an answer for read as
+ * what it names, never the raw URL (Katerina, 30 Oct, widget review 20).
+ */
 function previewText(body: string, people: People | undefined): string {
-  return stripInlineFormatting(body)
-    .replace(NOSTR_REFERENCE, (uri) => {
-      if (/^nostr:npub1/i.test(uri)) {
-        try {
-          const name = people?.[decodeNpub(uri)]?.displayName
-          if (name) return `@${name}`
-        } catch {
-          // Not a key: read as the reference it is.
-        }
-        return `@${uri.slice('nostr:'.length, 'nostr:'.length + 12)}…`
-      }
-      return referenceTypeWord(uri) ?? uri
-    })
-    .trim()
+  return openingWords(body, (pubkey) => people?.[pubkey]?.displayName, { resolveLink: knownLinkValue })
 }
 
 export interface LinkedContext {
@@ -66,6 +58,17 @@ export interface LinkedContext {
   onAct?: (actionId: string, value: string) => void
   /** What was said about it, when the caller has read that. */
   conversation?: LinkedConversation
+}
+
+/**
+ * What the link itself says, for when its file cannot be shown: the URL it was
+ * written as, which then stays that URL, a plain link (SPEC §13.1, C21), and
+ * whether a trusted deletion names its address, which says "deleted" rather
+ * than "not available" (§13.6.1).
+ */
+export interface LinkWritten {
+  url?: string
+  deleted?: boolean
 }
 
 /** Where a reference opens: Ship's own page for its own files, the owning app for anyone else's. */
@@ -88,16 +91,23 @@ export function linkedOf(object: ForeignObject, context?: LinkedContext): Linked
   return linkedFrom(object, optionsOf(context))
 }
 
-/** "Not available.", named by what the reference says it is. */
-export function notAvailable(uri: string): LinkState {
-  return { state: 'unavailable', kind: linkedKindOf(uri), noun: referenceTypeWord(uri) ?? 'Link' }
+/** What the reference says it is, and what the link itself says: a URL to fall back on, or deleted. */
+function unreadOf(uri: string, written: LinkWritten = {}) {
+  const url = written.url && /^https?:\/\//i.test(written.url) ? written.url : undefined
+  return { kind: linkedKindOf(uri), noun: referenceTypeWord(uri) ?? 'Link', ...(url ? { url } : {}), ...(written.deleted ? { deleted: true } : {}) }
+}
+
+/** "Not available.", named by what the reference says it is; its written URL instead when it had one. */
+export function notAvailable(uri: string, written?: LinkWritten): LinkState {
+  return { state: 'unavailable', ...unreadOf(uri, written) }
 }
 
 /**
  * Where a reference's lookup stands, for the kit: `undefined` is still asked,
  * `null` an answer of nothing. Nothing, and a file the reader may not read,
- * draw alike: "not available." (Miky, 15 Oct).
+ * draw alike: "not available." (Miky, 15 Oct) — unless the link was written as
+ * a URL, which stays that URL, or a trusted deletion says it was deleted.
  */
-export function linkStateOf(uri: string, object: ForeignObject | null | undefined, context?: LinkedContext): LinkState {
-  return linkStateFrom(object, { kind: linkedKindOf(uri), noun: referenceTypeWord(uri) ?? 'Link' }, optionsOf(context))
+export function linkStateOf(uri: string, object: ForeignObject | null | undefined, context?: LinkedContext, written?: LinkWritten): LinkState {
+  return linkStateFrom(object, unreadOf(uri, written), optionsOf(context))
 }

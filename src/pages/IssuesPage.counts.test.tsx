@@ -43,10 +43,10 @@ describe('Issues page counts (APP-5)', () => {
     const want = vi.fn()
     const { rerender } = render(page(false, want))
     expect(screen.getByText('Counted')).toBeInTheDocument()
-    expect(screen.queryByLabelText(/conversations?$/)).toBeNull()
+    expect(screen.queryByRole('link', { name: /open the conversation/ })).toBeNull()
     expect(want).toHaveBeenCalledWith({ folders: [FOLDER], about: [] })
 
     rerender(page(true, want))
-    expect(screen.getByLabelText('2 conversations')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /conversations — open the conversation/ }).textContent).toContain('2')
   })
 })

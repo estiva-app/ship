@@ -10,7 +10,6 @@ import { REACTION_EMOJI, REACTION_HORIZON, me, type Reaction } from '@/api'
 import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
 import { Attachments as FileAttachments } from '@/components/ui/Attachment'
 import { BlockAnchorNote } from '@/components/ui/BlockAnchorNote'
-import { MessagePart } from '@/components/ui/MessageLinks'
 import { ConfirmDeleteMessage, NewSinceHere, useThreadReactions, useThreadReferences, type ConversationsProps, type MessageData, type ThreadData } from '@/components/ConversationThread'
 import type { ActivityProps } from '@/components/Activity'
 import { PLACE_ICON, RELATION, Time, type Answer, type MentionListViewProps, type Picks, type ThreadListViewProps } from './shared'
@@ -53,7 +52,7 @@ const REACTION_OPTIONS = REACTION_EMOJI.map(({ emoji, name }) => ({ emoji, label
  * **Everything production's `Conversations` and `Activity` do is kept, part for
  * part**: the same props (`ConversationsProps`, `ActivityProps`) and reads
  * (`useThreadReferences`, `useThreadReactions`); files (`Attachments`, the
- * signed fetch); linked items (`ForeignObject`, a skeleton while they resolve);
+ * signed fetch); linked files (the kit's chips, rows and cards, keeping their shape while they resolve);
  * the note on a comment about one block; mentions by name; "edited" with when;
  * the reactions and their horizon line; "New since you last read this", with a
  * thread holding an unread reply opening by itself; the delete question with the
@@ -70,16 +69,20 @@ const REACTION_OPTIONS = REACTION_EMOJI.map(({ emoji, name }) => ({ emoji, label
 interface MessageProps {
   message: MessageData
   resolved?: Record<string, ForeignObjectData | null | undefined>
-  /** The address of the file this conversation is on: no card for it here, its chip stays (WID-3). */
+  /** The address of the file the page is on: no card for it here, its chip stays (WID-3). */
   here?: string
+  /** The address of the file the conversation itself is on, which its edit box gives no card: the page's, or a "Mentioned in" thread's own. */
+  boxHere?: string
   nameOf?: (pubkey: string) => string
   viewer?: string
   reactions?: readonly Reaction[]
   onToggleReaction?: (emoji: string, mine?: string) => Promise<Answer>
   onDelete?: () => Promise<boolean | void> | boolean | void
-  /** Publish an edit; with `removeCard`, ✕ on that file's sent card, the text left as it is. */
-  /** Save an edit; `files` only when it changed them — the whole set after it. */
-  onEdit?: (body: string, removeCard?: string, files?: readonly Imeta[]) => Promise<Answer>
+  /**
+   * Publish an edit; with `removeCard`, ✕ on that file's sent card, the text left as it is. `files` only when it
+   * changed them — the whole set after it. `dropped`: the card the edit box's ✕ took off.
+   */
+  onEdit?: (body: string, removeCard?: string, files?: readonly Imeta[], dropped?: string) => Promise<Answer>
   /** What `[` offers in its edit box, and the captions its references open with. */
   references?: (query: string) => ReturnType<typeof referenceSections>
   captions?: ReturnType<typeof referenceCaptions>
@@ -87,9 +90,11 @@ interface MessageProps {
   drafts?: DraftStore
   /** A first message's second row: the replies button. */
   footer?: React.ReactNode
+  /** Nothing can be written here (an archived file, signed out): its cards' values read as words. */
+  closed?: boolean
 }
 
-function Message({ message, resolved, here, nameOf, viewer, reactions, onToggleReaction, onDelete, onEdit, references, captions, repliesLeftBehind = 0, drafts, footer }: MessageProps) {
+function Message({ message, resolved, here, boxHere, nameOf, viewer, reactions, onToggleReaction, onDelete, onEdit, references, captions, repliesLeftBehind = 0, drafts, footer, closed = false }: MessageProps) {
   const [editing, setEditing] = useState(false)
   // An edit open when the sign-in ended opens again after the passkey tap, with what was typed (AUT-4).
   const editHold = `edit:${message.id}`
@@ -131,9 +136,7 @@ function Message({ message, resolved, here, nameOf, viewer, reactions, onToggleR
     <article className="flex flex-col gap-2" data-message={message.id}>
       {/* What a comment is about, above it: the anchored block, live, with the same card as a part (COM-2). */}
       {message.anchorPart ? (
-        <MessagePart>
-          <PartCard address={message.anchorPart.address} block={message.anchorPart.block} nameOf={nameOf} />
-        </MessagePart>
+        <PartCard address={message.anchorPart.address} block={message.anchorPart.block} nameOf={nameOf} />
       ) : (
         <BlockAnchorNote anchor={message.anchor} />
       )}
@@ -166,15 +169,15 @@ function Message({ message, resolved, here, nameOf, viewer, reactions, onToggleR
       {editing && onEdit ? (
         <Box
           kind="edit"
-          editing={{ body: message.body, urgent: message.urgent, files: message.files, holdKey: editHold, onCancel: () => setEditing(false) }}
+          editing={{ body: message.body, urgent: message.urgent, files: message.files, embeds: message.embeds, holdKey: editHold, onCancel: () => setEditing(false) }}
           references={references}
           captions={captions}
           resolved={resolved}
           nameOf={nameOf}
-          here={here}
+          here={boxHere}
           drafts={drafts}
-          // Every file the box still holds, changed or not: an edit is the whole new message.
-          onSend={(body, files) => onEdit(body, undefined, files)}
+          // Every file the box still holds, changed or not: an edit is the whole new message. And the card its ✕ took off.
+          onSend={(body, files, picks) => onEdit(body, undefined, files, picks.dropped)}
         />
       ) : (
         <>
@@ -188,6 +191,7 @@ function Message({ message, resolved, here, nameOf, viewer, reactions, onToggleR
             here={here}
             between={<FileAttachments files={message.files} />}
             onRemoveCard={removeCard}
+            words={closed}
           />
           {/* Row one: the package's pills, then its add button (her note 4, Linear's order); none yet, the add button alone. Where nobody may write, the pills only. */}
           {reactions?.length ? (
@@ -253,13 +257,17 @@ interface ThreadProps {
   judged?: boolean
   resolved?: Record<string, ForeignObjectData | null | undefined>
   here?: string
-  /** A thread living on another file ("Mentioned in"): its reply box treats no file as its own, and the send drops the thread's own file's card. */
+  /**
+   * A thread living on another file ("Mentioned in"), and that file's address: its boxes treat that file as their own,
+   * so they show no card for it, which a reply never sends (`reply` drops it).
+   */
   elsewhere?: boolean
+  file?: string
   nameOf?: (pubkey: string) => string
   reactionsBy?: Record<string, readonly Reaction[]>
   onReact?: (messageId: string, emoji: string, mine?: string) => Promise<Answer>
   onDeleteMessage?: (messageId: string) => Promise<boolean | void> | boolean | void
-  onEditMessage?: (messageId: string, body: string, removeCard?: string, files?: readonly Imeta[]) => Promise<Answer>
+  onEditMessage?: (messageId: string, body: string, removeCard?: string, files?: readonly Imeta[], dropped?: string) => Promise<Answer>
   upload?: (file: File) => Promise<Imeta>
   drafts?: DraftStore
   viewer?: string
@@ -269,7 +277,7 @@ interface ThreadProps {
 /** Replies hang one step in, behind today's left rule. */
 const REPLY_RULE = 'ml-2.5 border-l-2 border-border-default pl-3'
 
-function Thread({ thread, pageThreads, onReply, disabledReason, unread, stillUnread, judged = true, resolved, here, elsewhere = false, nameOf, reactionsBy, onReact, onDeleteMessage, onEditMessage, upload, drafts, viewer, onShown }: ThreadProps) {
+function Thread({ thread, pageThreads, onReply, disabledReason, unread, stillUnread, judged = true, resolved, here, elsewhere = false, file, nameOf, reactionsBy, onReact, onDeleteMessage, onEditMessage, upload, drafts, viewer, onShown }: ThreadProps) {
   const scope = useMemo(() => messageScope(pageThreads, thread.id), [pageThreads, thread.id])
   const references = useCallback((query: string) => referenceSections(scope, query, nameOf), [scope, nameOf])
   const captions = useMemo(() => referenceCaptions(scope, nameOf), [scope, nameOf])
@@ -297,16 +305,19 @@ function Thread({ thread, pageThreads, onReply, disabledReason, unread, stillUnr
     setFocusReply(!open)
     setOpen(!open)
   }
-  const common = { resolved, here, nameOf, viewer, drafts, references, captions }
-  // Closed (an archived file, signed out): no React, Edit or Delete, as the box is a line (Decided 2026-10-17).
+  // Closed (an archived file, signed out): no React, Edit or Delete, as the box is a line (Decided 2026-10-17), and a
+  // card's values are words, not pickers (Katerina, 30 Oct).
   const writable = !disabledReason
+  // The file the conversation itself is on: its boxes give it no card.
+  const boxHere = elsewhere ? file : here
+  const common = { resolved, here, boxHere, nameOf, viewer, drafts, references, captions, closed: !writable }
   const toolsFor = (message: MessageData) => {
     const offered = writable && offersEditAndDelete({ viewer, author: message.by ?? '' })
     return {
       reactions: reactionsBy?.[message.id],
       onToggleReaction: writable && onReact ? (emoji: string, mine?: string) => onReact(message.id, emoji, mine) : undefined,
       onDelete: offered && onDeleteMessage ? () => onDeleteMessage(message.id) : undefined,
-      onEdit: offered && onEditMessage ? (...edit: [body: string, removeCard?: string, files?: readonly Imeta[]]) => onEditMessage(message.id, ...edit) : undefined,
+      onEdit: offered && onEditMessage ? (...edit: [body: string, removeCard?: string, files?: readonly Imeta[], dropped?: string]) => onEditMessage(message.id, ...edit) : undefined,
     }
   }
 
@@ -336,7 +347,7 @@ function Thread({ thread, pageThreads, onReply, disabledReason, unread, stillUnr
               upload={upload}
               nameOf={nameOf}
               resolved={resolved}
-              here={elsewhere ? undefined : here}
+              here={boxHere}
               className="ml-2.5"
               references={references}
               captions={captions}
@@ -447,7 +458,7 @@ export function MentionListView(props: MentionListViewProps) {
                   <span>{relation.label}</span>
                 )}
               </p>
-              <Thread thread={item.thread} pageThreads={pageThreads} elsewhere {...threadProps(props)} disabledReason={item.closed ?? props.disabledReason} />
+              <Thread thread={item.thread} pageThreads={pageThreads} elsewhere file={item.file} {...threadProps(props)} disabledReason={item.closed ?? props.disabledReason} />
             </li>
           )
         })}

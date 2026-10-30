@@ -212,9 +212,10 @@ export function folderOfMessage(state: FolderState, messageId: string): string |
  * What an edit of one message needs to keep its cards right (SPEC §13.6.2): its
  * whole text as it stands, its own reference included (the drawn body leaves
  * that out), its folded cards, parts and files, and the file its conversation
- * is on. With `remove`, the edit is ✕ on that file's card.
+ * is on. With `remove`, the edit is ✕ on that file's card; with `dropped`, the
+ * card the edit box's ✕ took off.
  */
-export function cardEditOf(state: WorkspaceState, messageId: string, remove?: string): CardEdit | undefined {
+export function cardEditOf(state: WorkspaceState, messageId: string, remove?: string, dropped?: string): CardEdit | undefined {
   for (const conversation of state.conversations) {
     for (const message of [conversation.root, ...conversation.replies]) {
       if (message.id !== messageId) continue
@@ -224,6 +225,7 @@ export function cardEditOf(state: WorkspaceState, messageId: string, remove?: st
         here: message.anchor ?? conversation.root.anchor ?? conversation.about[0],
         own: { file: message.anchor ?? conversation.root.anchor, parent: message.parentId },
         remove,
+        ...(dropped ? { dropped } : {}),
         files: state.attachments[messageId.toLowerCase()],
       }
     }
@@ -313,12 +315,14 @@ export function activityFor(
     (conversation) => attachmentOf(conversation, addr, state.anchors) !== 'comment' && [conversation.root, ...conversation.replies].some((message) => listed.has(message.id)),
   )
   const mentions: ActivityItem[] = threads.map((conversation) => {
-    const closed = closedOn(conversation.root.anchor ?? conversation.about[0])
+    const file = conversation.root.anchor ?? conversation.about[0]
+    const closed = closedOn(file)
     return {
       thread: threadFor(conversation, directory, undefined, addr, state.edits, state.attachments, state.urgent, state.parts, state.embeds),
       relation: 'mention' as const,
       ...placeOf(conversation.root.folder, state),
       ...(closed ? { closed } : {}),
+      ...(file ? { file } : {}),
     }
   })
   return { items: mentions.slice(0, ACTIVITY_HORIZON), truncated: Math.max(0, mentions.length - ACTIVITY_HORIZON) }
@@ -849,12 +853,12 @@ export function ProjectPage({
           author or the NIP-OA owner of an authoring agent, and no client can
           evaluate the second half — same reasoning as the deletion above.
         */
-        onEditMessage={(messageId, body, removeCard, files) => {
+        onEditMessage={(messageId, body, removeCard, files, dropped) => {
           const folder = folderOfMessage(acting, messageId)
           if (!folder) {
             return Promise.resolve('That message has no Folder to publish an edit into.')
           }
-          return actInField(removeCard ? 'Remove card' : 'Edit', () => editMessage(folder, messageId, body, cardEditOf(acting, messageId, removeCard), files), () => refreshAfter(state, folder, refresh, rereadElsewhere))
+          return actInField(removeCard ? 'Remove card' : 'Edit', () => editMessage(folder, messageId, body, cardEditOf(acting, messageId, removeCard, dropped), files), () => refreshAfter(state, folder, refresh, rereadElsewhere))
         }}
         onReplyInActivity={(threadId, body, files, picks) => {
           const conversation = acting.conversations.find((c) => c.id === threadId)

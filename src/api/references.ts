@@ -1,6 +1,10 @@
 /**
- * What `[` offers in Ship (PEE-21): Messages, then Files, ranked by
- * `@estiva-app/conversation`'s `rankReferences` — the order Peek draws too.
+ * What `[` offers in Ship (PEE-21): Files, then Messages (Katerina, 30 Oct,
+ * widget review 19), ranked by `@estiva-app/conversation`'s `rankReferences`
+ * and drawn in `referenceSectionsOf`'s order, as Peek and Leaf draw them. A
+ * message's row is the package's (`messageCandidate`): found by its own words,
+ * never by the raw text of a link in it, and an app link Ship has an answer
+ * for read as what it names.
  *
  * - **Messages:** where the box is — a thread's reply box offers that thread,
  *   then the rest of the page; the page's own box offers the page, then its
@@ -19,10 +23,11 @@ import { useEffect } from 'react'
 import {
   FILE_TIER,
   MESSAGE_TIER,
-  messageReference,
+  messageCandidate as messageRow,
   openingWords,
   rankReferences,
   referenceSearch,
+  referenceSectionsOf,
   type ReferenceCandidate,
 } from '@estiva-app/conversation'
 import { decodeNevent } from '@estiva-app/protocol'
@@ -30,24 +35,28 @@ import type { CaptionedItem, ReferenceTriggerOptions } from '@estiva-app/ui/edit
 import type { MessageData, ThreadData } from '@/components/ConversationThread'
 import { KIND } from '@/nostr/kinds'
 import { fileCandidatesOf, searchFiles, type ForeignObject } from './foreign'
+import { knownLinkValue, links, linksChanged } from './linkCards'
 import { short } from './people'
 
 /**
- * A message's opening words, read as in Peek and Leaf (PEEKM-6). Ship's
- * `nameOf` answers a key it cannot name with its own short form; the caption
- * says such a person as §13.1's shortened `npub`, as the other two do.
+ * A person's name for the package's captions. Ship's `nameOf` answers a key it
+ * cannot name with its own short form; the caption says such a person as
+ * §13.1's shortened `npub`, as Peek and Leaf do (PEEKM-6).
  */
+const named = (nameOf?: (pubkey: string) => string) => (pubkey: string) => {
+  const name = nameOf?.(pubkey)
+  return name === short(pubkey) ? undefined : name
+}
+
+/** A message's opening words, read as in Peek and Leaf, an app link Ship has an answer for read as what it names (widget review 20). */
 function captionOf(body: string, nameOf?: (pubkey: string) => string): string {
-  return openingWords(body, (pubkey) => {
-    const name = nameOf?.(pubkey)
-    return name === short(pubkey) ? undefined : name
-  })
+  return openingWords(body, named(nameOf), { resolveLink: knownLinkValue })
 }
 
 export type ReferenceSection = ReturnType<NonNullable<ReferenceTriggerOptions['sections']>>[number]
 
-/** The section headings, Messages above Files. */
-export const REFERENCE_COPY = { ariaLabel: 'Messages and files', messages: 'Messages', files: 'Files' }
+/** The section headings; Files are drawn above Messages (`referenceSectionsOf`). */
+export const REFERENCE_COPY = { ariaLabel: 'Files and messages', messages: 'Messages', files: 'Files' }
 
 /** How many recently read files are looked up — a few more than the section shows. */
 const RECENT_LIMIT = 12
@@ -65,36 +74,30 @@ const notify = () => listeners.forEach((listener) => listener())
 
 const search = referenceSearch({ search: searchFiles })
 
-/** Called while `[`'s list is open; told when a tier or a search answer changes. */
+/** Called while `[`'s list is open; told when a tier, a search answer or a link's answer changes. */
 export function subscribeReferences(listener: () => void): () => void {
   listeners.add(listener)
   const unsubscribe = search.subscribe(listener)
+  // A link's answer changes how a message's caption reads it.
+  const unlink = linksChanged(listener)
   return () => {
     listeners.delete(listener)
     unsubscribe()
+    unlink()
   }
 }
 
-// `[` asks on every keystroke, for every message in scope; a message's row is built once (per tier).
-const BUILT = new WeakMap<MessageData, ReferenceCandidate>()
+// `[` asks on every keystroke, for every message in scope; a message's row is built once per tier and per link answers.
+const BUILT = new WeakMap<MessageData, { answers: number; row: ReferenceCandidate }>()
 
 function messageCandidate(message: MessageData, tier: number, nameOf?: (pubkey: string) => string): ReferenceCandidate {
+  const answers = links.version()
   const known = BUILT.get(message)
-  if (known) return known.tier === tier ? known : { ...known, tier }
-  const built = {
-    id: message.id,
-    // The kind rides in the pointer so a reader fetches the manifest and the event together.
-    uri: messageReference(message.id, message.kind ?? CHAT_KIND),
-    type: 'message' as const,
-    kind: message.kind ?? CHAT_KIND,
-    title: message.author.name ?? 'Someone',
-    caption: captionOf(message.body, nameOf),
-    search: message.body,
-    tier,
-    at: message.at,
-  }
-  BUILT.set(message, built)
-  return built
+  if (known && known.answers === answers) return known.row.tier === tier ? known.row : { ...known.row, tier }
+  // The kind rides in the pointer so a reader fetches the manifest and the event together.
+  const row = messageRow({ id: message.id, kind: message.kind ?? CHAT_KIND, author: message.author.name ?? 'Someone', body: message.body, at: message.at }, tier, named(nameOf), { resolveLink: knownLinkValue })
+  BUILT.set(message, { answers, row })
+  return row
 }
 
 const messagesOf = (threads: readonly ThreadData[], tier: number, nameOf?: (pubkey: string) => string): ReferenceCandidate[] =>
@@ -144,10 +147,8 @@ export function referenceSections(scope: MessageScope, query: string, nameOf?: (
     ownKinds: [KIND.PROJECT, KIND.ISSUE],
     exclude: openFile ? [openFile] : [],
   })
-  return [
-    { label: REFERENCE_COPY.messages, items: ranked.messages.map(itemOf) },
-    { label: REFERENCE_COPY.files, items: ranked.files.map(itemOf) },
-  ]
+  // Files, then Messages: the package's order, the same in every app.
+  return referenceSectionsOf(ranked).map(({ name, items }) => ({ label: REFERENCE_COPY[name], items: items.map(itemOf) }))
 }
 
 /**

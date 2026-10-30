@@ -10,7 +10,7 @@ import { PartCardView } from './PartCard'
 */
 const ADDRESS = '30851:f:b4ea696a-d4a2-4833-8f2a-6aa1e2f3c4d5'
 const LINK = 'https://ship.estiva.app/issue/plan-the-launch-b4ea696a-d4a2-4833-8f2a-6aa1e2f3c4d5#block-p1'
-const object = { ref: ADDRESS, appName: 'Ship', noun: 'issue', slots: { title: { value: 'Plan the launch' } } } as unknown as ForeignObject
+const object = { ref: ADDRESS, address: ADDRESS, kind: 30851, appName: 'Ship', noun: 'issue', slots: { title: { value: 'Plan the launch' } }, meta: [{ label: 'Ref', value: 'SHI-12', field: 'ref' }], actions: [], comments: [] } as unknown as ForeignObject
 const text = (t: string) => [{ type: 'text', text: t }]
 
 const meta = {
@@ -62,8 +62,12 @@ export const Image: Story = {
   },
 }
 
+/** The block is gone from a file still there: "This part was deleted", leading nowhere (SPEC §13.6.1). */
 export const PartDeleted: Story = { args: { view: { state: 'detached', object, link: LINK } } }
+/** The file has no blocks to point into: "This part can't be shown", its words opening the whole file. */
 export const NoParts: Story = { args: { view: { state: 'unaddressable', object, link: LINK } } }
+/** A trusted deletion names the file: "A part of this issue deleted", no title, no way out. */
 export const Deleted: Story = { args: { view: { state: 'deleted' } } }
+/** Not this reader's to see: "A part of this issue not available", no title. */
 export const NotAvailable: Story = { args: { view: { state: 'unreadable' } } }
 export const Loading: Story = {}

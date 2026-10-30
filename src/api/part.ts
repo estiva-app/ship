@@ -14,7 +14,7 @@
  * interval while the tab is visible, and when the tab comes back.
  */
 import { useEffect, useState } from 'react'
-import { absenceOf, resolvePart, type Block, type PartPointer, type SignedEvent } from '@estiva-app/protocol'
+import { readAbsence, resolvePart, type Block, type PartPointer, type SignedEvent } from '@estiva-app/protocol'
 import { blockUrlOf, urlPatternsOf } from '@estiva-app/interop'
 import { pausedForMs } from '@/lib/relayBudget'
 import { resolveForeign, type ForeignObject } from './foreign'
@@ -114,15 +114,11 @@ export async function readPart(pointer: PartPointer): Promise<PartView> {
   if (!object || object.unreachable) {
     // A Folder the viewer is not in is skipped silently, so the empty answer
     // cannot say why; a deletion somebody was entitled to make is the one thing
-    // that can. None found also covers an address that never existed.
-    // The author's own deletions asked for apart: the relay checks only a
-    // deletion's first `a`, so anybody's could otherwise fill the window.
-    const author = pointer.address.split(':')[1] ?? ''
-    const deletions = await query([
-      { kinds: [5], authors: [author], '#a': [pointer.address], limit: 20 },
-      { kinds: [5], '#a': [pointer.address], limit: 20 },
-    ])
-    return absenceOf(pointer.address, deletions) === 'deleted' ? { state: 'deleted' } : { state: 'unreadable' }
+    // that can. None found also covers an address that never existed. The
+    // protocol's read (§13.6.1), the same in every app: the author's own
+    // deletions asked for apart, since the relay checks only a deletion's first
+    // `a` and anybody's could otherwise fill the window.
+    return (await readAbsence(pointer.address, query)) === 'deleted' ? { state: 'deleted' } : { state: 'unreadable' }
   }
   const body = object.slots.body
   // An object with no body slot has no parts Ship can see — not "deleted".

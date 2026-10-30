@@ -14,7 +14,8 @@ rather than by care.
 
 ## When
 
-- Any body that came off the relay: a message, a description, another app's.
+- A body that came off the relay and is drawn whole, not edited: one block of
+  another file (**PartCard**), another app's text inside a card.
 - `size="small"` — another app's message inside a card: the same text one step
   down, every structure kept.
 - Whenever you have the format from the event's own tag. The caller reads it
@@ -36,23 +37,22 @@ rather than by care.
 ```tsx
 import { ShipRichText } from '@/components/ui/ShipRichText'
 
-<ShipRichText value={body} format={format} resolved={resolved} nameOf={nameOf} renderAfter={(block) => blockLineCards(block, resolved)} />
+<ShipRichText value={block} format="blocks" size="small" nameOf={nameOf} />
 ```
 
 - `resolved` is keyed by URI and resolved once for the whole body, so an object
   named twice cannot be drawn in two states on one screen.
-- Every pointer is its chip, alone on its line too. `renderAfter` draws what
-  a description's chips ask for after their line (`blockLineCards`, SPEC
-  §13.3); only a page's own description passes it, never a card's body, where
-  two objects that card each other would nest forever.
+- Every pointer is its chip, alone on its line too, never a row or a card:
+  inside a part or another app's text, two objects that card each other would
+  nest forever (SPEC §13.3). A page's own description draws its rows and
+  cards as its editor does (**LiveHeader**).
 
 ## What it owns
 
 - **What is Ship's in a body**: a person or an item a run points at
-  (`Reference`), a file (`Attachment`), and a description's cards after their
-  lines. Everything else — the look, tables, links, the fallback for a block it
-  has never heard of — is the package's `RichText` (UIG-30, Katerina,
-  28 September), the same part Peek draws with.
+  (`Reference`) and a file (`Attachment`). Everything else — the look, tables,
+  links, the fallback for a block it has never heard of — is the package's
+  `RichText` (UIG-30, Katerina, 28 September), the same part Peek draws with.
 - **The look is the one the editor wears**: `richTextClassName()` on
   DescriptionEditor's writing surface, so neither can be restyled without the
   other.

@@ -62,8 +62,9 @@ export default function define(h) {
       } },
       { what: "Storybook reads a page that sits beside its component", run: () => h.contains(`.storybook/main.ts`, /['"]\.\.\/src\/components\/\*\*\/\*\.mdx['"]/, "main.ts globs src/components/**/*.mdx") },
       { what: "the four parts that had no picture anywhere now have stories", run: () => {
-        const missing = ["ui/ForeignObject", "ui/RichText", "ui/ConversationCount", "ui/BlockAnchorNote"].filter((p) => !h.exists(`src/components/${p}.stories.tsx`));
-        return missing.length ? h.FAIL(`no story file: ${missing.join(", ")}`) : h.PASS("ForeignObject, RichText, ConversationCount and BlockAnchorNote each have a story");
+        // ConversationCount is the kit's CommentCount since the widget review (Katerina, 30 Oct, item 52), with the kit's stories.
+        const missing = ["ui/ForeignObject", "ui/RichText", "ui/BlockAnchorNote"].filter((p) => !h.exists(`src/components/${p}.stories.tsx`));
+        return missing.length ? h.FAIL(`no story file: ${missing.join(", ")}`) : h.PASS("ForeignObject, RichText and BlockAnchorNote each have a story");
       } },
       // Built in memory, as `estiva-ui check` builds it: the catalogue is never
       // committed, and a local registry.json read stale, or not at all on a

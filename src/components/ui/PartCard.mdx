@@ -27,7 +27,14 @@ import { PartCard } from '@/components/ui/PartCard'
 
 ## What it owns
 
-- **The read** (`usePart`), live, and the five states it can be in. Deleted
-  and not this reader's read alike, "not available.", as in Peek (Miky, 15 Oct).
+- **The heading**: the title of the file it is part of, and its key under it
+  ("A part of SHI-12"), read by the kit's one builder (`linkedOf`). No "Issue ·"
+  before the title: the tile says what it is (Katerina, 30 Oct).
+- **The read** (`usePart`), live, and the SPEC's five states (§13.6.1), as the
+  kit's `PartCardState` draws them: a file a trusted deletion names says
+  "deleted" (the protocol's `readAbsence`), one the reader may not see "not
+  available", neither with its title; a block gone says "This part was
+  deleted", and a file with no blocks "This part can't be shown", opening the
+  whole file.
 - **"Open" for a file of Ship's own, "Open in" and the app's name for another app's**
   (Miky, 2026-10-09), level with Show more.

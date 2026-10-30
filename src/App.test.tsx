@@ -289,11 +289,11 @@ describe('Issues page — rows from the fold', () => {
     expect(main.getByRole('tab', { name: /^Open/ })).toHaveTextContent('2')
     expect(main.getByRole('tab', { name: /Assigned to me/ })).toHaveTextContent('1')
     // Issue links only: a row's project chip is a link of its own (S26).
-    const issueLinks = () => main.getAllByRole('link').filter((a) => a.getAttribute('href')?.startsWith('/issue/'))
+    const issueLinks = () => main.getAllByRole('link').filter((a) => a.getAttribute('href')?.startsWith('/issue/') && !a.getAttribute('href')?.endsWith('?tab=activity'))
     expect(issueLinks()).toHaveLength(3)
     expect(issueLinks().some((a) => a.getAttribute('href')?.includes(D('13')))).toBe(false)
-    // The row says the count as a small icon and a number, named in full for a reader who cannot see it (S26).
-    expect(main.getByLabelText('1 conversation')).toBeInTheDocument()
+    // The row says the count as the kit's count, a small icon and a number, opening the issue's conversations (S26; widget review 52).
+    expect(main.getByRole('link', { name: /conversation — open the conversation/ }).textContent).toContain('1')
     expect(main.getByRole('button', { name: 'Add issue' })).toBeEnabled()
 
     fireEvent.click(main.getByRole('tab', { name: /Assigned to me/ }))
