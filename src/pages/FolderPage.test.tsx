@@ -79,6 +79,12 @@ describe('FolderPage', () => {
     await waitFor(() => expect(screen.getByText('This folder could not be read.')).toBeInTheDocument())
   })
 
+  it('names the Folder in the browser tab from its own read, so a rename made elsewhere shows (SFX-2)', async () => {
+    readFolder.mockResolvedValue(folder({ name: 'Renamed in Peek' }))
+    render(<FolderPage id="f1" say={say} />)
+    await waitFor(() => expect(document.title).toBe('Renamed in Peek – Ship'))
+  })
+
   it('lists a project and an issue as peers, and counts a topic beside them rather than listing it', async () => {
     readFolder.mockResolvedValue(
       folder({

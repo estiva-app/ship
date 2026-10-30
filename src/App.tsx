@@ -68,7 +68,7 @@ function Shell() {
   const teams = useMemo(() => (folders ? topLevelFolders(folders) : undefined), [folders])
   // What is archived, and what with (FOL-46): read against every Folder, archived teams included.
   const archives = useMemo(() => (state ? archivesOf(state, folders ?? []) : undefined), [state, folders])
-  useTabTitle(pageTitleOf(route, state, folders))
+  useTabTitle(pageTitleOf(route, state))
   const { showToast } = useToast()
   const { banner, say, clear } = useBanner(showToast)
   // The project a sidebar row's "Move to Folder…" was chosen on (FOL-7), by address.

@@ -7,6 +7,7 @@ import { reloadFolders } from '@/api/useFolders'
 import { SkeletonList } from '@/components/ui/Skeleton'
 import { FolderView } from '@/views/FolderView'
 import { act, type Say } from '@/pages/act'
+import { useTabTitle } from '@/lib/tabTitle'
 
 /**
  * The Folder page: the read, and the three states around it.
@@ -40,6 +41,8 @@ export function FolderPage({ id, folders, nameOf = (pubkey) => `${pubkey.slice(0
   const [archiving, setArchiving] = useState<{ hides: string[]; staysVisible: string[] } | null>(null)
   // The Folder on screen now, so a rename's re-read that lands after navigating away is dropped.
   const shown = useRef(id)
+  // The tab names the Folder from this page's own read, as its heading does (SFX-2).
+  useTabTitle(contents ? (contents.name ?? 'Untitled folder') : undefined)
 
   useEffect(() => {
     shown.current = id

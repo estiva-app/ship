@@ -145,14 +145,13 @@ describe('App — the browser tab names the page, then Ship (SFX-2)', () => {
     await waitFor(() => expect(document.title).toBe('X-4 issue 14 – Ship'))
   })
 
-  it('says only Ship while the page loads, not the title of the page before', async () => {
+  it('says only Ship while the next page loads, not the title of the page before', async () => {
     goTo(`/issue/${D('14')}`)
-    const { unmount } = render(<App />)
-    await waitFor(() => expect(document.title).toBe('X-4 issue 14 – Ship'))
-    unmount()
-    vi.mocked(useWorkspace).mockReturnValue({ state: null, partial: false, error: null, clock: null, loading: true, busy: false, refresh, wantThreads: () => {}, live: false })
-    goTo(`/issue/${D('11')}`)
     render(<App />)
+    await waitFor(() => expect(document.title).toBe('X-4 issue 14 – Ship'))
+    // The next issue is not in the workspace yet: the same app moves on, and the tab lets go of issue 14.
+    vi.mocked(useWorkspace).mockReturnValue({ state: { ...STATE, issues: STATE.issues.filter((issue) => issue.id !== D('11')) }, partial: false, error: null, clock: null, loading: true, busy: false, refresh, wantThreads: () => {}, live: false })
+    act(() => goTo(`/issue/${D('11')}`))
     await waitFor(() => expect(document.title).toBe('Ship'))
   })
 })

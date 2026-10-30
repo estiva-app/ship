@@ -1,5 +1,4 @@
 import { useEffect } from 'react'
-import type { FolderSummary } from '@estiva-app/interop'
 import type { WorkspaceState } from '@/api'
 import type { Route } from '@/router'
 
@@ -12,8 +11,12 @@ export function tabTitle(page: string | undefined): string {
   return page ? `${page} – Ship` : 'Ship'
 }
 
-/** What the route's page is called, as its heading says; undefined until it is known. */
-export function pageTitleOf(route: Route, state: WorkspaceState | null, folders: FolderSummary[] | undefined): string | undefined {
+/**
+ * What the route's page is called, as its heading says; undefined until it is known. `null` for a Folder, which
+ * names itself from its own read (`FolderPage`): the sidebar's listing is read once a tab, so a rename made in Peek
+ * would leave the tab on the old name.
+ */
+export function pageTitleOf(route: Route, state: WorkspaceState | null): string | undefined | null {
   switch (route.name) {
     case 'issues':
       return 'Issues'
@@ -28,14 +31,15 @@ export function pageTitleOf(route: Route, state: WorkspaceState | null, folders:
       return issue.ref ? `${issue.ref} ${issue.title}` : issue.title
     }
     case 'folder':
-      return folders?.find((folder) => folder.id === route.id)?.name || undefined
+      return null
     default:
       return undefined
   }
 }
 
-export function useTabTitle(page: string | undefined): void {
+/** Sets the tab's title; `null` leaves it to the page, which calls this itself. */
+export function useTabTitle(page: string | undefined | null): void {
   useEffect(() => {
-    document.title = tabTitle(page)
+    if (page !== null) document.title = tabTitle(page)
   }, [page])
 }
