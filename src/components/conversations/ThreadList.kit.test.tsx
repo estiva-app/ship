@@ -9,7 +9,7 @@
  * only. The write itself is asserted at the wire in `api/cardAction.test.ts`.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { addrToNaddr, encodeNpub, type Embed } from '@estiva-app/protocol'
 import type { ForeignObject } from '@/api/foreign'
@@ -228,6 +228,29 @@ describe('where the comment is shown', () => {
     await waitFor(() => expect(c.textContent).toContain('Cards draw from the kit'))
     expect(c.querySelector('[data-card]')).toBeNull()
     expect(rows(c)).toEqual(['Widgets 2'])
+  })
+
+  it('shows no hover card on a chip whose card is already under the message; another chip still has one', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      const resolved = Object.fromEntries(Object.entries(objects.byReference)) as Record<string, ForeignObject>
+      const c = render(<MessageText body={`See ${ref(CARD_ISSUE)} and ${ref(SENTENCE_ISSUE)}.`} embeds={ITS_CARD} resolved={resolved} />).container
+      await waitFor(() => expect(c.querySelector('[data-card]')?.textContent).toContain('Cards draw from the kit'))
+      const said = (words: string) => c.ownerDocument.body.textContent?.split(words).length ?? 0
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+      const [carded, other] = [...c.querySelectorAll<HTMLAnchorElement>('[data-message-text] a')]
+      const before = said('Cards draw from the kit')
+      await user.hover(carded)
+      await act(async () => void vi.advanceTimersByTime(1000))
+      expect(said('Cards draw from the kit')).toBe(before)
+      await user.unhover(carded)
+      const otherBefore = said('Fix the sign-in')
+      await user.hover(other)
+      await act(async () => void vi.advanceTimersByTime(1000))
+      expect(said('Fix the sign-in')).toBeGreaterThan(otherBefore)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('draws a preview’s links as chips only: no row, no card, no picker', async () => {

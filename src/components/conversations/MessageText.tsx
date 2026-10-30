@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { linksAsReferences, toRenderTree, valuesIn, type Embed, type PartPointer } from '@estiva-app/protocol'
+import { linksAsReferences, toRenderTree, valueOfReference, valuesIn, type Embed, type PartPointer } from '@estiva-app/protocol'
 import { RichText } from '@estiva-app/ui'
 import type { ForeignObject } from '@/api/foreign'
 import { knownLinkValue } from '@/api/linkCards'
@@ -75,10 +75,13 @@ export function MessageText({
   const isHere = (value: string) => !!here && value.toLowerCase() === here.toLowerCase()
   const cards = preview ? [] : cardsOf(blocks, embeds, parts, claimed).filter((card) => !isHere(card.value))
   const placed = preview ? undefined : placeLines(blocks, { cards, parts, resolveLink, stayChip: isHere })
-  // A link to one block opens at the block (`opensAt`, the URL as written); any other where its file opens.
-  const chip = (reference: string, written?: string) => <MessageChip uri={reference} object={resolved?.[reference]} nameOf={nameOf} urgent={urgent} preview={!preview} opensAt={written} />
-  const row = (line: RowLine) => <MessageRow uri={line.reference} object={resolved?.[line.reference]} unreadable={line.unreadable} opensAt={line.url} />
   const shown = cards.filter((card) => card.layout !== 'none')
+  // A chip whose file's card is already under the message shows no hover card: it would cover that card (Katerina, 30 Oct).
+  const carded = new Set(shown.map((card) => card.value.toLowerCase()))
+  const hasCard = (reference: string) => carded.has(valueOfReference(reference)?.toLowerCase() ?? '')
+  // A link to one block opens at the block (`opensAt`, the URL as written); any other where its file opens.
+  const chip = (reference: string, written?: string) => <MessageChip uri={reference} object={resolved?.[reference]} nameOf={nameOf} urgent={urgent} preview={!preview && !hasCard(reference)} opensAt={written} />
+  const row = (line: RowLine) => <MessageRow uri={line.reference} object={resolved?.[line.reference]} unreadable={line.unreadable} opensAt={line.url} />
   return (
     <>
       {blocks.length > 0 && (
