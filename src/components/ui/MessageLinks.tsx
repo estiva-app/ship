@@ -105,10 +105,11 @@ export function MessageRow({
   /** The URL it was written as: a link to one block opens there (WBM-11). */
   opensAt?: string
 }) {
+  const conversation = useConversationOf(unreadable ? undefined : object)
   return (
     <LinkClicks block>
       <div data-link-row>
-        <LinkRow link={unreadable ? notAvailable(uri) : openingAt(linkStateOf(uri, object), opensAt)} />
+        <LinkRow link={unreadable ? notAvailable(uri) : openingAt(linkStateOf(uri, object, { conversation }), opensAt)} />
       </div>
     </LinkClicks>
   )
@@ -121,6 +122,17 @@ function conversationHref(object: ForeignObject): string {
   const title = object.slots.title
   const slug = title && !title.isPubkey ? title.value : undefined
   return object.kind === KIND.PROJECT ? href({ name: 'project', d, slug, view: 'table', tab: 'activity' }) : href({ name: 'issue', d, slug, tab: 'activity' })
+}
+
+/**
+ * The comment count a file's row and card show, opening its conversation (Katerina, 30 Oct: on rows too), with the
+ * dot only for a member with something unread. None for a file that cannot be read, a message, or a Peek topic,
+ * which is the conversation itself.
+ */
+function useConversationOf(object: ForeignObject | null | undefined): LinkedConversation | undefined {
+  const ready = object && !object.unreachable ? object : undefined
+  const said = useCardConversation(ready && ready.kind !== KIND_BARE_FILE ? ready.address : undefined)
+  return ready && said ? { count: said.count, href: conversationHref(ready), unread: said.unread } : undefined
 }
 
 /**
@@ -233,10 +245,8 @@ function CardBox({
 }) {
   const naddr = uri.replace(/^nostr:/i, '')
   const directory = useWorkspacePeople()
-  const ready = object && !object.unreachable ? object : undefined
-  // A Peek topic has no comments to count: it is the conversation itself.
-  const counted = ready && !compact && ready.kind !== KIND_BARE_FILE ? ready.address : undefined
-  const said = useCardConversation(counted)
+  // An old compact card is the file's row, and a row has the count too (Katerina, 30 Oct).
+  const conversation = useConversationOf(object)
 
   let link: LinkState
   let loadingShape: CardShape | undefined
@@ -251,7 +261,6 @@ function CardBox({
     // the page's refresh keeps asking quietly (Katerina, 30 Oct). It is not remembered: it is not an answer.
     link = notAvailable(uri)
   } else {
-    const conversation: LinkedConversation | undefined = ready && said ? { count: said.count, href: conversationHref(ready), unread: said.unread } : undefined
     link = openingAt(linkStateOf(uri, object, { directory, onAct, conversation }), opensAt)
   }
 

@@ -9,7 +9,7 @@
  * only. The write itself is asserted at the wire in `api/cardAction.test.ts`.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { addrToNaddr, encodeNpub, type Embed } from '@estiva-app/protocol'
 import type { ForeignObject } from '@/api/foreign'
@@ -51,7 +51,7 @@ const cardIssue = () =>
   })
 
 const { objects, applyCardAction } = vi.hoisted(() => ({
-  objects: { byReference: {} as Record<string, unknown>, parentArchive: {} as Record<string, { by: string; at: number; with: string } | undefined> },
+  objects: { byReference: {} as Record<string, unknown>, parentArchive: {} as Record<string, { by: string; at: number; with: string } | undefined>, said: undefined as { count: number; unread: boolean } | undefined },
   applyCardAction: vi.fn(async () => ({ ok: true as const })),
 }))
 vi.mock(import('@/api/foreign'), async (importOriginal) => ({
@@ -67,6 +67,8 @@ vi.mock(import('@/api/foreign'), async (importOriginal) => ({
   applyCardAction,
   parentArchiveOf: vi.fn(async (reference: string) => objects.parentArchive[reference]),
 }))
+// What was said about a file: none unless a test says (the read itself is `useCardConversation.test`'s).
+vi.mock('@/api/useCardConversation', () => ({ useCardConversation: (address: string | undefined) => (address ? objects.said : undefined) }))
 vi.mock('@/components/editing/mentionables', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/components/editing/mentionables')>()),
   useWorkspacePeople: () => ({ [ADA]: { displayName: 'Ada Lovelace' }, [BRUNO]: { displayName: 'Bruno Ferreira' } }),
@@ -88,6 +90,7 @@ const sentence = (c: HTMLElement) => c.querySelector('[data-message-text] p')?.t
 beforeEach(() => {
   applyCardAction.mockClear()
   objects.parentArchive = {}
+  objects.said = undefined
   objects.byReference = {
     [ref(SENTENCE_ISSUE)]: base(SENTENCE_ISSUE, 'Fix the sign-in'),
     [ref(PROJECT)]: base(PROJECT, 'Widgets 2'),
@@ -107,6 +110,15 @@ describe('where a link sits decides how it draws', () => {
     expect(rows(c)).toEqual(['Widgets 2'])
     // The carded issue's own line draws nothing: no row, no chip.
     expect(c.textContent?.match(/Cards draw from the kit/g)).toHaveLength(1)
+  })
+
+  it('gives a row its comment count, opening the file’s conversation, as its card has', async () => {
+    objects.said = { count: 3, unread: false }
+    const c = show(`${ref(PROJECT)}`)
+    await waitFor(() => expect(rows(c)).toEqual(['Widgets 2']))
+    const count = within(c.querySelector('[data-link-row]') as HTMLElement).getByRole('link', { name: /comments — open the conversation/ })
+    expect(count.textContent).toContain('3')
+    expect(count.getAttribute('href')).toMatch(/activity/)
   })
 
   it('draws a bullet or numbered line that is only a link as a row, keeping its bullet', async () => {
