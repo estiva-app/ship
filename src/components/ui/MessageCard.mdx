@@ -32,6 +32,10 @@ import { MessageCard } from '@/components/ui/MessageLinks'
 
 - **The file's live fields**, changed from the card and read back, since the
   relay is the authority on whether a change happened (Decided 16 Oct).
+- **Never blank**: loading keeps the card's last height; a file it cannot
+  read, or a read that failed (a busy relay, the network), draws the
+  not-available row, and a failed read is asked again quietly with the page's
+  refresh, never remembered as not available.
 - **The comment count's dot**, shown only for a member with something unread.
 - **`words`**: its values as words, no pickers, where the reader cannot act —
   a closed conversation (an archived file's), a description only read. A card

@@ -238,7 +238,7 @@ function CardBox({
   const counted = ready && !compact && ready.kind !== KIND_BARE_FILE ? ready.address : undefined
   const said = useCardConversation(counted)
 
-  let link: LinkState | null
+  let link: LinkState
   let loadingShape: CardShape | undefined
   if (object === undefined) {
     // Found not available the last time this device asked: its one-line row from the first paint, not a card's height.
@@ -247,8 +247,9 @@ function CardBox({
     loadingShape = rememberedUnavailable(naddr) || compact ? undefined : cardShapeOf(naddr, kind)
     link = rememberedUnavailable(naddr) ? notAvailable(uri) : { state: 'loading', kind, shape: loadingShape }
   } else if (failed) {
-    // A failed read keeps what this device remembered, and otherwise draws nothing.
-    link = rememberedUnavailable(naddr) ? notAvailable(uri) : null
+    // A failed read (a busy relay, the network) with nothing to show draws the not-available row, never nothing, and
+    // the page's refresh keeps asking quietly (Katerina, 30 Oct). It is not remembered: it is not an answer.
+    link = notAvailable(uri)
   } else {
     const conversation: LinkedConversation | undefined = ready && said ? { count: said.count, href: conversationHref(ready), unread: said.unread } : undefined
     link = openingAt(linkStateOf(uri, object, { directory, onAct, conversation }), opensAt)
@@ -258,7 +259,7 @@ function CardBox({
     The drawn card's shape and height, kept for its placeholder next time. The
     height holds what the shape cannot say: a summary the kit wraps to two lines.
   */
-  const shape = !compact && link?.state === 'ready' ? loadingShapeOf(link.linked) : undefined
+  const shape = !compact && link.state === 'ready' ? loadingShapeOf(link.linked) : undefined
   const shapeKey = shape && JSON.stringify(shape)
   const box = useRef<HTMLDivElement>(null)
   const kindOfCard = linkedKindOf(uri)
@@ -285,7 +286,6 @@ function CardBox({
       clearTimeout(settle)
     }
   }, [naddr, shapeKey, kindOfCard])
-  if (!link) return null
   return (
     <LinkClicks block>
       <div ref={box} data-card={compact ? 'compact' : 'detailed'} data-card-value={naddr} style={loadingShape?.height ? { minHeight: loadingShape.height } : undefined}>

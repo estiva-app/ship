@@ -56,9 +56,13 @@ const { objects, applyCardAction } = vi.hoisted(() => ({
 }))
 vi.mock(import('@/api/foreign'), async (importOriginal) => ({
   ...(await importOriginal()),
-  // A file with no entry is never answered: the card waits, as on a slow relay. A person is not a file.
+  // A file with no entry is never answered: the card waits, as on a slow relay. A person is not a file. `FAILS`: the read throws (a 429).
   resolveForeign: vi.fn((reference: string) =>
-    reference in objects.byReference || /^nostr:npub1/.test(reference) ? Promise.resolve((objects.byReference[reference] ?? null) as ForeignObject | null) : new Promise<never>(() => {}),
+    objects.byReference[reference] === 'FAILS'
+      ? Promise.reject(new Error('rate-limited'))
+      : reference in objects.byReference || /^nostr:npub1/.test(reference)
+        ? Promise.resolve((objects.byReference[reference] ?? null) as ForeignObject | null)
+        : new Promise<never>(() => {}),
   ),
   applyCardAction,
   parentArchiveOf: vi.fn(async (reference: string) => objects.parentArchive[reference]),
@@ -197,6 +201,17 @@ describe('the card under the comment', () => {
     const again = show(THE_MESSAGE, { embeds: ITS_CARD })
     expect(again.querySelector('[data-card]')?.textContent).toBe('Issue not available')
     noteCardAvailability(ref(CARD_ISSUE).replace(/^nostr:/, ''), true)
+  })
+
+  it('says "not available." when its read fails with nothing remembered, never nothing, and does not remember it', async () => {
+    objects.byReference[ref(CARD_ISSUE)] = 'FAILS'
+    const first = show(THE_MESSAGE, { embeds: ITS_CARD })
+    await waitFor(() => expect(first.querySelector('[data-card]')?.textContent).toBe('Issue not available'))
+    first.remove()
+    // A failed read is not an answer: the next open waits for the card, at a card's height, not the one-line row.
+    delete objects.byReference[ref(CARD_ISSUE)]
+    const again = show(THE_MESSAGE, { embeds: ITS_CARD })
+    expect(again.querySelector('[data-card] [aria-busy="true"]')).not.toBeNull()
   })
 
   it('names another app’s file it cannot read by what its address says, with a way to open it in its app', async () => {
