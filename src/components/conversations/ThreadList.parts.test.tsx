@@ -30,7 +30,12 @@ const object = {
   ref: ADDRESS,
   appName: 'Ship',
   noun: 'issue',
+  kind: 30851,
+  address: ADDRESS,
   slots: { title: { value: 'Plan the launch' } },
+  meta: [{ label: 'Ref', value: 'SHI-12', field: 'ref' }],
+  actions: [],
+  comments: [],
 } as never
 
 const thread = (body: string): ThreadData => ({
@@ -44,7 +49,7 @@ const show = (body: string, view: PartView) => {
 }
 
 describe('a pasted block link', () => {
-  it('draws the block under the message, with the type and title, and the way to open it', () => {
+  it('draws the block under the message, with its file’s title and key, and the way to open it', () => {
     const c = show(`Have a look ${LINK}`, {
       state: 'resolved',
       object,
@@ -52,7 +57,10 @@ describe('a pasted block link', () => {
       block: { type: 'paragraph', id: 'p1', content: [{ type: 'text', text: 'Ship on Friday' }] } as never,
     })
     const card = c.querySelector('[data-part="resolved"]')
-    expect(card?.textContent).toContain('Issue · Plan the launch')
+    expect(card?.textContent).toContain('Plan the launch')
+    // The tile says what it is: the title is not "Issue · …", and the key says which one (Katerina, 30 Oct).
+    expect(card?.textContent).not.toContain('Issue ·')
+    expect(card?.textContent).toContain('A part of SHI-12')
     expect(card?.textContent).toContain('Ship on Friday')
     expect(card?.textContent).toContain('Open in Ship')
   })

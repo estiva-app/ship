@@ -10,7 +10,7 @@ import { PartCardView } from './PartCard'
 */
 const ADDRESS = '30851:f:b4ea696a-d4a2-4833-8f2a-6aa1e2f3c4d5'
 const LINK = 'https://ship.estiva.app/issue/plan-the-launch-b4ea696a-d4a2-4833-8f2a-6aa1e2f3c4d5#block-p1'
-const object = { ref: ADDRESS, appName: 'Ship', noun: 'issue', slots: { title: { value: 'Plan the launch' } } } as unknown as ForeignObject
+const object = { ref: ADDRESS, address: ADDRESS, kind: 30851, appName: 'Ship', noun: 'issue', slots: { title: { value: 'Plan the launch' } }, meta: [{ label: 'Ref', value: 'SHI-12', field: 'ref' }], actions: [], comments: [] } as unknown as ForeignObject
 const text = (t: string) => [{ type: 'text', text: t }]
 
 const meta = {

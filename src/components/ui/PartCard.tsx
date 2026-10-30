@@ -2,8 +2,7 @@ import { serializeBlockDocument } from '@estiva-app/protocol'
 import { Button, PartCard as KitPartCard, thingKindOf } from '@estiva-app/ui'
 import { IconExternalLink } from '@tabler/icons-react'
 import { usePart, type PartView } from '@/api/part'
-import type { ForeignObject } from '@/api/foreign'
-import { typeLabelOf } from '@/lib/typeLabel'
+import { linkedOf } from '@/lib/linked'
 import { navigateTo } from '@/router'
 import { ShipRichText } from './ShipRichText'
 
@@ -38,7 +37,7 @@ function placeOf(link: string | undefined): { href: string; here: boolean } | un
  * One block of another object, drawn from a read that has already happened.
  *
  * Peek's `PartCard`, by design the same in both apps (COM-2), in the kit's
- * frame (ui 0.75): the object's type and title, then the block — whole when it
+ * frame (ui 0.75): the title of what it is part of and its key, then the block — whole when it
  * is short; cut behind ShowMore's fade when it is long, and opened in place
  * (Katerina, 2026-10-08). The way into the app it came from is a Button with an
  * open-out icon, level with Show more.
@@ -66,7 +65,9 @@ export function PartCardView({ view, address, block, nameOf }: { view: PartView;
   }
 
   const place = placeOf(view.link)
-  const frame = { kind: thingKindOf(view.object.kind), heading: headingOf(view.object), href: place?.href }
+  // The title alone, and its key under it ("A part of ABC-2"): the tile already says what it is (Katerina, 30 Oct).
+  const { title, key } = linkedOf(view.object)
+  const frame = { kind: thingKindOf(view.object.kind), heading: title, partKey: key, href: place?.href }
 
   if (view.state !== 'resolved') {
     return (
@@ -98,11 +99,4 @@ export function PartCardView({ view, address, block, nameOf }: { view: PartView;
       </KitPartCard>
     </div>
   )
-}
-
-/** "Issue · Plan the launch": what it is, then which one (label objects by type, PRO-24). */
-function headingOf(object: ForeignObject): string {
-  const label = typeLabelOf(object)
-  const title = object.slots.title?.isPubkey ? undefined : object.slots.title?.value
-  return [label, title].filter(Boolean).join(' · ') || 'Untitled'
 }
