@@ -21,8 +21,9 @@ import { referenceOfValue, sameFiles, type Answer, type Picks } from './shared'
  * Ship's comment box: estiva-ui's `CommentBox`, the one box every app writes a
  * comment, a reply, a chat line and an edit in (COMM-7). What Ship adds is only
  * what Ship knows: its people for `@` and `!@`, its `[` sections, its `/`
- * Insert rows, its upload, its drafts, its lookups for the kit's chips, and a send through its own
- * `buildConversationMessage` that answers whether the relay took it.
+ * Insert rows, its upload, its drafts, its lookups for the kit's chips, and a
+ * send through its own `buildConversationMessage` that answers whether the
+ * relay took it.
  *
  * - **Not optimistic**: the box holds the words, shut, until the relay answers;
  *   a refusal is said under it with the words still in it — no toast (record
