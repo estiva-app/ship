@@ -1,0 +1,44 @@
+import { Meta } from '@storybook/addon-docs/blocks'
+
+<Meta title="Pages/DescriptionLink/Usage" />
+
+# DescriptionLink
+
+A link in an issue's or a project's description, drawn by where it sits: the
+kit's chip in a sentence, its row alone on its line, the card its writer chose
+in the row's place (SPEC §13.3).
+
+**Seen in** [Pages/Title and description › With links](?path=/story/pages-title-and-description--with-links): a link to another site stays a link; a file's chip, row and card draw a file read from the relay, which a story does not answer, so `LiveHeader`'s tests draw them.
+
+## When
+
+- The description's editor, as its `referenceView` (`LiveDescription`).
+- The description as text before the editor arrives (`DescriptionReading`,
+  in `LiveHeader`), so nothing moves when the editor replaces it.
+
+## When not
+
+- A message's link → **MessageChip**, **MessageRow**, **MessageCard**, placed
+  by the message rule (`MessageText`).
+- A link inside one block of another file → **ShipRichText**: every link there
+  is its chip.
+
+## How
+
+```tsx
+import { DescriptionLink, DescriptionLinks } from '@/components/editing/descriptionLinks'
+
+<DescriptionLinks editor={editor} resolved={resolved} nameOf={nameOf} readOnly={readOnly}>
+  <DescriptionLink uri={uri} href={href} place="row" />
+</DescriptionLinks>
+```
+
+## What it owns
+
+- **The three places**: `chip`, `row`, `card`, as the editor's `LinkPlaces`
+  or `placeDocumentLines` decide.
+- **A URL whose file has not come back**, or cannot be read, reads as the URL
+  it was written as (WBM-11), never an empty chip.
+- **The card's pickers**, live while the caret is in the text too (Katerina,
+  30 Oct); its values are words only where the reader cannot act, a
+  description only read.
