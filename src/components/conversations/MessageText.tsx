@@ -5,7 +5,7 @@ import type { ForeignObject } from '@/api/foreign'
 import { knownLinkValue } from '@/api/linkCards'
 import { MAX_PARTS_PER_MESSAGE, urlNamesAddress } from '@/api/part'
 import { linksIn } from '@estiva-app/interop'
-import { MessageCard, MessageChip, MessagePart, MessageRow } from '@/components/ui/MessageLinks'
+import { MessageCard, MessageChip, MessageRow } from '@/components/ui/MessageLinks'
 import { PartCard } from '@/components/ui/PartCard'
 import { drawAttachment } from '@/components/ui/ShipRichText'
 import { placeLines, ROW_BLOCK, type RowLine } from '@/lib/messageLines'
@@ -113,9 +113,7 @@ export function MessageText({
         </div>
       )}
       {parts.map((part) => (
-        <MessagePart key={part.address}>
-          <PartCard address={part.address} block={part.block} nameOf={nameOf} />
-        </MessagePart>
+        <PartCard key={part.address} address={part.address} block={part.block} nameOf={nameOf} />
       ))}
     </>
   )

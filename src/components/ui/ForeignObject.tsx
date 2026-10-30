@@ -3,7 +3,7 @@ import { LinkCard, LinkRow } from '@estiva-app/ui'
 import { pickWidget } from '@/api/foreign'
 import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
 import { linkStateOf } from '@/lib/linked'
-import { conversationHref, LinkClicks } from './MessageLinks'
+import { conversationHref } from './MessageLinks'
 
 /**
  * A file Ship lists by itself — a Folder's own projects and issues, the file a
@@ -43,10 +43,8 @@ export function ForeignObject({ object, conversations, row = false }: ForeignObj
   // Its reference names it by kind before anything is read: the words "not available" falls back on.
   const link = linkStateOf((object.address && referenceOfValue(object.address)) || object.ref, object, conversation ? { conversation } : {})
   return (
-    <LinkClicks block>
-      <div data-foreign-object={object.ref} data-widget={picked === 'message' ? 'message' : widget} data-state={object.unreachable ? 'unreachable' : undefined}>
-        {widget === 'card' ? <LinkCard link={link} /> : <LinkRow link={link} />}
-      </div>
-    </LinkClicks>
+    <div data-foreign-object={object.ref} data-widget={picked === 'message' ? 'message' : widget} data-state={object.unreachable ? 'unreachable' : undefined}>
+      {widget === 'card' ? <LinkCard link={link} /> : <LinkRow link={link} />}
+    </div>
   )
 }

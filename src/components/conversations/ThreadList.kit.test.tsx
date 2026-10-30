@@ -9,7 +9,7 @@
  * asserted at the wire in `api/cardAction.test.ts`.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { addrToNaddr, encodeNpub, type Embed } from '@estiva-app/protocol'
 import type { ForeignObject } from '@/api/foreign'
@@ -51,7 +51,7 @@ const cardIssue = () =>
   })
 
 const { objects, applyCardAction } = vi.hoisted(() => ({
-  objects: { byReference: {} as Record<string, unknown>, parentArchive: {} as Record<string, { by: string; at: number; with: string } | undefined>, said: undefined as { count: number; unread: boolean } | undefined },
+  objects: { byReference: {} as Record<string, unknown>, parentArchive: {} as Record<string, { by: string; at: number; with: string } | undefined>, said: undefined as { count: number; unread: boolean } | undefined, deleted: new Set<string>() },
   applyCardAction: vi.fn(async () => ({ ok: true as const })),
 }))
 vi.mock(import('@/api/foreign'), async (importOriginal) => ({
@@ -67,6 +67,8 @@ vi.mock(import('@/api/foreign'), async (importOriginal) => ({
   applyCardAction,
   parentArchiveOf: vi.fn(async (reference: string) => objects.parentArchive[reference]),
 }))
+// Whether a file read back empty was deleted: never unless a test says (the read itself is `absence.test`'s).
+vi.mock('@/api/absence', () => ({ useDeleted: (reference: string, absent: boolean) => absent && objects.deleted.has(reference) }))
 // What was said about a file: none unless a test says (the read itself is `useCardConversation.test`'s).
 vi.mock('@/api/useCardConversation', () => ({ useCardConversation: (address: string | undefined) => (address ? objects.said : undefined) }))
 vi.mock('@/components/editing/mentionables', async (importOriginal) => ({
@@ -77,7 +79,8 @@ vi.mock('@/components/editing/mentionables', async (importOriginal) => ({
 import { ThreadList } from './ThreadList'
 import { MessageText } from './MessageText'
 import type { ThreadData } from '@/components/ConversationThread'
-import { noteCardShape } from '@/lib/cardShapes'
+import { AppProvider } from '@estiva-app/ui'
+import { cardShapes } from '@/lib/cardShapes'
 import { noteCardAvailability } from '@/lib/unavailableCards'
 
 const thread = (body: string, embeds?: Embed[]): ThreadData => ({ id: 't1', root: { id: 't1', author: { name: 'Ann' }, at: 1000, body, by: 'ann', embeds }, replies: [] })
@@ -91,6 +94,7 @@ beforeEach(() => {
   applyCardAction.mockClear()
   objects.parentArchive = {}
   objects.said = undefined
+  objects.deleted.clear()
   objects.byReference = {
     [ref(SENTENCE_ISSUE)]: base(SENTENCE_ISSUE, 'Fix the sign-in'),
     [ref(PROJECT)]: base(PROJECT, 'Widgets 2'),
@@ -196,7 +200,7 @@ describe('the card under the comment', () => {
 
   it('keeps the height it last drew at while it loads', () => {
     delete objects.byReference[ref(CARD_ISSUE)]
-    noteCardShape(ref(CARD_ISSUE).replace(/^nostr:/, ''), { subtitle: false, summary: true, rows: 0, latest: false, ring: false, footer: 'pickers', height: 134 })
+    cardShapes.note(ref(CARD_ISSUE).replace(/^nostr:/, ''), { subtitle: false, summary: true, rows: 0, latest: false, ring: false, footer: 'pickers', height: 134 })
     const c = show(THE_MESSAGE, { embeds: ITS_CARD })
     const card = c.querySelector<HTMLElement>('[data-card="detailed"]')
     expect(card?.style.minHeight).toBe('134px')
@@ -212,6 +216,22 @@ describe('the card under the comment', () => {
     delete objects.byReference[ref(CARD_ISSUE)]
     const again = show(THE_MESSAGE, { embeds: ITS_CARD })
     expect(again.querySelector('[data-card]')?.textContent).toBe('Issue not available')
+    noteCardAvailability(ref(CARD_ISSUE).replace(/^nostr:/, ''), true)
+  })
+
+  // SPEC §13.6.1, "deleted is not not-permitted" (Katerina, 30 Oct, widget review 56).
+  it('says "deleted" for a file a trusted deletion names, on its card and its chip, and "not available" for the rest', async () => {
+    objects.byReference[ref(CARD_ISSUE)] = null
+    objects.byReference[ref(SENTENCE_ISSUE)] = null
+    objects.deleted.add(ref(CARD_ISSUE))
+    objects.deleted.add(ref(SENTENCE_ISSUE))
+    const c = show(THE_MESSAGE, { embeds: ITS_CARD })
+    await waitFor(() => expect(c.querySelector('[data-card]')?.textContent).toBe('Issue deleted'))
+    expect(sentence(c)).toBe('Look at Issue deleted today.')
+    objects.deleted.clear()
+    const other = show(THE_MESSAGE, { embeds: ITS_CARD })
+    await waitFor(() => expect(other.querySelector('[data-card]')?.textContent).toBe('Issue not available'))
+    cleanup()
     noteCardAvailability(ref(CARD_ISSUE).replace(/^nostr:/, ''), true)
   })
 
@@ -267,10 +287,15 @@ describe('where the comment is shown', () => {
 })
 
 describe('a click on a link', () => {
+  // The kit's AppProvider does it since ui 0.92 (Ship's own click capture went with it), as the app's root gives it a router.
   it('opens another app’s file in a new tab, never in Ship’s', async () => {
     const open = vi.spyOn(window, 'open').mockReturnValue(null)
     objects.byReference[ref(TOPIC)] = { ...base(TOPIC, 'Weekly notes'), appName: 'Peek', openUrl: `https://peek.estiva.app/o/${TOPIC}` }
-    const c = show(`Look at ${ref(TOPIC)} today.`)
+    const c = render(
+      <AppProvider navigate={vi.fn()}>
+        <ThreadList threads={[thread(`Look at ${ref(TOPIC)} today.`)]} onStart={noop} onReply={noop} />
+      </AppProvider>,
+    ).container
     await waitFor(() => expect(sentence(c)).toBe('Look at Weekly notes today.'))
     fireEvent.click(c.querySelector('[data-message-text] a') as HTMLAnchorElement)
     expect(open).toHaveBeenCalledWith(`https://peek.estiva.app/o/${TOPIC}`, '_blank', 'noopener,noreferrer')

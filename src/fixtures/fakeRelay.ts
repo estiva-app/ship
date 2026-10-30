@@ -95,8 +95,10 @@ const POINTED: ForeignObject = {
   widget: 'card',
   appName: 'Ship',
   slots: { title: { value: 'Fold the change stream once per read' }, status: { value: 'In Progress', colour: 'blue' } },
-  meta: [{ label: 'REL-4', value: '' }],
+  // Whole, as the projection hands it over: the kit's builder reads its actions (an empty list draws the status as words).
+  meta: [{ label: 'Ref', value: 'REL-4', field: 'ref' }],
   comments: [],
+  actions: [],
   openUrl: '#',
 } as unknown as ForeignObject
 

@@ -1,13 +1,14 @@
 /**
  * The card in the box (COMM-8), read as the message will be sent: an edit box
- * shows one too, for a file the edit names first, and its ✕ leaves it off the
- * save (Katerina, 30 Oct, item 37); a "Mentioned in" reply box shows none for
+ * shows one too — the message's own, with its ✕, or a file the edit names
+ * first — and never one taken off before, and its ✕ leaves it off the save
+ * (Katerina, 30 Oct, items 36, 37); a "Mentioned in" reply box shows none for
  * the thread's own file, which a reply never sends (item 49).
  */
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import type { Editor } from '@tiptap/react'
-import { addrToNaddr } from '@estiva-app/protocol'
+import { addrToNaddr, type Embed } from '@estiva-app/protocol'
 
 const ISSUE_PK = 'cb77583ed45cac74ce4e46c626c1edada0204a6fc4c91f9c7be230b5af36156c'
 const FIRST = `30851:${ISSUE_PK}:a0b27d90-d5b9-40e7-8078-865ab36a421c`
@@ -55,7 +56,7 @@ beforeAll(() => {
 const ME = 'b'.repeat(64)
 type EditorBox = HTMLElement & { editor: Editor }
 
-const thread = (body: string): ThreadData => ({ id: 'root-1', root: { id: 'root-1', author: { name: 'Me' }, at: 1_756_000_000, body, by: ME }, replies: [] })
+const thread = (body: string, embeds?: Embed[]): ThreadData => ({ id: 'root-1', root: { id: 'root-1', author: { name: 'Me' }, at: 1_756_000_000, body, by: ME, embeds }, replies: [] })
 
 /** The box's whole text, replaced through the editor's own commands: jsdom cannot type into a contenteditable. */
 const replace = (box: EditorBox, text: string) => act(() => void box.editor.chain().selectAll().insertContent({ type: 'text', text }).run())
@@ -67,9 +68,9 @@ const ready = async (name: string) => {
 const inTheBox = () => document.querySelector<HTMLElement>('[data-box-under]')
 
 describe('the edit box', () => {
-  const edit = async (body: string) => {
+  const edit = async (body: string, embeds?: Embed[]) => {
     const onEditMessage = vi.fn(async (): Promise<true | string> => true)
-    render(<ThreadListView threads={[thread(body)]} onStart={async () => true} onReply={async () => true} viewer={ME} onEditMessage={onEditMessage} />)
+    render(<ThreadListView threads={[thread(body, embeds)]} onStart={async () => true} onReply={async () => true} viewer={ME} onEditMessage={onEditMessage} />)
     fireEvent.click(screen.getByRole('button', { name: 'Message actions' }))
     fireEvent.click(screen.getByRole('menuitem', { name: 'Edit message' }))
     return { box: await ready('Edit message'), onEditMessage }
@@ -98,6 +99,22 @@ describe('the edit box', () => {
     const { box } = await edit(`See ${ref(FIRST)}`)
     replace(box, `See ${ref(FIRST)} again`)
     // The box reads on every change, and a card would show at once (loading, then filled): none.
+    await act(async () => {})
+    expect(inTheBox()).toBeNull()
+  })
+
+  it('shows the message’s own card, with its ✕, and its ✕ takes it off the message with the words as they were', async () => {
+    const text = `See ${ref(FIRST)}`
+    const { onEditMessage } = await edit(text, [{ value: FIRST, layout: 'detailed' }])
+    await waitFor(() => expect(inTheBox()?.textContent).toContain('Named first'))
+    fireEvent.click(within(inTheBox()!).getByRole('button', { name: 'Remove' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(onEditMessage).toHaveBeenCalledWith('root-1', text, undefined, [], FIRST))
+  })
+
+  it('never shows again a card taken off before, its link put back', async () => {
+    const { box } = await edit('No link now.', [{ value: FIRST, layout: 'none' }])
+    replace(box, `See ${ref(FIRST)}`)
     await act(async () => {})
     expect(inTheBox()).toBeNull()
   })

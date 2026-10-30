@@ -13,7 +13,7 @@ what Ship reads about that file, or a person's chip for an `npub`.
 
 - A reference in a sent message's text (`MessageText`).
 - A link in a sentence of an issue's or a project's description (`DescriptionLink`, WBD-7).
-- A link in a box being written in, pasted or kept from an edit (`ConversationBox`), with `preview={false}` and `follows={false}`: one chip look in every box (Katerina, 30 Oct).
+- A link in a box being written in — pasted, picked with `[`, or kept from an edit (`ConversationBox`) — with `preview={false}`: one chip look in every box (Katerina, 30 Oct). The kit keeps a click there in the draft.
 - A link inside one block of another file, or another app's text (`ShipRichText`).
 
 ## When not
@@ -33,4 +33,5 @@ import { MessageChip } from '@/components/ui/MessageLinks'
 ## What it owns
 
 - **The hover card**, off with `preview={false}`: in a list of previews, in a description being edited, where a click is the chip menu's, and on a chip whose file's card is already under the same message, which the hover card would cover (Katerina, 30 Oct).
-- **Where it opens**: the URL it was written as, so a link to one block opens there (WBM-11). With `follows={false}` a click opens nothing: in a box, a click is not a way out of the draft.
+- **Where it opens**: the URL it was written as, so a link to one block opens there (WBM-11); another app's file in a new tab, by the kit's `AppProvider`.
+- **The URL as written**: a link written as a URL whose file cannot be shown stays that URL, a plain link (SPEC §13.1); "not available" is only for a `nostr:` reference.

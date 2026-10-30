@@ -5,9 +5,12 @@
  * `ShipRichText.blockLinks.test.tsx`: the description's reading surface draws
  * with `DescriptionReading` now, as its editor does (item 43).
  */
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { render } from '@testing-library/react'
 import { addrToNaddr } from '@estiva-app/protocol'
+// Deleted or not, a link written as a URL stays its URL: the deletion read is `absence.test`'s.
+vi.mock('@/api/absence', () => ({ useDeleted: () => false }))
+
 import { DescriptionReading } from './descriptionLinks'
 
 const D = 'b4ea696a-d4a2-4833-8f2a-6aa1e2f3c4d5'
@@ -37,5 +40,14 @@ describe('a link to one block in a description', () => {
 
   it('an old `#/page/…` link opens as written, where its app still serves it', () => {
     expect(chipOf(`see ${OLD_LINK} here`)?.getAttribute('href')).toBe(OLD_LINK)
+  })
+
+  // SPEC §13.1, C21 (widget review 58): "not available" is only for a `nostr:` reference with no URL to fall back on.
+  it('stays the URL as written, a plain link, when its file cannot be shown', () => {
+    const { container } = render(<DescriptionReading value={`see ${FILE_LINK} here`} format="marker" resolved={{ [REFERENCE]: null }} resolveLink={(url) => (url.startsWith(FILE_LINK) ? ADDRESS : undefined)} readOnly />)
+    const link = container.querySelector('p a')
+    expect(link?.getAttribute('href')).toBe(FILE_LINK)
+    expect(link?.textContent).toContain(FILE_LINK)
+    expect(container.textContent).not.toContain('not available')
   })
 })

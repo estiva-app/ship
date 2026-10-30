@@ -10,7 +10,6 @@ import { REACTION_EMOJI, REACTION_HORIZON, me, type Reaction } from '@/api'
 import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
 import { Attachments as FileAttachments } from '@/components/ui/Attachment'
 import { BlockAnchorNote } from '@/components/ui/BlockAnchorNote'
-import { MessagePart } from '@/components/ui/MessageLinks'
 import { ConfirmDeleteMessage, NewSinceHere, useThreadReactions, useThreadReferences, type ConversationsProps, type MessageData, type ThreadData } from '@/components/ConversationThread'
 import type { ActivityProps } from '@/components/Activity'
 import { PLACE_ICON, RELATION, Time, type Answer, type MentionListViewProps, type Picks, type ThreadListViewProps } from './shared'
@@ -137,9 +136,7 @@ function Message({ message, resolved, here, boxHere, nameOf, viewer, reactions, 
     <article className="flex flex-col gap-2" data-message={message.id}>
       {/* What a comment is about, above it: the anchored block, live, with the same card as a part (COM-2). */}
       {message.anchorPart ? (
-        <MessagePart>
-          <PartCard address={message.anchorPart.address} block={message.anchorPart.block} nameOf={nameOf} />
-        </MessagePart>
+        <PartCard address={message.anchorPart.address} block={message.anchorPart.block} nameOf={nameOf} />
       ) : (
         <BlockAnchorNote anchor={message.anchor} />
       )}
@@ -172,7 +169,7 @@ function Message({ message, resolved, here, boxHere, nameOf, viewer, reactions, 
       {editing && onEdit ? (
         <Box
           kind="edit"
-          editing={{ body: message.body, urgent: message.urgent, files: message.files, holdKey: editHold, onCancel: () => setEditing(false) }}
+          editing={{ body: message.body, urgent: message.urgent, files: message.files, embeds: message.embeds, holdKey: editHold, onCancel: () => setEditing(false) }}
           references={references}
           captions={captions}
           resolved={resolved}

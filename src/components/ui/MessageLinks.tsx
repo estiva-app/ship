@@ -1,13 +1,14 @@
-import { useCallback, useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { KIND_BARE_FILE } from '@estiva-app/interop'
-import { AttachedCard, FieldLine, LinkChip, LinkRow, loadingShapeOf, type LinkState, type LinkedConversation, type LoadingShape } from '@estiva-app/ui'
+import { AttachedCard, FieldLine, LinkChip, LinkRow, loadingShapeOf, type CardShape, type LinkState, type LinkedConversation, type LoadingShape } from '@estiva-app/ui'
 import { applyCardAction, resolveForeign, type ForeignObject } from '@/api/foreign'
+import { useDeleted } from '@/api/absence'
 import { resolveFailed } from '@/api/useForeignObjects'
 import { isReadableFolder, useFolderFiles } from '@/api/useFolderFiles'
 import { useCardConversation } from '@/api/useCardConversation'
 import { useParentArchive } from '@/api/useParentArchive'
 import { useWorkspacePeople } from '@/components/editing/mentionables'
-import { cardShapeOf, noteCardShape, type CardShape } from '@/lib/cardShapes'
+import { cardShapes } from '@/lib/cardShapes'
 import { hrefOf, linkedKindOf, linkStateOf, notAvailable } from '@/lib/linked'
 import { isOwnKind } from '@/lib/ownKinds'
 import { writtenLink } from '@/api/linkCards'
@@ -26,44 +27,10 @@ import { Reference } from './Reference'
   change.
 */
 
-const isModified = (event: MouseEvent) => event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey
-
-/**
- * Another app's address opens in a new tab: a stranger published it into a
- * shared relay, hence `noopener`. Ship's own go through the kit, which hands
- * them to `AppProvider`'s `navigate`. With `follows` off, a click opens
- * nothing: in a box being written in, it is not a way out of the draft.
- */
-export function LinkClicks({ block = false, follows = true, children }: { block?: boolean; follows?: boolean; children: ReactNode }) {
-  const onClickCapture = (event: MouseEvent<HTMLElement>) => {
-    const anchor = (event.target as Element).closest('a')
-    if (anchor && !follows) {
-      event.preventDefault()
-      return
-    }
-    if (!anchor || isModified(event) || anchor.getAttribute('target')) return
-    let url: URL
-    try {
-      url = new URL(anchor.getAttribute('href') ?? '', window.location.href)
-    } catch {
-      return
-    }
-    if (url.origin === window.location.origin) return
-    event.preventDefault()
-    window.open(url.href, '_blank', 'noopener,noreferrer')
-  }
-  return block ? <div onClickCapture={onClickCapture}>{children}</div> : <span onClickCapture={onClickCapture}>{children}</span>
-}
-
 /** A file's link state, opening at the block a link to one block was written for (§13.6.1). */
 function openingAt(link: LinkState, written: string | undefined): LinkState {
   const block = link.state === 'ready' ? writtenLink(written, link.linked.href) : undefined
   return block && link.state === 'ready' ? { ...link, linked: { ...link.linked, href: block.href } } : link
-}
-
-/** A part of another file shown in a message (SPEC §13.6.1): its links are clicked as a chip's are. */
-export function MessagePart({ children }: { children: ReactNode }) {
-  return <LinkClicks block>{children}</LinkClicks>
 }
 
 /**
@@ -77,7 +44,6 @@ export function MessageChip({
   nameOf,
   urgent,
   preview = true,
-  follows = true,
   opensAt,
 }: {
   uri: string
@@ -86,17 +52,12 @@ export function MessageChip({
   urgent?: readonly string[]
   /** Hovering shows its card; off in a list of previews, where a card would cover the next one, and in a box being written in. */
   preview?: boolean
-  /** A click opens it; off in a box being written in, where a click is not a way out of the draft (Katerina, 30 Oct). */
-  follows?: boolean
-  /** The URL it was written as: a link to one block opens there (WBM-11). */
+  /** The URL it was written as: a link to one block opens there (WBM-11), and one that cannot be shown stays that URL. */
   opensAt?: string
 }) {
+  const deleted = useDeleted(uri, isAbsent(uri, object))
   if (/^nostr:npub1/i.test(uri)) return <Reference uri={uri} nameOf={nameOf} urgent={urgent} />
-  return (
-    <LinkClicks follows={follows}>
-      <LinkChip link={openingAt(linkStateOf(uri, object), opensAt)} preview={preview} />
-    </LinkClicks>
-  )
+  return <LinkChip link={openingAt(linkStateOf(uri, deleted ? null : object, undefined, { url: opensAt, deleted }), opensAt)} preview={preview} />
 }
 
 /** A line that is only a link to a file or a message: that file's row, where the line was. */
@@ -110,17 +71,21 @@ export function MessageRow({
   object: ForeignObject | null | undefined
   /** A reference that names no address or event id. */
   unreadable?: boolean
-  /** The URL it was written as: a link to one block opens there (WBM-11). */
+  /** The URL it was written as: a link to one block opens there (WBM-11), and one that cannot be shown stays that URL. */
   opensAt?: string
 }) {
   const conversation = useConversationOf(unreadable ? undefined : object)
+  const deleted = useDeleted(uri, !unreadable && isAbsent(uri, object))
   return (
-    <LinkClicks block>
-      <div data-link-row>
-        <LinkRow link={unreadable ? notAvailable(uri) : openingAt(linkStateOf(uri, object, { conversation }), opensAt)} />
-      </div>
-    </LinkClicks>
+    <div data-link-row>
+      <LinkRow link={unreadable ? notAvailable(uri, { url: opensAt }) : openingAt(linkStateOf(uri, deleted ? null : object, { conversation }, { url: opensAt, deleted }), opensAt)} />
+    </div>
   )
+}
+
+/** A file whose read came back empty — nothing, or interop's stand-in for what it could not see — and not because the read failed. */
+function isAbsent(uri: string, object: ForeignObject | null | undefined): boolean {
+  return (object === null && !resolveFailed(uri)) || !!object?.unreachable
 }
 
 /** Where a file's comment count opens: a Ship file's Activity tab, anyone else's file in its own app. */
@@ -257,6 +222,8 @@ function CardBox({
   const directory = useWorkspacePeople()
   // An old compact card is the file's row, and a row has the count too (Katerina, 30 Oct).
   const conversation = useConversationOf(object)
+  // Deleted, as a trusted deletion naming it says, or only not this reader's to see (SPEC §13.6.1).
+  const deleted = useDeleted(uri, !failed && isAbsent(uri, object))
 
   let link: LinkState
   let loadingShape: CardShape | undefined
@@ -264,14 +231,15 @@ function CardBox({
     // Found not available the last time this device asked: its one-line row from the first paint, not a card's height.
     // Otherwise a placeholder of the card's own height, so the conversation does not move as it loads.
     const kind = linkedKindOf(uri)
-    loadingShape = rememberedUnavailable(naddr) || compact ? undefined : cardShapeOf(naddr, kind)
-    link = rememberedUnavailable(naddr) ? notAvailable(uri) : { state: 'loading', kind, shape: loadingShape }
+    loadingShape = rememberedUnavailable(naddr) || compact ? undefined : cardShapes.of(naddr, kind)
+    link = rememberedUnavailable(naddr) ? notAvailable(uri, { url: opensAt }) : { state: 'loading', kind, shape: loadingShape }
   } else if (failed) {
-    // A failed read (a busy relay, the network) with nothing to show draws the not-available row, never nothing, and
-    // the page's refresh keeps asking quietly (Katerina, 30 Oct). It is not remembered: it is not an answer.
-    link = notAvailable(uri)
+    // A failed read (a busy relay, the network) with nothing to show draws the not-available row (or the URL it was
+    // written as), never nothing, and the page's refresh keeps asking quietly (Katerina, 30 Oct). It is not remembered:
+    // it is not an answer.
+    link = notAvailable(uri, { url: opensAt })
   } else {
-    link = openingAt(linkStateOf(uri, object, { directory, onAct, conversation }), opensAt)
+    link = openingAt(linkStateOf(uri, deleted ? null : object, { directory, onAct, conversation }, { url: opensAt, deleted }), opensAt)
   }
 
   /*
@@ -289,7 +257,7 @@ function CardBox({
     // A card not on screen (a closed tab) measures 0: it keeps the height it last drew at.
     const note = () => {
       const height = Math.round(card.getBoundingClientRect().height)
-      noteCardShape(naddr, height > 0 ? { ...drawn, height } : { ...drawn, height: cardShapeOf(naddr, kindOfCard)?.height })
+      cardShapes.note(naddr, height > 0 ? { ...drawn, height } : { ...drawn, height: cardShapes.of(naddr, kindOfCard)?.height })
     }
     note()
     if (typeof ResizeObserver === 'undefined') return
@@ -306,15 +274,13 @@ function CardBox({
     }
   }, [naddr, shapeKey, kindOfCard])
   return (
-    <LinkClicks block>
-      <div ref={box} data-card={compact ? 'compact' : 'detailed'} data-card-value={naddr} style={loadingShape?.height ? { minHeight: loadingShape.height } : undefined}>
-        {compact ? <LinkRow link={link} /> : <AttachedCard link={link} onRemove={onRemove} />}
-        {error && (
-          <FieldLine tone="error" className="mt-1">
-            {error}
-          </FieldLine>
-        )}
-      </div>
-    </LinkClicks>
+    <div ref={box} data-card={compact ? 'compact' : 'detailed'} data-card-value={naddr} style={loadingShape?.height ? { minHeight: loadingShape.height } : undefined}>
+      {compact ? <LinkRow link={link} /> : <AttachedCard link={link} onRemove={onRemove} />}
+      {error && (
+        <FieldLine tone="error" className="mt-1">
+          {error}
+        </FieldLine>
+      )}
+    </div>
   )
 }

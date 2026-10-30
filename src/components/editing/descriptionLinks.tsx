@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, type ReactNode } from 'react'
+import { createContext, useContext, type ReactNode } from 'react'
 import { useEditorState, type Editor } from '@tiptap/react'
 import { imetaFromAttrs, linksAsReferences, referenceOfLink, toRenderTree, urlRunsIn, type ContentFormat, type LinkResolver, type RenderBlock } from '@estiva-app/protocol'
 import { RichText } from '@estiva-app/ui'
@@ -78,7 +78,9 @@ export function DescriptionLinks({ editor, resolved, nameOf, readOnly, children 
  * A link in a description, drawn by where it sits (`place`, §13.3) with the
  * same chip, row and card a message draws: the chip in a sentence, the row
  * alone on its line, the card in the row's place when its writer chose Card.
- * While editing, a click is the chip menu's, so the chip shows no hover card.
+ * While the caret is on its line, a click is the chip menu's, so the chip
+ * shows no hover card (the kit says `editing` only then, ui 0.92). A URL whose
+ * file cannot be shown stays the URL it was written as (WBM-11), the kit's way.
  * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/every-app-edits-a-document-with-one-shared-editor.md
  */
 export function DescriptionLink({ uri, href, place = 'chip', editing = false }: ReferenceViewProps) {
@@ -87,8 +89,6 @@ export function DescriptionLink({ uri, href, place = 'chip', editing = false }: 
   const object = resolved[uri]
   if (place === 'card') return <DescriptionCard uri={uri} object={object} href={href} />
   if (place === 'row') return <MessageRow uri={uri} object={object} opensAt={href} />
-  // A URL whose file has not come back, or cannot be read, reads as the URL it was written as (WBM-11).
-  if (href && (!object || object.unreachable)) return <span>{href}</span>
   return <MessageChip uri={uri} object={object} nameOf={nameOf} preview={!editing} opensAt={href} />
 }
 
@@ -124,27 +124,12 @@ export function DescriptionReading({ value, format, resolveLink, resolved, nameO
 /**
  * The card its writer chose, its pickers live while the caret is in the text too (Katerina, 30 Oct, against the
  * record a-card-changes-what-a-files-app-shares's "words while the text is edited"). Words only where the reader
- * cannot act: a description only read.
+ * cannot act: a description only read. A press on a picker keeps the caret where it was: the kit's `ReferenceNode`
+ * does that for every app since ui 0.92 (Leaf's fix and Ship's, moved there).
  */
 function DescriptionCard({ uri, object, href }: { uri: string; object: ForeignObjectData | null | undefined; href?: string }) {
   const { readOnly } = useContext(Links)
-  const card = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    const element = card.current
-    if (!element) return
-    // ProseMirror sees a press before React does and takes the caret into the text, closing the picker before it
-    // opened. It leaves alone a press whose default is prevented (as Leaf's). Goes once the kit's BlockNodes does it.
-    const keep = (event: MouseEvent) => {
-      if (event.target instanceof Element && event.target.closest('button, [role="combobox"]')) event.preventDefault()
-    }
-    element.addEventListener('mousedown', keep)
-    return () => element.removeEventListener('mousedown', keep)
-  }, [])
-  return (
-    <div ref={card}>
-      <MessageCard uri={uri} object={object} opensAt={href} words={readOnly} />
-    </div>
-  )
+  return <MessageCard uri={uri} object={object} opensAt={href} words={readOnly} />
 }
 
 /**

@@ -42,9 +42,12 @@ function placeOf(link: string | undefined): { href: string; here: boolean } | un
  * (Katerina, 2026-10-08). The way into the app it came from is a Button with an
  * open-out icon, level with Show more.
  *
- * Deleted, or not this reader's to see, read the same (Miky, 15 Oct): the relay
- * answers both alike, and a title or its words would tell a reader something
- * about a Folder they are not in.
+ * The SPEC's five states (§13.6.1), as the kit's `PartCardState` draws them
+ * (ui 0.92): not this reader's to see says "not available"; deleted, as a
+ * trusted deletion naming what it is part of says, says "deleted"; a block gone
+ * from a file still there, and a file with no blocks, say so in the SPEC's
+ * words, the second opening the whole file. Neither of the first two shows a
+ * title, which would tell a reader something about a Folder they are not in.
  */
 export function PartCardView({ view, address, block, nameOf }: { view: PartView; address: string; block: string; nameOf?: (pubkey: string) => string }) {
   // What it is part of, by its icon, known from the address before anything is read.
@@ -59,22 +62,21 @@ export function PartCardView({ view, address, block, nameOf }: { view: PartView;
   if (view.state === 'unreadable' || view.state === 'deleted') {
     return (
       <div data-part={view.state} data-part-address={address}>
-        <KitPartCard state="unavailable" kind={kind} noun={kind[0].toUpperCase() + kind.slice(1)} />
+        <KitPartCard state={view.state === 'deleted' ? 'deleted' : 'unavailable'} kind={kind} noun={kind[0].toUpperCase() + kind.slice(1)} />
       </div>
     )
   }
 
   const place = placeOf(view.link)
   // The title alone, and its key under it ("A part of ABC-2"): the tile already says what it is (Katerina, 30 Oct).
-  const { title, key } = linkedOf(view.object)
+  const { title, key, href } = linkedOf(view.object)
   const frame = { kind: thingKindOf(view.object.kind), heading: title, partKey: key, href: place?.href }
 
   if (view.state !== 'resolved') {
     return (
       <div data-part={view.state} data-part-address={address}>
-        <KitPartCard {...frame}>
-          <span className="text-caption italic text-text-muted">{view.state === 'detached' ? 'This part was deleted' : "This part can't be shown"}</span>
-        </KitPartCard>
+        {/* A file with no blocks opens whole; a deleted block leads nowhere. */}
+        <KitPartCard state={view.state} kind={frame.kind} {...(view.state === 'unaddressable' && href ? { href } : {})} />
       </div>
     )
   }

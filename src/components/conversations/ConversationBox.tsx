@@ -2,7 +2,7 @@ import { createContext, useContext, useMemo, useRef, useState } from 'react'
 import { Extension } from '@tiptap/core'
 import type { JSONContent } from '@tiptap/react'
 import { boxReadOf, composerDocument, composerDraft, composerText, embedsToSend, namedBefore, withoutNewUrgency, type ComposerLabels } from '@estiva-app/conversation'
-import { referenceOfLink, type EditorDocument, type Imeta } from '@estiva-app/protocol'
+import { referenceOfLink, type EditorDocument, type Embed, type Imeta } from '@estiva-app/protocol'
 import { Kbd } from '@estiva-app/ui'
 import { CommentBox, commentBoxRows, LinkChips, type BoxFile, type BoxSentUnder, type BoxUnder, type ReferenceViewProps, type SendAnswer, type UploadAnswer } from '@estiva-app/ui/editor'
 import type { ForeignObject } from '@/api/foreign'
@@ -13,7 +13,7 @@ import { useForeignObjects } from '@/api/useForeignObjects'
 import { heldText, releaseHeld, useHeldTyping } from '@/auth/heldTyping'
 import { browserDrafts, type DraftStore } from '@/lib/drafts'
 import { useMentionPeople } from '@/components/editing/mentionables'
-import { MessageCard, MessageChip, MessagePart } from '@/components/ui/MessageLinks'
+import { MessageCard, MessageChip } from '@/components/ui/MessageLinks'
 import { PartCard } from '@/components/ui/PartCard'
 import { referenceOfValue, sameFiles, type Answer, type Picks } from './shared'
 
@@ -31,8 +31,8 @@ import { referenceOfValue, sameFiles, type Answer, type Picks } from './shared'
  * - **In the box**, under the text with its files, while a message is written:
  *   the one file it names as the card it will be sent with, ✕ to take it off,
  *   and the live part of a pasted block link (COMM-8), read as Peek and Leaf
- *   read their boxes. An edit shows the card of a file it names first, and its
- *   ✕ leaves it off the save (Katerina, 30 Oct).
+ *   read their boxes. An edit shows the message's own card, or a file it names
+ *   first, and its ✕ leaves it off the save (Katerina, 30 Oct).
  * - **An edit opens with chips**, not `nostr:` text (SHI-49): people by name,
  *   a message or file `[` knows by its caption, any other by the kit's chip.
  * - **Closed** (an archived file, signed out): a line saying why takes the
@@ -63,15 +63,16 @@ function BoxCard({ uri }: { uri: string }) {
 /**
  * What shows in the box while a message is written, read as it will be sent (why:
  * https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-link-on-words-counts-toward-the-card.md). In an edit,
- * `before` is the message as it stands: only a file the edit names first gets a card, as the save reads it (`editMessage`).
+ * `before` is the message as it stands and `folded` its cards: the box shows the message's own card while the edit
+ * still names its file, with its ✕, else a file the edit names first; a card taken off before never comes back
+ * (Katerina, 30 Oct, widget review 36) — the package's rule, as the save reads it (`editMessage`).
  */
-function boxUnder(here: string | undefined, nameOf?: (pubkey: string) => string, before?: string): BoxUnder {
+function boxUnder(here: string | undefined, nameOf?: (pubkey: string) => string, edit?: { before: string; folded?: readonly Embed[] }): BoxUnder {
   const context = { resolveLink: knownLinkValue, blockOf: knownBlockOf, here }
   return {
     read: (body) => {
       // Read again each time, so a link of the message's answered since counts as named before.
-      const previous = before === undefined ? undefined : namedBefore(before, context)
-      const links = boxReadOf(body as EditorDocument, previous ? { ...context, previous } : context)
+      const links = boxReadOf(body as EditorDocument, edit ? { ...context, previous: namedBefore(edit.before, context), folded: edit.folded ?? [] } : context)
       // Each read asks about the links not answered yet; an answer coming back reads again (`linksChanged`).
       void askLinkValues(links.urls.slice(0, MAX_LINKS_ASKED)).catch(() => {})
       const uri = links.card ? referenceOfValue(links.card) : undefined
@@ -79,11 +80,7 @@ function boxUnder(here: string | undefined, nameOf?: (pubkey: string) => string,
         card: links.card && uri ? { value: links.card, view: <BoxCard uri={uri} /> } : undefined,
         parts: links.parts.map((part) => ({
           key: `${part.address}#${part.block}`,
-          view: (
-            <MessagePart>
-              <PartCard address={part.address} block={part.block} nameOf={nameOf} />
-            </MessagePart>
-          ),
+          view: <PartCard address={part.address} block={part.block} nameOf={nameOf} />,
         })),
         names: [...links.values, ...links.parts.map((part) => part.address)],
       }
@@ -112,7 +109,7 @@ export interface ConversationBoxProps {
   closed?: string
   autoFocus?: boolean
   /** Editing a sent message: its text, urgent tags and files, where its unsaved words are held through a sign-in ending (AUT-4), and how to stop. */
-  editing?: { body: string; urgent?: readonly string[]; files?: readonly Imeta[]; holdKey?: string; onCancel: () => void }
+  editing?: { body: string; urgent?: readonly string[]; files?: readonly Imeta[]; embeds?: readonly Embed[]; holdKey?: string; onCancel: () => void }
   className?: string
 }
 
@@ -129,9 +126,10 @@ export function ConversationBox({ kind, onSend, references, captions, nameOf, re
     [],
   )
   const draft = useMemo(() => (draftKey && !editing ? composerDraft(drafts, draftKey, labels) : undefined), [draftKey, drafts, editing, labels])
-  // An edit shows a card too, for a file it names first (Katerina, 30 Oct, as Peek's and Leaf's edit boxes do).
+  // An edit shows a card too: the message's own with its ✕, or a file it names first (Katerina, 30 Oct, as in Peek and Leaf).
   const before = editing?.body
-  const under = useMemo(() => boxUnder(here, nameOf, before), [before, here, nameOf])
+  const folded = editing?.embeds
+  const under = useMemo(() => boxUnder(here, nameOf, before === undefined ? undefined : { before, folded }), [before, folded, here, nameOf])
 
   // An edit opens with the words held through a sign-in ending, else the message's; a re-read while editing does not reset them.
   const holdKey = editing?.holdKey
@@ -174,7 +172,8 @@ export function ConversationBox({ kind, onSend, references, captions, nameOf, re
     if (editing && !text) return { accepted: false, reason: 'a message needs words; Delete removes it' }
     // A file can be added or taken off while editing (Miky, 26 Oct, PEEKM-4): the whole set rides the edit as `imeta`,
     // and an edit with none takes every file off (SPEC §6.8).
-    // The card the edit box read, gone from what it saved: its ✕ took it off, and the save leaves it off.
+    // The card the edit box read, gone from what it saved: its ✕ took it off, and the save leaves it off (the message's
+    // own set none), even with the words unchanged.
     const read = editing ? under.read(body).card?.value : undefined
     const dropped = read && read !== shown.card ? read : undefined
     const unchanged = editing && text === editing.body.trim() && sameFiles(attached, editing.files ?? []) && !dropped
@@ -270,9 +269,8 @@ function BoxReference({ uri, href }: ReferenceViewProps) {
   const known = resolved?.[uri]
   const [asked] = useForeignObjects(known === undefined ? [uri] : []) ?? []
   const object = known ?? asked
-  // A URL chip whose file has not come back, or cannot be read, reads as the URL it was written as (WBM-11).
-  if (href && (!object || object.unreachable)) return <span>{href}</span>
-  return <MessageChip uri={uri} object={object} nameOf={nameOf} preview={false} follows={false} opensAt={href} />
+  // The kit keeps a click in the draft; a URL whose file cannot be shown stays the URL it was written as (WBM-11).
+  return <MessageChip uri={uri} object={object} nameOf={nameOf} preview={false} opensAt={href} />
 }
 
 /** Loaded on first use (see ThreadList): the editor is its own chunk. */

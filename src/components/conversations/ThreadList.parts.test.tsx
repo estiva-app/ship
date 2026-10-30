@@ -73,22 +73,27 @@ describe('a pasted block link', () => {
     expect(button).not.toContain('Open in Ship')
   })
 
-  it('says a deleted block was deleted, under its title', () => {
+  it('says a deleted block was deleted, in the SPEC’s words, and leads nowhere', () => {
     const c = show(LINK, { state: 'detached', object })
     expect(c.querySelector('[data-part="detached"]')?.textContent).toContain('This part was deleted')
+    expect(c.querySelector('[data-part="detached"] a')).toBeNull()
   })
 
-  it('says a body with no parts cannot be shown', () => {
+  it('says a body with no parts cannot be shown, its words opening the whole file', () => {
     const c = show(LINK, { state: 'unaddressable', object })
-    expect(c.querySelector('[data-part="unaddressable"]')?.textContent).toContain("This part can't be shown")
+    const card = c.querySelector('[data-part="unaddressable"]')
+    expect(card?.textContent).toContain("This part can't be shown")
+    expect(card?.querySelector('a')?.getAttribute('href')).toBe('/issue/plan-the-launch-b4ea696a-d4a2-4833-8f2a-6aa1e2f3c4d5')
   })
 
-  // Deleted, or not this reader's to see, read the same, as in Peek (Miky, 15 Oct): the relay answers both alike.
-  it('says only "not available" for a deleted object and for one the reader may not see, alike', () => {
+  // Changed on purpose (SPEC §13.6.1 "deleted is not not-permitted"; Katerina, 30 Oct, widget review 56): a trusted
+  // deletion naming the file says "deleted"; one the reader may not see says "not available". Neither shows a title.
+  it('says "deleted" for a file a trusted deletion names, and "not available" for one the reader may not see', () => {
     const deleted = show(LINK, { state: 'deleted' }).querySelector('[data-part="deleted"]')?.textContent
     const unreadable = show(LINK, { state: 'unreadable' }).querySelector('[data-part="unreadable"]')?.textContent
-    expect(deleted).toMatch(/not available$/)
-    expect(unreadable).toBe(deleted)
+    expect(deleted).toBe('A part of this issue deleted')
+    expect(unreadable).toBe('A part of this issue not available')
+    expect(deleted).not.toContain('Plan the launch')
   })
 
   it("draws a comment's anchored block with the same card, above the text (Decided 2026-10-07)", () => {

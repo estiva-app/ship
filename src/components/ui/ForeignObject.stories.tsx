@@ -53,6 +53,19 @@ export const Card: Story = {
   },
 }
 
+/** An issue nobody is assigned to: its owner reads "Unassigned" beside the person silhouette, never a letter "U" (ui 0.92). */
+export const Unassigned: Story = {
+  args: {
+    object: obj({
+      kind: 30851,
+      noun: 'issue',
+      slots: { title: { value: 'Turn off the old read path' }, status: { value: 'Todo', colour: 'neutral' } },
+      meta: [{ label: 'Ref', value: 'REL-7', field: 'ref' }],
+      actions: [{ id: 'assign-issue', label: 'Assign', control: 'pubkey', field: 'assignee', current: '' }],
+    }),
+  },
+}
+
 /** `row` — the kit's row, for a list of them. */
 export const Row: Story = {
   args: { object: obj({ widget: 'row', slots: { title: { value: 'Design review' } } }) },
