@@ -31,11 +31,16 @@ const isModified = (event: MouseEvent) => event.button !== 0 || event.metaKey ||
 /**
  * Another app's address opens in a new tab: a stranger published it into a
  * shared relay, hence `noopener`. Ship's own go through the kit, which hands
- * them to `AppProvider`'s `navigate`.
+ * them to `AppProvider`'s `navigate`. With `follows` off, a click opens
+ * nothing: in a box being written in, it is not a way out of the draft.
  */
-function LinkClicks({ block = false, children }: { block?: boolean; children: ReactNode }) {
+function LinkClicks({ block = false, follows = true, children }: { block?: boolean; follows?: boolean; children: ReactNode }) {
   const onClickCapture = (event: MouseEvent<HTMLElement>) => {
     const anchor = (event.target as Element).closest('a')
+    if (anchor && !follows) {
+      event.preventDefault()
+      return
+    }
     if (!anchor || isModified(event) || anchor.getAttribute('target')) return
     let url: URL
     try {
@@ -72,20 +77,23 @@ export function MessageChip({
   nameOf,
   urgent,
   preview = true,
+  follows = true,
   opensAt,
 }: {
   uri: string
   object: ForeignObject | null | undefined
   nameOf?: (pubkey: string) => string
   urgent?: readonly string[]
-  /** Hovering shows its card; off in a list of previews, where a card would cover the next one. */
+  /** Hovering shows its card; off in a list of previews, where a card would cover the next one, and in a box being written in. */
   preview?: boolean
+  /** A click opens it; off in a box being written in, where a click is not a way out of the draft (Katerina, 30 Oct). */
+  follows?: boolean
   /** The URL it was written as: a link to one block opens there (WBM-11). */
   opensAt?: string
 }) {
   if (/^nostr:npub1/i.test(uri)) return <Reference uri={uri} nameOf={nameOf} urgent={urgent} />
   return (
-    <LinkClicks>
+    <LinkClicks follows={follows}>
       <LinkChip link={openingAt(linkStateOf(uri, object), opensAt)} preview={preview} />
     </LinkClicks>
   )

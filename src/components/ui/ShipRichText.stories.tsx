@@ -22,6 +22,9 @@ const issue = {
   widget: 'row',
   appName: 'Estiva Ship',
   slots: { title: { value: 'Ship the block model' }, status: { value: 'In Progress', colour: 'blue' } },
+  meta: [{ label: 'Ref', value: 'SHI-7', field: 'ref' }],
+  actions: [],
+  comments: [],
 } as unknown as ForeignObject
 
 const MARKER = [
@@ -49,7 +52,7 @@ const meta = {
 export default meta
 type Story = StoryObj<typeof meta>
 
-/** Marker text, which is what every published description is today: every block, a mention inside a sentence, and `<b>` reaching the screen as characters. */
+/** Marker text, which is what every published description is today: every block, a link inside a sentence as the kit's chip, and `<b>` reaching the screen as characters. */
 export const MarkerBody: Story = { args: { value: MARKER, format: 'marker' } }
 
 /** A block document. The last block is a type from a later version of the spec: its inline text is drawn rather than dropped, because a block that vanishes looks like one you are not allowed to see. */

@@ -1,178 +1,34 @@
 /**
- * One component for every kind of reference — RIC-10.
- *
- * Miky's note: "everything you mention is basically a file. Even things like
- * different topic, message, or even specific person." So a person and a project
- * are the same idea pointed at two things, and this draws whatever the URI
- * turns out to name rather than the caller knowing in advance.
- *
- * Two mechanisms side by side is how the display-name mention drifted away from
- * the projection layer; this replaces `MentionChip`, which knew only people.
+ * A person named in text — RIC-10's person half. A file or a message named in
+ * text is the kit's chip since the widget review (Katerina, 30 Oct, items 16
+ * and 52): `MessageChip`, tested where it draws (`ThreadList.kit.test.tsx`,
+ * `ConversationBox.cards.test.tsx`).
  */
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { render } from '@testing-library/react'
-import { addrToNaddr, encodeNevent, encodeNpub } from '@estiva-app/protocol'
-import type { ForeignObject } from '@/api/foreign'
+import { encodeNpub } from '@estiva-app/protocol'
 import { Reference } from './Reference'
 
 const ADA = 'b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46'
+const STRANGER = 'cd'.repeat(32)
 const NPUB = `nostr:${encodeNpub(ADA)}`
-const NADDR = `nostr:${addrToNaddr(`30851:${ADA}:an-issue`)}`
 const nameOf = (pubkey: string) => (pubkey === ADA ? 'Ada Lovelace' : `${pubkey.slice(0, 8)}…`)
 
-const anIssue = (status?: string): ForeignObject =>
-  ({
-    ref: '30851:x:an-issue',
-    slots: { title: { value: 'Ship it' }, ...(status ? { status: { value: status } } : {}) },
-  }) as unknown as ForeignObject
-
-describe('Reference', () => {
+describe('Reference, a person', () => {
   it('draws a person from the directory', () => {
     const c = render(<Reference uri={NPUB} nameOf={nameOf} />).container
     expect(c.querySelector('[data-reference="person"]')).not.toBeNull()
     expect(c.textContent).toBe('@Ada Lovelace')
   })
 
-  it('draws an object from its own projection', () => {
-    const c = render(<Reference uri={NADDR} object={anIssue()} />).container
-    expect(c.querySelector('[data-reference="object"]')).not.toBeNull()
-    expect(c.textContent).toContain('Ship it')
+  it('is a label: Ship has no page for a person', () => {
+    expect(render(<Reference uri={NPUB} nameOf={nameOf} />).container.querySelector('a')).toBeNull()
   })
 
-  it('shows the status where the manifest declares one', () => {
-    // The "maybe the status as icon" half of the ask.
-    const c = render(<Reference uri={NADDR} object={anIssue('in_progress')} />).container
-    expect(c.textContent).toContain('Ship it')
-    expect(c.textContent).toContain('in_progress')
-  })
-
-  it('omits the status where it declares none, rather than inventing one', () => {
-    const c = render(<Reference uri={NADDR} object={anIssue()} />).container
-    expect(c.textContent).toBe('Ship it')
-  })
-
-  it('never renders blank — §13.1', () => {
-    // Three ways to know nothing, all of which still say a reference is here.
-    for (const [label, node] of [
-      ['still resolving', <Reference key="a" uri={NADDR} />],
-      ['resolved to nothing', <Reference key="b" uri={NADDR} object={null} />],
-      ['a person outside the workspace', <Reference key="c" uri={`nostr:${encodeNpub('cd'.repeat(32))}`} nameOf={nameOf} />],
-    ] as const) {
-      const c = render(node).container
-      expect(c.textContent, label).not.toBe('')
-    }
-  })
-
-  it('tells "still resolving" apart from "resolved to nothing"', () => {
-    // Drawn the same, marked differently: neither is something a reader can act
-    // on, but they are different facts and a check should be able to see which.
-    const pending = render(<Reference uri={NADDR} />).container
-    const empty = render(<Reference uri={NADDR} object={null} />).container
-    expect(pending.querySelector('[data-reference="pending"]')).not.toBeNull()
-    expect(empty.querySelector('[data-reference="unresolved"]')).not.toBeNull()
-  })
-})
-
-/**
- * A message, through Peek's manifest — RIC-11. It has no title of its own, so
- * the manifest titles it by its author (`field: "pubkey", as: "pubkey"`) and
- * carries the text as `body`. The done-when is that a mention made in Peek
- * resolves *here*, with no shared fixture: the runtime's `people` name the
- * author, and the chip quotes the opening words so a reader knows which
- * message.
- */
-describe('Reference, for a message', () => {
-  const NEVENT = `nostr:${encodeNevent({ id: 'c'.repeat(64), relays: [], kind: 9 })}`
-  const aMessage = (people?: ForeignObject['people'], widget: ForeignObject['widget'] = ['message', 'card']): ForeignObject =>
-    ({
-      ref: 'nevent1msg',
-      kind: 9,
-      widget,
-      slots: { title: { value: ADA, isPubkey: true }, body: { value: 'The build is green again.' } },
-      people,
-    }) as unknown as ForeignObject
-
-  it('names the author and quotes the opening words', () => {
-    const c = render(<Reference uri={NEVENT} object={aMessage({ [ADA]: { displayName: 'Ada Lovelace' } })} />).container
-    expect(c.textContent).toBe('Ada Lovelace: The build is green again.')
-  })
-
-  it('never prints the key when the runtime found no profile', () => {
-    const c = render(<Reference uri={NEVENT} object={aMessage()} nameOf={nameOf} />).container
-    expect(c.textContent).toBe('Ada Lovelace: The build is green again.')
-    const stranger = render(<Reference uri={NEVENT} object={aMessage(undefined)} />).container
-    expect(stranger.textContent).not.toContain(ADA)
-    expect(stranger.textContent).toContain(`${ADA.slice(0, 8)}…`)
-  })
-
-  it('draws a person-titled object that is not a message by the name alone', () => {
-    // The `message` widget is what makes something a message, not the
-    // person-shaped title: a project led by somebody is still a project.
-    const c = render(<Reference uri={NADDR} object={aMessage({ [ADA]: { displayName: 'Ada' } }, 'card')} />).container
-    expect(c.textContent).toBe('Ada')
-  })
-})
-
-describe('Reference, as a link (RIC-16)', () => {
-  const D = '0212db6d-bcbf-40d0-890e-f4f056db2f5d'
-  const anOwnIssue = (): ForeignObject =>
-    ({ ref: `30851:${ADA}:${D}`, kind: 30851, address: `30851:${ADA}:${D}`, slots: { title: { value: 'Ship it' } } }) as unknown as ForeignObject
-  const aPeekTopic = (): ForeignObject =>
-    ({ ref: 'naddr1topic', kind: 39000, openUrl: 'https://peek.estiva.app/o/naddr1topic', slots: { title: { value: 'Feedback on Ship' } } }) as unknown as ForeignObject
-  const click = (init: MouseEventInit = {}) => new MouseEvent('click', { bubbles: true, cancelable: true, button: 0, ...init })
-
-  afterEach(() => {
-    history.replaceState(null, '', '/')
-  })
-
-  it("a label leads nowhere: nothing resolved, or an app with no web template, is not an anchor", () => {
-    expect(render(<Reference uri={NADDR} object={undefined} />).container.querySelector('a')).toBeNull()
-    expect(render(<Reference uri={NADDR} object={anIssue()} />).container.querySelector('a')).toBeNull()
-  })
-
-  it("one of Ship's own objects is a link to its page here, followed through the router", () => {
-    const c = render(<Reference uri={NADDR} object={anOwnIssue()} />).container
-    const a = c.querySelector('a')!
-    expect(a.getAttribute('href')).toBe(`/issue/ship-it-${D}`)
-    expect(a.getAttribute('target')).toBeNull()
-    const event = click()
-    a.dispatchEvent(event)
-    // Routed in place, not a document load.
-    expect(event.defaultPrevented).toBe(true)
-    expect(location.pathname).toBe(`/issue/ship-it-${D}`)
-  })
-
-  it('a modified click is left to the browser, so open-in-new-tab keeps working', () => {
-    const c = render(<Reference uri={NADDR} object={anOwnIssue()} />).container
-    const event = click({ ctrlKey: true })
-    c.querySelector('a')!.dispatchEvent(event)
-    expect(event.defaultPrevented).toBe(false)
-    expect(location.pathname).toBe('/')
-  })
-
-  it('a Peek topic opens in Peek, at the URL its manifest gave, in a new tab', () => {
-    const c = render(<Reference uri={NADDR} object={aPeekTopic()} />).container
-    const a = c.querySelector('a')!
-    expect(a.getAttribute('href')).toBe('https://peek.estiva.app/o/naddr1topic')
-    expect(a.getAttribute('target')).toBe('_blank')
-    expect(a.getAttribute('rel')).toContain('noopener')
-    expect(a.textContent).toBe('Feedback on Ship')
-    // Not intercepted: the browser follows it.
-    const event = click()
-    a.dispatchEvent(event)
-    expect(event.defaultPrevented).toBe(false)
-  })
-
-  it('following a chip does not reach the surface under it', () => {
-    // The description's reading view enters editing on a click; a mention
-    // followed is not a description edited.
-    const onSurface = vi.fn()
-    const c = render(
-      <div onClick={onSurface}>
-        <Reference uri={NADDR} object={aPeekTopic()} />
-      </div>,
-    ).container
-    c.querySelector('a')!.dispatchEvent(click())
-    expect(onSurface).not.toHaveBeenCalled()
+  it('never renders blank, and never the whole key, for somebody the directory cannot name — §13.1', () => {
+    const c = render(<Reference uri={`nostr:${encodeNpub(STRANGER)}`} nameOf={nameOf} />).container
+    expect(c.textContent).not.toBe('')
+    expect(c.textContent).not.toContain(STRANGER)
+    expect(c.querySelector('[data-resolved="false"]')).not.toBeNull()
   })
 })

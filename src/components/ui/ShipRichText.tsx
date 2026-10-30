@@ -1,8 +1,9 @@
-import type { ForeignObject } from '@/api/foreign'
 import { RichText as PackageRichText, type RichTextBlock, type RichTextSize } from '@estiva-app/ui'
+import type { ForeignObject } from '@/api/foreign'
+import { imetaFromAttrs, referencesIn, toRenderTree, type ContentFormat } from '@estiva-app/protocol'
+import { byReference, useForeignObjects } from '@/api/useForeignObjects'
 import { Attachment } from './Attachment'
-import { Reference } from './Reference'
-import { imetaFromAttrs, toRenderTree, type ContentFormat } from '@estiva-app/protocol'
+import { MessageChip } from './MessageLinks'
 
 /**
  * A body, drawn — SPEC §13.
@@ -21,17 +22,18 @@ import { imetaFromAttrs, toRenderTree, type ContentFormat } from '@estiva-app/pr
  *
  * **The look is the package's** (UIG-30, Katerina, 28 September): Peek and Ship
  * had drawn the same tree two ways, and one design now draws both. What is
- * Ship's is what a word points at — a person or an item (`Reference`) and a
- * file (`Attachment`). Inside it every reference is its chip, never a row or a
- * card: two objects that card each other would nest forever (§13.3).
+ * Ship's is what a word points at — a file or a message, as the kit's chip
+ * (`MessageChip`, read once for the whole body), a person by the directory's
+ * name — and a file (`Attachment`). Inside it every reference is its chip,
+ * never a row or a card: two objects that card each other would nest forever
+ * (§13.3).
  */
 export function ShipRichText({
   value,
   format,
   size,
   nameOf,
-  resolved,
-  urgent,
+  resolved: given,
 }: {
   value: string
   format: ContentFormat
@@ -39,23 +41,20 @@ export function ShipRichText({
   size?: RichTextSize
   /** Resolve a mentioned key to a name — SPEC §13.1. The workspace directory's. */
   nameOf?: (pubkey: string) => string
-  /**
-   * The body's references, already resolved — RIC-10.
-   *
-   * Keyed by URI and resolved once for the whole body, so an object named twice
-   * cannot be drawn in two states on one screen.
-   */
+  /** Its references already read, by URI: a story's or a test's seam. Otherwise it reads them itself. */
   resolved?: Record<string, ForeignObject | null | undefined>
-  /** A message's urgent keys, which draw their person chips urgent — SPEC §13.1, CON-24. */
-  urgent?: readonly string[]
 }) {
   const blocks = toRenderTree(value, format)
+  // Its files and messages, read once for the whole body, so one named twice is never drawn in two states (RIC-10). A person is the directory's.
+  const references = given ? [] : referencesIn(blocks).filter((reference) => !/^nostr:npub1/i.test(reference))
+  const read = useForeignObjects(references)
+  const resolved = given ?? byReference(references, read)
   if (blocks.length === 0) return null
   return (
     <PackageRichText
       blocks={blocks}
       size={size}
-      renderReference={(reference) => <Reference uri={reference} object={resolved?.[reference]} nameOf={nameOf} urgent={urgent} />}
+      renderReference={(reference) => <MessageChip uri={reference} object={resolved[reference]} nameOf={nameOf} />}
       renderBlock={drawAttachment}
     />
   )

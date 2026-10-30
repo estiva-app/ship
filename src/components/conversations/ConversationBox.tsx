@@ -13,16 +13,15 @@ import { useForeignObjects } from '@/api/useForeignObjects'
 import { heldText, releaseHeld, useHeldTyping } from '@/auth/heldTyping'
 import { browserDrafts, type DraftStore } from '@/lib/drafts'
 import { useMentionPeople } from '@/components/editing/mentionables'
-import { MessageCard, MessagePart } from '@/components/ui/MessageLinks'
+import { MessageCard, MessageChip, MessagePart } from '@/components/ui/MessageLinks'
 import { PartCard } from '@/components/ui/PartCard'
-import { Reference } from '@/components/ui/Reference'
 import { referenceOfValue, sameFiles, type Answer, type Picks } from './shared'
 
 /**
  * Ship's comment box: estiva-ui's `CommentBox`, the one box every app writes a
  * comment, a reply, a chat line and an edit in (COMM-7). What Ship adds is only
  * what Ship knows: its people for `@` and `!@`, its `[` sections, its `/`
- * Insert rows, its upload, its drafts, its chips, and a send through its own
+ * Insert rows, its upload, its drafts, its lookups for the kit's chips, and a send through its own
  * `buildConversationMessage` that answers whether the relay took it.
  *
  * - **Not optimistic**: the box holds the words, shut, until the relay answers;
@@ -34,7 +33,7 @@ import { referenceOfValue, sameFiles, type Answer, type Picks } from './shared'
  *   read their boxes. An edit shows the card of a file it names first, and its
  *   ✕ leaves it off the save (Katerina, 30 Oct).
  * - **An edit opens with chips**, not `nostr:` text (SHI-49): people by name,
- *   a message or file `[` knows by its caption, any other by Ship's own chip.
+ *   a message or file `[` knows by its caption, any other by the kit's chip.
  * - **Closed** (an archived file, signed out): a line saying why takes the
  *   box's place (Decided 2026-10-17).
  *
@@ -258,9 +257,12 @@ interface BoxReferenceContext {
 const BoxReferences = createContext<BoxReferenceContext>({})
 
 /**
- * A `nostr:` reference or an app link the box holds, as Ship's chip — the same
- * `Reference` a sent message draws — resolved from the page, or asked for when
- * the page has not (an edit's reference to a message elsewhere: SHI-49).
+ * A `nostr:` reference or an app link the box holds, as the kit's chip — the
+ * one a sent message draws: its key, its title cut short, its status as its
+ * mark, its kind's icon (Katerina, 30 Oct) — resolved from the page, or asked
+ * for when the page has not (an edit's reference to a message elsewhere:
+ * SHI-49). While written it follows no click and shows no hover card. A person
+ * is the directory's chip.
  */
 function BoxReference({ uri, href }: ReferenceViewProps) {
   const { resolved, nameOf } = useContext(BoxReferences)
@@ -269,7 +271,7 @@ function BoxReference({ uri, href }: ReferenceViewProps) {
   const object = known ?? asked
   // A URL chip whose file has not come back, or cannot be read, reads as the URL it was written as (WBM-11).
   if (href && (!object || object.unreachable)) return <span>{href}</span>
-  return <Reference uri={uri} object={object} nameOf={nameOf} opensAt={href} />
+  return <MessageChip uri={uri} object={object} nameOf={nameOf} preview={false} follows={false} opensAt={href} />
 }
 
 /** Loaded on first use (see ThreadList): the editor is its own chunk. */

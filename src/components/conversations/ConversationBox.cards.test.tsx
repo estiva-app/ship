@@ -23,7 +23,7 @@ const object = (address: string, title: string) => ({
   widget: 'row',
   appName: 'Ship',
   slots: { title: { value: title } },
-  meta: [],
+  meta: address === FIRST ? [{ label: 'Ref', value: 'SHI-9', field: 'ref' }] : [],
   comments: [],
   actions: [],
   viaRecommendation: true,
@@ -74,6 +74,19 @@ describe('the edit box', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: 'Edit message' }))
     return { box: await ready('Edit message'), onEditMessage }
   }
+
+  // One chip look in every box (Katerina, 30 Oct, item 16): the kit's, with its key, which a click does not follow while written.
+  it('draws a link it holds as the kit’s chip, key and title, which a click does not follow', async () => {
+    const { box } = await edit(`See ${ref(FIRST)}`)
+    await waitFor(() => expect(box.querySelector('a')?.textContent).toContain('Named first'))
+    const chip = box.querySelector('a')!
+    expect(chip.textContent).toContain('SHI-9')
+    const click = new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 })
+    chip.dispatchEvent(click)
+    // Kept from the browser and from the router alike.
+    expect(click.defaultPrevented).toBe(true)
+    expect(location.pathname).toBe('/')
+  })
 
   it('shows the card of a file the edit names first', async () => {
     const { box } = await edit('No link yet.')
