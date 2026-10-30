@@ -82,6 +82,8 @@ export function Time({ at }: { at: number }) {
 export interface Picks {
   urgent?: readonly string[]
   embeds?: readonly Embed[]
+  /** An edit's: the card the box's ✕ took off, which the edit then does not add, or takes off the message (SPEC §13.6.2). */
+  dropped?: string
 }
 
 /**

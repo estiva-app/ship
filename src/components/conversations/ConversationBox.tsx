@@ -1,7 +1,7 @@
 import { createContext, useContext, useMemo, useRef, useState } from 'react'
 import { Extension } from '@tiptap/core'
 import type { JSONContent } from '@tiptap/react'
-import { boxReadOf, composerDocument, composerDraft, composerText, embedsToSend, withoutNewUrgency, type ComposerLabels } from '@estiva-app/conversation'
+import { boxReadOf, composerDocument, composerDraft, composerText, embedsToSend, namedBefore, withoutNewUrgency, type ComposerLabels } from '@estiva-app/conversation'
 import { referenceOfLink, type EditorDocument, type Imeta } from '@estiva-app/protocol'
 import { Kbd } from '@estiva-app/ui'
 import { CommentBox, commentBoxRows, LinkChips, type BoxFile, type BoxSentUnder, type BoxUnder, type ReferenceViewProps, type SendAnswer, type UploadAnswer } from '@estiva-app/ui/editor'
@@ -28,9 +28,11 @@ import { referenceOfValue, sameFiles, type Answer, type Picks } from './shared'
  * - **Not optimistic**: the box holds the words, shut, until the relay answers;
  *   a refusal is said under it with the words still in it — no toast (record
  *   a-refused-action-is-undone-and-your-text-comes-back).
- * - **Under the box** while a new message is written: the one file it names as
- *   the card it will be sent with, ✕ to take it off, and the live part of a
- *   pasted block link (COMM-8), read as Peek and Leaf read their boxes.
+ * - **In the box**, under the text with its files, while a message is written:
+ *   the one file it names as the card it will be sent with, ✕ to take it off,
+ *   and the live part of a pasted block link (COMM-8), read as Peek and Leaf
+ *   read their boxes. An edit shows the card of a file it names first, and its
+ *   ✕ leaves it off the save (Katerina, 30 Oct).
  * - **An edit opens with chips**, not `nostr:` text (SHI-49): people by name,
  *   a message or file `[` knows by its caption, any other by Ship's own chip.
  * - **Closed** (an archived file, signed out): a line saying why takes the
@@ -52,17 +54,24 @@ const MAX_LINKS_ASKED = 24
 
 const DEFAULT_DRAFTS = browserDrafts()
 
-/** A file's card under the box, drawn as a sent message draws it. */
+/** A file's card in the box, under the text, drawn as a sent message draws it. */
 function BoxCard({ uri }: { uri: string }) {
   const [object] = useForeignObjects([uri]) ?? []
   return <MessageCard uri={uri} object={object} />
 }
 
-/** What shows under the box while a new message is written, read as it will be sent (why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-link-on-words-counts-toward-the-card.md). */
-function boxUnder(here: string | undefined, nameOf?: (pubkey: string) => string): BoxUnder {
+/**
+ * What shows in the box while a message is written, read as it will be sent (why:
+ * https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-link-on-words-counts-toward-the-card.md). In an edit,
+ * `before` is the message as it stands: only a file the edit names first gets a card, as the save reads it (`editMessage`).
+ */
+function boxUnder(here: string | undefined, nameOf?: (pubkey: string) => string, before?: string): BoxUnder {
+  const context = { resolveLink: knownLinkValue, blockOf: knownBlockOf, here }
   return {
     read: (body) => {
-      const links = boxReadOf(body as EditorDocument, { resolveLink: knownLinkValue, blockOf: knownBlockOf, here })
+      // Read again each time, so a link of the message's answered since counts as named before.
+      const previous = before === undefined ? undefined : namedBefore(before, context)
+      const links = boxReadOf(body as EditorDocument, previous ? { ...context, previous } : context)
       // Each read asks about the links not answered yet; an answer coming back reads again (`linksChanged`).
       void askLinkValues(links.urls.slice(0, MAX_LINKS_ASKED)).catch(() => {})
       const uri = links.card ? referenceOfValue(links.card) : undefined
@@ -120,7 +129,9 @@ export function ConversationBox({ kind, onSend, references, captions, nameOf, re
     [],
   )
   const draft = useMemo(() => (draftKey && !editing ? composerDraft(drafts, draftKey, labels) : undefined), [draftKey, drafts, editing, labels])
-  const under = useMemo(() => (editing ? undefined : boxUnder(here, nameOf)), [editing, here, nameOf])
+  // An edit shows a card too, for a file it names first (Katerina, 30 Oct, as Peek's and Leaf's edit boxes do).
+  const before = editing?.body
+  const under = useMemo(() => boxUnder(here, nameOf, before), [before, here, nameOf])
 
   // An edit opens with the words held through a sign-in ending, else the message's; a re-read while editing does not reset them.
   const holdKey = editing?.holdKey
@@ -163,11 +174,14 @@ export function ConversationBox({ kind, onSend, references, captions, nameOf, re
     if (editing && !text) return { accepted: false, reason: 'a message needs words; Delete removes it' }
     // A file can be added or taken off while editing (Miky, 26 Oct, PEEKM-4): the whole set rides the edit as `imeta`,
     // and an edit with none takes every file off (SPEC §6.8).
-    const unchanged = editing && text === editing.body.trim() && sameFiles(attached, editing.files ?? [])
+    // The card the edit box read, gone from what it saved: its ✕ took it off, and the save leaves it off.
+    const read = editing ? under.read(body).card?.value : undefined
+    const dropped = read && read !== shown.card ? read : undefined
+    const unchanged = editing && text === editing.body.trim() && sameFiles(attached, editing.files ?? []) && !dropped
     const answer = unchanged
       ? true
       : editing
-        ? await onSend(withoutNewUrgency(text, editing.body), attached, {})
+        ? await onSend(withoutNewUrgency(text, editing.body), attached, dropped ? { dropped } : {})
         : await onSend(text, attached, { urgent, embeds: embedsToSend({ card: shown.card }, new Set()) })
     // The box writes the sentence round the reason ("Not sent: … . Your text is back in the box."), so the reason's own full stop goes.
     if (answer !== true) return { accepted: false, reason: answer.replace(/\.+$/, '') }
@@ -193,7 +207,7 @@ export function ConversationBox({ kind, onSend, references, captions, nameOf, re
           if (holdKey) releaseHeld(holdKey)
           editing.onCancel()
         },
-        onSave: (body: JSONContent, files: BoxFile[]) => send(body, files),
+        onSave: (body: JSONContent, files: BoxFile[], shown: BoxSentUnder) => send(body, files, shown),
       }
     : undefined
 

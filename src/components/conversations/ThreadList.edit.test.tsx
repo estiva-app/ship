@@ -114,7 +114,7 @@ describe('the edit control', () => {
     const box = await openEditor()
     replace(box, 'Key is in 1Password.')
     fireEvent.click(save())
-    await waitFor(() => expect(onEditMessage).toHaveBeenCalledWith('root-1', 'Key is in 1Password.', undefined, []))
+    await waitFor(() => expect(onEditMessage).toHaveBeenCalledWith('root-1', 'Key is in 1Password.', undefined, [], undefined))
   })
 
   /* The package Form (UIG-7): the keys every form has. Enter in the text is a
@@ -130,7 +130,7 @@ describe('the edit control', () => {
     expect(box.querySelectorAll('p')).toHaveLength(2)
     expect(onEditMessage).not.toHaveBeenCalled()
     fireEvent.keyDown(box, { key: 'Enter', ctrlKey: true })
-    await waitFor(() => expect(onEditMessage).toHaveBeenCalledWith('root-1', 'Key is in 1Password.', undefined, []))
+    await waitFor(() => expect(onEditMessage).toHaveBeenCalledWith('root-1', 'Key is in 1Password.', undefined, [], undefined))
   })
 
   /* Nothing to publish, and a no-op edit would still cost an event that every
@@ -225,7 +225,7 @@ describe('the files of a message being edited', () => {
     await screen.findByText('notes.txt')
     await waitFor(() => expect(save().disabled).toBe(false))
     fireEvent.click(save())
-    await waitFor(() => expect(onEditMessage).toHaveBeenCalledWith('root-1', 'Blocked on the Stripe key.', undefined, [kept, added]))
+    await waitFor(() => expect(onEditMessage).toHaveBeenCalledWith('root-1', 'Blocked on the Stripe key.', undefined, [kept, added], undefined))
   })
 
   it('lists the files again on an edit that did not touch them, since an edit is the whole new message', async () => {
@@ -234,7 +234,7 @@ describe('the files of a message being edited', () => {
     const box = await openEditor()
     replace(box, 'Key is in 1Password.')
     fireEvent.click(save())
-    await waitFor(() => expect(onEditMessage).toHaveBeenCalledWith('root-1', 'Key is in 1Password.', undefined, [kept]))
+    await waitFor(() => expect(onEditMessage).toHaveBeenCalledWith('root-1', 'Key is in 1Password.', undefined, [kept], undefined))
   })
 
   it('takes the last one off: the edit saves with no files (SPEC §6.8)', async () => {
@@ -243,7 +243,7 @@ describe('the files of a message being edited', () => {
     await openEditor()
     fireEvent.click(screen.getByRole('button', { name: /Remove brief\.pdf/ }))
     fireEvent.click(save())
-    await waitFor(() => expect(onEditMessage).toHaveBeenCalledWith('root-1', 'Blocked on the Stripe key.', undefined, []))
+    await waitFor(() => expect(onEditMessage).toHaveBeenCalledWith('root-1', 'Blocked on the Stripe key.', undefined, [], undefined))
     expect(screen.queryByText(/cannot be taken off/)).toBeNull()
   })
 })

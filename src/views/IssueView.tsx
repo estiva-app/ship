@@ -93,7 +93,7 @@ export interface IssueViewProps {
   /** Publish a deletion for one message — CON-3. Omitted where nobody may write. */
   onDeleteMessage?: (messageId: string) => Promise<boolean | void> | boolean | void
   /** Publish an edit of one message — CON-4. Omitted where nobody may write. */
-  onEditMessage?: (messageId: string, body: string, removeCard?: string, files?: readonly Imeta[]) => Promise<Answer>
+  onEditMessage?: (messageId: string, body: string, removeCard?: string, files?: readonly Imeta[], dropped?: string) => Promise<Answer>
   /** Why writes are unavailable — every write control on the page is disabled with it. */
   readOnlyReason?: string
   /** Why this issue's own title, description and rail are shut while it can still be discussed, archived or deleted — an archived issue (SHI-36). */

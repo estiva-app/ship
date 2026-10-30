@@ -332,7 +332,7 @@ export interface ConversationsProps {
    * still in it and the words under it. Omitted where nobody may write, and the
    * control is then absent rather than disabled.
    */
-  onEditMessage?: (messageId: string, body: string, removeCard?: string, files?: readonly Imeta[]) => Promise<Answer>
+  onEditMessage?: (messageId: string, body: string, removeCard?: string, files?: readonly Imeta[], dropped?: string) => Promise<Answer>
   className?: string
 }
 

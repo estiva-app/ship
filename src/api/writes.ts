@@ -669,7 +669,8 @@ export function editMessage(folder: string, messageEventId: string, body: string
     ])
     const [after, before] = [linkResolverFor(body, links.known), linkResolverFor(card.before, links.known)]
     const read = { resolveLink: (url: string) => after(url) ?? before(url), blockOf: links.knownBlock, here: card.here }
-    const embeds = embedsToEdit(boxLinksOf(body, { ...read, previous: namedBefore(card.before, read) }), new Set(), card.embeds)
+    // A card the edit box's ✕ took off is not added (COMM-8, item 37).
+    const embeds = embedsToEdit(boxLinksOf(body, { ...read, previous: namedBefore(card.before, read) }), new Set(card.dropped ? [card.dropped] : []), card.embeds)
     // The files ride the same edit as the text and the cards, so neither can race the other.
     return store.editMessage({ folder, messageEventId, body, embeds, files, linkTags })
   })
@@ -691,6 +692,8 @@ export interface CardEdit {
   own: OwnPlace
   /** The file whose sent card ✕ removes. */
   remove?: string
+  /** The card the edit box's ✕ took off: the edit does not add it. */
+  dropped?: string
   /** Its files, folded over earlier edits: what an edit that does not change them lists again. */
   files?: readonly Imeta[]
 }

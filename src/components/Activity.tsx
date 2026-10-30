@@ -68,6 +68,8 @@ export interface ActivityItem {
   whereKind?: 'project' | 'issue'
   /** Why this thread takes no reply or reaction: the file it is on is archived (Decided 2026-10-17). */
   closed?: string
+  /** The address of the file this thread is on: its reply box shows no card for it, since a reply never sends one (`reply`). */
+  file?: string
 }
 
 export interface ActivityProps {
@@ -95,7 +97,7 @@ export interface ActivityProps {
    */
   onDeleteMessage?: (messageId: string) => Promise<boolean | void> | boolean | void
   /** Publish an edit of one message — CON-4. Offered here for the same reason delete is. */
-  onEditMessage?: (messageId: string, body: string, removeCard?: string, files?: readonly Imeta[]) => Promise<Answer>
+  onEditMessage?: (messageId: string, body: string, removeCard?: string, files?: readonly Imeta[], dropped?: string) => Promise<Answer>
   /**
    * How many threads the horizon left out — `ACTIVITY_HORIZON`.
    *
