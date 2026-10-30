@@ -113,18 +113,34 @@ describe('LiveHeader draws its description (from Description.test.tsx)', () => {
     const d = readDescription(read(`See ${NADDR} for the detail.`))
     expect(d.textContent).toContain('See')
     expect(d.textContent).toContain('for the detail.')
-    expect(d.querySelector('[data-reference]')).not.toBeNull()
+    // The kit's chip, as the editor draws it (item 43): loading here, its kind's icon and a bar.
+    expect(d.querySelector('[aria-busy="true"]')).not.toBeNull()
     // Shortened, not the 200-character pointer the author typed.
     expect(d.textContent!.length).toBeLessThan(NADDR.length)
   })
 
-  it('draws a pointer that is the whole paragraph as its chip, with no card', () => {
-    // Changed on purpose (Widgets, SPEC §13.3): alone on its line it is its
-    // chip, as in a sentence, and a card comes only from the writer's choice.
+  it('draws a pointer that is the whole paragraph as its row, as the editor will, with no card', () => {
+    // Changed on purpose (Katerina, 30 Oct, item 43): before the editor arrives a link alone on its line is drawn
+    // where and as the editor draws it, its row, so nothing moves when it arrives. A card comes only from the
+    // writer's choice.
     const c = read(NADDR)
-    expect(c.querySelector('[data-reference]')).not.toBeNull()
-    expect(c.querySelector('[data-foreign-object]')).toBeNull()
+    expect(readDescription(c).querySelector('[data-link-row]')).not.toBeNull()
+    expect(c.querySelector('[data-card]')).toBeNull()
     expect(c.textContent).not.toContain(NADDR.slice(6))
+  })
+
+  it('draws, before the editor arrives, the card a writer chose in its lone link’s place, at that block', () => {
+    const doc = JSON.stringify({
+      type: 'doc',
+      content: [
+        { type: 'paragraph', id: 'p1', content: [{ type: 'text', text: NADDR, marks: [{ type: 'reference', attrs: { uri: NADDR, embed: 'detailed' } }] }] },
+        { type: 'paragraph', id: 'p2', content: [{ type: 'text', text: `See ${NADDR} here.` }] },
+      ],
+    })
+    const d = readDescription(read(doc, 'blocks'))
+    expect(d.querySelector('[data-block-id="p1"] [data-card="detailed"]')).not.toBeNull()
+    expect(d.querySelectorAll('[data-card]')).toHaveLength(1)
+    expect(d.querySelector('[data-block-id="p2"]')?.textContent).toContain('See')
   })
 
   // Changed on purpose (WBD-7, the documents rule of SPEC §13.3): a card is drawn in the row's place of a link alone on

@@ -3,12 +3,10 @@ import { linksAsReferences, referencesIn, resolveBlockAnchor, toRenderTree, type
 import { BlockHandle } from '@estiva-app/ui'
 import { Banner } from '@/components/Banner'
 import { useLinkValues } from '@/api/linkCards'
-import { referenceOfValue } from '@/components/conversations/shared'
 import { blockRows, linkedBlock } from './blockRows'
 import { ReadingSummary } from './ReadingSummary'
-import { linksInBlocks } from './descriptionLinks'
+import { DescriptionReading, linksInBlocks } from './descriptionLinks'
 import { ReadingTitle } from './ReadingTitle'
-import { ShipRichText } from '@/components/ui/ShipRichText'
 import { byReference, useForeignObjects } from '@/api/useForeignObjects'
 import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
 
@@ -137,18 +135,10 @@ export function LiveHeader(props: LiveHeaderProps) {
   const references = referencesIn(linked.size ? linksAsReferences(blocks, resolveLink) : blocks)
   const objects = useForeignObjects(references)
   const resolved = byReference(references, objects)
-  // Drawn as a chip only once its file has come back and can be read: until then, and for good when it cannot, the
-  // URL as written (OPT-18, as a message reads; WBM-11), never a chip with nothing in it.
-  const readable: LinkResolver = (url) => {
-    const value = linked.get(url)
-    const reference = value ? referenceOfValue(value) : undefined
-    const object = reference ? resolved[reference] : undefined
-    return object && !object.unreachable ? value : undefined
-  }
 
   const [missing, dismiss] = useLinkedBlock(description, format, readOnly)
 
-  const reading = <ReadingHeader {...props} resolved={resolved} resolveLink={readable} />
+  const reading = <ReadingHeader {...props} resolved={resolved} resolveLink={resolveLink} />
   return (
     <div className="flex flex-col gap-4">
       {missing && (
@@ -165,7 +155,9 @@ export function LiveHeader(props: LiveHeaderProps) {
 
 /**
  * The same page as text, in the moment before the editors arrive. Laid out as
- * the editors are; a link alone on its line is its chip here until then.
+ * the editors are, its links where and as the editor draws them: a chip, a row,
+ * or a card in the row's place (`DescriptionReading`), so nothing moves when it
+ * arrives.
  */
 function ReadingHeader({ title, titlePlaceholder, summary, onSummarize, description, format, nameOf, readOnly, resolved, resolveLink, onCommentOnBlock, onCopyBlockLink }: LiveHeaderProps & { resolved: Record<string, ForeignObjectData | null | undefined>; resolveLink: LinkResolver }) {
   const empty = description.trim() === ''
@@ -184,7 +176,7 @@ function ReadingHeader({ title, titlePlaceholder, summary, onSummarize, descript
         ) : (
           // A reader gets the handle too, with Copy link and Comment (Miky, RIC-18 kickoff); the editing rows need the editor.
           <BlockHandle actions={blockRows(onCommentOnBlock, onCopyBlockLink)}>
-            <ShipRichText value={description} format={format} nameOf={nameOf} resolved={resolved} resolveLink={resolveLink} />
+            <DescriptionReading value={description} format={format} nameOf={nameOf} resolved={resolved} resolveLink={resolveLink} readOnly={!!readOnly} />
           </BlockHandle>
         )}
       </div>

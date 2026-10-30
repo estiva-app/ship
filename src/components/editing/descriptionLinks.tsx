@@ -1,12 +1,15 @@
 import { createContext, useContext, useEffect, useRef, type ReactNode } from 'react'
 import { useEditorState, type Editor } from '@tiptap/react'
-import { imetaFromAttrs, urlRunsIn, type RenderBlock } from '@estiva-app/protocol'
+import { imetaFromAttrs, linksAsReferences, referenceOfLink, toRenderTree, urlRunsIn, type ContentFormat, type LinkResolver, type RenderBlock } from '@estiva-app/protocol'
+import { RichText } from '@estiva-app/ui'
 import type { AttachmentViewProps, ReferenceViewProps } from '@estiva-app/ui/editor'
 import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
 import { byReference, useForeignObjects } from '@/api/useForeignObjects'
 import { Attachment } from '@/components/ui/Attachment'
 import { MessageCard, MessageChip, MessageRow } from '@/components/ui/MessageLinks'
 import { Reference } from '@/components/ui/Reference'
+import { drawAttachment } from '@/components/ui/ShipRichText'
+import { placeDocumentLines, ROW_BLOCK, type RowLine } from '@/lib/messageLines'
 
 type Resolved = Record<string, ForeignObjectData | null | undefined>
 
@@ -87,6 +90,35 @@ export function DescriptionLink({ uri, href, place = 'chip', editing = false }: 
   // A URL whose file has not come back, or cannot be read, reads as the URL it was written as (WBM-11).
   if (href && (!object || object.unreachable)) return <span>{href}</span>
   return <MessageChip uri={uri} object={object} nameOf={nameOf} preview={!editing} opensAt={href} />
+}
+
+/**
+ * The description as text, in the moment before its editor arrives: each link drawn where and as the editor will
+ * draw it (`placeDocumentLines`, as `LinkPlaces` places them), its chip, its row, or its card in the row's place, so
+ * nothing moves when the editor replaces it (Katerina, 30 Oct). `resolveLink` is what each app URL names.
+ */
+export function DescriptionReading({ value, format, resolveLink, resolved, nameOf, readOnly }: { value: string; format: ContentFormat; resolveLink: LinkResolver; resolved: Resolved; nameOf?: (pubkey: string) => string; readOnly: boolean }) {
+  const placed = placeDocumentLines(linksAsReferences(toRenderTree(value, format), resolveLink), { resolveLink })
+  if (placed.blocks.length === 0) return null
+  const line = (row: RowLine) => <DescriptionLink uri={row.reference} {...(row.url ? { href: row.url } : {})} place={row.card ? 'card' : 'row'} editing={!readOnly} />
+  return (
+    <Links.Provider value={{ resolved, nameOf, readOnly }}>
+      <RichText
+        blocks={placed.blocks}
+        renderReference={(reference, run) => {
+          const row = placed.rowRuns.get(run)
+          if (row) return line(row)
+          // Only a run whose words are a URL naming this same file is where it opens: a stored reference's words are its writer's (security review).
+          const href = /^https?:\/\//i.test(run.text) && referenceOfLink(run.text, resolveLink) === reference ? run.text : undefined
+          return <DescriptionLink uri={reference} {...(href ? { href } : {})} editing={!readOnly} />
+        }}
+        renderBlock={(block) => {
+          const row = block.type === ROW_BLOCK ? placed.rowOf(block) : undefined
+          return row ? <div data-block-id={block.id}>{line(row)}</div> : drawAttachment(block)
+        }}
+      />
+    </Links.Provider>
+  )
 }
 
 /**
