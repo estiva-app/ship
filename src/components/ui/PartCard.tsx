@@ -1,9 +1,7 @@
 import { serializeBlockDocument } from '@estiva-app/protocol'
-import { Button, PartCard as KitPartCard, thingKindOf } from '@estiva-app/ui'
-import { IconExternalLink } from '@tabler/icons-react'
+import { PartCard as KitPartCard, thingKindOf } from '@estiva-app/ui'
 import { usePart, type PartView } from '@/api/part'
 import { linkedOf } from '@/lib/linked'
-import { navigateTo } from '@/router'
 import { ShipRichText } from './ShipRichText'
 
 /**
@@ -39,8 +37,9 @@ function placeOf(link: string | undefined): { href: string; here: boolean } | un
  * Peek's `PartCard`, by design the same in both apps (COM-2), in the kit's
  * frame (ui 0.75): the title of what it is part of and its key, then the block — whole when it
  * is short; cut behind ShowMore's fade when it is long, and opened in place
- * (Katerina, 2026-10-08). The way into the app it came from is a Button with an
- * open-out icon, level with Show more.
+ * (Katerina, 2026-10-08). The way into the app it came from is its title: a
+ * path of Ship's own opens in place, another app's in a new tab. There is no
+ * "Open" button beside it, which said again what the title does (Katerina, 31 Oct).
  *
  * The SPEC's five states (§13.6.1), as the kit's `PartCardState` draws them
  * (ui 0.92): not this reader's to see says "not available"; deleted, as a
@@ -81,22 +80,12 @@ export function PartCardView({ view, address, block, nameOf }: { view: PartView;
     )
   }
 
-  // A Button, not a Link, by Katerina's call (2026-10-08): the way out reads as
-  // an action, level with Show more at the right of its row.
-  const openIn = place ? (
-    <Button size="small" leadingIcon={<IconExternalLink stroke={1.5} className="size-3.5" />} onClick={() => (place.here ? navigateTo(place.href) : window.open(place.href, '_blank', 'noopener,noreferrer'))}>
-      {/* "Open" when it stays in Ship; "in <app>" only when it takes you elsewhere (Miky, 2026-10-09). */}
-      {place.here ? 'Open' : `Open in ${view.object.appName ?? 'app'}`}
-    </Button>
-  ) : undefined
   return (
     <div data-part="resolved" data-part-address={address} data-part-block={block}>
-      {/* The kit's PartCard draws Show more and Open in on one row under the
-          block, outside its quote bar (ui 0.91.1; Katerina, 30 Oct). An
-          attachment is never cut (no height reaches Infinity): its card is
+      {/* An attachment is never cut (no height reaches Infinity): its card is
           already the thumbnail, and a click on it opens the full picture as it
           does on a message's own. */}
-      <KitPartCard {...frame} action={openIn} maxHeight={view.block.type === 'attachment' ? Infinity : CUT_AT}>
+      <KitPartCard {...frame} maxHeight={view.block.type === 'attachment' ? Infinity : CUT_AT}>
         <ShipRichText value={serializeBlockDocument({ type: 'doc', content: [view.block] })} format="blocks" size="small" nameOf={nameOf} />
       </KitPartCard>
     </div>

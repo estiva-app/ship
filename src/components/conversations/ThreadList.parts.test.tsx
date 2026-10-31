@@ -62,15 +62,17 @@ describe('a pasted block link', () => {
     expect(card?.textContent).not.toContain('Issue ·')
     expect(card?.textContent).toContain('A part of SHI-12')
     expect(card?.textContent).toContain('Ship on Friday')
-    expect(card?.textContent).toContain('Open in Ship')
+    // Its title is the way to it; no "Open in" button beside it (Katerina, 31 Oct).
+    expect(card?.querySelector('a')?.textContent).toBe('Plan the launch')
+    expect(card?.querySelector('a')?.getAttribute('href')).toBe(LINK)
+    expect(card?.textContent).not.toContain('Open')
   })
 
-  it('says only "Open" for a block of Ship itself (Miky, 2026-10-09)', () => {
+  it('opens a block of Ship itself in place, from its title', () => {
     const here = `${window.location.origin}/issue/plan-the-launch-${D}#block-p1`
     const c = show(`Have a look ${LINK}`, { state: 'resolved', object, link: here, block: { type: 'paragraph', id: 'p1', content: [{ type: 'text', text: 'x' }] } as never })
-    const button = [...c.querySelectorAll('[data-part="resolved"] button')].map((b) => b.textContent)
-    expect(button).toContain('Open')
-    expect(button).not.toContain('Open in Ship')
+    expect(c.querySelector('[data-part="resolved"] a')?.getAttribute('href')).toBe(`/issue/plan-the-launch-${D}#block-p1`)
+    expect(c.querySelector('[data-part="resolved"] button')).toBeNull()
   })
 
   it('says a deleted block was deleted, in the SPEC’s words, and leads nowhere', () => {
