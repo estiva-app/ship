@@ -250,7 +250,9 @@ describe('the card under the comment', () => {
     objects.byReference[ref(TOPIC)] = { ...base(TOPIC, ''), unreachable: true, appName: 'Peek', openUrl: `https://peek.estiva.app/o/${TOPIC}` }
     const c = show(ref(TOPIC), { embeds: [{ value: TOPIC, layout: 'detailed' }] })
     await waitFor(() => expect(c.querySelector('[data-card]')?.textContent).toContain('Peek not available'))
-    expect(c.querySelector('[data-card]')?.textContent).toContain('Open in Peek')
+    // The kit's Button "Open", the app in its name (ui 0.95; Katerina, 31 Oct).
+    expect(c.querySelector('[data-card] a')?.getAttribute('aria-label')).toBe('Open in Peek')
+    expect(c.querySelector('[data-card] a')?.textContent).toBe('Open')
   })
 })
 
