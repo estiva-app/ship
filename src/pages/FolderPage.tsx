@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { archiveFolder, me, renameFolder } from '@/api'
 import { folderArchiveImpact, loadQuery, readFolder, type FolderContents, type FolderSummary } from '@/api/foreign'
-import { ArchiveDialog } from '@/components/ArchiveDialog'
-import { ArchivedNotice } from '@estiva-app/ui'
-import { archivedNoticeOf } from '@/lib/archive'
+import { ArchiveDialog, ArchivedNotice } from '@estiva-app/ui'
+import { ARCHIVE_WORDS, archivedNoticeOf } from '@/lib/archive'
 import { reloadFolders } from '@/api/useFolders'
 import { SkeletonList } from '@/components/ui/Skeleton'
 import { FolderView } from '@/views/FolderView'
@@ -152,6 +151,7 @@ export function FolderPage({ id, folders, nameOf = (pubkey) => `${pubkey.slice(0
       />
       {archiving && (
         <ArchiveDialog
+          {...ARCHIVE_WORDS}
           title={contents.name ?? 'Untitled folder'}
           what="folder"
           hides={archiving.hides.map((part) => `${part} only in it`)}

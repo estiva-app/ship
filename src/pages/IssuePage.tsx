@@ -2,9 +2,8 @@ import { IconLinkOff } from '@tabler/icons-react'
 import { newestDrawn, useMarkRead, useShownThreads } from '@/lib/useMarkRead'
 import { useNewSince } from '@/lib/useNewSince'
 import { useCallback, useMemo, useState } from 'react'
-import { ArchiveDialog } from '@/components/ArchiveDialog'
-import { ArchivedNotice } from '@estiva-app/ui'
-import { archivedLine, archivedNoticeOf, lockedReason, ownArchive, type Archives } from '@/lib/archive'
+import { ArchiveDialog, ArchivedNotice } from '@estiva-app/ui'
+import { ARCHIVE_WORDS, archivedLine, archivedNoticeOf, lockedReason, ownArchive, type Archives } from '@/lib/archive'
 import { ISSUE_STATUSES, lookupStatus, addMentioned, archiveIssue, commentsOn, deleteIssue, deleteMessage, editMessage, react, reply, setIssueField, unreact, startConversation, type DirectoryView, type FolderState, type WorkspaceState, threadContext, fileContext, useMergedReadState, useFeedJudges, unreadByThread } from '@/api'
 import { me, useMentionsElsewhere } from '@/api'
 import { MEMBER_FIELD_PREFIX, memberOfField } from '@estiva-app/conversation'
@@ -374,6 +373,7 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
       />
       {archiving && (
         <ArchiveDialog
+          {...ARCHIVE_WORDS}
           title={issue.title}
           what="issue"
           hides={conversations.length ? [`its ${conversations.length} ${conversations.length === 1 ? 'conversation' : 'conversations'}`] : []}

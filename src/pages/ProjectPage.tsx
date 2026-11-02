@@ -65,9 +65,8 @@ import { go, href, type ProjectTab, type ProjectView as ProjectViewName } from '
 import { act, actInField, sayOnceLeft, type Say } from './act'
 import { hrefForIssue, rowFor } from './IssuesPage'
 import { MoveProject } from '@/components/MoveProject'
-import { ArchiveDialog } from '@/components/ArchiveDialog'
-import { ArchivedNotice } from '@estiva-app/ui'
-import { archivedLine, archivedNoticeOf, lockedReason, ownArchive, type Archives } from '@/lib/archive'
+import { ArchiveDialog, ArchivedNotice } from '@estiva-app/ui'
+import { ARCHIVE_WORDS, archivedLine, archivedNoticeOf, lockedReason, ownArchive, type Archives } from '@/lib/archive'
 import { KIND } from '@/nostr/kinds'
 
 export type { Say } from './act'
@@ -915,6 +914,7 @@ export function ProjectPage({
 
       {dialog === 'archive' && (
         <ArchiveDialog
+          {...ARCHIVE_WORDS}
           title={project.title}
           what="project"
           hides={issues.length ? [`its ${issues.length} ${issues.length === 1 ? 'issue' : 'issues'}`] : []}

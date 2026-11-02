@@ -421,7 +421,9 @@ describe('Project page — one project from the fold', () => {
     const main = within(screen.getByRole('main'))
     fireEvent.click(main.getByRole('button', { name: 'Archive project' }))
     const dialog = within(screen.getByRole('dialog', { name: /Archive .Live./ }))
-    expect(dialog.getByText(/hides the project and its 2 issues from every list/)).toBeInTheDocument()
+    // Ship's words: the two apps it goes out of, and that nothing is deleted.
+    expect(dialog.getByText('This hides the project and its 2 issues from every list, in Ship and in Peek.')).toBeInTheDocument()
+    expect(dialog.getByText('Nothing is deleted: a link still opens it, and Unarchive brings everything back as it was.')).toBeInTheDocument()
     expect(archiveProject).not.toHaveBeenCalled()
     fireEvent.change(dialog.getByRole('textbox', { name: /Resolution/ }), { target: { value: 'Shipped in 0.37.' } })
     fireEvent.click(dialog.getByRole('button', { name: 'Archive project' }))
