@@ -12,6 +12,8 @@ import { Textarea } from '@/components/ui/Textarea'
  * a resolution, and a question with a field is a form. So Ctrl+Enter archives
  * from the field, the field is switched off while it archives, and Escape or a
  * press outside closes it, as every other dialog with fields does.
+ *
+ * @registry namesake: Ship's own archive question, drawn before the package had one (ui 0.99.0); kept until Ship takes the package's ArchiveDialog in its place.
  */
 export interface ArchiveDialogProps {
   /** The file's name, for the title. */

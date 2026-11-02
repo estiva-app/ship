@@ -20,6 +20,8 @@ export interface ArchivedNoticeProps {
  * archived is a state the file is in, not news. The Banner is the app-wide
  * strip under the header, square and one line; this sits in the page, so it
  * is a card with the reason inside it rather than loose under it.
+ *
+ * @registry namesake: Ship's own archived card, drawn before the package had one (ui 0.96.0); kept until Ship takes the package's ArchivedNotice in its place.
  */
 export function ArchivedNotice({ archive, nameOf, onUnarchive, onOpenParent, readOnlyReason }: ArchivedNoticeProps) {
   // A Folder is a proper noun in every app's copy.
