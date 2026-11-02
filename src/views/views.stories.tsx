@@ -126,7 +126,7 @@ export const IssuesEmpty: Story = {
   },
 }
 
-/** One project, in tabs: Overview (title, its fields, description, Related), Activity (Conversations, Mentioned in), Issues (table or board). The actions in the header's ⋯. */
+/** One project, in tabs: Overview (title, its fields, description, Related), Activity (Mentioned in), Issues (table or board). Its comments in the column beside, on every tab; the header's buttons hide it and hold the ⋯. */
 /** FOL-46's notice, as the pages build it: archived by Miky two days ago, with a resolution. */
 const ARCHIVED_AT = Math.floor(Date.now() / 1000) - 2 * 86400
 
@@ -157,6 +157,7 @@ const projectPage = (startTab: ProjectTab, startView: 'table' | 'board' = 'table
     const [summary, setSummary] = useState<string | undefined>('Every workspace read and write on the relay, one surface at a time.')
     const [description, setDescription] = useState('Moving every workspace read and write onto the relay, one surface at a time, with the old path kept until each is proven.')
     const done = ISSUES.filter((issue) => issue.status === 'done').length
+    const [commentsShown, setCommentsShown] = useState(true)
     return (
       <Shell current={{ projectAddr: '30850:a:rel' }}>
         <ProjectView
@@ -192,6 +193,7 @@ const projectPage = (startTab: ProjectTab, startView: 'table' | 'board' = 'table
             total: ISSUES.length,
           }}
           menu={{ archive: archived ? 'own' : 'none', onMove: fn(), onCopyLink: fn(), onArchive: fn(), onDelete: fn() }}
+          comments={{ shown: commentsShown, onShownChange: setCommentsShown }}
         />
       </Shell>
     )
@@ -211,7 +213,7 @@ export const ProjectSignedOut: Story = projectPage('activity', 'table', 'Sign in
 /** Archived (FOL-46): the notice first on every tab; the fields shut, saying why; the ⋯ holds Unarchive and Delete. */
 export const ProjectArchived: Story = projectPage('overview', 'table', undefined, true)
 
-/** One issue, in tabs: Overview (title, its fields, description, Related) and Activity (Conversations, Mentioned in, History). The actions in the header's ⋯. */
+/** One issue, in tabs: Overview (title, its fields, description, Related) and Activity (Mentioned in, History). Its comments in the column beside, on every tab; the header's buttons hide it and hold the ⋯. */
 const issuePage = (startTab: IssueTab, archivedWithProject = false, withSummary = true): Story => ({
   render: () => {
     const issue = ISSUES[0]
@@ -222,6 +224,7 @@ const issuePage = (startTab: IssueTab, archivedWithProject = false, withSummary 
     const [title, setTitle] = useState(issue.title)
     const [summary, setSummary] = useState(withSummary ? issue.summary : undefined)
     const [description, setDescription] = useState('After an archived project is restored, the board draws its columns in the order the folder union returned them rather than the vocabulary order.')
+    const [commentsShown, setCommentsShown] = useState(true)
     return (
       <Shell current={{ projectAddr: '30850:a:rel' }}>
         <IssueView
@@ -257,6 +260,7 @@ const issuePage = (startTab: IssueTab, archivedWithProject = false, withSummary 
             onProjectChange: setProject,
           }}
           menu={{ archive: archivedWithProject ? 'with' : 'none', onCopyLink: fn(), onArchive: fn(), onDelete: fn() }}
+          comments={{ shown: commentsShown, onShownChange: setCommentsShown }}
         />
       </Shell>
     )

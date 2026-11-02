@@ -308,6 +308,9 @@ async function main() {
     await page.waitForSelector(`[data-tab="${name.toLowerCase()}"]`)
   }
 
+  /* The comments: the kit's column beside the page, on every tab (ONE-6, step 4c), where the Activity tab's "Conversations" was. */
+  const commentsColumn = () => page.locator('[data-comments-column]')
+
   /* The page's actions are rows of its header's ⋯ (ONE-6, step 4b), where the details column's buttons were. */
   const pageAction = async (name: string) => {
     await page.getByRole('button', { name: 'More actions' }).click()
@@ -543,10 +546,10 @@ async function main() {
   )
 
   // ── Comment, reply, assignee ──────────────────────────────────────────────
-  const conversations = sectionFor('Conversations')
+  const conversations = commentsColumn()
   /** Every message drawn: the kit's cards, a comment's body and each reply (ONE-6), what the hand-made `<article>` was. */
   const MESSAGES = '[data-comment-body], [data-reply-id]'
-  const startBox = () => sectionFor('Conversations').getByRole('textbox', { name: 'Start a conversation…' })
+  const startBox = () => commentsColumn().getByRole('textbox', { name: 'Start a conversation…' })
   await startBox().click()
   await page.keyboard.type('Blocked on the Stripe key.')
   // Enter sends, as in every app's box (COMM-7).
@@ -701,7 +704,7 @@ async function main() {
   await page.keyboard.type('Key is in 1Password now.')
   await page.keyboard.press('Enter')
   await page.waitForFunction(
-    () => document.querySelectorAll('section [data-comment-body], section [data-reply-id]').length >= 2,
+    () => document.querySelectorAll('[data-comments-column] [data-comment-body], [data-comments-column] [data-reply-id]').length >= 2,
   )
   // A flat kind:1111 naming the comment — SHI-28, SPEC §6.4 *Replies*.
   const reply = stored.filter((e) => e.kind === 1111 && e.id !== comment?.id).at(-1)
@@ -812,7 +815,7 @@ async function main() {
   await deleted.getByRole('button', { name: 'Message actions' }).click()
   await page.getByRole('menuitem', { name: 'Delete message' }).click()
   await page.getByRole('button', { name: 'Delete message' }).click()
-  await page.waitForFunction(() => document.querySelectorAll('section [data-comment-body], section [data-reply-id]').length === 1)
+  await page.waitForFunction(() => document.querySelectorAll('[data-comments-column] [data-comment-body], [data-comments-column] [data-reply-id]').length === 1)
   const deletion = stored.find((e) => e.kind === 5 && e.tags.some((t) => t[0] === 'e' && t[1] === reply!.id))
   check('deleting a comment publishes a kind:5 naming it', !!deletion)
   /* The event form, not the address form: a comment is a regular event, and the
@@ -861,7 +864,7 @@ async function main() {
     which is why the populated case is asserted in `Activity.test.tsx` — this
     checks the wiring a unit test cannot see.
   */
-  check('the Activity tab shows Conversations, Mentioned in and History as three lists', (await sectionFor('Mentioned in').count()) === 1 && (await history.count()) === 1 && (await conversations.count()) === 1)
+  check('the Activity tab shows Mentioned in and History, the comments the column beside it', (await sectionFor('Mentioned in').count()) === 1 && (await history.count()) === 1 && (await sectionFor('Conversations').count()) === 0 && (await conversations.count()) === 1)
   check(
     '  …with the comment in Conversations and not in Mentioned in',
     !(await sectionFor('Mentioned in').textContent())?.includes('Blocked on the Stripe key.'),
@@ -889,7 +892,7 @@ async function main() {
   await page.reload()
   // The tab is in the address, so a reload comes back to Activity.
   await page.waitForSelector('[data-surface="issue"][data-tab="activity"]', { timeout: 10000 })
-  const afterReload = sectionFor('Conversations')
+  const afterReload = commentsColumn()
   await startBox().waitFor()
   check('an unsent message survives a reload', (await textOf(startBox())) === draft, await textOf(startBox()))
 
@@ -903,10 +906,10 @@ async function main() {
 
   // Sending clears it: the next load starts empty rather than re-offering text
   // that has already been posted.
-  // The start box is the first on the page; its Send is the first Send.
-  await afterReload.getByRole('button', { name: 'Send', exact: true }).first().click()
+  // The start box is at the comments column's foot (ONE-6, step 4c), under the open thread's: its Send is the last Send.
+  await afterReload.getByRole('button', { name: 'Send', exact: true }).last().click()
   await page.waitForFunction(
-    (n) => document.querySelectorAll('section [data-comment-body], section [data-reply-id]').length > n,
+    (n) => document.querySelectorAll('[data-comments-column] [data-comment-body], [data-comments-column] [data-reply-id]').length > n,
     await afterReload.locator('[data-comment-body], [data-reply-id]').count(),
   )
   await page.reload()
@@ -944,8 +947,8 @@ async function main() {
   )
   check(
     "  …nor do the project's OWN conversations",
-    (await sectionFor('Conversations').count()) === 1 &&
-      !(await sectionFor('Conversations').textContent())?.includes('Blocked on the Stripe key.'),
+    (await commentsColumn().count()) === 1 &&
+      !(await commentsColumn().textContent())?.includes('Blocked on the Stripe key.'),
   )
   await shot(page, '11-project-activity')
 

@@ -1,7 +1,7 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { IconDotsVertical, IconMessage2, IconX } from '@tabler/icons-react'
 import type { Imeta } from '@estiva-app/protocol'
-import { AddReactionButton, Avatar, Button, Card, EmptyState, FieldLine, IconButton, Menu, MenuItem, ReactionRow, SkeletonList, Thread as KitThread, WithTooltip } from '@estiva-app/ui'
+import { AddReactionButton, Avatar, Button, Card, ConversationLayout, EmptyState, FieldLine, IconButton, LinkedIcon, Menu, MenuItem, ReactionRow, SkeletonList, Thread as KitThread, WithTooltip, type ConversationItem } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
 import { ago } from '@/lib/time'
 import { draftKeys, type DraftStore } from '@/lib/drafts'
@@ -363,104 +363,140 @@ const threadProps = (p: ThreadListViewProps | MentionListViewProps) => ({
   drafts: p.drafts,
 })
 
+/** What `[` offers in a thread's boxes, and the captions its references open with: the page's messages, this thread's first. */
+function useThreadScope(pageThreads: readonly ThreadData[], threadId: string, nameOf?: (pubkey: string) => string) {
+  const scope = useMemo(() => messageScope(pageThreads, threadId), [pageThreads, threadId])
+  const references = useCallback((query: string) => referenceSections(scope, query, nameOf), [scope, nameOf])
+  const captions = useMemo(() => referenceCaptions(scope, nameOf), [scope, nameOf])
+  return { references, captions }
+}
+
 interface ShipThreadProps extends Omit<ThreadProps, 'unread' | 'judged' | 'onShown' | 'elsewhere' | 'file'> {
-  /** Its thread is open under it. One at a time: the list holds which. */
-  open: boolean
-  /** Opened to write a reply: the box takes the caret. */
-  focusBox: boolean
-  /** A press on the comment: open or close its thread. */
-  onToggle: () => void
-  /** Reply, on the strip: open its thread at the box. */
-  onOpenToReply: () => void
   /** By message id, each comment resolved in Peek or Leaf. */
   resolvedBy?: Record<string, Resolution>
 }
 
-/**
- * One conversation on the kit's cards (ONE-6, step 3): the comment, and its thread opening under it — the replies on
- * the kit's `ReplyCard`, then Ship's reply box. New comments and replies keep their dot and edge until read, and the
- * replies row says how many are new (SHI-38); "New since you last read this" is gone (Katerina, 2 November). A deleted
- * comment says so, with every message under it and no new reply, as Peek draws it (PER-24).
- */
-function ShipThread({ thread, pageThreads, onReply, disabledReason, stillUnread, resolved, here, nameOf, reactionsBy, onReact, onDeleteMessage, onEditMessage, upload, drafts, viewer, open, focusBox, onToggle, onOpenToReply, resolvedBy }: ShipThreadProps) {
-  const scope = useMemo(() => messageScope(pageThreads, thread.id), [pageThreads, thread.id])
-  const references = useCallback((query: string) => referenceSections(scope, query, nameOf), [scope, nameOf])
-  const captions = useMemo(() => referenceCaptions(scope, nameOf), [scope, nameOf])
+/** A deleted comment's stand-in is its earliest reply: every message hangs under "This comment was deleted." (PER-24). */
+const repliesOf = (thread: ThreadData) => (thread.rootMissing ? [thread.root, ...thread.replies] : thread.replies)
+
+/** A message's own writes, offered only where Ship offers them: a writable page, and your own or your agent's (SHI-29). */
+function toolsFor(message: MessageData, { disabledReason, viewer, reactionsBy, onReact, onDeleteMessage, onEditMessage }: ShipThreadProps) {
   const writable = !disabledReason
-  const deleted = thread.rootMissing === true
-  // A deleted comment's stand-in is its earliest reply: every message hangs under "This comment was deleted."
-  const replies = deleted ? [thread.root, ...thread.replies] : thread.replies
-  const common = { resolved, here, boxHere: here, nameOf, viewer, drafts, references, captions, closed: !writable }
-  const toolsFor = (message: MessageData) => {
-    const offered = writable && offersEditAndDelete({ viewer, author: message.by ?? '' })
-    return {
-      reactions: reactionsBy?.[message.id],
-      onToggleReaction: writable && onReact ? (emoji: string, mine?: string) => onReact(message.id, emoji, mine) : undefined,
-      onDelete: offered && onDeleteMessage ? () => onDeleteMessage(message.id) : undefined,
-      onEdit: offered && onEditMessage ? (...edit: [body: string, removeCard?: string, files?: readonly Imeta[], dropped?: string]) => onEditMessage(message.id, ...edit) : undefined,
-    }
+  const offered = writable && offersEditAndDelete({ viewer, author: message.by ?? '' })
+  return {
+    reactions: reactionsBy?.[message.id],
+    onToggleReaction: writable && onReact ? (emoji: string, mine?: string) => onReact(message.id, emoji, mine) : undefined,
+    onDelete: offered && onDeleteMessage ? () => onDeleteMessage(message.id) : undefined,
+    onEdit: offered && onEditMessage ? (...edit: [body: string, removeCard?: string, files?: readonly Imeta[], dropped?: string]) => onEditMessage(message.id, ...edit) : undefined,
   }
+}
+
+/**
+ * A conversation's comment, on the kit's card in the column (ONE-6, step 4c). The layout opens its thread: a press on
+ * the card, its replies row, or Reply on the strip, so none of those is passed. A deleted comment says so, with no
+ * React, Edit, Delete or Reply of its own (PER-24).
+ */
+function ShipThreadComment(props: ShipThreadProps) {
+  const { thread, pageThreads, disabledReason, stillUnread, resolved, here, nameOf, viewer, drafts, resolvedBy } = props
+  const { references, captions } = useThreadScope(pageThreads, thread.id, nameOf)
+  const deleted = thread.rootMissing === true
+  const replies = repliesOf(thread)
   const isNew = (id: string) => !!stillUnread?.includes(id)
   const faces = [...new Map(replies.map((reply) => [reply.by ?? reply.id, reply.author])).values()].map((author) => ({ name: author.name ?? '—', picture: author.picture, bot: author.bot }))
   const last = replies.at(-1)
   return (
-    <div className="flex flex-col" data-thread={thread.id}>
-      <ShipComment
-        message={thread.root}
-        {...common}
-        // A deleted comment has nothing of its own to react to, edit or delete: its stand-in is a reply below.
-        {...(deleted ? {} : toolsFor(thread.root))}
-        deleted={deleted}
-        isNew={!deleted && isNew(thread.root.id)}
-        repliesLeftBehind={thread.replies.length}
-        replies={last ? { count: replies.length, faces, last: ago(last.at), newCount: replies.filter((reply) => isNew(reply.id)).length, open, onOpen: onToggle } : undefined}
-        onReply={writable && !deleted ? onOpenToReply : undefined}
-        onClick={onToggle}
-        resolution={deleted ? undefined : resolvedBy?.[thread.root.id]}
-      />
-      {open && (
-        <KitThread
-          place="under"
-          box={
-            writable && !deleted ? (
-              <Box
-                key={thread.id}
-                kind="reply"
-                autoFocus={focusBox}
-                draftKey={draftKeys.thread(thread.id)}
-                drafts={drafts}
-                upload={upload}
-                nameOf={nameOf}
-                resolved={resolved}
-                here={here}
-                references={references}
-                captions={captions}
-                onSend={(text, files, picks) => onReply(thread.id, text, files, picks)}
-              />
-            ) : undefined
-          }
-          // Closed (an archived file, signed out): no box and no line; the start box's line already says why.
-          notice={writable && deleted ? 'The comment was deleted, so this thread takes no new replies.' : undefined}
-        >
-          {replies.map((reply) => (
-            <ShipReply key={reply.id} message={reply} {...common} {...toolsFor(reply)} isNew={isNew(reply.id)} />
-          ))}
-        </KitThread>
-      )}
+    <ShipComment
+      message={thread.root}
+      resolved={resolved}
+      here={here}
+      boxHere={here}
+      nameOf={nameOf}
+      viewer={viewer}
+      drafts={drafts}
+      references={references}
+      captions={captions}
+      closed={!!disabledReason}
+      // A deleted comment has nothing of its own to react to, edit or delete: its stand-in is a reply below.
+      {...(deleted ? {} : toolsFor(thread.root, props))}
+      deleted={deleted}
+      isNew={!deleted && isNew(thread.root.id)}
+      repliesLeftBehind={thread.replies.length}
+      replies={last ? { count: replies.length, faces, last: ago(last.at), newCount: replies.filter((reply) => isNew(reply.id)).length } : undefined}
+      resolution={deleted ? undefined : resolvedBy?.[thread.root.id]}
+    />
+  )
+}
+
+/**
+ * A conversation's thread, open under its comment: the replies on the kit's `ReplyCard`, then Ship's reply box, which
+ * takes the caret each time the thread opens (the kit's one column). A deleted comment's thread takes no new reply.
+ */
+function ShipThreadReplies(props: ShipThreadProps) {
+  const { thread, pageThreads, onReply, disabledReason, stillUnread, resolved, here, nameOf, viewer, drafts, upload } = props
+  const { references, captions } = useThreadScope(pageThreads, thread.id, nameOf)
+  const writable = !disabledReason
+  const deleted = thread.rootMissing === true
+  const common = { resolved, here, boxHere: here, nameOf, viewer, drafts, references, captions, closed: !writable }
+  return (
+    <KitThread
+      place="under"
+      box={
+        writable && !deleted ? (
+          <Box
+            key={thread.id}
+            kind="reply"
+            draftKey={draftKeys.thread(thread.id)}
+            drafts={drafts}
+            upload={upload}
+            nameOf={nameOf}
+            resolved={resolved}
+            here={here}
+            references={references}
+            captions={captions}
+            onSend={(text, files, picks) => onReply(thread.id, text, files, picks)}
+          />
+        ) : undefined
+      }
+      // Closed (an archived file, signed out): no box and no line; the start box's line already says why.
+      notice={writable && deleted ? 'The comment was deleted, so this thread takes no new replies.' : undefined}
+    >
+      {repliesOf(thread).map((reply) => (
+        <ShipReply key={reply.id} message={reply} {...common} {...toolsFor(reply, props)} isNew={!!stillUnread?.includes(reply.id)} />
+      ))}
+    </KitThread>
+  )
+}
+
+/**
+ * The comments column's name (Katerina, 2 November, "E": the kit's rich title, ContainerHeader "With rich title"):
+ * "Comments", over whose they are, with its kind's icon: "REL-1 · Board columns…", or "Relay Migration as a whole".
+ */
+export function commentsTitle(kind: 'issue' | 'project', name: string): ReactNode {
+  return (
+    <div className="min-w-0">
+      <p className="truncate text-body-2-strong text-text-primary">Comments</p>
+      <p className="flex min-w-0 items-center gap-1 text-caption text-text-muted">
+        <LinkedIcon kind={kind} size={14} />
+        <span className="truncate">{kind === 'issue' ? name : `${name} as a whole`}</span>
+      </p>
     </div>
   )
 }
 
-/** The drawing, with the reads handed in — for a story, or a caller that has them. */
+/**
+ * The drawing, with the reads handed in — for a story, or a caller that has them: the comments as the kit's one
+ * column (ONE-6, step 4c), 384px beside the page. Each comment opens its thread under it, one at a time; resolved ones
+ * wait closed under "Resolved" at the end, and ones on a block since deleted under "On deleted blocks" (the kit's);
+ * the box is at the column's foot, with the block a comment will be about above it.
+ */
 export function ThreadListView(props: ThreadListViewProps) {
-  const { threads, onStart, disabledReason, className, unread, nameOf, about, omitted = 0, reactionsCut = false, upload, drafts, anchor, onDropAnchor } = props
+  const { threads, onStart, disabledReason, className, unread, nameOf, about, omitted = 0, reactionsCut = false, upload, drafts, anchor, onDropAnchor, title } = props
   const scope = useMemo(() => messageScope(threads), [threads])
   const references = useCallback((query: string) => referenceSections(scope, query, nameOf), [scope, nameOf])
   const captions = useMemo(() => referenceCaptions(scope, nameOf), [scope, nameOf])
   const blockId = anchor && anchor.state !== 'unanchored' ? anchor.id : undefined
-  // One thread open at a time, and the box takes the caret when it was opened to reply (the kit's one column).
+  // One thread open at a time (the kit's one column keeps the press; the list keeps which).
   const [openId, setOpenId] = useState<string>()
-  const [focusId, setFocusId] = useState<string>()
   // At most one opens by itself: the newest holding a reply that was new when the page opened, once read state is known.
   const [openedByItself, setOpenedByItself] = useState(false)
   if (unread !== undefined && !openedByItself) {
@@ -475,8 +511,30 @@ export function ThreadListView(props: ThreadListViewProps) {
     onShown(openId, true)
     return () => onShown(openId, false)
   }, [openId, onShown])
-  return (
-    <div className={cn('flex flex-col gap-3', className)}>
+  const items: ConversationItem[] = threads.map((thread) => {
+    const shared: ShipThreadProps = { thread, pageThreads: threads, stillUnread: (props.stillUnread ?? unread)?.[thread.id], resolvedBy: props.resolvedBy, ...threadProps(props) }
+    return {
+      id: thread.id,
+      card: <ShipThreadComment {...shared} />,
+      thread: () => <ShipThreadReplies {...shared} />,
+      // Resolved in Peek or Leaf: closed under "Resolved", at the end (Katerina, 2 November).
+      resolved: !thread.rootMissing && !!props.resolvedBy?.[thread.root.id],
+      // On a block since removed from the description (§13.6): closed under "On deleted blocks", before "Resolved".
+      gone: thread.root.anchor?.state === 'detached',
+    }
+  })
+  const horizon = (omitted > 0 || reactionsCut) && (
+    <>
+      {omitted > 0 && (
+        <p className="text-caption text-text-muted">
+          Reactions are shown for the {REACTION_HORIZON} most recent messages. {omitted} older {omitted === 1 ? 'message was' : 'messages were'} not checked.
+        </p>
+      )}
+      {reactionsCut && <p className="text-caption text-text-muted">Some reactions may be missing.</p>}
+    </>
+  )
+  const box = (
+    <div className="flex flex-col gap-2">
       {/* From a block's menu (RIC-18): the part this conversation will be about, as the posted comment shows it. */}
       {blockId && (
         <div className="flex items-start gap-2" data-pending-anchor={blockId}>
@@ -489,7 +547,8 @@ export function ThreadListView(props: ThreadListViewProps) {
         </div>
       )}
       <Box
-        key={about}
+        // A new block to comment on is a new box, which takes the caret; the text typed so far is kept as a draft.
+        key={`${about ?? ''}:${blockId ?? ''}`}
         kind="conversation"
         onSend={(text, files, picks) => onStart(text, files, picks, blockId)}
         references={references}
@@ -503,42 +562,25 @@ export function ThreadListView(props: ThreadListViewProps) {
         resolved={props.resolved}
         here={about}
       />
-      {props.loading ? (
-        <SkeletonList rows={2} />
-      ) : threads.length ? (
-        <ol className="flex flex-col gap-2">
-          {threads.map((thread) => (
-            <li key={thread.id}>
-              <ShipThread
-                thread={thread}
-                pageThreads={threads}
-                stillUnread={(props.stillUnread ?? unread)?.[thread.id]}
-                open={openId === thread.id}
-                focusBox={focusId === thread.id}
-                onToggle={() => {
-                  setFocusId(undefined)
-                  setOpenId(openId === thread.id ? undefined : thread.id)
-                }}
-                onOpenToReply={() => {
-                  setFocusId(thread.id)
-                  setOpenId(thread.id)
-                }}
-                resolvedBy={props.resolvedBy}
-                {...threadProps(props)}
-              />
-            </li>
-          ))}
-        </ol>
-      ) : (
-        <EmptyState scope="section" message="No conversations yet." />
-      )}
-      {omitted > 0 && (
-        <p className="text-caption text-text-muted">
-          Reactions are shown for the {REACTION_HORIZON} most recent messages. {omitted} older {omitted === 1 ? 'message was' : 'messages were'} not checked.
-        </p>
-      )}
-      {reactionsCut && <p className="text-caption text-text-muted">Some reactions may be missing.</p>}
     </div>
+  )
+  return (
+    <ConversationLayout
+      // Opened by itself before it is drawn, so the thread the page opens does not take the caret from the page: drawn
+      // again once the read state is known (the kit gives the caret only to a thread that opens after it is drawn).
+      key={unread === undefined ? 'reading' : 'read'}
+      threads="under"
+      items={items}
+      open={openId}
+      onOpenChange={setOpenId}
+      loading={props.loading}
+      // Ship's words (Katerina, 2 November: Ship keeps its own where the kit differs).
+      empty="No conversations yet."
+      {...(title !== undefined ? { title } : {})}
+      box={box}
+      below={horizon}
+      className={className}
+    />
   )
 }
 

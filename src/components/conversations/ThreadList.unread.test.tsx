@@ -25,7 +25,7 @@ const thread = (id: string, replyIds: string[] = []): ThreadData => ({
 const noop = async (): Promise<true> => true
 
 /** The unread dot on a comment, and on a reply. */
-const commentIsNew = (id: string) => !!document.querySelector(`[data-thread="${id}"] [data-comment-body] [data-unread]`)
+const commentIsNew = (id: string) => !!document.querySelector(`[data-conversation-item="${id}"] [data-comment-body] [data-unread]`)
 const replyIsNew = (id: string) => !!document.querySelector(`[data-reply-id="${id}"] [data-unread]`)
 /** A thread's replies row, by how it is named: "2 replies, 1 new, open the thread". */
 const row = (name: RegExp) => screen.getByRole('button', { name })

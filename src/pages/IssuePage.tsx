@@ -62,17 +62,20 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
      marker, so a new top-level comment stayed new until the project page was
      opened and opening the project page read every issue's roots.
 
-     Both advance only on the Activity tab, where the conversation is drawn:
-     a `thread:` context while its replies are shown (CON-34, under §11.3's
-     thread rule), the issue's own stream whenever the tab is open (66b31c4b,
-     Miky 2026-10-06). Opening an issue lands on Overview, which draws none of
-     it, so marking there cleared Peek's dot for comments nobody had seen. */
+     Both advance only while the comments are drawn: a `thread:` context
+     while its replies are shown (CON-34, under §11.3's thread rule), the
+     issue's own stream whenever the comments column is shown (66b31c4b, Miky
+     2026-10-06: what is not on screen is not read). The column is beside the
+     page on every tab since ONE-6, step 4c, and the header hides it; until
+     then the comments were the Activity tab's. */
+  // The comments column, shown until the person hides it (Katerina, 2 November).
+  const [commentsShown, setCommentsShown] = useState(true)
   const [shownThreads, onThreadShown] = useShownThreads()
   const drawn = useMemo(() => newestDrawn(conversations, shownThreads), [conversations, shownThreads])
   // Nor while its conversations are on the way (APP-5): with none drawn, the mark would be the clock's.
-  const fileContexts = useMemo(() => (tab === 'activity' && held.all ? [fileContext(issue?.addr)] : []), [issue, tab, held.all])
+  const fileContexts = useMemo(() => (commentsShown && held.all ? [fileContext(issue?.addr)] : []), [issue, commentsShown, held.all])
   useMarkRead(fileContexts, drawn.rootsAt)
-  useMarkRead(tab === 'activity' ? shownThreads.map(threadContext) : [], drawn.repliesAt)
+  useMarkRead(commentsShown ? shownThreads.map(threadContext) : [], drawn.repliesAt)
   const threads = useMemo(
     () => conversations.map((c) => threadFor(c, directory, issue ? { value: issue.description, format: issue.descriptionFormat } : undefined, issue?.addr, state.edits, state.attachments, state.urgent, state.parts, state.embeds)),
     [conversations, directory, issue],
@@ -140,6 +143,7 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
         edited={editedFor(issue.addr, state, directory, { at: issue.createdAt, by: issue.author })}
         tab={tab}
         onTab={(next) => go({ name: 'issue', d: issue.id, slug: issue.title, tab: next })}
+        comments={{ shown: commentsShown, onShownChange: setCommentsShown }}
         archivedNotice={
           archive && (
             <ArchivedNotice

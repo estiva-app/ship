@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite'
 import type { Resolution } from '@/api'
 import type { ThreadData, UnreadByThread } from '@/components/ConversationThread'
 import { useFakeRelay } from '@/fixtures/fakeRelay'
-import { MentionListView, ThreadListView } from './ThreadList'
+import { MentionListView, ThreadListView, commentsTitle } from './ThreadList'
 import { STORY_DELETED, STORY_ME, STORY_MENTIONS, STORY_PEOPLE, STORY_QUOTED, STORY_REACTIONS, STORY_RESOLVED, STORY_THREADS, STORY_URGENT } from './stories.fixtures'
 
 /**
@@ -14,38 +14,41 @@ import { STORY_DELETED, STORY_ME, STORY_MENTIONS, STORY_PEOPLE, STORY_QUOTED, ST
  */
 function Conversations({ empty = false, signedOut = false, unread, resolvedBy, first = [] }: { empty?: boolean; signedOut?: boolean; unread?: UnreadByThread; resolvedBy?: Record<string, Resolution>; first?: ThreadData[] }) {
   const relay = useFakeRelay({ threads: empty ? [] : [...first, ...STORY_THREADS], mentioned: STORY_MENTIONS, people: STORY_PEOPLE, me: STORY_ME, reactions: STORY_REACTIONS, unread, signedOut })
-  return <ThreadListView {...relay.conversations} resolvedBy={resolvedBy} />
+  // The kit's one column, 384px, at a page's height beside it (ONE-6, step 4c).
+  return (
+    <div className="flex h-screen">
+      <ThreadListView {...relay.conversations} resolvedBy={resolvedBy} title={commentsTitle('issue', 'REL-1 · Board columns lose order')} />
+    </div>
+  )
 }
 
 function Mentioned({ empty = false, truncated = 0 }: { empty?: boolean; truncated?: number }) {
   const relay = useFakeRelay({ threads: [], mentioned: empty ? [] : STORY_MENTIONS, people: STORY_PEOPLE, me: STORY_ME, reactions: STORY_REACTIONS })
-  return <MentionListView {...relay.mentioned} truncated={truncated} />
+  // The page's reading column, where Mentioned in still is (the Activity tab).
+  return (
+    <div className="w-full max-w-3xl p-4">
+      <MentionListView {...relay.mentioned} truncated={truncated} />
+    </div>
+  )
 }
 
 const meta = {
   title: 'Conversations/Conversations',
   component: Conversations,
-  // The page's reading column.
-  // Padded, not centred: in the centred layout a column has no width to take, and a short one shrank to its words.
-  parameters: { layout: 'padded' },
-  decorators: [
-    (Story) => (
-      <div className="w-full max-w-3xl">
-        <Story />
-      </div>
-    ),
-  ],
+  // The whole frame: the comments are a column at a page's height. Mentioned in pads its own reading column.
+  parameters: { layout: 'fullscreen' },
 } satisfies Meta<typeof Conversations>
 
 export default meta
 type Story = StoryObj<typeof meta>
 
 /**
- * The kit's cards, in Ship's words, still in the Activity tab (ONE-6, step 3):
- * a comment per conversation, its replies row (faces, how many, the last time)
- * and its thread opening under it, one at a time. React, Reply and "Message
- * actions" show on hover. A picture, a text file, a linked issue and an edit
- * are in the sample.
+ * The comments column beside an issue's or a project's page (ONE-6, step 4c):
+ * the kit's one column, 384px, "Comments" over whose they are, the kit's cards
+ * in Ship's words. A comment per conversation, its replies row (faces, how
+ * many, the last time) and its thread opening under it, one at a time; the box
+ * at its foot. React, Reply and "Message actions" show on hover. A picture, a
+ * text file, a linked issue and an edit are in the sample.
  */
 export const Default: Story = {}
 
@@ -53,9 +56,9 @@ export const Default: Story = {}
 export const Empty: Story = { args: { empty: true } }
 
 /**
- * "New since you last read this" above a new reply — the thread opens by
- * itself, and its replies button says how many are new — and above a whole new
- * conversation.
+ * New since it was last read: the thread holding a new reply opens by itself,
+ * its replies row says how many are new, and each new message keeps its dot
+ * and edge until read ("New since you last read this" went, Katerina, 2 November).
  */
 export const Unread: Story = { args: { unread: { t1: ['m3'], t2: ['m4'] } } }
 
@@ -71,7 +74,7 @@ export const MentionedInEmpty: StoryObj<typeof Mentioned> = { render: () => <Men
 /** More than the horizon: the list says how many it left out rather than implying there are none. */
 export const MentionedInTruncated: StoryObj<typeof Mentioned> = { render: () => <Mentioned truncated={12} /> }
 
-/** A comment resolved in Peek: "✓ Resolved" by its time, and who resolved it with the note above its replies. Ship offers no Resolve. */
+/** A comment resolved in Peek: closed under "Resolved" at the column's end (Katerina, 2 November); opened, who resolved it and the note. Ship offers no Resolve. */
 export const ResolvedInPeek: Story = { args: { resolvedBy: STORY_RESOLVED } }
 
 /** A comment that was deleted: "This comment was deleted.", its replies under it, and in place of the box, why no reply can be written. */

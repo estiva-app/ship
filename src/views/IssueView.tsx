@@ -12,10 +12,10 @@ import { History, type HistoryEntry } from '@/components/History'
 import type { ActivityItem } from '@/components/Activity'
 import type { ThreadData, UnreadByThread } from '@/components/ConversationThread'
 import { IssueFields, type IssueFieldsProps } from '@/components/PageFields'
-import { PageMenu, type PageMenuProps } from '@/components/PageMenu'
+import { PageActions, type PageActionsProps } from '@/components/PageActions'
 import { Related, hasRelated } from '@/components/Related'
 import { LiveHeader, type LiveHeaderProps } from '@/components/editing/LiveHeader'
-import { MentionList, ThreadList } from '@/components/conversations/ThreadList'
+import { MentionList, ThreadList, commentsTitle } from '@/components/conversations/ThreadList'
 import { useBlockComment } from '@/components/conversations/useBlockComment'
 import type { RelatedState } from '@/api/useRelated'
 import { AppSection, Centred } from '@/components/layout/ReadingColumn'
@@ -23,9 +23,10 @@ import { AppSection, Centred } from '@/components/layout/ReadingColumn'
 /**
  * One issue, in the project page's format (Katerina, 29 September): two tabs,
  * **Overview** (the title, its fields, the description, "Related") and
- * **Activity** (the three lists), in the same centred column. No details
- * column (ONE-6, step 4b): the fields are a row under the summary, the
- * actions the header's ⋯.
+ * **Activity** (Mentioned in and History), in the same centred column. No
+ * details column (ONE-6, step 4b): the fields are a row under the summary, the
+ * actions the header's ⋯. Its comments are the column beside the page, on
+ * every tab, shown or hidden from the header (step 4c).
  *
  * **The three lists are three different questions, and CON-9 renamed one.**
  *
@@ -92,7 +93,9 @@ export interface IssueViewProps {
   /** Status, assignee and project, as a row between the summary and the description (ONE-6, step 4b). */
   fields: Omit<IssueFieldsProps, 'readOnlyReason' | 'lockedReason'>
   /** The header's ⋯: Copy link, Archive or Unarchive, Delete. */
-  menu: Omit<PageMenuProps, 'what' | 'readOnlyReason' | 'lockedReason'>
+  menu: Omit<PageActionsProps, 'what' | 'comments' | 'readOnlyReason' | 'lockedReason'>
+  /** The comments column beside the page, on every tab (Katerina, 2 November), and whether it is shown: the header's button shows or hides it, and the page reads the comments only while it is. */
+  comments: { shown: boolean; onShownChange: (shown: boolean) => void }
   /** This object's address, so an unsent message is kept against it — CON-10. */
   about?: string
   /** Add or take back a reaction on a message — CON-2. */
@@ -123,24 +126,26 @@ const TABS: { id: IssueTab; label: string }[] = [
 ]
 
 /** One issue's page, in tabs: Overview and Activity. */
-export function IssueView({ crumbs, tab, onTab, title, summary, onSummarize, description, descriptionFormat, nameOf, onRename, onCopyBlockLink, onDescribe, onMention, descriptionBy, related, threads, conversationsLoading, mentionsLoading, unread, stillUnread, onThreadShown, onStartConversation, onReply, activity, activityTruncated, onReplyInActivity, history, fields, menu, about, onReact, onDeleteMessage, onEditMessage, readOnlyReason, lockedReason, commentsClosed, upload, archivedNotice, members, edited }: IssueViewProps) {
+export function IssueView({ crumbs, tab, onTab, title, summary, onSummarize, description, descriptionFormat, nameOf, onRename, onCopyBlockLink, onDescribe, onMention, descriptionBy, related, threads, conversationsLoading, mentionsLoading, unread, stillUnread, onThreadShown, onStartConversation, onReply, activity, activityTruncated, onReplyInActivity, history, fields, menu, comments, about, onReact, onDeleteMessage, onEditMessage, readOnlyReason, lockedReason, commentsClosed, upload, archivedNotice, members, edited }: IssueViewProps) {
   // `linkTo` on each crumb (S15, 0.10.0): the breadcrumbs were the last links in Ship that reloaded the app (SHI-20).
   const items: Crumb[] = [{ label: 'Issues', ...linkTo(crumbs.issuesHref) }]
   // The box before the project's name says it is a project, as the sidebar's entry does (Katerina, 2026-09-09).
   if (crumbs.project) items.push({ label: crumbs.project.title, icon: <IconBox size={16} stroke={1.5} />, ...linkTo(crumbs.project.href) })
   if (crumbs.ref) items.push({ label: crumbs.ref, mono: true })
-  const comment = useBlockComment(description, descriptionFormat, onTab, onStartConversation)
+  // A block menu's Comment shows the column, with that block above its box (RIC-18).
+  const comment = useBlockComment(description, descriptionFormat, () => comments.onShownChange(true), onStartConversation)
 
   return (
     // `data-surface` and `data-tab` are the smoke test's waypoints — see IssuesView. A page that scrolls inside
-    // itself: `flex-1 min-h-0 [contain:size]` takes exactly the frame's height, so its column scrolls and the frame does not.
-    <div data-surface="issue" data-tab={tab} className="flex min-h-0 flex-1 flex-col gap-4 [contain:size]">
-      {/* The kit's PageHeader (ONE-6, step 4a): the path, when it last changed, who is in it, and the page's ⋯ (4b). 48px whatever it holds, so the members pill arriving moves nothing. */}
-      <PageHeader title={<Breadcrumb items={items} />} {...(edited ? { time: edited } : {})} members={members} actions={<PageMenu what="issue" {...menu} readOnlyReason={readOnlyReason} lockedReason={lockedReason} />} />
+    // itself: `flex-1 min-h-0 [contain:size]` takes exactly the frame's height, so its columns scroll and the frame does not.
+    <div data-surface="issue" data-tab={tab} className="flex min-h-0 flex-1 [contain:size]">
+      <div className="flex min-w-0 flex-1 flex-col gap-4">
+      {/* The kit's PageHeader (ONE-6, step 4a): the path, when it last changed, who is in it, and the page's own buttons (4b, 4c). 48px whatever it holds, so the members pill arriving moves nothing. */}
+      <PageHeader title={<Breadcrumb items={items} />} {...(edited ? { time: edited } : {})} members={members} actions={<PageActions what="issue" comments={comments} {...menu} readOnlyReason={readOnlyReason} lockedReason={lockedReason} />} />
       {/* The tabs directly under the header, 16px below it, as they were. */}
       <div className="flex min-h-8 items-center px-6">
-        {/* Overview does not read the conversation (66b31c4b), so Activity says when something there is new. */}
-        <Tabs tabs={TABS.map((t) => (t.id === 'activity' ? { ...t, unread: Object.keys(stillUnread ?? {}).length > 0 } : t))} active={tab} onChange={onTab} />
+        {/* Changed on purpose (ONE-6, step 4c): the comments left Activity for the column, so the tab no longer says something there is new. */}
+        <Tabs tabs={TABS} active={tab} onChange={onTab} />
       </div>
 
       <ScrollArea className="min-h-0 min-w-0 flex-1" contentClassName="flex flex-col gap-6 px-6 pb-5">
@@ -164,9 +169,6 @@ export function IssueView({ crumbs, tab, onTab, title, summary, onSummarize, des
         {tab === 'activity' && (
           <Centred>
             {archivedNotice}
-            <AppSection title="Conversations">
-              <ThreadList threads={threads} loading={conversationsLoading} unread={unread} stillUnread={stillUnread} onThreadShown={onThreadShown} onStart={comment.post} anchor={comment.anchor} onDropAnchor={comment.drop} onReply={onReply} disabledReason={readOnlyReason ?? commentsClosed} nameOf={nameOf} onReact={onReact} onDeleteMessage={onDeleteMessage} onEditMessage={onEditMessage} about={about} upload={upload} />
-            </AppSection>
             <AppSection title="Mentioned in">
               <MentionList items={activity} loading={mentionsLoading} truncated={activityTruncated} onReply={onReplyInActivity} disabledReason={readOnlyReason} nameOf={nameOf} onReact={onReact} onDeleteMessage={onDeleteMessage} onEditMessage={onEditMessage} about={about} upload={upload} />
             </AppSection>
@@ -176,6 +178,14 @@ export function IssueView({ crumbs, tab, onTab, title, summary, onSummarize, des
           </Centred>
         )}
       </ScrollArea>
+      </div>
+
+      {/* Its comments, the kit's one column, 384px beside the page on every tab, the full height of the page (Katerina, 2 November). */}
+      {comments.shown && (
+        <div className="flex shrink-0 flex-col border-l border-border-default" data-comments-column>
+          <ThreadList title={commentsTitle('issue', crumbs.ref ? `${crumbs.ref} · ${title || 'Untitled issue'}` : title || 'Untitled issue')} threads={threads} loading={conversationsLoading} unread={unread} stillUnread={stillUnread} onThreadShown={onThreadShown} onStart={comment.post} anchor={comment.anchor} onDropAnchor={comment.drop} onReply={onReply} disabledReason={readOnlyReason ?? commentsClosed} nameOf={nameOf} onReact={onReact} onDeleteMessage={onDeleteMessage} onEditMessage={onEditMessage} about={about} upload={upload} className="min-h-0 flex-1" />
+        </div>
+      )}
     </div>
   )
 }

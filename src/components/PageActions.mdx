@@ -1,16 +1,18 @@
 import { Meta } from '@storybook/addon-docs/blocks'
 
-<Meta title="Pages/PageMenu" />
+<Meta title="Pages/PageActions" />
 
-# PageMenu
+# PageActions
 
-An issue's or a project's ⋯, at the right of its **PageHeader**: what the
-details column's buttons did, in the page's own menu, as Leaf's and Peek's
-(ONE-6, step 4b; Katerina, 1 November). The kit's **Menu** behind a
-**ToolbarButton** "More actions", in a **Toolbar** with no box of its own.
+An issue's or a project's own buttons, at the right of its **PageHeader**, as
+Leaf's and Peek's (ONE-6, steps 4b and 4c; Katerina, 1 November): the comments
+column shown or hidden, then the ⋯ with what the details column's buttons did.
+The kit's **ToolbarButton**s and **Menu**, in a **Toolbar** with no box of its
+own.
 
 **Seen in** — *Pages/In the shell*: **Project**, **Project Archived**,
-**Issue** and **Issue Archived With Project**. Open the ⋯ on each.
+**Issue** and **Issue Archived With Project**. Press the comments button, and
+open the ⋯.
 
 ## When
 
@@ -27,14 +29,28 @@ details column's buttons did, in the page's own menu, as Leaf's and Peek's
 ## How
 
 ```tsx
-import { PageMenu } from '@/components/PageMenu'
+import { PageActions } from '@/components/PageActions'
 
 <PageHeader
   title={<Breadcrumb items={items} />}
-  actions={<PageMenu what="project" archive={own ? 'own' : archive ? 'with' : 'none'} onMove={…} onCopyLink={…} onArchive={…} onDelete={…} readOnlyReason={readOnlyReason} lockedReason={lockedReason} />}
+  actions={
+    <PageActions
+      what="project"
+      comments={{ shown, onShownChange: setShown }}
+      archive={own ? 'own' : archive ? 'with' : 'none'}
+      onMove={…}
+      onCopyLink={…}
+      onArchive={…}
+      onDelete={…}
+      readOnlyReason={readOnlyReason}
+      lockedReason={lockedReason}
+    />
+  }
 />
 ```
 
+- `comments`: the page keeps whether the column is shown. It reads the
+  comments only while they are on screen.
 - `onMove` only once the Folders are read and there is one to move to. Without
   it there is no row.
 - `onCopyLink` copies the page's own address without its tab (`href`), and
@@ -42,6 +58,8 @@ import { PageMenu } from '@/components/PageMenu'
 
 ## What it owns
 
+- **The comments button**: "Hide comments" while the column is shown, "Show
+  comments" while it is not.
 - **Which rows**, by the file's archive (FOL-46):
   - Not archived: Move to Folder… (a project), Copy link, then Archive and
     Delete.

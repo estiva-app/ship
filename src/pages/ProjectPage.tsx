@@ -619,9 +619,9 @@ export function ProjectPage({
   )
   /* This feed is two streams drawn as one — SPEC §11.1 (FOL-16): the record
      channel's chat, which answers to its bare channel uuid, and the project's
-     own comments, which answer to the project's address. Looking at the
-     Activity tab advances both, because both are on it — §11.2, "exactly the
-     streams you are showing" — and Overview and Issues draw neither. Its
+     own comments, which answer to the project's address. Showing the
+     comments column advances both, because both are in it — §11.2, "exactly
+     the streams you are showing" — and hiding it reads neither. Its
      issues' comments are other files' streams and are untouched;
      before FOL-16 their roots answered to the channel marker, so this line
      silently read every issue in the project.
@@ -631,17 +631,19 @@ export function ProjectPage({
      channel, only a team, and marking the team would advance the team's chat,
      which is not on this page.
 
-     A thread in the feed whose replies are drawn, on the Activity tab,
-     advances its `thread:` context too (CON-34, Miky 2026-10-05): under
+     A thread in the feed whose replies are drawn, in the column, advances
+     its `thread:` context too (CON-34, Miky 2026-10-05): under
      §11.3's thread rule reading the streams no longer reads their replies. The
      issues' threads rolled up above are not drawn here and are not marked. */
+  // The comments column, beside the page on every tab until the person hides it (ONE-6, step 4c; Katerina, 2 November).
+  const [commentsShown, setCommentsShown] = useState(true)
   const [shownThreads, onThreadShown] = useShownThreads()
   const drawn = useMemo(() => newestDrawn(conversations, shownThreads), [conversations, shownThreads])
-  // Only on Activity, where the feed is drawn: Overview and Issues read nothing (66b31c4b, Miky 2026-10-06).
+  // Only while the column is shown, where the feed is drawn: hidden, nothing is read (66b31c4b, Miky 2026-10-06).
   // Nor while its conversations are on the way (APP-5): with none drawn, the mark would be the clock's.
-  const streams = useMemo(() => (tab === 'activity' && held.all ? [channelContext(record), fileContext(project?.addr)] : []), [record, project, tab, held.all])
+  const streams = useMemo(() => (commentsShown && held.all ? [channelContext(record), fileContext(project?.addr)] : []), [record, project, commentsShown, held.all])
   useMarkRead(streams, drawn.rootsAt)
-  useMarkRead(tab === 'activity' ? shownThreads.map(threadContext) : [], drawn.repliesAt)
+  useMarkRead(commentsShown ? shownThreads.map(threadContext) : [], drawn.repliesAt)
   const threads = useMemo(
     () => conversations.map((c) => threadFor(c, directory, project ? { value: project.description, format: project.descriptionFormat } : undefined, project?.addr, state.edits, state.attachments, state.urgent, state.parts, state.embeds)),
     [conversations, directory, project],
@@ -774,6 +776,7 @@ export function ProjectPage({
         {...(archive ? {} : { onAddIssue: () => setDialog('issue') })}
         tab={tab}
         onTab={(next) => go({ name: 'project', d: project.id, slug: project.title, view, tab: next })}
+        comments={{ shown: commentsShown, onShownChange: setCommentsShown }}
         view={view}
         onView={(next) => go({ name: 'project', d: project.id, slug: project.title, view: next, tab })}
         issues={issues}

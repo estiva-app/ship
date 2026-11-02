@@ -179,20 +179,38 @@ const late = [
   check('  …and the issue has one comment, not two', commentsOn(state.conversations, ISSUE, anchors).length === 1)
 }
 
-// ── A thread whose root nobody can see reads as a mention ───────────────────
+// ── A thread whose root nobody can see ──────────────────────────────────────
 
 {
-  // The root `m1` is missing — truncated history. `foldConversations` stands the
-  // earliest visible message in for it, and that stand-in's tags are not the
-  // root's, so calling it a comment would be a guess about an unseen event.
+  // Changed on purpose (ONE-6, step 4c; Katerina, 2 November: a deleted comment stays in the comments, as in Peek).
+  // The root is missing — deleted, or truncated history. `foldConversations` stands the earliest visible message in
+  // for it; a NIP-22 reply carries its thread's object as its `A` (§6.4 Replies), so it says whose comment it was.
   const events = [event({ id: 'orphan', kind: 1111, tags: [['A', ISSUE], ['e', 'gone', '', 'reply'], ['E', 'gone']], content: 'a reply with no parent' })]
   const state = foldFolder(events, refs)
   const anchors = anchorIndex(events)
   const thread = state.conversations[0]
   check(
-    'a thread with no visible root falls to the secondary list, not the primary one',
-    attachmentOf(thread, ISSUE, anchors) === 'mention',
+    'a thread whose root is gone stays in the comments of the file its replies name',
+    attachmentOf(thread, ISSUE, anchors) === 'comment' && commentsOn(state.conversations, ISSUE, anchors).length === 1,
   )
+  check('  …and no other file’s comment', commentsOn(state.conversations, POINTED_AT, anchors).length === 0)
+}
+
+{
+  // The same, its stand-in answering a reply (`e` ≠ `E`): the `A` it copies still names the issue.
+  const events = [event({ id: 'deeper', kind: 1111, tags: [['A', ISSUE], ['e', 'gone-reply', '', 'reply'], ['E', 'gone']], content: 'a reply to a reply, both roots gone' })]
+  const state = foldFolder(events, refs)
+  const anchors = anchorIndex(events)
+  check('  …and when its stand-in answers a reply, not the comment', attachmentOf(state.conversations[0], ISSUE, anchors) === 'comment')
+  check('  …which is kept apart, never a comment root of its own', anchors.deeper === undefined)
+}
+
+{
+  // A stand-in that is chat — a kind:9 — names no thread object: still the safe side, a mention.
+  const events = [event({ id: 'chat', kind: 9, tags: [['e', 'gone', '', 'reply'], ['a', ISSUE]], content: 'a chat reply naming it' })]
+  const state = foldFolder(events, refs)
+  const anchors = anchorIndex(events)
+  check('  …but a chat stand-in still reads as a mention', attachmentOf(state.conversations[0], ISSUE, anchors) === 'mention')
 }
 
 // ── An object nothing refers to ─────────────────────────────────────────────

@@ -6,7 +6,7 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { IssueFields, ProjectFields, type IssueFieldsProps, type ProjectFieldsProps } from './PageFields'
-import { PageMenu, type PageMenuProps } from './PageMenu'
+import { PageActions, type PageActionsProps } from './PageActions'
 
 const STATUSES = [
   { value: 'planned', label: 'Planned', colour: 'neutral' as const },
@@ -23,8 +23,8 @@ const projectFields = (extra: Partial<ProjectFieldsProps> = {}) => (
 const issueFields = (extra: Partial<IssueFieldsProps> = {}) => (
   <IssueFields status="planned" statuses={STATUSES} onStatusChange={vi.fn()} assignee="" people={PEOPLE} onAssigneeChange={vi.fn()} project="30850:x:hive" projects={PROJECTS} onProjectChange={vi.fn()} {...extra} />
 )
-const menu = (extra: Partial<PageMenuProps> & Pick<PageMenuProps, 'what'>) => (
-  <PageMenu archive="none" onArchive={vi.fn()} onDelete={vi.fn()} onCopyLink={vi.fn()} {...extra} />
+const menu = (extra: Partial<PageActionsProps> & Pick<PageActionsProps, 'what'>) => (
+  <PageActions archive="none" onArchive={vi.fn()} onDelete={vi.fn()} onCopyLink={vi.fn()} {...extra} />
 )
 
 /** Opens the ⋯ and answers its rows by name, in order. */

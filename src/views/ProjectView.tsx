@@ -17,10 +17,10 @@ import type { ActivityItem } from '@/components/Activity'
 import type { IssueRowData } from '@/components/IssueRow'
 import { IssuesTable, type IssuesTableRow } from '@/components/IssuesTable'
 import { ProjectFields, type ProjectFieldsProps } from '@/components/PageFields'
-import { PageMenu, type PageMenuProps } from '@/components/PageMenu'
+import { PageActions, type PageActionsProps } from '@/components/PageActions'
 import { Related, hasRelated } from '@/components/Related'
 import { LiveHeader, type LiveHeaderProps } from '@/components/editing/LiveHeader'
-import { MentionList, ThreadList } from '@/components/conversations/ThreadList'
+import { MentionList, ThreadList, commentsTitle } from '@/components/conversations/ThreadList'
 import { useBlockComment } from '@/components/conversations/useBlockComment'
 import { AppSection, Centred } from '@/components/layout/ReadingColumn'
 import type { RelatedState } from '@/api/useRelated'
@@ -30,8 +30,9 @@ import type { RelatedState } from '@/api/useRelated'
  *
  * - **Overview** — the title, its fields and the description, always editable,
  *   and what is placed under the project ("Related").
- * - **Activity** — "Conversations" (what declared itself about this project)
- *   and "Mentioned in" (conversations elsewhere that name it; CON-9's two lists).
+ * - **Activity** — "Mentioned in" (conversations elsewhere that name it; CON-9).
+ *   What declared itself about this project is its comments, the column beside
+ *   the page on every tab, shown or hidden from the header (ONE-6, step 4c).
  * - **Issues** — the issues, full width, with Table / Board at the right end of
  *   the tab row.
  *
@@ -99,7 +100,9 @@ export interface ProjectViewProps {
   /** Status, assignee and progress, as a row between the summary and the description (ONE-6, step 4b). */
   fields: Omit<ProjectFieldsProps, 'readOnlyReason' | 'lockedReason'>
   /** The header's ⋯: Move to Folder…, Copy link, Archive or Unarchive, Delete. */
-  menu: Omit<PageMenuProps, 'what' | 'readOnlyReason' | 'lockedReason'>
+  menu: Omit<PageActionsProps, 'what' | 'comments' | 'readOnlyReason' | 'lockedReason'>
+  /** The comments column beside the page, on every tab (Katerina, 2 November), and whether it is shown: the header's button shows or hides it, and the page reads the comments only while it is. */
+  comments: { shown: boolean; onShownChange: (shown: boolean) => void }
   /** This object's address, so an unsent message is kept against it — CON-10. */
   about?: string
   /** Add or take back a reaction on a message — CON-2. */
@@ -131,24 +134,26 @@ const TABS: { id: ProjectTab; label: string }[] = [
 ]
 
 /** One project's page, in tabs: Overview, Activity and Issues. */
-export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onView, issues, issueStatuses, hrefFor, related, threads, conversationsLoading, mentionsLoading, unread, stillUnread, onThreadShown, onStartConversation, onReply, onCopyBlockLink, activity, activityTruncated, onReplyInActivity, fields, menu, about, onReact, onDeleteMessage, onEditMessage, readOnlyReason, lockedReason, commentsClosed, upload, archivedNotice, members, edited }: ProjectViewProps) {
-  const comment = useBlockComment(header.description, header.descriptionFormat, onTab, onStartConversation)
+export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onView, issues, issueStatuses, hrefFor, related, threads, conversationsLoading, mentionsLoading, unread, stillUnread, onThreadShown, onStartConversation, onReply, onCopyBlockLink, activity, activityTruncated, onReplyInActivity, fields, menu, comments, about, onReact, onDeleteMessage, onEditMessage, readOnlyReason, lockedReason, commentsClosed, upload, archivedNotice, members, edited }: ProjectViewProps) {
+  // A block menu's Comment shows the column, with that block above its box (RIC-18).
+  const comment = useBlockComment(header.description, header.descriptionFormat, () => comments.onShownChange(true), onStartConversation)
   return (
     // `data-surface`, `data-view` and `data-tab` are the smoke test's waypoints — see IssuesView. The Table/Board
     // toggle and the tabs swap content in place on the same route, so without them a test cannot tell "it
     // rendered" from "the click did nothing". A page that scrolls inside itself — see IssueView.
-    <div data-surface="project" data-view={view} data-tab={tab} className="flex min-h-0 flex-1 flex-col gap-4 [contain:size]">
+    <div data-surface="project" data-view={view} data-tab={tab} className="flex min-h-0 flex-1 [contain:size]">
+      <div className="flex min-w-0 flex-1 flex-col gap-4">
       {/* The kit's PageHeader (ONE-6, steps 4a and 4b) — see IssueView. The box before the name says it is a project — the sidebar's icon for one (Katerina, 2026-09-09). */}
       <PageHeader
         title={<Breadcrumb items={[{ label: 'Projects', ...linkTo(crumbs.projectsHref) }, { label: crumbs.title, icon: <IconBox size={16} stroke={1.5} /> }]} />}
         {...(edited ? { time: edited } : {})}
         members={members}
-        actions={<PageMenu what="project" {...menu} readOnlyReason={readOnlyReason} lockedReason={lockedReason} />}
+        actions={<PageActions what="project" comments={comments} {...menu} readOnlyReason={readOnlyReason} lockedReason={lockedReason} />}
       />
       {/* The tabs directly under the header, 16px below it, as they were. */}
       <div className="flex min-h-8 items-center gap-3 px-6">
-        {/* Overview and Issues do not read the conversation (66b31c4b), so Activity says when something there is new. */}
-        <Tabs tabs={TABS.map((t) => (t.id === 'activity' ? { ...t, unread: Object.keys(stillUnread ?? {}).length > 0 } : t))} active={tab} onChange={onTab} />
+        {/* Changed on purpose (ONE-6, step 4c): the comments left Activity for the column, so the tab no longer says something there is new. */}
+        <Tabs tabs={TABS} active={tab} onChange={onTab} />
         <div className="flex-1" />
         {tab === 'issues' && (
           <Tabs
@@ -191,9 +196,6 @@ export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onVi
         {tab === 'activity' && (
           <Centred>
             {archivedNotice}
-            <AppSection title="Conversations">
-              <ThreadList threads={threads} loading={conversationsLoading} unread={unread} stillUnread={stillUnread} onThreadShown={onThreadShown} onStart={comment.post} anchor={comment.anchor} onDropAnchor={comment.drop} onReply={onReply} disabledReason={readOnlyReason ?? commentsClosed} nameOf={header.nameOf} onReact={onReact} onDeleteMessage={onDeleteMessage} onEditMessage={onEditMessage} about={about} upload={upload} />
-            </AppSection>
             <AppSection title="Mentioned in">
               <MentionList items={activity} loading={mentionsLoading} truncated={activityTruncated} onReply={onReplyInActivity} disabledReason={readOnlyReason} nameOf={header.nameOf} onReact={onReact} onDeleteMessage={onDeleteMessage} onEditMessage={onEditMessage} about={about} upload={upload} />
             </AppSection>
@@ -210,6 +212,14 @@ export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onVi
             <IssuesTable issues={issues} statuses={issueStatuses} hrefFor={hrefFor} />
           ))}
       </ScrollArea>
+      </div>
+
+      {/* Its comments, the kit's one column, 384px beside the page on every tab, Issues too (Katerina, 2 November: A). */}
+      {comments.shown && (
+        <div className="flex shrink-0 flex-col border-l border-border-default" data-comments-column>
+          <ThreadList title={commentsTitle('project', header.title || 'Untitled project')} threads={threads} loading={conversationsLoading} unread={unread} stillUnread={stillUnread} onThreadShown={onThreadShown} onStart={comment.post} anchor={comment.anchor} onDropAnchor={comment.drop} onReply={onReply} disabledReason={readOnlyReason ?? commentsClosed} nameOf={header.nameOf} onReact={onReact} onDeleteMessage={onDeleteMessage} onEditMessage={onEditMessage} about={about} upload={upload} className="min-h-0 flex-1" />
+        </div>
+      )}
     </div>
   )
 }
