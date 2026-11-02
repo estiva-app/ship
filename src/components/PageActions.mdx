@@ -5,14 +5,16 @@ import { Meta } from '@storybook/addon-docs/blocks'
 # PageActions
 
 An issue's or a project's own buttons, at the right of its **PageHeader**, as
-Leaf's and Peek's (ONE-6, steps 4b and 4c; Katerina, 1 November): the comments
-column shown or hidden, then the ⋯ with what the details column's buttons did.
+Leaf's and Peek's (ONE-6, steps 4b to 4d; Katerina, 1 and 2 November): the
+comments shown or hidden, the Overview shown or hidden, then the ⋯ with what
+the details column's buttons did.
 The kit's **ToolbarButton**s and **Menu**, in a **Toolbar** with no box of its
 own.
 
 **Seen in** — *Pages/In the shell*: **Project**, **Project Archived**,
 **Issue**, **Issue Archived With Project** and **Issue Comments Hidden With
-New**. Press the comments button, and open the ⋯.
+New**, **Issue Overview Panel**. Press the comments button and the side-panel
+button, and open the ⋯.
 
 ## When
 
@@ -36,7 +38,8 @@ import { PageActions } from '@/components/PageActions'
   actions={
     <PageActions
       what="project"
-      comments={{ shown, onShownChange: setShown, unread: somethingNew }}
+      comments={{ ...side.comments, unread: somethingNew }}
+      overview={side.overview}
       archive={own ? 'own' : archive ? 'with' : 'none'}
       onMove={…}
       onCopyLink={…}
@@ -49,8 +52,9 @@ import { PageActions } from '@/components/PageActions'
 />
 ```
 
-- `comments`: the page keeps whether the column is shown. It reads the
-  comments only while they are on screen.
+- `comments` and `overview`: the page keeps which of the two the column
+  beside it holds (`useSideColumn`), one at a time. It reads the comments only
+  while they are on screen.
 - `onMove` only once the Folders are read and there is one to move to. Without
   it there is no row.
 - `onCopyLink` copies the page's own address without its tab (`href`), and
@@ -62,6 +66,8 @@ import { PageActions } from '@/components/PageActions'
   comments" while it is not. Hidden with something new in it (`unread`), the
   button carries the kit's dot on its icon's corner (**ToolbarButton**
   `unread`), and its name says "new".
+- **The side-panel button**, Peek's: the sidebar icon, "Show side panel" and
+  "Hide side panel", pressed while the Overview is shown.
 - **Which rows**, by the file's archive (FOL-46):
   - Not archived: Move to Folder… (a project), Copy link, then Archive and
     Delete.

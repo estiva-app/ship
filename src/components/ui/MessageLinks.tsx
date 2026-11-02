@@ -88,13 +88,13 @@ function isAbsent(uri: string, object: ForeignObject | null | undefined): boolea
   return (object === null && !resolveFailed(uri)) || !!object?.unreachable
 }
 
-/** Where a file's comment count opens: a Ship file's Activity tab, anyone else's file in its own app. */
+/** Where a file's comment count opens: a Ship file's page, its comments beside it (ONE-6), anyone else's file in its own app. */
 export function conversationHref(object: ForeignObject): string {
   if (!isOwnKind(object.kind) || !object.address) return hrefOf(object)
   const d = object.address.split(':').slice(2).join(':')
   const title = object.slots.title
   const slug = title && !title.isPubkey ? title.value : undefined
-  return object.kind === KIND.PROJECT ? href({ name: 'project', d, slug, view: 'table', tab: 'activity' }) : href({ name: 'issue', d, slug, tab: 'activity' })
+  return object.kind === KIND.PROJECT ? href({ name: 'project', d, slug, view: 'table' }) : href({ name: 'issue', d, slug })
 }
 
 /**

@@ -281,10 +281,6 @@ async function main() {
     return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
   })
 
-  /** The section a heading names — how the conversation and activity blocks are found. */
-  const sectionFor = (name: string) =>
-    page.locator('section').filter({ has: page.getByRole('heading', { name, exact: true }) })
-
   /** `Select` is not a native `<select>`: a labelled trigger, then a listbox.
    *  The trigger is a `combobox` rather than a `button` since the Base UI
    *  migration — which is what the component's own unit tests already say. */
@@ -300,16 +296,27 @@ async function main() {
 
   const sidebar = () => page.getByRole('navigation', { name: 'Workspace' })
 
-  /* The project and issue pages are in tabs (Katerina, 29 September): Overview,
-     Activity and, on a project, Issues. `data-tab` on the surface is the waypoint
-     that says the click landed. */
-  const openTab = async (name: 'Overview' | 'Activity' | 'Issues') => {
+  /* A project's page is in tabs (Katerina, 29 September): Overview and Issues; an issue's has none since the Activity
+     tab went (ONE-6, step 4d). `data-tab` on the surface is the waypoint that says the click landed. */
+  const openTab = async (name: 'Overview' | 'Issues') => {
     await page.getByRole('tab', { name, exact: true }).click()
     await page.waitForSelector(`[data-tab="${name.toLowerCase()}"]`)
   }
 
   /* The comments: the kit's column beside the page, on every tab (ONE-6, step 4c), where the Activity tab's "Conversations" was. */
   const commentsColumn = () => page.locator('[data-comments-column]')
+
+  /* The Overview: Peek's panel, in the comments' place, from the header's side-panel button (ONE-6, step 4d), where
+     the Activity tab's Mentioned in and History went. Hiding it brings the comments back. */
+  const overviewColumn = () => page.locator('[data-overview-column]')
+  const showOverview = async () => {
+    await page.getByRole('button', { name: 'Show side panel', exact: true }).click()
+    await overviewColumn().waitFor()
+  }
+  const hideOverview = async () => {
+    await page.getByRole('button', { name: 'Hide side panel', exact: true }).click()
+    await commentsColumn().waitFor()
+  }
 
   /* The page's actions are rows of its header's ⋯ (ONE-6, step 4b), where the details column's buttons were. */
   const pageAction = async (name: string) => {
@@ -402,8 +409,8 @@ async function main() {
   await page.waitForSelector('[data-surface="project"][data-tab="overview"]')
   check('the project opens on its Overview tab', page.url().includes('/project/'))
   check(
-    '  …with Overview, Activity and Issues as tabs on one page',
-    (await page.getByRole('tab', { name: /^(Overview|Activity|Issues)$/ }).count()) === 3,
+    '  …with Overview and Issues as tabs on one page',
+    (await page.getByRole('tab').count()) === 2 && (await page.getByRole('tab', { name: /^(Overview|Issues)$/ }).count()) === 2,
   )
 
   await page.getByRole('button', { name: 'Add issue' }).click()
@@ -529,10 +536,11 @@ async function main() {
     of conversations on *related* files. Two sections on one page could not both
     be Activity, and this one was always the history.
   */
-  // The fields are a row on Overview (ONE-6, step 4b); Conversations, Mentioned in and History are the Activity tab.
+  // The fields are a row on the page (ONE-6, step 4b); Mentioned in and History are the Overview's (step 4d).
   await pick('Status', 'In Progress')
-  await openTab('Activity')
-  const history = sectionFor('History')
+  await showOverview()
+  // History's rows are the panel's only list items: Activity's mentions are the kit's cards.
+  const history = overviewColumn()
   await history.locator('li').first().waitFor()
   const change = stored.find((e) => e.kind === 1851)
   check('a kind:1851 change was published, not an edit', !!change)
@@ -544,6 +552,8 @@ async function main() {
     'the change is authored by the actor',
     !!change && !!issue && change.pubkey === issue.pubkey,
   )
+  // The comments come back in the Overview's place.
+  await hideOverview()
 
   // ── Comment, reply, assignee ──────────────────────────────────────────────
   const conversations = commentsColumn()
@@ -844,10 +854,10 @@ async function main() {
     of them — Activity is a list of `li` too, so an unscoped count would now
     move for a reason that has nothing to do with the change being published.
   */
+  await showOverview()
   const historyRows = await history.locator('li').count()
-  await openTab('Overview')
+  // The page's fields stay on screen beside the Overview, so the change shows up in History as it is made.
   await pick('Assignee', 1)
-  await openTab('Activity')
   await history.locator('li').nth(historyRows).waitFor()
   check(
     'assigning publishes a second change',
@@ -864,16 +874,24 @@ async function main() {
     which is why the populated case is asserted in `Activity.test.tsx` — this
     checks the wiring a unit test cannot see.
   */
-  check('the Activity tab shows Mentioned in and History, the comments the column beside it', (await sectionFor('Mentioned in').count()) === 1 && (await history.count()) === 1 && (await sectionFor('Conversations').count()) === 0 && (await conversations.count()) === 1)
   check(
-    '  …with the comment in Conversations and not in Mentioned in',
-    !(await sectionFor('Mentioned in').textContent())?.includes('Blocked on the Stripe key.'),
+    'the Overview holds Activity and History in the comments’ place, and no tab is left',
+    (await overviewColumn().count()) === 1 &&
+      /Activity[\s\S]*History/.test((await overviewColumn().textContent()) ?? '') &&
+      (await commentsColumn().count()) === 0 &&
+      (await page.getByRole('tab').count()) === 0,
   )
   check(
-    '  …and Mentioned in saying what it holds rather than nothing',
-    (await sectionFor('Mentioned in').textContent())?.includes('No related conversations yet.') ?? false,
+    '  …with the comment in the comments and not in its Activity',
+    !(await overviewColumn().textContent())?.includes('Blocked on the Stripe key.'),
+  )
+  check(
+    '  …and Activity saying what it holds rather than nothing',
+    (await overviewColumn().textContent())?.includes('No related conversations yet.') ?? false,
   )
   await shot(page, '06-issue-detail')
+  await hideOverview()
+  check('  …and hiding it brings the comments back', (await commentsColumn().count()) === 1 && (await overviewColumn().count()) === 0)
 
   /*
     Drafts survive a reload — CON-10.
@@ -890,8 +908,8 @@ async function main() {
   await startBox().click()
   await page.keyboard.type(draft)
   await page.reload()
-  // The tab is in the address, so a reload comes back to Activity.
-  await page.waitForSelector('[data-surface="issue"][data-tab="activity"]', { timeout: 10000 })
+  // A reload opens the page with its comments beside it.
+  await page.waitForSelector('[data-comments-column]', { timeout: 10000 })
   const afterReload = commentsColumn()
   await startBox().waitFor()
   check('an unsent message survives a reload', (await textOf(startBox())) === draft, await textOf(startBox()))
@@ -913,16 +931,16 @@ async function main() {
     await afterReload.locator('[data-comment-body], [data-reply-id]').count(),
   )
   await page.reload()
-  await page.waitForSelector('[data-surface="issue"][data-tab="activity"]', { timeout: 10000 })
+  await page.waitForSelector('[data-comments-column]', { timeout: 10000 })
   await startBox().waitFor()
   check('  …and is forgotten once it has been sent', (await textOf(startBox())) === '', await textOf(startBox()))
 
   /*
     An issue's comments stay on the issue (PEE-26, which undid CON-9's sub-file
     roll-up). Walk back to the project: the comment just written on its issue
-    must be in neither the project's Activity — which is mentions only now — nor
-    its Conversations, which are the project's OWN discussion. A leak into the
-    latter would be the §5.1 merge one level up.
+    must be in neither the project's Activity — which is mentions only now, in
+    its Overview — nor its comments, which are the project's OWN discussion. A
+    leak into the latter would be the §5.1 merge one level up.
 
     Both checks are absences, and an absence passes on a page that has not
     loaded yet — Activity draws its empty state before and after. So first wait
@@ -933,9 +951,9 @@ async function main() {
   await page.waitForSelector('[data-surface="project"]', { timeout: 10000 })
   await openTab('Issues')
   await page.locator('table tbody tr').first().waitFor({ timeout: 10000 })
-  await openTab('Activity')
   await page.waitForLoadState('networkidle')
-  const projectActivity = sectionFor('Mentioned in')
+  await showOverview()
+  const projectActivity = overviewColumn()
   check(
     "a project's Activity does not carry its issues' conversations",
     (await projectActivity.count()) === 1 &&
@@ -945,12 +963,13 @@ async function main() {
     '  …and draws no sub-file row',
     (await projectActivity.locator('[data-relation="sub-file"]').count()) === 0,
   )
+  await shot(page, '11-project-activity')
+  await hideOverview()
   check(
     "  …nor do the project's OWN conversations",
     (await commentsColumn().count()) === 1 &&
       !(await commentsColumn().textContent())?.includes('Blocked on the Stripe key.'),
   )
-  await shot(page, '11-project-activity')
 
   // ── The inbound leg: a reference pasted from Peek ─────────────────────────
   // Encoded with the app's own encoder, so this cannot pass against a shape

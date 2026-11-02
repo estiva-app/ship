@@ -11,7 +11,8 @@ import { IssueView } from './IssueView'
 import { IssuesView, type IssuesScope } from './IssuesView'
 import { ProjectView } from './ProjectView'
 import { ProjectsView } from './ProjectsView'
-import type { IssueTab, ProjectTab } from '@/router'
+import type { ProjectTab } from '@/router'
+import { useSideColumn, type Side } from '@/pages/sideColumn'
 import type { Imeta } from '@estiva-app/protocol'
 import { ArchivedNotice } from '@estiva-app/ui'
 import { archivedNoticeOf } from '@/lib/archive'
@@ -147,7 +148,7 @@ const archivedNotice = (withProject?: boolean) => (
   />
 )
 
-const projectPage = (startTab: ProjectTab, startView: 'table' | 'board' = 'table', readOnlyReason?: string, archived = false): Story => ({
+const projectPage = (startTab: ProjectTab, startView: 'table' | 'board' = 'table', readOnlyReason?: string, archived = false, startSide: Side = 'comments'): Story => ({
   render: () => {
     const [tab, setTab] = useState<ProjectTab>(startTab)
     const [view, setView] = useState<'table' | 'board'>(startView)
@@ -157,7 +158,8 @@ const projectPage = (startTab: ProjectTab, startView: 'table' | 'board' = 'table
     const [summary, setSummary] = useState<string | undefined>('Every workspace read and write on the relay, one surface at a time.')
     const [description, setDescription] = useState('Moving every workspace read and write onto the relay, one surface at a time, with the old path kept until each is proven.')
     const done = ISSUES.filter((issue) => issue.status === 'done').length
-    const [commentsShown, setCommentsShown] = useState(true)
+    // The page's own: the comments or the Overview beside it, one at a time (ONE-6, step 4d).
+    const side = useSideColumn(startSide)
     return (
       <Shell current={{ projectAddr: '30850:a:rel' }}>
         <ProjectView
@@ -177,7 +179,7 @@ const projectPage = (startTab: ProjectTab, startView: 'table' | 'board' = 'table
           onStartConversation={fn()}
           onReply={fn()}
           activity={ACTIVITY_ITEMS}
-          onReplyInActivity={fn()}
+          history={ACTIVITY}
           readOnlyReason={readOnlyReason}
           upload={pretendUpload}
           archivedNotice={archived && archivedNotice()}
@@ -193,45 +195,43 @@ const projectPage = (startTab: ProjectTab, startView: 'table' | 'board' = 'table
             total: ISSUES.length,
           }}
           menu={{ archive: archived ? 'own' : 'none', onMove: fn(), onCopyLink: fn(), onArchive: fn(), onDelete: fn() }}
-          comments={{ shown: commentsShown, onShownChange: setCommentsShown }}
+          comments={side.comments}
+          overview={side.overview}
         />
       </Shell>
     )
   },
 })
 
-/** A project, Overview: the title and description, always editable, then Related under a line. */
+/** A project, Overview: the title, its fields and the description, always editable; its comments beside it. */
 export const Project: Story = projectPage('overview')
-/** A project, Activity: Conversations and Mentioned in. */
-export const ProjectActivity: Story = projectPage('activity')
+/** A project with its Overview beside it, from the header's side-panel button (ONE-6, step 4d): Activity, History, Related. Hide it, and the comments come back. */
+export const ProjectOverviewPanel: Story = projectPage('overview', 'table', undefined, false, 'overview')
 /** A project, Issues: full width, Table / Board at the right of the tab row. */
 export const ProjectIssues: Story = projectPage('issues')
 /** A project's Issues as a board — `?view=board`. */
 export const ProjectBoard: Story = projectPage('issues', 'board')
 /** Signed out: the title and description are text, and every write control is disabled with the reason. */
-export const ProjectSignedOut: Story = projectPage('activity', 'table', 'Sign in to react or reply.')
+export const ProjectSignedOut: Story = projectPage('overview', 'table', 'Sign in to react or reply.')
 /** Archived (FOL-46): the notice first on every tab; the fields shut, saying why; the ⋯ holds Unarchive and Delete. */
 export const ProjectArchived: Story = projectPage('overview', 'table', undefined, true)
 
-/** One issue, in tabs: Overview (title, its fields, description, Related) and Activity (Mentioned in, History). Its comments in the column beside, on every tab; the header's buttons hide it and hold the ⋯. */
-const issuePage = (startTab: IssueTab, archivedWithProject = false, withSummary = true, newWhileHidden = false): Story => ({
+/** One issue: its title, fields and description, and beside it its comments or its Overview; the header's buttons show and hide them, and hold the ⋯. */
+const issuePage = (archivedWithProject = false, withSummary = true, newWhileHidden = false, startSide: Side = 'comments'): Story => ({
   render: () => {
     const issue = ISSUES[0]
-    const [tab, setTab] = useState<IssueTab>(startTab)
     const [status, setStatus] = useState(issue.status)
     const [assignee, setAssignee] = useState('ana')
     const [project, setProject] = useState('rel')
     const [title, setTitle] = useState(issue.title)
     const [summary, setSummary] = useState(withSummary ? issue.summary : undefined)
     const [description, setDescription] = useState('After an archived project is restored, the board draws its columns in the order the folder union returned them rather than the vocabulary order.')
-    const [commentsShown, setCommentsShown] = useState(!newWhileHidden)
+    const side = useSideColumn(newWhileHidden ? 'none' : startSide)
     return (
       <Shell current={{ projectAddr: '30850:a:rel' }}>
         <IssueView
           edited={STORY_EDITED}
           crumbs={{ issuesHref: '#/issues', project: { title: 'Relay Migration', href: '#/project/30850%3Aa%3Arel' }, ref: issue.ref }}
-          tab={tab}
-          onTab={setTab}
           title={title}
           summary={summary}
           onSummarize={async (v) => (setSummary(v || undefined), true)}
@@ -245,7 +245,6 @@ const issuePage = (startTab: IssueTab, archivedWithProject = false, withSummary 
           onStartConversation={fn()}
           onReply={fn()}
           activity={ACTIVITY_ITEMS}
-          onReplyInActivity={fn()}
           history={ACTIVITY}
           upload={pretendUpload}
           archivedNotice={archivedWithProject && archivedNotice(true)}
@@ -262,20 +261,21 @@ const issuePage = (startTab: IssueTab, archivedWithProject = false, withSummary 
             onProjectChange: setProject,
           }}
           menu={{ archive: archivedWithProject ? 'with' : 'none', onCopyLink: fn(), onArchive: fn(), onDelete: fn() }}
-          comments={{ shown: commentsShown, onShownChange: setCommentsShown }}
+          comments={side.comments}
+          overview={side.overview}
         />
       </Shell>
     )
   },
 })
 
-/** An issue, Overview: its summary under the title — click it to change it. */
-export const Issue: Story = issuePage('overview')
+/** An issue: its summary under the title — click it to change it. */
+export const Issue: Story = issuePage()
 /** An issue with no summary: a quiet "Add a summary" under the title, for someone who can edit. */
-export const IssueNoSummary: Story = issuePage('overview', false, false)
-/** An issue, Activity: Conversations, Mentioned in, History. */
-export const IssueActivity: Story = issuePage('activity')
+export const IssueNoSummary: Story = issuePage(false, false)
+/** An issue with its Overview beside it, from the header's side-panel button (ONE-6, step 4d): Activity, the mentions elsewhere, read-only; then History. */
+export const IssueOverviewPanel: Story = issuePage(false, true, false, 'overview')
 /** An issue archived with its project (FOL-46): the notice names the project and opens it. */
-export const IssueArchivedWithProject: Story = issuePage('overview', true)
-/** The comments hidden, with a new one among them: the kit's dot beside the header's "Show comments" (Katerina, 2 November). */
-export const IssueCommentsHiddenWithNew: Story = issuePage('overview', false, true, true)
+export const IssueArchivedWithProject: Story = issuePage(true)
+/** The comments hidden, with a new one among them: the kit's dot on the header's "Show comments" (Katerina, 3 November). */
+export const IssueCommentsHiddenWithNew: Story = issuePage(false, true, true)

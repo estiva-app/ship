@@ -7,41 +7,36 @@ import { Breadcrumb } from '@/components/ui/Breadcrumb'
 import { ScrollArea } from '@/components/ui/ScrollArea'
 import { linkTo, type ProjectTab } from '@/router'
 import { Button } from '@/components/ui/Button'
-import { Divider } from '@/components/ui/Divider'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Tabs } from '@/components/ui/Tabs'
 import type { StatusEntry } from '@/lib/issues'
 import { Board } from '@/components/Board'
 import type { ThreadData, UnreadByThread } from '@/components/ConversationThread'
 import type { ActivityItem } from '@/components/Activity'
+import type { HistoryEntry } from '@/components/History'
 import type { IssueRowData } from '@/components/IssueRow'
 import { IssuesTable, type IssuesTableRow } from '@/components/IssuesTable'
 import { ProjectFields, type ProjectFieldsProps } from '@/components/PageFields'
 import { PageActions, type PageActionsProps } from '@/components/PageActions'
-import { Related, hasRelated } from '@/components/Related'
+import { OverviewPanel } from '@/components/OverviewPanel'
 import { LiveHeader, type LiveHeaderProps } from '@/components/editing/LiveHeader'
-import { MentionList, ThreadList } from '@/components/conversations/ThreadList'
+import { ThreadList } from '@/components/conversations/ThreadList'
 import { useBlockComment } from '@/components/conversations/useBlockComment'
-import { AppSection, Centred } from '@/components/layout/ReadingColumn'
+import { Centred } from '@/components/layout/ReadingColumn'
 import type { RelatedState } from '@/api/useRelated'
 
 /**
  * One project, in tabs (Katerina, 29 September, shaped like Linear's):
  *
- * - **Overview** — the title, its fields and the description, always editable,
- *   and what is placed under the project ("Related").
- * - **Activity** — "Mentioned in" (conversations elsewhere that name it; CON-9).
- *   What declared itself about this project is its comments, the column beside
- *   the page on every tab, shown or hidden from the header (ONE-6, step 4c).
- * - **Issues** — the issues, full width, with Table / Board at the right end of
- *   the tab row.
+ * - **Overview** — the title, its fields and the description, always editable, in one centred 768px column.
+ * - **Issues** — the issues, full width, because the board has a column per status, with Table / Board at the right
+ *   end of the tab row.
  *
- * Overview and Activity sit in one centred 768px column; Issues takes the full
- * width, because the board has a column per status. "Add issue" is on every
- * tab. No details column (ONE-6, step 4b): the fields are a row under the
- * summary, the actions the header's ⋯. The open tab and the Table / Board
- * toggle are in the URL (`?tab=activity`, `?view=board`), so the caller owns
- * them.
+ * "Add issue" is on both tabs. No details column (ONE-6, step 4b): the fields are a row under the summary, the
+ * actions the header's ⋯. Beside the page on both tabs, one at a time, its comments (step 4c) or its Overview (step
+ * 4d: Activity, the conversations elsewhere that name it; its History; what is placed under it, "Related"), each shown
+ * or hidden from the header; the Activity tab went into the Overview (Katerina, 2 November). The open tab and the
+ * Table / Board toggle are in the URL (`?tab=issues`, `?view=board`), so the caller owns them.
  */
 export interface ProjectViewProps {
   crumbs: { projectsHref: string; title: string }
@@ -71,10 +66,10 @@ export interface ProjectViewProps {
   issues: IssuesTableRow[]
   issueStatuses: StatusEntry[]
   hrefFor: (issue: IssueRowData) => string
-  /** Foreign files placed under this project — RFC 0.5 §10.7. Drawn only when there is something to say; see `hasRelated`. */
+  /** Foreign files placed under this project — RFC 0.5 §10.7: the Overview's "Related", drawn only when there is something to say; see `hasRelated`. */
   related?: RelatedState
   threads: ThreadData[]
-  /** The conversations, and Mentioned in, are still on the way (APP-5): drawn as loading, never as none. */
+  /** The comments, and the Overview's Activity, are still on the way (APP-5): drawn as loading, never as none. */
   conversationsLoading?: boolean
   mentionsLoading?: boolean
   /** Thread id → its message ids new when the page opened. Drives the "new since" line (CRO-13), held for the visit (99557309). */
@@ -91,18 +86,20 @@ export interface ProjectViewProps {
   onReply: (threadId: string, text: string, files: readonly Imeta[], picks?: Picks) => Promise<Answer>
   /** The block menu's Copy link (RIC-18): copies and says so. */
   onCopyBlockLink?: (link: string) => void
-  /** Threads elsewhere that mention this project — CON-9. */
+  /** Threads elsewhere that mention this project — CON-9: the Overview's Activity. */
   activity: ActivityItem[]
   /** How many the horizon left out — `ACTIVITY_HORIZON`. Said on screen, never implied. */
   activityTruncated?: number
-  /** Reply into a thread belonging to another file: its own Folder, never this project's. */
-  onReplyInActivity: (threadId: string, text: string, files: readonly Imeta[], picks?: Picks) => Promise<Answer>
+  /** Its own changes, in words: the Overview's History. */
+  history: HistoryEntry[]
   /** Status, assignee and progress, as a row between the summary and the description (ONE-6, step 4b). */
   fields: Omit<ProjectFieldsProps, 'readOnlyReason' | 'lockedReason'>
   /** The header's ⋯: Move to Folder…, Copy link, Archive or Unarchive, Delete. */
-  menu: Omit<PageActionsProps, 'what' | 'comments' | 'readOnlyReason' | 'lockedReason'>
-  /** The comments column beside the page, on every tab (Katerina, 2 November), and whether it is shown: the header's button shows or hides it, and the page reads the comments only while it is. */
+  menu: Omit<PageActionsProps, 'what' | 'comments' | 'overview' | 'readOnlyReason' | 'lockedReason'>
+  /** Its comments, in the column beside the page, and whether they are shown: the header's button shows or hides them, and the page reads them only while they are. */
   comments: { shown: boolean; onShownChange: (shown: boolean) => void }
+  /** Its Overview, in the same column in the comments' place: the header's side-panel button (ONE-6, step 4d). */
+  overview: { shown: boolean; onShownChange: (shown: boolean) => void }
   /** This object's address, so an unsent message is kept against it — CON-10. */
   about?: string
   /** Add or take back a reaction on a message — CON-2. */
@@ -129,12 +126,11 @@ export interface ProjectViewProps {
 
 const TABS: { id: ProjectTab; label: string }[] = [
   { id: 'overview', label: 'Overview' },
-  { id: 'activity', label: 'Activity' },
   { id: 'issues', label: 'Issues' },
 ]
 
-/** One project's page, in tabs: Overview, Activity and Issues. */
-export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onView, issues, issueStatuses, hrefFor, related, threads, conversationsLoading, mentionsLoading, unread, stillUnread, onThreadShown, onStartConversation, onReply, onCopyBlockLink, activity, activityTruncated, onReplyInActivity, fields, menu, comments, about, onReact, onDeleteMessage, onEditMessage, readOnlyReason, lockedReason, commentsClosed, upload, archivedNotice, members, edited }: ProjectViewProps) {
+/** One project's page, in tabs: Overview and Issues; its comments or its Overview beside it. */
+export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onView, issues, issueStatuses, hrefFor, related, threads, conversationsLoading, mentionsLoading, unread, stillUnread, onThreadShown, onStartConversation, onReply, onCopyBlockLink, activity, activityTruncated, history, fields, menu, comments, overview, about, onReact, onDeleteMessage, onEditMessage, readOnlyReason, lockedReason, commentsClosed, upload, archivedNotice, members, edited }: ProjectViewProps) {
   // A block menu's Comment shows the column, with that block above its box (RIC-18).
   const comment = useBlockComment(header.description, header.descriptionFormat, () => comments.onShownChange(true), onStartConversation)
   return (
@@ -148,11 +144,10 @@ export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onVi
         title={<Breadcrumb items={[{ label: 'Projects', ...linkTo(crumbs.projectsHref) }, { label: crumbs.title, icon: <IconBox size={16} stroke={1.5} /> }]} />}
         {...(edited ? { time: edited } : {})}
         members={members}
-        actions={<PageActions what="project" comments={{ ...comments, unread: Object.values(stillUnread ?? {}).some((ids) => ids.length > 0) }} {...menu} readOnlyReason={readOnlyReason} lockedReason={lockedReason} />}
+        actions={<PageActions what="project" comments={{ ...comments, unread: Object.values(stillUnread ?? {}).some((ids) => ids.length > 0) }} overview={overview} {...menu} readOnlyReason={readOnlyReason} lockedReason={lockedReason} />}
       />
       {/* The tabs directly under the header, 16px below it, as they were. */}
       <div className="flex min-h-8 items-center gap-3 px-6">
-        {/* Changed on purpose (ONE-6, step 4c): the comments left Activity for the column, so the tab no longer says something there is new. */}
         <Tabs tabs={TABS} active={tab} onChange={onTab} />
         <div className="flex-1" />
         {tab === 'issues' && (
@@ -180,25 +175,6 @@ export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onVi
           <Centred gap="block">
             {archivedNotice}
             <LiveHeader fields={<ProjectFields {...fields} readOnlyReason={readOnlyReason} lockedReason={lockedReason} />} title={header.title} titlePlaceholder="Untitled project" onRename={header.onRename} summary={header.summary} onSummarize={header.onSummarize} description={header.description} format={header.descriptionFormat} onDescribe={header.onDescribe} onMention={header.onMention} descriptionBy={header.descriptionBy} nameOf={header.nameOf} readOnly={!!(readOnlyReason ?? lockedReason)} upload={upload} onCommentOnBlock={readOnlyReason ?? commentsClosed ? undefined : comment.start} onCopyBlockLink={onCopyBlockLink} holdKey={about && `description:${about}`} />
-            {/* Nesting is by intent (RFC 0.5 §10.7): what somebody placed under this project, whatever app it belongs
-                to. A line first, so the list the app adds never reads as part of the description someone typed. */}
-            {hasRelated(related) && (
-              <>
-                <Divider className="mx-0" />
-                <AppSection title="Related">
-                  <Related related={related} />
-                </AppSection>
-              </>
-            )}
-          </Centred>
-        )}
-
-        {tab === 'activity' && (
-          <Centred>
-            {archivedNotice}
-            <AppSection title="Mentioned in">
-              <MentionList items={activity} loading={mentionsLoading} truncated={activityTruncated} onReply={onReplyInActivity} disabledReason={readOnlyReason} nameOf={header.nameOf} onReact={onReact} onDeleteMessage={onDeleteMessage} onEditMessage={onEditMessage} about={about} upload={upload} />
-            </AppSection>
           </Centred>
         )}
 
@@ -214,7 +190,13 @@ export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onVi
       </ScrollArea>
       </div>
 
-      {/* Its comments, the kit's one column, 384px beside the page on every tab, Issues too (Katerina, 2 November: A). */}
+      {/* Its Overview, in the comments' place (ONE-6, step 4d): Activity, History, and what is placed under it ("Related"). */}
+      {overview.shown && (
+        <div className="flex shrink-0 flex-col border-l border-border-default" data-overview-column>
+          <OverviewPanel activity={activity} activityTruncated={activityTruncated} loading={mentionsLoading} history={history} related={related} about={about} nameOf={header.nameOf} />
+        </div>
+      )}
+      {/* Its comments, the kit's one column, 384px beside the page on both tabs, Issues too (Katerina, 2 November: A). */}
       {comments.shown && (
         <div className="flex shrink-0 flex-col border-l border-border-default" data-comments-column>
           <ThreadList threads={threads} loading={conversationsLoading} unread={unread} stillUnread={stillUnread} onThreadShown={onThreadShown} onStart={comment.post} anchor={comment.anchor} onDropAnchor={comment.drop} onReply={onReply} disabledReason={readOnlyReason ?? commentsClosed} nameOf={header.nameOf} onReact={onReact} onDeleteMessage={onDeleteMessage} onEditMessage={onEditMessage} about={about} upload={upload} className="min-h-0 flex-1" />

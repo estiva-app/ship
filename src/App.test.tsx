@@ -310,8 +310,9 @@ describe('Issues page — rows from the fold', () => {
     expect(main.getByRole('tab', { name: /^All/ })).toHaveTextContent('3')
     expect(main.getByRole('tab', { name: /^Open/ })).toHaveTextContent('2')
     expect(main.getByRole('tab', { name: /Assigned to me/ })).toHaveTextContent('1')
-    // Issue links only: a row's project chip is a link of its own (S26).
-    const issueLinks = () => main.getAllByRole('link').filter((a) => a.getAttribute('href')?.startsWith('/issue/') && !a.getAttribute('href')?.endsWith('?tab=activity'))
+    // Issue links only: a row's project chip is a link of its own (S26), and so is its comment count, to the same page (ONE-6, step 4d).
+    const counts = main.queryAllByRole('link', { name: /open the conversation/ })
+    const issueLinks = () => main.getAllByRole('link').filter((a) => a.getAttribute('href')?.startsWith('/issue/') && !counts.includes(a))
     expect(issueLinks()).toHaveLength(3)
     expect(issueLinks().some((a) => a.getAttribute('href')?.includes(D('13')))).toBe(false)
     // The row says the count as the kit's count, a small icon and a number, opening the issue's conversations (S26; widget review 52).
@@ -379,13 +380,13 @@ describe('Project page — one project from the fold', () => {
     // Its fields under the summary, on Overview (ONE-6, step 4b): the status, and the progress as the kit's ring.
     expect(main.getByRole('combobox', { name: 'Status' })).toBeEnabled()
     expect(main.getByText('1/2')).toBeInTheDocument()
-    // The tabs are in the URL: Issues shows the table, Activity the conversations.
+    // The tabs are in the URL: Issues shows the table. Changed on purpose (ONE-6, step 4d): no Activity tab; its
+    // comments are the column beside both tabs.
+    expect(main.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['Overview', 'Issues'])
     fireEvent.click(main.getByRole('tab', { name: 'Issues' }))
     await waitFor(() => expect(location.search).toBe('?tab=issues'))
     expect(main.getByRole('table')).toBeInTheDocument()
     expect(main.getAllByRole('row')).toHaveLength(3) // header + 2 issues
-    fireEvent.click(main.getByRole('tab', { name: 'Activity' }))
-    await waitFor(() => expect(location.search).toBe('?tab=activity'))
     // The record channel's chat waits for the teams read, which tells it from a team's (FOL-2).
     expect(await main.findByText('about the project')).toBeInTheDocument()
     // Replies fold behind the replies button, and it opens them.
@@ -522,10 +523,11 @@ describe('Issue page — one issue from the fold', () => {
     expect(main.queryByRole('link', { name: 'Live' })).not.toBeInTheDocument()
     // Its fields under the summary, on Overview (ONE-6, step 4b).
     expect(main.getByRole('combobox', { name: 'Assignee' })).toBeEnabled()
-    // Conversations and History are on the Activity tab.
-    fireEvent.click(main.getByRole('tab', { name: 'Activity' }))
-    await waitFor(() => expect(location.search).toBe('?tab=activity'))
+    // Changed on purpose (ONE-6, step 4d): no tabs. The conversation is the column beside the page; History is the
+    // Overview's, which the header's side-panel button shows in its place.
+    expect(main.queryByRole('tab')).toBeNull()
     expect(await main.findByText('hi')).toBeInTheDocument()
+    fireEvent.click(main.getByRole('button', { name: 'Show side panel' }))
     const feed = main.getAllByText(/set status to|assigned/)
     expect(feed.map((node) => node.textContent)).toEqual(['Me Myself set status to In Progress', 'Someone assigned Me Myself'])
     // A URL is how a person addresses an issue (Miky, 2026-10-14): no "Copy reference", and the ⋯ copies the page's link (Katerina, 1 November).

@@ -295,7 +295,7 @@ function Page({ route, state, loading, directory, teams, folders, archives, say,
     case 'project':
       return <ProjectPage state={state} directory={directory} teams={teams} archives={archives} d={route.d} view={route.view} tab={route.tab ?? 'overview'} say={say} refresh={refresh} />
     case 'issue':
-      return <IssuePage state={state} directory={directory} archives={archives} d={route.d} tab={route.tab ?? 'overview'} say={say} refresh={refresh} />
+      return <IssuePage state={state} directory={directory} archives={archives} d={route.d} say={say} refresh={refresh} />
     default:
       return <EmptyState icon={<IconLink size={16} stroke={1.5} />} message="Resolving reference…" />
   }

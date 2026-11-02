@@ -42,14 +42,23 @@ describe('useRoute', () => {
       [{ name: 'project', d: UUID, slug: 'payments', view: 'table' }, { name: 'project', d: UUID, view: 'table' }],
       // The board is on the Issues tab, so a link that asks for it opens that tab (Katerina, 30 September).
       [{ name: 'project', d: UUID, view: 'board' }, { name: 'project', d: UUID, view: 'board', tab: 'issues' }],
-      [{ name: 'project', d: UUID, view: 'table', tab: 'activity' }, { name: 'project', d: UUID, view: 'table', tab: 'activity' }],
-      [{ name: 'issue', d: UUID, tab: 'activity' }, { name: 'issue', d: UUID, tab: 'activity' }],
+      [{ name: 'project', d: UUID, view: 'table', tab: 'issues' }, { name: 'project', d: UUID, view: 'table', tab: 'issues' }],
       [{ name: 'issue', d: UUID, slug: 'billing-entry' }, { name: 'issue', d: UUID }],
       [{ name: 'inbound', naddr: 'naddr1xyz' }, { name: 'inbound', naddr: 'naddr1xyz' }],
       [{ name: 'folder', id: UUID }, { name: 'folder', id: UUID }],
       [{ name: 'elsewhere', word: 'topic', ref: `level-2-${UUID}` }, { name: 'elsewhere', word: 'topic', ref: `level-2-${UUID}` }],
     ] as const
     for (const [route, expected] of routes) expect(parse(href(route))).toEqual(expected)
+  })
+
+  /*
+    Changed on purpose (ONE-6, step 4d; Katerina, 2 November): the Activity tab went, its Mentioned in and History to
+    the Overview panel. A link written before still opens the page, on Overview, its comments beside it, where the
+    conversation it meant is now.
+  */
+  it('an old Activity link opens the page itself', () => {
+    expect(parse(`/project/payments-${UUID}?tab=activity`)).toEqual({ name: 'project', d: UUID, view: 'table' })
+    expect(parse(`/issue/billing-entry-${UUID}?tab=activity`)).toEqual({ name: 'issue', d: UUID })
   })
 })
 

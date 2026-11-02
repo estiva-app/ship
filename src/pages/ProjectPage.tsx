@@ -63,7 +63,8 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { ProjectView } from '@/views/ProjectView'
 import { go, href, type ProjectTab, type ProjectView as ProjectViewName } from '../router'
 import { act, actInField, sayOnceLeft, type Say } from './act'
-import { editedFor } from './history'
+import { editedFor, historyFor } from './history'
+import { useSideColumn } from './sideColumn'
 import { hrefForIssue, rowFor } from './IssuesPage'
 import { MoveProject } from '@/components/MoveProject'
 import { ArchiveDialog, ArchivedNotice } from '@estiva-app/ui'
@@ -262,13 +263,16 @@ export function whereThreadLives(folder: string, state: FolderState): string | u
   return placeOf(folder, state).where
 }
 
-/** The same answer, and whether it named a project or an issue — so the place can carry that one's icon. */
-export function placeOf(folder: string, state: FolderState): { where?: string; whereKind?: 'project' | 'issue' } {
+/**
+ * The same answer, whether it named a project or an issue — so the place can carry that one's icon — and its page,
+ * where a mention opens (ONE-6, step 4d).
+ */
+export function placeOf(folder: string, state: FolderState): { where?: string; whereKind?: 'project' | 'issue'; href?: string } {
   if (!folder) return {}
   const project = state.projects.find((candidate) => candidate.contentFolder === folder)
-  if (project) return { where: project.title, whereKind: 'project' }
+  if (project) return { where: project.title, whereKind: 'project', href: href({ name: 'project', d: project.id, slug: project.title, view: 'table' }) }
   const issue = state.issues.find((candidate) => candidate.folder === folder)
-  if (issue) return { where: issue.ref ? `${issue.ref} · ${issue.title}` : issue.title, whereKind: 'issue' }
+  if (issue) return { where: issue.ref ? `${issue.ref} · ${issue.title}` : issue.title, whereKind: 'issue', href: href({ name: 'issue', d: issue.id, slug: issue.title }) }
   return {}
 }
 
@@ -635,8 +639,10 @@ export function ProjectPage({
      its `thread:` context too (CON-34, Miky 2026-10-05): under
      §11.3's thread rule reading the streams no longer reads their replies. The
      issues' threads rolled up above are not drawn here and are not marked. */
-  // The comments column, beside the page on every tab until the person hides it (ONE-6, step 4c; Katerina, 2 November).
-  const [commentsShown, setCommentsShown] = useState(true)
+  // The column beside the page: the comments, on both tabs until the person hides them or shows the Overview (ONE-6,
+  // steps 4c and 4d; Katerina, 2 November).
+  const side = useSideColumn()
+  const commentsShown = side.comments.shown
   const [shownThreads, onThreadShown] = useShownThreads()
   const drawn = useMemo(() => newestDrawn(conversations, shownThreads), [conversations, shownThreads])
   // Only while the column is shown, where the feed is drawn: hidden, nothing is read (66b31c4b, Miky 2026-10-06).
@@ -776,7 +782,8 @@ export function ProjectPage({
         {...(archive ? {} : { onAddIssue: () => setDialog('issue') })}
         tab={tab}
         onTab={(next) => go({ name: 'project', d: project.id, slug: project.title, view, tab: next })}
-        comments={{ shown: commentsShown, onShownChange: setCommentsShown }}
+        comments={side.comments}
+        overview={side.overview}
         view={view}
         onView={(next) => go({ name: 'project', d: project.id, slug: project.title, view: next, tab })}
         issues={issues}
@@ -810,6 +817,8 @@ export function ProjectPage({
         }}
         activity={activity.items}
         activityTruncated={activity.truncated}
+        // Its own changes, as an issue's, in the project's words (pages/history.ts).
+        history={historyFor(project.addr, state, directory, PROJECT_STATUSES)}
         /* A reply in Activity goes to the thread's own Folder, never this
            project's — CON-9. Refused when the thread's root carries no `h`,
            because filing somebody else's reply here is the wrong guess. */
@@ -853,10 +862,10 @@ export function ProjectPage({
 
           **The message's OWN Folder, never this page's.** An edit is
           channel-scoped (40003 is in `requires_h_channel_scope`), and a message
-          reached through Activity belongs to a different file — publishing it
-          under this surface's Folder would be refused, or worse, accepted into
-          the wrong channel. So the Folder is looked up from the message, the
-          same rule `onReplyInActivity` keeps for replies.
+          read from elsewhere belongs to a different file — publishing it under
+          this surface's Folder would be refused, or worse, accepted into the
+          wrong channel. So the Folder is looked up from the message, the same
+          rule a reply keeps.
 
           `refresh` because an edit IS in the read: `edits.ts` folds it beside
           the fold, so the new text arrives on the next workspace read rather
@@ -872,11 +881,6 @@ export function ProjectPage({
             return Promise.resolve('That message has no Folder to publish an edit into.')
           }
           return actInField(removeCard ? 'Remove card' : 'Edit', () => editMessage(folder, messageId, body, cardEditOf(acting, messageId, removeCard, dropped), files), () => refreshAfter(state, folder, refresh, rereadElsewhere))
-        }}
-        onReplyInActivity={(threadId, body, files, picks) => {
-          const conversation = acting.conversations.find((c) => c.id === threadId)
-          if (!conversation?.root.folder) return Promise.resolve('That conversation has no Folder to reply into.')
-          return actInField('Reply', () => reply(conversation, conversation.root.folder, body, files, picks?.urgent, picks?.embeds), () => refreshAfter(state, conversation.root.folder, refresh, rereadElsewhere))
         }}
         fields={{
           status: project.status,

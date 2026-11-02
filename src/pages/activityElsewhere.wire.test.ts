@@ -4,6 +4,9 @@
  * Folder, asserted on the signed event that would reach the relay. The relay
  * is stubbed at the API's `store` and the manifests at `handoff`; the writes,
  * the fold beside the workspace and the `Store` that signs are real.
+ *
+ * The Overview's Activity no longer offers Edit or Reply on these rows (ONE-6,
+ * step 4d: read-only, Peek's way); the writes stay pinned for any caller.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { addrToNaddr, type Relay, type SignedEvent, type UnsignedEvent } from '@estiva-app/protocol'

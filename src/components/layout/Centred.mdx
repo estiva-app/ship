@@ -4,14 +4,15 @@ import { Meta } from '@storybook/addon-docs/blocks'
 
 # Centred
 
-The reading column a page's Overview and Activity tabs share: 768px, centred,
-52px under the tab row.
+The reading column of a page's Overview: 768px, centred, 52px under the tab
+row (an issue's page has no tab row since ONE-6, step 4d).
 
-**Seen in** Pages/In the shell: Project, Project Activity, Issue, Issue Activity.
+**Seen in** Pages/In the shell: Project, Project Overview Panel, Issue, Issue
+Overview Panel.
 
 ## When
 
-- For a tab that is read top to bottom — a description, conversations, history.
+- For a page that is read top to bottom: the title, its fields, the description.
 
 ## When not
 
@@ -23,10 +24,11 @@ The reading column a page's Overview and Activity tabs share: 768px, centred,
 ```tsx
 import { Centred } from '@/components/layout/ReadingColumn'
 
-{tab === 'activity' && <Centred>…</Centred>}
+{tab === 'overview' && <Centred gap="block">…</Centred>}
 ```
 
 ## What it owns
 
 - **The width and the gap under the tabs** (Katerina, 29 September: Linear's
-  width, measured; 52px on both tabs), so the two tabs cannot drift apart.
+  width, measured; 52px), so a project's Overview and an issue's page cannot
+  drift apart.

@@ -1,0 +1,57 @@
+import { Meta } from '@storybook/addon-docs/blocks'
+
+<Meta title="Pages/OverviewPanel" />
+
+# OverviewPanel
+
+An issue's or a project's Overview: Peek's third column, in the column beside
+the page in place of the comments (ONE-6, step 4d; Katerina, 2 November). The
+kit's **Panel** "Overview", holding Activity, then History, then Related, in
+one scroll.
+
+**Seen in** — *Pages/In the shell*: **Issue Overview Panel** and **Project
+Overview Panel**. Press the header's side-panel button to hide it, and the
+comments come back.
+
+## When
+
+- Beside an issue's or a project's page, when the header's side-panel button
+  ("Show side panel") is pressed. It takes the comments' place, and hiding it
+  brings back what the column held before (`useSideColumn`).
+
+## When not
+
+- Not for the comments. They are the column's other occupant, **ThreadList**,
+  the kit's one column.
+- Not as a tab. Its sections were the Activity tab until step 4d; there is
+  none now.
+
+## How
+
+```tsx
+import { OverviewPanel } from '@/components/OverviewPanel'
+
+{overview.shown && (
+  <div className="flex shrink-0 flex-col border-l border-border-default" data-overview-column>
+    <OverviewPanel activity={activity} activityTruncated={truncated} loading={mentionsLoading} history={history} related={related} about={addr} nameOf={nameOf} />
+  </div>
+)}
+```
+
+- `activity` is `activityFor`'s items: the conversations elsewhere that name
+  the file. `history` is `historyFor`'s, a project's with `PROJECT_STATUSES`.
+- `related` draws a "Related" section only when there is something to say
+  (`hasRelated`).
+
+## What it owns
+
+- **Its sections and their order**: "Activity" with its count, "History",
+  then "Related", with Peek's spacing (16px above the first heading, the
+  rows at the cards' 16px edge).
+- **Activity, read-only, Peek's way** (PEE-48): each conversation under the
+  kit's **ConversationPlace** chip, "Mentioned in" and where it was said, as
+  the kit's card with no React, Edit, Delete or Reply. A press on it opens
+  the page it was said on, when that page is Ship's. Then Ship's note on what
+  this reader cannot see.
+- **Its width**: 384px, the comments column's, so the page does not move when
+  one replaces the other.

@@ -122,7 +122,8 @@ describe('where a link sits decides how it draws', () => {
     await waitFor(() => expect(rows(c)).toEqual(['Widgets 2']))
     const count = within(c.querySelector('[data-link-row]') as HTMLElement).getByRole('link', { name: /comments — open the conversation/ })
     expect(count.textContent).toContain('3')
-    expect(count.getAttribute('href')).toMatch(/activity/)
+    // Changed on purpose (ONE-6, step 4d): the page itself, its comments beside it; the Activity tab it opened went.
+    expect(count.getAttribute('href')).toMatch(/^\/project\/[^?]+$/)
   })
 
   it('draws a bullet or numbered line that is only a link as a row, keeping its bullet', async () => {

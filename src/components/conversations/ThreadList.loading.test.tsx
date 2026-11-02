@@ -28,9 +28,9 @@ describe('conversations on the way (APP-5)', () => {
   })
 
   it('says nothing about where else it was mentioned while that loads, then says there is nothing', () => {
-    const { rerender } = render(<MentionList items={[]} loading onReply={noop} />)
+    const { rerender } = render(<MentionList items={[]} loading />)
     expect(screen.queryByText('No related conversations yet.')).toBeNull()
-    rerender(<MentionList items={[]} onReply={noop} />)
+    rerender(<MentionList items={[]} />)
     expect(screen.getByText('No related conversations yet.')).toBeInTheDocument()
   })
 })

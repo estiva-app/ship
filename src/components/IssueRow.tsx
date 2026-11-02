@@ -24,7 +24,8 @@ import { WithSummary } from './SummaryLine'
  * shape and the title, and it covers the whole row (the package's `Link`
  * `cover`, UIG-33), so a click anywhere opens the issue and the keyboard ring
  * goes round the row — except on the conversation count, the kit's, which
- * opens the issue's Activity tab (Katerina, 30 Oct, widget review 52), and the
+ * opens the issue with its comments beside it (Katerina, 30 Oct, widget review
+ * 52; the Activity tab it opened went in ONE-6, step 4d), and the
  * project chip, which is its own link to
  * the project (the package's `Chip` `href`) and sits above the cover (her
  * ask, 2026-09-09). Her second pass the same day: 12px at the
@@ -90,7 +91,7 @@ export function IssueRow({ issue, statuses, href, className }: IssueRowProps) {
       </WithSummary>
       {/* The count before the chip (Katerina, 2026-09-09): what is said
           about the issue, then where it lives, then who and when. */}
-      {threads > 0 && <CommentCount conversation={{ count: threads, href: routeTo({ name: 'issue', d: issue.id, slug: issue.title, tab: 'activity' }) }} noun={threads === 1 ? 'conversation' : 'conversations'} />}
+      {threads > 0 && <CommentCount conversation={{ count: threads, href: routeTo({ name: 'issue', d: issue.id, slug: issue.title }) }} noun={threads === 1 ? 'conversation' : 'conversations'} />}
       {issue.project && (
         <Chip {...linkTo(issue.project.href)} label={issue.project.title} leadingIcon={<IconBox size={12} stroke={1.5} />} className="max-w-[200px] shrink-0" />
       )}

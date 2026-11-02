@@ -135,6 +135,6 @@ export interface ThreadListViewProps extends ConversationsProps {
 export interface MentionListViewProps extends ActivityProps {
   resolved?: Record<string, ForeignObjectData | null | undefined>
   reactionsBy?: Record<string, readonly Reaction[]>
-  upload?: (file: File) => Promise<Imeta>
-  drafts?: DraftStore
+  /** By message id, each comment resolved in Peek or Leaf. */
+  resolvedBy?: Record<string, Resolution>
 }

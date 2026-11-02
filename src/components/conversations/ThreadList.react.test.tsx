@@ -91,7 +91,11 @@ describe('the message tools', () => {
     expect(screen.getByRole('button', { name: 'Thank you, 1' })).toBeDisabled()
   })
 
-  it('offers no reaction under "Mentioned in" on a thread whose own file is archived, and still does on one that is not', () => {
+  /*
+    Changed on purpose (ONE-6, step 4d): "Mentioned in" is read-only, Peek's way (PEE-48), archived or not. Its
+    reactions are shown as they are, and none can be added or taken back there.
+  */
+  it('offers no reaction under "Mentioned in", and shows the ones it has', () => {
     const open = { ...thread, id: 'm2', root: { ...thread.root, id: 'm2', by: 'ann' } }
     render(
       <MentionListView
@@ -99,12 +103,11 @@ describe('the message tools', () => {
           { thread, relation: 'mention', closed: 'Archived. Unarchive it to comment.' },
           { thread: open, relation: 'mention' },
         ]}
-        onReply={async () => true}
-        onReact={answered()}
+        reactionsBy={{ m2: [{ emoji: '🙏', count: 1, by: ['ann'] }] }}
         viewer="bob"
       />,
     )
-    expect(screen.getAllByRole('button', { name: 'Add a reaction' })).toHaveLength(1)
-    expect(document.querySelector('[data-thread="m1"]')?.querySelector('button[aria-label="Add a reaction"]')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Add a reaction' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Thank you, 1' })).toBeDisabled()
   })
 })

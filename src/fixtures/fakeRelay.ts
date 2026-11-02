@@ -192,6 +192,7 @@ export function useFakeRelay({ threads: seedThreads, mentioned: seedMentioned, p
       },
       onReply: reply,
     },
-    mentioned: { ...common, items, onReply: reply },
+    // Read-only (ONE-6, step 4d): what the Overview's Activity takes.
+    mentioned: { nameOf, resolved, reactionsBy: reactions, items },
   }
 }

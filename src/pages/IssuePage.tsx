@@ -13,9 +13,10 @@ import { membershipActions } from './membership'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { IssueView } from '@/views/IssueView'
-import { go, href, type IssueTab } from '../router'
+import { go, href } from '../router'
 import { act, actInField, sayOnceLeft, type Say } from './act'
 import { editedFor, historyFor } from './history'
+import { useSideColumn } from './sideColumn'
 import { activityFor, cardEditOf, copyText, folderOfMessage, pickerPeople, refreshAfter, threadFor, useMentionLinks, withElsewhere } from './ProjectPage'
 import { useReferencePage } from '@/api/references'
 
@@ -27,7 +28,7 @@ import { useReferencePage } from '@/api/references'
  * field edit is one change event to the issue's own Folder, followed by a
  * re-read; a refused one leaves the field as the relay has it.
  */
-export function IssuePage({ state, directory, archives, d, tab, say, refresh }: { state: WorkspaceState; directory: DirectoryView; /** What is archived, and what with — FOL-46. */ archives: Archives; /** The object's `d`, which is all a §7.2 URL carries. */ d: string; /** The open tab — Overview or Activity. */ tab: IssueTab; say: Say; refresh: (folders?: string[]) => Promise<void> }) {
+export function IssuePage({ state, directory, archives, d, say, refresh }: { state: WorkspaceState; directory: DirectoryView; /** What is archived, and what with — FOL-46. */ archives: Archives; /** The object's `d`, which is all a §7.2 URL carries. */ d: string; say: Say; refresh: (folders?: string[]) => Promise<void> }) {
   const issue = state.issues.find((candidate) => candidate.id === d)
   const project = issue?.projectAddr ? state.projects.find((candidate) => candidate.addr === issue.projectAddr) : undefined
   /*
@@ -44,7 +45,7 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
     calls that indefensible; the mentions are in Activity below.
   */
   const conversations = useMemo(() => (issue ? commentsOn(state.conversations, issue.addr, state.anchors) : []), [issue, state])
-  /* Activity is where else this issue was mentioned (PEE-26). */
+  /* Activity is where else this issue was mentioned (PEE-26): the Overview's first section (ONE-6, step 4d). */
   const { events: elsewhere, reread: rereadElsewhere } = useMentionsElsewhere(issue?.addr, state)
   const linksAnswered = useMentionLinks(issue?.addr, state, elsewhere)
   const activity = useMemo(
@@ -52,7 +53,7 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
     // eslint-disable-next-line react-hooks/exhaustive-deps -- a link's answer coming back reads the list again
     [issue, state, directory, archives, linksAnswered, elsewhere],
   )
-  // A row Activity read from elsewhere is edited, deleted and replied to in its own Folder, as any other.
+  // A message read from elsewhere is edited and deleted in its own Folder, as any other.
   const acting = withElsewhere(state, elsewhere)
   /* An issue's comments are its own stream, keyed on its address — SPEC §11.1
      (FOL-16) — so reading it advances that address and one `thread:` context
@@ -65,11 +66,13 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
      Both advance only while the comments are drawn: a `thread:` context
      while its replies are shown (CON-34, under §11.3's thread rule), the
      issue's own stream whenever the comments column is shown (66b31c4b, Miky
-     2026-10-06: what is not on screen is not read). The column is beside the
-     page on every tab since ONE-6, step 4c, and the header hides it; until
-     then the comments were the Activity tab's. */
-  // The comments column, shown until the person hides it (Katerina, 2 November).
-  const [commentsShown, setCommentsShown] = useState(true)
+     2026-10-06: what is not on screen is not read). The comments are in the
+     column beside the page since ONE-6, step 4c, until the header hides them
+     or the Overview takes their place (step 4d); before, they were the
+     Activity tab's. */
+  // The column beside the page: the comments, until the person hides them or shows the Overview (Katerina, 2 November).
+  const side = useSideColumn()
+  const commentsShown = side.comments.shown
   const [shownThreads, onThreadShown] = useShownThreads()
   const drawn = useMemo(() => newestDrawn(conversations, shownThreads), [conversations, shownThreads])
   // Nor while its conversations are on the way (APP-5): with none drawn, the mark would be the clock's.
@@ -141,9 +144,8 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
       <IssueView
         // When it last changed, over the page (ONE-6, step 4a).
         edited={editedFor(issue.addr, state, directory, { at: issue.createdAt, by: issue.author })}
-        tab={tab}
-        onTab={(next) => go({ name: 'issue', d: issue.id, slug: issue.title, tab: next })}
-        comments={{ shown: commentsShown, onShownChange: setCommentsShown }}
+        comments={side.comments}
+        overview={side.overview}
         archivedNotice={
           archive && (
             <ArchivedNotice
@@ -214,14 +216,6 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
         }}
         activity={activity.items}
         activityTruncated={activity.truncated}
-        /*
-          A reply in Activity goes to the thread's OWN Folder, never this
-          issue's — CON-9. `reply()` already publishes into
-          `conversation.root.folder`, so the fallback here is only reached for a
-          thread whose root carries no `h` at all, and this issue's Folder is
-          the wrong guess for that case: it would file somebody else's reply
-          under this issue. Refusing is the honest answer.
-        */
         about={issue.addr}
         /*
           A reaction, published then re-read — CON-2.
@@ -262,10 +256,9 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
 
           **The message's OWN Folder, never this page's.** An edit is
           channel-scoped (40003 is in `requires_h_channel_scope`), and a message
-          reached through Activity belongs to a different file — publishing it
-          under this surface's Folder would be refused, or worse, accepted into
-          the wrong channel. So the Folder is looked up from the message, the
-          same rule `onReplyInActivity` keeps for replies.
+          read from elsewhere belongs to a different file — publishing it under
+          this surface's Folder would be refused, or worse, accepted into the
+          wrong channel. So the Folder is looked up from the message.
 
           `refresh` because an edit IS in the read: `edits.ts` folds it beside
           the fold, so the new text arrives on the next workspace read rather
@@ -281,11 +274,6 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
             return Promise.resolve('That message has no Folder to publish an edit into.')
           }
           return actInField(removeCard ? 'Remove card' : 'Edit', () => editMessage(folder, messageId, body, cardEditOf(acting, messageId, removeCard, dropped), files), () => refreshAfter(state, folder, refresh, rereadElsewhere))
-        }}
-        onReplyInActivity={(threadId, body, files, picks) => {
-          const conversation = acting.conversations.find((c) => c.id === threadId)
-          if (!conversation?.root.folder) return Promise.resolve('That conversation has no Folder to reply into.')
-          return actInField('Reply', () => reply(conversation, conversation.root.folder, body, files, picks?.urgent, picks?.embeds), () => refreshAfter(state, conversation.root.folder, refresh, rereadElsewhere))
         }}
         history={history}
         fields={{

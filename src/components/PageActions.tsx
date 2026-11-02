@@ -1,9 +1,10 @@
-import { IconDotsVertical, IconMessage, IconMessageOff } from '@tabler/icons-react'
+import { IconDotsVertical, IconLayoutSidebarRight, IconMessage, IconMessageOff } from '@tabler/icons-react'
 import { Menu, MenuItem, MenuSeparator, Toolbar, ToolbarButton } from '@estiva-app/ui'
 
 /**
- * The page's own buttons at the right of its header, one strip as Leaf's and Peek's (ONE-6, steps 4b and 4c): the
- * comments column shown or hidden, then the ⋯ with what the details column's buttons did (Katerina, 1 November).
+ * The page's own buttons at the right of its header, one strip as Leaf's and Peek's (ONE-6, steps 4b to 4d): the
+ * comments shown or hidden, the Overview shown or hidden (Peek's side-panel button), then the ⋯ with what the details
+ * column's buttons did (Katerina, 1 and 2 November). The comments and the Overview share the column beside the page.
  *
  * The ⋯'s rows:
  * - Not archived: a project's **Move to Folder…** first (once the Folders are read), **Copy link**, then **Archive**
@@ -24,6 +25,8 @@ export interface PageActionsProps {
    * its name says "new" (Katerina, 3 November).
    */
   comments?: { shown: boolean; onShownChange: (shown: boolean) => void; unread?: boolean }
+  /** The Overview panel, shown or not: Peek's side-panel button, pressed while it is shown. Omitted: no button. */
+  overview?: { shown: boolean; onShownChange: (shown: boolean) => void }
   /** Not archived; archived itself; or archived only with its project or its Folder (FOL-46). */
   archive: 'none' | 'own' | 'with'
   /** Archive it, or unarchive it when it is archived itself. */
@@ -39,10 +42,11 @@ export interface PageActionsProps {
   lockedReason?: string
 }
 
-export function PageActions({ what, comments, archive, onArchive, onDelete, onMove, onCopyLink, readOnlyReason, lockedReason }: PageActionsProps) {
+export function PageActions({ what, comments, overview, archive, onArchive, onDelete, onMove, onCopyLink, readOnlyReason, lockedReason }: PageActionsProps) {
   // Under its Folder's archive, archiving a project again is an edit; an issue's own stays offered whatever is archived above it.
   const archiveShut = archive === 'with' && what === 'project' ? (readOnlyReason ?? lockedReason) : readOnlyReason
   const commentsWord = comments?.shown ? 'Hide comments' : 'Show comments'
+  const overviewWord = overview?.shown ? 'Hide side panel' : 'Show side panel'
   return (
     // One strip: one Tab stop, arrows along it (the kit's Toolbar, no box of its own).
     <Toolbar aria-label="Page actions" surface={false}>
@@ -57,6 +61,12 @@ export function PageActions({ what, comments, archive, onArchive, onDelete, onMo
           onClick={() => comments.onShownChange(!comments.shown)}
         >
           {comments.shown ? <IconMessageOff size={16} stroke={1.5} /> : <IconMessage size={16} stroke={1.5} />}
+        </ToolbarButton>
+      )}
+      {overview && (
+        // Peek's SidePanelButton, its icon and its words: the sidebar, pressed while the Overview is shown (Katerina, 2 November).
+        <ToolbarButton tooltip={overviewWord} aria-label={overviewWord} pressed={overview.shown} onClick={() => overview.onShownChange(!overview.shown)}>
+          <IconLayoutSidebarRight size={16} stroke={1.5} />
         </ToolbarButton>
       )}
       <Menu

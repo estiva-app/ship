@@ -24,9 +24,9 @@ function Conversations({ empty = false, signedOut = false, unread, resolvedBy, f
 
 function Mentioned({ empty = false, truncated = 0 }: { empty?: boolean; truncated?: number }) {
   const relay = useFakeRelay({ threads: [], mentioned: empty ? [] : STORY_MENTIONS, people: STORY_PEOPLE, me: STORY_ME, reactions: STORY_REACTIONS })
-  // The page's reading column, where Mentioned in still is (the Activity tab).
+  // The Overview panel's width, where Mentioned in is (ONE-6, step 4d), at its 16px inset.
   return (
-    <div className="w-full max-w-3xl p-4">
+    <div className="w-96 p-4">
       <MentionListView {...relay.mentioned} truncated={truncated} />
     </div>
   )
@@ -35,7 +35,7 @@ function Mentioned({ empty = false, truncated = 0 }: { empty?: boolean; truncate
 const meta = {
   title: 'Conversations/Conversations',
   component: Conversations,
-  // The whole frame: the comments are a column at a page's height. Mentioned in pads its own reading column.
+  // The whole frame: the comments are a column at a page's height. Mentioned in pads its own, the Overview's width.
   parameters: { layout: 'fullscreen' },
 } satisfies Meta<typeof Conversations>
 
@@ -65,7 +65,7 @@ export const Unread: Story = { args: { unread: { t1: ['m3'], t2: ['m4'] } } }
 /** Signed out: the boxes say why, nothing can be pressed, and reactions still show. */
 export const SignedOut: Story = { args: { signedOut: true } }
 
-/** "Mentioned in": conversations elsewhere that name this object, each with the place it lives. */
+/** "Mentioned in", the Overview's Activity (ONE-6, step 4d): conversations elsewhere that name this object, each under the kit's chip and the place it lives, read-only as Peek draws them. */
 export const MentionedIn: StoryObj<typeof Mentioned> = { render: () => <Mentioned /> }
 
 /** "Mentioned in" with nothing yet. */
