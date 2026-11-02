@@ -108,6 +108,8 @@ export interface ProjectViewProps {
     archived?: boolean
     onArchive: () => void
     onDelete: () => void
+    /** The topics that list it, with Add to topic (TOP-5). */
+    topics?: ReactNode
   }
   /** This object's address, so an unsent message is kept against it — CON-10. */
   about?: string

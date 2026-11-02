@@ -30,7 +30,10 @@ import {
   resolveForeignObject,
   resolveForeignRoots,
   fileCandidates,
+  folderOf,
+  isArchived,
   searchFileReferences,
+  topicsOfFile,
   type FolderContents,
   type FolderSummary,
   type ForeignObject,
@@ -39,7 +42,7 @@ import {
 
 /** Chain-walking, from the runtime — one implementation, not one per consumer. */
 export { pickWidget } from '@estiva-app/interop'
-import { KIND_CHANGE, type ReferenceCandidate } from '@estiva-app/conversation'
+import { KIND_CHANGE, membersOf, type ReferenceCandidate } from '@estiva-app/conversation'
 import { relatedTo } from '@/lib/ownKinds'
 import { relay, signer } from './store'
 
@@ -299,6 +302,80 @@ export async function readFolderListing(id: string, read: QueryFn = loadQuery())
  */
 export function searchFiles(text: string): Promise<ReferenceCandidate[]> {
   return searchFileReferences(text, query, { cache: manifests })
+}
+
+/** A topic as the Topics line draws it and a list entry names it (TOP-5). */
+export interface TopicOfFile {
+  /** Its address, `30840:<pubkey>:<d>`. */
+  address: string
+  /** Its Folder, read from its root (§6.2): where an entry about it is filed. */
+  folder: string
+  title: string
+  /** Where it opens: Peek, as its manifest says. */
+  openUrl?: string
+  /** Archived: read-only in every app, so no Add and no Remove on it. */
+  archived: boolean
+}
+
+const KIND_TOPIC = 30840
+const KIND_COMMENT = 1111
+
+function topicsAsDrawn(roots: ReadonlyMap<string, SignedEvent>, objects: readonly ForeignObject[]): TopicOfFile[] {
+  return objects.flatMap((object) => {
+    const root = object.address ? roots.get(object.address) : undefined
+    const folder = root ? folderOf(root) : null
+    if (!root || !folder || object.unreachable) return []
+    return [{ address: object.address!, folder, title: object.slots.title?.value || 'Untitled topic', openUrl: object.openUrl, archived: isArchived(object) }]
+  })
+}
+
+/**
+ * The topics whose list names this file (TOP-5, SPEC §6.14): `#o` on its id,
+ * the newest entry per topic, only topics the reader can read, each with its
+ * current title and archive. A–Z.
+ * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-topic-keeps-its-own-list-of-files.md
+ */
+export async function readFileTopics(file: string): Promise<TopicOfFile[]> {
+  const listing = await topicsOfFile(query, file)
+  if (listing.length === 0) return []
+  const roots = new Map(listing.map((topic) => [topic.address, topic.root]))
+  const objects = await resolveForeignRoots([...roots.keys()], query, manifests)
+  return topicsAsDrawn(roots, objects).sort((a, b) => a.title.localeCompare(b.title))
+}
+
+/**
+ * What Add to topic offers (TOP-5): every topic the reader can read and that
+ * is not archived, split as Peek's Topics screen splits them — the ones they
+ * are a member of, then the rest — each A–Z. Membership is folded as a file's
+ * page folds it (SPEC §11.8), over all history, the topic's author counting
+ * from its root.
+ */
+export async function readTopicChoices(): Promise<{ yours: TopicOfFile[]; others: TopicOfFile[] }> {
+  const roots = new Map<string, SignedEvent>()
+  for (const root of await relay.queryAll([{ kinds: [KIND_TOPIC] }] as never)) {
+    const address = `${root.kind}:${root.pubkey}:${root.tags.find((t) => t[0] === 'd')?.[1] ?? ''}`
+    const held = roots.get(address)
+    if (!held || root.created_at > held.created_at) roots.set(address, root)
+  }
+  if (roots.size === 0) return { yours: [], others: [] }
+  const addresses = [...roots.keys()]
+  const me = signer.pubkey
+  const [objects, events] = await Promise.all([
+    resolveForeignRoots(addresses, query, manifests),
+    relay.queryAll([
+      { kinds: [KIND_CHANGE], '#a': addresses, '#p': [me] },
+      { kinds: [KIND_COMMENT], '#A': addresses, authors: [me] },
+      { kinds: [KIND_COMMENT], '#a': addresses, authors: [me] },
+      { kinds: [KIND_COMMENT], '#A': addresses, '#p': [me] },
+      { kinds: [KIND_COMMENT], '#a': addresses, '#p': [me] },
+    ] as never),
+  ])
+  const unique = [...new Map(events.map((e) => [e.id, e])).values()]
+  const mine = (topic: TopicOfFile) => membersOf(topic.address, [roots.get(topic.address)!, ...unique]).has(me)
+  const open = topicsAsDrawn(roots, objects)
+    .filter((topic) => !topic.archived)
+    .sort((a, b) => a.title.localeCompare(b.title))
+  return { yours: open.filter(mine), others: open.filter((topic) => !mine(topic)) }
 }
 
 /**

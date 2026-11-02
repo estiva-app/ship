@@ -28,7 +28,7 @@ import {
   type CommentRef,
 } from './events'
 import { findNaddrs, naddrToAddr, buildReaction, buildEdit, buildDeletion as buildEventDeletion, imetaTag } from '@estiva-app/protocol'
-import { createLoadQuery, planArchiveFolder, planCreateFolder, planDeleteFolder, planMoveFromFolders, planPlaceFile, planRenameFolder, planUnlistFile, readMentionedIn, type FolderRef, type MovableFile, type MoveRefusal } from '@estiva-app/interop'
+import { createLoadQuery, planArchiveFolder, planCreateFolder, planDeleteFolder, planListInTopic, planMoveFromFolders, planPlaceFile, planRemoveFromTopic, planRenameFolder, planUnlistFile, readMentionedIn, type ListHolder, type FolderRef, type MovableFile, type MoveRefusal } from '@estiva-app/interop'
 import { foldFolder, type FolderState } from './fold'
 import { buildMembershipChange, decorationsOf, foldAttachments, foldEdits, foldEmbeds, URGENT_TAG, type Decorations, type EditFold, type QueryFn } from '@estiva-app/conversation'
 import { anchorIndex, type AnchorIndex } from './references'
@@ -1068,6 +1068,18 @@ export class Store {
    */
   setMembership(args: { folder: string; file: string; person: string; member: boolean }): Promise<PublishResult> {
     return this.publish(buildMembershipChange(this.signer.pubkey, Date.now(), args))
+  }
+
+  /**
+   * Put a file on a topic's list, or take it off (TOP-5, SPEC §6.14): one
+   * change on the topic, in the topic's Folder, signed by whoever clicked.
+   * `file` is the listed file's id. The file is not touched: listing grants
+   * nothing, so its own editors are not asked.
+   */
+  setListedInTopic(args: { topic: ListHolder; file: string; listed: boolean }): Promise<PublishResult> {
+    const plan = args.listed ? planListInTopic : planRemoveFromTopic
+    const [entry] = plan(this.signer.pubkey, Date.now(), { topic: args.topic, file: args.file })
+    return this.publish(entry)
   }
 
   /**

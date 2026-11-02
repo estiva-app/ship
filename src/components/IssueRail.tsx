@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { cn } from '@/lib/cn'
 import { ago } from '@/lib/time'
 import { Button } from '@/components/ui/Button'
@@ -39,6 +40,8 @@ export interface IssueRailProps {
   readOnlyReason?: string
   /** Why the issue's fields are shut while Archive and Delete stay open — an archived issue (SHI-36): unarchiving is the way back. */
   lockedReason?: string
+  /** The topics that list it, with Add to topic (TOP-5): the list is the topics', so the issue's locks do not shut it. */
+  topics?: ReactNode
   className?: string
 }
 
@@ -59,6 +62,7 @@ export function IssueRail({
   onDelete,
   readOnlyReason,
   lockedReason,
+  topics,
   className,
 }: IssueRailProps) {
   const fieldsShut = readOnlyReason ?? lockedReason
@@ -75,6 +79,11 @@ export function IssueRail({
         {/* Archived only with its project, a move out stays offered (SPEC §6.5): it is how the issue reopens. */}
         <Select value={project} onChange={onProjectChange} options={projects} ariaLabel="Project" disabledReason={archived ? fieldsShut : readOnlyReason} />
       </Property>
+      {topics && (
+        <Property layout="stacked" label="Topics">
+          {topics}
+        </Property>
+      )}
       <Divider className="mx-0" />
       {/* The same shape as the three above (Katerina, 2026-09-08): the label
           over the value, not beside it. */}

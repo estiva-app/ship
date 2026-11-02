@@ -12,6 +12,7 @@ vi.mock('./store', () => ({
     renameFolder: vi.fn(),
     postMessage: vi.fn(),
     editMessage: vi.fn(),
+    setListedInTopic: vi.fn(),
   },
 }))
 vi.mock('./clock', () => ({ clockProblem: vi.fn() }))
@@ -20,7 +21,7 @@ vi.mock('./foreign', () => ({ readFolders: vi.fn(), readFolderListing: vi.fn(), 
 import { clockProblem } from './clock'
 import { readFolderListing, readFolders } from './foreign'
 import { store } from './store'
-import { archiveProject, createFolder, createIssue, createProject, deleteProject, editMessage, moveProject, renameFolder, reply, setIssueField, setProjectField, startConversation } from './writes'
+import { archiveProject, createFolder, createIssue, createProject, deleteProject, editMessage, moveProject, renameFolder, reply, setIssueField, setListedInTopic, setProjectField, startConversation } from './writes'
 import { addrToNaddr, type Relay, type SignedEvent, type UnsignedEvent } from '@estiva-app/protocol'
 import { Store } from '../nostr/store'
 import type { Signer } from '../nostr/signer'
@@ -425,5 +426,49 @@ describe('createFolder and renameFolder say what the relay did (FOL-8)', () => {
   it('a refused rename is the relay’s reason', async () => {
     s.renameFolder.mockResolvedValue({ ok: false, reason: 'restricted' })
     expect(await renameFolder(FOLDER, 'Renamed')).toEqual({ ok: false, reason: 'restricted' })
+  })
+})
+
+describe('Add to topic and Remove go on the wire as an entry on the topic (TOP-5)', () => {
+  const TOPIC = { address: `30840:${'f'.repeat(64)}:topic-1`, folder: 'topic-folder' }
+  const signed = () => {
+    const sent: SignedEvent[] = []
+    const relay = { publish: async (event: SignedEvent) => (sent.push(event), { ok: true }) } as unknown as Relay
+    const signer = { pubkey: PK, sign: async (unsigned: UnsignedEvent) => ({ ...unsigned, id: 'e'.repeat(64), sig: '0'.repeat(128) }) } as unknown as Signer
+    const real = new Store(relay, signer)
+    s.setListedInTopic.mockImplementation((args: Parameters<Store['setListedInTopic']>[0]) => real.setListedInTopic(args))
+    return sent
+  }
+
+  it('adding names the topic as the file it changes and the issue by its id, in the topic’s Folder, signed by whoever clicked', async () => {
+    const sent = signed()
+    expect(await setListedInTopic(TOPIC, ISSUE.id, true)).toEqual({ ok: true })
+    expect(sent).toHaveLength(1)
+    const [entry] = sent
+    expect(entry.kind).toBe(1851)
+    expect(entry.pubkey).toBe(PK)
+    expect(entry.tags.filter((t) => t[0] !== 'ts')).toEqual([
+      ['a', TOPIC.address],
+      ['O', 'topic-1'],
+      ['field', `lists:${ISSUE.id}`],
+      ['value', 'true'],
+      ['h', 'topic-folder'],
+      ['o', ISSUE.id],
+    ])
+  })
+
+  it('removing writes the same entry with value false, in the topic’s Folder, never the file’s own', async () => {
+    const sent = signed()
+    await setListedInTopic(TOPIC, PROJECT.id, false)
+    const tags = sent[0].tags
+    expect(tags).toContainEqual(['field', `lists:${PROJECT.id}`])
+    expect(tags).toContainEqual(['value', 'false'])
+    expect(tags).toContainEqual(['h', 'topic-folder'])
+    expect(tags).not.toContainEqual(['h', PROJECT.contentFolder])
+  })
+
+  it('a refusal for someone outside the topic’s Folder is the relay’s reason', async () => {
+    s.setListedInTopic.mockResolvedValue({ ok: false, reason: 'restricted: not a channel member' })
+    expect(await setListedInTopic(TOPIC, ISSUE.id, true)).toEqual({ ok: false, reason: 'restricted: not a channel member' })
   })
 })
