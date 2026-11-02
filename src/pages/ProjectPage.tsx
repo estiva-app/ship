@@ -180,9 +180,17 @@ export function threadFor(
       embeds: embeds?.[m.id],
       // The anchored block, read live from its object like any part (COM-2).
       anchorPart: m.blockId && m.anchor ? { address: m.anchor, block: m.blockId } : undefined,
+      // The words it quotes, written on a selection in Leaf (LEAF-7).
+      ...(m.quote ? { quote: m.quote } : {}),
     }
   }
-  return { id: conversation.id, root: message(conversation.root), replies: conversation.replies.map(message) }
+  return {
+    id: conversation.id,
+    root: message(conversation.root),
+    replies: conversation.replies.map(message),
+    // Its comment was deleted: `root` is the earliest reply standing in for it (PER-24).
+    ...(conversation.rootMissing ? { rootMissing: true as const } : {}),
+  }
 }
 
 /**

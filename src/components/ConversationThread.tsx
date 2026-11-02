@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import type { BlockAnchor, Embed, Imeta, PartPointer } from '@estiva-app/protocol'
+import type { BlockAnchor, Embed, Imeta, PartPointer, Quote } from '@estiva-app/protocol'
 import { referencesIn, toRenderTree } from '@estiva-app/protocol'
 import { ConfirmDialog } from './ui/ConfirmDialog'
 import { Divider } from './ui/Divider'
@@ -9,7 +9,7 @@ import { useLinkValues } from '@/api/linkCards'
 import { referenceOfValue } from '@/components/conversations/shared'
 import { linksNamingCards } from '@/lib/linksNamingCards'
 import { useReactions } from '@/api'
-import type { Reaction } from '@/api'
+import type { Reaction, Resolution } from '@/api'
 import type { Answer, Picks } from '@/components/conversations/shared'
 
 /**
@@ -112,6 +112,8 @@ export interface MessageData {
    * draws it. Undefined for a comment about the whole object.
    */
   anchorPart?: PartPointer
+  /** The words it quotes, when it was written on a selection in Leaf (LEAF-7): drawn as its subject. */
+  quote?: Quote
 }
 
 /** Messages are marker text (SPEC §13.2); only a rich text *field* is a block document. */
@@ -185,6 +187,8 @@ export function useThreadReactions(threads: readonly ThreadData[]): {
   reactionsBy: Record<string, readonly Reaction[]>
   omitted: number
   cut: boolean
+  /** By message id, each one that stands resolved, by the resolution Peek or Leaf wrote: Ship shows it and writes none. */
+  resolvedBy: Record<string, Resolution>
   refresh: () => void
 } {
   // Every root and reply with its `created_at`: the horizon is the newest 100
@@ -193,14 +197,19 @@ export function useThreadReactions(threads: readonly ThreadData[]): {
     () => threads.flatMap((thread) => [thread.root, ...thread.replies]).map((message) => ({ id: message.id, at: message.at })),
     [threads],
   )
-  const { reactions, omitted, cut, refresh } = useReactions(targets)
-  return { reactionsBy: reactions, omitted, cut, refresh }
+  const { reactions, omitted, cut, resolved, refresh } = useReactions(targets)
+  return { reactionsBy: reactions, omitted, cut, resolvedBy: resolved, refresh }
 }
 
 export interface ThreadData {
   id: string
   root: MessageData
   replies: MessageData[]
+  /**
+   * Its comment was deleted (PER-24): `root` is then the earliest reply, standing in for it, and the one
+   * conversation draws "This comment was deleted." with every message under it and no new reply, as Peek does.
+   */
+  rootMissing?: true
 }
 
 /**
