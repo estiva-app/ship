@@ -6,7 +6,6 @@ import { IdentityMenu } from '@/components/IdentityMenu'
 import { ShipSidebar } from '@/components/ShipSidebar'
 import { ACTIVITY, ARCHIVED_CARDS, PEOPLE, PROJECT_CARDS, PROJECT_STATUSES, SIDEBAR_PROJECTS } from '@/fixtures/projects'
 import { ACTIVITY_ITEMS, ANA, ISSUES, ISSUE_STATUSES, THREADS, hrefFor, makeIssues } from '@/fixtures/issues'
-import type { ForeignObject } from '@/api/foreign'
 import type { RelatedState } from '@/api/useRelated'
 import { IssueView } from './IssueView'
 import { IssuesView, type IssuesScope } from './IssuesView'
@@ -23,6 +22,9 @@ const pretendUpload = async (file: File) => ({ url: URL.createObjectURL(file), m
  * A bare-file topic somebody started under the project in Peek — RFC 0.5
  * §10.7's Related section, with its comment count. The shape `readRelated`
  * hands the page; see `Related.stories` for the section's own states.
+ * Typed, not cast: every field the projection always carries is here, so a
+ * missing one is a type error, not a story that throws (it had no `actions`,
+ * which the kit's card reads).
  */
 const RELATED: RelatedState = {
   inside: {},
@@ -38,8 +40,10 @@ const RELATED: RelatedState = {
       slots: { title: { value: 'Cut-over checklist' }, body: { value: 'What has to be true before the old read path is turned off.' } },
       meta: [],
       comments: [],
+      actions: [],
+      viaRecommendation: false,
       parentRef: '30850:a:rel',
-    } as unknown as ForeignObject,
+    },
   ],
   counts: { '30840:a:cutover': 7 },
 }
