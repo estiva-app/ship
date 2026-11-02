@@ -367,6 +367,8 @@ describe('Project page — one project from the fold', () => {
     const main = within(screen.getByRole('main'))
     // Overview (Katerina, 29 September): the title is always editable, with no box.
     expect(await main.findByRole('textbox', { name: 'Title' })).toHaveTextContent('Live')
+    // The header says when it last changed (ONE-6, step 4a).
+    expect(main.getByText(/^(Edited|Created) /)).toBeInTheDocument()
     // The tabs are in the URL: Issues shows the table, Activity the conversations.
     fireEvent.click(main.getByRole('tab', { name: 'Issues' }))
     await waitFor(() => expect(location.search).toBe('?tab=issues'))

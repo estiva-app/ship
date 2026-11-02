@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Change, DirectoryView, FolderState } from '@/api'
 import { PROJECT_STATUSES } from '@/nostr/kinds'
-import { historyFor } from './history'
+import { editedFor, historyFor } from './history'
 
 const PROJECT = `30850:${'a'.repeat(64)}:the-project`
 const OTHER = `30850:${'a'.repeat(64)}:another`
@@ -41,5 +41,28 @@ describe("a project's History", () => {
 
   it('names the lead it was given, and the one it took away', () => {
     expect(history([change('lead', LEAD), change('lead', '')]).map((entry) => entry.text)).toEqual(['removed Ana Duarte as the lead', 'made Ana Duarte the lead'])
+  })
+})
+
+describe('"Edited … ago" over a page (ONE-6, step 4a)', () => {
+  const NOW = Math.floor(Date.now() / 1000)
+  const at = (field: string, value: string, secondsAgo: number, author = AUTHOR): Change => ({ ...change(field, value), createdAt: NOW - secondsAgo, author })
+  const edited = (activity: Change[]) =>
+    editedFor(PROJECT, { activity, projects: [] } as unknown as FolderState, directory, { at: NOW - 86400 * 2, by: LEAD })
+
+  it('says its newest change, and who made it and exactly when under the pointer', () => {
+    const time = edited([at('title', 'Old', 7200), at('status', 'completed', 3 * 3600 - 7200)])
+    expect(time.label).toBe('Edited 1h ago')
+    expect(time.exact).toMatch(/^Edited by Miky · /)
+  })
+
+  it('leaves out who follows it: a join is not an edit, as the issues table’s Updated has it (SHI-31)', () => {
+    expect(edited([at('title', 'Old', 7200), at(`member:${LEAD}`, 'true', 60, LEAD)]).label).toBe('Edited 2h ago')
+  })
+
+  it('a file not changed since it was made says when it was made, and by whom', () => {
+    const time = edited([at(`member:${LEAD}`, 'true', 60, LEAD)])
+    expect(time.label).toBe('Created 2d ago')
+    expect(time.exact).toMatch(/^Created by Ana Duarte · /)
   })
 })

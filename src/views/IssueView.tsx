@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { IconBox } from '@tabler/icons-react'
+import { PageHeader } from '@estiva-app/ui'
 import { Breadcrumb, type Crumb } from '@/components/ui/Breadcrumb'
 import { ScrollArea } from '@/components/ui/ScrollArea'
 import { linkTo, type IssueTab } from '@/router'
@@ -106,6 +107,8 @@ export interface IssueViewProps {
   archivedNotice?: ReactNode
   /** The members pill, at the end of the breadcrumb row — the old Peek header's place for it (SHI-31). */
   members?: ReactNode
+  /** When it last changed, in the header: "Edited 5m ago", who and exactly when under the pointer. */
+  edited?: { label: string; exact: string }
 }
 
 const TABS: { id: IssueTab; label: string }[] = [
@@ -114,7 +117,7 @@ const TABS: { id: IssueTab; label: string }[] = [
 ]
 
 /** One issue's page, in tabs: Overview and Activity, with the rail on every tab. */
-export function IssueView({ crumbs, tab, onTab, title, summary, onSummarize, description, descriptionFormat, nameOf, onRename, onCopyBlockLink, onDescribe, onMention, descriptionBy, related, threads, conversationsLoading, mentionsLoading, unread, stillUnread, onThreadShown, onStartConversation, onReply, activity, activityTruncated, onReplyInActivity, history, rail, about, onReact, onDeleteMessage, onEditMessage, readOnlyReason, lockedReason, commentsClosed, upload, archivedNotice, members }: IssueViewProps) {
+export function IssueView({ crumbs, tab, onTab, title, summary, onSummarize, description, descriptionFormat, nameOf, onRename, onCopyBlockLink, onDescribe, onMention, descriptionBy, related, threads, conversationsLoading, mentionsLoading, unread, stillUnread, onThreadShown, onStartConversation, onReply, activity, activityTruncated, onReplyInActivity, history, rail, about, onReact, onDeleteMessage, onEditMessage, readOnlyReason, lockedReason, commentsClosed, upload, archivedNotice, members, edited }: IssueViewProps) {
   // `linkTo` on each crumb (S15, 0.10.0): the breadcrumbs were the last links in Ship that reloaded the app (SHI-20).
   const items: Crumb[] = [{ label: 'Issues', ...linkTo(crumbs.issuesHref) }]
   // The box before the project's name says it is a project, as the sidebar's entry does (Katerina, 2026-09-09).
@@ -126,11 +129,8 @@ export function IssueView({ crumbs, tab, onTab, title, summary, onSummarize, des
     // `data-surface` and `data-tab` are the smoke test's waypoints — see IssuesView. A page that scrolls inside
     // itself: `flex-1 min-h-0 [contain:size]` takes exactly the frame's height, so its columns scroll and the frame does not.
     <div data-surface="issue" data-tab={tab} className="grid min-h-0 flex-1 [contain:size] grid-cols-[minmax(0,1fr)_1px_auto] grid-rows-[auto_auto_minmax(0,1fr)] gap-y-4">
-      {/* `mt-5`, not `pt-5`: `min-h-8` counts padding, so with `pt-5` the row was 40px without the members pill and 52px with it, and the page dropped 12px when it arrived. */}
-      <div className="col-start-1 row-start-1 mt-5 flex min-h-8 items-center justify-between gap-4 px-6">
-        <Breadcrumb items={items} />
-        {members}
-      </div>
+      {/* The kit's PageHeader over the page's column (ONE-6, step 4a): the path, when it last changed, who is in it. 48px whatever it holds, so the members pill arriving moves nothing. */}
+      <PageHeader className="col-start-1 row-start-1" title={<Breadcrumb items={items} />} {...(edited ? { time: edited } : {})} members={members} />
       {/* The tab row is its own grid row, level with the rail's top, so the rail starts where it always has. */}
       <div className="col-start-1 row-start-2 flex min-h-8 items-center px-6">
         {/* Overview does not read the conversation (66b31c4b), so Activity says when something there is new. */}

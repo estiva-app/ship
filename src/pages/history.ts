@@ -2,6 +2,7 @@ import type { DirectoryView, FolderState } from '@/api'
 import { MEMBER_FIELD_PREFIX, memberOfField } from '@estiva-app/conversation'
 import type { HistoryEntry } from '@/components/History'
 import { ISSUE_STATUSES, lookupStatus, type VocabEntry } from '@/nostr/kinds'
+import { ago } from '@/lib/time'
 
 /**
  * An issue's or a project's slice of the change stream, in words, newest
@@ -75,4 +76,17 @@ function changeInWords(field: string, value: string, previous: string | undefine
     default:
       return value ? `set ${field} to ${person(value)}` : `cleared ${field}`
   }
+}
+
+/**
+ * When a file last changed, as its page's header says it (the kit's `PageHeader` `time`): "Edited 5m ago", and who
+ * and exactly when under the pointer. Its newest change, leaving out who follows it, as the issues table's Updated
+ * does (SHI-31); a file not changed since it was made says when it was made, and by whom.
+ */
+export function editedFor(addr: string, state: FolderState, directory: DirectoryView, created: { at: number; by: string }): { label: string; exact: string } {
+  const touched = state.activity.filter((change) => change.target === addr && !change.field.startsWith(MEMBER_FIELD_PREFIX)).at(-1)
+  const verb = touched ? 'Edited' : 'Created'
+  const at = touched?.createdAt ?? created.at
+  const by = directory.nameOf(touched?.author ?? created.by)
+  return { label: `${verb} ${ago(at)}`, exact: `${verb} by ${by} · ${new Date(at * 1000).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}` }
 }

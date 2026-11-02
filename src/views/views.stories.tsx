@@ -129,6 +129,9 @@ export const IssuesEmpty: Story = {
 /** One project, in tabs: Overview (title, description, Related), Activity (Conversations, Mentioned in), Issues (table or board). The rail on every tab. */
 /** FOL-46's notice, as the pages build it: archived by Miky two days ago, with a resolution. */
 const ARCHIVED_AT = Math.floor(Date.now() / 1000) - 2 * 86400
+
+/** The header's "Edited … ago" (ONE-6, step 4a), as the pages make it: who changed it last, and exactly when under the pointer. */
+const STORY_EDITED = { label: 'Edited 5m ago', exact: 'Edited by Ana Duarte · Nov 2, 2026, 10:30 AM' }
 const archivedNotice = (withProject?: boolean) => (
   <ArchivedNotice
     {...archivedNoticeOf(
@@ -157,6 +160,7 @@ const projectPage = (startTab: ProjectTab, startView: 'table' | 'board' = 'table
     return (
       <Shell current={{ projectAddr: '30850:a:rel' }}>
         <ProjectView
+          edited={STORY_EDITED}
           {...(archived ? {} : { onAddIssue: fn() })}
           crumbs={{ projectsHref: '#/projects', title }}
           header={{ title, summary, description, descriptionFormat: 'marker', archived, onRename: (v) => (setTitle(v), true), onSummarize: async (v) => (setSummary(v || undefined), true), onDescribe: (v) => (setDescription(v), true) }}
@@ -223,6 +227,7 @@ const issuePage = (startTab: IssueTab, archivedWithProject = false, withSummary 
     return (
       <Shell current={{ projectAddr: '30850:a:rel' }}>
         <IssueView
+          edited={STORY_EDITED}
           crumbs={{ issuesHref: '#/issues', project: { title: 'Relay Migration', href: '#/project/30850%3Aa%3Arel' }, ref: issue.ref }}
           tab={tab}
           onTab={setTab}

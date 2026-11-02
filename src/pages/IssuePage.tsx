@@ -15,7 +15,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { IssueView } from '@/views/IssueView'
 import { go, href, type IssueTab } from '../router'
 import { act, actInField, sayOnceLeft, type Say } from './act'
-import { historyFor } from './history'
+import { editedFor, historyFor } from './history'
 import { activityFor, cardEditOf, copyText, folderOfMessage, railPeople, refreshAfter, threadFor, useMentionLinks, withElsewhere } from './ProjectPage'
 import { useReferencePage } from '@/api/references'
 
@@ -136,6 +136,8 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
   return (
     <>
       <IssueView
+        // When it last changed, over the page (ONE-6, step 4a).
+        edited={editedFor(issue.addr, state, directory, { at: issue.createdAt, by: issue.author })}
         tab={tab}
         onTab={(next) => go({ name: 'issue', d: issue.id, slug: issue.title, tab: next })}
         archivedNotice={

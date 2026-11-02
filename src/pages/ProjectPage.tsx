@@ -63,6 +63,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { ProjectView } from '@/views/ProjectView'
 import { go, href, type ProjectTab, type ProjectView as ProjectViewName } from '../router'
 import { act, actInField, sayOnceLeft, type Say } from './act'
+import { editedFor } from './history'
 import { hrefForIssue, rowFor } from './IssuesPage'
 import { MoveProject } from '@/components/MoveProject'
 import { ArchiveDialog, ArchivedNotice } from '@estiva-app/ui'
@@ -721,6 +722,8 @@ export function ProjectPage({
   return (
     <>
       <ProjectView
+        // When it last changed, over the page (ONE-6, step 4a).
+        edited={editedFor(project.addr, state, directory, { at: project.createdAt, by: project.author })}
         archivedNotice={
           archive && (
             <ArchivedNotice

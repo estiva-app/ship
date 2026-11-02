@@ -2,6 +2,7 @@ import { IconBox, IconLayoutKanban, IconTable } from '@tabler/icons-react'
 import type { ContentFormat, Imeta } from '@estiva-app/protocol'
 import type { Answer, Picks } from '@/components/conversations/shared'
 import type { ReactNode } from 'react'
+import { PageHeader } from '@estiva-app/ui'
 import { Breadcrumb } from '@/components/ui/Breadcrumb'
 import { ScrollArea } from '@/components/ui/ScrollArea'
 import { linkTo, type ProjectTab } from '@/router'
@@ -129,6 +130,8 @@ export interface ProjectViewProps {
   archivedNotice?: ReactNode
   /** The members pill, at the end of the breadcrumb row (SHI-31). */
   members?: ReactNode
+  /** When it last changed, in the header: "Edited 5m ago", who and exactly when under the pointer. */
+  edited?: { label: string; exact: string }
 }
 
 const TABS: { id: ProjectTab; label: string }[] = [
@@ -138,19 +141,20 @@ const TABS: { id: ProjectTab; label: string }[] = [
 ]
 
 /** One project's page, in tabs: Overview, Activity and Issues, with the rail on every tab. */
-export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onView, issues, issueStatuses, hrefFor, related, threads, conversationsLoading, mentionsLoading, unread, stillUnread, onThreadShown, onStartConversation, onReply, onCopyBlockLink, activity, activityTruncated, onReplyInActivity, rail, about, onReact, onDeleteMessage, onEditMessage, readOnlyReason, lockedReason, commentsClosed, upload, archivedNotice, members }: ProjectViewProps) {
+export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onView, issues, issueStatuses, hrefFor, related, threads, conversationsLoading, mentionsLoading, unread, stillUnread, onThreadShown, onStartConversation, onReply, onCopyBlockLink, activity, activityTruncated, onReplyInActivity, rail, about, onReact, onDeleteMessage, onEditMessage, readOnlyReason, lockedReason, commentsClosed, upload, archivedNotice, members, edited }: ProjectViewProps) {
   const comment = useBlockComment(header.description, header.descriptionFormat, onTab, onStartConversation)
   return (
     // `data-surface`, `data-view` and `data-tab` are the smoke test's waypoints — see IssuesView. The Table/Board
     // toggle and the tabs swap content in place on the same route, so without them a test cannot tell "it
     // rendered" from "the click did nothing". A page that scrolls inside itself — see IssueView.
     <div data-surface="project" data-view={view} data-tab={tab} className="grid min-h-0 flex-1 [contain:size] grid-cols-[minmax(0,1fr)_1px_auto] grid-rows-[auto_auto_minmax(0,1fr)] gap-y-4">
-      {/* `mt-5`, not `pt-5`, so the members pill arriving does not move the page — see IssueView. */}
-      <div className="col-start-1 row-start-1 mt-5 flex min-h-8 items-center justify-between gap-4 px-6">
-        {/* The box before the name says it is a project — the sidebar's icon for one (Katerina, 2026-09-09). */}
-        <Breadcrumb items={[{ label: 'Projects', ...linkTo(crumbs.projectsHref) }, { label: crumbs.title, icon: <IconBox size={16} stroke={1.5} /> }]} />
-        {members}
-      </div>
+      {/* The kit's PageHeader over the page's column (ONE-6, step 4a) — see IssueView. The box before the name says it is a project — the sidebar's icon for one (Katerina, 2026-09-09). */}
+      <PageHeader
+        className="col-start-1 row-start-1"
+        title={<Breadcrumb items={[{ label: 'Projects', ...linkTo(crumbs.projectsHref) }, { label: crumbs.title, icon: <IconBox size={16} stroke={1.5} /> }]} />}
+        {...(edited ? { time: edited } : {})}
+        members={members}
+      />
       {/* The tab row is its own grid row, level with the rail's top, so the rail starts where it always has. */}
       <div className="col-start-1 row-start-2 flex min-h-8 items-center gap-3 px-6">
         {/* Overview and Issues do not read the conversation (66b31c4b), so Activity says when something there is new. */}
