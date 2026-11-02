@@ -134,21 +134,24 @@ describe('ProjectView, archived (SHI-36)', () => {
 describe('the comments column (ONE-6, step 4c)', () => {
   const THREAD = { id: 't1', root: { id: 't1', body: 'Is the order the vocabulary order?', at: 1, author: { name: 'Ana' } }, replies: [] } as unknown as IssueViewProps['threads'][number]
 
-  it('is beside the page on every tab, titled "Comments" over the issue it is about', async () => {
+  // Changed on purpose (Katerina, 2 November): the column's header is the kit's "Comments" alone, not whose they are.
+  it('is beside the page on every tab, under the kit’s own "Comments" header and no line naming the issue', async () => {
     for (const tab of ['overview', 'activity'] as const) {
       const { unmount } = render(view(tab, { threads: [THREAD], crumbs: { issuesHref: '/issues', ref: 'REL-1' } }))
       const column = document.querySelector('[data-comments-column]') as HTMLElement
       expect(column).not.toBeNull()
       expect(column.textContent).toContain('Comments')
-      expect(column.textContent).toContain('REL-1 · Board columns out of order')
+      expect(column.textContent).not.toContain('REL-1')
       expect(await screen.findByText('Is the order the vocabulary order?')).toBeInTheDocument()
       unmount()
     }
   })
 
-  it('a project’s says it is about the project as a whole, on its Issues tab too', () => {
+  it('a project’s is there on its Issues tab too, and does not name the project', () => {
     render(projectView('issues', {}))
-    expect(document.querySelector('[data-comments-column]')?.textContent).toContain('Relay Migration as a whole')
+    const column = document.querySelector('[data-comments-column]')
+    expect(column?.textContent).toContain('Comments')
+    expect(column?.textContent).not.toContain('Relay Migration')
   })
 
   it('leaves Activity with Mentioned in and History, and the tab with no dot for comments', () => {
@@ -156,6 +159,15 @@ describe('the comments column (ONE-6, step 4c)', () => {
     expect(document.querySelector('[data-app-section="Conversations"]')).toBeNull()
     expect(document.querySelector('[data-app-section="Mentioned in"]')).not.toBeNull()
     expect(screen.getByRole('tab', { name: 'Activity' }).querySelector('[data-unread]')).toBeNull()
+  })
+
+  it('hidden, the header’s button carries the dot when a comment is new, and not when none is', () => {
+    const { unmount } = render(view('overview', { threads: [THREAD], stillUnread: { t1: ['t1'] }, comments: { shown: false, onShownChange: vi.fn() } }))
+    expect(screen.getByRole('button', { name: 'Show comments, new' })).toBeInTheDocument()
+    unmount()
+    render(view('overview', { threads: [THREAD], stillUnread: { t1: [] }, comments: { shown: false, onShownChange: vi.fn() } }))
+    expect(screen.getByRole('button', { name: 'Show comments' })).toBeInTheDocument()
+    expect(document.querySelector('[data-unread]')).toBeNull()
   })
 
   it('the header’s button hides it and shows it again', async () => {

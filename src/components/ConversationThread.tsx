@@ -1,4 +1,4 @@
-import { useMemo, type ReactNode } from 'react'
+import { useMemo } from 'react'
 import type { BlockAnchor, Embed, Imeta, PartPointer, Quote } from '@estiva-app/protocol'
 import { referencesIn, toRenderTree } from '@estiva-app/protocol'
 import { ConfirmDialog } from './ui/ConfirmDialog'
@@ -318,8 +318,6 @@ export interface ConversationsProps {
    * surface that has no single object.
    */
   about?: string
-  /** The comments column's name in its header: `commentsTitle`, saying whose they are (ONE-6, step 4c). Default, the kit's "Comments". */
-  title?: ReactNode
   /**
    * Add or take back a reaction on one message — CON-2.
    *

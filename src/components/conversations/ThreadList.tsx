@@ -1,7 +1,7 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { IconDotsVertical, IconMessage2, IconX } from '@tabler/icons-react'
 import type { Imeta } from '@estiva-app/protocol'
-import { AddReactionButton, Avatar, Button, Card, ConversationLayout, EmptyState, FieldLine, IconButton, LinkedIcon, Menu, MenuItem, ReactionRow, SkeletonList, Thread as KitThread, WithTooltip, type ConversationItem } from '@estiva-app/ui'
+import { AddReactionButton, Avatar, Button, Card, ConversationLayout, EmptyState, FieldLine, IconButton, Menu, MenuItem, ReactionRow, SkeletonList, Thread as KitThread, WithTooltip, type ConversationItem } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
 import { ago } from '@/lib/time'
 import { draftKeys, type DraftStore } from '@/lib/drafts'
@@ -468,29 +468,14 @@ function ShipThreadReplies(props: ShipThreadProps) {
 }
 
 /**
- * The comments column's name (Katerina, 2 November, "E": the kit's rich title, ContainerHeader "With rich title"):
- * "Comments", over whose they are, with its kind's icon: "REL-1 · Board columns…", or "Relay Migration as a whole".
- */
-export function commentsTitle(kind: 'issue' | 'project', name: string): ReactNode {
-  return (
-    <div className="min-w-0">
-      <p className="truncate text-body-2-strong text-text-primary">Comments</p>
-      <p className="flex min-w-0 items-center gap-1 text-caption text-text-muted">
-        <LinkedIcon kind={kind} size={14} />
-        <span className="truncate">{kind === 'issue' ? name : `${name} as a whole`}</span>
-      </p>
-    </div>
-  )
-}
-
-/**
  * The drawing, with the reads handed in — for a story, or a caller that has them: the comments as the kit's one
- * column (ONE-6, step 4c), 384px beside the page. Each comment opens its thread under it, one at a time; resolved ones
+ * column (ONE-6, step 4c), 384px beside the page, under the kit's own header, "Comments" and nothing more (Katerina,
+ * 2 November: not whose they are). Each comment opens its thread under it, one at a time; resolved ones
  * wait closed under "Resolved" at the end, and ones on a block since deleted under "On deleted blocks" (the kit's);
  * the box is at the column's foot, with the block a comment will be about above it.
  */
 export function ThreadListView(props: ThreadListViewProps) {
-  const { threads, onStart, disabledReason, className, unread, nameOf, about, omitted = 0, reactionsCut = false, upload, drafts, anchor, onDropAnchor, title } = props
+  const { threads, onStart, disabledReason, className, unread, nameOf, about, omitted = 0, reactionsCut = false, upload, drafts, anchor, onDropAnchor } = props
   const scope = useMemo(() => messageScope(threads), [threads])
   const references = useCallback((query: string) => referenceSections(scope, query, nameOf), [scope, nameOf])
   const captions = useMemo(() => referenceCaptions(scope, nameOf), [scope, nameOf])
@@ -576,7 +561,6 @@ export function ThreadListView(props: ThreadListViewProps) {
       loading={props.loading}
       // Ship's words (Katerina, 2 November: Ship keeps its own where the kit differs).
       empty="No conversations yet."
-      {...(title !== undefined ? { title } : {})}
       box={box}
       below={horizon}
       className={className}

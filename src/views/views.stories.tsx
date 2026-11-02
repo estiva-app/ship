@@ -214,7 +214,7 @@ export const ProjectSignedOut: Story = projectPage('activity', 'table', 'Sign in
 export const ProjectArchived: Story = projectPage('overview', 'table', undefined, true)
 
 /** One issue, in tabs: Overview (title, its fields, description, Related) and Activity (Mentioned in, History). Its comments in the column beside, on every tab; the header's buttons hide it and hold the ⋯. */
-const issuePage = (startTab: IssueTab, archivedWithProject = false, withSummary = true): Story => ({
+const issuePage = (startTab: IssueTab, archivedWithProject = false, withSummary = true, newWhileHidden = false): Story => ({
   render: () => {
     const issue = ISSUES[0]
     const [tab, setTab] = useState<IssueTab>(startTab)
@@ -224,7 +224,7 @@ const issuePage = (startTab: IssueTab, archivedWithProject = false, withSummary 
     const [title, setTitle] = useState(issue.title)
     const [summary, setSummary] = useState(withSummary ? issue.summary : undefined)
     const [description, setDescription] = useState('After an archived project is restored, the board draws its columns in the order the folder union returned them rather than the vocabulary order.')
-    const [commentsShown, setCommentsShown] = useState(true)
+    const [commentsShown, setCommentsShown] = useState(!newWhileHidden)
     return (
       <Shell current={{ projectAddr: '30850:a:rel' }}>
         <IssueView
@@ -240,6 +240,8 @@ const issuePage = (startTab: IssueTab, archivedWithProject = false, withSummary 
           onRename={(v) => (setTitle(v), true)}
           onDescribe={(v) => (setDescription(v), true)}
           threads={THREADS}
+          // A new comment in the hidden column (Katerina, 2 November): the header's button carries the dot.
+          {...(newWhileHidden ? { stillUnread: { t2: [THREADS[1].root.id] } } : {})}
           onStartConversation={fn()}
           onReply={fn()}
           activity={ACTIVITY_ITEMS}
@@ -275,3 +277,5 @@ export const IssueNoSummary: Story = issuePage('overview', false, false)
 export const IssueActivity: Story = issuePage('activity')
 /** An issue archived with its project (FOL-46): the notice names the project and opens it. */
 export const IssueArchivedWithProject: Story = issuePage('overview', true)
+/** The comments hidden, with a new one among them: the kit's dot beside the header's "Show comments" (Katerina, 2 November). */
+export const IssueCommentsHiddenWithNew: Story = issuePage('overview', false, true, true)

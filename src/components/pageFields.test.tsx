@@ -218,3 +218,35 @@ describe('the page’s ⋯', () => {
     expect(onDelete).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('the comments button (ONE-6, step 4c)', () => {
+  const page = (comments: NonNullable<PageActionsProps['comments']>) => menu({ what: 'issue', comments })
+
+  it('hides the column while it is shown, and shows it while it is hidden', async () => {
+    const user = userEvent.setup()
+    const onShownChange = vi.fn()
+    const { rerender } = render(page({ shown: true, onShownChange }))
+    await user.click(screen.getByRole('button', { name: 'Hide comments' }))
+    expect(onShownChange).toHaveBeenLastCalledWith(false)
+    rerender(page({ shown: false, onShownChange }))
+    await user.click(screen.getByRole('button', { name: 'Show comments' }))
+    expect(onShownChange).toHaveBeenLastCalledWith(true)
+  })
+
+  // Katerina, 2 November: hidden, nothing else on the page said a new comment had come.
+  it('hidden with something new: the kit’s dot beside it, and "new" in its name', () => {
+    render(page({ shown: false, onShownChange: vi.fn(), unread: true }))
+    const button = screen.getByRole('button', { name: 'Show comments, new' })
+    expect(button.nextElementSibling?.hasAttribute('data-unread')).toBe(true)
+  })
+
+  it('no dot when nothing is new, nor while the column is shown, where each new comment carries its own', () => {
+    const { unmount } = render(page({ shown: false, onShownChange: vi.fn(), unread: false }))
+    expect(screen.getByRole('button', { name: 'Show comments' })).toBeInTheDocument()
+    expect(document.querySelector('[data-unread]')).toBeNull()
+    unmount()
+    render(page({ shown: true, onShownChange: vi.fn(), unread: true }))
+    expect(screen.getByRole('button', { name: 'Hide comments' })).toBeInTheDocument()
+    expect(document.querySelector('[data-unread]')).toBeNull()
+  })
+})

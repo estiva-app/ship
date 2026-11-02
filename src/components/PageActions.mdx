@@ -11,8 +11,8 @@ The kit's **ToolbarButton**s and **Menu**, in a **Toolbar** with no box of its
 own.
 
 **Seen in** — *Pages/In the shell*: **Project**, **Project Archived**,
-**Issue** and **Issue Archived With Project**. Press the comments button, and
-open the ⋯.
+**Issue**, **Issue Archived With Project** and **Issue Comments Hidden With
+New**. Press the comments button, and open the ⋯.
 
 ## When
 
@@ -36,7 +36,7 @@ import { PageActions } from '@/components/PageActions'
   actions={
     <PageActions
       what="project"
-      comments={{ shown, onShownChange: setShown }}
+      comments={{ shown, onShownChange: setShown, unread: somethingNew }}
       archive={own ? 'own' : archive ? 'with' : 'none'}
       onMove={…}
       onCopyLink={…}
@@ -59,7 +59,8 @@ import { PageActions } from '@/components/PageActions'
 ## What it owns
 
 - **The comments button**: "Hide comments" while the column is shown, "Show
-  comments" while it is not.
+  comments" while it is not. Hidden with something new in it (`unread`), the
+  kit's **UnreadDot** sits right after the button, and its name says "new".
 - **Which rows**, by the file's archive (FOL-46):
   - Not archived: Move to Folder… (a project), Copy link, then Archive and
     Delete.

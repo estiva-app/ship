@@ -15,7 +15,7 @@ import { IssueFields, type IssueFieldsProps } from '@/components/PageFields'
 import { PageActions, type PageActionsProps } from '@/components/PageActions'
 import { Related, hasRelated } from '@/components/Related'
 import { LiveHeader, type LiveHeaderProps } from '@/components/editing/LiveHeader'
-import { MentionList, ThreadList, commentsTitle } from '@/components/conversations/ThreadList'
+import { MentionList, ThreadList } from '@/components/conversations/ThreadList'
 import { useBlockComment } from '@/components/conversations/useBlockComment'
 import type { RelatedState } from '@/api/useRelated'
 import { AppSection, Centred } from '@/components/layout/ReadingColumn'
@@ -141,7 +141,7 @@ export function IssueView({ crumbs, tab, onTab, title, summary, onSummarize, des
     <div data-surface="issue" data-tab={tab} className="flex min-h-0 flex-1 [contain:size]">
       <div className="flex min-w-0 flex-1 flex-col gap-4">
       {/* The kit's PageHeader (ONE-6, step 4a): the path, when it last changed, who is in it, and the page's own buttons (4b, 4c). 48px whatever it holds, so the members pill arriving moves nothing. */}
-      <PageHeader title={<Breadcrumb items={items} />} {...(edited ? { time: edited } : {})} members={members} actions={<PageActions what="issue" comments={comments} {...menu} readOnlyReason={readOnlyReason} lockedReason={lockedReason} />} />
+      <PageHeader title={<Breadcrumb items={items} />} {...(edited ? { time: edited } : {})} members={members} actions={<PageActions what="issue" comments={{ ...comments, unread: Object.values(stillUnread ?? {}).some((ids) => ids.length > 0) }} {...menu} readOnlyReason={readOnlyReason} lockedReason={lockedReason} />} />
       {/* The tabs directly under the header, 16px below it, as they were. */}
       <div className="flex min-h-8 items-center px-6">
         {/* Changed on purpose (ONE-6, step 4c): the comments left Activity for the column, so the tab no longer says something there is new. */}
@@ -183,7 +183,7 @@ export function IssueView({ crumbs, tab, onTab, title, summary, onSummarize, des
       {/* Its comments, the kit's one column, 384px beside the page on every tab, the full height of the page (Katerina, 2 November). */}
       {comments.shown && (
         <div className="flex shrink-0 flex-col border-l border-border-default" data-comments-column>
-          <ThreadList title={commentsTitle('issue', crumbs.ref ? `${crumbs.ref} · ${title || 'Untitled issue'}` : title || 'Untitled issue')} threads={threads} loading={conversationsLoading} unread={unread} stillUnread={stillUnread} onThreadShown={onThreadShown} onStart={comment.post} anchor={comment.anchor} onDropAnchor={comment.drop} onReply={onReply} disabledReason={readOnlyReason ?? commentsClosed} nameOf={nameOf} onReact={onReact} onDeleteMessage={onDeleteMessage} onEditMessage={onEditMessage} about={about} upload={upload} className="min-h-0 flex-1" />
+          <ThreadList threads={threads} loading={conversationsLoading} unread={unread} stillUnread={stillUnread} onThreadShown={onThreadShown} onStart={comment.post} anchor={comment.anchor} onDropAnchor={comment.drop} onReply={onReply} disabledReason={readOnlyReason ?? commentsClosed} nameOf={nameOf} onReact={onReact} onDeleteMessage={onDeleteMessage} onEditMessage={onEditMessage} about={about} upload={upload} className="min-h-0 flex-1" />
         </div>
       )}
     </div>

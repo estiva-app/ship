@@ -20,7 +20,7 @@ import { ProjectFields, type ProjectFieldsProps } from '@/components/PageFields'
 import { PageActions, type PageActionsProps } from '@/components/PageActions'
 import { Related, hasRelated } from '@/components/Related'
 import { LiveHeader, type LiveHeaderProps } from '@/components/editing/LiveHeader'
-import { MentionList, ThreadList, commentsTitle } from '@/components/conversations/ThreadList'
+import { MentionList, ThreadList } from '@/components/conversations/ThreadList'
 import { useBlockComment } from '@/components/conversations/useBlockComment'
 import { AppSection, Centred } from '@/components/layout/ReadingColumn'
 import type { RelatedState } from '@/api/useRelated'
@@ -148,7 +148,7 @@ export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onVi
         title={<Breadcrumb items={[{ label: 'Projects', ...linkTo(crumbs.projectsHref) }, { label: crumbs.title, icon: <IconBox size={16} stroke={1.5} /> }]} />}
         {...(edited ? { time: edited } : {})}
         members={members}
-        actions={<PageActions what="project" comments={comments} {...menu} readOnlyReason={readOnlyReason} lockedReason={lockedReason} />}
+        actions={<PageActions what="project" comments={{ ...comments, unread: Object.values(stillUnread ?? {}).some((ids) => ids.length > 0) }} {...menu} readOnlyReason={readOnlyReason} lockedReason={lockedReason} />}
       />
       {/* The tabs directly under the header, 16px below it, as they were. */}
       <div className="flex min-h-8 items-center gap-3 px-6">
@@ -217,7 +217,7 @@ export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onVi
       {/* Its comments, the kit's one column, 384px beside the page on every tab, Issues too (Katerina, 2 November: A). */}
       {comments.shown && (
         <div className="flex shrink-0 flex-col border-l border-border-default" data-comments-column>
-          <ThreadList title={commentsTitle('project', header.title || 'Untitled project')} threads={threads} loading={conversationsLoading} unread={unread} stillUnread={stillUnread} onThreadShown={onThreadShown} onStart={comment.post} anchor={comment.anchor} onDropAnchor={comment.drop} onReply={onReply} disabledReason={readOnlyReason ?? commentsClosed} nameOf={header.nameOf} onReact={onReact} onDeleteMessage={onDeleteMessage} onEditMessage={onEditMessage} about={about} upload={upload} className="min-h-0 flex-1" />
+          <ThreadList threads={threads} loading={conversationsLoading} unread={unread} stillUnread={stillUnread} onThreadShown={onThreadShown} onStart={comment.post} anchor={comment.anchor} onDropAnchor={comment.drop} onReply={onReply} disabledReason={readOnlyReason ?? commentsClosed} nameOf={header.nameOf} onReact={onReact} onDeleteMessage={onDeleteMessage} onEditMessage={onEditMessage} about={about} upload={upload} className="min-h-0 flex-1" />
         </div>
       )}
     </div>

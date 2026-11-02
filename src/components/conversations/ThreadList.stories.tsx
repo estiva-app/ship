@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite'
 import type { Resolution } from '@/api'
 import type { ThreadData, UnreadByThread } from '@/components/ConversationThread'
 import { useFakeRelay } from '@/fixtures/fakeRelay'
-import { MentionListView, ThreadListView, commentsTitle } from './ThreadList'
+import { MentionListView, ThreadListView } from './ThreadList'
 import { STORY_DELETED, STORY_ME, STORY_MENTIONS, STORY_PEOPLE, STORY_QUOTED, STORY_REACTIONS, STORY_RESOLVED, STORY_THREADS, STORY_URGENT } from './stories.fixtures'
 
 /**
@@ -17,7 +17,7 @@ function Conversations({ empty = false, signedOut = false, unread, resolvedBy, f
   // The kit's one column, 384px, at a page's height beside it (ONE-6, step 4c).
   return (
     <div className="flex h-screen">
-      <ThreadListView {...relay.conversations} resolvedBy={resolvedBy} title={commentsTitle('issue', 'REL-1 · Board columns lose order')} />
+      <ThreadListView {...relay.conversations} resolvedBy={resolvedBy} />
     </div>
   )
 }
@@ -44,7 +44,7 @@ type Story = StoryObj<typeof meta>
 
 /**
  * The comments column beside an issue's or a project's page (ONE-6, step 4c):
- * the kit's one column, 384px, "Comments" over whose they are, the kit's cards
+ * the kit's one column, 384px, under its own "Comments", the kit's cards
  * in Ship's words. A comment per conversation, its replies row (faces, how
  * many, the last time) and its thread opening under it, one at a time; the box
  * at its foot. React, Reply and "Message actions" show on hover. A picture, a
