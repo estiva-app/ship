@@ -18,6 +18,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { IssueView } from '@/views/IssueView'
 import { go, href, type IssueTab } from '../router'
 import { act, actInField, sayOnceLeft, type Say } from './act'
+import { FileTopicsOf } from '@/components/FileTopicsOf'
 import { activityFor, cardEditOf, copyText, folderOfMessage, railPeople, refreshAfter, threadFor, useMentionLinks, withElsewhere } from './ProjectPage'
 import { useReferencePage } from '@/api/references'
 
@@ -370,6 +371,7 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
           archived: !!own,
           onArchive: () => (own ? unarchive() : setArchiving(true)),
           onDelete: () => setConfirmingDelete(true),
+          topics: <FileTopicsOf file={issue.id} say={say} />,
         }}
       />
       {archiving && (

@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { fn } from 'storybook/test'
+import type { TopicOfFile } from '@/api/foreign'
+import { FileTopics } from './FileTopics'
 import { IssueRail } from './IssueRail'
 
 const NOW = Math.floor(Date.now() / 1000)
@@ -76,3 +78,35 @@ export const Assigned: Story = { args: { status: 'in_progress', assignee: 'ravi'
  * carries a reason.
  */
 export const ReadOnly: Story = { args: { readOnlyReason: 'You do not have write access to this Folder.' } }
+
+const topic = (d: string, title: string, archived = false): TopicOfFile => ({ address: `30840:${'a'.repeat(64)}:${d}`, folder: 'team', title, openUrl: `https://peek.estiva.app/topic/${d}`, archived })
+const CHOICES = { yours: [topic('w', 'Widgets'), topic('r', 'Roadmap')], others: [topic('d', 'Design review'), topic('q', 'Q4 planning')] }
+
+/**
+ * Topics (TOP-5): the topics that list the issue, each opening in Peek, an
+ * archived one with no ✕, and Add to topic offering your topics first. Working:
+ * add and remove change the chips here.
+ */
+export const Topics: Story = {
+  render: (args) => {
+    const [topics, setTopics] = useState<TopicOfFile[]>([topic('w', 'Widgets'), topic('o', 'Old launch', true)])
+    return (
+      <IssueRail
+        {...args}
+        topics={
+          <FileTopics
+            topics={topics}
+            busy={new Set()}
+            onChange={(t, listed) => setTopics((held) => (listed ? [...held, t] : held.filter((h) => h.address !== t.address)).sort((a, b) => a.title.localeCompare(b.title)))}
+            readChoices={async () => CHOICES}
+          />
+        }
+      />
+    )
+  },
+}
+
+/** No topic lists it: None, and Add to topic. */
+export const NoTopics: Story = {
+  args: { topics: <FileTopics topics={[]} busy={new Set()} onChange={fn()} readChoices={async () => CHOICES} /> },
+}

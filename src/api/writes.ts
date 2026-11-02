@@ -79,6 +79,16 @@ export function setMembership(target: { kind: 'issue'; issue: Issue } | { kind: 
 }
 
 /**
+ * Add this issue or project to a topic, or take it off (TOP-5): an entry on
+ * the topic's list, by the file's id, filed in the topic's Folder. Refused by
+ * the relay for someone outside that Folder.
+ * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-topic-keeps-its-own-list-of-files.md
+ */
+export function setListedInTopic(topic: { address: string; folder: string }, file: string, listed: boolean): Promise<WriteResult> {
+  return publish(() => store.setListedInTopic({ topic: { address: topic.address, folder: topic.folder }, file, listed }))
+}
+
+/**
  * Add the people a description save names anew, as the Add button does (SPEC
  * §11.8): one Add each, never for yourself, at most `MAX_MENTIONED_PEOPLE`.
  * Answers the ones the relay refused, for the next save that still names them.

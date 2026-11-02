@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { Link, ProgressBar } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
 import { linkTo } from '@/router'
@@ -63,6 +64,8 @@ export interface ProjectRailProps {
   readOnlyReason?: string
   /** Why the project's fields and Move are shut while Archive and Delete stay open — an archived project (SHI-36): unarchiving is the way back. */
   lockedReason?: string
+  /** The topics that list it, with Add to topic (TOP-5): the list is the topics', so the project's locks do not shut it. */
+  topics?: ReactNode
   className?: string
 }
 
@@ -94,6 +97,7 @@ export function ProjectRail({
   onDelete,
   readOnlyReason,
   lockedReason,
+  topics,
   className,
 }: ProjectRailProps) {
   const fieldsShut = readOnlyReason ?? lockedReason
@@ -141,6 +145,11 @@ export function ProjectRail({
           </div>
         )}
       </Property>
+      {topics && (
+        <Property layout="stacked" label="Topics">
+          {topics}
+        </Property>
+      )}
       <Divider className="mx-0" />
       <div className="flex flex-col items-start gap-1">
         {/* Locked only by its Folder's archive, archiving it again is an edit; unarchiving its own never is. */}

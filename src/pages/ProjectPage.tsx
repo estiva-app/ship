@@ -63,6 +63,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { ProjectView } from '@/views/ProjectView'
 import { go, href, type ProjectTab, type ProjectView as ProjectViewName } from '../router'
 import { act, actInField, sayOnceLeft, type Say } from './act'
+import { FileTopicsOf } from '@/components/FileTopicsOf'
 import { hrefForIssue, rowFor } from './IssuesPage'
 import { MoveProject } from '@/components/MoveProject'
 import { ArchiveDialog } from '@/components/ArchiveDialog'
@@ -889,6 +890,7 @@ export function ProjectPage({
           archived: !!own,
           onArchive: () => (own ? unarchive() : setDialog('archive')),
           onDelete: () => setDialog('delete'),
+          topics: <FileTopicsOf file={project.id} say={say} />,
         }}
       />
 
