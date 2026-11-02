@@ -16,7 +16,8 @@ import type { ThreadData, UnreadByThread } from '@/components/ConversationThread
 import type { ActivityItem } from '@/components/Activity'
 import type { IssueRowData } from '@/components/IssueRow'
 import { IssuesTable, type IssuesTableRow } from '@/components/IssuesTable'
-import { ProjectRail, type RailFolder, type RailPerson } from '@/components/ProjectRail'
+import { ProjectFields, type ProjectFieldsProps } from '@/components/PageFields'
+import { PageMenu, type PageMenuProps } from '@/components/PageMenu'
 import { Related, hasRelated } from '@/components/Related'
 import { LiveHeader, type LiveHeaderProps } from '@/components/editing/LiveHeader'
 import { MentionList, ThreadList } from '@/components/conversations/ThreadList'
@@ -27,8 +28,8 @@ import type { RelatedState } from '@/api/useRelated'
 /**
  * One project, in tabs (Katerina, 29 September, shaped like Linear's):
  *
- * - **Overview** — the title and the description, always editable, and what is
- *   placed under the project ("Related").
+ * - **Overview** — the title, its fields and the description, always editable,
+ *   and what is placed under the project ("Related").
  * - **Activity** — "Conversations" (what declared itself about this project)
  *   and "Mentioned in" (conversations elsewhere that name it; CON-9's two lists).
  * - **Issues** — the issues, full width, with Table / Board at the right end of
@@ -36,9 +37,10 @@ import type { RelatedState } from '@/api/useRelated'
  *
  * Overview and Activity sit in one centred 768px column; Issues takes the full
  * width, because the board has a column per status. "Add issue" is on every
- * tab. The rail is on every tab and never moves: the tab row is a grid row of
- * its own, level with the rail's top. The open tab and the Table / Board toggle
- * are in the URL (`?tab=activity`, `?view=board`), so the caller owns them.
+ * tab. No details column (ONE-6, step 4b): the fields are a row under the
+ * summary, the actions the header's ⋯. The open tab and the Table / Board
+ * toggle are in the URL (`?tab=activity`, `?view=board`), so the caller owns
+ * them.
  */
 export interface ProjectViewProps {
   crumbs: { projectsHref: string; title: string }
@@ -94,22 +96,10 @@ export interface ProjectViewProps {
   activityTruncated?: number
   /** Reply into a thread belonging to another file: its own Folder, never this project's. */
   onReplyInActivity: (threadId: string, text: string, files: readonly Imeta[], picks?: Picks) => Promise<Answer>
-  rail: {
-    status: string
-    statuses: StatusEntry[]
-    onStatusChange: (v: string) => void
-    lead: string
-    people: RailPerson[]
-    onLeadChange: (v: string) => void
-    done: number
-    total: number
-    folders: RailFolder[] | null | undefined
-    onMove?: () => void
-    /** The project's own archive, when it differs from the header's (archived with its team, FOL-46). */
-    archived?: boolean
-    onArchive: () => void
-    onDelete: () => void
-  }
+  /** Status, assignee and progress, as a row between the summary and the description (ONE-6, step 4b). */
+  fields: Omit<ProjectFieldsProps, 'readOnlyReason' | 'lockedReason'>
+  /** The header's ⋯: Move to Folder…, Copy link, Archive or Unarchive, Delete. */
+  menu: Omit<PageMenuProps, 'what' | 'readOnlyReason' | 'lockedReason'>
   /** This object's address, so an unsent message is kept against it — CON-10. */
   about?: string
   /** Add or take back a reaction on a message — CON-2. */
@@ -120,7 +110,7 @@ export interface ProjectViewProps {
   onEditMessage?: (messageId: string, body: string, removeCard?: string, files?: readonly Imeta[], dropped?: string) => Promise<Answer>
   /** Why writes are unavailable — every write control on the page is disabled with it. */
   readOnlyReason?: string
-  /** Why this project's own title, description, rail and Add issue are shut while it can still be discussed, archived or deleted — an archived project (SHI-36). */
+  /** Why this project's own title, description, fields and Add issue are shut while it can still be discussed, archived or deleted — an archived project (SHI-36). */
   lockedReason?: string
   /** The line in the comment box's place when this file takes no comment or reaction — archived (Decided 2026-10-17). */
   commentsClosed?: string
@@ -140,23 +130,23 @@ const TABS: { id: ProjectTab; label: string }[] = [
   { id: 'issues', label: 'Issues' },
 ]
 
-/** One project's page, in tabs: Overview, Activity and Issues, with the rail on every tab. */
-export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onView, issues, issueStatuses, hrefFor, related, threads, conversationsLoading, mentionsLoading, unread, stillUnread, onThreadShown, onStartConversation, onReply, onCopyBlockLink, activity, activityTruncated, onReplyInActivity, rail, about, onReact, onDeleteMessage, onEditMessage, readOnlyReason, lockedReason, commentsClosed, upload, archivedNotice, members, edited }: ProjectViewProps) {
+/** One project's page, in tabs: Overview, Activity and Issues. */
+export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onView, issues, issueStatuses, hrefFor, related, threads, conversationsLoading, mentionsLoading, unread, stillUnread, onThreadShown, onStartConversation, onReply, onCopyBlockLink, activity, activityTruncated, onReplyInActivity, fields, menu, about, onReact, onDeleteMessage, onEditMessage, readOnlyReason, lockedReason, commentsClosed, upload, archivedNotice, members, edited }: ProjectViewProps) {
   const comment = useBlockComment(header.description, header.descriptionFormat, onTab, onStartConversation)
   return (
     // `data-surface`, `data-view` and `data-tab` are the smoke test's waypoints — see IssuesView. The Table/Board
     // toggle and the tabs swap content in place on the same route, so without them a test cannot tell "it
     // rendered" from "the click did nothing". A page that scrolls inside itself — see IssueView.
-    <div data-surface="project" data-view={view} data-tab={tab} className="grid min-h-0 flex-1 [contain:size] grid-cols-[minmax(0,1fr)_1px_auto] grid-rows-[auto_auto_minmax(0,1fr)] gap-y-4">
-      {/* The kit's PageHeader over the page's column (ONE-6, step 4a) — see IssueView. The box before the name says it is a project — the sidebar's icon for one (Katerina, 2026-09-09). */}
+    <div data-surface="project" data-view={view} data-tab={tab} className="flex min-h-0 flex-1 flex-col gap-4 [contain:size]">
+      {/* The kit's PageHeader (ONE-6, steps 4a and 4b) — see IssueView. The box before the name says it is a project — the sidebar's icon for one (Katerina, 2026-09-09). */}
       <PageHeader
-        className="col-start-1 row-start-1"
         title={<Breadcrumb items={[{ label: 'Projects', ...linkTo(crumbs.projectsHref) }, { label: crumbs.title, icon: <IconBox size={16} stroke={1.5} /> }]} />}
         {...(edited ? { time: edited } : {})}
         members={members}
+        actions={<PageMenu what="project" {...menu} readOnlyReason={readOnlyReason} lockedReason={lockedReason} />}
       />
-      {/* The tab row is its own grid row, level with the rail's top, so the rail starts where it always has. */}
-      <div className="col-start-1 row-start-2 flex min-h-8 items-center gap-3 px-6">
+      {/* The tabs directly under the header, 16px below it, as they were. */}
+      <div className="flex min-h-8 items-center gap-3 px-6">
         {/* Overview and Issues do not read the conversation (66b31c4b), so Activity says when something there is new. */}
         <Tabs tabs={TABS.map((t) => (t.id === 'activity' ? { ...t, unread: Object.keys(stillUnread ?? {}).length > 0 } : t))} active={tab} onChange={onTab} />
         <div className="flex-1" />
@@ -179,11 +169,12 @@ export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onVi
       </div>
 
       {/* Both columns scroll in a ScrollArea (D40): the bar takes no width, so the 24px of padding read the same with a bar as without. */}
-      <ScrollArea className="col-start-1 row-start-3 min-h-0 min-w-0" contentClassName="flex flex-col gap-6 px-6 pb-5">
+      <ScrollArea className="min-h-0 min-w-0 flex-1" contentClassName="flex flex-col gap-6 px-6 pb-5">
         {tab === 'overview' && (
-          <Centred>
+          // Blocks 16px apart (Katerina, 1 November).
+          <Centred gap="block">
             {archivedNotice}
-            <LiveHeader title={header.title} titlePlaceholder="Untitled project" onRename={header.onRename} summary={header.summary} onSummarize={header.onSummarize} description={header.description} format={header.descriptionFormat} onDescribe={header.onDescribe} onMention={header.onMention} descriptionBy={header.descriptionBy} nameOf={header.nameOf} readOnly={!!(readOnlyReason ?? lockedReason)} upload={upload} onCommentOnBlock={readOnlyReason ?? commentsClosed ? undefined : comment.start} onCopyBlockLink={onCopyBlockLink} holdKey={about && `description:${about}`} />
+            <LiveHeader fields={<ProjectFields {...fields} readOnlyReason={readOnlyReason} lockedReason={lockedReason} />} title={header.title} titlePlaceholder="Untitled project" onRename={header.onRename} summary={header.summary} onSummarize={header.onSummarize} description={header.description} format={header.descriptionFormat} onDescribe={header.onDescribe} onMention={header.onMention} descriptionBy={header.descriptionBy} nameOf={header.nameOf} readOnly={!!(readOnlyReason ?? lockedReason)} upload={upload} onCommentOnBlock={readOnlyReason ?? commentsClosed ? undefined : comment.start} onCopyBlockLink={onCopyBlockLink} holdKey={about && `description:${about}`} />
             {/* Nesting is by intent (RFC 0.5 §10.7): what somebody placed under this project, whatever app it belongs
                 to. A line first, so the list the app adds never reads as part of the description someone typed. */}
             {hasRelated(related) && (
@@ -218,12 +209,6 @@ export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onVi
           ) : (
             <IssuesTable issues={issues} statuses={issueStatuses} hrefFor={hrefFor} />
           ))}
-      </ScrollArea>
-
-      <Divider orientation="vertical" className="col-start-2 row-span-3 row-start-1" />
-      {/* The rail on every tab, starting level with the tab row and never moving (Katerina, 29 September). */}
-      <ScrollArea className="col-start-3 row-span-2 row-start-2 min-h-0" contentClassName="px-6 pb-5">
-        <ProjectRail {...rail} archived={rail.archived ?? header.archived} readOnlyReason={readOnlyReason} lockedReason={lockedReason} />
       </ScrollArea>
     </div>
   )

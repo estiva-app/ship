@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { Suspense, lazy, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { linksAsReferences, referencesIn, resolveBlockAnchor, toRenderTree, type ContentFormat, type Imeta, type LinkResolver } from '@estiva-app/protocol'
 import { BlockHandle } from '@estiva-app/ui'
 import { Banner } from '@/components/Banner'
@@ -46,6 +46,8 @@ export interface LiveHeaderProps {
   onCopyBlockLink?: (link: string) => void
   /** Where the description's unsaved text is held when the sign-in ends (AUT-4). */
   holdKey?: string
+  /** The file's fields, between the summary and the description (ONE-6, step 4b): drawn in both halves, so nothing moves when the editors arrive. */
+  fields?: ReactNode
 }
 
 /**
@@ -159,17 +161,18 @@ export function LiveHeader(props: LiveHeaderProps) {
  * or a card in the row's place (`DescriptionReading`), so nothing moves when it
  * arrives.
  */
-function ReadingHeader({ title, titlePlaceholder, summary, onSummarize, description, format, nameOf, readOnly, resolved, resolveLink, onCommentOnBlock, onCopyBlockLink }: LiveHeaderProps & { resolved: Record<string, ForeignObjectData | null | undefined>; resolveLink: LinkResolver }) {
+function ReadingHeader({ title, titlePlaceholder, summary, onSummarize, description, format, nameOf, readOnly, resolved, resolveLink, onCommentOnBlock, onCopyBlockLink, fields }: LiveHeaderProps & { resolved: Record<string, ForeignObjectData | null | undefined>; resolveLink: LinkResolver }) {
   const empty = description.trim() === ''
   return (
     <div className="flex flex-col gap-4">
-      {/* The title and the summary under it, 4px apart; the description 16px below (the short-summary prototype's ShipFilePage). */}
+      {/* The title and the summary under it, 4px apart; the fields and the description 16px below each (the short-summary prototype's ShipFilePage; ONE-6). */}
       <div className="flex flex-col gap-1">
         <ReadingTitle title={title} placeholder={titlePlaceholder} />
         {/* For a writer this is the moment before the editors arrive: the summary waits, unclickable, so nothing typed is
             lost when HeaderEditing replaces this header. */}
         <ReadingSummary value={summary ?? ''} waiting={!readOnly && !!onSummarize} />
       </div>
+      {fields}
       <div className="-mx-2 px-2 py-1" data-description="reading">
         {empty ? (
           <span className="text-body-2 text-text-muted">{readOnly ? '' : 'Add a description…'}</span>

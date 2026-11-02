@@ -16,14 +16,14 @@ import { IssueView } from '@/views/IssueView'
 import { go, href, type IssueTab } from '../router'
 import { act, actInField, sayOnceLeft, type Say } from './act'
 import { editedFor, historyFor } from './history'
-import { activityFor, cardEditOf, copyText, folderOfMessage, railPeople, refreshAfter, threadFor, useMentionLinks, withElsewhere } from './ProjectPage'
+import { activityFor, cardEditOf, copyText, folderOfMessage, pickerPeople, refreshAfter, threadFor, useMentionLinks, withElsewhere } from './ProjectPage'
 import { useReferencePage } from '@/api/references'
 
 /**
  * One issue from the fold, as the old app's issueView: the trail (its
  * project, or none), title and description, every conversation that
  * mentions it — including ones started in Peek before it came up — its
- * history, and the rail with who opened it. History and conversation stay two sections (REW-4). Every
+ * history, and its fields. History and conversation stay two sections (REW-4). Every
  * field edit is one change event to the issue's own Folder, followed by a
  * re-read; a refused one leaves the field as the relay has it.
  */
@@ -92,7 +92,7 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
   // Judged against the frontier this visit opened on, so the divider outlives the page's own marks (99557309).
   const { unread, stillUnread } = useNewSince(issue?.addr, merged, verdictAt)
   const history = useMemo(() => (issue ? historyFor(issue.addr, state, directory) : []), [issue, state, directory])
-  const people = useMemo(() => railPeople(state, directory), [state, directory])
+  const people = useMemo(() => pickerPeople(state, directory), [state, directory])
   const projects = useMemo(
     // No move into an archived project, a new child under it (SPEC §6.5); its own stays listed, and moving out stays offered.
     () => [{ value: '', label: 'No project' }, ...state.projects.filter((p) => p.addr === issue?.projectAddr || !archives.ofProject(p.addr)).map((p) => ({ value: p.addr, label: p.title }))],
@@ -124,7 +124,7 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
 
   const set = (field: 'title' | 'description' | 'status' | 'assignee' | 'project', value: string, note: string, contentFormat?: string) =>
     act(note, () => setIssueField(issue, field, value, note, contentFormat), say, () => refresh([issue.folder]))
-  // Its own archive, which the rail toggles; and the one shown first, which may be its project's (FOL-46).
+  // Its own archive, which the ⋯ toggles; and the one shown first, which may be its project's (FOL-46).
   const own = ownArchive(issue, state.activity)
   const archive = archives.ofIssue(issue)
   // The notice's Unarchive waits for the answer.
@@ -284,9 +284,10 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
           return actInField('Reply', () => reply(conversation, conversation.root.folder, body, files, picks?.urgent, picks?.embeds), () => refreshAfter(state, conversation.root.folder, refresh, rereadElsewhere))
         }}
         history={history}
-        rail={{
+        fields={{
           status: issue.status,
-          statuses: ISSUE_STATUSES.map(({ value, label }) => ({ value, label })),
+          // Each with its colour, so the picker draws the status's shape (ONE-6, step 4b).
+          statuses: ISSUE_STATUSES.map(({ value, label, colour }) => ({ value, label, colour })),
           onStatusChange: (value) => void set('status', value, `Status → ${value}`),
           assignee: issue.assignee ?? '',
           people,
@@ -297,11 +298,15 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
             const target = state.projects.find((p) => p.addr === value)
             void set('project', value, `Move to ${target?.title ?? 'No project'}`)
           },
-          openedBy: directory.personOf(issue.author),
-          openedAt: issue.createdAt,
           archived: !!own,
+        }}
+        menu={{
+          // Its own archive, which the ⋯ toggles; archived only with its project, its own Archive stays offered (SPEC §6.5).
+          archive: own ? 'own' : archive ? 'with' : 'none',
           onArchive: () => (own ? unarchive() : setArchiving(true)),
           onDelete: () => setConfirmingDelete(true),
+          // The page's own address, without the open tab: the short link (`href` leaves the defaults out).
+          onCopyLink: () => void copyText(new URL(href({ name: 'issue', d: issue.id, slug: issue.title }), window.location.origin).href, 'Link copied', 'Copy this link:', say),
         }}
       />
       {archiving && (

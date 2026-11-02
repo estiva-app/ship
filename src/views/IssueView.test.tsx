@@ -32,9 +32,9 @@ const view = (tab: 'overview' | 'activity', extra: Partial<IssueViewProps>) => (
     activity={[]}
     onReplyInActivity={vi.fn()}
     history={[]}
-    rail={{
+    fields={{
       status: 'todo',
-      statuses: [{ value: 'todo', label: 'Todo' }],
+      statuses: [{ value: 'todo', label: 'Todo', colour: 'neutral' }],
       onStatusChange: vi.fn(),
       assignee: '',
       people: [],
@@ -42,24 +42,23 @@ const view = (tab: 'overview' | 'activity', extra: Partial<IssueViewProps>) => (
       project: '',
       projects: [{ value: '', label: 'No project' }],
       onProjectChange: vi.fn(),
-      openedBy: {},
-      openedAt: Math.floor(Date.now() / 1000),
       archived: true,
-      onArchive: vi.fn(),
-      onDelete: vi.fn(),
     }}
+    menu={{ archive: 'own', onArchive: vi.fn(), onDelete: vi.fn(), onCopyLink: vi.fn() }}
     {...extra}
   />
 )
 
 describe('IssueView, archived (SHI-36)', () => {
-  it('draws the description without an editor and shuts the rail’s fields, leaving Unarchive and Delete', () => {
+  it('draws the description without an editor and shuts its fields, leaving Unarchive and Delete in the ⋯', async () => {
+    const user = userEvent.setup()
     render(view('overview', { lockedReason: 'Unarchive to edit' }))
     expect(screen.getByText(/draws its columns in the wrong order/)).toBeInTheDocument()
     expect(screen.queryByRole('textbox', { name: 'Description' })).toBeNull()
     expect(screen.queryByRole('textbox', { name: 'Title' })).toBeNull()
     expect(screen.getByRole('combobox', { name: 'Status' }).getAttribute('aria-disabled')).toBe('true')
-    for (const name of ['Unarchive issue', 'Delete issue']) expect(screen.getByRole('button', { name }).getAttribute('aria-disabled')).toBe(null)
+    await user.click(screen.getByRole('button', { name: 'More actions' }))
+    for (const name of ['Unarchive issue', 'Delete issue']) expect((await screen.findByRole('menuitem', { name })).getAttribute('aria-disabled')).not.toBe('true')
   })
 
   /*
@@ -98,20 +97,23 @@ const projectView = (tab: 'overview' | 'activity', extra: Partial<ProjectViewPro
     onReply={vi.fn()}
     activity={[]}
     onReplyInActivity={vi.fn()}
-    rail={{ status: 'planned', statuses: [{ value: 'planned', label: 'Planned' }], onStatusChange: vi.fn(), lead: '', people: [], onLeadChange: vi.fn(), done: 0, total: 0, folders: [], archived: true, onArchive: vi.fn(), onDelete: vi.fn() }}
+    fields={{ status: 'planned', statuses: [{ value: 'planned', label: 'Planned', colour: 'neutral' }], onStatusChange: vi.fn(), lead: '', people: [], onLeadChange: vi.fn(), done: 0, total: 0 }}
+    menu={{ archive: 'own', onArchive: vi.fn(), onDelete: vi.fn(), onCopyLink: vi.fn() }}
     {...extra}
   />
 )
 
 describe('ProjectView, archived (SHI-36)', () => {
   // Changed on purpose (PEEKM-2, Decided 2026-10-23): no new issue is offered under an archived project, so the page passes no onAddIssue.
-  it('draws the description without an editor and offers no Add issue, leaving Unarchive and Delete', () => {
+  it('draws the description without an editor and offers no Add issue, leaving Unarchive and Delete in the ⋯', async () => {
+    const user = userEvent.setup()
     render(projectView('overview', { lockedReason: 'Unarchive to edit', onAddIssue: undefined }))
     expect(screen.getByText(/Move every Folder to the new relay/)).toBeInTheDocument()
     // Changed on purpose (WBD-7): the description is the shared editor, only read, so nothing in it can be written.
     expect(document.querySelector('[contenteditable="true"]')).toBeNull()
     expect(screen.queryByRole('button', { name: 'Add issue' })).toBeNull()
-    for (const name of ['Unarchive project', 'Delete project']) expect(screen.getByRole('button', { name }).getAttribute('aria-disabled')).toBe(null)
+    await user.click(screen.getByRole('button', { name: 'More actions' }))
+    for (const name of ['Unarchive project', 'Delete project']) expect((await screen.findByRole('menuitem', { name })).getAttribute('aria-disabled')).not.toBe('true')
   })
 
   // Changed on purpose (COMM-7, Decided 2026-10-17): an archived project's chat takes no new message either.
@@ -318,5 +320,21 @@ describe('the summary on an issue’s and a project’s page (SUM-4)', () => {
     render(projectView('overview', { header: { title: 'Relay Migration', summary: SUMMARY, onSummarize: vi.fn(), description: 'Move every Folder.', descriptionFormat: 'marker', archived: false, onRename: vi.fn(), onDescribe: vi.fn() } }))
     await screen.findByRole('textbox', { name: 'Description' })
     expect(screen.queryByRole('textbox', { name: 'Summary' })?.textContent).toBe(SUMMARY)
+  })
+})
+
+/* No details column (ONE-6, step 4b): the fields are a row under the summary (where: LiveHeader.fields.test), the actions the header's ⋯. */
+describe('the page without its details column (ONE-6, step 4b)', () => {
+  it('has no details column: no "Opened by", no action buttons on the page, the actions in the header’s ⋯', () => {
+    render(view('overview', {}))
+    expect(screen.queryByText(/Opened by/)).toBeNull()
+    expect(screen.queryByRole('button', { name: /Delete issue|Archive issue/ })).toBeNull()
+    expect(screen.getByRole('button', { name: 'More actions' })).toBeInTheDocument()
+  })
+
+  it('draws the fields on Overview only', () => {
+    render(view('activity', {}))
+    expect(document.querySelector('[data-page-fields]')).toBeNull()
+    expect(screen.queryByRole('combobox', { name: 'Status' })).toBeNull()
   })
 })

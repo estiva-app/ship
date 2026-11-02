@@ -11,7 +11,8 @@ import { Tabs } from '@/components/ui/Tabs'
 import { History, type HistoryEntry } from '@/components/History'
 import type { ActivityItem } from '@/components/Activity'
 import type { ThreadData, UnreadByThread } from '@/components/ConversationThread'
-import { IssueRail, type IssueRailProps } from '@/components/IssueRail'
+import { IssueFields, type IssueFieldsProps } from '@/components/PageFields'
+import { PageMenu, type PageMenuProps } from '@/components/PageMenu'
 import { Related, hasRelated } from '@/components/Related'
 import { LiveHeader, type LiveHeaderProps } from '@/components/editing/LiveHeader'
 import { MentionList, ThreadList } from '@/components/conversations/ThreadList'
@@ -21,8 +22,10 @@ import { AppSection, Centred } from '@/components/layout/ReadingColumn'
 
 /**
  * One issue, in the project page's format (Katerina, 29 September): two tabs,
- * **Overview** (the title, the description, "Related") and **Activity** (the
- * three lists), in the same centred column, with the rail on every tab.
+ * **Overview** (the title, its fields, the description, "Related") and
+ * **Activity** (the three lists), in the same centred column. No details
+ * column (ONE-6, step 4b): the fields are a row under the summary, the
+ * actions the header's ⋯.
  *
  * **The three lists are three different questions, and CON-9 renamed one.**
  *
@@ -86,7 +89,10 @@ export interface IssueViewProps {
   /** Reply into a thread that belongs to another file — its own Folder, never this issue's (CON-9). */
   onReplyInActivity: (threadId: string, text: string, files: readonly Imeta[], picks?: Picks) => Promise<Answer>
   history: HistoryEntry[]
-  rail: Omit<IssueRailProps, 'className'>
+  /** Status, assignee and project, as a row between the summary and the description (ONE-6, step 4b). */
+  fields: Omit<IssueFieldsProps, 'readOnlyReason' | 'lockedReason'>
+  /** The header's ⋯: Copy link, Archive or Unarchive, Delete. */
+  menu: Omit<PageMenuProps, 'what' | 'readOnlyReason' | 'lockedReason'>
   /** This object's address, so an unsent message is kept against it — CON-10. */
   about?: string
   /** Add or take back a reaction on a message — CON-2. */
@@ -97,7 +103,7 @@ export interface IssueViewProps {
   onEditMessage?: (messageId: string, body: string, removeCard?: string, files?: readonly Imeta[], dropped?: string) => Promise<Answer>
   /** Why writes are unavailable — every write control on the page is disabled with it. */
   readOnlyReason?: string
-  /** Why this issue's own title, description and rail are shut while it can still be discussed, archived or deleted — an archived issue (SHI-36). */
+  /** Why this issue's own title, description and fields are shut while it can still be discussed, archived or deleted — an archived issue (SHI-36). */
   lockedReason?: string
   /** The line in the comment box's place when this file takes no comment or reaction — archived (Decided 2026-10-17). */
   commentsClosed?: string
@@ -116,8 +122,8 @@ const TABS: { id: IssueTab; label: string }[] = [
   { id: 'activity', label: 'Activity' },
 ]
 
-/** One issue's page, in tabs: Overview and Activity, with the rail on every tab. */
-export function IssueView({ crumbs, tab, onTab, title, summary, onSummarize, description, descriptionFormat, nameOf, onRename, onCopyBlockLink, onDescribe, onMention, descriptionBy, related, threads, conversationsLoading, mentionsLoading, unread, stillUnread, onThreadShown, onStartConversation, onReply, activity, activityTruncated, onReplyInActivity, history, rail, about, onReact, onDeleteMessage, onEditMessage, readOnlyReason, lockedReason, commentsClosed, upload, archivedNotice, members, edited }: IssueViewProps) {
+/** One issue's page, in tabs: Overview and Activity. */
+export function IssueView({ crumbs, tab, onTab, title, summary, onSummarize, description, descriptionFormat, nameOf, onRename, onCopyBlockLink, onDescribe, onMention, descriptionBy, related, threads, conversationsLoading, mentionsLoading, unread, stillUnread, onThreadShown, onStartConversation, onReply, activity, activityTruncated, onReplyInActivity, history, fields, menu, about, onReact, onDeleteMessage, onEditMessage, readOnlyReason, lockedReason, commentsClosed, upload, archivedNotice, members, edited }: IssueViewProps) {
   // `linkTo` on each crumb (S15, 0.10.0): the breadcrumbs were the last links in Ship that reloaded the app (SHI-20).
   const items: Crumb[] = [{ label: 'Issues', ...linkTo(crumbs.issuesHref) }]
   // The box before the project's name says it is a project, as the sidebar's entry does (Katerina, 2026-09-09).
@@ -127,21 +133,22 @@ export function IssueView({ crumbs, tab, onTab, title, summary, onSummarize, des
 
   return (
     // `data-surface` and `data-tab` are the smoke test's waypoints — see IssuesView. A page that scrolls inside
-    // itself: `flex-1 min-h-0 [contain:size]` takes exactly the frame's height, so its columns scroll and the frame does not.
-    <div data-surface="issue" data-tab={tab} className="grid min-h-0 flex-1 [contain:size] grid-cols-[minmax(0,1fr)_1px_auto] grid-rows-[auto_auto_minmax(0,1fr)] gap-y-4">
-      {/* The kit's PageHeader over the page's column (ONE-6, step 4a): the path, when it last changed, who is in it. 48px whatever it holds, so the members pill arriving moves nothing. */}
-      <PageHeader className="col-start-1 row-start-1" title={<Breadcrumb items={items} />} {...(edited ? { time: edited } : {})} members={members} />
-      {/* The tab row is its own grid row, level with the rail's top, so the rail starts where it always has. */}
-      <div className="col-start-1 row-start-2 flex min-h-8 items-center px-6">
+    // itself: `flex-1 min-h-0 [contain:size]` takes exactly the frame's height, so its column scrolls and the frame does not.
+    <div data-surface="issue" data-tab={tab} className="flex min-h-0 flex-1 flex-col gap-4 [contain:size]">
+      {/* The kit's PageHeader (ONE-6, step 4a): the path, when it last changed, who is in it, and the page's ⋯ (4b). 48px whatever it holds, so the members pill arriving moves nothing. */}
+      <PageHeader title={<Breadcrumb items={items} />} {...(edited ? { time: edited } : {})} members={members} actions={<PageMenu what="issue" {...menu} readOnlyReason={readOnlyReason} lockedReason={lockedReason} />} />
+      {/* The tabs directly under the header, 16px below it, as they were. */}
+      <div className="flex min-h-8 items-center px-6">
         {/* Overview does not read the conversation (66b31c4b), so Activity says when something there is new. */}
         <Tabs tabs={TABS.map((t) => (t.id === 'activity' ? { ...t, unread: Object.keys(stillUnread ?? {}).length > 0 } : t))} active={tab} onChange={onTab} />
       </div>
 
-      <ScrollArea className="col-start-1 row-start-3 min-h-0 min-w-0" contentClassName="flex flex-col gap-6 px-6 pb-5">
+      <ScrollArea className="min-h-0 min-w-0 flex-1" contentClassName="flex flex-col gap-6 px-6 pb-5">
         {tab === 'overview' && (
-          <Centred>
+          // Blocks 16px apart (Katerina, 1 November).
+          <Centred gap="block">
             {archivedNotice}
-            <LiveHeader title={title} titlePlaceholder="Untitled issue" onRename={onRename} summary={summary} onSummarize={onSummarize} description={description} format={descriptionFormat} onDescribe={onDescribe} onMention={onMention} descriptionBy={descriptionBy} nameOf={nameOf} readOnly={!!(readOnlyReason ?? lockedReason)} upload={upload} onCommentOnBlock={readOnlyReason ?? commentsClosed ? undefined : comment.start} onCopyBlockLink={onCopyBlockLink} holdKey={about && `description:${about}`} />
+            <LiveHeader fields={<IssueFields {...fields} readOnlyReason={readOnlyReason} lockedReason={lockedReason} />} title={title} titlePlaceholder="Untitled issue" onRename={onRename} summary={summary} onSummarize={onSummarize} description={description} format={descriptionFormat} onDescribe={onDescribe} onMention={onMention} descriptionBy={descriptionBy} nameOf={nameOf} readOnly={!!(readOnlyReason ?? lockedReason)} upload={upload} onCommentOnBlock={readOnlyReason ?? commentsClosed ? undefined : comment.start} onCopyBlockLink={onCopyBlockLink} holdKey={about && `description:${about}`} />
             {/* Nesting is by intent (RFC 0.5 §10.7): what somebody placed under this issue, from whichever app owns it. */}
             {hasRelated(related) && (
               <>
@@ -168,12 +175,6 @@ export function IssueView({ crumbs, tab, onTab, title, summary, onSummarize, des
             </AppSection>
           </Centred>
         )}
-      </ScrollArea>
-
-      <Divider orientation="vertical" className="col-start-2 row-span-3 row-start-1" />
-      {/* The rail on every tab, starting level with the tab row and never moving (Katerina, 29 September). */}
-      <ScrollArea className="col-start-3 row-span-2 row-start-2 min-h-0" contentClassName="px-6 pb-5">
-        <IssueRail {...rail} readOnlyReason={readOnlyReason} lockedReason={lockedReason} />
       </ScrollArea>
     </div>
   )

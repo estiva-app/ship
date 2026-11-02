@@ -5,7 +5,7 @@ import { placedIn } from '@/lib/placement'
 import { act, type Say } from '@/pages/act'
 
 /**
- * "Move to Folder…", from the project rail or a sidebar row (FOL-7): the
+ * "Move to Folder…", from the project page's ⋯ or a sidebar row (FOL-7): the
  * dialog, the write, and what is said after it.
  *
  * **Where it is now is the sidebar's rule** (`placedIn`), so the Folders it is

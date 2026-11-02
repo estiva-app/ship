@@ -56,7 +56,7 @@ import type { ThreadData } from '@/components/ConversationThread'
 import type { ActivityItem } from '@/components/Activity'
 import type { IssuesTableRow } from '@/components/IssuesTable'
 import { NewIssueDialog } from '@/components/NewIssueDialog'
-import type { RailPerson } from '@/components/ProjectRail'
+import type { WorkspacePerson } from '@/components/PageFields'
 import { placedIn } from '@/lib/placement'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -495,7 +495,7 @@ export function subFileThreads(state: WorkspaceState, subFiles: ReadonlySet<stri
 export const ACTIVITY_HORIZON = 50
 
 /** Everyone in the workspace as a picker option, ordered by name — by key would be ordered by nothing a person can see. */
-export function railPeople(state: FolderState, directory: DirectoryView): RailPerson[] {
+export function pickerPeople(state: FolderState, directory: DirectoryView): WorkspacePerson[] {
   return peopleIn(state, me)
     .map((pubkey) => ({ value: pubkey, name: directory.nameOf(pubkey), picture: directory.personOf(pubkey).picture, ...(directory.personOf(pubkey).bot ? { bot: true } : {}) }))
     .sort((a, b) => a.name.localeCompare(b.name))
@@ -515,7 +515,7 @@ export async function copyText(text: string, done: string, prompt: string, say: 
  * One project from the fold, as the old app's projectView: its issues as a
  * table (Updated = the last change to that issue, or when it was opened)
  * or a board, the conversation in its Folder, its issues' conversations under
- * Activity, and the rail. Every control writes one change
+ * Activity, and its fields. Every control writes one change
  * to one object and then re-reads the relay (`act`). Delete is offered
  * only to the author (NIP-09 honours nobody else) and asks first. A
  * project the fold does not have gets the old app's words, not a blank
@@ -538,8 +538,8 @@ export function ProjectPage({
   archives: Archives
   /**
    * The top-level Folders, so a project filed into one is not given that
-   * Folder's chat (`recordChannel`), and so the rail can name the one it is in
-   * (`placedIn`). `undefined` while they are read.
+   * Folder's chat (`recordChannel`), and so Related and Move to Folder… know the
+   * one it is in (`placedIn`). `undefined` while they are read.
    */
   teams: readonly { id: string; name?: string; hasState: boolean; addresses?: readonly string[] }[] | undefined
   /** The object's `d`, which is all a §7.2 URL carries. */
@@ -660,7 +660,7 @@ export function ProjectPage({
   }, [judges, project, conversations, state.anchors])
   // Judged against the frontier this visit opened on, so the divider outlives the page's own marks (99557309).
   const { unread, stillUnread } = useNewSince(project?.addr, merged, verdictAt)
-  const people = useMemo(() => railPeople(state, directory), [state, directory])
+  const people = useMemo(() => pickerPeople(state, directory), [state, directory])
   /*
     What somebody placed under this project from another app — RFC 0.5 §10.7.
 
@@ -710,7 +710,7 @@ export function ProjectPage({
 
   const done = issues.filter((issue) => issue.status === 'done').length
   const set = (field: 'title' | 'description' | 'status' | 'lead', value: string, note: string, contentFormat?: string) => act(note, () => setProjectField(project, field, value, note, contentFormat), say, refresh)
-  // Its own archive, which the rail toggles; and the one the page shows, which may be its team's (FOL-46).
+  // Its own archive, which the ⋯ toggles; and the one the page shows, which may be its team's (FOL-46).
   const own = ownArchive(project, state.activity)
   const archive = archives.ofProject(project.addr)
   // The notice's Unarchive waits for the answer.
@@ -875,9 +875,10 @@ export function ProjectPage({
           if (!conversation?.root.folder) return Promise.resolve('That conversation has no Folder to reply into.')
           return actInField('Reply', () => reply(conversation, conversation.root.folder, body, files, picks?.urgent, picks?.embeds), () => refreshAfter(state, conversation.root.folder, refresh, rereadElsewhere))
         }}
-        rail={{
+        fields={{
           status: project.status,
-          statuses: PROJECT_STATUSES.map(({ value, label }) => ({ value, label })),
+          // Each with its colour, so the picker draws the status's shape (ONE-6, step 4b).
+          statuses: PROJECT_STATUSES.map(({ value, label, colour }) => ({ value, label, colour })),
           onStatusChange: (value) => void set('status', value, `Status → ${value}`),
           lead: project.lead ?? '',
           people,
@@ -885,20 +886,18 @@ export function ProjectPage({
           onLeadChange: (value) => void set('lead', value, value ? 'Assign project' : 'Unassign project'),
           done,
           total: issues.length,
-          // The top-level Folder it is in, by the sidebar's rule: the state that lists it, then its own Folder (FOL-3).
-          // No top-level Folders at all is a refused or empty read, not "in none" — the rail says so (`null`).
-          folders:
-            teams &&
-            (teams.length === 0
-              ? null
-              : placedIn({ addr: project.addr, folder: project.contentFolder }, teams).map((folder) => ({ name: folder.name ?? 'Untitled Folder', href: href({ name: 'folder', id: folder.id }) }))),
-          // Only once there are Folders to move between (FOL-7).
+        }}
+        menu={{
+          // The page never names its Folder (Katerina, 1 November); Move to Folder… is the ⋯'s first row, once there
+          // are Folders to move between (FOL-7).
           ...(teams?.length ? { onMove: () => setDialog('move') } : {}),
           // Archiving asks first — it hides the issues too; restoring does not need to (FOL-46).
-          // The rail says the project's own state: archived with its team, there is nothing here to unarchive.
-          archived: !!own,
+          // The ⋯ says the project's own state: archived with its team, there is nothing here to unarchive.
+          archive: own ? 'own' : archive ? 'with' : 'none',
           onArchive: () => (own ? unarchive() : setDialog('archive')),
           onDelete: () => setDialog('delete'),
+          // The page's own address, without the open tab or the board: the short link (`href` leaves the defaults out).
+          onCopyLink: () => void copyText(new URL(href({ name: 'project', d: project.id, slug: project.title, view: 'table' }), window.location.origin).href, 'Link copied', 'Copy this link:', say),
         }}
       />
 

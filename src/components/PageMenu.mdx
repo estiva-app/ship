@@ -1,0 +1,57 @@
+import { Meta } from '@storybook/addon-docs/blocks'
+
+<Meta title="Pages/PageMenu" />
+
+# PageMenu
+
+An issue's or a project's ⋯, at the right of its **PageHeader**: what the
+details column's buttons did, in the page's own menu, as Leaf's and Peek's
+(ONE-6, step 4b; Katerina, 1 November). The kit's **Menu** behind a
+**ToolbarButton** "More actions", in a **Toolbar** with no box of its own.
+
+**Seen in** — *Pages/In the shell*: **Project**, **Project Archived**,
+**Issue** and **Issue Archived With Project**. Open the ⋯ on each.
+
+## When
+
+- In the header of an issue's or a project's page, on every tab.
+
+## When not
+
+- Not for a message's actions. Those are the card's own ⋯ ("Message actions").
+- Not for a sidebar row. Its ⋯ is the row's `menu`, which offers Move to
+  Folder… for a project too (`ShipSidebar`).
+- Not for a field. Status, assignee and project are the fields row under the
+  summary (`IssueFields`, `ProjectFields`).
+
+## How
+
+```tsx
+import { PageMenu } from '@/components/PageMenu'
+
+<PageHeader
+  title={<Breadcrumb items={items} />}
+  actions={<PageMenu what="project" archive={own ? 'own' : archive ? 'with' : 'none'} onMove={…} onCopyLink={…} onArchive={…} onDelete={…} readOnlyReason={readOnlyReason} lockedReason={lockedReason} />}
+/>
+```
+
+- `onMove` only once the Folders are read and there is one to move to. Without
+  it there is no row.
+- `onCopyLink` copies the page's own address without its tab (`href`), and
+  says "Link copied".
+
+## What it owns
+
+- **Which rows**, by the file's archive (FOL-46):
+  - Not archived: Move to Folder… (a project), Copy link, then Archive and
+    Delete.
+  - Archived itself: Unarchive and Delete only.
+  - Archived only with its project or its Folder: its own Archive and Delete.
+    An issue's own Archive stays open under its project's archive (SPEC §6.5).
+    A project's is shut under its Folder's, saying why. The way back is the
+    notice's "Open project" or "Open Folder".
+- **Shut, saying why.** A row that cannot be used is shown shut, with the
+  reason on hover and on the arrow keys (the kit's `disabledReason`).
+  `readOnlyReason` shuts every row but Copy link, which writes nothing.
+- **Ship's words**: "Archive issue", "Unarchive project", "Delete issue", and
+  Delete in the destructive colour.

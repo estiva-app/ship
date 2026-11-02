@@ -308,6 +308,12 @@ async function main() {
     await page.waitForSelector(`[data-tab="${name.toLowerCase()}"]`)
   }
 
+  /* The page's actions are rows of its header's ⋯ (ONE-6, step 4b), where the details column's buttons were. */
+  const pageAction = async (name: string) => {
+    await page.getByRole('button', { name: 'More actions' }).click()
+    await page.getByRole('menuitem', { name, exact: true }).click()
+  }
+
   /* A write that leaves nothing new on screen — a description saved as the
      field is left — is waited for on the stub's own store, never on a timer. */
   const until = async (condition: () => boolean, timeout = 15000) => {
@@ -520,10 +526,10 @@ async function main() {
     of conversations on *related* files. Two sections on one page could not both
     be Activity, and this one was always the history.
   */
-  // Conversations, Mentioned in and History are the issue's Activity tab; the rail is on every tab.
+  // The fields are a row on Overview (ONE-6, step 4b); Conversations, Mentioned in and History are the Activity tab.
+  await pick('Status', 'In Progress')
   await openTab('Activity')
   const history = sectionFor('History')
-  await pick('Status', 'In Progress')
   await history.locator('li').first().waitFor()
   const change = stored.find((e) => e.kind === 1851)
   check('a kind:1851 change was published, not an edit', !!change)
@@ -836,7 +842,9 @@ async function main() {
     move for a reason that has nothing to do with the change being published.
   */
   const historyRows = await history.locator('li').count()
+  await openTab('Overview')
   await pick('Assignee', 1)
+  await openTab('Activity')
   await history.locator('li').nth(historyRows).waitFor()
   check(
     'assigning publishes a second change',
@@ -970,11 +978,12 @@ async function main() {
   await page.goto(`http://localhost:${PORT}/#/project/${encodeURIComponent(projectAddr)}`)
   await page.waitForSelector('[data-surface="project"]')
   // FOL-46: archiving asks first, and carries the resolution the person gives.
-  await page.getByRole('button', { name: 'Archive project' }).click()
+  await pageAction('Archive project')
   const archiveDialog = page.getByRole('dialog', { name: /^Archive / })
   await archiveDialog.getByRole('textbox', { name: /Resolution/ }).fill('Smoke test: done with it.')
   await archiveDialog.getByRole('button', { name: 'Archive project' }).click()
-  await page.getByRole('button', { name: 'Unarchive project' }).waitFor()
+  // The notice's own Unarchive says it is archived.
+  await page.getByRole('button', { name: 'Unarchive', exact: true }).waitFor()
   check(
     'archiving publishes a change, not a deletion',
     stored.some((e) => e.kind === 1851 && tagValue(e, 'field') === 'archived'),
@@ -985,10 +994,16 @@ async function main() {
   )
   check('  …which the page shows first', await page.getByText('Smoke test: done with it.').isVisible())
   await shot(page, '09-archived-notice')
+  await page.getByRole('button', { name: 'More actions' }).click()
   check(
-    '  …and is reversible from the same control',
-    await page.getByRole('button', { name: 'Unarchive project' }).isVisible(),
+    '  …and is reversible from the same menu',
+    // Waited for: the menu draws its rows a moment after the press.
+    await page
+      .getByRole('menuitem', { name: 'Unarchive project', exact: true })
+      .waitFor({ timeout: 5000 })
+      .then(() => true, () => false),
   )
+  await page.keyboard.press('Escape')
 
   // Scoped to the sidebar: the project detail's breadcrumb also says "Projects".
   await sidebar().getByRole('link', { name: /^Projects/ }).click()
@@ -1006,8 +1021,9 @@ async function main() {
   // sections read this project through its Folder, which leaves an archived
   // file out whatever its app declares.
   await projects.getByRole('link').first().click()
-  await page.getByRole('button', { name: 'Unarchive project' }).click()
-  await page.getByRole('button', { name: 'Archive project' }).waitFor()
+  await page.waitForSelector('[data-surface="project"]')
+  await pageAction('Unarchive project')
+  await page.getByRole('button', { name: 'Unarchive', exact: true }).waitFor({ state: 'detached' })
   const restoredRow = sidebar().getByRole('link', { name: /Payment integration/ })
   await restoredRow.waitFor({ timeout: 10_000 }).catch(() => {})
   check('unarchiving restores it to the sidebar', await restoredRow.isVisible())
@@ -1189,7 +1205,7 @@ async function main() {
   await page.goto(`http://localhost:${PORT}/#/project/${encodeURIComponent(projectAddr)}`)
   await page.waitForSelector('[data-surface="project"]')
   const beforeMove = stored.length
-  await page.getByRole('button', { name: 'Move to Folder…' }).click()
+  await pageAction('Move to Folder…')
   const moveDialog = page.getByRole('dialog', { name: 'Move to Folder' })
   await moveDialog.waitFor()
   await pick('Destination Folder', 'Smoke team')
@@ -1248,7 +1264,7 @@ async function main() {
 
   await page.goto(`http://localhost:${PORT}/#/project/${encodeURIComponent(projectAddr)}`)
   await page.waitForSelector('[data-surface="project"]')
-  await page.getByRole('button', { name: 'Delete project' }).click()
+  await pageAction('Delete project')
   const deleteDialog = page.getByRole('alertdialog', { name: /^Delete “Payment integration”/ })
   await deleteDialog.waitFor()
   await deleteDialog.getByRole('button', { name: 'Delete project' }).click()

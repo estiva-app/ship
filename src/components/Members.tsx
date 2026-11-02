@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { MembersDialog, MembersPill, type MembersDialogCandidate, type MembersDialogMember } from '@estiva-app/ui'
-import type { RailPerson } from './ProjectRail'
+import type { WorkspacePerson } from './PageFields'
 
 /** How many faces the pill draws; the count says the rest. */
 const PILL_FACES = 3
@@ -11,7 +11,7 @@ export interface MembersProps {
   /** The viewer's key. */
   me: string
   /** Names and faces by key — the workspace's people, who are also who "Add members" offers. */
-  people: RailPerson[]
+  people: WorkspacePerson[]
   /** A key's name when it is not among `people`. */
   nameOf: (pubkey: string) => string
   /** A key's face when it is not among `people`: its picture, and whether it is an agent's. */
@@ -39,7 +39,7 @@ export function Members({ members, me, people, nameOf, personOf, roles, note, re
   if (!members) return null
 
   const byKey = new Map(people.map((p) => [p.value, p]))
-  const person = (pubkey: string): RailPerson => {
+  const person = (pubkey: string): WorkspacePerson => {
     const known = byKey.get(pubkey)
     if (known) return known
     const { picture, bot } = personOf(pubkey)

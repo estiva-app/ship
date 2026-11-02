@@ -126,7 +126,7 @@ export const IssuesEmpty: Story = {
   },
 }
 
-/** One project, in tabs: Overview (title, description, Related), Activity (Conversations, Mentioned in), Issues (table or board). The rail on every tab. */
+/** One project, in tabs: Overview (title, its fields, description, Related), Activity (Conversations, Mentioned in), Issues (table or board). The actions in the header's ⋯. */
 /** FOL-46's notice, as the pages build it: archived by Miky two days ago, with a resolution. */
 const ARCHIVED_AT = Math.floor(Date.now() / 1000) - 2 * 86400
 
@@ -181,7 +181,7 @@ const projectPage = (startTab: ProjectTab, startView: 'table' | 'board' = 'table
           upload={pretendUpload}
           archivedNotice={archived && archivedNotice()}
           lockedReason={archived ? 'Unarchive to edit' : undefined}
-          rail={{
+          fields={{
             status,
             statuses: PROJECT_STATUSES,
             onStatusChange: setStatus,
@@ -190,10 +190,8 @@ const projectPage = (startTab: ProjectTab, startView: 'table' | 'board' = 'table
             onLeadChange: setLead,
             done,
             total: ISSUES.length,
-            folders: [{ name: 'Ship', href: '/app/folder/5c1e2a7b-9d40-4f3a-8e6b-2f0c7d1a9b34' }],
-            onArchive: fn(),
-            onDelete: fn(),
           }}
+          menu={{ archive: archived ? 'own' : 'none', onMove: fn(), onCopyLink: fn(), onArchive: fn(), onDelete: fn() }}
         />
       </Shell>
     )
@@ -210,10 +208,10 @@ export const ProjectIssues: Story = projectPage('issues')
 export const ProjectBoard: Story = projectPage('issues', 'board')
 /** Signed out: the title and description are text, and every write control is disabled with the reason. */
 export const ProjectSignedOut: Story = projectPage('activity', 'table', 'Sign in to react or reply.')
-/** Archived (FOL-46): the notice first on every tab, the rail where it always is. */
+/** Archived (FOL-46): the notice first on every tab; the fields shut, saying why; the ⋯ holds Unarchive and Delete. */
 export const ProjectArchived: Story = projectPage('overview', 'table', undefined, true)
 
-/** One issue, in tabs: Overview (title, description, Related) and Activity (Conversations, Mentioned in, History). The rail on every tab. */
+/** One issue, in tabs: Overview (title, its fields, description, Related) and Activity (Conversations, Mentioned in, History). The actions in the header's ⋯. */
 const issuePage = (startTab: IssueTab, archivedWithProject = false, withSummary = true): Story => ({
   render: () => {
     const issue = ISSUES[0]
@@ -247,7 +245,7 @@ const issuePage = (startTab: IssueTab, archivedWithProject = false, withSummary 
           upload={pretendUpload}
           archivedNotice={archivedWithProject && archivedNotice(true)}
           lockedReason={archivedWithProject ? 'Unarchive its project to edit' : undefined}
-          rail={{
+          fields={{
             status,
             statuses: ISSUE_STATUSES,
             onStatusChange: setStatus,
@@ -257,11 +255,8 @@ const issuePage = (startTab: IssueTab, archivedWithProject = false, withSummary 
             project,
             projects: [{ value: '', label: 'No project' }, { value: 'des', label: 'Design System' }, { value: 'rel', label: 'Relay Migration' }],
             onProjectChange: setProject,
-            openedBy: issue.openedBy,
-            openedAt: issue.at,
-            onArchive: fn(),
-            onDelete: fn(),
           }}
+          menu={{ archive: archivedWithProject ? 'with' : 'none', onCopyLink: fn(), onArchive: fn(), onDelete: fn() }}
         />
       </Shell>
     )

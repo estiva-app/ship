@@ -129,7 +129,8 @@ describe('an archived project offers no new issue until it is unarchived (PEEKM-
     vi.mocked(useWorkspace).mockReturnValue({ state: { ...STATE, projects: [archived, STATE.projects[1]] }, partial: false, error: null, clock: null, loading: false, busy: false, refresh, wantThreads: () => {}, live: false })
     goTo(`/project/billing-${D_PROJECT}`)
     const { unmount } = render(<App />)
-    await screen.findByRole('button', { name: 'Unarchive project' })
+    // Drawn as archived: the notice's Unarchive (the rail's "Unarchive project" is in the page's ⋯ since ONE-6, step 4b).
+    await screen.findByRole('button', { name: 'Unarchive' })
     expect(screen.queryByRole('button', { name: 'Add issue' })).toBeNull()
     unmount()
     vi.mocked(useWorkspace).mockReturnValue({ state: STATE, partial: false, error: null, clock: null, loading: false, busy: false, refresh, wantThreads: () => {}, live: false })
