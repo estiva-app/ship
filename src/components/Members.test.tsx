@@ -22,7 +22,7 @@ const fixture = (props: Partial<MembersProps> = {}) => (
     me={ME}
     people={[{ value: ANA, name: 'Ana Duarte' }, { value: RAVI, name: 'Ravi Mehta' }, { value: ME, name: 'Miky' }]}
     nameOf={(pubkey) => pubkey.slice(0, 8)}
-    pictureOf={() => undefined}
+    personOf={() => ({})}
     roles={[{ pubkey: ANA, role: 'Author' }]}
     onSetMine={vi.fn(async () => true)}
     onAdd={vi.fn(async () => true)}

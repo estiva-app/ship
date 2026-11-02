@@ -141,7 +141,7 @@ function Message({ message, resolved, here, boxHere, nameOf, viewer, reactions, 
         <BlockAnchorNote anchor={message.anchor} />
       )}
       <div className="flex min-h-6 items-center gap-2">
-        <Avatar size={20} src={message.author.picture} name={message.author.name} />
+        <Avatar size={20} src={message.author.picture} name={message.author.name} bot={message.author.bot} />
         <span className={cn('truncate text-body-2-strong', message.author.name ? 'text-text-primary' : 'text-text-muted')}>{message.author.name ?? '—'}</span>
         <Time at={message.at} />
         {message.editedAt !== undefined && (

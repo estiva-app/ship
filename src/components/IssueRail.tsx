@@ -27,7 +27,7 @@ export interface IssueRailProps {
   project: string
   projects: SelectOption[]
   onProjectChange: (value: string) => void
-  openedBy: { name?: string; picture?: string }
+  openedBy: { name?: string; picture?: string; bot?: boolean }
   /** Seconds, as the relay keeps them. */
   openedAt: number
   /** The issue's own archive (FOL-46); archived only with its project, there is nothing here to unarchive. */
@@ -82,7 +82,7 @@ export function IssueRail({
         <span className="flex items-center gap-1.5 text-caption text-text-muted">
           {/* A name takes the tone of where it sits (UIG-9). */}
           <span className="contents text-text-secondary">
-            <Person name={openedBy.name} picture={openedBy.picture} size={16} />
+            <Person name={openedBy.name} picture={openedBy.picture} bot={openedBy.bot} size={16} />
           </span>
           · {ago(openedAt)}
         </span>

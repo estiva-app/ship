@@ -488,7 +488,7 @@ export const ACTIVITY_HORIZON = 50
 /** Everyone in the workspace as a picker option, ordered by name — by key would be ordered by nothing a person can see. */
 export function railPeople(state: FolderState, directory: DirectoryView): RailPerson[] {
   return peopleIn(state, me)
-    .map((pubkey) => ({ value: pubkey, name: directory.nameOf(pubkey), picture: directory.personOf(pubkey).picture }))
+    .map((pubkey) => ({ value: pubkey, name: directory.nameOf(pubkey), picture: directory.personOf(pubkey).picture, ...(directory.personOf(pubkey).bot ? { bot: true } : {}) }))
     .sort((a, b) => a.name.localeCompare(b.name))
 }
 
@@ -732,7 +732,7 @@ export function ProjectPage({
             me={me}
             people={people}
             nameOf={directory.nameOf}
-            pictureOf={(pubkey) => directory.personOf(pubkey).picture}
+            personOf={directory.personOf}
             roles={[{ pubkey: project.author, role: 'Author' }, ...(project.lead ? [{ pubkey: project.lead, role: 'Lead' }] : [])]}
             // Membership is per file: leaving the project leaves its issues as they are (Miky, 2026-10-06).
             note="Your issues here still notify you."

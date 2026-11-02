@@ -28,6 +28,8 @@ export interface RailPerson {
   value: string
   name: string
   picture?: string
+  /** An agent: its face is a robot (ui 0.97.0). */
+  bot?: boolean
 }
 
 /** A top-level Folder as the rail names it. */
@@ -73,7 +75,7 @@ export function peopleOptions(people: RailPerson[]): SelectOption[] {
     ...people.map((person) => ({
       value: person.value,
       label: person.name,
-      leading: <Avatar name={person.name} src={person.picture} size={16} />,
+      leading: <Avatar name={person.name} src={person.picture} bot={person.bot} size={16} />,
     })),
   ]
 }

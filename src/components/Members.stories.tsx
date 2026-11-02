@@ -13,7 +13,7 @@ const meta = {
     me: ME,
     people: [{ value: ANA, name: 'Ana Duarte' }, { value: RAVI, name: 'Ravi Mehta' }, { value: ME, name: 'Miky' }],
     nameOf: (pubkey: string) => pubkey.slice(0, 8),
-    pictureOf: () => undefined,
+    personOf: () => ({}),
     roles: [{ pubkey: ANA, role: 'Author' }],
     onSetMine: async () => true,
     onAdd: async () => true,

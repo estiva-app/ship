@@ -232,7 +232,7 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
             me={me}
             people={people}
             nameOf={directory.nameOf}
-            pictureOf={(pubkey) => directory.personOf(pubkey).picture}
+            personOf={directory.personOf}
             roles={[{ pubkey: issue.author, role: 'Author' }, ...(issue.assignee ? [{ pubkey: issue.assignee, role: 'Assignee' }] : [])]}
             {...membershipActions({ kind: 'issue', issue }, issue.title, directory.nameOf, say, async () => {
               await Promise.all([judges.reload(), refresh([issue.folder])])

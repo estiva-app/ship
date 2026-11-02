@@ -52,8 +52,8 @@ export interface IssueRowData {
   status: string
   /** The parent project, as the chip names it and links to it. Absent for a parentless issue. */
   project?: { title: string; href: string }
-  assignee?: { name?: string; picture?: string }
-  openedBy?: { name?: string; picture?: string }
+  assignee?: { name?: string; picture?: string; bot?: boolean }
+  openedBy?: { name?: string; picture?: string; bot?: boolean }
   /** Seconds — when it was opened. */
   at: number
   /** Threads about this issue. */
@@ -94,7 +94,7 @@ export function IssueRow({ issue, statuses, href, className }: IssueRowProps) {
       {issue.project && (
         <Chip {...linkTo(issue.project.href)} label={issue.project.title} leadingIcon={<IconBox size={12} stroke={1.5} />} className="max-w-[200px] shrink-0" />
       )}
-      {issue.assignee && <Avatar name={issue.assignee.name} src={issue.assignee.picture} size={16} label={issue.assignee.name} />}
+      {issue.assignee && <Avatar name={issue.assignee.name} src={issue.assignee.picture} bot={issue.assignee.bot} size={16} label={issue.assignee.name} />}
       {/* A fixed column, right-aligned, so the times stack down the list. */}
       <span className="w-16 shrink-0 text-right text-caption tabular-nums text-text-muted">{ago(issue.at)}</span>
     </div>
