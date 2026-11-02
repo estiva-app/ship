@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { MoveProjectDialog } from './MoveProjectDialog'
+import { NewFolderDialog } from './NewFolderDialog'
 import { NewIssueDialog } from './NewIssueDialog'
 import { NewProjectDialog } from './NewProjectDialog'
 import { suggestKey } from '../nostr/keys'
@@ -134,6 +135,32 @@ describe('NewProjectDialog', () => {
     await chooseTeam('Ship')
     fireEvent.click(screen.getByRole('button', { name: 'Create project' }))
     await waitFor(() => expect(screen.getByRole('button', { name: 'Create project' })).toBeEnabled())
+    expect(onClose).not.toHaveBeenCalled()
+  })
+})
+
+describe('NewFolderDialog (FOL-8)', () => {
+  it('needs a name, says Creating… while it is written, and hands over the trimmed name', async () => {
+    let answer: (ok: boolean) => void = () => {}
+    const onCreate = vi.fn(() => new Promise<boolean>((resolve) => (answer = resolve)))
+    const onClose = vi.fn()
+    render(<NewFolderDialog onClose={onClose} onCreate={onCreate} />)
+    expect(screen.getByRole('button', { name: 'Create folder' })).toBeDisabled()
+    fireEvent.change(screen.getByPlaceholderText('What is it for?'), { target: { value: '  Steer  ' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Create folder' }))
+    expect(onCreate).toHaveBeenCalledWith('Steer')
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Creating…' })).toBeDisabled())
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled()
+    answer(true)
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1))
+  })
+
+  it('stays open, Create folder ready again, when the caller says the write failed', async () => {
+    const onClose = vi.fn()
+    render(<NewFolderDialog onClose={onClose} onCreate={vi.fn().mockResolvedValue(false)} />)
+    fireEvent.change(screen.getByPlaceholderText('What is it for?'), { target: { value: 'Steer' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Create folder' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Create folder' })).toBeEnabled())
     expect(onClose).not.toHaveBeenCalled()
   })
 })

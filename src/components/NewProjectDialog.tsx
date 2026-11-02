@@ -1,7 +1,5 @@
 import { useState } from 'react'
-import { Form } from '@estiva-app/ui'
-import { Button } from '@/components/ui/Button'
-import { DialogShell } from '@/components/ui/DialogShell'
+import { FormDialog } from '@estiva-app/ui'
 import { Field } from '@/components/ui/Field'
 import { Select } from '@/components/ui/Select'
 import { TextInput } from '@/components/ui/TextInput'
@@ -11,8 +9,8 @@ import { summaryText } from '@/nostr/summary'
 import { SummaryField } from './SummaryField'
 
 /**
- * Production's "New project" form (apps/ship/views/projects.ts) in the
- * DialogShell: a title, an optional description, and the team it is filed
+ * Production's "New project" form (apps/ship/views/projects.ts) in the kit's
+ * FormDialog: a title, an optional description, and the team it is filed
  * into (FOL-2, SPEC §6.7). A project no longer gets a Folder of its own or
  * pairs with a pasted one: its issues and conversation live in the team's.
  *
@@ -72,7 +70,6 @@ export function NewProjectDialog({ teams, suggestKey, keyProblem, onClose, onCre
   // Undefined until the person types one: until then the key follows the title.
   const [typedKey, setTypedKey] = useState<string | undefined>(held?.typedKey)
   const [teamId, setTeamId] = useState(held?.teamId ?? '')
-  const [busy, setBusy] = useState(false)
 
   useHeldTyping(holdKey, () =>
     title.trim() || summary.trim() || description.trim() || typedKey ? JSON.stringify({ title, summary, description, typedKey, teamId }) : undefined,
@@ -84,65 +81,45 @@ export function NewProjectDialog({ teams, suggestKey, keyProblem, onClose, onCre
   const team = teams?.find((candidate) => candidate.id === teamId)
   const key = typedKey ?? (title.trim() ? suggestKey(title) : '')
   const problem = key ? keyProblem(key) : undefined
-  const canSubmit = title.trim().length > 0 && key.length > 0 && !problem && team !== undefined && !busy
-
-  const submit = async () => {
-    if (!canSubmit || !team) return
-    setBusy(true)
-    try {
-      const ok = await onCreate({ title: title.trim(), summary: summaryText(summary), description: description.trim(), key, team: { folder: team.id, hasState: team.hasState } })
-      if (ok !== false) close()
-    } finally {
-      setBusy(false)
-    }
-  }
+  const canSubmit = title.trim().length > 0 && key.length > 0 && !problem && team !== undefined
 
   return (
-    <DialogShell
+    // The kit's FormDialog owns the send: everything waits, a refusal keeps it open, a create closes it.
+    <FormDialog
       title="New project"
+      submitLabel="Create project"
+      ready={canSubmit}
+      onSubmit={() => team && onCreate({ title: title.trim(), summary: summaryText(summary), description: description.trim(), key, team: { folder: team.id, hasState: team.hasState } })}
       onClose={close}
-      bodyClassName="flex flex-col gap-6"
-      footer={
-        <>
-          <Button variant="muted" onClick={close} disabled={busy}>
-            Cancel
-          </Button>
-          <Button variant="primary" type="submit" form="new-project" disabled={!canSubmit}>
-            Create project
-          </Button>
-        </>
-      }
     >
-      <Form id="new-project" onSubmit={submit} busy={busy}>
-        <Field label="Title" required>
-          <TextInput value={title} onChange={(e) => setTitle(e.target.value)} placeholder="New project title" autoFocus />
-        </Field>
-        <SummaryField value={summary} onChange={setSummary} />
-        <Field label="Key" required helper={problem ? undefined : `Its issues are ${key || 'KEY'}-1, ${key || 'KEY'}-2, …`} error={problem}>
-          <TextInput
-            value={key}
-            onChange={(e) => setTypedKey(e.target.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 6))}
-            placeholder="ABC"
-          />
-        </Field>
-        <Field label="Description">
-          <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description (optional)" className="h-[80px]" />
-        </Field>
-        <Field
-          label="Folder"
-          required
-          helper={teams?.length === 0 ? 'No Folders to file into — the relay did not answer, or there are none yet.' : 'Its issues and conversation live in this Folder.'}
-        >
-          <Select
-            value={teamId}
-            onChange={setTeamId}
-            options={(teams ?? []).map((candidate) => ({ value: candidate.id, label: candidate.name }))}
-            placeholder="Choose a Folder"
-            disabled={!teams?.length}
-            disabledReason={teams === undefined ? 'Reading the Folders…' : teams.length === 0 ? 'No Folders to file into' : undefined}
-          />
-        </Field>
-      </Form>
-    </DialogShell>
+      <Field label="Title" required>
+        <TextInput value={title} onChange={(e) => setTitle(e.target.value)} placeholder="New project title" autoFocus />
+      </Field>
+      <SummaryField value={summary} onChange={setSummary} />
+      <Field label="Key" required helper={problem ? undefined : `Its issues are ${key || 'KEY'}-1, ${key || 'KEY'}-2, …`} error={problem}>
+        <TextInput
+          value={key}
+          onChange={(e) => setTypedKey(e.target.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 6))}
+          placeholder="ABC"
+        />
+      </Field>
+      <Field label="Description">
+        <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description (optional)" className="h-[80px]" />
+      </Field>
+      <Field
+        label="Folder"
+        required
+        helper={teams?.length === 0 ? 'No Folders to file into — the relay did not answer, or there are none yet.' : 'Its issues and conversation live in this Folder.'}
+      >
+        <Select
+          value={teamId}
+          onChange={setTeamId}
+          options={(teams ?? []).map((candidate) => ({ value: candidate.id, label: candidate.name }))}
+          placeholder="Choose a Folder"
+          disabled={!teams?.length}
+          disabledReason={teams === undefined ? 'Reading the Folders…' : teams.length === 0 ? 'No Folders to file into' : undefined}
+        />
+      </Field>
+    </FormDialog>
   )
 }

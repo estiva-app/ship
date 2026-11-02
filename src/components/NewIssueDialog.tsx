@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Form } from '@estiva-app/ui'
+import { FormDialog } from '@estiva-app/ui'
 import { Button } from '@/components/ui/Button'
 import { DialogShell } from '@/components/ui/DialogShell'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -12,8 +12,8 @@ import { summaryText } from '@/nostr/summary'
 import { SummaryField } from './SummaryField'
 
 /**
- * Production's "New issue" form (apps/ship/views/new-issue.ts) in the
- * DialogShell. An issue lives in a project's Folder, so it always has a
+ * Production's "New issue" form (apps/ship/views/new-issue.ts) in the kit's
+ * FormDialog. An issue lives in a project's Folder, so it always has a
  * project: preselected when opened from a project page, chosen from a
  * select when opened from the Issues page — and when there is no project
  * at all, the form says to create one first rather than offer a field that
@@ -47,9 +47,8 @@ export function NewIssueDialog({ projects, project, onClose, onCreate, holdKey }
   const [summary, setSummary] = useState(held?.summary ?? '')
   const [description, setDescription] = useState(held?.description ?? '')
   const [projectAddr, setProjectAddr] = useState(project?.addr ?? (held?.projectAddr && projects.some((p) => p.value === held.projectAddr) ? held.projectAddr : projects[0]?.value ?? ''))
-  const [busy, setBusy] = useState(false)
   const none = !project && projects.length === 0
-  const canSubmit = title.trim().length > 0 && projectAddr !== '' && !busy
+  const canSubmit = title.trim().length > 0 && projectAddr !== ''
 
   useHeldTyping(holdKey, () => (title.trim() || summary.trim() || description.trim() ? JSON.stringify({ title, summary, description, projectAddr }) : undefined))
   const close = () => {
@@ -57,53 +56,47 @@ export function NewIssueDialog({ projects, project, onClose, onCreate, holdKey }
     onClose()
   }
 
-  const submit = async () => {
-    if (!canSubmit) return
-    setBusy(true)
-    try {
-      const ok = await onCreate({ title: title.trim(), summary: summaryText(summary), description: description.trim(), projectAddr })
-      if (ok !== false) close()
-    } finally {
-      setBusy(false)
-    }
+  const heading = project ? `New issue in ${project.title}` : 'New issue'
+
+  // No project to put it in: only the reason and Cancel, never a Create that cannot succeed.
+  if (none) {
+    return (
+      <DialogShell
+        title={heading}
+        onClose={close}
+        bodyClassName="flex flex-col gap-6"
+        footer={
+          <Button variant="muted" onClick={close}>
+            Cancel
+          </Button>
+        }
+      >
+        <EmptyState scope="section" message="Create a project first." />
+      </DialogShell>
+    )
   }
 
   return (
-    <DialogShell
-      title={project ? `New issue in ${project.title}` : 'New issue'}
+    // The kit's FormDialog owns the send: everything waits, a refusal keeps it open, a create closes it.
+    <FormDialog
+      title={heading}
+      submitLabel="Create issue"
+      ready={canSubmit}
+      onSubmit={() => onCreate({ title: title.trim(), summary: summaryText(summary), description: description.trim(), projectAddr })}
       onClose={close}
-      bodyClassName="flex flex-col gap-6"
-      footer={
-        <>
-          <Button variant="muted" onClick={close} disabled={busy}>
-            Cancel
-          </Button>
-          {!none && (
-            <Button variant="primary" type="submit" form="new-issue" disabled={!canSubmit}>
-              Create issue
-            </Button>
-          )}
-        </>
-      }
     >
-      {none ? (
-        <EmptyState scope="section" message="Create a project first." />
-      ) : (
-        <Form id="new-issue" onSubmit={submit} busy={busy}>
-          <Field label="Title" required>
-            <TextInput value={title} onChange={(e) => setTitle(e.target.value)} placeholder={project ? `New issue in ${project.title}` : 'Issue title'} autoFocus />
-          </Field>
-          <SummaryField value={summary} onChange={setSummary} />
-          <Field label="Description">
-            <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description (optional)" className="h-[80px]" />
-          </Field>
-          {!project && (
-            <Field label="Project" required>
-              <Select value={projectAddr} onChange={setProjectAddr} options={projects} ariaLabel="Project" />
-            </Field>
-          )}
-        </Form>
+      <Field label="Title" required>
+        <TextInput value={title} onChange={(e) => setTitle(e.target.value)} placeholder={project ? `New issue in ${project.title}` : 'Issue title'} autoFocus />
+      </Field>
+      <SummaryField value={summary} onChange={setSummary} />
+      <Field label="Description">
+        <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description (optional)" className="h-[80px]" />
+      </Field>
+      {!project && (
+        <Field label="Project" required>
+          <Select value={projectAddr} onChange={setProjectAddr} options={projects} ariaLabel="Project" />
+        </Field>
       )}
-    </DialogShell>
+    </FormDialog>
   )
 }
