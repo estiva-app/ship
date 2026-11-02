@@ -10,7 +10,7 @@ import { describe, expect, it } from 'vitest'
 import type { ContentFormat } from '@estiva-app/protocol'
 import type { DirectoryView, FolderState } from '@/api'
 import type { Change } from '../nostr/fold'
-import { historyFor } from './IssuePage'
+import { historyFor } from './history'
 
 const ISSUE = `30851:${'a'.repeat(64)}:the-issue`
 const AUTHOR = 'b'.repeat(64)
