@@ -17,7 +17,7 @@ vi.mock('./store', async () => {
   const { Store } = await import('../nostr/store')
   const signer = { pubkey: 'c'.repeat(64) }
   const relay = { query: async (filters: Record<string, unknown>[]) => answer(filters) }
-  return { relay, signer, store: new Store(relay as never, signer as never, null) }
+  return { relay, signer, store: new Store(relay as never, signer as never) }
 })
 
 const { reactionsOn } = await import('./index')
