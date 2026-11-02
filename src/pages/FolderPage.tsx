@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { archiveFolder, me, renameFolder } from '@/api'
 import { folderArchiveImpact, loadQuery, readFolder, type FolderContents, type FolderSummary } from '@/api/foreign'
 import { ArchiveDialog } from '@/components/ArchiveDialog'
-import { ArchivedNotice } from '@/components/ArchivedNotice'
+import { ArchivedNotice } from '@estiva-app/ui'
+import { archivedNoticeOf } from '@/lib/archive'
 import { reloadFolders } from '@/api/useFolders'
 import { SkeletonList } from '@/components/ui/Skeleton'
 import { FolderView } from '@/views/FolderView'
@@ -142,9 +143,9 @@ export function FolderPage({ id, folders, nameOf = (pubkey) => `${pubkey.slice(0
         archivedNotice={
           contents.archived && (
             <ArchivedNotice
-              archive={{ by: contents.archived.by, at: contents.archived.at, resolution: contents.archived.resolution }}
-              nameOf={nameOf}
-              {...(canArchive ? { onUnarchive: () => void setArchived(false) } : {})}
+              {...archivedNoticeOf({ by: contents.archived.by, at: contents.archived.at, resolution: contents.archived.resolution }, nameOf)}
+              // The notice's Unarchive waits for the answer.
+              {...(canArchive ? { onUnarchive: () => setArchived(false) } : {})}
             />
           )
         }

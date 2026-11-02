@@ -13,7 +13,8 @@ import { ProjectView } from './ProjectView'
 import { ProjectsView } from './ProjectsView'
 import type { IssueTab, ProjectTab } from '@/router'
 import type { Imeta } from '@estiva-app/protocol'
-import { ArchivedNotice } from '@/components/ArchivedNotice'
+import { ArchivedNotice } from '@estiva-app/ui'
+import { archivedNoticeOf } from '@/lib/archive'
 
 /** Attach without a relay: the picked file, shown from the browser's own memory. */
 const pretendUpload = async (file: File) => ({ url: URL.createObjectURL(file), m: file.type || 'application/octet-stream', x: '0'.repeat(64), size: file.size, filename: file.name }) as unknown as Imeta
@@ -130,13 +131,15 @@ export const IssuesEmpty: Story = {
 const ARCHIVED_AT = Math.floor(Date.now() / 1000) - 2 * 86400
 const archivedNotice = (withProject?: boolean) => (
   <ArchivedNotice
-    archive={{
-      by: 'a'.repeat(64),
-      at: ARCHIVED_AT,
-      resolution: 'Shipped as interop 0.37.0. The follow-ups are FOL-49 and FOL-50.',
-      ...(withProject ? { with: { kind: 'project' as const, addr: '30850:a:rel', title: 'Relay Migration' } } : {}),
-    }}
-    nameOf={() => 'Miky'}
+    {...archivedNoticeOf(
+      {
+        by: 'a'.repeat(64),
+        at: ARCHIVED_AT,
+        resolution: 'Shipped as interop 0.37.0. The follow-ups are FOL-49 and FOL-50.',
+        ...(withProject ? { with: { kind: 'project' as const, addr: '30850:a:rel', title: 'Relay Migration' } } : {}),
+      },
+      () => 'Miky',
+    )}
     {...(withProject ? { onOpenParent: fn() } : { onUnarchive: fn() })}
   />
 )

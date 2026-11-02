@@ -3,8 +3,8 @@ import { newestDrawn, useMarkRead, useShownThreads } from '@/lib/useMarkRead'
 import { useNewSince } from '@/lib/useNewSince'
 import { useCallback, useMemo, useState } from 'react'
 import { ArchiveDialog } from '@/components/ArchiveDialog'
-import { ArchivedNotice } from '@/components/ArchivedNotice'
-import { archivedLine, lockedReason, ownArchive, type Archives } from '@/lib/archive'
+import { ArchivedNotice } from '@estiva-app/ui'
+import { archivedLine, archivedNoticeOf, lockedReason, ownArchive, type Archives } from '@/lib/archive'
 import { ISSUE_STATUSES, lookupStatus, addMentioned, archiveIssue, commentsOn, deleteIssue, deleteMessage, editMessage, react, reply, setIssueField, unreact, startConversation, type DirectoryView, type FolderState, type WorkspaceState, threadContext, fileContext, useMergedReadState, useFeedJudges, unreadByThread } from '@/api'
 import { me, useMentionsElsewhere } from '@/api'
 import { MEMBER_FIELD_PREFIX, memberOfField } from '@estiva-app/conversation'
@@ -197,8 +197,9 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
   // Its own archive, which the rail toggles; and the one shown first, which may be its project's (FOL-46).
   const own = ownArchive(issue, state.activity)
   const archive = archives.ofIssue(issue)
+  // The notice's Unarchive waits for the answer.
   const unarchive = () =>
-    void act('Unarchive', () => archiveIssue(issue, false), say, () => refresh([issue.folder])).then((ok) => {
+    act('Unarchive', () => archiveIssue(issue, false), say, () => refresh([issue.folder])).then((ok) => {
       if (ok) say('Issue restored')
     })
 
@@ -210,8 +211,7 @@ export function IssuePage({ state, directory, archives, d, tab, say, refresh }: 
         archivedNotice={
           archive && (
             <ArchivedNotice
-              archive={archive}
-              nameOf={directory.nameOf}
+              {...archivedNoticeOf(archive, directory.nameOf)}
               onUnarchive={unarchive}
               // Opens what is archived: the project, or the team it is archived with.
               {...(archive.with?.kind === 'folder' && archive.with.id

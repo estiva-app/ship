@@ -16,7 +16,8 @@
  * Generic over the shapes it reads, so this file knows no kinds.
  */
 import { archivedAncestorOf } from '@estiva-app/interop'
-import { archivedLine as sharedArchivedLine } from '@estiva-app/ui'
+import { archivedLine as sharedArchivedLine, type ArchivedNoticeProps } from '@estiva-app/ui'
+import { ago } from './time'
 
 /** Ship wrote this note on every archive before FOL-46; it is not a resolution. */
 const PLACEHOLDER_NOTE = 'archived'
@@ -91,6 +92,20 @@ export function lockedReason(archive: ArchiveState | undefined): string | undefi
  */
 export function archivedLine(archive: ArchiveState | undefined): string | undefined {
   return sharedArchivedLine(archive && (archive.with ? { with: archive.with.addr } : {}), archive?.with?.kind)
+}
+
+/**
+ * The kit's `ArchivedNotice`, said in Ship's words: who by name, when as Ship
+ * says a time ("3h ago"), and what it is archived with by its kind, a Folder
+ * being a proper noun in every app's copy (FOL-46).
+ */
+export function archivedNoticeOf(archive: ArchiveState, nameOf: (pubkey: string) => string): Pick<ArchivedNoticeProps, 'by' | 'when' | 'resolution' | 'withWhat' | 'withTitle'> {
+  return {
+    by: nameOf(archive.by),
+    when: ago(archive.at),
+    ...(archive.resolution ? { resolution: archive.resolution } : {}),
+    ...(archive.with ? { withWhat: archive.with.kind === 'folder' ? 'Folder' : archive.with.kind, withTitle: archive.with.title } : {}),
+  }
 }
 
 export interface Archives {

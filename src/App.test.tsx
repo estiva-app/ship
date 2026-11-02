@@ -445,6 +445,28 @@ describe('Project page — one project from the fold', () => {
     await waitFor(() => expect(vi.mocked(archiveProject).mock.calls[0]?.slice(1)).toEqual([false]))
   })
 
+  it('an archived project’s Unarchive waits while it is written, so a second press writes nothing more', async () => {
+    let answer: (result: { ok: true }) => void = () => {}
+    vi.mocked(archiveProject).mockReturnValue(new Promise((resolve) => (answer = resolve)))
+    const archivedAt = STATE.projects.find((p) => p.id === OLD)!
+    vi.mocked(useWorkspace).mockReturnValue({
+      state: { ...STATE, activity: [...STATE.activity, { id: 'c'.repeat(64), author: OTHER, createdAt: 1, target: archivedAt.addr, field: 'archived', value: 'true', format: 'marker', note: 'Replaced by Live.' }] },
+      partial: false, error: null, clock: null, loading: false, busy: false, refresh, wantThreads: () => {}, live: false,
+    })
+    goTo(`/project/old-${OLD}`)
+    render(<App />)
+    const main = within(screen.getByRole('main'))
+    const unarchive = main.getByRole('button', { name: 'Unarchive' })
+    fireEvent.click(unarchive)
+    // Whatever settles at once has settled: a press that did not hand its write back would have opened again.
+    await act(async () => {})
+    expect(unarchive).toBeDisabled()
+    fireEvent.click(unarchive)
+    expect(archiveProject).toHaveBeenCalledTimes(1)
+    answer({ ok: true })
+    await waitFor(() => expect(unarchive).toBeEnabled())
+  })
+
   it('an issue in an archived project says it is archived with it, and opens the project', async () => {
     goTo(`/issue/issue-13-${D('13')}`)
     render(<App />)

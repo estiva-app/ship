@@ -66,8 +66,8 @@ import { act, actInField, sayOnceLeft, type Say } from './act'
 import { hrefForIssue, rowFor } from './IssuesPage'
 import { MoveProject } from '@/components/MoveProject'
 import { ArchiveDialog } from '@/components/ArchiveDialog'
-import { ArchivedNotice } from '@/components/ArchivedNotice'
-import { archivedLine, lockedReason, ownArchive, type Archives } from '@/lib/archive'
+import { ArchivedNotice } from '@estiva-app/ui'
+import { archivedLine, archivedNoticeOf, lockedReason, ownArchive, type Archives } from '@/lib/archive'
 import { KIND } from '@/nostr/kinds'
 
 export type { Say } from './act'
@@ -705,8 +705,9 @@ export function ProjectPage({
   // Its own archive, which the rail toggles; and the one the page shows, which may be its team's (FOL-46).
   const own = ownArchive(project, state.activity)
   const archive = archives.ofProject(project.addr)
+  // The notice's Unarchive waits for the answer.
   const unarchive = () =>
-    void act('Unarchive', () => archiveProject(project, false), say, refresh).then((ok) => {
+    act('Unarchive', () => archiveProject(project, false), say, refresh).then((ok) => {
       if (ok) say('Project restored')
     })
 
@@ -716,8 +717,7 @@ export function ProjectPage({
         archivedNotice={
           archive && (
             <ArchivedNotice
-              archive={archive}
-              nameOf={directory.nameOf}
+              {...archivedNoticeOf(archive, directory.nameOf)}
               onUnarchive={unarchive}
               {...(archive.with?.id ? { onOpenParent: () => go({ name: 'folder', id: archive.with!.id! }) } : {})}
             />
