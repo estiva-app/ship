@@ -95,13 +95,13 @@ describe('the delete control', () => {
   })
 
   /* Deleting a thread's opening line does not delete the thread: replies are
-     separate events with their own authors, and `foldConversations` promotes
-     the earliest survivor. Worth knowing before rather than after. */
-  it('warns that a root’s replies survive it', () => {
+     separate events with their own authors, and they stay under "This comment
+     was deleted.", as Peek draws it. Worth knowing before rather than after. */
+  it('warns that a root’s replies survive it, under the deleted comment', () => {
     open(vi.fn())
     fireEvent.click(actions()[0])
     fireEvent.click(screen.getByRole('menuitem', { name: 'Delete message' }))
-    expect(screen.getByText(/1 reply is a separate event/)).toBeTruthy()
+    expect(screen.getByText('Its 1 reply is a separate event and is not deleted: it stays, under “This comment was deleted.”')).toBeTruthy()
   })
 
   it('says nothing about replies when deleting one', () => {

@@ -31,8 +31,8 @@ function deleteNote(replies: number): ReactNode {
       </p>
       {replies > 0 && (
         <p>
-          Its {replies} {replies === 1 ? 'reply is a separate event and is' : 'replies are separate events and are'} not deleted:
-          they stay, under &ldquo;This comment was deleted.&rdquo;
+          Its {replies} {replies === 1 ? 'reply is a separate event and is' : 'replies are separate events and are'} not deleted:{' '}
+          {replies === 1 ? 'it stays' : 'they stay'}, under &ldquo;This comment was deleted.&rdquo;
         </p>
       )}
     </>
