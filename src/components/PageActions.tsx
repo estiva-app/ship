@@ -1,5 +1,5 @@
 import { IconDotsVertical, IconMessage, IconMessageOff } from '@tabler/icons-react'
-import { Menu, MenuItem, MenuSeparator, Toolbar, ToolbarButton, UnreadDot } from '@estiva-app/ui'
+import { Menu, MenuItem, MenuSeparator, Toolbar, ToolbarButton } from '@estiva-app/ui'
 
 /**
  * The page's own buttons at the right of its header, one strip as Leaf's and Peek's (ONE-6, steps 4b and 4c): the
@@ -20,8 +20,8 @@ export interface PageActionsProps {
   what: 'issue' | 'project'
   /**
    * The comments column, shown or not, and the button that shows or hides it. Omitted: no button. `unread`: something
-   * in them is new to the reader; while the column is hidden the kit's `UnreadDot` sits beside the button, and its name
-   * says "new" (Katerina, 2 November).
+   * in them is new to the reader; while the column is hidden the button carries the kit's dot on its icon's corner, and
+   * its name says "new" (Katerina, 3 November).
    */
   comments?: { shown: boolean; onShownChange: (shown: boolean) => void; unread?: boolean }
   /** Not archived; archived itself; or archived only with its project or its Folder (FOL-46). */
@@ -43,19 +43,22 @@ export function PageActions({ what, comments, archive, onArchive, onDelete, onMo
   // Under its Folder's archive, archiving a project again is an edit; an issue's own stays offered whatever is archived above it.
   const archiveShut = archive === 'with' && what === 'project' ? (readOnlyReason ?? lockedReason) : readOnlyReason
   const commentsWord = comments?.shown ? 'Hide comments' : 'Show comments'
-  // Shown, each new comment carries its own dot in the column; hidden, the button says it for them.
-  const newHidden = !!comments && !comments.shown && !!comments.unread
   return (
     // One strip: one Tab stop, arrows along it (the kit's Toolbar, no box of its own).
     <Toolbar aria-label="Page actions" surface={false}>
       {comments && (
-        // The prototype's (Katerina, 1 November): the message icon, struck through while the column is shown.
-        <ToolbarButton tooltip={commentsWord} aria-label={newHidden ? `${commentsWord}, new` : commentsWord} onClick={() => comments.onShownChange(!comments.shown)}>
+        // The prototype's (Katerina, 1 November): the message icon, struck through while the column is shown. Shown,
+        // each new comment carries its own dot in the column; hidden, the button carries one on its icon's corner, and
+        // its name says "new" (the kit's `unread`; Katerina, 3 November).
+        <ToolbarButton
+          tooltip={commentsWord}
+          aria-label={commentsWord}
+          unread={!comments.shown && !!comments.unread}
+          onClick={() => comments.onShownChange(!comments.shown)}
+        >
           {comments.shown ? <IconMessageOff size={16} stroke={1.5} /> : <IconMessage size={16} stroke={1.5} />}
         </ToolbarButton>
       )}
-      {/* The kit's dot in its own 24px slot, as a control's, right after the button it is about, as a tab's follows its label. */}
-      {newHidden && <UnreadDot />}
       <Menu
         align="right"
         trigger={

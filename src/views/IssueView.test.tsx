@@ -163,11 +163,11 @@ describe('the comments column (ONE-6, step 4c)', () => {
 
   it('hidden, the header’s button carries the dot when a comment is new, and not when none is', () => {
     const { unmount } = render(view('overview', { threads: [THREAD], stillUnread: { t1: ['t1'] }, comments: { shown: false, onShownChange: vi.fn() } }))
-    expect(screen.getByRole('button', { name: 'Show comments, new' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Show comments, new' }).querySelector('[data-unread-dot]')).not.toBeNull()
     unmount()
     render(view('overview', { threads: [THREAD], stillUnread: { t1: [] }, comments: { shown: false, onShownChange: vi.fn() } }))
     expect(screen.getByRole('button', { name: 'Show comments' })).toBeInTheDocument()
-    expect(document.querySelector('[data-unread]')).toBeNull()
+    expect(document.querySelector('[data-unread-dot], [data-unread]')).toBeNull()
   })
 
   it('the header’s button hides it and shows it again', async () => {

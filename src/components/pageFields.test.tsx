@@ -233,20 +233,22 @@ describe('the comments button (ONE-6, step 4c)', () => {
     expect(onShownChange).toHaveBeenLastCalledWith(true)
   })
 
-  // Katerina, 2 November: hidden, nothing else on the page said a new comment had come.
-  it('hidden with something new: the kit’s dot beside it, and "new" in its name', () => {
+  // Katerina, 2 November: hidden, nothing else on the page said a new comment had come; 3 November: on the icon.
+  it('hidden with something new: the kit’s dot on its icon, and "new" in its name', () => {
     render(page({ shown: false, onShownChange: vi.fn(), unread: true }))
     const button = screen.getByRole('button', { name: 'Show comments, new' })
-    expect(button.nextElementSibling?.hasAttribute('data-unread')).toBe(true)
+    expect(button.querySelector('[data-unread-dot]')).not.toBeNull()
+    // On the button, not in a slot of its own between it and the ⋯.
+    expect(button.nextElementSibling?.hasAttribute('data-unread')).toBe(false)
   })
 
   it('no dot when nothing is new, nor while the column is shown, where each new comment carries its own', () => {
     const { unmount } = render(page({ shown: false, onShownChange: vi.fn(), unread: false }))
     expect(screen.getByRole('button', { name: 'Show comments' })).toBeInTheDocument()
-    expect(document.querySelector('[data-unread]')).toBeNull()
+    expect(document.querySelector('[data-unread-dot], [data-unread]')).toBeNull()
     unmount()
     render(page({ shown: true, onShownChange: vi.fn(), unread: true }))
     expect(screen.getByRole('button', { name: 'Hide comments' })).toBeInTheDocument()
-    expect(document.querySelector('[data-unread]')).toBeNull()
+    expect(document.querySelector('[data-unread-dot], [data-unread]')).toBeNull()
   })
 })
