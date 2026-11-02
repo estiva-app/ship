@@ -202,7 +202,8 @@ describe('the card under the comment', () => {
     delete objects.byReference[ref(CARD_ISSUE)]
     cardShapes.note(ref(CARD_ISSUE).replace(/^nostr:/, ''), { subtitle: false, summary: true, rows: 0, latest: false, ring: false, footer: 'pickers', height: 134 })
     const c = show(THE_MESSAGE, { embeds: ITS_CARD })
-    const card = c.querySelector<HTMLElement>('[data-card="detailed"]')
+    // The kit's card box holds the height, as Peek's does.
+    const card = c.querySelector<HTMLElement>('[data-card="detailed"] > *')
     expect(card?.style.minHeight).toBe('134px')
     expect(card?.querySelector('[aria-busy="true"]')).not.toBeNull()
   })
