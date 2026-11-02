@@ -10,7 +10,7 @@
  * is a line saying why instead.
  */
 import { describe, expect, it, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MentionListView, ThreadListView } from './ThreadList'
 import type { ThreadData } from '@/components/ConversationThread'
@@ -27,29 +27,36 @@ const show = (props: Partial<ThreadListViewProps> = {}) =>
 
 const answered = () => vi.fn(async (): Promise<true | string> => true)
 
+/** The kit's card shows React and its `…` while pointed at (Katerina, 1 November: the strip on hover). */
+const pointAt = () => document.querySelectorAll('[data-comment-body], [data-reply-id]').forEach((card) => fireEvent.mouseEnter(card))
+
 describe('the message tools', () => {
-  it('offers the add-reaction button and the menu on a message', () => {
+  it('offers React and the menu on a message, while it is pointed at', () => {
     show({ onReact: answered(), onEditMessage: answered(), onDeleteMessage: vi.fn() })
-    expect(screen.getByRole('button', { name: 'Add a reaction' })).toBeInTheDocument()
+    pointAt()
+    expect(screen.getByRole('button', { name: 'React' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Message actions' })).toBeInTheDocument()
   })
 
-  it('offers no add-reaction button without a handler, and no menu without one', () => {
+  it('offers no React without a handler, and no menu without one', () => {
     const { unmount } = show({ onDeleteMessage: vi.fn() })
-    expect(screen.queryByRole('button', { name: 'Add a reaction' })).toBeNull()
+    pointAt()
+    expect(screen.queryByRole('button', { name: 'React' })).toBeNull()
     expect(screen.getByRole('button', { name: 'Message actions' })).toBeInTheDocument()
     unmount()
     show({ onReact: answered() })
-    expect(screen.getByRole('button', { name: 'Add a reaction' })).toBeInTheDocument()
+    pointAt()
+    expect(screen.getByRole('button', { name: 'React' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Message actions' })).toBeNull()
   })
 
-  it('opens the picker from the add button, and picking hands back the message and the emoji and closes it', async () => {
+  it('opens the picker from React, and picking hands back the message and the emoji and closes it', async () => {
     const user = userEvent.setup()
     const onReact = answered()
     show({ onReact })
-    await user.click(screen.getByRole('button', { name: 'Add a reaction' }))
-    const picker = await screen.findByRole('dialog', { name: 'Add a reaction' })
+    pointAt()
+    await user.click(screen.getByRole('button', { name: 'React' }))
+    const picker = await screen.findByRole('dialog', { name: 'Reactions' })
     // Each control is named by its meaning — a bare glyph is not a name.
     await user.click(screen.getByRole('button', { name: 'Thank you' }))
     expect(onReact).toHaveBeenCalledTimes(1)
@@ -68,13 +75,17 @@ describe('the message tools', () => {
   it('says a refused reaction under the row, in the relay’s words', async () => {
     const user = userEvent.setup()
     show({ onReact: vi.fn(async () => 'rate-limited: slow down') })
-    await user.click(screen.getByRole('button', { name: 'Add a reaction' }))
+    pointAt()
+    await user.click(screen.getByRole('button', { name: 'React' }))
     await user.click(await screen.findByRole('button', { name: 'Thank you' }))
-    expect(await screen.findByText('Not reacted: rate-limited: slow down')).toBeInTheDocument()
+    // The kit says it as a sentence, with its full stop.
+    expect(await screen.findByText('Not reacted: rate-limited: slow down.')).toBeInTheDocument()
   })
 
   it('offers no reaction, edit or delete where nothing can be written, and draws the pills only', () => {
     show({ onReact: answered(), onEditMessage: answered(), onDeleteMessage: vi.fn(), disabledReason: 'Archived. Unarchive it to comment.', reactionsBy: { m1: [{ emoji: '🙏', count: 1, by: ['ann'] }] } })
+    pointAt()
+    expect(screen.queryByRole('button', { name: 'React' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Add a reaction' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Message actions' })).toBeNull()
     expect(screen.getByRole('button', { name: 'Thank you, 1' })).toBeDisabled()

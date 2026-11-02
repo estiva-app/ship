@@ -1,12 +1,12 @@
-import { Fragment, Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { IconDotsVertical, IconMessage2, IconX } from '@tabler/icons-react'
 import type { Imeta } from '@estiva-app/protocol'
-import { AddReactionButton, Avatar, Button, Card, EmptyState, FieldLine, IconButton, Menu, MenuItem, ReactionRow, SkeletonBar, SkeletonList, WithTooltip } from '@estiva-app/ui'
+import { AddReactionButton, Avatar, Button, Card, EmptyState, FieldLine, IconButton, Menu, MenuItem, ReactionRow, SkeletonList, Thread as KitThread, WithTooltip } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
 import { ago } from '@/lib/time'
 import { draftKeys, type DraftStore } from '@/lib/drafts'
 import { offersEditAndDelete } from '@estiva-app/conversation'
-import { REACTION_EMOJI, REACTION_HORIZON, me, type Reaction } from '@/api'
+import { REACTION_EMOJI, REACTION_HORIZON, me, type Reaction, type Resolution } from '@/api'
 import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
 import { Attachments as FileAttachments } from '@/components/ui/Attachment'
 import { BlockAnchorNote } from '@/components/ui/BlockAnchorNote'
@@ -14,23 +14,11 @@ import { ConfirmDeleteMessage, NewSinceHere, useThreadReactions, useThreadRefere
 import type { ActivityProps } from '@/components/Activity'
 import { PLACE_ICON, RELATION, Time, type Answer, type MentionListViewProps, type Picks, type ThreadListViewProps } from './shared'
 import { MessageText } from './MessageText'
+import { Box } from './lazyBox'
+import { ShipComment, ShipReply } from './ThreadCards'
 import { messageScope, referenceCaptions, referenceSections } from '@/api/references'
 import { PartCard } from '@/components/ui/PartCard'
 import { useReopenHeld } from '@/auth/heldTyping'
-
-/*
-  The box is its own chunk: its editor is ProseMirror, which a reader must
-  never download (RIC-14's rule for the description, kept). Until it lands a
-  bar holds its place; a closed box is a line and needs no editor.
-*/
-const LazyBox = lazy(() => import('./ConversationBox'))
-function Box(props: ComponentProps<typeof LazyBox>) {
-  return (
-    <Suspense fallback={props.kind === 'edit' ? null : <SkeletonBar shape="control" className={cn('h-10 w-full', props.className)} />}>
-      <LazyBox {...props} />
-    </Suspense>
-  )
-}
 
 /** The five reactions, each named, as the package's row and picker take them (SPEC §6.6). */
 const REACTION_OPTIONS = REACTION_EMOJI.map(({ emoji, name }) => ({ emoji, label: name }))
@@ -375,6 +363,94 @@ const threadProps = (p: ThreadListViewProps | MentionListViewProps) => ({
   drafts: p.drafts,
 })
 
+interface ShipThreadProps extends Omit<ThreadProps, 'unread' | 'judged' | 'onShown' | 'elsewhere' | 'file'> {
+  /** Its thread is open under it. One at a time: the list holds which. */
+  open: boolean
+  /** Opened to write a reply: the box takes the caret. */
+  focusBox: boolean
+  /** A press on the comment: open or close its thread. */
+  onToggle: () => void
+  /** Reply, on the strip: open its thread at the box. */
+  onOpenToReply: () => void
+  /** By message id, each comment resolved in Peek or Leaf. */
+  resolvedBy?: Record<string, Resolution>
+}
+
+/**
+ * One conversation on the kit's cards (ONE-6, step 3): the comment, and its thread opening under it — the replies on
+ * the kit's `ReplyCard`, then Ship's reply box. New comments and replies keep their dot and edge until read, and the
+ * replies row says how many are new (SHI-38); "New since you last read this" is gone (Katerina, 2 November). A deleted
+ * comment says so, with every message under it and no new reply, as Peek draws it (PER-24).
+ */
+function ShipThread({ thread, pageThreads, onReply, disabledReason, stillUnread, resolved, here, nameOf, reactionsBy, onReact, onDeleteMessage, onEditMessage, upload, drafts, viewer, open, focusBox, onToggle, onOpenToReply, resolvedBy }: ShipThreadProps) {
+  const scope = useMemo(() => messageScope(pageThreads, thread.id), [pageThreads, thread.id])
+  const references = useCallback((query: string) => referenceSections(scope, query, nameOf), [scope, nameOf])
+  const captions = useMemo(() => referenceCaptions(scope, nameOf), [scope, nameOf])
+  const writable = !disabledReason
+  const deleted = thread.rootMissing === true
+  // A deleted comment's stand-in is its earliest reply: every message hangs under "This comment was deleted."
+  const replies = deleted ? [thread.root, ...thread.replies] : thread.replies
+  const common = { resolved, here, boxHere: here, nameOf, viewer, drafts, references, captions, closed: !writable }
+  const toolsFor = (message: MessageData) => {
+    const offered = writable && offersEditAndDelete({ viewer, author: message.by ?? '' })
+    return {
+      reactions: reactionsBy?.[message.id],
+      onToggleReaction: writable && onReact ? (emoji: string, mine?: string) => onReact(message.id, emoji, mine) : undefined,
+      onDelete: offered && onDeleteMessage ? () => onDeleteMessage(message.id) : undefined,
+      onEdit: offered && onEditMessage ? (...edit: [body: string, removeCard?: string, files?: readonly Imeta[], dropped?: string]) => onEditMessage(message.id, ...edit) : undefined,
+    }
+  }
+  const isNew = (id: string) => !!stillUnread?.includes(id)
+  const faces = [...new Map(replies.map((reply) => [reply.by ?? reply.id, reply.author])).values()].map((author) => ({ name: author.name ?? '—', picture: author.picture, bot: author.bot }))
+  const last = replies.at(-1)
+  return (
+    <div className="flex flex-col" data-thread={thread.id}>
+      <ShipComment
+        message={thread.root}
+        {...common}
+        // A deleted comment has nothing of its own to react to, edit or delete: its stand-in is a reply below.
+        {...(deleted ? {} : toolsFor(thread.root))}
+        deleted={deleted}
+        isNew={!deleted && isNew(thread.root.id)}
+        repliesLeftBehind={thread.replies.length}
+        replies={last ? { count: replies.length, faces, last: ago(last.at), newCount: replies.filter((reply) => isNew(reply.id)).length, open, onOpen: onToggle } : undefined}
+        onReply={writable && !deleted ? onOpenToReply : undefined}
+        onClick={onToggle}
+        resolution={deleted ? undefined : resolvedBy?.[thread.root.id]}
+      />
+      {open && (
+        <KitThread
+          place="under"
+          box={
+            writable && !deleted ? (
+              <Box
+                key={thread.id}
+                kind="reply"
+                autoFocus={focusBox}
+                draftKey={draftKeys.thread(thread.id)}
+                drafts={drafts}
+                upload={upload}
+                nameOf={nameOf}
+                resolved={resolved}
+                here={here}
+                references={references}
+                captions={captions}
+                onSend={(text, files, picks) => onReply(thread.id, text, files, picks)}
+              />
+            ) : undefined
+          }
+          // Closed (an archived file, signed out): no box and no line; the start box's line already says why.
+          notice={writable && deleted ? 'The comment was deleted, so this thread takes no new replies.' : undefined}
+        >
+          {replies.map((reply) => (
+            <ShipReply key={reply.id} message={reply} {...common} {...toolsFor(reply)} isNew={isNew(reply.id)} />
+          ))}
+        </KitThread>
+      )}
+    </div>
+  )
+}
+
 /** The drawing, with the reads handed in — for a story, or a caller that has them. */
 export function ThreadListView(props: ThreadListViewProps) {
   const { threads, onStart, disabledReason, className, unread, nameOf, about, omitted = 0, reactionsCut = false, upload, drafts, anchor, onDropAnchor } = props
@@ -382,6 +458,23 @@ export function ThreadListView(props: ThreadListViewProps) {
   const references = useCallback((query: string) => referenceSections(scope, query, nameOf), [scope, nameOf])
   const captions = useMemo(() => referenceCaptions(scope, nameOf), [scope, nameOf])
   const blockId = anchor && anchor.state !== 'unanchored' ? anchor.id : undefined
+  // One thread open at a time, and the box takes the caret when it was opened to reply (the kit's one column).
+  const [openId, setOpenId] = useState<string>()
+  const [focusId, setFocusId] = useState<string>()
+  // At most one opens by itself: the newest holding a reply that was new when the page opened, once read state is known.
+  const [openedByItself, setOpenedByItself] = useState(false)
+  if (unread !== undefined && !openedByItself) {
+    setOpenedByItself(true)
+    const first = threads.find((thread) => thread.replies.some((reply) => unread[thread.id]?.includes(reply.id)))
+    if (first && openId === undefined) setOpenId(first.id)
+  }
+  // An open thread is read as it is shown, as before (CON-34).
+  const onShown = props.onThreadShown
+  useEffect(() => {
+    if (!openId || !onShown) return
+    onShown(openId, true)
+    return () => onShown(openId, false)
+  }, [openId, onShown])
   return (
     <div className={cn('flex flex-col gap-3', className)}>
       {/* From a block's menu (RIC-18): the part this conversation will be about, as the posted comment shows it. */}
@@ -413,10 +506,26 @@ export function ThreadListView(props: ThreadListViewProps) {
       {props.loading ? (
         <SkeletonList rows={2} />
       ) : threads.length ? (
-        <ol className="flex flex-col gap-3">
+        <ol className="flex flex-col gap-2">
           {threads.map((thread) => (
             <li key={thread.id}>
-              <Thread thread={thread} pageThreads={threads} unread={unread?.[thread.id]} stillUnread={(props.stillUnread ?? unread)?.[thread.id]} judged={unread !== undefined} onShown={props.onThreadShown} {...threadProps(props)} />
+              <ShipThread
+                thread={thread}
+                pageThreads={threads}
+                stillUnread={(props.stillUnread ?? unread)?.[thread.id]}
+                open={openId === thread.id}
+                focusBox={focusId === thread.id}
+                onToggle={() => {
+                  setFocusId(undefined)
+                  setOpenId(openId === thread.id ? undefined : thread.id)
+                }}
+                onOpenToReply={() => {
+                  setFocusId(thread.id)
+                  setOpenId(thread.id)
+                }}
+                resolvedBy={props.resolvedBy}
+                {...threadProps(props)}
+              />
             </li>
           ))}
         </ol>
@@ -478,7 +587,7 @@ export function MentionListView(props: MentionListViewProps) {
  */
 export function ThreadList(props: ConversationsProps & Pick<ThreadListViewProps, 'upload' | 'drafts'>) {
   const { resolved } = useThreadReferences(props.threads)
-  const { reactionsBy, omitted, cut, refresh } = useThreadReactions(props.threads)
+  const { reactionsBy, omitted, cut, resolvedBy, refresh } = useThreadReactions(props.threads)
   const onReact = props.onReact
     ? async (messageId: string, emoji: string, mine?: string) => {
         const answer = await props.onReact!(messageId, emoji, mine)
@@ -486,7 +595,7 @@ export function ThreadList(props: ConversationsProps & Pick<ThreadListViewProps,
         return answer
       }
     : undefined
-  return <ThreadListView {...props} onReact={onReact} resolved={resolved}reactionsBy={reactionsBy} omitted={omitted} reactionsCut={cut} viewer={props.viewer ?? me} />
+  return <ThreadListView {...props} onReact={onReact} resolved={resolved} reactionsBy={reactionsBy} resolvedBy={resolvedBy} omitted={omitted} reactionsCut={cut} viewer={props.viewer ?? me} />
 }
 
 /** "Mentioned in" with production's `Activity` props and its reads. */

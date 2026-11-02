@@ -4,7 +4,7 @@ import { addressToPointer, cardsIn, encodeNaddr, encodeNevent, referenceOfLink, 
 import { WithTooltip } from '@estiva-app/ui'
 import { ago } from '@/lib/time'
 import type { DraftStore } from '@/lib/drafts'
-import type { Reaction } from '@/api'
+import type { Reaction, Resolution } from '@/api'
 import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
 import type { ConversationsProps } from '@/components/ConversationThread'
 import type { ActivityProps, Relation } from '@/components/Activity'
@@ -120,6 +120,8 @@ export const PLACE_ICON: Record<'project' | 'issue', ReactNode> = {
 export interface ThreadListViewProps extends ConversationsProps {
   resolved?: Record<string, ForeignObjectData | null | undefined>
   reactionsBy?: Record<string, readonly Reaction[]>
+  /** By message id, each comment resolved in Peek or Leaf: Ship shows it and offers no Resolve (Katerina, 2 November). */
+  resolvedBy?: Record<string, Resolution>
   /** Messages past the reactions horizon — CON-1. */
   omitted?: number
   /** The reaction read came back at the relay's page ceiling, so some may be missing — SPEC §6.6. */

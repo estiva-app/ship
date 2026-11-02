@@ -71,6 +71,8 @@ describe('the edit box', () => {
   const edit = async (body: string, embeds?: Embed[]) => {
     const onEditMessage = vi.fn(async (): Promise<true | string> => true)
     render(<ThreadListView threads={[thread(body, embeds)]} onStart={async () => true} onReply={async () => true} viewer={ME} onEditMessage={onEditMessage} />)
+    // The kit's card shows its `…` while pointed at.
+    fireEvent.mouseEnter(document.querySelector('[data-comment-body]')!)
     fireEvent.click(screen.getByRole('button', { name: 'Message actions' }))
     fireEvent.click(screen.getByRole('menuitem', { name: 'Edit message' }))
     return { box: await ready('Edit message'), onEditMessage }

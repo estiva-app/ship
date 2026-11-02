@@ -1,0 +1,31 @@
+import { Meta } from '@storybook/addon-docs/blocks'
+
+<Meta title="Conversations/Box" />
+
+# Box
+
+Ship's writing box, loaded the first time it is drawn: the box that starts a conversation, the one a reply is written in, and the one a message is edited in. Each is Ship's `ConversationBox`, the kit's `CommentBox` with Ship's references, cards, files and drafts.
+
+**Seen in** — the start of a page's conversations, under an open thread, and in a comment or reply being edited (*Conversations/Conversations*).
+
+## When
+
+- Anywhere Ship writes a message: `kind="conversation"`, `"reply"` or `"edit"`.
+- Where nothing can be written (an archived file, signed out): `closed` with the reason, a line that needs no editor.
+
+## When not
+
+- The description of a file → its own editor (**LiveDescription**).
+- Reading a message → **MessageText**; the box is only for writing.
+
+## How
+
+```tsx
+import { Box } from './lazyBox'
+
+<Box kind="reply" draftKey={draftKeys.thread(thread.id)} drafts={drafts} onSend={(text, files, picks) => onReply(thread.id, text, files, picks)} />
+```
+
+## What it owns
+
+- **Loading the editor on first use.** The editor is ProseMirror, which a reader must never download (RIC-14): until it lands, a bar holds its place, and an edit box draws nothing while it loads.

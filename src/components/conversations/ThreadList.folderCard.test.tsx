@@ -97,7 +97,7 @@ describe('a Folder linked in a message', () => {
     expect(cardOf(c)?.textContent).toContain('Launch')
 
     // The chip in the sentence: its name, and no list of its own.
-    const chip = c.querySelector('[data-message="t1"]')
+    const chip = c.querySelector('[data-thread="t1"] [data-comment-body]')
     expect(chip?.textContent).toContain('Estiva HQ')
     expect(filesIn(chip)).toEqual([])
   })

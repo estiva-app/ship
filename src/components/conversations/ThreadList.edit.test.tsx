@@ -65,7 +65,11 @@ type EditorBox = HTMLElement & { editor: Editor }
 
 /* The edit box is the writing box, loaded on first use: `findBy`, then wait for
    its editor to be made before typing into it. */
+/** The kit's cards show their strip and `…` while pointed at: point at every comment and reply drawn. */
+const pointAtAll = () => document.querySelectorAll('[data-comment-body], [data-reply-id]').forEach((card) => fireEvent.mouseEnter(card))
+
 const openEditor = async () => {
+  pointAtAll()
   fireEvent.click(screen.getAllByRole('button', { name: 'Message actions' })[0])
   fireEvent.click(screen.getByRole('menuitem', { name: 'Edit message' }))
   const box = (await screen.findByRole('textbox', { name: 'Edit message' })) as EditorBox
@@ -81,7 +85,10 @@ const save = () => screen.getByRole('button', { name: 'Save' }) as HTMLButtonEle
 describe('the edit control', () => {
   const HUMAN = 'c'.repeat(64)
   const as = (author: ThreadData['root']['author'], by: string): ThreadData => ({ ...thread, root: { ...thread.root, author, by } })
-  const menuOffered = () => screen.queryAllByRole('button', { name: 'Message actions' }).length > 0
+  const menuOffered = () => {
+    pointAtAll()
+    return screen.queryAllByRole('button', { name: 'Message actions' }).length > 0
+  }
 
   it('is not offered on an agent’s message, even to a viewer who may own it (SHI-29)', () => {
     render(<ThreadListView threads={[as({ name: 'Claude', bot: true }, AGENT)]} onStart={async () => true} onReply={async () => true} viewer={HUMAN} onEditMessage={vi.fn()} onDeleteMessage={vi.fn()} />)

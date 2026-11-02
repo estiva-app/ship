@@ -1,8 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import type { UnreadByThread } from '@/components/ConversationThread'
+import type { Resolution } from '@/api'
+import type { ThreadData, UnreadByThread } from '@/components/ConversationThread'
 import { useFakeRelay } from '@/fixtures/fakeRelay'
 import { MentionListView, ThreadListView } from './ThreadList'
-import { STORY_ME, STORY_MENTIONS, STORY_PEOPLE, STORY_REACTIONS, STORY_THREADS } from './stories.fixtures'
+import { STORY_DELETED, STORY_ME, STORY_MENTIONS, STORY_PEOPLE, STORY_QUOTED, STORY_REACTIONS, STORY_RESOLVED, STORY_THREADS, STORY_URGENT } from './stories.fixtures'
 
 /**
  * The conversations on a project or an issue. Everything here really runs —
@@ -11,9 +12,9 @@ import { STORY_ME, STORY_MENTIONS, STORY_PEOPLE, STORY_REACTIONS, STORY_THREADS 
  * against a pretend relay (`fakeRelay`). Type "refuse" to see the relay say
  * no: the text stays. A file over 5 MB is refused in the relay's words.
  */
-function Conversations({ empty = false, signedOut = false, unread }: { empty?: boolean; signedOut?: boolean; unread?: UnreadByThread }) {
-  const relay = useFakeRelay({ threads: empty ? [] : STORY_THREADS, mentioned: STORY_MENTIONS, people: STORY_PEOPLE, me: STORY_ME, reactions: STORY_REACTIONS, unread, signedOut })
-  return <ThreadListView {...relay.conversations} />
+function Conversations({ empty = false, signedOut = false, unread, resolvedBy, first = [] }: { empty?: boolean; signedOut?: boolean; unread?: UnreadByThread; resolvedBy?: Record<string, Resolution>; first?: ThreadData[] }) {
+  const relay = useFakeRelay({ threads: empty ? [] : [...first, ...STORY_THREADS], mentioned: STORY_MENTIONS, people: STORY_PEOPLE, me: STORY_ME, reactions: STORY_REACTIONS, unread, signedOut })
+  return <ThreadListView {...relay.conversations} resolvedBy={resolvedBy} />
 }
 
 function Mentioned({ empty = false, truncated = 0 }: { empty?: boolean; truncated?: number }) {
@@ -40,10 +41,11 @@ export default meta
 type Story = StoryObj<typeof meta>
 
 /**
- * A card per conversation. Under each message and reply, its reactions then
- * the add-reaction button; under a first message, the replies button ("💬 2",
- * or the icon alone). "…" is always there. A picture, a text file, a linked
- * issue and an edit are in the sample.
+ * The kit's cards, in Ship's words, still in the Activity tab (ONE-6, step 3):
+ * a comment per conversation, its replies row (faces, how many, the last time)
+ * and its thread opening under it, one at a time. React, Reply and "Message
+ * actions" show on hover. A picture, a text file, a linked issue and an edit
+ * are in the sample.
  */
 export const Default: Story = {}
 
@@ -68,3 +70,15 @@ export const MentionedInEmpty: StoryObj<typeof Mentioned> = { render: () => <Men
 
 /** More than the horizon: the list says how many it left out rather than implying there are none. */
 export const MentionedInTruncated: StoryObj<typeof Mentioned> = { render: () => <Mentioned truncated={12} /> }
+
+/** A comment resolved in Peek: "✓ Resolved" by its time, and who resolved it with the note above its replies. Ship offers no Resolve. */
+export const ResolvedInPeek: Story = { args: { resolvedBy: STORY_RESOLVED } }
+
+/** A comment that was deleted: "This comment was deleted.", its replies under it, and in place of the box, why no reply can be written. */
+export const DeletedComment: Story = { args: { first: [STORY_DELETED] } }
+
+/** A comment written on words in Leaf: the words it quotes, under the name. */
+export const QuotedInLeaf: Story = { args: { first: [STORY_QUOTED] } }
+
+/** A new comment naming you urgently: the amber mark and edge until it is read. */
+export const UrgentForYou: Story = { args: { first: [STORY_URGENT], unread: { m10: ['m10'] } } }

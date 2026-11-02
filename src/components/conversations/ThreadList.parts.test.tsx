@@ -106,7 +106,7 @@ describe('a pasted block link', () => {
     expect(card?.textContent).toContain('This part was deleted')
     expect(c.querySelector('[data-anchor]')).toBeNull()
     // Above the text, as the subject of the remark.
-    expect(card!.compareDocumentPosition(c.querySelector('[data-message] .break-words')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(card!.compareDocumentPosition(c.querySelector('[data-comment-body] [data-message-text]')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
   it('draws the block of a link the link reader has not answered, from the link naming its file, as Peek does', () => {

@@ -538,12 +538,14 @@ async function main() {
 
   // ── Comment, reply, assignee ──────────────────────────────────────────────
   const conversations = sectionFor('Conversations')
+  /** Every message drawn: the kit's cards, a comment's body and each reply (ONE-6), what the hand-made `<article>` was. */
+  const MESSAGES = '[data-comment-body], [data-reply-id]'
   const startBox = () => sectionFor('Conversations').getByRole('textbox', { name: 'Start a conversation…' })
   await startBox().click()
   await page.keyboard.type('Blocked on the Stripe key.')
   // Enter sends, as in every app's box (COMM-7).
   await page.keyboard.press('Enter')
-  await conversations.locator('article').first().waitFor()
+  await conversations.locator(MESSAGES).first().waitFor()
 
   const comment = stored.find((e) => e.kind === 1111)
   const issueAddr = `30851:${issue!.pubkey}:${tagValue(issue!, 'd')}`
@@ -676,7 +678,7 @@ async function main() {
     absence of `naddr1` passes just as well when the whole body has been deleted,
     which is the bug this replaced.
   */
-  const posted = conversations.locator('article').first()
+  const posted = conversations.locator('[data-comment-body]').first()
   check(
     'the comment reads as what was typed',
     (await posted.textContent())?.includes('Blocked on the Stripe key.') ?? false,
@@ -686,13 +688,14 @@ async function main() {
     !(await conversations.textContent())?.includes('naddr1'),
   )
 
-  // The reply box opens from the small reply button under a message with none yet (Katerina, 29 September).
+  // The reply box opens from Reply on the comment's strip, shown while the comment is pointed at (the kit's card).
+  await conversations.locator('[data-comment-body]').first().hover()
   await conversations.getByRole('button', { name: 'Reply', exact: true }).first().click()
   await conversations.getByRole('textbox', { name: 'Reply…' }).first().click()
   await page.keyboard.type('Key is in 1Password now.')
   await page.keyboard.press('Enter')
   await page.waitForFunction(
-    () => document.querySelectorAll('section article').length >= 2,
+    () => document.querySelectorAll('section [data-comment-body], section [data-reply-id]').length >= 2,
   )
   // A flat kind:1111 naming the comment — SHI-28, SPEC §6.4 *Replies*.
   const reply = stored.filter((e) => e.kind === 1111 && e.id !== comment?.id).at(-1)
@@ -705,7 +708,7 @@ async function main() {
     '  …and the object with the comment’s own A, with no lowercase a',
     !!reply && !!comment && tagValue(reply, 'A') === tagValue(comment, 'A') && tagValue(reply, 'a') === undefined,
   )
-  check('  …and renders nested', (await conversations.locator('article').count()) === 2)
+  check('  …and renders nested', (await conversations.locator(MESSAGES).count()) === 2)
 
   /*
     Deleting a comment — CON-3, read off the screen rather than off the event.
@@ -733,7 +736,10 @@ async function main() {
     and the re-read are both round trips, and the re-read is what proves the
     edit came back through `foldEdits` rather than being patched in locally.
   */
-  await conversations.getByRole('button', { name: 'Message actions' }).nth(1).click()
+  // The reply's ⋯, on its strip while it is pointed at.
+  const edited = conversations.locator('[data-reply-id]').first()
+  await edited.hover()
+  await edited.getByRole('button', { name: 'Message actions' }).click()
   await page.getByRole('menuitem', { name: 'Edit message' }).click()
   /*
     Typed rather than `fill()`ed, and that is not a stylistic choice: `fill` set
@@ -788,12 +794,19 @@ async function main() {
   )
   check('  …and the message marked as edited', (await conversations.textContent())?.includes('edited') ?? false)
 
-  const replyMenus = await conversations.getByRole('button', { name: 'Message actions' }).count()
+  // Each card shows its ⋯ while it is pointed at: point at each in turn.
+  let replyMenus = 0
+  for (const card of await conversations.locator(MESSAGES).all()) {
+    await card.hover()
+    if ((await conversations.getByRole('button', { name: 'Message actions' }).count()) > 0) replyMenus++
+  }
   check('every message offers a delete, not just your own', replyMenus === 2)
-  await conversations.getByRole('button', { name: 'Message actions' }).nth(1).click()
+  const deleted = conversations.locator('[data-reply-id]').first()
+  await deleted.hover()
+  await deleted.getByRole('button', { name: 'Message actions' }).click()
   await page.getByRole('menuitem', { name: 'Delete message' }).click()
   await page.getByRole('button', { name: 'Delete message' }).click()
-  await page.waitForFunction(() => document.querySelectorAll('section article').length === 1)
+  await page.waitForFunction(() => document.querySelectorAll('section [data-comment-body], section [data-reply-id]').length === 1)
   const deletion = stored.find((e) => e.kind === 5 && e.tags.some((t) => t[0] === 'e' && t[1] === reply!.id))
   check('deleting a comment publishes a kind:5 naming it', !!deletion)
   /* The event form, not the address form: a comment is a regular event, and the
@@ -873,6 +886,8 @@ async function main() {
   check('an unsent message survives a reload', (await textOf(startBox())) === draft, await textOf(startBox()))
 
   // The reply box on the same page is a different destination and must be empty.
+  // Reply on the comment's strip, while it is pointed at; or its replies row.
+  await afterReload.locator('[data-comment-body]').first().hover()
   await afterReload.getByRole('button', { name: /^(Reply$|\d+ repl)/ }).first().click()
   const replyBox = afterReload.getByRole('textbox', { name: 'Reply…' }).first()
   await replyBox.waitFor()
@@ -883,8 +898,8 @@ async function main() {
   // The start box is the first on the page; its Send is the first Send.
   await afterReload.getByRole('button', { name: 'Send', exact: true }).first().click()
   await page.waitForFunction(
-    (n) => document.querySelectorAll('section article').length > n,
-    await afterReload.locator('article').count(),
+    (n) => document.querySelectorAll('section [data-comment-body], section [data-reply-id]').length > n,
+    await afterReload.locator('[data-comment-body], [data-reply-id]').count(),
   )
   await page.reload()
   await page.waitForSelector('[data-surface="issue"][data-tab="activity"]', { timeout: 10000 })

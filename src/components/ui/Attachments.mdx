@@ -1,0 +1,34 @@
+import { Meta } from '@storybook/addon-docs/blocks'
+
+<Meta title="Primitives/Attachments" />
+
+# Attachments
+
+Every file on one message, in the order the sender attached them: one `Attachment` each, laid out in a row that wraps.
+
+**Seen in** — a comment and a reply on the kit's cards, and a message under "Mentioned in", between its words and its cards. The card itself has its own page in `@estiva-app/ui` (*Links & references/AttachmentCard*), with every state.
+
+## When
+
+- Under a message's words, before the cards it shows: where Ship has always drawn its files (SHI-2).
+- With the message's `files` as they are now: an edit's whole set, folded beside the fold.
+
+## When not
+
+- One file on its own → **Attachment**.
+- A file in a box being written → the box's own files, which **CommentBox** draws.
+
+## How
+
+```tsx
+import { Attachments } from '@/components/ui/Attachment'
+
+<Attachments files={message.files} />
+```
+
+- Nothing to draw, it draws nothing: pass the message's files as they are.
+
+## What it owns
+
+- **The order** the sender attached them in, and the row they wrap in.
+- **Each file's fetch and thumbnail**, through `Attachment`, with this reader's authorization.

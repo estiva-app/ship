@@ -41,17 +41,28 @@ const thread: ThreadData = {
 /** The same thread with the viewer, the agent, writing both messages: both are its own to delete. */
 const own: ThreadData = { ...thread, replies: [{ ...thread.replies[0], author: thread.root.author, by: AGENT }] }
 
-// Changed on purpose: replies are folded behind the replies button, so the thread is opened to reach the reply's menu.
+// Replies wait behind the kit's replies row, so the thread is opened to reach the reply's menu.
 function open(onDeleteMessage?: (id: string) => Promise<boolean | void> | boolean | void, threads = [own], viewer = AGENT) {
   const view = render(
     <ThreadListView threads={threads} onStart={async () => true} onReply={async () => true} onDeleteMessage={onDeleteMessage} viewer={viewer} />,
   )
-  fireEvent.click(screen.getByRole('button', { name: '1 reply' }))
+  fireEvent.click(screen.getByRole('button', { name: '1 reply, open the thread' }))
   return view
 }
 
+/** The kit's cards show their `…` while pointed at: point at every message drawn, the comment first. */
+const pointAtAll = () => {
+  for (const words of ['Opening line.', 'A reply.']) {
+    const shown = screen.queryByText(words)
+    if (shown) fireEvent.mouseEnter(shown)
+  }
+}
+
 /** The `…` triggers, in render order: the root's, then each reply's. */
-const actions = () => screen.getAllByRole('button', { name: 'Message actions' })
+const actions = () => {
+  pointAtAll()
+  return screen.getAllByRole('button', { name: 'Message actions' })
+}
 
 describe('the delete control', () => {
   it('is offered only on the viewer’s own message — not on an agent’s (SPEC §6.5, SHI-29)', () => {
@@ -62,11 +73,13 @@ describe('the delete control', () => {
 
   it('is offered on nothing when nobody is signed in', () => {
     render(<ThreadListView threads={[own]} onStart={async () => true} onReply={async () => true} onDeleteMessage={vi.fn()} />)
+    pointAtAll()
     expect(screen.queryAllByRole('button', { name: 'Message actions' })).toHaveLength(0)
   })
 
   it('is absent, not disabled, where nobody may write at all', () => {
     open(undefined)
+    pointAtAll()
     expect(screen.queryAllByRole('button', { name: 'Message actions' })).toHaveLength(0)
   })
 
