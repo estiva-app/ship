@@ -15,7 +15,7 @@
  * here is deterministic, which is what makes "two apps agree on the state"
  * checkable rather than hopeful.
  */
-import { blockAnchorOf, contentFormatOf, type ContentFormat, type SignedEvent } from '@estiva-app/protocol'
+import { blockAnchorOf, contentFormatOf, quoteOf, type ContentFormat, type Quote, type SignedEvent } from '@estiva-app/protocol'
 import { DEFAULT_ISSUE_STATUS, DEFAULT_PROJECT_STATUS, KIND } from './kinds'
 import { summaryText } from './summary'
 
@@ -356,6 +356,13 @@ export interface Message {
    * tells those apart, and §13.6 forbids collapsing them.
    */
   blockId?: string
+  /**
+   * The words a comment quotes, when it was written on a selection (Leaf,
+   * LEAF-7): its `quote` tag, read by the protocol's rule. Undefined on a
+   * comment on whole blocks or the whole file, and on a `kind:9`.
+   * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-comment-points-at-blocks-and-the-words-quoted.md
+   */
+  quote?: Quote
 }
 
 /**
@@ -383,6 +390,14 @@ export interface Conversation {
   createdAt: number
   /** Newest message in the thread — what a list should sort on. */
   lastAt: number
+  /**
+   * The message the thread hangs from is not in the read: it was deleted (the
+   * relay stops returning a deleted event, and a thread is read whole). `root`
+   * is then the earliest reply, standing in for it as before; the one
+   * conversation draws "This comment was deleted." in its place, with every
+   * message under it and no new reply (PER-24, as Peek draws it).
+   */
+  rootMissing?: true
 }
 
 /**
@@ -478,6 +493,7 @@ function parseNip22Comment(
     ],
     ...(tag(event, 'A') ? { anchor: tag(event, 'A') } : {}),
     ...(blockAnchorOf(event) ? { blockId: blockAnchorOf(event) } : {}),
+    ...(quoteOf(event) ? { quote: quoteOf(event) } : {}),
   }
 }
 
@@ -496,7 +512,8 @@ function foldConversations(messages: Message[]): Conversation[] {
     // truncated history, or a reply that arrived before its parent — and a
     // thread with no visible root is still worth showing, so the earliest
     // message stands in rather than the whole conversation disappearing.
-    const root = group.find((message) => message.id === id) ?? group[0]
+    const found = group.find((message) => message.id === id)
+    const root = found ?? group[0]
     // A reply copies its comment's `block` (SPEC §13.6): the thread's place,
     // which the root already shows, so a reply draws none of its own. A reply
     // standing in for a deleted comment keeps it, and with it the thread's place.
@@ -509,6 +526,7 @@ function foldConversations(messages: Message[]): Conversation[] {
       about: [...new Set(group.flatMap((message) => message.about))],
       createdAt: root.createdAt,
       lastAt: group[group.length - 1].createdAt,
+      ...(found ? {} : { rootMissing: true as const }),
     })
   }
   conversations.sort((a, b) => b.lastAt - a.lastAt)
