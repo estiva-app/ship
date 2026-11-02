@@ -1,7 +1,7 @@
 import { readTopicChoices } from '@/api/foreign'
 import { useFileTopics } from '@/api/useFileTopics'
-import { FileTopics } from '@/components/FileTopics'
-import { act, type Say } from './act'
+import { FileTopics } from './FileTopics'
+import { act, type Say } from '@/pages/act'
 
 /**
  * The rail's Topics for the issue or project page (TOP-5): its topics read and

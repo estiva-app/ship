@@ -1,0 +1,39 @@
+import { Meta } from '@storybook/addon-docs/blocks'
+
+<Meta title="Issues/FileTopicsOf" />
+
+# FileTopicsOf
+
+The Topics in an issue's or a project's rail, read and changed by the file's
+id (TOP-5): `FileTopics` fed by `useFileTopics`, a refusal said as every
+other write's is.
+
+**Seen in** none of its own: it reads and writes production, so no story can
+draw it. Its look is `FileTopics`, drawn in the `Issues/IssueRail` stories
+Topics and NoTopics.
+
+## When
+
+- In the `topics` slot of `IssueRail` and `ProjectRail`, from the issue page
+  and the project page, with the file's `d` and the page's `say`.
+
+## When not
+
+- **A story or a test** draws `FileTopics` with its own `topics` and
+  `readChoices`: this one reads and writes production.
+- **A file of another app** (a Leaf document): its own app draws its topics.
+
+## How
+
+```tsx
+rail={{ …, topics: <FileTopicsOf file={issue.id} say={say} /> }}
+```
+
+## What it owns
+
+- Reading the topics that list the file, once and again after each write; no
+  live watch, as the project promises "after a reload".
+- Add to topic and Remove as one entry on the topic's list, in the topic's
+  Folder, shown at once and taken back when the relay refuses it, with the
+  relay's reason.
+- No workspace re-read: a topic's list is not in Ship's fold.

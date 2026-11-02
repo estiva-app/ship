@@ -18,7 +18,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { IssueView } from '@/views/IssueView'
 import { go, href, type IssueTab } from '../router'
 import { act, actInField, sayOnceLeft, type Say } from './act'
-import { FileTopicsOf } from './topics'
+import { FileTopicsOf } from '@/components/FileTopicsOf'
 import { activityFor, cardEditOf, copyText, folderOfMessage, railPeople, refreshAfter, threadFor, useMentionLinks, withElsewhere } from './ProjectPage'
 import { useReferencePage } from '@/api/references'
 
