@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { readFileTopics, type TopicOfFile } from './foreign'
 import { setListedInTopic, type WriteResult } from './writes'
 
@@ -21,6 +21,8 @@ export function useFileTopics(file: string | undefined): {
   const [state, setState] = useState<FileTopicsState>(undefined)
   const [busy, setBusy] = useState<ReadonlySet<string>>(new Set())
   const [nonce, setNonce] = useState(0)
+  /** Writes on their way: a read landing meanwhile is not drawn. */
+  const writing = useRef(0)
 
   useEffect(() => {
     setState(undefined)
@@ -30,7 +32,8 @@ export function useFileTopics(file: string | undefined): {
     if (!file) return
     let live = true
     readFileTopics(file)
-      .then((topics) => live && setState(topics))
+      // A read that started before a write still on its way would draw the list without it: the write's own re-read follows.
+      .then((topics) => live && writing.current === 0 && setState(topics))
       // A failed re-read keeps what was read; only a failed first read says so.
       .catch(() => live && setState((held) => (held === undefined ? 'failed' : held)))
     return () => {
@@ -55,8 +58,9 @@ export function useFileTopics(file: string | undefined): {
           return put ? [...without, topic].sort((a, b) => a.title.localeCompare(b.title)) : without
         })
       mark(true)
+      writing.current += 1
       apply(listed)
-      const result = await setListedInTopic(topic, file, listed)
+      const result = await setListedInTopic(topic, file, listed).finally(() => (writing.current -= 1))
       if (!result.ok) apply(!listed)
       mark(false)
       setNonce((n) => n + 1)

@@ -55,7 +55,7 @@ export function FileTopics({ topics, busy, onChange, readChoices }: {
         <div className="flex flex-wrap items-center gap-1">
           {topics.map((topic) => (
             <span key={topic.address} className="flex items-center" data-file-topic={topic.address}>
-              <Chip label={topic.title} leadingIcon={<KindIcon kind="topic" size={14} tone="inherit" />} href={topic.openUrl} />
+              <Chip label={topic.title} leadingIcon={<KindIcon kind="topic" size={14} tone="inherit" />} href={topic.openUrl} onClick={(event) => openBeside(event, topic.openUrl)} />
               {!topic.archived && !busy.has(topic.address) && (
                 <IconButton variant="muted" aria-label={`Remove from ${topic.title}`} tooltip={`Remove from ${topic.title}`} onClick={() => onChange(topic, false)}>
                   <IconX size={12} stroke={1.5} />
@@ -84,6 +84,23 @@ export function FileTopics({ topics, busy, onChange, readChoices }: {
 }
 
 /**
+ * Every typed word starts a word of the title, in any order: search matches
+ * word starts only, everywhere (Miky, 2026-10-19).
+ * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/search-matches-every-word-as-a-word-start.md
+ */
+function startsWords(title: string, words: readonly string[]): boolean {
+  const own = title.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean)
+  return words.every((word) => own.some((w) => w.startsWith(word)))
+}
+
+/** Another app's page, beside Ship rather than in its place, as every other file of another app opens. */
+function openBeside(event: { preventDefault: () => void }, url: string | undefined) {
+  if (!url) return
+  event.preventDefault()
+  window.open(url, '_blank', 'noopener,noreferrer')
+}
+
+/**
  * Add to topic's picker, in the kit's palette as Peek's Add file is: the
  * topics you are a member of first, then every other topic you can read, each
  * A–Z, as Peek's Topics screen splits them; archived ones and the ones already
@@ -107,10 +124,10 @@ function AddToTopic({ listed, readChoices, onPick, onClose }: {
       live = false
     }
   }, [readChoices])
-  const words = query.trim().toLowerCase()
+  const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean)
   const rows = (topics: readonly TopicOfFile[]): CommandPaletteRow[] =>
     topics
-      .filter((topic) => !listed.includes(topic.address) && (!words || topic.title.toLowerCase().includes(words)))
+      .filter((topic) => !listed.includes(topic.address) && startsWords(topic.title, words))
       .map((topic) => ({ id: topic.address, label: topic.title, icon: <KindIcon kind="topic" tone="inherit" />, onSelect: () => onPick(topic) }))
   const groups = typeof choices === 'object' ? [{ label: 'Your topics', rows: rows(choices.yours) }, { label: 'Other topics', rows: rows(choices.others) }].filter((group) => group.rows.length > 0) : []
   return (
@@ -121,7 +138,7 @@ function AddToTopic({ listed, readChoices, onPick, onClose }: {
         placeholder="Find a topic…"
         groups={groups}
         pending={choices === undefined ? 'Reading topics…' : undefined}
-        empty={choices === 'failed' ? 'Topics could not be read.' : words ? `No topic is called “${query.trim()}”.` : 'No topic to add it to.'}
+        empty={choices === 'failed' ? 'Topics could not be read.' : words.length ? `No topic is called “${query.trim()}”.` : 'No topic to add it to.'}
       />
     </CommandPalette>
   )

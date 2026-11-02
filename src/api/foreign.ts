@@ -44,6 +44,7 @@ import {
 export { pickWidget } from '@estiva-app/interop'
 import { KIND_CHANGE, membersOf, type ReferenceCandidate } from '@estiva-app/conversation'
 import { relatedTo } from '@/lib/ownKinds'
+import { safeLink } from '@/lib/handoff'
 import { relay, signer } from './store'
 
 export type { ForeignObject, ResolvedSlot, FolderContents, FolderSummary } from '@estiva-app/interop'
@@ -325,7 +326,8 @@ function topicsAsDrawn(roots: ReadonlyMap<string, SignedEvent>, objects: readonl
     const root = object.address ? roots.get(object.address) : undefined
     const folder = root ? folderOf(root) : null
     if (!root || !folder || object.unreachable) return []
-    return [{ address: object.address!, folder, title: object.slots.title?.value || 'Untitled topic', openUrl: object.openUrl, archived: isArchived(object) }]
+    // https only: the link comes from a manifest anyone may publish until WOR-2.
+    return [{ address: object.address!, folder, title: object.slots.title?.value || 'Untitled topic', openUrl: safeLink(object.openUrl), archived: isArchived(object) }]
   })
 }
 
@@ -355,7 +357,8 @@ export async function readTopicChoices(): Promise<{ yours: TopicOfFile[]; others
   for (const root of await relay.queryAll([{ kinds: [KIND_TOPIC] }] as never)) {
     const address = `${root.kind}:${root.pubkey}:${root.tags.find((t) => t[0] === 'd')?.[1] ?? ''}`
     const held = roots.get(address)
-    if (!held || root.created_at > held.created_at) roots.set(address, root)
+    // Two versions of one record: the later created_at, then the lower id (§6.3).
+    if (!held || root.created_at > held.created_at || (root.created_at === held.created_at && root.id < held.id)) roots.set(address, root)
   }
   if (roots.size === 0) return { yours: [], others: [] }
   const addresses = [...roots.keys()]

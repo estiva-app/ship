@@ -68,4 +68,25 @@ describe('FileTopics, a project’s or an issue’s Topics in its rail (TOP-5)',
     expect(within(dialog).getByText('Roadmap')).toBeTruthy()
     expect(within(dialog).queryByText('Design')).toBeNull()
   })
+
+  it('matches every typed word at a word start, in any order, never inside a word', async () => {
+    const readChoices = vi.fn().mockResolvedValue({ yours: [topic('b', 'Widgets 2: build 1')], others: [DESIGN] })
+    render(<FileTopics topics={[]} busy={new Set()} onChange={vi.fn()} readChoices={readChoices} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Add to topic' }))
+    const dialog = await screen.findByRole('dialog')
+    await waitFor(() => expect(within(dialog).getByText('Design')).toBeTruthy())
+    const box = within(dialog).getByRole('combobox')
+    fireEvent.change(box, { target: { value: 'build wid' } })
+    expect(within(dialog).getByText('Widgets 2: build 1')).toBeTruthy()
+    fireEvent.change(box, { target: { value: 'dget' } })
+    expect(within(dialog).queryByText('Widgets 2: build 1')).toBeNull()
+  })
+
+  it('a topic opens in Peek beside Ship, not in Ship’s place', () => {
+    const open = vi.spyOn(window, 'open').mockReturnValue(null)
+    render(<FileTopics topics={[WIDGETS]} busy={new Set()} onChange={vi.fn()} readChoices={vi.fn()} />)
+    fireEvent.click(screen.getByRole('link', { name: /Widgets/ }))
+    expect(open).toHaveBeenCalledWith('https://peek.estiva.app/topic/w', '_blank', 'noopener,noreferrer')
+    open.mockRestore()
+  })
 })
