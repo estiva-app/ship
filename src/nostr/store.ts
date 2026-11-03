@@ -567,11 +567,13 @@ export class Store {
    * the project alone.
    *
    * **In order, stopping at the first refusal, and nothing at all if either
-   * side has no state** — the planner's rules. `moveRefused` reads a refusal
-   * (`readMoveRefusal`): nothing moved, or which Folders still list it, which
-   * moving again fixes. `refused` is a move planned as unsafe, before anything
-   * was sent — `target-is-private` included: a project's root carries no `h`,
-   * so it is readable by the whole workspace wherever it is listed.
+   * side has no state** — the planner's rules. `moveRefused` reads where it
+   * stopped (`readMoveRefusal`): nothing moved, or which Folders still list
+   * it, which moving again fixes — with the relay's `reason`, or what this
+   * side `threw` (the signer, the network) on any command, not only the
+   * first. `refused` is a move planned as unsafe, before anything was sent —
+   * `target-is-private` included: a project's root carries no `h`, so it is
+   * readable by the whole workspace wherever it is listed.
    */
   async moveProject(args: {
     project: string
@@ -580,7 +582,7 @@ export class Store {
     to: FolderRef
     /** Each source Folder's files (`FolderContents.files`, archived included), by Folder id. */
     listings?: ReadonlyMap<string, readonly MovableFile[]>
-  }): Promise<{ refused?: MoveRefusal; moveRefused?: ReturnType<typeof readMoveRefusal> }> {
+  }): Promise<{ refused?: MoveRefusal; moveRefused?: ReturnType<typeof readMoveRefusal> & { reason?: string; httpStatus?: number; threw?: unknown } }> {
     assertFolderId(args.to.id)
     // One move from each source, naming what it lists beneath the project (SHI-37, TEA-3).
     const plan = planMoveFromFolders(this.signer.pubkey, Date.now(), {
@@ -590,8 +592,17 @@ export class Store {
       listings: args.listings ?? new Map(),
     })
     if (!plan.ok) return { refused: plan.reason }
-    const { refusedAt, result } = await this.publishInOrder(plan.events)
-    return refusedAt === undefined ? {} : { moveRefused: readMoveRefusal(plan.events, refusedAt, result.reason) }
+    for (const [index, event] of plan.events.entries()) {
+      let result: PublishResult
+      try {
+        result = await this.publish(event)
+      } catch (threw) {
+        // The earlier moves stand: a signer or a network failing on a later one is still a half move.
+        return { moveRefused: { ...readMoveRefusal(plan.events, index, undefined), threw } }
+      }
+      if (!result.ok) return { moveRefused: { ...readMoveRefusal(plan.events, index, result.reason), reason: result.reason, httpStatus: result.httpStatus } }
+    }
+    return {}
   }
 
   /**

@@ -24,16 +24,16 @@ export function MoveProject({
   onClose,
 }: {
   project: Project
-  teams: readonly { id: string; name?: string; hasState: boolean; private?: boolean; company?: boolean; addresses?: readonly string[] }[]
+  teams: readonly { id: string; name?: string; hasState: boolean; private?: boolean; addresses?: readonly string[] }[]
   say: Say
   onClose: () => void
 }) {
   const folders: MoveProjectFolder[] = teams.map((team) => ({ id: team.id, name: team.name ?? 'Untitled Folder', hasState: team.hasState, ...(team.private ? { private: true } : {}) }))
   const here = new Set(placedIn({ addr: project.addr, folder: project.contentFolder }, teams).map((team) => team.id))
   const current = folders.filter((folder) => here.has(folder.id))
-  // Each one names the project: it is what is being moved, including out of its own Folder, where it may be held by containment
-  // while a topic under it is listed (`placedIn`'s fallback) — the planner then moves the two together.
-  const sources = teams.filter((team) => here.has(team.id)).map((team) => ({ id: team.id, hasState: team.hasState, addresses: [project.addr] }))
+  // What each one's state lists, as read: its own Folder, where `placedIn` puts a project no Folder lists, may hold none of
+  // it, and `moveProject` then places it rather than moving it out of a Folder that does not list it.
+  const sources = teams.filter((team) => here.has(team.id)).map((team) => ({ id: team.id, hasState: team.hasState, addresses: team.addresses }))
   const nameOf = (id: string) => folders.find((folder) => folder.id === id)?.name ?? 'Untitled Folder'
 
   return (
@@ -43,21 +43,29 @@ export function MoveProject({
       folders={folders}
       onClose={onClose}
       onMove={async (to) => {
-        let stillIn: { folder: string; reason: string }[] | undefined
+        let stillIn: { folder: string; why?: string } | undefined
+        let changed = false
         const ok = await act(
           'Move',
           async () => {
-            const result = await moveProject(project, sources, { ...to, company: teams.find((team) => team.id === to.id)?.company })
+            const result = await moveProject(project, sources, to)
             if (result.ok) stillIn = result.stillIn
+            else changed = !!result.changed
             return result
           },
           say,
           reloadFolders,
+          // Already Ship's sentence: "Nothing was moved: …".
+          (reason) => reason,
         )
-        if (!ok) return false
+        if (!ok) {
+          // A list changed since it was read: read the Folders again, so Move tries from where it is now.
+          if (changed) await reloadFolders()
+          return false
+        }
         if (stillIn) {
-          const names = stillIn.map(({ folder }) => nameOf(folder)).join(' and ')
-          say(`Moved to ${to.name}, but ${names} refused to let it go, so it is still listed there too — ${stillIn[0].reason}. Press Move to try again.`, 'error')
+          // Only the Folder whose move was refused is named; any after it were never asked.
+          say(`Moved to ${to.name}, but ${nameOf(stillIn.folder)} still lists it too${stillIn.why ? `: ${stillIn.why}` : '. Try moving it again.'}`, 'error')
           return false
         }
         say(`Moved to ${to.name}`)

@@ -22,9 +22,9 @@ import { clockProblem } from './clock'
 import { readFolderListing, readFolders } from './foreign'
 import { store } from './store'
 import { archiveProject, createFolder, createIssue, createProject, deleteProject, editMessage, moveProject, renameFolder, reply, setIssueField, setListedInTopic, setProjectField, startConversation } from './writes'
-import { addrToNaddr, type Relay, type SignedEvent, type UnsignedEvent } from '@estiva-app/protocol'
+import { addrToNaddr, Relay, type SignedEvent, type UnsignedEvent } from '@estiva-app/protocol'
 import { Store } from '../nostr/store'
-import type { Signer } from '../nostr/signer'
+import { SignerTokenExpired, type Signer } from '../nostr/signer'
 
 const s = store as unknown as Record<string, ReturnType<typeof vi.fn>>
 const PK = 'ab'.repeat(32)
@@ -357,51 +357,112 @@ describe('moving a project', () => {
   const FROM = { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', hasState: true }
   const TO = { id: TEAM.folder, hasState: true }
 
+  const OTHER = { id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', hasState: true }
+  const THIRD = { id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', hasState: true }
+  const listing = [{ ref: PROJECT.addr, address: PROJECT.addr }]
+  /** The real store and relay client, over a transport that answers each move as `answer` says: what the relay is sent, and what the person reads. */
+  const relayAnswering = (answer: (event: SignedEvent, index: number) => { status: number; body: unknown } = () => ({ status: 200, body: { accepted: true } })) => {
+    const sent: SignedEvent[] = []
+    const signer = { pubkey: PK, sign: async (unsigned: UnsignedEvent) => ({ ...unsigned, id: 'e'.repeat(64), sig: '0'.repeat(128) }) } as unknown as Signer
+    const fetch = async (_url: string, init: { body: string }) => {
+      const event = JSON.parse(init.body) as SignedEvent
+      sent.push(event)
+      const { status, body } = answer(event, sent.length - 1)
+      return { status, text: async () => JSON.stringify(body), headers: { get: () => null } }
+    }
+    const real = new Store(new Relay('https://relay.test', signer, { fetch: fetch as never, busyRetryDelaysMs: [] }), signer)
+    s.moveProject.mockImplementation((args: Parameters<Store['moveProject']>[0]) => real.moveProject(args))
+    return { sent, real, signer }
+  }
+  const refuse = (message: string) => ({ status: 200, body: { accepted: false, message } })
+  const tag = (event: SignedEvent, name: string) => event.tags.find((t) => t[0] === name)?.[1]
+  const wire = (sent: SignedEvent[]) => sent.map((event) => [event.kind, tag(event, 'op'), tag(event, 'h'), tag(event, 'from') ?? null, event.tags.filter((t) => t[0] === 'a').map((t) => t[1])])
+
   it('moves by address, from the Folders that list it, to the one chosen, with what each lists', async () => {
     const sub = { ref: 'sub', address: '30840:x:sub', parentRef: PROJECT.addr }
     vi.mocked(readFolderListing).mockResolvedValue([sub] as never)
-    s.moveProject.mockResolvedValue({})
+    const { sent } = relayAnswering()
     expect(await moveProject(PROJECT, [FROM], TO)).toEqual({ ok: true })
-    // The source's listing, read at the move (SPEC §3.3); the planner puts the project in it when its card did not resolve.
+    // The source's listing, read at the move (SPEC §3.3); the project is named beside what it lists under it, though its card did not resolve.
     expect(readFolderListing).toHaveBeenCalledWith(FROM.id, expect.any(Function))
-    expect(s.moveProject).toHaveBeenCalledWith({
-      project: PROJECT.addr,
-      from: [FROM],
-      to: TO,
-      listings: new Map([[FROM.id, [sub]]]),
-    })
+    expect(wire(sent)).toEqual([[1852, 'move', TO.id, FROM.id, [PROJECT.addr, sub.address]]])
+  })
+
+  it('a project its Folder is under but does not list is placed in the one chosen, not moved out of a Folder that holds none of it', async () => {
+    const { sent } = relayAnswering()
+    expect(await moveProject(PROJECT, [FROM], TO)).toEqual({ ok: true })
+    expect(wire(sent)).toEqual([[1852, 'add', TO.id, null, [PROJECT.addr]]])
   })
 
   it('sends nothing when a source cannot be read — what is under the project would be left behind', async () => {
     vi.mocked(readFolderListing).mockRejectedValue(new Error('rate-limited'))
-    expect(await moveProject(PROJECT, [FROM], TO)).toEqual({ ok: false, reason: expect.stringMatching(/could not be read/) })
+    expect(await moveProject(PROJECT, [FROM], TO)).toEqual({ ok: false, reason: 'Nothing was moved: the Folder it is in could not be read. Try again.' })
     expect(s.moveProject).not.toHaveBeenCalled()
   })
 
-  it('a move into a private Folder is refused, saying why', async () => {
-    s.moveProject.mockResolvedValue({ refused: 'target-is-private' })
-    expect(await moveProject(PROJECT, [FROM], { ...TO, private: true })).toEqual({ ok: false, reason: expect.stringMatching(/private/) })
+  it('a move into a private Folder is refused, saying why, and nothing is sent', async () => {
+    vi.mocked(readFolderListing).mockResolvedValue(listing as never)
+    const { sent } = relayAnswering()
+    expect(await moveProject(PROJECT, [FROM], { ...TO, private: true })).toEqual({ ok: false, reason: 'Nothing was moved: that Folder is private, and this project would stay readable by the whole workspace.' })
+    expect(sent).toEqual([])
   })
 
-  it('a move planned as unsafe is refused, saying why', async () => {
-    s.moveProject.mockResolvedValue({ refused: 'target-has-no-state' })
-    expect(await moveProject(PROJECT, [FROM], TO)).toEqual({ ok: false, reason: expect.stringMatching(/no list of its own/) })
+  it('a move into a Folder with no list of its own is refused, saying why, and nothing is sent', async () => {
+    vi.mocked(readFolderListing).mockResolvedValue(listing as never)
+    const { sent } = relayAnswering()
+    expect(await moveProject(PROJECT, [FROM], { ...TO, hasState: false })).toEqual({ ok: false, reason: 'Nothing was moved: that Folder has no list of its own, so adding to it would hide what is already there.' })
+    expect(sent).toEqual([])
   })
 
-  // TEA-3: the person reads Ship's words for why, never the relay's text.
+  // TEA-3: the relay's real refusals of the one move, and what the person reads for each — never the relay's text.
   it.each([
-    ['team-archived', 'one of the Folders is archived, so nothing was moved'],
-    ['not-a-member', 'you need to be a member of both Folders to move this, so nothing was moved'],
-    ['changed-meanwhile', 'the Folders changed since this opened, so nothing was moved. Try again'],
-    ['refused', 'the move was not accepted, so nothing was moved. Try again'],
-  ])('a refused move says why in Ship’s words: %s', async (why, reason) => {
-    s.moveProject.mockResolvedValue({ moveRefused: { why, nothingMoved: true, notMovedFrom: [] } })
-    expect(await moveProject(PROJECT, [FROM], TO)).toEqual({ ok: false, reason })
+    ["invalid: only the team's members mark or unmark its spaces", 'Nothing was moved: you need to be a member of both Folders to move this.'],
+    ['invalid: channel is archived', 'Nothing was moved: one of the Folders is archived.'],
+    ['invalid: team 31afb7af is archived; its list does not change', 'Nothing was moved: one of the Folders is archived.'],
+    [`invalid: the team a move leaves does not list ${PROJECT.addr}`, 'Nothing was moved: the Folders changed since you opened this. Try again.'],
+    ['invalid: the team a move leaves lists none of its files', 'Nothing was moved: the Folders changed since you opened this. Try again.'],
+    ["invalid: a topic is listed by one team: take it off the other team's list first", 'Nothing was moved: the Folders changed since you opened this. Try again.'],
+    ['invalid: rate-limited', 'Nothing was moved. Try again.'],
+  ])('the relay refusing the move with %j reads: %s', async (message, reason) => {
+    vi.mocked(readFolderListing).mockResolvedValue(listing as never)
+    const { sent } = relayAnswering(() => refuse(message))
+    expect(await moveProject(PROJECT, [FROM], TO)).toEqual({ ok: false, reason, ...(/Folders changed/.test(reason) ? { changed: true } : {}) })
+    expect(wire(sent)).toEqual([[1852, 'move', TO.id, FROM.id, [PROJECT.addr]]])
   })
 
-  it('a move refused after an earlier one is a move that says which Folder still lists it', async () => {
-    s.moveProject.mockResolvedValue({ moveRefused: { why: 'changed-meanwhile', nothingMoved: false, notMovedFrom: [FROM.id] } })
-    expect(await moveProject(PROJECT, [FROM], TO)).toEqual({ ok: true, stillIn: [{ folder: FROM.id, reason: 'the Folders changed since this opened' }] })
+  it('a refused second move leaves the first standing and names only the Folder that refused; the one after it is never sent', async () => {
+    vi.mocked(readFolderListing).mockResolvedValue(listing as never)
+    const { sent } = relayAnswering((_, index) => (index === 1 ? refuse('invalid: channel is archived') : { status: 200, body: { accepted: true } }))
+    expect(await moveProject(PROJECT, [FROM, OTHER, THIRD], TO)).toEqual({ ok: true, stillIn: { folder: OTHER.id, why: 'one of the Folders is archived.' } })
+    expect(wire(sent).map((move) => move[3])).toEqual([FROM.id, OTHER.id])
+  })
+
+  it('a second move refused for no reason Ship knows says only which Folder still lists it', async () => {
+    vi.mocked(readFolderListing).mockResolvedValue(listing as never)
+    relayAnswering((_, index) => (index === 1 ? refuse('invalid: rate-limited') : { status: 200, body: { accepted: true } }))
+    expect(await moveProject(PROJECT, [FROM, OTHER], TO)).toEqual({ ok: true, stillIn: { folder: OTHER.id } })
+  })
+
+  it('this side failing on the second move — a cancelled passkey, a busy relay, an ended sign-in — is said as that failure, after the first landed', async () => {
+    vi.mocked(readFolderListing).mockResolvedValue(listing as never)
+    const { signer } = relayAnswering()
+    const sign = signer.sign.bind(signer)
+    let signs = 0
+    signer.sign = async (unsigned) => (unsigned.kind === 1852 && ++signs === 2 ? Promise.reject(new Error('The operation either timed out or was not allowed.')) : sign(unsigned))
+    expect(await moveProject(PROJECT, [FROM, OTHER], TO)).toEqual({ ok: true, stillIn: { folder: OTHER.id, why: 'the move could not be sent. Try again.' } })
+
+    signs = 0
+    signer.sign = async (unsigned) => (unsigned.kind === 1852 && ++signs === 2 ? Promise.reject(new SignerTokenExpired()) : sign(unsigned))
+    expect(await moveProject(PROJECT, [FROM, OTHER], TO)).toEqual({ ok: true, stillIn: { folder: OTHER.id, why: 'your sign-in has ended. Sign in again.' } })
+
+    relayAnswering((_, index) => (index === 1 ? { status: 429, body: { error: 'rate-limited: quota exceeded; retry in 10s' } } : { status: 200, body: { accepted: true } }))
+    expect(await moveProject(PROJECT, [FROM, OTHER], TO)).toEqual({ ok: true, stillIn: { folder: OTHER.id, why: 'the relay is too busy right now. Try again shortly.' } })
+  })
+
+  it('this side failing on the first move is said as that failure, with nothing moved', async () => {
+    vi.mocked(readFolderListing).mockResolvedValue(listing as never)
+    relayAnswering(() => ({ status: 503, body: { error: 'overloaded' } }))
+    expect(await moveProject(PROJECT, [FROM], TO)).toEqual({ ok: false, reason: 'Nothing was moved: the relay is too busy right now. Try again shortly.' })
   })
 })
 

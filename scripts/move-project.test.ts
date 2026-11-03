@@ -28,14 +28,14 @@ const B = { id: '22222222-2222-4222-8222-222222222222', hasState: true }
 const C = { id: '33333333-3333-4333-8333-333333333333', hasState: true }
 
 let sent: UnsignedEvent[] = []
-/** Which move to refuse: the one out of Folder `from`, with the relay's `reason`. */
-let refuse: { from: string; reason: string } | undefined
+/** Which command to refuse: the move out of Folder `from`, or with `from: null` the add that names none, with the relay's `reason`. */
+let refuse: { from: string | null; reason: string } | undefined
 
 const tag = (event: UnsignedEvent, name: string) => event.tags.find((t) => t[0] === name)?.[1]
 const relay = {
   async publish(event: SignedEvent): Promise<PublishResult> {
     sent.push(event)
-    if (refuse && tag(event, 'from') === refuse.from) return { ok: false, reason: refuse.reason } as PublishResult
+    if (refuse && (tag(event, 'from') ?? null) === refuse.from) return { ok: false, reason: refuse.reason } as PublishResult
     return { ok: true } as PublishResult
   },
 } as unknown as Relay
@@ -44,7 +44,7 @@ const store = new Store(relay, signer)
 
 const shape = () =>
   sent.map((event) => `${event.kind} ${tag(event, 'op')} ${tag(event, 'h')?.slice(0, 1)}${tag(event, 'from') ? `<${tag(event, 'from')!.slice(0, 1)}` : ''} ${tag(event, 'a') === PROJECT ? 'project' : tag(event, 'a')}`)
-function reset(refusal?: { from: string; reason: string }) {
+function reset(refusal?: { from: string | null; reason: string }) {
   sent = []
   refuse = refusal
 }
@@ -53,7 +53,7 @@ function reset(refusal?: { from: string; reason: string }) {
 reset()
 let result = await store.moveProject({ project: PROJECT, from: [A], to: B })
 check('a move is one move into the target, naming the source', JSON.stringify(shape()) === JSON.stringify(['1852 move 2<1 project']), shape().join(' | '))
-check('…and it was accepted', result.moveRefused === undefined && result.refused === undefined)
+check('…and it was accepted: nothing is reported', JSON.stringify(result) === '{}', JSON.stringify(result))
 check('no kind:1851 — the conversation keeps its Folder', sent.every((event) => event.kind === 1852))
 
 // 2. and 3. A Folder without state: refused, nothing sent.
@@ -65,7 +65,7 @@ result = await store.moveProject({ project: PROJECT, from: [{ ...A, hasState: fa
 check('out of a Folder with no state is refused before anything is sent', result.refused === 'source-has-no-state' && sent.length === 0)
 
 // 4. The move refused: nothing moved, read in the app's terms.
-reset({ from: A.id, reason: 'invalid: team 11111111 is archived' })
+reset({ from: A.id, reason: 'invalid: team 11111111 is archived; its list does not change' })
 result = await store.moveProject({ project: PROJECT, from: [A], to: B })
 check('a refused move is read: an archived team, nothing moved', result.moveRefused?.why === 'team-archived' && result.moveRefused.nothingMoved && sent.length === 1)
 
@@ -76,10 +76,10 @@ check('in A and B, moved to B: one move from A', JSON.stringify(shape()) === JSO
 reset()
 result = await store.moveProject({ project: PROJECT, from: [A, C], to: B })
 check('in A and C, moved to B: one move from each, in order', JSON.stringify(shape()) === JSON.stringify(['1852 move 2<1 project', '1852 move 2<3 project']), shape().join(' | '))
-reset({ from: C.id, reason: 'invalid: 33333333 does not list it' })
+reset({ from: C.id, reason: `invalid: the team a move leaves does not list ${PROJECT}` })
 result = await store.moveProject({ project: PROJECT, from: [A, C], to: B })
 check('…the second refused: C still lists it, and the first stands', result.moveRefused?.why === 'changed-meanwhile' && !result.moveRefused.nothingMoved && JSON.stringify(result.moveRefused.notMovedFrom) === JSON.stringify([C.id]))
-reset({ from: A.id, reason: "invalid: only the team's members may move it" })
+reset({ from: A.id, reason: "invalid: only the team's members mark or unmark its spaces" })
 result = await store.moveProject({ project: PROJECT, from: [A, C], to: B })
 check('…the first refused: nothing more is sent', result.moveRefused?.why === 'not-a-member' && result.moveRefused.nothingMoved && sent.length === 1)
 
@@ -87,6 +87,9 @@ check('…the first refused: nothing more is sent', result.moveRefused?.why === 
 reset()
 result = await store.moveProject({ project: PROJECT, from: [], to: B })
 check('a project no Folder lists is only added', JSON.stringify(shape()) === JSON.stringify(['1852 add 2 project']), shape().join(' | '))
+reset({ from: null, reason: 'invalid: channel is archived' })
+result = await store.moveProject({ project: PROJECT, from: [], to: B })
+check('…and that add refused is read: an archived team, nothing moved', result.moveRefused?.why === 'team-archived' && result.moveRefused.nothingMoved && sent.length === 1, JSON.stringify(result))
 reset()
 result = await store.moveProject({ project: PROJECT, from: [B], to: B })
 check('a move to where it already is, and only there, sends nothing', sent.length === 0 && result.refused === undefined)
