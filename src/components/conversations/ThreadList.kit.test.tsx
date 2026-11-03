@@ -209,20 +209,21 @@ describe('the card under the comment', () => {
     expect(card?.querySelector('[aria-busy="true"]')).not.toBeNull()
   })
 
-  it('says "not available." for a file the reader cannot read, and draws that row at once the next time', async () => {
+  // The card's words for a file you can't open (Decided 2026-11-03, ALO-4): "You can't open this issue", no Open button.
+  it('says "You can\'t open this issue" for a file the reader cannot read, and draws that row at once the next time', async () => {
     objects.byReference[ref(CARD_ISSUE)] = null
     const first = show(THE_MESSAGE, { embeds: ITS_CARD })
-    await waitFor(() => expect(first.querySelector('[data-card]')?.textContent).toBe('Issue not available'))
+    await waitFor(() => expect(first.querySelector('[data-card]')?.textContent).toBe("You can't open this issue"))
     first.remove()
     // Next open, before the relay answers: the one-line row from the first paint, not a card's height.
     delete objects.byReference[ref(CARD_ISSUE)]
     const again = show(THE_MESSAGE, { embeds: ITS_CARD })
-    expect(again.querySelector('[data-card]')?.textContent).toBe('Issue not available')
+    expect(again.querySelector('[data-card]')?.textContent).toBe("You can't open this issue")
     noteCardAvailability(ref(CARD_ISSUE).replace(/^nostr:/, ''), true)
   })
 
   // SPEC §13.6.1, "deleted is not not-permitted" (Katerina, 30 Oct, widget review 56).
-  it('says "deleted" for a file a trusted deletion names, on its card and its chip, and "not available" for the rest', async () => {
+  it('says "deleted" for a file a trusted deletion names, on its card and its chip, and "You can\'t open" for the rest', async () => {
     objects.byReference[ref(CARD_ISSUE)] = null
     objects.byReference[ref(SENTENCE_ISSUE)] = null
     objects.deleted.add(ref(CARD_ISSUE))
@@ -232,15 +233,16 @@ describe('the card under the comment', () => {
     expect(sentence(c)).toBe('Look at Issue deleted today.')
     objects.deleted.clear()
     const other = show(THE_MESSAGE, { embeds: ITS_CARD })
-    await waitFor(() => expect(other.querySelector('[data-card]')?.textContent).toBe('Issue not available'))
+    await waitFor(() => expect(other.querySelector('[data-card]')?.textContent).toBe("You can't open this issue"))
     cleanup()
     noteCardAvailability(ref(CARD_ISSUE).replace(/^nostr:/, ''), true)
   })
 
-  it('says "not available." when its read fails with nothing remembered, never nothing, and does not remember it', async () => {
+  // A failed read is no answer about access (Decided 2026-11-03, ALO-4).
+  it('says "Couldn\'t load this issue" when its read fails with nothing remembered, never nothing, and does not remember it', async () => {
     objects.byReference[ref(CARD_ISSUE)] = 'FAILS'
     const first = show(THE_MESSAGE, { embeds: ITS_CARD })
-    await waitFor(() => expect(first.querySelector('[data-card]')?.textContent).toBe('Issue not available'))
+    await waitFor(() => expect(first.querySelector('[data-card]')?.textContent).toBe("Couldn't load this issue"))
     first.remove()
     // A failed read is not an answer: the next open waits for the card, at a card's height, not the one-line row.
     delete objects.byReference[ref(CARD_ISSUE)]
@@ -248,13 +250,12 @@ describe('the card under the comment', () => {
     expect(again.querySelector('[data-card] [aria-busy="true"]')).not.toBeNull()
   })
 
-  it('names another app’s file it cannot read by its app, its type having no name, with a way to open it there', async () => {
+  it('names another app’s file it cannot read by its app as written, its type having no name, with no Open button', async () => {
     objects.byReference[ref(TOPIC)] = { ...base(TOPIC, ''), unreachable: true, appName: 'Peek', openUrl: `https://peek.estiva.app/o/${TOPIC}` }
     const c = show(ref(TOPIC), { embeds: [{ value: TOPIC, layout: 'detailed' }] })
-    await waitFor(() => expect(c.querySelector('[data-card]')?.textContent).toContain('Peek not available'))
-    // The kit's Button "Open", the app in its name (ui 0.95; Katerina, 31 Oct).
-    expect(c.querySelector('[data-card] a')?.getAttribute('aria-label')).toBe('Open in Peek')
-    expect(c.querySelector('[data-card] a')?.textContent).toBe('Open')
+    // An app's name is where the file lives: "this file in Peek" (Decided 2026-11-03, ALO-4; ui 0.102.2).
+    await waitFor(() => expect(c.querySelector('[data-card]')?.textContent).toBe("You can't open this file in Peek"))
+    expect(c.querySelector('[data-card] a')).toBeNull()
   })
 })
 

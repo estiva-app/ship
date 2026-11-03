@@ -233,8 +233,8 @@ function CardBox({
   } else if (failed) {
     // A failed read (a busy relay, the network) with nothing to show draws the not-available row (or the URL it was
     // written as), never nothing, and the page's refresh keeps asking quietly (Katerina, 30 Oct). It is not remembered:
-    // it is not an answer.
-    link = notAvailable(uri, { url: opensAt })
+    // it is not an answer, so it says "Couldn't load", never "You can't open" (Decided 2026-11-03, ALO-4).
+    link = notAvailable(uri, { url: opensAt, failed: true })
   } else {
     link = openingAt(linkStateOf(uri, deleted ? null : object, { directory, onAct, conversation }, { url: opensAt, deleted }), opensAt)
   }

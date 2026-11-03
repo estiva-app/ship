@@ -89,12 +89,13 @@ describe('a pasted block link', () => {
   })
 
   // Changed on purpose (SPEC §13.6.1 "deleted is not not-permitted"; Katerina, 30 Oct, widget review 56): a trusted
-  // deletion naming the file says "deleted"; one the reader may not see says "not available". Neither shows a title.
-  it('says "deleted" for a file a trusted deletion names, and "not available" for one the reader may not see', () => {
+  // deletion naming the file says "deleted"; one the reader may not see says "You can't open this issue" (Decided
+  // 2026-11-03, ALO-4). Neither shows a title.
+  it('says "deleted" for a file a trusted deletion names, and "You can\'t open" for one the reader may not see', () => {
     const deleted = show(LINK, { state: 'deleted' }).querySelector('[data-part="deleted"]')?.textContent
     const unreadable = show(LINK, { state: 'unreadable' }).querySelector('[data-part="unreadable"]')?.textContent
     expect(deleted).toBe('A part of this issue deleted')
-    expect(unreadable).toBe('A part of this issue not available')
+    expect(unreadable).toBe("You can't open this issue")
     expect(deleted).not.toContain('Plan the launch')
   })
 

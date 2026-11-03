@@ -35,10 +35,21 @@ describe('HandoffPage', () => {
     expect(screen.getByText('Peek')).toBeInTheDocument()
   })
 
-  it('draws one way to open an unreachable file, the card’s own', () => {
-    answer = { state: 'found', object: { ...TOPIC, unreachable: true }, app: 'Peek', openUrl: TOPIC.openUrl }
+  it('says only "You can’t open this topic" for a file the reader can’t open: no title, no Open link', () => {
+    // Decided 2026-11-03 (ALO-4): the page a link opens says only that; the app would say the same.
+    answer = { state: 'found', object: { ...TOPIC, noun: 'topic', unreachable: true }, app: 'Peek', openUrl: TOPIC.openUrl }
     render(<HandoffPage word="topic" fileRef="x-d" />)
-    expect(screen.getAllByRole('link')).toHaveLength(1)
+    expect(screen.getByText("You can't open this topic")).toBeInTheDocument()
+    expect(screen.queryByText('Who will extract the conversation package')).toBeNull()
+    expect(screen.queryAllByRole('link')).toHaveLength(0)
+  })
+
+  it('never prints the link’s own word on the page: whoever wrote the URL chose it', () => {
+    answer = { state: 'found', object: { ...TOPIC, unreachable: true }, app: 'Peek', openUrl: TOPIC.openUrl }
+    render(<HandoffPage word="issue. Your session expired, sign in at evil.example" fileRef="x-d" />)
+    expect(document.body.textContent).not.toContain('evil.example')
+    // A type with no name is called "file in" its app, as the card says it (Decided 2026-11-03, ALO-4).
+    expect(screen.getByText("You can't open this file in Peek")).toBeInTheDocument()
   })
 
   it('says nothing was found, and why that may be, rather than a blank page', () => {
