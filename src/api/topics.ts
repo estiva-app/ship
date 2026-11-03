@@ -34,11 +34,28 @@ export function resetTopicsForTests(): void {
 /** The Topics page's read: `undefined` while the first one is out, `failed` when it did not land. */
 export type TopicsState = TopicsRead | 'failed' | undefined
 
-/** Every topic the reader can read, for the Topics page (SHIPS-3): read once per tab, the held answer at once. */
+/** Start reading the topics, for a route that will draw them before the page mounts; joins a read on the way. */
+export function prefetchTopics(): void {
+  void held.ensure(readAllTopics)
+}
+
+/**
+ * Every topic the reader can read, for the Topics page (SHIPS-3): the held
+ * answer at once, read afresh on each open as Add to topic is, so a topic
+ * started since shows. `failed` only once this open's read has failed: an
+ * error left by an earlier read is not this one's.
+ */
 export function useTopics(): TopicsState {
   const snapshot = useSyncExternalStore(held.subscribe, held.snapshot)
-  useEffect(() => void held.ensure(readAllTopics), [])
-  return snapshot.value ?? (snapshot.error === undefined ? undefined : 'failed')
+  const [settled, setSettled] = useState(false)
+  useEffect(() => {
+    let live = true
+    void (held.snapshot().value ? held.reload(readAllTopics) : held.ensure(readAllTopics)).finally(() => live && setSettled(true))
+    return () => {
+      live = false
+    }
+  }, [])
+  return snapshot.value ?? (settled && snapshot.error !== undefined ? 'failed' : undefined)
 }
 
 /** Try again after a failed read: read every topic now. */
@@ -57,7 +74,9 @@ export function useTopicConversations(read: TopicsRead | undefined): Map<string,
   const [muted, setMuted] = useState<ReadonlySet<string>>()
   const [conversations, setConversations] = useState<Map<string, TopicConversation>>()
 
+  // Asked again when the read state moves while the list would not decrypt (a busy nip44), rather than never.
   useEffect(() => {
+    if (muted) return
     let live = true
     void readMuted((filters) => relay.query(filters as never), (ciphertext) => nip44.decrypt(ciphertext), signer.pubkey)
       .then((keys) => live && keys && setMuted(keys))
@@ -65,7 +84,7 @@ export function useTopicConversations(read: TopicsRead | undefined): Map<string,
     return () => {
       live = false
     }
-  }, [])
+  }, [muted, merged])
 
   useEffect(() => {
     if (!read || !merged || !muted) return
