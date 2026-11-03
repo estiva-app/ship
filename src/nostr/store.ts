@@ -415,9 +415,11 @@ export class Store {
   /**
    * The current fields of the projects `addrs` names, read by the list read —
    * and for each one in `opened`, its current text as well (§6.13: one text,
-   * however long its history). A deleted project is not in a list read, so it
-   * is opened by `#d` too: that answers its `deleted` change and who signed it,
-   * for its link's notice and the Archived view's deleted filter.
+   * however long its history). A deleted project is in no read by its fields,
+   * `#d` included (§6.13), but stays readable by its id: its changes are read
+   * plainly by `#a`, which answers its `deleted` change and who signed it, for
+   * its link's notice and the Archived view's deleted filter. On production
+   * 3 Nov that was 18 of 154 projects, each a few changes.
    */
   private async projectFileEvents(read: QueryFn, fields: ProjectFields, roots: readonly SignedEvent[], opened: ReadonlySet<string>, scope: 'all' | 'these' = 'all'): Promise<SignedEvent[]> {
     const own = roots.filter((root) => root.kind === KIND.PROJECT)
@@ -425,15 +427,23 @@ export class Store {
     if (scope === 'these' && !own.length) return []
     const listed = await listFiles(read, { kinds: [KIND.PROJECT], ...(scope === 'these' ? { '#d': [...new Set(own.map(dOf))] } : {}) })
     const held = new Set(listed.map((file) => file.address))
-    const open = (addr: string, text: boolean) => {
+    const open = (addr: string) => {
       const [, pubkey, ...d] = addr.split(':')
-      return openFile(read, { kind: KIND.PROJECT, pubkey: pubkey!, d: d.join(':') }, { text })
+      return openFile(read, { kind: KIND.PROJECT, pubkey: pubkey!, d: d.join(':') }, { text: true })
     }
     const addrs = [...new Set(own.map((root) => `${KIND.PROJECT}:${root.pubkey}:${dOf(root)}`))]
     const unlisted = addrs.filter((addr) => !held.has(addr))
     const withText = fields.text ? [...opened].filter((addr) => held.has(addr)) : []
-    const more = await Promise.all([...unlisted.map((addr) => open(addr, false)), ...withText.map((addr) => open(addr, true))])
-    return [...listed, ...more.flatMap((file) => (file ? [file] : []))].flatMap((file) => file.events)
+    const [deleted, texts] = await Promise.all([this.changesOf(read, unlisted), Promise.all(withText.map(open))])
+    return [...listed, ...texts.flatMap((file) => (file ? [file] : []))].flatMap((file) => file.events).concat(deleted)
+  }
+
+  /** Every change to `addrs`, by `#a` (§6.2), a few hundred addresses per filter. */
+  private changesOf(read: QueryFn, addrs: readonly string[]): Promise<SignedEvent[]> {
+    if (!addrs.length) return Promise.resolve([])
+    const filters: Record<string, unknown>[] = []
+    for (let at = 0; at < addrs.length; at += ISSUES_PER_FILTER) filters.push({ kinds: [KIND.CHANGE], '#a': addrs.slice(at, at + ISSUES_PER_FILTER) })
+    return read(filters)
   }
 
   /**
@@ -442,10 +452,7 @@ export class Store {
    * while project changes leave the load. A few hundred addresses per filter.
    */
   private issueChanges(read: QueryFn, issues: readonly string[]): Promise<SignedEvent[]> {
-    if (!issues.length) return Promise.resolve([])
-    const filters: Record<string, unknown>[] = []
-    for (let at = 0; at < issues.length; at += ISSUES_PER_FILTER) filters.push({ kinds: [KIND.CHANGE], '#a': issues.slice(at, at + ISSUES_PER_FILTER) })
-    return read(filters)
+    return this.changesOf(read, issues)
   }
 
   /**
