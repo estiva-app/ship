@@ -28,7 +28,7 @@ import {
   type CommentRef,
 } from './events'
 import { findNaddrs, naddrToAddr, buildReaction, buildEdit, buildDeletion as buildEventDeletion, imetaTag } from '@estiva-app/protocol'
-import { createLoadQuery, planArchiveFolder, planCreateFolder, planDeleteFolder, planListInTopic, planMoveFromFolders, planPlaceFile, planRemoveFromTopic, planRenameFolder, planUnlistFile, readMentionedIn, type ListHolder, type FolderRef, type MovableFile, type MoveRefusal } from '@estiva-app/interop'
+import { createLoadQuery, planArchiveFolder, planCreateFolder, planDeleteFolder, planListInTopic, planMoveFromFolders, planPlaceFile, planRemoveFromTopic, planRenameFolder, planUnlistFile, readMentionedIn, readMoveRefusal, type ListHolder, type FolderRef, type MovableFile, type MoveRefusal } from '@estiva-app/interop'
 import { foldFolder, type FolderState } from './fold'
 import { buildMembershipChange, decorationsOf, foldAttachments, foldEdits, foldEmbeds, URGENT_TAG, type Decorations, type EditFold, type QueryFn } from '@estiva-app/conversation'
 import { anchorIndex, type AnchorIndex } from './references'
@@ -545,9 +545,9 @@ export class Store {
   /**
    * Move a project to another top-level Folder — FOL-7, RFC 0.4 §2.
    *
-   * **Only the listings change.** One `kind:1852 add` to `to`, then one
-   * `kind:1852 remove` from each Folder in `from`, planned by interop's
-   * `planMoveFromFolders` — the planner Peek and the agent move by too.
+   * **Only the listings change.** One `kind:1852 move` into `to` from each
+   * Folder in `from`, planned by interop's `planMoveFromFolders` — the planner
+   * Peek and the agent move by too.
    * No `kind:1851` and no `buzz-channel` change: what is already written stays
    * where it is, and new comments and issues stay in the project's own Folder
    * (`workFolder`; record what-belongs-to-a-file-is-stored-with-it);
@@ -561,16 +561,19 @@ export class Store {
    *
    * **What is listed beneath it moves with it** (SPEC §3.3): `listings` holds
    * each source Folder's files, archived ones included, and the one `add`
-   * names the project and every file under it in any source — a topic started
-   * under the project. So the add lands whole or not at all (SHI-37). A source
-   * with no listing moves the project alone.
+   * names the project and every file under it in that source — a topic
+   * started under the project. Each move changes both lists or neither, so it
+   * lands whole or not at all (SHI-37, TEA-3). A source with no listing moves
+   * the project alone.
    *
-   * **Add first, and nothing at all if either side has no state** — the
-   * planner's rules. A refused `remove` leaves the project listed in both,
-   * which is visible and fixed by moving again; `removed` says which Folders
-   * still list it. `refused` is a move planned as unsafe, before anything was
-   * sent — `target-is-private` included: a project's root carries no `h`, so it
-   * is readable by the whole workspace wherever it is listed.
+   * **In order, stopping at the first refusal, and nothing at all if either
+   * side has no state** — the planner's rules. `moveRefused` reads where it
+   * stopped (`readMoveRefusal`): nothing moved, or which Folders still list
+   * it, which moving again fixes — with the relay's `reason`, or what this
+   * side `threw` (the signer, the network) on any command, not only the
+   * first. `refused` is a move planned as unsafe, before anything was sent —
+   * `target-is-private` included: a project's root carries no `h`, so it is
+   * readable by the whole workspace wherever it is listed.
    */
   async moveProject(args: {
     project: string
@@ -579,22 +582,27 @@ export class Store {
     to: FolderRef
     /** Each source Folder's files (`FolderContents.files`, archived included), by Folder id. */
     listings?: ReadonlyMap<string, readonly MovableFile[]>
-  }): Promise<{ refused?: MoveRefusal; added?: PublishResult; removed: { folder: string; result: PublishResult }[] }> {
+  }): Promise<{ refused?: MoveRefusal; moveRefused?: ReturnType<typeof readMoveRefusal> & { reason?: string; httpStatus?: number; threw?: unknown } }> {
     assertFolderId(args.to.id)
-    // One add naming everything every source lists beneath it, then a remove from each (SHI-37).
+    // One move from each source, naming what it lists beneath the project (SHI-37, TEA-3).
     const plan = planMoveFromFolders(this.signer.pubkey, Date.now(), {
       file: { ref: args.project, address: args.project },
       from: args.from,
       to: args.to,
       listings: args.listings ?? new Map(),
     })
-    if (!plan.ok) return { refused: plan.reason, removed: [] }
-    if (!plan.add) return { removed: [] }
-    const added = await this.publish(plan.add)
-    if (!added.ok) return { added, removed: [] }
-    const removed: { folder: string; result: PublishResult }[] = []
-    for (const { folder, event } of plan.removes) removed.push({ folder, result: await this.publish(event) })
-    return { added, removed }
+    if (!plan.ok) return { refused: plan.reason }
+    for (const [index, event] of plan.events.entries()) {
+      let result: PublishResult
+      try {
+        result = await this.publish(event)
+      } catch (threw) {
+        // The earlier moves stand: a signer or a network failing on a later one is still a half move.
+        return { moveRefused: { ...readMoveRefusal(plan.events, index, undefined), threw } }
+      }
+      if (!result.ok) return { moveRefused: { ...readMoveRefusal(plan.events, index, result.reason), reason: result.reason, httpStatus: result.httpStatus } }
+    }
+    return {}
   }
 
   /**

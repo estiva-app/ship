@@ -201,8 +201,8 @@ export async function parentArchiveOf(reference: string): Promise<ForeignObject[
 /** The fields a card never writes: a file's words, and its archive. */
 const NOT_ON_A_CARD = new Set(['title', 'summary', 'description', 'archived'])
 
-/** The tags a §7.3 change carries: the file, the field, its value, the Folder, the writer's clock, and a person it names. */
-const CHANGE_TAGS = new Set(['a', 'field', 'value', 'h', 'ts', 'p'])
+/** The tags a §7.3 change carries: the file and its id, the field, its value, the Folder, the writer's clock, a person it names, and a staged option's stage. */
+const CHANGE_TAGS = new Set(['a', 'O', 'field', 'value', 'h', 'ts', 'p', 'stage'])
 
 /** Whether what the runtime built is exactly one `kind:1851` change of `field` on `address`, in `folder`. */
 function isFieldChange(built: readonly { kind: number; tags: string[][] }[], want: { address: string; folder: string; field: string }): boolean {
@@ -210,6 +210,11 @@ function isFieldChange(built: readonly { kind: number; tags: string[][] }[], wan
   const tags = built[0].tags
   const one = (name: string) => tags.filter((t) => t[0] === name)
   if (!tags.every((t) => CHANGE_TAGS.has(t[0]))) return false
+  // The file's id beside its address (interop 0.73, §6.2): at most one, and the address's own.
+  const id = want.address.split(':').slice(2).join(':')
+  if (one('O').length > 1 || (one('O').length === 1 && one('O')[0][1] !== id)) return false
+  // A staged option's stage (interop 0.73): at most one, about the field this change sets.
+  if (one('stage').length > 1 || (one('stage').length === 1 && one('stage')[0][1] !== want.field)) return false
   return one('a').length === 1 && one('a')[0][1] === want.address && one('h').length === 1 && one('h')[0][1] === want.folder && one('field').length === 1 && one('field')[0][1] === want.field && one('value').length === 1
 }
 
