@@ -1,8 +1,6 @@
 import type { ReactNode } from 'react'
 import { IconBox, IconListDetails } from '@tabler/icons-react'
 import { addressToPointer, cardsIn, encodeNaddr, encodeNevent, referenceOfLink, referencesIn, valueOfReference, type Embed, type Imeta, type LinkResolver, type PartPointer, type RenderBlock } from '@estiva-app/protocol'
-import { WithTooltip } from '@estiva-app/ui'
-import { ago } from '@/lib/time'
 import type { DraftStore } from '@/lib/drafts'
 import type { Reaction, Resolution } from '@/api'
 import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
@@ -67,15 +65,6 @@ export function referenceOfValue(value: string): string | undefined {
   } catch {
     return undefined
   }
-}
-
-/** The time as "3h ago", and the date and time on hover (Katerina, 29 September). */
-export function Time({ at }: { at: number }) {
-  return (
-    <WithTooltip label={new Date(at * 1000).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}>
-      <span className="whitespace-nowrap text-caption text-text-muted">{ago(at)}</span>
-    </WithTooltip>
-  )
 }
 
 /** What a send carries beyond its text: whom it names urgently (SPEC §13.1), and the card the box showed under itself unless ✕ took it off (COMM-7). */

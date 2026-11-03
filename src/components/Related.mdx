@@ -15,8 +15,8 @@ projection says, and nothing here knows what any app is.
 
 ## When
 
-- On an object's Overview tab, under a line and an **AppSection** titled
-  "Related", with `hasRelated` deciding whether any of it is drawn at all.
+- Last in an object's **OverviewPanel**, under its "Related" heading, with
+  `hasRelated` deciding whether any of it is drawn at all (ONE-6, step 4d).
 - In the Folder's order, with what is placed under a file nested beneath it.
 
 ## When not
@@ -33,10 +33,10 @@ import { Related, hasRelated } from '@/components/Related'
 
 {hasRelated(related) && (
   <>
-    <Divider className="mx-0" />
-    <AppSection title="Related">
+    <SectionHeader title="Related" hover="none" className="mx-2 mt-4" />
+    <div className="px-4 pt-1">
       <Related related={related} />
-    </AppSection>
+    </div>
   </>
 )}
 ```

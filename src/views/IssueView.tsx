@@ -134,7 +134,7 @@ export function IssueView({ crumbs, title, summary, onSummarize, description, de
       {/* No tab row: with Activity in the Overview, an issue has one page (Katerina, 2 November). */}
       <ScrollArea className="min-h-0 min-w-0 flex-1" contentClassName="flex flex-col gap-6 px-6 pb-5">
         {/* Blocks 16px apart (Katerina, 1 November). */}
-        <Centred gap="block">
+        <Centred>
           {archivedNotice}
           <LiveHeader fields={<IssueFields {...fields} readOnlyReason={readOnlyReason} lockedReason={lockedReason} />} title={title} titlePlaceholder="Untitled issue" onRename={onRename} summary={summary} onSummarize={onSummarize} description={description} format={descriptionFormat} onDescribe={onDescribe} onMention={onMention} descriptionBy={descriptionBy} nameOf={nameOf} readOnly={!!(readOnlyReason ?? lockedReason)} upload={upload} onCommentOnBlock={readOnlyReason ?? commentsClosed ? undefined : comment.start} onCopyBlockLink={onCopyBlockLink} holdKey={about && `description:${about}`} />
         </Centred>

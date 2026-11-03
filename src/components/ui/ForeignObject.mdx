@@ -1,7 +1,6 @@
-import { Meta, Canvas, Controls } from '@storybook/addon-docs/blocks'
-import * as ForeignObjectStories from './ForeignObject.stories'
+import { Meta } from '@storybook/addon-docs/blocks'
 
-<Meta of={ForeignObjectStories} />
+<Meta title="Primitives/ForeignObject" />
 
 # ForeignObject
 
@@ -10,7 +9,9 @@ hand-off page names, a file placed under another — as the kit's **LinkRow** or
 **LinkCard**, the same widgets a message draws (Katerina, 30 Oct). What is
 Ship's here is only which of the two its manifest hints, and where it opens.
 
-<Canvas of={ForeignObjectStories.Card} />
+**Seen in** — *Views/FolderView*, each row, and *Projects/Related*, a file
+placed under another. The row and the card have their stories in the kit
+(*Links & references/LinkRow*, *Links & references/LinkCard*).
 
 ## When
 
@@ -47,7 +48,3 @@ import { ForeignObject } from '@/components/ui/ForeignObject'
   an empty file never look alike.
 - **Words, not pickers**: a listing is not where a file is changed.
 - **Another app's file opens in a new tab**, by the kit's `AppProvider`, as a message's links do.
-
-## Props
-
-<Controls of={ForeignObjectStories.Card} />

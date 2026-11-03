@@ -1,8 +1,6 @@
 import { useMemo } from 'react'
 import type { BlockAnchor, Embed, Imeta, PartPointer, Quote } from '@estiva-app/protocol'
 import { referencesIn, toRenderTree } from '@estiva-app/protocol'
-import { ConfirmDialog } from './ui/ConfirmDialog'
-import { Divider } from './ui/Divider'
 import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
 import { byReference, useForeignObjects } from '@/api/useForeignObjects'
 import { useLinkValues } from '@/api/linkCards'
@@ -210,60 +208,6 @@ export interface ThreadData {
    * conversation draws "This comment was deleted." with every message under it and no new reply, as Peek does.
    */
   rootMissing?: true
-}
-
-/**
- * The question asked before a deletion, and the three things it has to say.
- *
- * A deletion is a **request**: the relay may decline it, and copies held by
- * another relay or another app's cache are untouched. That is not hedging — it
- * is the difference between this and archiving, which is the reversible,
- * attributable operation §6.5 still puts first.
- *
- * Deleting the **root** of a thread does not delete the thread: replies are
- * separate events with their own authors, and `foldConversations` promotes the
- * earliest surviving message to stand in for a root it cannot see. So the
- * conversation carries on without its opening line, which is worth knowing
- * before rather than after.
- */
-export function ConfirmDeleteMessage({
-  replies,
-  onConfirm,
-  onClose,
-}: {
-  /** How many replies this message would leave behind — 0 unless it is a root. */
-  replies: number
-  onConfirm: () => Promise<boolean | void> | boolean | void
-  onClose: () => void
-}) {
-  return (
-    <ConfirmDialog title="Delete this message?" confirmLabel="Delete message" destructive onConfirm={onConfirm} onClose={onClose}>
-      <p>
-        This publishes a NIP-09 deletion request. The relay decides: it accepts one from the message&rsquo;s author, or from the
-        owner of an agent that wrote it. Copies held by other relays or apps are unaffected.
-      </p>
-      {replies > 0 && (
-        <p>
-          Its {replies} {replies === 1 ? 'reply is a separate event and is' : 'replies are separate events and are'} not deleted.
-          The conversation stays, opening with whichever message comes next.
-        </p>
-      )}
-    </ConfirmDialog>
-  )
-}
-
-/**
- * Where "new since you looked" begins (CRO-13).
- *
- * A rule rather than a badge: the divider sits above the first message the
- * reader has not seen, and everything below it is new. Ship's lists stay clean —
- * the signal lives where the reading happens.
- */
-export function NewSinceHere() {
-  // The package's labelled Divider (0.11.0, D40), in the warning colour: the
-  // accent this drew in measured 3.3:1 on Ship's background and could not
-  // be read (Katerina, 2026-09-08); the warning colour measures 9.6:1.
-  return <Divider label="New since you last read this" tone="warning" className="mx-0 py-1" />
 }
 
 /** Thread id → the ids of its unread messages, oldest first. Omitted threads have nothing new. */

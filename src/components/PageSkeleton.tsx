@@ -49,7 +49,7 @@ export function PageSkeleton({ shape }: { shape: PageSkeletonShape }) {
             </div>
           )}
           <div className="px-6">
-            <Centred gap="block">
+            <Centred>
               {/* The title, and the summary 4px under it: each bar on a line of the text's own size, so each is as
                   tall as what replaces it. */}
               <div className="flex flex-col gap-1">

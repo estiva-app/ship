@@ -1,7 +1,6 @@
 import { Meta } from '@storybook/addon-docs/blocks'
-import * as MembersStories from './Members.stories'
 
-<Meta of={MembersStories} />
+<Meta title="Projects/Members" />
 
 # Members
 
@@ -10,6 +9,11 @@ the end of the page's breadcrumb row, opening its **MembersDialog** with Join or
 Leave for you and Add members for a member. It is the old Peek design (Miky,
 2026-10-06). Ship decides which people are listed, what their second line says,
 and what each press writes.
+
+**Seen in** — No story: the members are read from the relay with the page,
+and the page stories leave them out; `Members.test` draws each state. The pill
+and the dialog have their stories in the kit (*People/MembersPill*,
+*People/MembersDialog*).
 
 ## When
 
