@@ -33,6 +33,12 @@ const ready = async () => {
 }
 /* jsdom cannot type into a contenteditable: text goes in through the editor's own command, at the end. */
 const type = (box: EditorBox, text: string) => act(() => void box.editor.chain().focus('end').insertContent(text).run())
+/* That command puts the focus in the box a frame later (Tiptap's `focus`), so a test of Escape waits for it: pressed
+   before it lands, Escape leaves a box the late focus then enters again (seen on CI, 3 November). */
+const typeInFocus = async (box: EditorBox, text: string) => {
+  await type(box, text)
+  await waitFor(() => expect(document.activeElement).toBe(box))
+}
 
 /**
  * Attaching a file to a description — SHI-2.
@@ -225,7 +231,7 @@ describe('a description whose save is refused', () => {
     render(<LiveDescription value="" format="marker" onCommit={onCommit} resolved={{}} />)
     const box = await ready()
     box.tabIndex = -1
-    await type(box, '/')
+    await typeInFocus(box, '/')
     expect(screen.getByRole('listbox')).toBeInTheDocument()
     expect(document.activeElement).toBe(box)
     await act(() => void fireEvent.keyDown(box, { key: 'Escape' }))
@@ -239,7 +245,7 @@ describe('a description whose save is refused', () => {
     render(<LiveDescription value="" format="marker" onCommit={vi.fn(async () => true)} resolved={{}} />)
     const box = await ready()
     box.tabIndex = -1
-    await type(box, '/zzzz')
+    await typeInFocus(box, '/zzzz')
     expect(screen.queryByRole('option')).toBeNull()
     await act(() => void fireEvent.keyDown(box, { key: 'Escape' }))
     expect(document.activeElement).not.toBe(box)

@@ -1,5 +1,6 @@
 import { Suspense, lazy, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { linksAsReferences, referencesIn, resolveBlockAnchor, toRenderTree, type ContentFormat, type Imeta, type LinkResolver } from '@estiva-app/protocol'
+import type { Editor } from '@tiptap/react'
 import { BlockHandle } from '@estiva-app/ui'
 import { Banner } from '@/components/Banner'
 import { useLinkValues } from '@/api/linkCards'
@@ -17,7 +18,9 @@ import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
   is read in the same shared editor it is written in. Until they land the page
   shows the reading surface.
 */
-const HeaderEditing = lazy(() => import('./HeaderEditing'))
+const editors = () => import('./HeaderEditing')
+const TitleEditing = lazy(() => editors().then((m) => ({ default: m.TitleEditing })))
+const DescriptionEditing = lazy(() => editors().then((m) => ({ default: m.DescriptionEditing })))
 
 export interface LiveHeaderProps {
   title: string
@@ -46,7 +49,7 @@ export interface LiveHeaderProps {
   onCopyBlockLink?: (link: string) => void
   /** Where the description's unsaved text is held when the sign-in ends (AUT-4). */
   holdKey?: string
-  /** The file's fields, between the summary and the description (ONE-6, step 4b): drawn in both halves, so nothing moves when the editors arrive. */
+  /** The file's fields, between the summary and the description (ONE-6, step 4b): drawn once, outside the swaps, so the editors arriving neither moves nor redraws them. */
   fields?: ReactNode
 }
 
@@ -139,50 +142,61 @@ export function LiveHeader(props: LiveHeaderProps) {
   const resolved = byReference(references, objects)
 
   const [missing, dismiss] = useLinkedBlock(description, format, readOnly)
+  // The description's editor once it has arrived: Enter in the title or the summary goes on into it.
+  const [body, setBody] = useState<Editor | null>(null)
 
-  const reading = <ReadingHeader {...props} resolved={resolved} resolveLink={resolveLink} />
   return (
+    // 16px between title and description (Katerina, 29 September: "a bit more" than the 8px pages had), and the
+    // fields between the summary and the description, 16px from each (ONE-6, step 4b).
     <div className="flex flex-col gap-4">
       {missing && (
         <Banner tone="info" onDismiss={dismiss}>
           {missing === 'detached' ? 'That part of the description was removed.' : 'That link is to a part of the description, which is no longer written in parts.'}
         </Banner>
       )}
-      <Suspense fallback={reading}>
-        <HeaderEditing {...props} resolved={resolved} />
+      {/* Two swaps, with the fields between them: drawn in one, the fields were drawn again when the editors arrived,
+          and a picker opened in the moment before closed (ONE-6 follow-up, 3 November). */}
+      <Suspense fallback={<ReadingTop {...props} />}>
+        <TitleEditing {...props} body={body} />
+      </Suspense>
+      {props.fields}
+      <Suspense fallback={<ReadingBody {...props} resolved={resolved} resolveLink={resolveLink} />}>
+        <DescriptionEditing {...props} resolved={resolved} onEditor={setBody} />
       </Suspense>
     </div>
   )
 }
 
-/**
- * The same page as text, in the moment before the editors arrive. Laid out as
- * the editors are, its links where and as the editor draws them: a chip, a row,
- * or a card in the row's place (`DescriptionReading`), so nothing moves when it
- * arrives.
- */
-function ReadingHeader({ title, titlePlaceholder, summary, onSummarize, description, format, nameOf, readOnly, resolved, resolveLink, onCommentOnBlock, onCopyBlockLink, fields }: LiveHeaderProps & { resolved: Record<string, ForeignObjectData | null | undefined>; resolveLink: LinkResolver }) {
-  const empty = description.trim() === ''
+/*
+  The same page as text, in the moment before the editors arrive: the title and
+  the summary, then the description. Laid out as the editors are, its links
+  where and as the editor draws them: a chip, a row, or a card in the row's
+  place (`DescriptionReading`), so nothing moves when they arrive.
+*/
+
+/** The title and the summary under it, 4px apart (the short-summary prototype's ShipFilePage; ONE-6). */
+function ReadingTop({ title, titlePlaceholder, summary, onSummarize, readOnly }: LiveHeaderProps) {
   return (
-    <div className="flex flex-col gap-4">
-      {/* The title and the summary under it, 4px apart; the fields and the description 16px below each (the short-summary prototype's ShipFilePage; ONE-6). */}
-      <div className="flex flex-col gap-1">
-        <ReadingTitle title={title} placeholder={titlePlaceholder} />
-        {/* For a writer this is the moment before the editors arrive: the summary waits, unclickable, so nothing typed is
-            lost when HeaderEditing replaces this header. */}
-        <ReadingSummary value={summary ?? ''} waiting={!readOnly && !!onSummarize} />
-      </div>
-      {fields}
-      <div className="-mx-2 px-2 py-1" data-description="reading">
-        {empty ? (
-          <span className="text-body-2 text-text-muted">{readOnly ? '' : 'Add a description…'}</span>
-        ) : (
-          // A reader gets the handle too, with Copy link and Comment (Miky, RIC-18 kickoff); the editing rows need the editor.
-          <BlockHandle actions={blockRows(onCommentOnBlock, onCopyBlockLink)}>
-            <DescriptionReading value={description} format={format} nameOf={nameOf} resolved={resolved} resolveLink={resolveLink} readOnly={!!readOnly} />
-          </BlockHandle>
-        )}
-      </div>
+    <div className="flex flex-col gap-1">
+      <ReadingTitle title={title} placeholder={titlePlaceholder} />
+      {/* For a writer this is the moment before the editors arrive: the summary waits, unclickable, so nothing typed is
+          lost when the title's editor replaces it. */}
+      <ReadingSummary value={summary ?? ''} waiting={!readOnly && !!onSummarize} />
+    </div>
+  )
+}
+
+function ReadingBody({ description, format, nameOf, readOnly, resolved, resolveLink, onCommentOnBlock, onCopyBlockLink }: LiveHeaderProps & { resolved: Record<string, ForeignObjectData | null | undefined>; resolveLink: LinkResolver }) {
+  return (
+    <div className="-mx-2 px-2 py-1" data-description="reading">
+      {description.trim() === '' ? (
+        <span className="text-body-2 text-text-muted">{readOnly ? '' : 'Add a description…'}</span>
+      ) : (
+        // A reader gets the handle too, with Copy link and Comment (Miky, RIC-18 kickoff); the editing rows need the editor.
+        <BlockHandle actions={blockRows(onCommentOnBlock, onCopyBlockLink)}>
+          <DescriptionReading value={description} format={format} nameOf={nameOf} resolved={resolved} resolveLink={resolveLink} readOnly={!!readOnly} />
+        </BlockHandle>
+      )}
     </div>
   )
 }
