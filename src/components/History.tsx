@@ -5,7 +5,7 @@ import { ago } from '@/lib/time'
 /** One change, already in words: "set status to In Progress" (audit A2: never a wire value). */
 export interface HistoryEntry {
   id: string
-  by: { name?: string; picture?: string }
+  by: { name?: string; picture?: string; bot?: boolean }
   /** Seconds. */
   at: number
   text: string
@@ -27,7 +27,7 @@ export function History({ entries, className }: { entries: HistoryEntry[]; class
       {newestFirst.map((entry) => (
         // One line a change; a long one wraps rather than being cut (production shows every word of a rename).
         <li key={entry.id} className="flex min-h-7 items-start gap-2 py-1 text-body-2">
-          <Avatar name={entry.by.name} src={entry.by.picture} size={16} className="mt-0.5 shrink-0" />
+          <Avatar name={entry.by.name} src={entry.by.picture} bot={entry.by.bot} size={16} className="mt-0.5 shrink-0" />
           <span className="min-w-0 flex-1 text-text-secondary">
             <span className={cn('font-medium', entry.by.name ? 'text-text-primary' : 'text-text-muted')}>{entry.by.name ?? '—'}</span> {entry.text}
           </span>

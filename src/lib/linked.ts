@@ -1,4 +1,4 @@
-import type { LinkState, Linked, LinkedConversation, LinkedFromOptions, LinkedKind } from '@estiva-app/ui'
+import type { LinkState, Linked, LinkedConversation, LinkedFromOptions, LinkedKind, LinkedProfile } from '@estiva-app/ui'
 import { linkStateFrom, linkedFrom } from '@estiva-app/ui'
 import type { ForeignObject, People } from '@estiva-app/interop'
 import { openingWords } from '@estiva-app/conversation'
@@ -43,7 +43,7 @@ export function linkedKindOf(uri: string): LinkedKind {
  * its chip would say it, and a bare app URL Ship has an answer for read as
  * what it names, never the raw URL (Katerina, 30 Oct, widget review 20).
  */
-function previewText(body: string, people: People | undefined): string {
+function previewText(body: string, people: Record<string, LinkedProfile> | undefined): string {
   return openingWords(body, (pubkey) => people?.[pubkey]?.displayName, { resolveLink: knownLinkValue })
 }
 

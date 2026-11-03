@@ -4,8 +4,6 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { SIDEBAR_PROJECTS } from '@/fixtures/projects'
-import { MoveProjectDialog } from './MoveProjectDialog'
-import { NewFolderDialog } from './NewFolderDialog'
 import { NewIssueDialog } from './NewIssueDialog'
 import { NewProjectDialog } from './NewProjectDialog'
 import { suggestKey } from '../nostr/keys'
@@ -101,43 +99,12 @@ export const NewIssueWithoutProjects: Story = {
   render: () => <NewIssueDialog projects={[]} onClose={fn()} onCreate={fn()} />,
 }
 
-/** Delete project, with production's warning — the one write that asks first. */
-export const DeleteProject: Story = {
-  render: () => (
-    <ConfirmDialog title="Delete “Relay Migration”?" confirmLabel="Delete project" destructive onConfirm={fn()} onClose={fn()}>
-      <p>This publishes a NIP-09 deletion request. Relays may decline it, and copies held elsewhere are unaffected.</p>
-      <p>Its 6 issues are separate events and are not deleted — they stay in the Folder and stop being reachable from here.</p>
-      <p className="text-text-secondary">Archiving is reversible and usually what you want.</p>
-    </ConfirmDialog>
-  ),
-}
-
 /** No teams came back from the read: the picker says why it is shut, and nothing can be created. */
 export const NewProjectNoTeams: Story = {
   render: () => <NewProjectDialog {...KEYS} teams={[]} onClose={fn()} onCreate={fn()} />,
   play: async () => {
     await userEvent.type(screen.getByPlaceholderText('New project title'), 'Relay migration')
   },
-}
-
-/** Move a project to another Folder (FOL-7): where it is now is not offered. */
-export const MoveProject: Story = {
-  render: () => <MoveProjectDialog title="Ship: Feedback & Bugs" current={[TEAMS[2]!]} folders={TEAMS} onClose={fn()} onMove={fn()} />,
-}
-
-/** A move that half-worked left it in two: both are destinations, and Move again is the retry. */
-export const MoveProjectInTwo: Story = {
-  render: () => <MoveProjectDialog title="Ship: Feedback & Bugs" current={[TEAMS[1]!, TEAMS[2]!]} folders={TEAMS} onClose={fn()} onMove={fn()} />,
-}
-
-/** Nowhere else it can go: said, and no Move. */
-export const MoveProjectNowhere: Story = {
-  render: () => <MoveProjectDialog title="Ship: Feedback & Bugs" current={[TEAMS[2]!]} folders={[TEAMS[2]!]} onClose={fn()} onMove={fn()} />,
-}
-
-/** "New folder" from the sidebar (FOL-8): one field, and Create folder stays off until it holds a name. */
-export const NewFolder: Story = {
-  render: () => <NewFolderDialog onClose={fn()} onCreate={fn(async () => true)} />,
 }
 
 /** Open each from a button, and close it with Cancel, ✕, the backdrop or Escape. */

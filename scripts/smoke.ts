@@ -281,10 +281,6 @@ async function main() {
     return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
   })
 
-  /** The section a heading names — how the conversation and activity blocks are found. */
-  const sectionFor = (name: string) =>
-    page.locator('section').filter({ has: page.getByRole('heading', { name, exact: true }) })
-
   /** `Select` is not a native `<select>`: a labelled trigger, then a listbox.
    *  The trigger is a `combobox` rather than a `button` since the Base UI
    *  migration — which is what the component's own unit tests already say. */
@@ -300,12 +296,32 @@ async function main() {
 
   const sidebar = () => page.getByRole('navigation', { name: 'Workspace' })
 
-  /* The project and issue pages are in tabs (Katerina, 29 September): Overview,
-     Activity and, on a project, Issues. `data-tab` on the surface is the waypoint
-     that says the click landed. */
-  const openTab = async (name: 'Overview' | 'Activity' | 'Issues') => {
+  /* A project's page is in tabs (Katerina, 29 September): Overview and Issues; an issue's has none since the Activity
+     tab went (ONE-6, step 4d). `data-tab` on the surface is the waypoint that says the click landed. */
+  const openTab = async (name: 'Overview' | 'Issues') => {
     await page.getByRole('tab', { name, exact: true }).click()
     await page.waitForSelector(`[data-tab="${name.toLowerCase()}"]`)
+  }
+
+  /* The comments: the kit's column beside the page, on every tab (ONE-6, step 4c), where the Activity tab's "Conversations" was. */
+  const commentsColumn = () => page.locator('[data-comments-column]')
+
+  /* The Overview: Peek's panel, in the comments' place, from the header's side-panel button (ONE-6, step 4d), where
+     the Activity tab's Mentioned in and History went. Hiding it brings the comments back. */
+  const overviewColumn = () => page.locator('[data-overview-column]')
+  const showOverview = async () => {
+    await page.getByRole('button', { name: 'Show side panel', exact: true }).click()
+    await overviewColumn().waitFor()
+  }
+  const hideOverview = async () => {
+    await page.getByRole('button', { name: 'Hide side panel', exact: true }).click()
+    await commentsColumn().waitFor()
+  }
+
+  /* The page's actions are rows of its header's ⋯ (ONE-6, step 4b), where the details column's buttons were. */
+  const pageAction = async (name: string) => {
+    await page.getByRole('button', { name: 'More actions' }).click()
+    await page.getByRole('menuitem', { name, exact: true }).click()
   }
 
   /* A write that leaves nothing new on screen — a description saved as the
@@ -393,8 +409,8 @@ async function main() {
   await page.waitForSelector('[data-surface="project"][data-tab="overview"]')
   check('the project opens on its Overview tab', page.url().includes('/project/'))
   check(
-    '  …with Overview, Activity and Issues as tabs on one page',
-    (await page.getByRole('tab', { name: /^(Overview|Activity|Issues)$/ }).count()) === 3,
+    '  …with Overview and Issues as tabs on one page',
+    (await page.getByRole('tab').count()) === 2 && (await page.getByRole('tab', { name: /^(Overview|Issues)$/ }).count()) === 2,
   )
 
   await page.getByRole('button', { name: 'Add issue' }).click()
@@ -520,10 +536,11 @@ async function main() {
     of conversations on *related* files. Two sections on one page could not both
     be Activity, and this one was always the history.
   */
-  // Conversations, Mentioned in and History are the issue's Activity tab; the rail is on every tab.
-  await openTab('Activity')
-  const history = sectionFor('History')
+  // The fields are a row on the page (ONE-6, step 4b); Mentioned in and History are the Overview's (step 4d).
   await pick('Status', 'In Progress')
+  await showOverview()
+  // History's rows are the panel's only list items: Activity's mentions are the kit's cards.
+  const history = overviewColumn()
   await history.locator('li').first().waitFor()
   const change = stored.find((e) => e.kind === 1851)
   check('a kind:1851 change was published, not an edit', !!change)
@@ -535,15 +552,19 @@ async function main() {
     'the change is authored by the actor',
     !!change && !!issue && change.pubkey === issue.pubkey,
   )
+  // The comments come back in the Overview's place.
+  await hideOverview()
 
   // ── Comment, reply, assignee ──────────────────────────────────────────────
-  const conversations = sectionFor('Conversations')
-  const startBox = () => sectionFor('Conversations').getByRole('textbox', { name: 'Start a conversation…' })
+  const conversations = commentsColumn()
+  /** Every message drawn: the kit's cards, a comment's body and each reply (ONE-6), what the hand-made `<article>` was. */
+  const MESSAGES = '[data-comment-body], [data-reply-id]'
+  const startBox = () => commentsColumn().getByRole('textbox', { name: 'Start a conversation…' })
   await startBox().click()
   await page.keyboard.type('Blocked on the Stripe key.')
   // Enter sends, as in every app's box (COMM-7).
   await page.keyboard.press('Enter')
-  await conversations.locator('article').first().waitFor()
+  await conversations.locator(MESSAGES).first().waitFor()
 
   const comment = stored.find((e) => e.kind === 1111)
   const issueAddr = `30851:${issue!.pubkey}:${tagValue(issue!, 'd')}`
@@ -676,7 +697,7 @@ async function main() {
     absence of `naddr1` passes just as well when the whole body has been deleted,
     which is the bug this replaced.
   */
-  const posted = conversations.locator('article').first()
+  const posted = conversations.locator('[data-comment-body]').first()
   check(
     'the comment reads as what was typed',
     (await posted.textContent())?.includes('Blocked on the Stripe key.') ?? false,
@@ -686,13 +707,14 @@ async function main() {
     !(await conversations.textContent())?.includes('naddr1'),
   )
 
-  // The reply box opens from the small reply button under a message with none yet (Katerina, 29 September).
+  // The reply box opens from Reply on the comment's strip, shown while the comment is pointed at (the kit's card).
+  await conversations.locator('[data-comment-body]').first().hover()
   await conversations.getByRole('button', { name: 'Reply', exact: true }).first().click()
   await conversations.getByRole('textbox', { name: 'Reply…' }).first().click()
   await page.keyboard.type('Key is in 1Password now.')
   await page.keyboard.press('Enter')
   await page.waitForFunction(
-    () => document.querySelectorAll('section article').length >= 2,
+    () => document.querySelectorAll('[data-comments-column] [data-comment-body], [data-comments-column] [data-reply-id]').length >= 2,
   )
   // A flat kind:1111 naming the comment — SHI-28, SPEC §6.4 *Replies*.
   const reply = stored.filter((e) => e.kind === 1111 && e.id !== comment?.id).at(-1)
@@ -705,7 +727,7 @@ async function main() {
     '  …and the object with the comment’s own A, with no lowercase a',
     !!reply && !!comment && tagValue(reply, 'A') === tagValue(comment, 'A') && tagValue(reply, 'a') === undefined,
   )
-  check('  …and renders nested', (await conversations.locator('article').count()) === 2)
+  check('  …and renders nested', (await conversations.locator(MESSAGES).count()) === 2)
 
   /*
     Deleting a comment — CON-3, read off the screen rather than off the event.
@@ -733,7 +755,10 @@ async function main() {
     and the re-read are both round trips, and the re-read is what proves the
     edit came back through `foldEdits` rather than being patched in locally.
   */
-  await conversations.getByRole('button', { name: 'Message actions' }).nth(1).click()
+  // The reply's ⋯, on its strip while it is pointed at.
+  const edited = conversations.locator('[data-reply-id]').first()
+  await edited.hover()
+  await edited.getByRole('button', { name: 'Message actions' }).click()
   await page.getByRole('menuitem', { name: 'Edit message' }).click()
   /*
     Typed rather than `fill()`ed, and that is not a stylistic choice: `fill` set
@@ -788,12 +813,19 @@ async function main() {
   )
   check('  …and the message marked as edited', (await conversations.textContent())?.includes('edited') ?? false)
 
-  const replyMenus = await conversations.getByRole('button', { name: 'Message actions' }).count()
+  // Each card shows its ⋯ while it is pointed at: point at each in turn.
+  let replyMenus = 0
+  for (const card of await conversations.locator(MESSAGES).all()) {
+    await card.hover()
+    if ((await conversations.getByRole('button', { name: 'Message actions' }).count()) > 0) replyMenus++
+  }
   check('every message offers a delete, not just your own', replyMenus === 2)
-  await conversations.getByRole('button', { name: 'Message actions' }).nth(1).click()
+  const deleted = conversations.locator('[data-reply-id]').first()
+  await deleted.hover()
+  await deleted.getByRole('button', { name: 'Message actions' }).click()
   await page.getByRole('menuitem', { name: 'Delete message' }).click()
   await page.getByRole('button', { name: 'Delete message' }).click()
-  await page.waitForFunction(() => document.querySelectorAll('section article').length === 1)
+  await page.waitForFunction(() => document.querySelectorAll('[data-comments-column] [data-comment-body], [data-comments-column] [data-reply-id]').length === 1)
   const deletion = stored.find((e) => e.kind === 5 && e.tags.some((t) => t[0] === 'e' && t[1] === reply!.id))
   check('deleting a comment publishes a kind:5 naming it', !!deletion)
   /* The event form, not the address form: a comment is a regular event, and the
@@ -822,7 +854,9 @@ async function main() {
     of them — Activity is a list of `li` too, so an unscoped count would now
     move for a reason that has nothing to do with the change being published.
   */
+  await showOverview()
   const historyRows = await history.locator('li').count()
+  // The page's fields stay on screen beside the Overview, so the change shows up in History as it is made.
   await pick('Assignee', 1)
   await history.locator('li').nth(historyRows).waitFor()
   check(
@@ -840,16 +874,24 @@ async function main() {
     which is why the populated case is asserted in `Activity.test.tsx` — this
     checks the wiring a unit test cannot see.
   */
-  check('the Activity tab shows Conversations, Mentioned in and History as three lists', (await sectionFor('Mentioned in').count()) === 1 && (await history.count()) === 1 && (await conversations.count()) === 1)
   check(
-    '  …with the comment in Conversations and not in Mentioned in',
-    !(await sectionFor('Mentioned in').textContent())?.includes('Blocked on the Stripe key.'),
+    'the Overview holds Activity and History in the comments’ place, and no tab is left',
+    (await overviewColumn().count()) === 1 &&
+      /Activity[\s\S]*History/.test((await overviewColumn().textContent()) ?? '') &&
+      (await commentsColumn().count()) === 0 &&
+      (await page.getByRole('tab').count()) === 0,
   )
   check(
-    '  …and Mentioned in saying what it holds rather than nothing',
-    (await sectionFor('Mentioned in').textContent())?.includes('No related conversations yet.') ?? false,
+    '  …with the comment in the comments and not in its Activity',
+    !(await overviewColumn().textContent())?.includes('Blocked on the Stripe key.'),
+  )
+  check(
+    '  …and Activity saying what it holds rather than nothing',
+    (await overviewColumn().textContent())?.includes('No related conversations yet.') ?? false,
   )
   await shot(page, '06-issue-detail')
+  await hideOverview()
+  check('  …and hiding it brings the comments back', (await commentsColumn().count()) === 1 && (await overviewColumn().count()) === 0)
 
   /*
     Drafts survive a reload — CON-10.
@@ -866,13 +908,15 @@ async function main() {
   await startBox().click()
   await page.keyboard.type(draft)
   await page.reload()
-  // The tab is in the address, so a reload comes back to Activity.
-  await page.waitForSelector('[data-surface="issue"][data-tab="activity"]', { timeout: 10000 })
-  const afterReload = sectionFor('Conversations')
+  // A reload opens the page with its comments beside it.
+  await page.waitForSelector('[data-comments-column]', { timeout: 10000 })
+  const afterReload = commentsColumn()
   await startBox().waitFor()
   check('an unsent message survives a reload', (await textOf(startBox())) === draft, await textOf(startBox()))
 
   // The reply box on the same page is a different destination and must be empty.
+  // Reply on the comment's strip, while it is pointed at; or its replies row.
+  await afterReload.locator('[data-comment-body]').first().hover()
   await afterReload.getByRole('button', { name: /^(Reply$|\d+ repl)/ }).first().click()
   const replyBox = afterReload.getByRole('textbox', { name: 'Reply…' }).first()
   await replyBox.waitFor()
@@ -880,23 +924,23 @@ async function main() {
 
   // Sending clears it: the next load starts empty rather than re-offering text
   // that has already been posted.
-  // The start box is the first on the page; its Send is the first Send.
-  await afterReload.getByRole('button', { name: 'Send', exact: true }).first().click()
+  // The start box is at the comments column's foot (ONE-6, step 4c), under the open thread's: its Send is the last Send.
+  await afterReload.getByRole('button', { name: 'Send', exact: true }).last().click()
   await page.waitForFunction(
-    (n) => document.querySelectorAll('section article').length > n,
-    await afterReload.locator('article').count(),
+    (n) => document.querySelectorAll('[data-comments-column] [data-comment-body], [data-comments-column] [data-reply-id]').length > n,
+    await afterReload.locator('[data-comment-body], [data-reply-id]').count(),
   )
   await page.reload()
-  await page.waitForSelector('[data-surface="issue"][data-tab="activity"]', { timeout: 10000 })
+  await page.waitForSelector('[data-comments-column]', { timeout: 10000 })
   await startBox().waitFor()
   check('  …and is forgotten once it has been sent', (await textOf(startBox())) === '', await textOf(startBox()))
 
   /*
     An issue's comments stay on the issue (PEE-26, which undid CON-9's sub-file
     roll-up). Walk back to the project: the comment just written on its issue
-    must be in neither the project's Activity — which is mentions only now — nor
-    its Conversations, which are the project's OWN discussion. A leak into the
-    latter would be the §5.1 merge one level up.
+    must be in neither the project's Activity — which is mentions only now, in
+    its Overview — nor its comments, which are the project's OWN discussion. A
+    leak into the latter would be the §5.1 merge one level up.
 
     Both checks are absences, and an absence passes on a page that has not
     loaded yet — Activity draws its empty state before and after. So first wait
@@ -907,9 +951,9 @@ async function main() {
   await page.waitForSelector('[data-surface="project"]', { timeout: 10000 })
   await openTab('Issues')
   await page.locator('table tbody tr').first().waitFor({ timeout: 10000 })
-  await openTab('Activity')
   await page.waitForLoadState('networkidle')
-  const projectActivity = sectionFor('Mentioned in')
+  await showOverview()
+  const projectActivity = overviewColumn()
   check(
     "a project's Activity does not carry its issues' conversations",
     (await projectActivity.count()) === 1 &&
@@ -919,12 +963,13 @@ async function main() {
     '  …and draws no sub-file row',
     (await projectActivity.locator('[data-relation="sub-file"]').count()) === 0,
   )
+  await shot(page, '11-project-activity')
+  await hideOverview()
   check(
     "  …nor do the project's OWN conversations",
-    (await sectionFor('Conversations').count()) === 1 &&
-      !(await sectionFor('Conversations').textContent())?.includes('Blocked on the Stripe key.'),
+    (await commentsColumn().count()) === 1 &&
+      !(await commentsColumn().textContent())?.includes('Blocked on the Stripe key.'),
   )
-  await shot(page, '11-project-activity')
 
   // ── The inbound leg: a reference pasted from Peek ─────────────────────────
   // Encoded with the app's own encoder, so this cannot pass against a shape
@@ -955,11 +1000,12 @@ async function main() {
   await page.goto(`http://localhost:${PORT}/#/project/${encodeURIComponent(projectAddr)}`)
   await page.waitForSelector('[data-surface="project"]')
   // FOL-46: archiving asks first, and carries the resolution the person gives.
-  await page.getByRole('button', { name: 'Archive project' }).click()
+  await pageAction('Archive project')
   const archiveDialog = page.getByRole('dialog', { name: /^Archive / })
   await archiveDialog.getByRole('textbox', { name: /Resolution/ }).fill('Smoke test: done with it.')
   await archiveDialog.getByRole('button', { name: 'Archive project' }).click()
-  await page.getByRole('button', { name: 'Unarchive project' }).waitFor()
+  // The notice's own Unarchive says it is archived.
+  await page.getByRole('button', { name: 'Unarchive', exact: true }).waitFor()
   check(
     'archiving publishes a change, not a deletion',
     stored.some((e) => e.kind === 1851 && tagValue(e, 'field') === 'archived'),
@@ -970,10 +1016,16 @@ async function main() {
   )
   check('  …which the page shows first', await page.getByText('Smoke test: done with it.').isVisible())
   await shot(page, '09-archived-notice')
+  await page.getByRole('button', { name: 'More actions' }).click()
   check(
-    '  …and is reversible from the same control',
-    await page.getByRole('button', { name: 'Unarchive project' }).isVisible(),
+    '  …and is reversible from the same menu',
+    // Waited for: the menu draws its rows a moment after the press.
+    await page
+      .getByRole('menuitem', { name: 'Unarchive project', exact: true })
+      .waitFor({ timeout: 5000 })
+      .then(() => true, () => false),
   )
+  await page.keyboard.press('Escape')
 
   // Scoped to the sidebar: the project detail's breadcrumb also says "Projects".
   await sidebar().getByRole('link', { name: /^Projects/ }).click()
@@ -991,8 +1043,9 @@ async function main() {
   // sections read this project through its Folder, which leaves an archived
   // file out whatever its app declares.
   await projects.getByRole('link').first().click()
-  await page.getByRole('button', { name: 'Unarchive project' }).click()
-  await page.getByRole('button', { name: 'Archive project' }).waitFor()
+  await page.waitForSelector('[data-surface="project"]')
+  await pageAction('Unarchive project')
+  await page.getByRole('button', { name: 'Unarchive', exact: true }).waitFor({ state: 'detached' })
   const restoredRow = sidebar().getByRole('link', { name: /Payment integration/ })
   await restoredRow.waitFor({ timeout: 10_000 }).catch(() => {})
   check('unarchiving restores it to the sidebar', await restoredRow.isVisible())
@@ -1175,7 +1228,7 @@ async function main() {
   await page.goto(`http://localhost:${PORT}/#/project/${encodeURIComponent(projectAddr)}`)
   await page.waitForSelector('[data-surface="project"]')
   const beforeMove = stored.length
-  await page.getByRole('button', { name: 'Move to Folder…' }).click()
+  await pageAction('Move to Folder…')
   const moveDialog = page.getByRole('dialog', { name: 'Move to Folder' })
   await moveDialog.waitFor()
   await pick('Destination Folder', 'Smoke team')
@@ -1234,7 +1287,7 @@ async function main() {
 
   await page.goto(`http://localhost:${PORT}/#/project/${encodeURIComponent(projectAddr)}`)
   await page.waitForSelector('[data-surface="project"]')
-  await page.getByRole('button', { name: 'Delete project' }).click()
+  await pageAction('Delete project')
   const deleteDialog = page.getByRole('alertdialog', { name: /^Delete “Payment integration”/ })
   await deleteDialog.waitFor()
   await deleteDialog.getByRole('button', { name: 'Delete project' }).click()

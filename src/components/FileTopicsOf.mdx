@@ -4,18 +4,21 @@ import { Meta } from '@storybook/addon-docs/blocks'
 
 # FileTopicsOf
 
-The Topics in an issue's or a project's rail, read and changed by the file's
+The Topics in an issue's or a project's Overview, read and changed by the file's
 id (TOP-5): `FileTopics` fed by `useFileTopics`, a refusal said as every
 other write's is.
 
 **Seen in** none of its own: it reads and writes production, so no story can
-draw it. Its look is `FileTopics`, drawn in the `Issues/IssueRail` stories
-Topics and NoTopics.
+draw it. Its look is `FileTopics`, drawn in *Pages/In the shell*: **Issue
+Overview Panel** (two topics, one archived) and **Project Overview Panel**
+(none).
 
 ## When
 
-- In the `topics` slot of `IssueRail` and `ProjectRail`, from the issue page
-  and the project page, with the file's `d` and the page's `say`.
+- In the `topics` of `IssueView` and `ProjectView`, from the issue page and
+  the project page, with the file's `d` and the page's `say`: the
+  **OverviewPanel** draws it under "Topics", where the rail had it until the
+  rail went (ONE-6).
 
 ## When not
 
@@ -26,7 +29,7 @@ Topics and NoTopics.
 ## How
 
 ```tsx
-rail={{ …, topics: <FileTopicsOf file={issue.id} say={say} /> }}
+topics={<FileTopicsOf topics={useFileTopics(issue.id)} say={say} />}
 ```
 
 ## What it owns

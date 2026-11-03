@@ -1,7 +1,5 @@
-import { useId, useState } from 'react'
-import { Form } from '@estiva-app/ui'
-import { Button } from '@/components/ui/Button'
-import { DialogShell } from '@/components/ui/DialogShell'
+import { useState } from 'react'
+import { FormDialog } from '@estiva-app/ui'
 import { Field } from '@/components/ui/Field'
 import { TextInput } from '@/components/ui/TextInput'
 
@@ -21,41 +19,15 @@ export interface NewFolderDialogProps {
 
 export function NewFolderDialog({ onClose, onCreate }: NewFolderDialogProps) {
   const [name, setName] = useState('')
-  const [busy, setBusy] = useState(false)
-  const formId = useId()
   const trimmed = name.trim()
 
-  const submit = async () => {
-    if (!trimmed || busy) return
-    setBusy(true)
-    try {
-      if (await onCreate(trimmed)) onClose()
-    } finally {
-      setBusy(false)
-    }
-  }
-
   return (
-    <DialogShell
-      title="New folder"
-      onClose={onClose}
-      footer={
-        <>
-          <Button variant="muted" onClick={onClose} disabled={busy}>
-            Cancel
-          </Button>
-          <Button variant="primary" type="submit" form={formId} disabled={!trimmed || busy}>
-            {busy ? 'Creating…' : 'Create folder'}
-          </Button>
-        </>
-      }
-    >
-      <Form id={formId} onSubmit={submit} busy={busy}>
-        <p className="text-body-2 text-text-secondary">A place for projects, shown to everyone at the top of the sidebar.</p>
-        <Field label="Folder name">
-          <TextInput value={name} onChange={(event) => setName(event.target.value)} placeholder="What is it for?" autoFocus />
-        </Field>
-      </Form>
-    </DialogShell>
+    // The kit's FormDialog owns the send: its busy words, everything waiting, closing once it went through.
+    <FormDialog title="New folder" submitLabel="Create folder" busyLabel="Creating…" ready={trimmed !== ''} onSubmit={() => onCreate(trimmed)} onClose={onClose}>
+      <p className="text-body-2 text-text-secondary">A place for projects, shown to everyone at the top of the sidebar.</p>
+      <Field label="Folder name">
+        <TextInput value={name} onChange={(event) => setName(event.target.value)} placeholder="What is it for?" autoFocus />
+      </Field>
+    </FormDialog>
   )
 }

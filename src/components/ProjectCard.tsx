@@ -35,7 +35,7 @@ export interface ProjectCardProps {
   status: { value: string; label: string }
   issueCount: number
   doneCount: number
-  author: { name?: string; picture?: string }
+  author: { name?: string; picture?: string; bot?: boolean }
   /** Seconds, as the relay keeps them. */
   createdAt: number
   archived?: boolean
@@ -84,7 +84,7 @@ export function ProjectCard({
           <span>by</span>
           {/* The package's Person: a face beside a name, the em dash for a missing one. A name takes the tone of where it sits (UIG-9). */}
           <span className="contents text-text-secondary">
-            <Person name={author.name} picture={author.picture} size={16} />
+            <Person name={author.name} picture={author.picture} bot={author.bot} size={16} />
           </span>
         </span>
         <Dot />

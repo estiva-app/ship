@@ -129,7 +129,8 @@ describe('an archived project offers no new issue until it is unarchived (PEEKM-
     vi.mocked(useWorkspace).mockReturnValue({ state: { ...STATE, projects: [archived, STATE.projects[1]] }, partial: false, error: null, clock: null, loading: false, busy: false, refresh, wantThreads: () => {}, live: false })
     goTo(`/project/billing-${D_PROJECT}`)
     const { unmount } = render(<App />)
-    await screen.findByRole('button', { name: 'Unarchive project' })
+    // Drawn as archived: the notice's Unarchive (the rail's "Unarchive project" is in the page's ⋯ since ONE-6, step 4b).
+    await screen.findByRole('button', { name: 'Unarchive' })
     expect(screen.queryByRole('button', { name: 'Add issue' })).toBeNull()
     unmount()
     vi.mocked(useWorkspace).mockReturnValue({ state: STATE, partial: false, error: null, clock: null, loading: false, busy: false, refresh, wantThreads: () => {}, live: false })
@@ -166,6 +167,9 @@ describe('an archived project offers no new issue until it is unarchived (PEEKM-
     vi.mocked(useWorkspace).mockReturnValue({ state: { ...STATE, projects: [STATE.projects[0], loose], issues: [issue] } as unknown as WorkspaceState, partial: false, error: null, clock: null, loading: false, busy: false, refresh, wantThreads: () => {}, live: false })
     goTo(`/issue/rounding-${D_ISSUE}`)
     render(<App />)
+    // The pills are drawn again when the header's editor lands after its plain first drawing: open the picker once it
+    // has. On a slow runner the click came first, and the open picker went with the pills it belonged to.
+    await waitFor(() => expect(document.querySelector('[data-description="editing"]')).not.toBeNull())
     await userEvent.click(await screen.findByRole('combobox', { name: 'Project' }))
     expect(await screen.findByRole('option', { name: 'Billing' })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: 'No project' })).toBeInTheDocument()

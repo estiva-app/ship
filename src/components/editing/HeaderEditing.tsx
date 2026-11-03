@@ -18,7 +18,7 @@ import type { LiveHeaderProps } from './LiveHeader'
  * text and the description in the same editor, only read, so its links draw as
  * a writer's do (WBD-7).
  */
-export default function HeaderEditing({ title, titlePlaceholder, onRename, summary, onSummarize, description, format, onDescribe, onMention, descriptionBy, nameOf, upload, resolved, onCommentOnBlock, onCopyBlockLink, holdKey, readOnly = false }: LiveHeaderProps & { resolved: Record<string, ForeignObjectData | null | undefined> }) {
+export default function HeaderEditing({ title, titlePlaceholder, onRename, summary, onSummarize, description, format, onDescribe, onMention, descriptionBy, nameOf, upload, resolved, onCommentOnBlock, onCopyBlockLink, holdKey, fields, readOnly = false }: LiveHeaderProps & { resolved: Record<string, ForeignObjectData | null | undefined> }) {
   const [body, setBody] = useState<Editor | null>(null)
   const summaryEditor = useRef<InlineTextHandle>(null)
   const toDescription = () => {
@@ -33,7 +33,8 @@ export default function HeaderEditing({ title, titlePlaceholder, onRename, summa
   }
   return (
     // 16px between title and description (Katerina, 29 September: "a bit more" than the 8px pages had), and the
-    // summary 4px under the title, between them (the short-summary prototype's ShipFilePage).
+    // summary 4px under the title, between them (the short-summary prototype's ShipFilePage). The fields between
+    // the summary and the description, 16px from each (ONE-6, step 4b); Enter from the summary goes past them.
     <div className="flex flex-col gap-4">
       {readOnly ? (
         <div className="flex flex-col gap-1">
@@ -42,18 +43,22 @@ export default function HeaderEditing({ title, titlePlaceholder, onRename, summa
         </div>
       ) : (
       <div className="flex flex-col gap-1">
-        {/* The title: no box (Katerina, 29 September, findings E1 and E2), now the package's. */}
-        <InlineText
-          variant="title"
-          label="Title"
-          value={title}
-          placeholder={titlePlaceholder}
-          onCommit={onRename}
-          onEnter={onSummarize ? () => summaryEditor.current?.focus('start') : toDescription}
-        />
+        {/* The title: no box (Katerina, 29 September, findings E1 and E2), now the package's; at a document's heading
+            size, 26px, as Leaf draws a Ship file (Katerina, 1 November), and the page's h1 as Leaf's is. */}
+        <h1 className="text-h1 text-text-primary">
+          <InlineText
+            variant="heading"
+            label="Title"
+            value={title}
+            placeholder={titlePlaceholder}
+            onCommit={onRename}
+            onEnter={onSummarize ? () => summaryEditor.current?.focus('start') : toDescription}
+          />
+        </h1>
         {onSummarize ? <LiveSummary ref={summaryEditor} value={summary ?? ''} onCommit={onSummarize} onEnter={toDescription} /> : <ReadingSummary value={summary ?? ''} />}
       </div>
       )}
+      {fields}
       {readOnly && description.trim() === '' ? null : (
         <LiveDescription value={description} format={format} onCommit={onDescribe} onMention={onMention} changedBy={descriptionBy} nameOf={nameOf} resolved={resolved} onEditor={setBody} upload={upload} onCommentOnBlock={onCommentOnBlock} onCopyBlockLink={onCopyBlockLink} holdKey={holdKey} readOnly={readOnly} />
       )}

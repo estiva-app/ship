@@ -8,13 +8,13 @@ import { Meta } from '@storybook/addon-docs/blocks'
 line saying where it lives — the sidebar's icon for a project or an issue, and
 its name.
 
-**Seen in** Conversations/Conversations: Mentioned In, Mentioned In Empty,
-Mentioned In Truncated.
+**Seen in** — *Pages/In the shell*: **Issue Overview Panel** and **Project
+Overview Panel**.
 
 ## When
 
-- On the Activity tab, under an **AppSection** titled "Mentioned in", below the
-  object's own conversations.
+- In the **OverviewPanel**, under its "Activity" heading, in the column beside
+  the page where the comments are when it is hidden (ONE-6, step 4d).
 
 ## When not
 
@@ -26,11 +26,12 @@ Mentioned In Truncated.
 ```tsx
 import { MentionList } from '@/components/conversations/ThreadList'
 
-<MentionList items={activity} truncated={activityTruncated} onReply={replyInItsFolder} />
+<MentionList items={activity} loading={loading} truncated={activityTruncated} about={about} nameOf={nameOf} />
 ```
 
-- The props are production's `ActivityProps`. A reply goes to the thread's own
-  Folder, never this object's — which is why the place line is there.
+- The props are production's `ActivityProps`. Read-only, Peek's way (PEE-48):
+  no reply, reaction, edit or delete here; a press opens the page it was said
+  on, when that page is Ship's.
 
 ## What it owns
 

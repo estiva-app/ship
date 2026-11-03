@@ -4,7 +4,7 @@ import { FileTopics } from './FileTopics'
 import { act, type Say } from '@/pages/act'
 
 /**
- * The rail's Topics for the issue or project page (TOP-5): its topics read and
+ * The Overview's Topics for the issue or project page (TOP-5): its topics read and
  * changed by the file's id, a refusal said as every other write's is. No
  * workspace re-read: a topic's list is not in Ship's fold. The page holds the
  * read (`useFileTopics`), so its Related leaves out a topic already named here.

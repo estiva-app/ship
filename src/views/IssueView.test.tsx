@@ -16,11 +16,9 @@ import { actInField } from '@/pages/act'
 import { IssueView, type IssueViewProps } from './IssueView'
 import { ProjectView, type ProjectViewProps } from './ProjectView'
 
-const view = (tab: 'overview' | 'activity', extra: Partial<IssueViewProps>) => (
+const view = (extra: Partial<IssueViewProps> = {}) => (
   <IssueView
     crumbs={{ issuesHref: '/issues' }}
-    tab={tab}
-    onTab={vi.fn()}
     title="Board columns out of order"
     description="The board draws its columns in the wrong order."
     descriptionFormat="marker"
@@ -30,11 +28,10 @@ const view = (tab: 'overview' | 'activity', extra: Partial<IssueViewProps>) => (
     onStartConversation={vi.fn()}
     onReply={vi.fn()}
     activity={[]}
-    onReplyInActivity={vi.fn()}
     history={[]}
-    rail={{
+    fields={{
       status: 'todo',
-      statuses: [{ value: 'todo', label: 'Todo' }],
+      statuses: [{ value: 'todo', label: 'Todo', colour: 'neutral' }],
       onStatusChange: vi.fn(),
       assignee: '',
       people: [],
@@ -42,24 +39,25 @@ const view = (tab: 'overview' | 'activity', extra: Partial<IssueViewProps>) => (
       project: '',
       projects: [{ value: '', label: 'No project' }],
       onProjectChange: vi.fn(),
-      openedBy: {},
-      openedAt: Math.floor(Date.now() / 1000),
       archived: true,
-      onArchive: vi.fn(),
-      onDelete: vi.fn(),
     }}
+    menu={{ archive: 'own', onArchive: vi.fn(), onDelete: vi.fn(), onCopyLink: vi.fn() }}
+    comments={{ shown: true, onShownChange: vi.fn() }}
+    overview={{ shown: false, onShownChange: vi.fn() }}
     {...extra}
   />
 )
 
 describe('IssueView, archived (SHI-36)', () => {
-  it('draws the description without an editor and shuts the rail’s fields, leaving Unarchive and Delete', () => {
-    render(view('overview', { lockedReason: 'Unarchive to edit' }))
+  it('draws the description without an editor and shuts its fields, leaving Unarchive and Delete in the ⋯', async () => {
+    const user = userEvent.setup()
+    render(view({ lockedReason: 'Unarchive to edit' }))
     expect(screen.getByText(/draws its columns in the wrong order/)).toBeInTheDocument()
     expect(screen.queryByRole('textbox', { name: 'Description' })).toBeNull()
     expect(screen.queryByRole('textbox', { name: 'Title' })).toBeNull()
     expect(screen.getByRole('combobox', { name: 'Status' }).getAttribute('aria-disabled')).toBe('true')
-    for (const name of ['Unarchive issue', 'Delete issue']) expect(screen.getByRole('button', { name }).getAttribute('aria-disabled')).toBe(null)
+    await user.click(screen.getByRole('button', { name: 'More actions' }))
+    for (const name of ['Unarchive issue', 'Delete issue']) expect((await screen.findByRole('menuitem', { name })).getAttribute('aria-disabled')).not.toBe('true')
   })
 
   /*
@@ -68,20 +66,20 @@ describe('IssueView, archived (SHI-36)', () => {
     is a line in its place saying why. The box is its own chunk, so `findBy`.
   */
   it('shows a line saying it is archived where the box was, and no box', async () => {
-    render(view('activity', { lockedReason: 'Unarchive to edit', commentsClosed: 'Archived. Unarchive it to comment.' }))
+    render(view({ lockedReason: 'Unarchive to edit', commentsClosed: 'Archived. Unarchive it to comment.' }))
     expect(await screen.findByText('Archived. Unarchive it to comment.')).toBeInTheDocument()
     expect(screen.queryByRole('textbox', { name: 'Start a conversation…' })).toBeNull()
     expect(screen.queryByText('Start a conversation or type')).toBeNull()
   })
 
   it('shows the same line, saying why, when nothing on the page may be written', async () => {
-    render(view('activity', { readOnlyReason: 'Sign in to reply.' }))
+    render(view({ readOnlyReason: 'Sign in to reply.' }))
     expect(await screen.findByText('Sign in to reply.')).toBeInTheDocument()
     expect(screen.queryByRole('textbox', { name: 'Start a conversation…' })).toBeNull()
   })
 })
 
-const projectView = (tab: 'overview' | 'activity', extra: Partial<ProjectViewProps>) => (
+const projectView = (tab: 'overview' | 'issues', extra: Partial<ProjectViewProps> = {}) => (
   <ProjectView
     crumbs={{ projectsHref: '/projects', title: 'Relay Migration' }}
     header={{ title: 'Relay Migration', description: 'Move every Folder to the new relay.', descriptionFormat: 'marker', archived: true, onRename: vi.fn(), onDescribe: vi.fn() }}
@@ -97,53 +95,135 @@ const projectView = (tab: 'overview' | 'activity', extra: Partial<ProjectViewPro
     onStartConversation={vi.fn()}
     onReply={vi.fn()}
     activity={[]}
-    onReplyInActivity={vi.fn()}
-    rail={{ status: 'planned', statuses: [{ value: 'planned', label: 'Planned' }], onStatusChange: vi.fn(), lead: '', people: [], onLeadChange: vi.fn(), done: 0, total: 0, folders: [], archived: true, onArchive: vi.fn(), onDelete: vi.fn() }}
+    history={[]}
+    fields={{ status: 'planned', statuses: [{ value: 'planned', label: 'Planned', colour: 'neutral' }], onStatusChange: vi.fn(), lead: '', people: [], onLeadChange: vi.fn(), done: 0, total: 0 }}
+    menu={{ archive: 'own', onArchive: vi.fn(), onDelete: vi.fn(), onCopyLink: vi.fn() }}
+    comments={{ shown: true, onShownChange: vi.fn() }}
+    overview={{ shown: false, onShownChange: vi.fn() }}
     {...extra}
   />
 )
 
 describe('ProjectView, archived (SHI-36)', () => {
   // Changed on purpose (PEEKM-2, Decided 2026-10-23): no new issue is offered under an archived project, so the page passes no onAddIssue.
-  it('draws the description without an editor and offers no Add issue, leaving Unarchive and Delete', () => {
-    render(projectView('overview', { lockedReason: 'Unarchive to edit', onAddIssue: undefined }))
+  it('draws the description without an editor and offers no Add issue, leaving Unarchive and Delete in the ⋯', async () => {
+    const user = userEvent.setup()
+    // As the page passes it: archived, the comments column's box is a line too (COMM-7), so nothing on the page is written.
+    render(projectView('overview', { lockedReason: 'Unarchive to edit', commentsClosed: 'Archived. Unarchive it to comment.', onAddIssue: undefined }))
     expect(screen.getByText(/Move every Folder to the new relay/)).toBeInTheDocument()
     // Changed on purpose (WBD-7): the description is the shared editor, only read, so nothing in it can be written.
     expect(document.querySelector('[contenteditable="true"]')).toBeNull()
     expect(screen.queryByRole('button', { name: 'Add issue' })).toBeNull()
-    for (const name of ['Unarchive project', 'Delete project']) expect(screen.getByRole('button', { name }).getAttribute('aria-disabled')).toBe(null)
+    await user.click(screen.getByRole('button', { name: 'More actions' }))
+    for (const name of ['Unarchive project', 'Delete project']) expect((await screen.findByRole('menuitem', { name })).getAttribute('aria-disabled')).not.toBe('true')
   })
 
   // Changed on purpose (COMM-7, Decided 2026-10-17): an archived project's chat takes no new message either.
   it('shows a line saying it is archived where the chat box was', async () => {
-    render(projectView('activity', { lockedReason: 'Unarchive to edit', commentsClosed: 'Archived. Unarchive it to comment.' }))
+    render(projectView('overview', { lockedReason: 'Unarchive to edit', commentsClosed: 'Archived. Unarchive it to comment.' }))
     expect(await screen.findByText('Archived. Unarchive it to comment.')).toBeInTheDocument()
     expect(screen.queryByRole('textbox', { name: 'Start a conversation…' })).toBeNull()
   })
 })
 
-describe('the Activity tab says when its conversation has something new (66b31c4b)', () => {
-  /* Overview does not read the conversation any more, so it is the tab that tells you. */
-  it('lights Activity on an issue with an unread thread, and not without one', () => {
-    const { unmount } = render(view('overview', { unread: { t1: ['m1'] }, stillUnread: { t1: ['m1'] } }))
-    expect(screen.getByRole('tab', { name: /^Activity.*new$/ }).querySelector('[data-unread]')).not.toBeNull()
-    expect(screen.getByRole('tab', { name: 'Overview' }).querySelector('[data-unread]')).toBeNull()
+/*
+  Changed on purpose (ONE-6, step 4c): the comments left the Activity tab for a column beside the page (Katerina, 2
+  November), so no tab lights for them (66b31c4b's dot). What is new is marked on its card.
+*/
+describe('the comments column (ONE-6, step 4c)', () => {
+  const THREAD = { id: 't1', root: { id: 't1', body: 'Is the order the vocabulary order?', at: 1, author: { name: 'Ana' } }, replies: [] } as unknown as IssueViewProps['threads'][number]
+
+  // Changed on purpose (Katerina, 2 November): the column's header is the kit's "Comments" alone, not whose they are.
+  it('is beside the page, under the kit’s own "Comments" header and no line naming the issue', async () => {
+    render(view({ threads: [THREAD], crumbs: { issuesHref: '/issues', ref: 'REL-1' } }))
+    const column = document.querySelector('[data-comments-column]') as HTMLElement
+    expect(column).not.toBeNull()
+    expect(column.textContent).toContain('Comments')
+    expect(column.textContent).not.toContain('REL-1')
+    expect(await screen.findByText('Is the order the vocabulary order?')).toBeInTheDocument()
+  })
+
+  it('a project’s is there on its Issues tab too, and does not name the project', () => {
+    render(projectView('issues'))
+    const column = document.querySelector('[data-comments-column]')
+    expect(column?.textContent).toContain('Comments')
+    expect(column?.textContent).not.toContain('Relay Migration')
+  })
+
+  it('hidden, the header’s button carries the dot when a comment is new, and not when none is', () => {
+    const { unmount } = render(view({ threads: [THREAD], stillUnread: { t1: ['t1'] }, comments: { shown: false, onShownChange: vi.fn() } }))
+    expect(screen.getByRole('button', { name: 'Show comments, new' }).querySelector('[data-unread-dot]')).not.toBeNull()
     unmount()
-    render(view('overview', { unread: {}, stillUnread: {} }))
-    expect(screen.getByRole('tab', { name: 'Activity' }).querySelector('[data-unread]')).toBeNull()
+    render(view({ threads: [THREAD], stillUnread: { t1: [] }, comments: { shown: false, onShownChange: vi.fn() } }))
+    expect(screen.getByRole('button', { name: 'Show comments' })).toBeInTheDocument()
+    expect(document.querySelector('[data-unread-dot], [data-unread]')).toBeNull()
   })
 
-  /* `unread` is held for the visit so the "new since" line stays while you read
-     (99557309); the dot answers to what is unread now, so it goes once read. */
-  it('puts the dot out once the dwell has read it, though the divider stays', () => {
-    render(view('activity', { unread: { t1: ['m1'] }, stillUnread: {} }))
-    expect(screen.getByRole('tab', { name: 'Activity' }).querySelector('[data-unread]')).toBeNull()
+  it('the header’s button hides it and shows it again', async () => {
+    const user = userEvent.setup()
+    const onShownChange = vi.fn()
+    const { rerender } = render(view({ comments: { shown: true, onShownChange } }))
+    await user.click(screen.getByRole('button', { name: 'Hide comments' }))
+    expect(onShownChange).toHaveBeenCalledWith(false)
+    rerender(view({ comments: { shown: false, onShownChange } }))
+    expect(document.querySelector('[data-comments-column]')).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Show comments' }))
+    expect(onShownChange).toHaveBeenLastCalledWith(true)
+  })
+})
+
+/*
+  Changed on purpose (ONE-6, step 4d; Katerina, 2 November): no Activity tab. An issue has one page and no tab row; a
+  project's tabs are Overview and Issues. Mentioned in and History are the Overview panel's, which the header's
+  side-panel button shows in the comments' place.
+*/
+describe('the Overview panel (ONE-6, step 4d)', () => {
+  const HISTORY = [{ id: 'h1', by: { name: 'Ravi' }, at: 1_700_000_000, text: 'set status to In Progress' }]
+  const MENTION = {
+    relation: 'mention' as const,
+    where: 'Design System',
+    thread: { id: 'm1', root: { id: 'm1', body: 'Standup notes: REL-1 is next.', at: 1, author: { name: 'Mara' } }, replies: [] },
+  } as unknown as IssueViewProps['activity'][number]
+
+  it('an issue has no tab row; a project’s tabs are Overview and Issues', () => {
+    const { unmount } = render(view())
+    expect(screen.queryByRole('tablist')).toBeNull()
+    expect(screen.queryByRole('tab', { name: 'Activity' })).toBeNull()
+    unmount()
+    render(projectView('overview'))
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['Overview', 'Issues'])
   })
 
-  it('lights Activity on a project the same way, and never Issues', () => {
-    render(projectView('overview', { unread: { t1: ['m1'] }, stillUnread: { t1: ['m1'] } }))
-    expect(screen.getByRole('tab', { name: /^Activity.*new$/ }).querySelector('[data-unread]')).not.toBeNull()
-    expect(screen.getByRole('tab', { name: /^Issues/ }).querySelector('[data-unread]')).toBeNull()
+  it('the header’s side-panel button shows it, pressed while it is shown', async () => {
+    const user = userEvent.setup()
+    const onShownChange = vi.fn()
+    const { rerender } = render(view({ overview: { shown: false, onShownChange } }))
+    await user.click(screen.getByRole('button', { name: 'Show side panel' }))
+    expect(onShownChange).toHaveBeenCalledWith(true)
+    rerender(view({ overview: { shown: true, onShownChange }, comments: { shown: false, onShownChange: vi.fn() } }))
+    const button = screen.getByRole('button', { name: 'Hide side panel' })
+    expect(button.getAttribute('aria-pressed')).toBe('true')
+    await user.click(button)
+    expect(onShownChange).toHaveBeenLastCalledWith(false)
+  })
+
+  it('holds Activity, the mentions elsewhere with where they were said, then History, in the comments’ place', async () => {
+    render(view({ activity: [MENTION], history: HISTORY, overview: { shown: true, onShownChange: vi.fn() }, comments: { shown: false, onShownChange: vi.fn() } }))
+    const column = document.querySelector('[data-overview-column]') as HTMLElement
+    expect(column).not.toBeNull()
+    expect(document.querySelector('[data-comments-column]')).toBeNull()
+    const text = column.textContent ?? ''
+    expect(text.indexOf('Overview')).toBeLessThan(text.indexOf('Activity'))
+    expect(text.indexOf('Activity')).toBeLessThan(text.indexOf('History'))
+    expect(await screen.findByText('Standup notes: REL-1 is next.')).toBeInTheDocument()
+    expect(column.querySelector('[data-relation="mention"]')?.textContent).toContain('Mentioned in')
+    expect(column.querySelector('[data-relation="mention"]')?.textContent).toContain('Design System')
+    expect(text).toContain('set status to In Progress')
+  })
+
+  it('a project’s holds its History too, on either tab', () => {
+    render(projectView('issues', { history: HISTORY, overview: { shown: true, onShownChange: vi.fn() }, comments: { shown: false, onShownChange: vi.fn() } }))
+    expect(document.querySelector('[data-overview-column]')?.textContent).toContain('set status to In Progress')
   })
 })
 
@@ -159,7 +239,7 @@ describe('the summary on an issue’s and a project’s page (SUM-4)', () => {
   stubLayout()
   const SUMMARY = 'Columns come back in the order they were made, not the order they were left.'
   const writer = async (extra: Partial<IssueViewProps>) => {
-    render(view('overview', extra))
+    render(view(extra))
     await screen.findByRole('textbox', { name: 'Description' })
     return screen.queryByRole('textbox', { name: 'Summary' })
   }
@@ -223,13 +303,13 @@ describe('the summary on an issue’s and a project’s page (SUM-4)', () => {
     expect(edit?.textContent).toBe('')
     expect(screen.queryByText('Add a summary')).not.toBeNull()
     cleanup()
-    render(view('overview', { onSummarize: vi.fn(), readOnlyReason: 'Sign in to edit.' }))
+    render(view({ onSummarize: vi.fn(), readOnlyReason: 'Sign in to edit.' }))
     expect(screen.queryByText('Add a summary')).toBeNull()
     expect(screen.queryByRole('textbox', { name: 'Summary' })).toBeNull()
   })
 
   it('shows an archived issue’s summary as text, not something to edit', () => {
-    render(view('overview', { summary: SUMMARY, onSummarize: vi.fn(), lockedReason: 'Unarchive to edit' }))
+    render(view({ summary: SUMMARY, onSummarize: vi.fn(), lockedReason: 'Unarchive to edit' }))
     expect(screen.queryByText(SUMMARY)).not.toBeNull()
     expect(screen.queryByRole('textbox', { name: 'Summary' })).toBeNull()
   })
@@ -318,5 +398,22 @@ describe('the summary on an issue’s and a project’s page (SUM-4)', () => {
     render(projectView('overview', { header: { title: 'Relay Migration', summary: SUMMARY, onSummarize: vi.fn(), description: 'Move every Folder.', descriptionFormat: 'marker', archived: false, onRename: vi.fn(), onDescribe: vi.fn() } }))
     await screen.findByRole('textbox', { name: 'Description' })
     expect(screen.queryByRole('textbox', { name: 'Summary' })?.textContent).toBe(SUMMARY)
+  })
+})
+
+/* No details column (ONE-6, step 4b): the fields are a row under the summary (where: LiveHeader.fields.test), the actions the header's ⋯. */
+describe('the page without its details column (ONE-6, step 4b)', () => {
+  it('has no details column: no "Opened by", no action buttons on the page, the actions in the header’s ⋯', () => {
+    render(view({}))
+    expect(screen.queryByText(/Opened by/)).toBeNull()
+    expect(screen.queryByRole('button', { name: /Delete issue|Archive issue/ })).toBeNull()
+    expect(screen.getByRole('button', { name: 'More actions' })).toBeInTheDocument()
+  })
+
+  // Changed on purpose (ONE-6, step 4d): an issue has no other tab now; a project's Issues tab is the one without them.
+  it('draws the fields on Overview only', () => {
+    render(projectView('issues'))
+    expect(document.querySelector('[data-page-fields]')).toBeNull()
+    expect(screen.queryByRole('combobox', { name: 'Status' })).toBeNull()
   })
 })

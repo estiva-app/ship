@@ -41,8 +41,11 @@ export const Projects: Story = { render: () => <Loading shape="cards" current="p
 /** The issues page: its heading, the tabs, then rows. */
 export const Issues: Story = { render: () => <Loading shape="list" current="issues" /> }
 
-/** One project or one issue: the trail, the title and rows, and the rail. */
-export const ProjectOrIssue: Story = { render: () => <Loading shape="page" current="issues" /> }
+/** One issue: the header with its trail, the title, the summary, the pills and the description, and the comments column beside it. */
+export const Issue: Story = { render: () => <Loading shape="issue" current="issues" /> }
+
+/** One project: the same, with its tabs under the header. */
+export const Project: Story = { render: () => <Loading shape="project" current="projects" /> }
 
 /** Any other route (an inbound reference): rows. A Folder is not one — it draws its own. */
 export const Rows: Story = { render: () => <Loading shape="rows" current="issues" /> }

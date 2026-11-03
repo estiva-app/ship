@@ -12,8 +12,9 @@
  * there at the same weight, because a mention is anyone typing your address and
  * cannot be withdrawn.
  */
-import { describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { cleanup, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 
 vi.mock(import('@/api/foreign'), async (importOriginal) => ({
   ...(await importOriginal()),
@@ -34,47 +35,60 @@ const items: ActivityItem[] = [
   { relation: 'mention', where: 'Design System', thread: thread('b') },
 ]
 
-const show = (props: Partial<React.ComponentProps<typeof MentionList>> = {}) =>
-  render(<MentionList items={items} onReply={async () => true} {...props} />).container
+const show = (props: Partial<React.ComponentProps<typeof MentionList>> = {}) => render(<MentionList items={items} {...props} />).container
+
+afterEach(cleanup)
 
 describe('MentionList', () => {
   it('is one list, with both relations in it', () => {
     const c = show()
-    expect(c.querySelectorAll('li').length).toBe(2)
+    expect(c.querySelectorAll('[data-relation]').length).toBe(2)
     expect(screen.getByText('root of a')).toBeTruthy()
     expect(screen.getByText('root of b')).toBeTruthy()
   })
 
-  // Changed on purpose: the relation is no longer a visible chip; it is read out before the place's name
-  // (the place line shows the place's icon and name). The words are the same.
+  // Changed on purpose (ONE-6, step 4d): the relation is the kit's ConversationPlace chip again, as Peek draws it.
   it('says how each thread became related', () => {
     show()
     expect(screen.getByText('Mentioned in')).toBeTruthy()
     expect(screen.getByText('On an issue')).toBeTruthy()
   })
 
-  it('names the file each thread belongs to, because replying goes there', () => {
+  it('names the file each thread belongs to, beside its chip', () => {
     show()
     expect(screen.getByText('Design System')).toBeTruthy()
     expect(screen.getByText('REL-4 · Fold once')).toBeTruthy()
   })
 
   /*
-    The weight rule. Same list, not same weight: a stranger's name-drop must not
-    be indistinguishable from your project's own work.
+    Changed on purpose (ONE-6, step 4d; Katerina, 2 November: the Overview, Peek's way). The weight rule is kept by
+    words, not by colour: each row says how it is related on its own chip, and the card is read-only, so a stranger's
+    name-drop is never taken for this file's own conversation. Peek draws both relations so (PEE-48).
   */
-  // Changed on purpose: the weight is carried by the place line above the thread — muted for a mention,
-  // secondary for a sub-file — and no longer by the card (a mention's card had no fill and a subtler border).
-  it('draws a mention with less weight than a sub-file’s thread', () => {
+  it('says the relation on a chip, in words, for each row', () => {
     const c = show()
-    // The place line is the item's own first child, found through the item
-    // rather than by position in the list.
-    const placeOf = (relation: string) => c.querySelector(`[data-relation="${relation}"] > p`)
-    const mention = placeOf('mention')
-    const subFile = placeOf('sub-file')
-    expect(mention?.className).toContain('text-text-muted')
-    expect(subFile?.className).toContain('text-text-secondary')
-    expect(subFile?.className).not.toContain('text-text-muted')
+    expect(c.querySelector('[data-relation="mention"]')?.textContent).toContain('Mentioned in')
+    expect(c.querySelector('[data-relation="sub-file"]')?.textContent).toContain('On an issue')
+  })
+
+  /*
+    Changed on purpose (ONE-6, step 4d): Peek's way (PEE-48). A mention is another file's conversation, shown as it is:
+    nothing on it acts on the message. Before, Ship offered Reply, React, Edit and Delete here.
+  */
+  it('is read-only: no reply box, no reaction to add, no message menu', () => {
+    show()
+    expect(screen.queryByRole('textbox')).toBeNull()
+    expect(screen.queryByRole('button', { name: /reply/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: /reaction/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Message actions' })).toBeNull()
+  })
+
+  it('opens the page it was said on, when Ship has one', async () => {
+    const user = userEvent.setup()
+    history.replaceState(null, '', '/issue/here')
+    show({ items: [{ ...items[1], href: '/project/design-system-1' }] })
+    await user.click(screen.getByText('root of b'))
+    expect(location.pathname).toBe('/project/design-system-1')
   })
 
   /*

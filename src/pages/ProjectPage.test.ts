@@ -15,7 +15,7 @@ import { foldFolder } from '../nostr/fold'
 import { anchorIndex } from '../nostr/references'
 import { foldWorkspace, type WorkspaceState } from '../nostr/store'
 import type { DirectoryView } from '@/api'
-import { ACTIVITY_HORIZON, activityFor, cardEditOf, refreshAfter, subFileThreads, useMentionLinks, withElsewhere } from './ProjectPage'
+import { ACTIVITY_HORIZON, activityFor, cardEditOf, refreshAfter, subFileThreads, threadFor, useMentionLinks, withElsewhere } from './ProjectPage'
 
 const FOLDER = 'ffffffff-0000-0000-0000-000000000000'
 const PROJECT = `30850:${'a'.repeat(64)}:the-project`
@@ -222,5 +222,21 @@ describe('what an edit of one message is built from', () => {
     const shot = { url: `/media/${'d'.repeat(64)}.png`, m: 'image/png', x: 'd'.repeat(64), size: 40, filename: 'shot.png' }
     state.attachments = { i1: [shot] }
     expect(cardEditOf(state, 'i1')?.files).toEqual([shot])
+  })
+})
+
+describe('threadFor, for the one conversation’s cards (ONE-6)', () => {
+  it('says a thread’s comment was deleted, with every reply kept', () => {
+    const reply = event('r1', [['A', ISSUE], ['K', '30851'], ['e', 'gone'], ['k', '1111'], ['h', FOLDER]], 'Still here.')
+    const [conversation] = foldFolder([reply], refs).conversations
+    const thread = threadFor(conversation!, directory)
+    expect(thread.rootMissing).toBe(true)
+    expect(thread.root.id).toBe('r1')
+  })
+
+  it('keeps the words a comment written on a selection quotes', () => {
+    const quoted = event('c1', [['A', ISSUE], ['K', '30851'], ['h', FOLDER], ['quote', 'The board loses', 'its order']], 'This.')
+    const [conversation] = foldFolder([quoted], refs).conversations
+    expect(threadFor(conversation!, directory).root.quote).toEqual({ start: 'The board loses', end: 'its order' })
   })
 })

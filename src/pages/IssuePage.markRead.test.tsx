@@ -7,7 +7,7 @@
  * is `readStateSync.test.ts`'s. Mocked, as `summary.wire.test.tsx` does: the
  * workspace read, the people directory, the Folder listing reads and the clock check.
  */
-import { act, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorkspaceState } from '@/api'
 
@@ -81,5 +81,32 @@ describe('the Activity tab marks the issue read (APP-5)', () => {
     rerender(<App />)
     await act(async () => vi.advanceTimersByTimeAsync(READ_DWELL_MS * 3))
     expect(markedIssue().map(([, at]) => at)).toEqual([COMMENT_AT * 1000])
+  })
+})
+
+/*
+  Changed on purpose (ONE-6, step 4c): the comments are a column beside the page on every tab, so they are read
+  wherever the column is shown, Overview included, and not while the header's button hides it (66b31c4b: what is not
+  on screen is not read).
+*/
+describe('the comments column marks the issue read while it is shown (ONE-6, step 4c)', () => {
+  it('on Overview, where the comments are now drawn too', async () => {
+    history.replaceState(null, '', `/issue/invoice-totals-${D_ISSUE}`)
+    vi.mocked(useWorkspace).mockReturnValue(workspace(true))
+    render(<App />)
+    await screen.findByText('Totals are off')
+    await act(async () => vi.advanceTimersByTimeAsync(READ_DWELL_MS * 3))
+    expect(markedIssue().map(([, at]) => at)).toEqual([COMMENT_AT * 1000])
+  })
+
+  it('not once it is hidden', async () => {
+    history.replaceState(null, '', `/issue/invoice-totals-${D_ISSUE}`)
+    vi.mocked(useWorkspace).mockReturnValue(workspace(true))
+    render(<App />)
+    await screen.findByText('Totals are off')
+    fireEvent.click(screen.getByRole('button', { name: 'Hide comments' }))
+    expect(screen.queryByText('Totals are off')).toBeNull()
+    await act(async () => vi.advanceTimersByTimeAsync(READ_DWELL_MS * 3))
+    expect(markedIssue()).toEqual([])
   })
 })

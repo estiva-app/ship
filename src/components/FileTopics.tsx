@@ -13,7 +13,7 @@ import { SkeletonBar } from '@/components/ui/Skeleton'
 /**
  * **A project's or an issue's topics** (TOP-5; why:
  * https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-topic-keeps-its-own-list-of-files.md),
- * in its rail: one chip per topic whose list names this file, each opening the
+ * in its Overview: one chip per topic whose list names this file, each opening the
  * topic in Peek, as the Per app prototype draws a file's Topics row (estiva-ui
  * `concept/cross-app-navigation`, `Lens.tsx` FilePage). "None" when no topic
  * lists it.

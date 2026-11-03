@@ -65,11 +65,11 @@ describe('a comment that points at an object', () => {
     expect(c.textContent).not.toContain(NADDR)
   })
 
-  // Changed on purpose: replies are folded behind the replies button, so the thread is opened first.
+  // Replies wait behind the kit's replies row, so the thread is opened first.
   it('renders a pointer in a reply, not only in the root', async () => {
     const c = show(thread('Have a look at this.', `Here: ${NADDR}`))
-    fireEvent.click(screen.getByRole('button', { name: '1 reply' }))
-    await waitFor(() => expect(c.querySelector('[data-message="r1"] [data-message-text]')?.textContent).toBe('Here: Issue not available'))
+    fireEvent.click(screen.getByRole('button', { name: '1 reply, open the thread' }))
+    await waitFor(() => expect(c.querySelector('[data-reply-id="r1"] [data-message-text]')?.textContent).toBe('Here: Issue not available'))
     expect(c.textContent?.match(/not available/g)).toHaveLength(1)
   })
 

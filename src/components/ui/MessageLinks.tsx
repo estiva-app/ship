@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { KIND_BARE_FILE } from '@estiva-app/interop'
-import { AttachedCard, FieldLine, LinkChip, LinkRow, loadingShapeOf, type CardShape, type LinkState, type LinkedConversation, type LoadingShape } from '@estiva-app/ui'
+import { AttachedCard, FieldLine, LinkChip, LinkRow, type LinkState, type LinkedConversation } from '@estiva-app/ui'
 import { applyCardAction, resolveForeign, type ForeignObject } from '@/api/foreign'
 import { useDeleted } from '@/api/absence'
 import { resolveFailed } from '@/api/useForeignObjects'
@@ -88,13 +88,13 @@ function isAbsent(uri: string, object: ForeignObject | null | undefined): boolea
   return (object === null && !resolveFailed(uri)) || !!object?.unreachable
 }
 
-/** Where a file's comment count opens: a Ship file's Activity tab, anyone else's file in its own app. */
+/** Where a file's comment count opens: a Ship file's page, its comments beside it (ONE-6), anyone else's file in its own app. */
 export function conversationHref(object: ForeignObject): string {
   if (!isOwnKind(object.kind) || !object.address) return hrefOf(object)
   const d = object.address.split(':').slice(2).join(':')
   const title = object.slots.title
   const slug = title && !title.isPubkey ? title.value : undefined
-  return object.kind === KIND.PROJECT ? href({ name: 'project', d, slug, view: 'table', tab: 'activity' }) : href({ name: 'issue', d, slug, tab: 'activity' })
+  return object.kind === KIND.PROJECT ? href({ name: 'project', d, slug, view: 'table' }) : href({ name: 'issue', d, slug })
 }
 
 /**
@@ -226,13 +226,10 @@ function CardBox({
   const deleted = useDeleted(uri, !failed && isAbsent(uri, object))
 
   let link: LinkState
-  let loadingShape: CardShape | undefined
   if (object === undefined) {
     // Found not available the last time this device asked: its one-line row from the first paint, not a card's height.
-    // Otherwise a placeholder of the card's own height, so the conversation does not move as it loads.
-    const kind = linkedKindOf(uri)
-    loadingShape = rememberedUnavailable(naddr) || compact ? undefined : cardShapes.of(naddr, kind)
-    link = rememberedUnavailable(naddr) ? notAvailable(uri, { url: opensAt }) : { state: 'loading', kind, shape: loadingShape }
+    // Otherwise the kit holds the card's own height and shape from the last time (`remember`), so the conversation does not move as it loads.
+    link = rememberedUnavailable(naddr) ? notAvailable(uri, { url: opensAt }) : { state: 'loading', kind: linkedKindOf(uri) }
   } else if (failed) {
     // A failed read (a busy relay, the network) with nothing to show draws the not-available row (or the URL it was
     // written as), never nothing, and the page's refresh keeps asking quietly (Katerina, 30 Oct). It is not remembered:
@@ -242,40 +239,10 @@ function CardBox({
     link = openingAt(linkStateOf(uri, deleted ? null : object, { directory, onAct, conversation }, { url: opensAt, deleted }), opensAt)
   }
 
-  /*
-    The drawn card's shape and height, kept for its placeholder next time. The
-    height holds what the shape cannot say: a summary the kit wraps to two lines.
-  */
-  const shape = !compact && link.state === 'ready' ? loadingShapeOf(link.linked) : undefined
-  const shapeKey = shape && JSON.stringify(shape)
-  const box = useRef<HTMLDivElement>(null)
-  const kindOfCard = linkedKindOf(uri)
-  useEffect(() => {
-    const card = box.current?.firstElementChild
-    if (!shapeKey || !card) return
-    const drawn = JSON.parse(shapeKey) as LoadingShape
-    // A card not on screen (a closed tab) measures 0: it keeps the height it last drew at.
-    const note = () => {
-      const height = Math.round(card.getBoundingClientRect().height)
-      cardShapes.note(naddr, height > 0 ? { ...drawn, height } : { ...drawn, height: cardShapes.of(naddr, kindOfCard)?.height })
-    }
-    note()
-    if (typeof ResizeObserver === 'undefined') return
-    // A window being resized changes every card's height each frame: note it once it settles.
-    let settle: ReturnType<typeof setTimeout> | undefined
-    const observer = new ResizeObserver(() => {
-      clearTimeout(settle)
-      settle = setTimeout(note, 500)
-    })
-    observer.observe(card)
-    return () => {
-      observer.disconnect()
-      clearTimeout(settle)
-    }
-  }, [naddr, shapeKey, kindOfCard])
   return (
-    <div ref={box} data-card={compact ? 'compact' : 'detailed'} data-card-value={naddr} style={loadingShape?.height ? { minHeight: loadingShape.height } : undefined}>
-      {compact ? <LinkRow link={link} /> : <AttachedCard link={link} onRemove={onRemove} />}
+    <div data-card={compact ? 'compact' : 'detailed'} data-card-value={naddr}>
+      {/* The kit measures the drawn card and keeps its shape and height for its placeholder next time, as Peek's does. */}
+      {compact ? <LinkRow link={link} /> : <AttachedCard link={link} onRemove={onRemove} remember={{ memory: cardShapes, id: naddr }} />}
       {error && (
         <FieldLine tone="error" className="mt-1">
           {error}

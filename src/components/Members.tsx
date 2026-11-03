@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { MembersDialog, MembersPill, type MembersDialogCandidate, type MembersDialogMember } from '@estiva-app/ui'
-import type { RailPerson } from './ProjectRail'
+import type { WorkspacePerson } from './PageFields'
 
 /** How many faces the pill draws; the count says the rest. */
 const PILL_FACES = 3
@@ -11,11 +11,11 @@ export interface MembersProps {
   /** The viewer's key. */
   me: string
   /** Names and faces by key — the workspace's people, who are also who "Add members" offers. */
-  people: RailPerson[]
+  people: WorkspacePerson[]
   /** A key's name when it is not among `people`. */
   nameOf: (pubkey: string) => string
-  /** A key's face when it is not among `people`. */
-  pictureOf: (pubkey: string) => string | undefined
+  /** A key's face when it is not among `people`: its picture, and whether it is an agent's. */
+  personOf: (pubkey: string) => { picture?: string; bot?: boolean }
   /** Who holds a part in the file — "Assignee", "Author", "Lead" — drawn as the row's second line, and listed "· not following" once they have left. */
   roles: { pubkey: string; role: string }[]
   /** One line under the roster. */
@@ -34,12 +34,17 @@ export interface MembersProps {
  * members" (SHI-31; the old Peek design, Miky 2026-10-06). Ship's part is which
  * people, what their second line says, and the writes.
  */
-export function Members({ members, me, people, nameOf, pictureOf, roles, note, readOnlyReason, onSetMine, onAdd }: MembersProps) {
+export function Members({ members, me, people, nameOf, personOf, roles, note, readOnlyReason, onSetMine, onAdd }: MembersProps) {
   const [open, setOpen] = useState(false)
   if (!members) return null
 
   const byKey = new Map(people.map((p) => [p.value, p]))
-  const person = (pubkey: string) => byKey.get(pubkey) ?? { name: nameOf(pubkey), picture: pictureOf(pubkey) }
+  const person = (pubkey: string): WorkspacePerson => {
+    const known = byKey.get(pubkey)
+    if (known) return known
+    const { picture, bot } = personOf(pubkey)
+    return { value: pubkey, name: nameOf(pubkey), picture, ...(bot ? { bot } : {}) }
+  }
   const rolesOf = (pubkey: string) => roles.filter((r) => r.pubkey === pubkey).map((r) => r.role)
   const named = (pubkey: string) => (pubkey === me ? 'You' : person(pubkey).name)
 
@@ -47,18 +52,18 @@ export function Members({ members, me, people, nameOf, pictureOf, roles, note, r
   const keys = [...members.keys()].sort((a, b) => Number(b === me) - Number(a === me) || named(a).localeCompare(named(b)))
   const left = [...new Set(roles.map((r) => r.pubkey))].filter((pubkey) => !members.has(pubkey)).sort((a, b) => named(a).localeCompare(named(b)))
   const rows: MembersDialogMember[] = [
-    ...keys.map((pubkey) => ({ id: pubkey, name: named(pubkey), picture: person(pubkey).picture, caption: rolesOf(pubkey).join(' · ') || undefined })),
+    ...keys.map((pubkey) => ({ id: pubkey, name: named(pubkey), picture: person(pubkey).picture, bot: person(pubkey).bot, caption: rolesOf(pubkey).join(' · ') || undefined })),
     // Their own id, so the picker (which leaves out rows by id) still offers them: anyone may add back somebody who left (Miky, 2026-10-07).
-    ...left.map((pubkey) => ({ id: `left:${pubkey}`, name: named(pubkey), picture: person(pubkey).picture, caption: `${rolesOf(pubkey).join(' · ')} · not following` })),
+    ...left.map((pubkey) => ({ id: `left:${pubkey}`, name: named(pubkey), picture: person(pubkey).picture, bot: person(pubkey).bot, caption: `${rolesOf(pubkey).join(' · ')} · not following` })),
   ]
-  const candidates: MembersDialogCandidate[] = people.map((p) => ({ id: p.value, label: p.value === me ? 'You' : p.name, picture: p.picture }))
+  const candidates: MembersDialogCandidate[] = people.map((p) => ({ id: p.value, label: p.value === me ? 'You' : p.name, picture: p.picture, bot: p.bot }))
   const isMember = members.has(me)
   const canChange = !readOnlyReason
 
   return (
     <>
       <MembersPill
-        members={keys.slice(0, PILL_FACES).map((pubkey) => ({ name: named(pubkey), picture: person(pubkey).picture }))}
+        members={keys.slice(0, PILL_FACES).map((pubkey) => ({ name: named(pubkey), picture: person(pubkey).picture, bot: person(pubkey).bot }))}
         count={members.size}
         onClick={() => setOpen(true)}
       />

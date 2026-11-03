@@ -37,7 +37,7 @@ export function BoardCard({ issue, href }: { issue: IssueRowData; href: string }
       {issue.assignee && (
         // The package's Person: a face beside a name, the em dash for a missing one. A name takes the tone of where it sits (UIG-9).
         <span className="contents text-caption text-text-secondary">
-          <Person name={issue.assignee.name} picture={issue.assignee.picture} size={16} />
+          <Person name={issue.assignee.name} picture={issue.assignee.picture} bot={issue.assignee.bot} size={16} />
         </span>
       )}
     </Card>

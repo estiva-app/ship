@@ -23,10 +23,10 @@ export const NOBODY = {}
 export const REL = { title: 'Relay Migration', href: '#/p/rel' }
 
 export const ISSUE_STATUSES = [
-  { value: 'todo', label: 'Todo' },
-  { value: 'in_progress', label: 'In Progress' },
-  { value: 'done', label: 'Done' },
-  { value: 'cancelled', label: 'Cancelled' },
+  { value: 'todo', label: 'Todo', colour: 'neutral' as const },
+  { value: 'in_progress', label: 'In Progress', colour: 'blue' as const },
+  { value: 'done', label: 'Done', colour: 'green' as const },
+  { value: 'cancelled', label: 'Cancelled', colour: 'muted' as const },
 ]
 
 export const ISSUES: IssuesTableRow[] = [

@@ -1,7 +1,6 @@
-import { Meta, Canvas, Controls } from '@storybook/addon-docs/blocks'
-import * as ReferenceStories from './Reference.stories'
+import { Meta } from '@storybook/addon-docs/blocks'
 
-<Meta of={ReferenceStories} />
+<Meta title="Primitives/Reference" />
 
 # Reference
 
@@ -10,7 +9,9 @@ chip, with the name the workspace directory gives. What stays of Ship's own
 chip: a file or a message named in text is the kit's **LinkChip**, through
 **MessageChip**, in a box being written in too (Katerina, 30 Oct).
 
-<Canvas of={ReferenceStories.Person} />
+**Seen in** — No story: no story's text names a person; `Reference.test` and
+`ThreadList.references.test` draw it. The chip has its story in the kit
+(*Links & references/InlineChip*).
 
 ## When
 
@@ -40,7 +41,3 @@ import { Reference } from '@/components/ui/Reference'
 - **Never blank, never the whole key**: somebody the directory cannot name is
   a short key, quiet, with the whole address on hover (§13.1).
 - **A label, not a link**: Ship has no page for a person.
-
-## Props
-
-<Controls of={ReferenceStories.Person} />

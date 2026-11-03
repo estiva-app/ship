@@ -28,7 +28,7 @@ export function workspacePeople(pubkeys: readonly string[], directory: Pick<Dire
   const out: People = {}
   for (const pubkey of pubkeys) {
     const profile = directory.profileOf(pubkey)
-    if (profile) out[pubkey] = { displayName: profile.name, picture: profile.picture }
+    if (profile) out[pubkey] = { displayName: profile.name, picture: profile.picture, ...(profile.bot ? { bot: true as const } : {}) }
   }
   return out
 }
@@ -46,6 +46,6 @@ export function mentionPeople(pubkeys: readonly string[], me: string, directory:
     id: pubkey,
     name,
     pubkey,
-    avatar: <Avatar size={32} src={directory.personOf(pubkey).picture} name={name} />,
+    avatar: <Avatar size={32} src={directory.personOf(pubkey).picture} bot={directory.personOf(pubkey).bot} name={name} />,
   }))
 }

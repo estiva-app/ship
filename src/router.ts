@@ -71,7 +71,8 @@ export type Route =
    * test, a link built before the object loaded).
    */
   | { name: 'project'; d: string; slug?: string; view: ProjectView; tab?: ProjectTab }
-  | { name: 'issue'; d: string; slug?: string; tab?: IssueTab }
+  /** No tab: an issue's page has one (ONE-6, step 4d). */
+  | { name: 'issue'; d: string; slug?: string }
   /**
    * A Folder, addressed by its uuid — the same uuid that is its channel id and
    * the `d` of its state event (RFC 0.4 §5.2). No slug: a Folder's name lives
@@ -108,15 +109,14 @@ export type ProjectView = 'table' | 'board'
 
 /**
  * Which tab of a project page is open (Katerina, 29 September: Overview ·
- * Activity · Issues). In the URL for the same reason the view is — "look at
- * the conversation on this project" is a link you can send — and left out
- * when it is the first tab, so the everyday link stays short.
+ * Activity · Issues; 2 November: Activity went, its Mentioned in and History
+ * to the Overview panel, ONE-6 step 4d). In the URL for the same reason the
+ * view is, and left out when it is the first tab, so the everyday link stays
+ * short. An old `?tab=activity` opens Overview, its comments beside it, which
+ * is where the conversation it meant is now; an issue's, its one page.
  */
-export type ProjectTab = 'overview' | 'activity' | 'issues'
-/** An issue page's tabs: an issue has no Issues tab. */
-export type IssueTab = 'overview' | 'activity'
-const PROJECT_TABS: ProjectTab[] = ['overview', 'activity', 'issues']
-const ISSUE_TABS: IssueTab[] = ['overview', 'activity']
+export type ProjectTab = 'overview' | 'issues'
+const PROJECT_TABS: ProjectTab[] = ['overview', 'issues']
 
 const PROJECT_VIEWS: ProjectView[] = ['table', 'board']
 const DEFAULT_PROJECT_VIEW: ProjectView = 'table'
@@ -138,10 +138,8 @@ export function href(route: Route): string {
       const q = query.toString()
       return q ? `${base}?${q}` : base
     }
-    case 'issue': {
-      const base = `/issue/${objectRef(route.d, route.slug)}`
-      return route.tab && route.tab !== 'overview' ? `${base}?tab=${route.tab}` : base
-    }
+    case 'issue':
+      return `/issue/${objectRef(route.d, route.slug)}`
     case 'folder':
       return `/app/folder/${route.id}`
     case 'inbound':
@@ -202,10 +200,7 @@ export function parse(location: string): Route {
   }
   if (parts[0] === 'issue' && parts[1]) {
     const d = identifierFromRef(parts[1])
-    if (d) {
-      const asked = new URLSearchParams(query ?? '').get('tab')
-      return ISSUE_TABS.includes(asked as IssueTab) && asked !== 'overview' ? { name: 'issue', d, tab: asked as IssueTab } : { name: 'issue', d }
-    }
+    if (d) return { name: 'issue', d }
   }
   return { name: 'issues' }
 }

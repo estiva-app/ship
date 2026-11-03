@@ -41,7 +41,7 @@ export type EditIndex = Record<string, EditFold>
 export type AttachmentIndex = Record<string, Imeta[]>
 /** Target event id → its reactions, most reacted first. */
 export type ReactionsByTarget = Record<string, Reaction[]>
-export { REACTION_HORIZON, REACTION_EMOJI, type Reaction } from '@estiva-app/conversation'
+export { REACTION_HORIZON, REACTION_EMOJI, type Reaction, type Resolution } from '@estiva-app/conversation'
 export { useReactions } from './useReactions'
 export { useWorkspace } from './useWorkspace'
 export { useDirectory, type DirectoryView, type Person } from './useDirectory'
@@ -89,7 +89,7 @@ export {
 export { clockProblem } from './clock'
 import { signer, store } from './store'
 import { firstLoad } from './foreign'
-import { groupReactions, type EditFold, type Reaction } from '@estiva-app/conversation'
+import { groupReactions, type EditFold, type Reaction, type Resolution } from '@estiva-app/conversation'
 import type { Imeta } from '@estiva-app/protocol'
 
 
@@ -124,6 +124,11 @@ export function reloadFolders(previous: WorkspaceEvents, folders: string[]): Pro
  * the package's `decorationsOf`: the newest 100 targets by `created_at`, one
  * per `(target, pubkey, emoji)`, and both cuts reported. Sorted most reacted
  * first here, which §6.6 leaves to the app.
+ *
+ * The same read brings each message's resolutions (`kind:9101`, PEEK-128):
+ * `resolved` keeps the ones whose last word is "resolved", whoever wrote it,
+ * as Peek reads them. Ship writes none (Katerina, 2 November); it shows the
+ * ones made in Peek and Leaf.
  */
 export async function reactionsOn(targets: readonly { id: string; at: number }[]): Promise<{
   reactions: ReactionsByTarget
@@ -131,6 +136,8 @@ export async function reactionsOn(targets: readonly { id: string; at: number }[]
   omitted: number
   /** Whether the relay may hold reactions this read did not bring back. */
   cut: boolean
+  /** By message id, the resolution of each message that stands resolved; a reopened one is absent. */
+  resolved: Record<string, Resolution>
 }> {
   const decorations = await store.decorationsFor(targets)
   const reactions = groupReactions(
@@ -138,7 +145,12 @@ export async function reactionsOn(targets: readonly { id: string; at: number }[]
     signer.pubkey,
   )
   for (const list of Object.values(reactions)) list.sort((a, b) => b.count - a.count)
-  return { reactions, omitted: decorations.reactionTargetsOmitted, cut: decorations.reactionEventsCut }
+  const resolved: Record<string, Resolution> = {}
+  for (const [id, decoration] of Object.entries(decorations.byId)) {
+    const last = decoration.resolutions.at(-1)
+    if (last?.action === 'resolved') resolved[id] = last
+  }
+  return { reactions, omitted: decorations.reactionTargetsOmitted, cut: decorations.reactionEventsCut, resolved }
 }
 
 /** kind:0 profiles for a set of pubkeys — names and faces, never keys. */

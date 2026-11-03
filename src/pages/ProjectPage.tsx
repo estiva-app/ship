@@ -57,19 +57,20 @@ import type { ThreadData } from '@/components/ConversationThread'
 import type { ActivityItem } from '@/components/Activity'
 import type { IssuesTableRow } from '@/components/IssuesTable'
 import { NewIssueDialog } from '@/components/NewIssueDialog'
-import type { RailPerson } from '@/components/ProjectRail'
+import type { WorkspacePerson } from '@/components/PageFields'
 import { placedIn } from '@/lib/placement'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { ProjectView } from '@/views/ProjectView'
 import { go, href, type ProjectTab, type ProjectView as ProjectViewName } from '../router'
 import { act, actInField, sayOnceLeft, type Say } from './act'
+import { editedFor, historyFor } from './history'
+import { useSideColumn } from './sideColumn'
 import { FileTopicsOf } from '@/components/FileTopicsOf'
 import { hrefForIssue, rowFor } from './IssuesPage'
 import { MoveProject } from '@/components/MoveProject'
-import { ArchiveDialog } from '@/components/ArchiveDialog'
-import { ArchivedNotice } from '@/components/ArchivedNotice'
-import { archivedLine, lockedReason, ownArchive, type Archives } from '@/lib/archive'
+import { ArchiveDialog, ArchivedNotice } from '@estiva-app/ui'
+import { ARCHIVE_WORDS, archivedLine, archivedNoticeOf, lockedReason, ownArchive, type Archives } from '@/lib/archive'
 import { KIND } from '@/nostr/kinds'
 
 export type { Say } from './act'
@@ -183,9 +184,17 @@ export function threadFor(
       embeds: embeds?.[m.id],
       // The anchored block, read live from its object like any part (COM-2).
       anchorPart: m.blockId && m.anchor ? { address: m.anchor, block: m.blockId } : undefined,
+      // The words it quotes, written on a selection in Leaf (LEAF-7).
+      ...(m.quote ? { quote: m.quote } : {}),
     }
   }
-  return { id: conversation.id, root: message(conversation.root), replies: conversation.replies.map(message) }
+  return {
+    id: conversation.id,
+    root: message(conversation.root),
+    replies: conversation.replies.map(message),
+    // Its comment was deleted: `root` is the earliest reply standing in for it (PER-24).
+    ...(conversation.rootMissing ? { rootMissing: true as const } : {}),
+  }
 }
 
 /**
@@ -256,13 +265,16 @@ export function whereThreadLives(folder: string, state: FolderState): string | u
   return placeOf(folder, state).where
 }
 
-/** The same answer, and whether it named a project or an issue — so the place can carry that one's icon. */
-export function placeOf(folder: string, state: FolderState): { where?: string; whereKind?: 'project' | 'issue' } {
+/**
+ * The same answer, whether it named a project or an issue — so the place can carry that one's icon — and its page,
+ * where a mention opens (ONE-6, step 4d).
+ */
+export function placeOf(folder: string, state: FolderState): { where?: string; whereKind?: 'project' | 'issue'; href?: string } {
   if (!folder) return {}
   const project = state.projects.find((candidate) => candidate.contentFolder === folder)
-  if (project) return { where: project.title, whereKind: 'project' }
+  if (project) return { where: project.title, whereKind: 'project', href: href({ name: 'project', d: project.id, slug: project.title, view: 'table' }) }
   const issue = state.issues.find((candidate) => candidate.folder === folder)
-  if (issue) return { where: issue.ref ? `${issue.ref} · ${issue.title}` : issue.title, whereKind: 'issue' }
+  if (issue) return { where: issue.ref ? `${issue.ref} · ${issue.title}` : issue.title, whereKind: 'issue', href: href({ name: 'issue', d: issue.id, slug: issue.title }) }
   return {}
 }
 
@@ -489,9 +501,9 @@ export function subFileThreads(state: WorkspaceState, subFiles: ReadonlySet<stri
 export const ACTIVITY_HORIZON = 50
 
 /** Everyone in the workspace as a picker option, ordered by name — by key would be ordered by nothing a person can see. */
-export function railPeople(state: FolderState, directory: DirectoryView): RailPerson[] {
+export function pickerPeople(state: FolderState, directory: DirectoryView): WorkspacePerson[] {
   return peopleIn(state, me)
-    .map((pubkey) => ({ value: pubkey, name: directory.nameOf(pubkey), picture: directory.personOf(pubkey).picture }))
+    .map((pubkey) => ({ value: pubkey, name: directory.nameOf(pubkey), picture: directory.personOf(pubkey).picture, ...(directory.personOf(pubkey).bot ? { bot: true } : {}) }))
     .sort((a, b) => a.name.localeCompare(b.name))
 }
 
@@ -509,7 +521,7 @@ export async function copyText(text: string, done: string, prompt: string, say: 
  * One project from the fold, as the old app's projectView: its issues as a
  * table (Updated = the last change to that issue, or when it was opened)
  * or a board, the conversation in its Folder, its issues' conversations under
- * Activity, and the rail. Every control writes one change
+ * Activity, and its fields. Every control writes one change
  * to one object and then re-reads the relay (`act`). Delete is offered
  * only to the author (NIP-09 honours nobody else) and asks first. A
  * project the fold does not have gets the old app's words, not a blank
@@ -532,8 +544,8 @@ export function ProjectPage({
   archives: Archives
   /**
    * The top-level Folders, so a project filed into one is not given that
-   * Folder's chat (`recordChannel`), and so the rail can name the one it is in
-   * (`placedIn`). `undefined` while they are read.
+   * Folder's chat (`recordChannel`), and so Related and Move to Folder… know the
+   * one it is in (`placedIn`). `undefined` while they are read.
    */
   teams: readonly { id: string; name?: string; hasState: boolean; addresses?: readonly string[] }[] | undefined
   /** The object's `d`, which is all a §7.2 URL carries. */
@@ -613,9 +625,9 @@ export function ProjectPage({
   )
   /* This feed is two streams drawn as one — SPEC §11.1 (FOL-16): the record
      channel's chat, which answers to its bare channel uuid, and the project's
-     own comments, which answer to the project's address. Looking at the
-     Activity tab advances both, because both are on it — §11.2, "exactly the
-     streams you are showing" — and Overview and Issues draw neither. Its
+     own comments, which answer to the project's address. Showing the
+     comments column advances both, because both are in it — §11.2, "exactly
+     the streams you are showing" — and hiding it reads neither. Its
      issues' comments are other files' streams and are untouched;
      before FOL-16 their roots answered to the channel marker, so this line
      silently read every issue in the project.
@@ -625,17 +637,21 @@ export function ProjectPage({
      channel, only a team, and marking the team would advance the team's chat,
      which is not on this page.
 
-     A thread in the feed whose replies are drawn, on the Activity tab,
-     advances its `thread:` context too (CON-34, Miky 2026-10-05): under
+     A thread in the feed whose replies are drawn, in the column, advances
+     its `thread:` context too (CON-34, Miky 2026-10-05): under
      §11.3's thread rule reading the streams no longer reads their replies. The
      issues' threads rolled up above are not drawn here and are not marked. */
+  // The column beside the page: the comments, on both tabs until the person hides them or shows the Overview (ONE-6,
+  // steps 4c and 4d; Katerina, 2 November).
+  const side = useSideColumn()
+  const commentsShown = side.comments.shown
   const [shownThreads, onThreadShown] = useShownThreads()
   const drawn = useMemo(() => newestDrawn(conversations, shownThreads), [conversations, shownThreads])
-  // Only on Activity, where the feed is drawn: Overview and Issues read nothing (66b31c4b, Miky 2026-10-06).
+  // Only while the column is shown, where the feed is drawn: hidden, nothing is read (66b31c4b, Miky 2026-10-06).
   // Nor while its conversations are on the way (APP-5): with none drawn, the mark would be the clock's.
-  const streams = useMemo(() => (tab === 'activity' && held.all ? [channelContext(record), fileContext(project?.addr)] : []), [record, project, tab, held.all])
+  const streams = useMemo(() => (commentsShown && held.all ? [channelContext(record), fileContext(project?.addr)] : []), [record, project, commentsShown, held.all])
   useMarkRead(streams, drawn.rootsAt)
-  useMarkRead(tab === 'activity' ? shownThreads.map(threadContext) : [], drawn.repliesAt)
+  useMarkRead(commentsShown ? shownThreads.map(threadContext) : [], drawn.repliesAt)
   const threads = useMemo(
     () => conversations.map((c) => threadFor(c, directory, project ? { value: project.description, format: project.descriptionFormat } : undefined, project?.addr, state.edits, state.attachments, state.urgent, state.parts, state.embeds)),
     [conversations, directory, project],
@@ -654,7 +670,7 @@ export function ProjectPage({
   }, [judges, project, conversations, state.anchors])
   // Judged against the frontier this visit opened on, so the divider outlives the page's own marks (99557309).
   const { unread, stillUnread } = useNewSince(project?.addr, merged, verdictAt)
-  const people = useMemo(() => railPeople(state, directory), [state, directory])
+  const people = useMemo(() => pickerPeople(state, directory), [state, directory])
   /*
     What somebody placed under this project from another app — RFC 0.5 §10.7.
 
@@ -706,22 +722,24 @@ export function ProjectPage({
 
   const done = issues.filter((issue) => issue.status === 'done').length
   const set = (field: 'title' | 'description' | 'status' | 'lead', value: string, note: string, contentFormat?: string) => act(note, () => setProjectField(project, field, value, note, contentFormat), say, refresh)
-  // Its own archive, which the rail toggles; and the one the page shows, which may be its team's (FOL-46).
+  // Its own archive, which the ⋯ toggles; and the one the page shows, which may be its team's (FOL-46).
   const own = ownArchive(project, state.activity)
   const archive = archives.ofProject(project.addr)
+  // The notice's Unarchive waits for the answer.
   const unarchive = () =>
-    void act('Unarchive', () => archiveProject(project, false), say, refresh).then((ok) => {
+    act('Unarchive', () => archiveProject(project, false), say, refresh).then((ok) => {
       if (ok) say('Project restored')
     })
 
   return (
     <>
       <ProjectView
+        // When it last changed, over the page (ONE-6, step 4a).
+        edited={editedFor(project.addr, state, directory, { at: project.createdAt, by: project.author })}
         archivedNotice={
           archive && (
             <ArchivedNotice
-              archive={archive}
-              nameOf={directory.nameOf}
+              {...archivedNoticeOf(archive, directory.nameOf)}
               onUnarchive={unarchive}
               {...(archive.with?.id ? { onOpenParent: () => go({ name: 'folder', id: archive.with!.id! }) } : {})}
             />
@@ -737,7 +755,7 @@ export function ProjectPage({
             me={me}
             people={people}
             nameOf={directory.nameOf}
-            pictureOf={(pubkey) => directory.personOf(pubkey).picture}
+            personOf={directory.personOf}
             roles={[{ pubkey: project.author, role: 'Author' }, ...(project.lead ? [{ pubkey: project.lead, role: 'Lead' }] : [])]}
             // Membership is per file: leaving the project leaves its issues as they are (Miky, 2026-10-06).
             note="Your issues here still notify you."
@@ -768,12 +786,15 @@ export function ProjectPage({
         {...(archive ? {} : { onAddIssue: () => setDialog('issue') })}
         tab={tab}
         onTab={(next) => go({ name: 'project', d: project.id, slug: project.title, view, tab: next })}
+        comments={side.comments}
+        overview={side.overview}
         view={view}
         onView={(next) => go({ name: 'project', d: project.id, slug: project.title, view: next, tab })}
         issues={issues}
         issueStatuses={ISSUE_STATUSES}
         hrefFor={hrefForIssue}
         related={shownRelated}
+        topics={<FileTopicsOf topics={topics} say={say} />}
         threads={threads}
         conversationsLoading={!held.folders}
         mentionsLoading={!held.all}
@@ -801,6 +822,8 @@ export function ProjectPage({
         }}
         activity={activity.items}
         activityTruncated={activity.truncated}
+        // Its own changes, as an issue's, in the project's words (pages/history.ts).
+        history={historyFor(project.addr, state, directory, PROJECT_STATUSES)}
         /* A reply in Activity goes to the thread's own Folder, never this
            project's — CON-9. Refused when the thread's root carries no `h`,
            because filing somebody else's reply here is the wrong guess. */
@@ -844,10 +867,10 @@ export function ProjectPage({
 
           **The message's OWN Folder, never this page's.** An edit is
           channel-scoped (40003 is in `requires_h_channel_scope`), and a message
-          reached through Activity belongs to a different file — publishing it
-          under this surface's Folder would be refused, or worse, accepted into
-          the wrong channel. So the Folder is looked up from the message, the
-          same rule `onReplyInActivity` keeps for replies.
+          read from elsewhere belongs to a different file — publishing it under
+          this surface's Folder would be refused, or worse, accepted into the
+          wrong channel. So the Folder is looked up from the message, the same
+          rule a reply keeps.
 
           `refresh` because an edit IS in the read: `edits.ts` folds it beside
           the fold, so the new text arrives on the next workspace read rather
@@ -864,14 +887,10 @@ export function ProjectPage({
           }
           return actInField(removeCard ? 'Remove card' : 'Edit', () => editMessage(folder, messageId, body, cardEditOf(acting, messageId, removeCard, dropped), files), () => refreshAfter(state, folder, refresh, rereadElsewhere))
         }}
-        onReplyInActivity={(threadId, body, files, picks) => {
-          const conversation = acting.conversations.find((c) => c.id === threadId)
-          if (!conversation?.root.folder) return Promise.resolve('That conversation has no Folder to reply into.')
-          return actInField('Reply', () => reply(conversation, conversation.root.folder, body, files, picks?.urgent, picks?.embeds), () => refreshAfter(state, conversation.root.folder, refresh, rereadElsewhere))
-        }}
-        rail={{
+        fields={{
           status: project.status,
-          statuses: PROJECT_STATUSES.map(({ value, label }) => ({ value, label })),
+          // Each with its colour, so the picker draws the status's shape (ONE-6, step 4b).
+          statuses: PROJECT_STATUSES.map(({ value, label, colour }) => ({ value, label, colour })),
           onStatusChange: (value) => void set('status', value, `Status → ${value}`),
           lead: project.lead ?? '',
           people,
@@ -879,21 +898,18 @@ export function ProjectPage({
           onLeadChange: (value) => void set('lead', value, value ? 'Assign project' : 'Unassign project'),
           done,
           total: issues.length,
-          // The top-level Folder it is in, by the sidebar's rule: the state that lists it, then its own Folder (FOL-3).
-          // No top-level Folders at all is a refused or empty read, not "in none" — the rail says so (`null`).
-          folders:
-            teams &&
-            (teams.length === 0
-              ? null
-              : placedIn({ addr: project.addr, folder: project.contentFolder }, teams).map((folder) => ({ name: folder.name ?? 'Untitled Folder', href: href({ name: 'folder', id: folder.id }) }))),
-          // Only once there are Folders to move between (FOL-7).
+        }}
+        menu={{
+          // The page never names its Folder (Katerina, 1 November); Move to Folder… is the ⋯'s first row, once there
+          // are Folders to move between (FOL-7).
           ...(teams?.length ? { onMove: () => setDialog('move') } : {}),
           // Archiving asks first — it hides the issues too; restoring does not need to (FOL-46).
-          // The rail says the project's own state: archived with its team, there is nothing here to unarchive.
-          archived: !!own,
+          // The ⋯ says the project's own state: archived with its team, there is nothing here to unarchive.
+          archive: own ? 'own' : archive ? 'with' : 'none',
           onArchive: () => (own ? unarchive() : setDialog('archive')),
           onDelete: () => setDialog('delete'),
-          topics: <FileTopicsOf topics={topics} say={say} />,
+          // The page's own address, without the open tab or the board: the short link (`href` leaves the defaults out).
+          onCopyLink: () => void copyText(new URL(href({ name: 'project', d: project.id, slug: project.title, view: 'table' }), window.location.origin).href, 'Link copied', 'Copy this link:', say),
         }}
       />
 
@@ -920,6 +936,7 @@ export function ProjectPage({
 
       {dialog === 'archive' && (
         <ArchiveDialog
+          {...ARCHIVE_WORDS}
           title={project.title}
           what="project"
           hides={issues.length ? [`its ${issues.length} ${issues.length === 1 ? 'issue' : 'issues'}`] : []}

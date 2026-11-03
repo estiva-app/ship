@@ -75,12 +75,13 @@ describe('a reader who cannot edit', () => {
 })
 
 describe('a comment from a block’s menu', () => {
-  it('goes to the Activity tab with that block as the anchor, and posting sends it once', async () => {
-    const onTab = vi.fn()
+  // Changed on purpose (ONE-6, step 4c): the comments are a column beside the page, so Comment shows it, if hidden, rather than going to the Activity tab.
+  it('shows the comments column with that block as the anchor, and posting sends it once', async () => {
+    const onShow = vi.fn()
     const onStart = vi.fn(async (): Promise<true | string> => true)
-    const { result } = renderHook(() => useBlockComment(DESCRIPTION, 'blocks', onTab, onStart))
+    const { result } = renderHook(() => useBlockComment(DESCRIPTION, 'blocks', onShow, onStart))
     act(() => result.current.start('b1'))
-    expect(onTab).toHaveBeenCalledWith('activity')
+    expect(onShow).toHaveBeenCalledTimes(1)
     expect(result.current.anchor).toMatchObject({ state: 'resolved', id: 'b1' })
     await act(() => result.current.post('about this', [], undefined, 'b1'))
     expect(onStart).toHaveBeenCalledWith('about this', [], undefined, 'b1')

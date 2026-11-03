@@ -7,10 +7,10 @@ import { ANA, MARA, RAVI } from './issues'
 const NOW = Math.floor(Date.now() / 1000)
 
 export const PROJECT_STATUSES = [
-  { value: 'planned', label: 'Planned' },
-  { value: 'in_progress', label: 'In Progress' },
-  { value: 'completed', label: 'Completed' },
-  { value: 'cancelled', label: 'Cancelled' },
+  { value: 'planned', label: 'Planned', colour: 'neutral' as const },
+  { value: 'in_progress', label: 'In Progress', colour: 'blue' as const },
+  { value: 'completed', label: 'Completed', colour: 'green' as const },
+  { value: 'cancelled', label: 'Cancelled', colour: 'muted' as const },
 ]
 
 export const PROJECT_CARDS: ProjectCardProps[] = [

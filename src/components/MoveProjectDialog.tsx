@@ -1,15 +1,10 @@
 import { useState } from 'react'
-import { Form } from '@estiva-app/ui'
-import { Button } from '@/components/ui/Button'
-import { DialogShell } from '@/components/ui/DialogShell'
-import { EmptyState } from '@/components/ui/EmptyState'
-import { Field } from '@/components/ui/Field'
-import { Select } from '@/components/ui/Select'
+import { MoveDialog } from '@estiva-app/ui'
 
 /**
- * Move a project to another top-level Folder (FOL-7) — Peek's
- * `MoveFileDialog`, for a project: one destination as a `Select`, and only
- * the Folders a move can land in.
+ * Move a project to another top-level Folder (FOL-7) — the kit's
+ * `MoveDialog`, in Ship's words: one destination, and only the Folders a move
+ * can land in.
  *
  * **A Folder with no state is not offered**, as in Peek: an `add` to one
  * would list only this project and hide the rest (`planMoveFile` refuses it).
@@ -17,7 +12,11 @@ import { Select } from '@/components/ui/Select'
  * **Where it is now is not offered — unless it is in more than one.** A move
  * that half-worked leaves a project listed in two Folders; moving it into
  * either takes it out of the other, so both stay destinations and pressing
- * Move again is the retry. The dialog stays open for exactly that.
+ * Move again is the retry: `from` is then empty, as the kit's dialog takes it.
+ * The dialog stays open for exactly that.
+ *
+ * It opens on a destination, as Ship's always did: the first Folder it is not
+ * in, chosen once (`startIn`).
  */
 export interface MoveProjectFolder {
   id: string
@@ -41,57 +40,26 @@ export interface MoveProjectDialogProps {
 }
 
 export function MoveProjectDialog({ title, current, folders, onMove, onClose }: MoveProjectDialogProps) {
-  const only = current.length === 1 ? current[0].id : undefined
-  const candidates = folders.filter((folder) => folder.hasState && folder.id !== only)
-  const [to, setTo] = useState(() => (candidates.find((folder) => !current.some((here) => here.id === folder.id)) ?? candidates[0])?.id ?? '')
-  const [moving, setMoving] = useState(false)
-  const target = candidates.find((folder) => folder.id === to)
-
-  async function move() {
-    if (!target || moving) return
-    setMoving(true)
-    try {
-      if (await onMove(target)) onClose()
-    } finally {
-      setMoving(false)
-    }
-  }
+  const from = current.length === 1 ? current[0].id : ''
+  const withState = folders.filter((folder) => folder.hasState)
+  const candidates = withState.filter((folder) => folder.id !== from)
+  const [startIn] = useState(() => (candidates.find((folder) => !current.some((here) => here.id === folder.id)) ?? candidates[0])?.id)
 
   return (
-    <DialogShell
-      title="Move to Folder"
+    <MoveDialog
+      heading="Move to Folder"
+      title={title}
+      description="Only the Folder it is listed in changes. Its issues and its conversation stay exactly as they are."
+      folderLabel="Destination Folder"
+      noFolder="There is no other Folder it can be moved to."
+      from={from}
+      folders={withState.map(({ id, name }) => ({ id, name }))}
+      {...(startIn ? { startIn } : {})}
+      onMove={({ folder }) => {
+        const target = withState.find((candidate) => candidate.id === folder)
+        return target ? onMove(target) : false
+      }}
       onClose={onClose}
-      footer={
-        <>
-          <Button variant="muted" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button variant="primary" type="submit" form="move-project" disabled={!target || moving}>
-            {moving ? 'Moving…' : 'Move'}
-          </Button>
-        </>
-      }
-    >
-      {candidates.length === 0 ? (
-        <EmptyState scope="section" message="There is no other Folder it can be moved to." />
-      ) : (
-        <Form id="move-project" busy={moving} onSubmit={move}>
-          <div className="flex flex-col gap-2">
-            <p className="text-body-2-strong text-text-primary">{title}</p>
-            <p className="text-body-2 text-text-secondary">
-              Only the Folder it is listed in changes. Its issues and its conversation stay exactly as they are.
-            </p>
-          </div>
-          <Field label="Destination Folder">
-            <Select
-              value={to}
-              onChange={setTo}
-              options={candidates.map((folder) => ({ value: folder.id, label: folder.name }))}
-              ariaLabel="Destination Folder"
-            />
-          </Field>
-        </Form>
-      )}
-    </DialogShell>
+    />
   )
 }

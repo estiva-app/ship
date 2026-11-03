@@ -6,15 +6,18 @@ import { IdentityMenu } from '@/components/IdentityMenu'
 import { ShipSidebar } from '@/components/ShipSidebar'
 import { ACTIVITY, ARCHIVED_CARDS, PEOPLE, PROJECT_CARDS, PROJECT_STATUSES, SIDEBAR_PROJECTS } from '@/fixtures/projects'
 import { ACTIVITY_ITEMS, ANA, ISSUES, ISSUE_STATUSES, THREADS, hrefFor, makeIssues } from '@/fixtures/issues'
-import type { ForeignObject } from '@/api/foreign'
 import type { RelatedState } from '@/api/useRelated'
 import { IssueView } from './IssueView'
 import { IssuesView, type IssuesScope } from './IssuesView'
 import { ProjectView } from './ProjectView'
 import { ProjectsView } from './ProjectsView'
-import type { IssueTab, ProjectTab } from '@/router'
+import type { ProjectTab } from '@/router'
+import { useSideColumn, type Side } from '@/pages/sideColumn'
 import type { Imeta } from '@estiva-app/protocol'
-import { ArchivedNotice } from '@/components/ArchivedNotice'
+import { ArchivedNotice } from '@estiva-app/ui'
+import { archivedNoticeOf } from '@/lib/archive'
+import type { TopicOfFile } from '@/api/foreign'
+import { FileTopics } from '@/components/FileTopics'
 
 /** Attach without a relay: the picked file, shown from the browser's own memory. */
 const pretendUpload = async (file: File) => ({ url: URL.createObjectURL(file), m: file.type || 'application/octet-stream', x: '0'.repeat(64), size: file.size, filename: file.name }) as unknown as Imeta
@@ -23,6 +26,9 @@ const pretendUpload = async (file: File) => ({ url: URL.createObjectURL(file), m
  * A bare-file topic somebody started under the project in Peek — RFC 0.5
  * §10.7's Related section, with its comment count. The shape `readRelated`
  * hands the page; see `Related.stories` for the section's own states.
+ * Typed, not cast: every field the projection always carries is here, so a
+ * missing one is a type error, not a story that throws (it had no `actions`,
+ * which the kit's card reads).
  */
 const RELATED: RelatedState = {
   inside: {},
@@ -38,8 +44,10 @@ const RELATED: RelatedState = {
       slots: { title: { value: 'Cut-over checklist' }, body: { value: 'What has to be true before the old read path is turned off.' } },
       meta: [],
       comments: [],
+      actions: [],
+      viaRecommendation: false,
       parentRef: '30850:a:rel',
-    } as unknown as ForeignObject,
+    },
   ],
   counts: { '30840:a:cutover': 7 },
 }
@@ -121,23 +129,44 @@ export const IssuesEmpty: Story = {
   },
 }
 
-/** One project, in tabs: Overview (title, description, Related), Activity (Conversations, Mentioned in), Issues (table or board). The rail on every tab. */
+/** One project, in tabs: Overview (title, its fields, description, Related), Activity (Mentioned in), Issues (table or board). Its comments in the column beside, on every tab; the header's buttons hide it and hold the ⋯. */
 /** FOL-46's notice, as the pages build it: archived by Miky two days ago, with a resolution. */
 const ARCHIVED_AT = Math.floor(Date.now() / 1000) - 2 * 86400
+
+/** The header's "Edited … ago" (ONE-6, step 4a), as the pages make it: who changed it last, and exactly when under the pointer. */
+const STORY_EDITED = { label: 'Edited 5m ago', exact: 'Edited by Ana Duarte · Nov 2, 2026, 10:30 AM' }
 const archivedNotice = (withProject?: boolean) => (
   <ArchivedNotice
-    archive={{
-      by: 'a'.repeat(64),
-      at: ARCHIVED_AT,
-      resolution: 'Shipped as interop 0.37.0. The follow-ups are FOL-49 and FOL-50.',
-      ...(withProject ? { with: { kind: 'project' as const, addr: '30850:a:rel', title: 'Relay Migration' } } : {}),
-    }}
-    nameOf={() => 'Miky'}
+    {...archivedNoticeOf(
+      {
+        by: 'a'.repeat(64),
+        at: ARCHIVED_AT,
+        resolution: 'Shipped as interop 0.37.0. The follow-ups are FOL-49 and FOL-50.',
+        ...(withProject ? { with: { kind: 'project' as const, addr: '30850:a:rel', title: 'Relay Migration' } } : {}),
+      },
+      () => 'Miky',
+    )}
     {...(withProject ? { onOpenParent: fn() } : { onUnarchive: fn() })}
   />
 )
 
-const projectPage = (startTab: ProjectTab, startView: 'table' | 'board' = 'table', readOnlyReason?: string, archived = false): Story => ({
+const topic = (d: string, title: string, archived = false): TopicOfFile => ({ address: `30840:${'a'.repeat(64)}:${d}`, folder: 'team', title, openUrl: `https://peek.estiva.app/topic/${d}`, archived })
+const TOPIC_CHOICES = { yours: [topic('w', 'Widgets'), topic('r', 'Roadmap')], others: [topic('d', 'Design review'), topic('q', 'Q4 planning')] }
+
+/** The topics that list a file (TOP-5), working: Add to topic and ✕ change the chips; an archived topic has no ✕. */
+function StoryTopics({ start }: { start: TopicOfFile[] }) {
+  const [topics, setTopics] = useState(start)
+  return (
+    <FileTopics
+      topics={topics}
+      busy={new Set()}
+      onChange={(t, listed) => setTopics((held) => (listed ? [...held, t] : held.filter((h) => h.address !== t.address)).sort((a, b) => a.title.localeCompare(b.title)))}
+      readChoices={async () => TOPIC_CHOICES}
+    />
+  )
+}
+
+const projectPage = (startTab: ProjectTab, startView: 'table' | 'board' = 'table', readOnlyReason?: string, archived = false, startSide: Side = 'comments'): Story => ({
   render: () => {
     const [tab, setTab] = useState<ProjectTab>(startTab)
     const [view, setView] = useState<'table' | 'board'>(startView)
@@ -147,9 +176,12 @@ const projectPage = (startTab: ProjectTab, startView: 'table' | 'board' = 'table
     const [summary, setSummary] = useState<string | undefined>('Every workspace read and write on the relay, one surface at a time.')
     const [description, setDescription] = useState('Moving every workspace read and write onto the relay, one surface at a time, with the old path kept until each is proven.')
     const done = ISSUES.filter((issue) => issue.status === 'done').length
+    // The page's own: the comments or the Overview beside it, one at a time (ONE-6, step 4d).
+    const side = useSideColumn(startSide)
     return (
       <Shell current={{ projectAddr: '30850:a:rel' }}>
         <ProjectView
+          edited={STORY_EDITED}
           {...(archived ? {} : { onAddIssue: fn() })}
           crumbs={{ projectsHref: '#/projects', title }}
           header={{ title, summary, description, descriptionFormat: 'marker', archived, onRename: (v) => (setTitle(v), true), onSummarize: async (v) => (setSummary(v || undefined), true), onDescribe: (v) => (setDescription(v), true) }}
@@ -161,16 +193,17 @@ const projectPage = (startTab: ProjectTab, startView: 'table' | 'board' = 'table
           issueStatuses={ISSUE_STATUSES}
           hrefFor={hrefFor}
           related={RELATED}
+          topics={<StoryTopics start={[]} />}
           threads={THREADS}
           onStartConversation={fn()}
           onReply={fn()}
           activity={ACTIVITY_ITEMS}
-          onReplyInActivity={fn()}
+          history={ACTIVITY}
           readOnlyReason={readOnlyReason}
           upload={pretendUpload}
           archivedNotice={archived && archivedNotice()}
           lockedReason={archived ? 'Unarchive to edit' : undefined}
-          rail={{
+          fields={{
             status,
             statuses: PROJECT_STATUSES,
             onStatusChange: setStatus,
@@ -179,46 +212,45 @@ const projectPage = (startTab: ProjectTab, startView: 'table' | 'board' = 'table
             onLeadChange: setLead,
             done,
             total: ISSUES.length,
-            folders: [{ name: 'Ship', href: '/app/folder/5c1e2a7b-9d40-4f3a-8e6b-2f0c7d1a9b34' }],
-            onArchive: fn(),
-            onDelete: fn(),
           }}
+          menu={{ archive: archived ? 'own' : 'none', onMove: fn(), onCopyLink: fn(), onArchive: fn(), onDelete: fn() }}
+          comments={side.comments}
+          overview={side.overview}
         />
       </Shell>
     )
   },
 })
 
-/** A project, Overview: the title and description, always editable, then Related under a line. */
+/** A project, Overview: the title, its fields and the description, always editable; its comments beside it. */
 export const Project: Story = projectPage('overview')
-/** A project, Activity: Conversations and Mentioned in. */
-export const ProjectActivity: Story = projectPage('activity')
+/** A project with its Overview beside it, from the header's side-panel button (ONE-6, step 4d): Activity, History, Related. Hide it, and the comments come back. */
+export const ProjectOverviewPanel: Story = projectPage('overview', 'table', undefined, false, 'overview')
 /** A project, Issues: full width, Table / Board at the right of the tab row. */
 export const ProjectIssues: Story = projectPage('issues')
 /** A project's Issues as a board — `?view=board`. */
 export const ProjectBoard: Story = projectPage('issues', 'board')
 /** Signed out: the title and description are text, and every write control is disabled with the reason. */
-export const ProjectSignedOut: Story = projectPage('activity', 'table', 'Sign in to react or reply.')
-/** Archived (FOL-46): the notice first on every tab, the rail where it always is. */
+export const ProjectSignedOut: Story = projectPage('overview', 'table', 'Sign in to react or reply.')
+/** Archived (FOL-46): the notice first on every tab; the fields shut, saying why; the ⋯ holds Unarchive and Delete. */
 export const ProjectArchived: Story = projectPage('overview', 'table', undefined, true)
 
-/** One issue, in tabs: Overview (title, description, Related) and Activity (Conversations, Mentioned in, History). The rail on every tab. */
-const issuePage = (startTab: IssueTab, archivedWithProject = false, withSummary = true): Story => ({
+/** One issue: its title, fields and description, and beside it its comments or its Overview; the header's buttons show and hide them, and hold the ⋯. */
+const issuePage = (archivedWithProject = false, withSummary = true, newWhileHidden = false, startSide: Side = 'comments'): Story => ({
   render: () => {
     const issue = ISSUES[0]
-    const [tab, setTab] = useState<IssueTab>(startTab)
     const [status, setStatus] = useState(issue.status)
     const [assignee, setAssignee] = useState('ana')
     const [project, setProject] = useState('rel')
     const [title, setTitle] = useState(issue.title)
     const [summary, setSummary] = useState(withSummary ? issue.summary : undefined)
     const [description, setDescription] = useState('After an archived project is restored, the board draws its columns in the order the folder union returned them rather than the vocabulary order.')
+    const side = useSideColumn(newWhileHidden ? 'none' : startSide)
     return (
       <Shell current={{ projectAddr: '30850:a:rel' }}>
         <IssueView
+          edited={STORY_EDITED}
           crumbs={{ issuesHref: '#/issues', project: { title: 'Relay Migration', href: '#/project/30850%3Aa%3Arel' }, ref: issue.ref }}
-          tab={tab}
-          onTab={setTab}
           title={title}
           summary={summary}
           onSummarize={async (v) => (setSummary(v || undefined), true)}
@@ -227,15 +259,17 @@ const issuePage = (startTab: IssueTab, archivedWithProject = false, withSummary 
           onRename={(v) => (setTitle(v), true)}
           onDescribe={(v) => (setDescription(v), true)}
           threads={THREADS}
+          // A new comment in the hidden column (Katerina, 2 November): the header's button carries the dot.
+          {...(newWhileHidden ? { stillUnread: { t2: [THREADS[1].root.id] } } : {})}
           onStartConversation={fn()}
           onReply={fn()}
           activity={ACTIVITY_ITEMS}
-          onReplyInActivity={fn()}
           history={ACTIVITY}
+          topics={<StoryTopics start={[topic('w', 'Widgets'), topic('o', 'Old launch', true)]} />}
           upload={pretendUpload}
           archivedNotice={archivedWithProject && archivedNotice(true)}
           lockedReason={archivedWithProject ? 'Unarchive its project to edit' : undefined}
-          rail={{
+          fields={{
             status,
             statuses: ISSUE_STATUSES,
             onStatusChange: setStatus,
@@ -245,22 +279,23 @@ const issuePage = (startTab: IssueTab, archivedWithProject = false, withSummary 
             project,
             projects: [{ value: '', label: 'No project' }, { value: 'des', label: 'Design System' }, { value: 'rel', label: 'Relay Migration' }],
             onProjectChange: setProject,
-            openedBy: issue.openedBy,
-            openedAt: issue.at,
-            onArchive: fn(),
-            onDelete: fn(),
           }}
+          menu={{ archive: archivedWithProject ? 'with' : 'none', onCopyLink: fn(), onArchive: fn(), onDelete: fn() }}
+          comments={side.comments}
+          overview={side.overview}
         />
       </Shell>
     )
   },
 })
 
-/** An issue, Overview: its summary under the title — click it to change it. */
-export const Issue: Story = issuePage('overview')
+/** An issue: its summary under the title — click it to change it. */
+export const Issue: Story = issuePage()
 /** An issue with no summary: a quiet "Add a summary" under the title, for someone who can edit. */
-export const IssueNoSummary: Story = issuePage('overview', false, false)
-/** An issue, Activity: Conversations, Mentioned in, History. */
-export const IssueActivity: Story = issuePage('activity')
+export const IssueNoSummary: Story = issuePage(false, false)
+/** An issue with its Overview beside it, from the header's side-panel button (ONE-6, step 4d): Activity, the mentions elsewhere, read-only; then History. */
+export const IssueOverviewPanel: Story = issuePage(false, true, false, 'overview')
 /** An issue archived with its project (FOL-46): the notice names the project and opens it. */
-export const IssueArchivedWithProject: Story = issuePage('overview', true)
+export const IssueArchivedWithProject: Story = issuePage(true)
+/** The comments hidden, with a new one among them: the kit's dot on the header's "Show comments" (Katerina, 3 November). */
+export const IssueCommentsHiddenWithNew: Story = issuePage(false, true, true)

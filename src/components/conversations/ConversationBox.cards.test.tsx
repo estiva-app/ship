@@ -40,7 +40,7 @@ vi.mock(import('@/api/foreign'), async (importOriginal) => ({
 }))
 vi.mock('@/api/useCardConversation', () => ({ useCardConversation: () => undefined }))
 
-import { MentionListView, ThreadListView } from './ThreadList'
+import { ThreadListView } from './ThreadList'
 import type { ThreadData } from '@/components/ConversationThread'
 
 /* ProseMirror asks for rects jsdom does not draw, as `ThreadList.edit.test.tsx` says. */
@@ -71,6 +71,8 @@ describe('the edit box', () => {
   const edit = async (body: string, embeds?: Embed[]) => {
     const onEditMessage = vi.fn(async (): Promise<true | string> => true)
     render(<ThreadListView threads={[thread(body, embeds)]} onStart={async () => true} onReply={async () => true} viewer={ME} onEditMessage={onEditMessage} />)
+    // The kit's card shows its `…` while pointed at.
+    fireEvent.mouseEnter(document.querySelector('[data-comment-body]')!)
     fireEvent.click(screen.getByRole('button', { name: 'Message actions' }))
     fireEvent.click(screen.getByRole('menuitem', { name: 'Edit message' }))
     return { box: await ready('Edit message'), onEditMessage }
@@ -130,23 +132,8 @@ describe('the edit box', () => {
   })
 })
 
-describe('a "Mentioned in" reply box', () => {
-  const replyBox = async () => {
-    render(<MentionListView items={[{ thread: thread('Over here.'), relation: 'mention', file: THREAD_FILE }]} onReply={async () => true} viewer={ME} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Reply' }))
-    return ready('Reply…')
-  }
-
-  it('shows no card for the thread’s own file, which a reply never sends', async () => {
-    const box = await replyBox()
-    replace(box, `See ${ref(THREAD_FILE)}`)
-    await act(async () => {})
-    expect(inTheBox()).toBeNull()
-  })
-
-  it('shows the card of another file', async () => {
-    const box = await replyBox()
-    replace(box, `See ${ref(OTHER)}`)
-    await waitFor(() => expect(inTheBox()?.textContent).toContain('Another issue'))
-  })
-})
+/*
+  Changed on purpose (ONE-6, step 4d): "Mentioned in" has no reply box any more. It is read-only in the Overview,
+  Peek's way (PEE-48), so the rule its box kept (no card for the thread's own file, which a reply never sends) has no
+  box to keep it in. MentionList.test.tsx pins that nothing there writes.
+*/

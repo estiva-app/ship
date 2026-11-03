@@ -43,8 +43,17 @@ import { anchorsOf, isReply, type Strength } from '@estiva-app/conversation'
 import type { SignedEvent } from '@estiva-app/protocol'
 import type { Conversation } from './fold'
 
-/** Message id → the addresses that message is a **comment on**, by SPEC §6.4. */
+/**
+ * Message id → the addresses that message is a **comment on**, by SPEC §6.4.
+ *
+ * And, under `replyKey(id)`, each NIP-22 reply's thread object (its `A`, which a
+ * reply copies from its comment, §6.4 *Replies*): read only when the thread's
+ * root is gone, to know whose comment it was (`attachmentOf`).
+ */
 export type AnchorIndex = Record<string, string[]>
+
+/** Where a reply's thread object is kept in the index, apart from the comments' own entries. */
+export const replyKey = (id: string) => `reply:${id}`
 
 /** Which of the two strengths §6.4 allows. */
 export type Attachment = Strength
@@ -57,9 +66,10 @@ export type Attachment = Strength
 export function anchorIndex(events: readonly SignedEvent[]): AnchorIndex {
   const index: AnchorIndex = {}
   for (const event of events) {
-    if (isReply(event)) continue
     const anchors = anchorsOf(event)
-    if (anchors.length) index[event.id] = anchors
+    if (!anchors.length) continue
+    if (isReply(event)) index[replyKey(event.id)] = anchors
+    else index[event.id] = anchors
   }
   return index
 }
@@ -74,11 +84,16 @@ export function anchorIndex(events: readonly SignedEvent[]): AnchorIndex {
  * twenty-one under *Mentioned in* rather than inside the issue's comments,
  * which §5.1 calls indefensible.
  *
- * **A thread whose real root is missing reads as a mention.** `foldConversations`
- * stands the earliest visible message in for an absent root — truncated history,
- * or a reply that outran its parent — and that stand-in's tags are not the
- * root's. Reading it as a comment would be a guess about an event nobody here
- * has seen, and the secondary section is the safe side of that guess.
+ * **A thread whose real root is missing is a comment when its replies say so.**
+ * `foldConversations` stands the earliest visible message in for an absent root
+ * — a deleted comment, truncated history, or a reply that outran its parent —
+ * and that stand-in's own tags are not the root's. But a NIP-22 reply carries
+ * its thread's object as its `A`, copied from the comment it answers (§6.4
+ * *Replies*), so a `kind:1111` stand-in says whose comment it was without a
+ * guess, and the thread stays in that file's comments as Peek keeps it ("This
+ * comment was deleted.", PER-24; Katerina, 2 November). A stand-in with no such
+ * tag — a `kind:9`, chat — still reads as a mention: the secondary section is
+ * the safe side of a guess.
  */
 export function attachmentOf(
   conversation: Conversation,
@@ -87,8 +102,10 @@ export function attachmentOf(
 ): Attachment | null {
   if (!conversation.about.includes(address)) return null
   const rootIsPresent = conversation.root.id === conversation.id
-  const namedByRoot = rootIsPresent && (anchors[conversation.root.id] ?? []).includes(address)
-  return namedByRoot ? 'comment' : 'mention'
+  // A stand-in answering the root itself carries `e` = `E` and is indexed as a comment on that message, under its own
+  // id; one answering a reply, under `replyKey`. Either way its `A` is the thread's object.
+  const named = rootIsPresent ? anchors[conversation.root.id] : (anchors[conversation.root.id] ?? anchors[replyKey(conversation.root.id)])
+  return (named ?? []).includes(address) ? 'comment' : 'mention'
 }
 
 /**

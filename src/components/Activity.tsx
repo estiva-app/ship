@@ -1,6 +1,4 @@
-import type { Imeta } from '@estiva-app/protocol'
 import type { ThreadData } from './ConversationThread'
-import type { Answer, Picks } from './conversations/shared'
 
 /**
  * **Activity: the conversations of files *related* to this one** — CON-9.
@@ -66,6 +64,8 @@ export interface ActivityItem {
   where?: string
   /** What `where` is, when Ship knows: a project or an issue, so it can be drawn with that one's icon. */
   whereKind?: 'project' | 'issue'
+  /** Its page in Ship, where a press on it opens (ONE-6, step 4d). Absent for a place Ship does not serve: a Peek topic, a Leaf document. */
+  href?: string
   /** Why this thread takes no reply or reaction: the file it is on is archived (Decided 2026-10-17). */
   closed?: string
   /** The address of the file this thread is on: its reply box shows no card for it, since a reply never sends one (`reply`). */
@@ -78,26 +78,10 @@ export interface ActivityProps {
   loading?: boolean
   /** The address of the file the page is on: its links here keep their chip and draw no card (Miky, WID-3). */
   about?: string
-  /** The viewer's pubkey, for §6.5's Edit and Delete rule — see `ConversationsProps.viewer`. */
+  /** The viewer, for whose reactions are whose. */
   viewer?: string
-  onReply: (threadId: string, text: string, files: readonly Imeta[], picks?: Picks) => Promise<Answer>
-  /** Why nothing can be posted right now — every composer here is disabled with it. */
-  disabledReason?: string
   /** Resolve a mentioned key to a name — SPEC §13.1. */
   nameOf?: (pubkey: string) => string
-  /** Add or take back a reaction on a message in one of these threads — CON-2. */
-  onReact?: (messageId: string, emoji: string, mine?: string) => Promise<Answer>
-  /**
-   * Publish a deletion for one message — CON-3.
-   *
-   * Offered here too, and deliberately: an Activity thread belongs to another
-   * file, but a message is a message wherever it is read, and who may delete
-   * it is the relay's question rather than this surface's. Hiding the control
-   * on the roll-up would make it depend on where you happened to be standing.
-   */
-  onDeleteMessage?: (messageId: string) => Promise<boolean | void> | boolean | void
-  /** Publish an edit of one message — CON-4. Offered here for the same reason delete is. */
-  onEditMessage?: (messageId: string, body: string, removeCard?: string, files?: readonly Imeta[], dropped?: string) => Promise<Answer>
   /**
    * How many threads the horizon left out — `ACTIVITY_HORIZON`.
    *

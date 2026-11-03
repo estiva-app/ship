@@ -310,8 +310,9 @@ describe('Issues page — rows from the fold', () => {
     expect(main.getByRole('tab', { name: /^All/ })).toHaveTextContent('3')
     expect(main.getByRole('tab', { name: /^Open/ })).toHaveTextContent('2')
     expect(main.getByRole('tab', { name: /Assigned to me/ })).toHaveTextContent('1')
-    // Issue links only: a row's project chip is a link of its own (S26).
-    const issueLinks = () => main.getAllByRole('link').filter((a) => a.getAttribute('href')?.startsWith('/issue/') && !a.getAttribute('href')?.endsWith('?tab=activity'))
+    // Issue links only: a row's project chip is a link of its own (S26), and so is its comment count, to the same page (ONE-6, step 4d).
+    const counts = main.queryAllByRole('link', { name: /open the conversation/ })
+    const issueLinks = () => main.getAllByRole('link').filter((a) => a.getAttribute('href')?.startsWith('/issue/') && !counts.includes(a))
     expect(issueLinks()).toHaveLength(3)
     expect(issueLinks().some((a) => a.getAttribute('href')?.includes(D('13')))).toBe(false)
     // The row says the count as the kit's count, a small icon and a number, opening the issue's conversations (S26; widget review 52).
@@ -360,30 +361,42 @@ describe('opened on a project, before the whole read lands', () => {
   })
 })
 
+/** Opens the page's ⋯ in its header, where the details column's buttons went (ONE-6, step 4b), and answers its row named. */
+async function pageMenuRow(main: ReturnType<typeof within>, name: string) {
+  await userEvent.click(main.getByRole('button', { name: 'More actions' }))
+  return screen.findByRole('menuitem', { name })
+}
+const shut = (row: HTMLElement) => row.getAttribute('aria-disabled') === 'true'
+
 describe('Project page — one project from the fold', () => {
-  it('draws the table with Updated from the last change, the Folder threads, the rail — and offers Delete to a non-author', async () => {
+  it('draws the table with Updated from the last change, the Folder threads, its fields — and offers Delete to a non-author', async () => {
     goTo(`/project/live-${LIVE}`)
     render(<App />)
     const main = within(screen.getByRole('main'))
     // Overview (Katerina, 29 September): the title is always editable, with no box.
     expect(await main.findByRole('textbox', { name: 'Title' })).toHaveTextContent('Live')
-    // The tabs are in the URL: Issues shows the table, Activity the conversations.
+    // The header says when it last changed (ONE-6, step 4a).
+    expect(main.getByText(/^(Edited|Created) /)).toBeInTheDocument()
+    // Its fields under the summary, on Overview (ONE-6, step 4b): the status, and the progress as the kit's ring.
+    expect(main.getByRole('combobox', { name: 'Status' })).toBeEnabled()
+    expect(main.getByText('1/2')).toBeInTheDocument()
+    // The tabs are in the URL: Issues shows the table. Changed on purpose (ONE-6, step 4d): no Activity tab; its
+    // comments are the column beside both tabs.
+    expect(main.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['Overview', 'Issues'])
     fireEvent.click(main.getByRole('tab', { name: 'Issues' }))
     await waitFor(() => expect(location.search).toBe('?tab=issues'))
     expect(main.getByRole('table')).toBeInTheDocument()
     expect(main.getAllByRole('row')).toHaveLength(3) // header + 2 issues
-    fireEvent.click(main.getByRole('tab', { name: 'Activity' }))
-    await waitFor(() => expect(location.search).toBe('?tab=activity'))
     // The record channel's chat waits for the teams read, which tells it from a team's (FOL-2).
     expect(await main.findByText('about the project')).toBeInTheDocument()
     // Replies fold behind the replies button, and it opens them.
     fireEvent.click(main.getByRole('button', { name: /1 reply/ }))
     expect(main.getByText('reply')).toBeInTheDocument()
-    expect(main.getByRole('combobox', { name: 'Status' })).toBeEnabled()
-    // The Folder it is in, by name — the one whose state lists it — and no pairing (FOL-3).
-    expect(main.getByRole('link', { name: 'Ship' })).toHaveAttribute('href', '/app/folder/3167adea-877f-43c4-96fb-517a2b2d5d24')
-    expect(main.queryByRole('button', { name: /Folder link|Pair/ })).not.toBeInTheDocument()
-    expect(main.getByRole('button', { name: /Archive project/ })).toBeEnabled()
+    // Changed on purpose (Katerina, 1 November: the page never names its Folder): no Folder line and no link to it.
+    expect(main.queryByRole('link', { name: 'Ship' })).not.toBeInTheDocument()
+    expect(shut(await pageMenuRow(main, 'Archive project'))).toBe(false)
+    // No pairing is left (FOL-3).
+    expect(screen.queryByRole('menuitem', { name: /Folder link|Pair/ })).not.toBeInTheDocument()
     /*
       Offered even though this viewer did not author the project (SHI-14). The
       relay accepts a deletion from the author *or* from the owner of an
@@ -393,8 +406,7 @@ describe('Project page — one project from the fold', () => {
       from the person most likely to be entitled to it. Archive already works
       this way: offer, and report what the relay says.
     */
-    expect(main.getByRole('button', { name: 'Delete project' })).toBeEnabled()
-    expect(main.getByText('1 of 2 done')).toBeInTheDocument()
+    expect(shut(screen.getByRole('menuitem', { name: 'Delete project' }))).toBe(false)
     expect(main.getByRole('button', { name: 'Add issue' })).toBeEnabled()
   })
 
@@ -404,7 +416,7 @@ describe('Project page — one project from the fold', () => {
     render(<App />)
     const main = within(screen.getByRole('main'))
     expect(main.queryByRole('table')).not.toBeInTheDocument()
-    fireEvent.click(main.getByRole('button', { name: 'Delete project' }))
+    await userEvent.click(await pageMenuRow(main, 'Delete project'))
     const dialog = within(screen.getByRole('alertdialog', { name: /Delete .Mine./ }))
     expect(deleteProject).not.toHaveBeenCalled()
     fireEvent.click(dialog.getByRole('button', { name: 'Delete project' }))
@@ -419,9 +431,11 @@ describe('Project page — one project from the fold', () => {
     goTo(`/project/live-${LIVE}`)
     render(<App />)
     const main = within(screen.getByRole('main'))
-    fireEvent.click(main.getByRole('button', { name: 'Archive project' }))
+    await userEvent.click(await pageMenuRow(main, 'Archive project'))
     const dialog = within(screen.getByRole('dialog', { name: /Archive .Live./ }))
-    expect(dialog.getByText(/hides the project and its 2 issues from every list/)).toBeInTheDocument()
+    // Ship's words: the two apps it goes out of, and that nothing is deleted.
+    expect(dialog.getByText('This hides the project and its 2 issues from every list, in Ship and in Peek.')).toBeInTheDocument()
+    expect(dialog.getByText('Nothing is deleted: a link still opens it, and Unarchive brings everything back as it was.')).toBeInTheDocument()
     expect(archiveProject).not.toHaveBeenCalled()
     fireEvent.change(dialog.getByRole('textbox', { name: /Resolution/ }), { target: { value: 'Shipped in 0.37.' } })
     fireEvent.click(dialog.getByRole('button', { name: 'Archive project' }))
@@ -445,12 +459,36 @@ describe('Project page — one project from the fold', () => {
     await waitFor(() => expect(vi.mocked(archiveProject).mock.calls[0]?.slice(1)).toEqual([false]))
   })
 
+  it('an archived project’s Unarchive waits while it is written, so a second press writes nothing more', async () => {
+    let answer: (result: { ok: true }) => void = () => {}
+    vi.mocked(archiveProject).mockReturnValue(new Promise((resolve) => (answer = resolve)))
+    const archivedAt = STATE.projects.find((p) => p.id === OLD)!
+    vi.mocked(useWorkspace).mockReturnValue({
+      state: { ...STATE, activity: [...STATE.activity, { id: 'c'.repeat(64), author: OTHER, createdAt: 1, target: archivedAt.addr, field: 'archived', value: 'true', format: 'marker', note: 'Replaced by Live.' }] },
+      partial: false, error: null, clock: null, loading: false, busy: false, refresh, wantThreads: () => {}, live: false,
+    })
+    goTo(`/project/old-${OLD}`)
+    render(<App />)
+    const main = within(screen.getByRole('main'))
+    const unarchive = main.getByRole('button', { name: 'Unarchive' })
+    fireEvent.click(unarchive)
+    // Whatever settles at once has settled: a press that did not hand its write back would have opened again.
+    await act(async () => {})
+    expect(unarchive).toBeDisabled()
+    fireEvent.click(unarchive)
+    expect(archiveProject).toHaveBeenCalledTimes(1)
+    answer({ ok: true })
+    await waitFor(() => expect(unarchive).toBeEnabled())
+  })
+
   it('an issue in an archived project says it is archived with it, and opens the project', async () => {
     goTo(`/issue/issue-13-${D('13')}`)
     render(<App />)
     const main = within(screen.getByRole('main'))
     expect(main.getByText(/^Archived with its project “Old”/)).toBeInTheDocument()
-    expect(main.getByRole('button', { name: 'Archive issue' })).toBeEnabled()
+    // Its own Archive stays offered under its project's (SPEC §6.5), in the ⋯ now.
+    expect(shut(await pageMenuRow(main, 'Archive issue'))).toBe(false)
+    await userEvent.keyboard('{Escape}')
     fireEvent.click(main.getByRole('button', { name: 'Open project' }))
     await waitFor(() => expect(location.pathname).toMatch(new RegExp(`^/project/old-${OLD}`)))
   })
@@ -476,23 +514,27 @@ describe('Project page — one project from the fold', () => {
 })
 
 describe('Issue page — one issue from the fold', () => {
-  it('draws the trail, the conversation about it, the history in words newest first, and the rail', async () => {
+  it('draws the trail, the conversation about it, the history in words newest first, and its fields', async () => {
     goTo(`/issue/${D('14')}`)
     render(<App />)
     const main = within(screen.getByRole('main'))
     expect(await main.findByRole('textbox', { name: 'Title' })).toHaveTextContent('issue 14')
     expect(main.getByText('X-4')).toBeInTheDocument()
     expect(main.queryByRole('link', { name: 'Live' })).not.toBeInTheDocument()
-    // Conversations and History are on the Activity tab.
-    fireEvent.click(main.getByRole('tab', { name: 'Activity' }))
-    await waitFor(() => expect(location.search).toBe('?tab=activity'))
+    // Its fields under the summary, on Overview (ONE-6, step 4b).
+    expect(main.getByRole('combobox', { name: 'Assignee' })).toBeEnabled()
+    // Changed on purpose (ONE-6, step 4d): no tabs. The conversation is the column beside the page; History is the
+    // Overview's, which the header's side-panel button shows in its place.
+    expect(main.queryByRole('tab')).toBeNull()
     expect(await main.findByText('hi')).toBeInTheDocument()
+    fireEvent.click(main.getByRole('button', { name: 'Show side panel' }))
     const feed = main.getAllByText(/set status to|assigned/)
     expect(feed.map((node) => node.textContent)).toEqual(['Me Myself set status to In Progress', 'Someone assigned Me Myself'])
-    expect(main.getByRole('combobox', { name: 'Assignee' })).toBeEnabled()
-    // A URL is how a person addresses an issue: no "Copy reference" (Miky, 2026-10-14).
+    // A URL is how a person addresses an issue (Miky, 2026-10-14): no "Copy reference", and the ⋯ copies the page's link (Katerina, 1 November).
     expect(main.queryByRole('button', { name: /Copy reference/ })).toBeNull()
-    expect(main.getByText(/Opened by/)).toBeInTheDocument()
+    expect(await pageMenuRow(main, 'Copy link')).toBeInTheDocument()
+    // Changed on purpose (Katerina, 1 November): no "Opened by" on the page; the Members dialog's Author and the table keep it.
+    expect(main.queryByText(/Opened by/)).toBeNull()
   })
 
   it('a status change is one change event to the issue, then a re-read; a refusal is said and changes nothing', async () => {
@@ -520,7 +562,7 @@ describe('Issue page — one issue from the fold', () => {
     goTo(`/issue/${D('14')}`)
     render(<App />)
     const main = within(screen.getByRole('main'))
-    fireEvent.click(main.getByRole('button', { name: 'Delete issue' }))
+    await userEvent.click(await pageMenuRow(main, 'Delete issue'))
     const dialog = within(screen.getByRole('alertdialog', { name: /Delete/ }))
     expect(deleteIssue).not.toHaveBeenCalled()
     // SHI-3 is explicit that this must not read as deleting the discussion.
@@ -535,7 +577,7 @@ describe('Issue page — one issue from the fold', () => {
     goTo(`/issue/${D('14')}`)
     render(<App />)
     const main = within(screen.getByRole('main'))
-    fireEvent.click(main.getByRole('button', { name: 'Delete issue' }))
+    await userEvent.click(await pageMenuRow(main, 'Delete issue'))
     const dialog = within(screen.getByRole('alertdialog', { name: /Delete/ }))
     fireEvent.click(dialog.getByRole('button', { name: 'Delete issue' }))
     expect(await screen.findByText(/Delete rejected — must be event author/)).toBeInTheDocument()
@@ -581,6 +623,26 @@ describe('before the first read lands', () => {
     vi.mocked(useWorkspace).mockReturnValue({ state: null, partial: false, error: null, clock: null, loading: true, busy: false, refresh , wantThreads: () => {}, live: false })
     const { container } = render(<App />)
     expect(container.querySelector('[data-loading="workspace"]')).not.toBeNull()
+  })
+
+  /*
+    An issue and a project wait in the shape their page arrives in since ONE-6 (step 4e): the kit's header bar, and the
+    comments column beside the page under its "Comments", where the rail was. The project's tabs come with it; an issue
+    has none.
+  */
+  it.each([
+    ['an issue', `/issue/${D('11')}`, 'issue', 2],
+    ['a project', `/project/${D('20')}`, 'project', 3],
+  ])('waits for %s in its page’s shape, with the comments column beside it', (_, path, shape, rows) => {
+    goTo(path)
+    vi.mocked(useWorkspace).mockReturnValue({ state: null, partial: false, error: null, clock: null, loading: true, busy: false, refresh, wantThreads: () => {}, live: false })
+    const { container } = render(<App />)
+    const loading = container.querySelector(`[data-loading="workspace"][data-shape="${shape}"]`)
+    expect(loading).not.toBeNull()
+    // The page's column (header, tabs on a project, the reading column), then the comments column.
+    expect(loading!.children).toHaveLength(2)
+    expect(loading!.firstElementChild!.children).toHaveLength(rows)
+    expect(within(loading!.lastElementChild as HTMLElement).getByText('Comments')).toBeInTheDocument()
   })
 
   /*

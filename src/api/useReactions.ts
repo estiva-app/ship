@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { reactionHorizon } from '@estiva-app/conversation'
 import { useRefresh } from '@/lib/useRefresh'
-import { reactionsOn, type ReactionsByTarget } from './index'
+import { reactionsOn, type ReactionsByTarget, type Resolution } from './index'
 
 /**
  * The reactions on a set of messages — CON-2.
@@ -37,6 +37,8 @@ export function useReactions(targets: readonly { id: string; at: number }[]): {
   omitted: number
   /** Whether a read came back at the relay's page ceiling, so some reactions may be missing. */
   cut: boolean
+  /** By message id, each message that stands resolved, by the resolution Peek or Leaf wrote (PEEK-128). */
+  resolved: Record<string, Resolution>
   /** The first read has not landed yet. Distinct from "nobody reacted". */
   loading: boolean
   /**
@@ -51,7 +53,7 @@ export function useReactions(targets: readonly { id: string; at: number }[]): {
   refresh: () => void
 } {
   const { omitted } = reactionHorizon(targets)
-  const [read, setRead] = useState<{ reactions: ReactionsByTarget; cut: boolean } | undefined>(undefined)
+  const [read, setRead] = useState<{ reactions: ReactionsByTarget; cut: boolean; resolved: Record<string, Resolution> } | undefined>(undefined)
   const [nonce, setNonce] = useState(0)
 
   // The joined string rather than the array: a new array every render would
@@ -60,20 +62,20 @@ export function useReactions(targets: readonly { id: string; at: number }[]): {
 
   const load = useCallback(() => {
     if (targets.length === 0) {
-      setRead({ reactions: {}, cut: false })
+      setRead({ reactions: {}, cut: false, resolved: {} })
       return undefined
     }
     let cancelled = false
     reactionsOn(targets)
-      .then(({ reactions, cut }) => {
-        if (!cancelled) setRead({ reactions, cut })
+      .then(({ reactions, cut, resolved }) => {
+        if (!cancelled) setRead({ reactions, cut, resolved })
       })
       .catch(() => {
         // A failed reaction read is not a failed page. The conversation is
         // already on screen and correct; saying "could not load reactions"
         // over it would report a working app as broken, and the next refresh
         // is a moment away.
-        if (!cancelled) setRead((held) => held ?? { reactions: {}, cut: false })
+        if (!cancelled) setRead((held) => held ?? { reactions: {}, cut: false, resolved: {} })
       })
     return () => {
       cancelled = true
@@ -88,6 +90,7 @@ export function useReactions(targets: readonly { id: string; at: number }[]): {
     reactions: read?.reactions ?? {},
     omitted,
     cut: read?.cut ?? false,
+    resolved: read?.resolved ?? {},
     loading: read === undefined,
     refresh: () => setNonce((n) => n + 1),
   }
