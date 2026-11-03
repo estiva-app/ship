@@ -24,7 +24,9 @@ vi.mock('@/api/store', () => ({
   signer: { pubkey: 'c'.repeat(64) },
 }))
 vi.mock('@/api/nip44', () => ({ nip44: { decrypt: async () => undefined } }))
-vi.mock('@/api/readStateSync', async (actual) => ({ ...(await actual<object>()), useLandedReadState: () => ({}) }))
+/** Your read state, one answer held across renders as the real hook holds it. */
+const landed = vi.hoisted(() => ({}))
+vi.mock('@/api/readStateSync', async (actual) => ({ ...(await actual<object>()), useLandedReadState: () => landed }))
 const conversations = new Map<string, TopicConversation>()
 /** Read the conversations from the fake relay, as interop does, instead of the stub. */
 let realConversations = false
@@ -208,6 +210,24 @@ describe("Ship's Topics", () => {
     await waitFor(() => expect(named()).toContain(address('t-a')))
     expect(named()).not.toContain(address('t-empty'))
     expect(named()).not.toContain(address('t-elsewhere'))
+  })
+
+  it('reads the conversations of a topic once it is drawn, after the first ones were read', async () => {
+    realConversations = true
+    held.push(shipManifest(), topicManifest(), issueRoot('i-1'), issueRoot('i-2'))
+    held.push(topic('t-a', 'Alpha'), joined('t-a'), lists('t-a', 'i-1'))
+    held.push(topic('t-b', 'Beta'), joined('t-b'), lists('t-b', 'i-2'))
+    const conversationReads = () => asked.filter((f) => (f.kinds as number[] | undefined)?.includes(1111) && !f.authors && !f['#p'])
+    const named = () => conversationReads().flatMap((f) => [...((f['#a'] as string[]) ?? []), ...((f['#A'] as string[]) ?? [])])
+    // Ship does not hold Beta's issue yet, so Beta is not drawn.
+    const { rerender } = render(<TopicsPage state={ship([], ['i-1']).state} folders={[]} />)
+    await waitFor(() => expect(named()).toContain(address('t-a')))
+    expect(named()).not.toContain(address('t-b'))
+
+    // The workspace now holds it: Beta is drawn, and its conversations are read.
+    rerender(<TopicsPage state={ship([], ['i-1', 'i-2']).state} folders={[]} />)
+    await waitFor(() => expect(titles()).toEqual(['Alpha', 'Beta']))
+    await waitFor(() => expect(named()).toContain(address('t-b')))
   })
 
   it('draws the topics the route read as it opened, without reading them again', async () => {
