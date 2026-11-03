@@ -167,6 +167,9 @@ describe('an archived project offers no new issue until it is unarchived (PEEKM-
     vi.mocked(useWorkspace).mockReturnValue({ state: { ...STATE, projects: [STATE.projects[0], loose], issues: [issue] } as unknown as WorkspaceState, partial: false, error: null, clock: null, loading: false, busy: false, refresh, wantThreads: () => {}, live: false })
     goTo(`/issue/rounding-${D_ISSUE}`)
     render(<App />)
+    // The pills are drawn again when the header's editor lands after its plain first drawing: open the picker once it
+    // has. On a slow runner the click came first, and the open picker went with the pills it belonged to.
+    await waitFor(() => expect(document.querySelector('[data-description="editing"]')).not.toBeNull())
     await userEvent.click(await screen.findByRole('combobox', { name: 'Project' }))
     expect(await screen.findByRole('option', { name: 'Billing' })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: 'No project' })).toBeInTheDocument()
