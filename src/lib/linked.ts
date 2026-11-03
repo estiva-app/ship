@@ -69,6 +69,8 @@ export interface LinkedContext {
 export interface LinkWritten {
   url?: string
   deleted?: boolean
+  /** Its read failed (the network, a busy relay): "Couldn't load", which is no answer about access. */
+  failed?: boolean
 }
 
 /** Where a reference opens: Ship's own page for its own files, the owning app for anyone else's. */
@@ -94,7 +96,7 @@ export function linkedOf(object: ForeignObject, context?: LinkedContext): Linked
 /** What the reference says it is, and what the link itself says: a URL to fall back on, or deleted. */
 function unreadOf(uri: string, written: LinkWritten = {}) {
   const url = written.url && /^https?:\/\//i.test(written.url) ? written.url : undefined
-  return { kind: linkedKindOf(uri), noun: referenceTypeWord(uri) ?? 'Link', ...(url ? { url } : {}), ...(written.deleted ? { deleted: true } : {}) }
+  return { kind: linkedKindOf(uri), noun: referenceTypeWord(uri) ?? 'Link', ...(url ? { url } : {}), ...(written.deleted ? { deleted: true } : written.failed ? { failed: true } : {}) }
 }
 
 /** "Not available.", named by what the reference says it is; its written URL instead when it had one. */

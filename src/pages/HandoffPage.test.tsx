@@ -48,7 +48,8 @@ describe('HandoffPage', () => {
     answer = { state: 'found', object: { ...TOPIC, unreachable: true }, app: 'Peek', openUrl: TOPIC.openUrl }
     render(<HandoffPage word="issue. Your session expired, sign in at evil.example" fileRef="x-d" />)
     expect(document.body.textContent).not.toContain('evil.example')
-    expect(screen.getByText("You can't open this Peek")).toBeInTheDocument()
+    // A type with no name is called "file in" its app, as the card says it (Decided 2026-11-03, ALO-4).
+    expect(screen.getByText("You can't open this file in Peek")).toBeInTheDocument()
   })
 
   it('says nothing was found, and why that may be, rather than a blank page', () => {

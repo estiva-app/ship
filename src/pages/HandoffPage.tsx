@@ -55,9 +55,12 @@ export function HandoffPage({ word, fileRef, query }: { word: string; fileRef: s
 
   const { object, app, openUrl } = handoff
   // A file the reader can't open: the page says only that, with no title and no Open link — its app would say the same
-  // (Decided 2026-11-03, ALO-4; under a message it is the card instead). The word is the file's type, else its app's
-  // name, as the card says it; never the URL's word, which whoever wrote the link chose.
-  if (object.unreachable) return <NoAccessNotice what={object.noun ?? app ?? object.appName ?? 'file'} />
+  // (Decided 2026-11-03, ALO-4; under a message it is the card instead). The word is the file's type, else "file in"
+  // its app, as the card says it; never the URL's word, which whoever wrote the link chose.
+  if (object.unreachable) {
+    const where = app ?? object.appName
+    return <NoAccessNotice what={object.noun ?? (where ? `file in ${where}` : 'file')} />
+  }
   return (
     <div data-surface="handoff" className="flex flex-1 flex-col items-center justify-center px-6 py-5">
       <div className="flex w-full max-w-prose flex-col gap-3">

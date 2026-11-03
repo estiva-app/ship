@@ -238,10 +238,11 @@ describe('the card under the comment', () => {
     noteCardAvailability(ref(CARD_ISSUE).replace(/^nostr:/, ''), true)
   })
 
-  it('says "You can\'t open this issue" when its read fails with nothing remembered, never nothing, and does not remember it', async () => {
+  // A failed read is no answer about access (Decided 2026-11-03, ALO-4).
+  it('says "Couldn\'t load this issue" when its read fails with nothing remembered, never nothing, and does not remember it', async () => {
     objects.byReference[ref(CARD_ISSUE)] = 'FAILS'
     const first = show(THE_MESSAGE, { embeds: ITS_CARD })
-    await waitFor(() => expect(first.querySelector('[data-card]')?.textContent).toBe("You can't open this issue"))
+    await waitFor(() => expect(first.querySelector('[data-card]')?.textContent).toBe("Couldn't load this issue"))
     first.remove()
     // A failed read is not an answer: the next open waits for the card, at a card's height, not the one-line row.
     delete objects.byReference[ref(CARD_ISSUE)]
@@ -252,8 +253,8 @@ describe('the card under the comment', () => {
   it('names another app’s file it cannot read by its app as written, its type having no name, with no Open button', async () => {
     objects.byReference[ref(TOPIC)] = { ...base(TOPIC, ''), unreachable: true, appName: 'Peek', openUrl: `https://peek.estiva.app/o/${TOPIC}` }
     const c = show(ref(TOPIC), { embeds: [{ value: TOPIC, layout: 'detailed' }] })
-    // "this Peek", never "this peek" (ui 0.102.1).
-    await waitFor(() => expect(c.querySelector('[data-card]')?.textContent).toBe("You can't open this Peek"))
+    // An app's name is where the file lives: "this file in Peek" (Decided 2026-11-03, ALO-4; ui 0.102.2).
+    await waitFor(() => expect(c.querySelector('[data-card]')?.textContent).toBe("You can't open this file in Peek"))
     expect(c.querySelector('[data-card] a')).toBeNull()
   })
 })
