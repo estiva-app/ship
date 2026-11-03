@@ -292,6 +292,8 @@ function Page({ route, state, loading, directory, teams, folders, archives, say,
   if (route.name === 'elsewhere') return <HandoffPage word={route.word} fileRef={route.ref} query={route.query} />
   if (!state && loading) return <PageSkeleton shape={SKELETON[route.name] ?? 'rows'} />
   if (!state || !archives) return null
+  // A Folder's Projects and Issues are placed by the Folders' listing: until it lands, what is in the Folder is unknown, not nothing (SHIPS-5).
+  if ((route.name === 'projects' || route.name === 'issues') && route.folder && !teams) return <PageSkeleton shape={SKELETON[route.name] ?? 'rows'} />
   switch (route.name) {
     case 'topics':
       return <TopicsPage state={state} folders={folders} folder={route.folder} />

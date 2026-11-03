@@ -77,6 +77,7 @@ export function ProjectsPage({ state, directory, teams, archives, archived, fold
       {adding && (
         <NewProjectDialog
           teams={teams?.map((team) => ({ id: team.id, name: team.name ?? `Folder ${team.id.slice(0, 8)}…`, hasState: team.hasState }))}
+          team={folder}
           suggestKey={(title) => suggestKey(title, keys.taken)}
           keyProblem={(key) => keyProblem(key, state.projects, state.issues, keys.byProject)}
           holdKey={NEW_PROJECT_HOLD}

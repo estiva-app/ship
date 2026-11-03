@@ -158,10 +158,12 @@ describe('the §7.2 grammar', () => {
     expect(hashRedirect(`https://ship.estiva.app/issue/billing-${UUID}`)).toBe(null)
   })
 
-  it('does not rewrite an unrecognised hash to the issue list', () => {
+  it('does not rewrite an unrecognised hash to Topics, even one that starts like it', () => {
     // That would hide a broken link by pretending it pointed somewhere. Render
     // the fallback, but leave the URL saying what the person actually followed.
     expect(hashRedirect('https://ship.estiva.app/#/nonsense')).toBe(null)
+    expect(hashRedirect('https://ship.estiva.app/#/topicsx')).toBe(null)
+    expect(hashRedirect('https://ship.estiva.app/#/topics')).toBe('/topics')
   })
 })
 

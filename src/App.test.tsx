@@ -305,6 +305,22 @@ describe('Projects page — cards from the fold', () => {
     expect(refresh).not.toHaveBeenCalled()
   })
 
+  // SHIPS-5: the readFolders mock's team "Ship" lists Live; Mine's own Folder is no team, so it is in no team's Projects.
+  it("lists only a Folder's projects on its Projects, and Add project there starts on that Folder", async () => {
+    vi.mocked(createProject).mockResolvedValue({ ok: true, addr: '30850:x:new' })
+    goTo('/app/folder/3167adea-877f-43c4-96fb-517a2b2d5d24/projects')
+    render(<App />)
+    const main = within(screen.getByRole('main'))
+    expect(await main.findByRole('heading', { name: 'Ship · Projects' })).toBeInTheDocument()
+    expect(main.getByRole('link', { name: /Live/ })).toBeInTheDocument()
+    expect(main.queryByRole('link', { name: /Mine/ })).not.toBeInTheDocument()
+    fireEvent.click(main.getByRole('button', { name: 'Add project' }))
+    const dialog = within(screen.getByRole('dialog', { name: 'New project' }))
+    fireEvent.change(dialog.getByPlaceholderText('New project title'), { target: { value: 'Mobile app' } })
+    fireEvent.click(dialog.getByRole('button', { name: 'Create project' }))
+    await waitFor(() => expect(createProject).toHaveBeenCalledWith(expect.objectContaining({ title: 'Mobile app', team: { folder: '3167adea-877f-43c4-96fb-517a2b2d5d24', hasState: true } })))
+  })
+
   it('shows the archived list when the route asks for it', () => {
     goTo('/projects?archived')
     render(<App />)
@@ -336,6 +352,22 @@ describe('Issues page — rows from the fold', () => {
     fireEvent.click(main.getByRole('tab', { name: /Assigned to me/ }))
     expect(issueLinks()).toHaveLength(1)
     expect(main.getByRole('link', { name: /X-4/ })).toHaveAttribute('href', `/issue/issue-14-${D('14')}`)
+  })
+
+  // SHIPS-5: team "Ship" lists Live, so its Issues are Live's two; X-4 is in no project, so in no team's Issues.
+  it("lists only the issues of a Folder's projects on its Issues, and Add issue there offers only those projects", async () => {
+    goTo('/app/folder/3167adea-877f-43c4-96fb-517a2b2d5d24/issues')
+    render(<App />)
+    const main = within(screen.getByRole('main'))
+    expect(await main.findByRole('heading', { name: 'Ship · Issues' })).toBeInTheDocument()
+    expect(main.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['All2', 'Assigned to me0'])
+    fireEvent.click(main.getByRole('tab', { name: /^All/ }))
+    const hrefs = main.getAllByRole('link').map((a) => a.getAttribute('href') ?? '').filter((h) => h.startsWith('/issue/') && !h.includes('thread'))
+    expect(new Set(hrefs.map((h) => h.slice(-36)))).toEqual(new Set([D('11'), D('12')]))
+    fireEvent.click(main.getByRole('button', { name: 'Add issue' }))
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('combobox', { name: 'Project' }))
+    expect(await screen.findByRole('option', { name: 'Live' })).toBeInTheDocument()
+    expect(screen.getAllByRole('option')).toHaveLength(1)
   })
 })
 

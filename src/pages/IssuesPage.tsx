@@ -55,18 +55,19 @@ export function IssuesPage({ state, directory, teams, archives, folder, say, ref
   const [scope, setScope] = useState<IssuesScope>('mine')
   const [adding, setAdding] = useState(false)
   useReopenHeld(NEW_ISSUE_HOLD, () => setAdding(true))
+  // A Folder's Issues are the issues of the projects in it (SHIPS-5), and its Add issue offers only those projects.
+  const projects = useMemo(() => (folder ? projectsIn(state.projects, teams ?? [], folder) : state.projects), [state, folder, teams])
   const live = useMemo(() => {
-    // A Folder's Issues are the issues of the projects in it (SHIPS-5).
-    const here = folder ? new Set(projectsIn(state.projects, teams ?? [], folder).map((project) => project.addr)) : undefined
+    const here = folder ? new Set(projects.map((project) => project.addr)) : undefined
     return state.issues.filter((issue) => !archives.ofIssue(issue) && (!here || (!!issue.projectAddr && here.has(issue.projectAddr))))
-  }, [state, archives, folder, teams])
+  }, [state, archives, folder, projects])
   // A row counts its issue's conversations wherever they are, so every Folder's, read after the rows draw (APP-5).
   const counted = useThreads(state, state.folders).all
   const rows = useMemo(() => live.map((issue) => rowFor(issue, state, directory, counted)), [live, state, directory, counted])
   const mine = useMemo(() => new Set(live.filter((issue) => issue.assignee === me).map((issue) => issue.addr)), [live])
   const projectOptions = useMemo(
-    () => state.projects.filter((p) => !archives.ofProject(p.addr)).map((p) => ({ value: p.addr, label: p.title })),
-    [state, archives],
+    () => projects.filter((p) => !archives.ofProject(p.addr)).map((p) => ({ value: p.addr, label: p.title })),
+    [projects, archives],
   )
 
   return (

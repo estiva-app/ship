@@ -251,7 +251,7 @@ export function hashRedirect(location: string): string | null {
   const route = parse(hash)
   // An unrecognised hash falls through to Topics, and rewriting the URL to
   // `/topics` would hide that the link was broken rather than fix it.
-  if (route.name === 'topics' && !route.folder && !hash.startsWith(href(HOME))) return null
+  if (route.name === 'topics' && !route.folder && !/^\/topics(?:[/?]|$)/.test(hash)) return null
   return href(route)
 }
 
