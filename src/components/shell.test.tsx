@@ -15,17 +15,17 @@ describe('ShipSidebar', () => {
 
   it('lists Issues, Projects, then the active projects', () => {
     render(
-      <ShipSidebar openIssues={5} issuesHref="#/" projectsHref="#/projects" projects={projects} current="issues" />,
+      <ShipSidebar openIssues={5} topicsHref="#/topics" issuesHref="#/" projectsHref="#/projects" projects={projects} current="issues" />,
     )
     const labels = screen.getAllByRole('link').map((a) => a.textContent)
-    expect(labels).toEqual(['Issues5', 'Projects2', 'One2', 'Two'])
+    expect(labels).toEqual(['Topics', 'Issues5', 'Projects2', 'One2', 'Two'])
   })
 
   it('marks a project route on its own row, keyed by addr', () => {
     render(
       <ShipSidebar
         openIssues={5}
-        issuesHref="#/"
+        topicsHref="#/topics" issuesHref="#/"
         projectsHref="#/projects"
         projects={projects}
         current={{ projectAddr: '30850:x:two' }}
@@ -46,12 +46,12 @@ describe('ShipSidebar', () => {
 
   it('folds the projects under their teams, alphabetically, and draws no Projects fold (SHI-25)', () => {
     render(
-      <ShipSidebar openIssues={5} issuesHref="#/" projectsHref="#/projects" projects={filed} folders={teams} current="issues" />,
+      <ShipSidebar openIssues={5} topicsHref="#/topics" issuesHref="#/" projectsHref="#/projects" projects={filed} folders={teams} current="issues" />,
     )
     const folds = screen.getAllByRole('button').map((b) => b.textContent)
     expect(folds).toEqual(['Estiva HQ', 'Peek'])
     const labels = screen.getAllByRole('link').map((a) => a.textContent)
-    expect(labels).toEqual(['Issues5', 'Projects2', 'Two', 'One2'])
+    expect(labels).toEqual(['Topics', 'Issues5', 'Projects2', 'Two', 'One2'])
     // The team is a fold, not a link: a team's row carries no count and no href.
     expect(screen.queryByRole('link', { name: 'Peek' })).not.toBeInTheDocument()
   })
@@ -64,7 +64,7 @@ describe('ShipSidebar', () => {
       { id: 'hq', name: 'Estiva HQ', addresses: ['30850:x:one', '39000:relay:some-topic'] },
     ]
     const { container } = render(
-      <ShipSidebar openIssues={5} issuesHref="#/" projectsHref="#/projects" projects={filed} folders={listed} current="issues" />,
+      <ShipSidebar openIssues={5} topicsHref="#/topics" issuesHref="#/" projectsHref="#/projects" projects={filed} folders={listed} current="issues" />,
     )
     const rowsOf = (id: string) =>
       [...container.querySelectorAll(`[data-nav-group="${id}"] a`)].map((a) => a.textContent)
@@ -81,7 +81,7 @@ describe('ShipSidebar', () => {
       { id: 'hq', name: 'Estiva HQ', addresses: ['30850:x:two'] },
     ]
     const { container } = render(
-      <ShipSidebar openIssues={5} issuesHref="#/" projectsHref="#/projects" projects={filed} folders={listed} current="issues" />,
+      <ShipSidebar openIssues={5} topicsHref="#/topics" issuesHref="#/" projectsHref="#/projects" projects={filed} folders={listed} current="issues" />,
     )
     expect([...container.querySelectorAll('[data-nav-group="peek"] a')].map((a) => a.textContent)).toEqual(['One2'])
   })
@@ -90,7 +90,7 @@ describe('ShipSidebar', () => {
     render(
       <ShipSidebar
         openIssues={5}
-        issuesHref="#/"
+        topicsHref="#/topics" issuesHref="#/"
         projectsHref="#/projects"
         projects={[filed[0]!, projects[1]!, { addr: '30850:x:three', title: 'Three', href: '#/p/three', openCount: 1, folder: 'not-a-team' }]}
         folders={teams}
@@ -100,27 +100,27 @@ describe('ShipSidebar', () => {
     const folds = screen.getAllByRole('button').map((b) => b.textContent)
     expect(folds).toEqual(['Estiva HQ', 'Peek', 'Not in a Folder'])
     const labels = screen.getAllByRole('link').map((a) => a.textContent)
-    expect(labels).toEqual(['Issues5', 'Projects3', 'One2', 'Two', 'Three1'])
+    expect(labels).toEqual(['Topics', 'Issues5', 'Projects3', 'One2', 'Two', 'Three1'])
   })
 
   it('a project row\'s menu offers "Move to Folder…" for that project, and only when asked for (FOL-7)', async () => {
     const onMoveProject = vi.fn()
     const { rerender } = render(
-      <ShipSidebar openIssues={0} issuesHref="#/" projectsHref="#/projects" projects={filed} folders={teams} current="issues" onMoveProject={onMoveProject} />,
+      <ShipSidebar openIssues={0} topicsHref="#/topics" issuesHref="#/" projectsHref="#/projects" projects={filed} folders={teams} current="issues" onMoveProject={onMoveProject} />,
     )
     // The rows are still links, and the menu is beside the link, not inside it.
-    expect(screen.getAllByRole('link').map((a) => a.textContent)).toEqual(['Issues', 'Projects2', 'Two', 'One2'])
+    expect(screen.getAllByRole('link').map((a) => a.textContent)).toEqual(['Topics', 'Issues', 'Projects2', 'Two', 'One2'])
     await userEvent.click(screen.getByRole('button', { name: 'More options for One' }))
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Move to Folder…' }))
     expect(onMoveProject).toHaveBeenCalledWith(filed[0])
-    rerender(<ShipSidebar openIssues={0} issuesHref="#/" projectsHref="#/projects" projects={filed} folders={teams} current="issues" />)
+    rerender(<ShipSidebar openIssues={0} topicsHref="#/topics" issuesHref="#/" projectsHref="#/projects" projects={filed} folders={teams} current="issues" />)
     expect(screen.queryByRole('button', { name: /More options/ })).not.toBeInTheDocument()
   })
 
   it("the arrow on a team's fold opens the Folder", async () => {
     const onOpenFolder = vi.fn()
     render(
-      <ShipSidebar openIssues={0} issuesHref="#/" projectsHref="#/projects" projects={filed} folders={teams} current="issues" onOpenFolder={onOpenFolder} />,
+      <ShipSidebar openIssues={0} topicsHref="#/topics" issuesHref="#/" projectsHref="#/projects" projects={filed} folders={teams} current="issues" onOpenFolder={onOpenFolder} />,
     )
     await userEvent.click(screen.getAllByRole('button', { name: 'Open folder' })[1]!)
     expect(onOpenFolder).toHaveBeenCalledWith(teams[0])
@@ -130,7 +130,7 @@ describe('ShipSidebar', () => {
     // A state written by a placement carries no name, and `listFolders` reads
     // the state's name and stops (the Peek team, 2026-09-15).
     render(
-      <ShipSidebar openIssues={0} issuesHref="#/" projectsHref="#/projects" projects={[]} folders={[{ id: 'f1' }]} current="issues" />,
+      <ShipSidebar openIssues={0} topicsHref="#/topics" issuesHref="#/" projectsHref="#/projects" projects={[]} folders={[{ id: 'f1' }]} current="issues" />,
     )
     expect(screen.getByRole('button', { name: 'f1' })).toBeInTheDocument()
   })
@@ -145,7 +145,7 @@ describe('ShipSidebar', () => {
     render(
       <ShipSidebar
         openIssues={0}
-        issuesHref="#/"
+        topicsHref="#/topics" issuesHref="#/"
         projectsHref="#/projects"
         projects={filed}
         folders={teams}
@@ -161,7 +161,7 @@ describe('ShipSidebar', () => {
 
   it('marks a project route on its row and nothing on a folder route', () => {
     render(
-      <ShipSidebar openIssues={0} issuesHref="#/" projectsHref="#/projects" projects={filed} folders={teams} current={{ folderId: 'peek' }} />,
+      <ShipSidebar openIssues={0} topicsHref="#/topics" issuesHref="#/" projectsHref="#/projects" projects={filed} folders={teams} current={{ folderId: 'peek' }} />,
     )
     // Both branches of `current` are objects; a folder route must not light a
     // project row, which is why the discriminant is a key check, not `typeof`.
@@ -169,12 +169,12 @@ describe('ShipSidebar', () => {
   })
 
   it('shows placeholder rows while either read is still coming, and no team yet', () => {
-    const { container } = render(<ShipSidebar openIssues={0} issuesHref="#/" projectsHref="#/projects" projects={[]} current="issues" loading folders={[]} foldersLoading />)
+    const { container } = render(<ShipSidebar openIssues={0} topicsHref="#/topics" issuesHref="#/" projectsHref="#/projects" projects={[]} current="issues" loading folders={[]} foldersLoading />)
     // No heading over the placeholder: it used to be "Projects", the catch-all's title (FOL-5).
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
     expect(container.querySelectorAll('[aria-hidden="true"].animate-skeleton-in')).toHaveLength(1)
     const { container: withProjects } = render(
-      <ShipSidebar openIssues={0} issuesHref="#/" projectsHref="#/projects" projects={filed} current="issues" folders={[]} foldersLoading />,
+      <ShipSidebar openIssues={0} topicsHref="#/topics" issuesHref="#/" projectsHref="#/projects" projects={filed} current="issues" folders={[]} foldersLoading />,
     )
     // The projects are known and the teams are not: still the placeholder,
     // rather than a flat list that regroups itself a moment later.
@@ -183,15 +183,24 @@ describe('ShipSidebar', () => {
   })
 
   it('draws no team fold when there are none', () => {
-    render(<ShipSidebar openIssues={0} issuesHref="#/" projectsHref="#/projects" projects={[]} current="issues" />)
+    render(<ShipSidebar openIssues={0} topicsHref="#/topics" issuesHref="#/" projectsHref="#/projects" projects={[]} current="issues" />)
     expect(document.querySelector('[data-nav-group]')).toBeNull()
   })
 
   it('draws no Projects heading when there are none', () => {
-    render(<ShipSidebar openIssues={0} issuesHref="#/" projectsHref="#/projects" projects={[]} current="projects" />)
-    expect(screen.getAllByRole('link')).toHaveLength(2)
+    render(<ShipSidebar openIssues={0} topicsHref="#/topics" issuesHref="#/" projectsHref="#/projects" projects={[]} current="projects" />)
+    expect(screen.getAllByRole('link')).toHaveLength(3)
     // Only the nav entry says "Projects"; the section heading is not drawn.
     expect(screen.getAllByText('Projects')).toHaveLength(1)
+  })
+
+  it('has Topics above Issues, marked on the Topics page (SHIPS-3)', () => {
+    render(<ShipSidebar openIssues={0} topicsHref="/topics" issuesHref="/issues" projectsHref="/projects" projects={[]} current="topics" />)
+    const links = screen.getAllByRole('link')
+    expect(links.map((link) => link.textContent?.replace(/\d+$/, ''))).toEqual(['Topics', 'Issues', 'Projects'])
+    expect(links[0].getAttribute('href')).toBe('/topics')
+    expect(links[0].getAttribute('aria-current')).toBe('page')
+    expect(links[1].getAttribute('aria-current')).toBeNull()
   })
 })
 

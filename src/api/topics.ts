@@ -1,13 +1,19 @@
+import { useEffect, useState, useSyncExternalStore } from 'react'
 import { createRetryingRead } from '@estiva-app/platform'
-import { addableTopics, type ReadTopic, type TopicsRead } from '@estiva-app/interop'
-import { readAllTopics, topicAsDrawn, type FolderSummary, type TopicOfFile } from './foreign'
+import { addableTopics, type ReadTopic, type TopicConversation, type TopicsRead } from '@estiva-app/interop'
+import { readAllTopics, readTopicConversations, topicAsDrawn, type FolderSummary, type TopicOfFile } from './foreign'
 import { foldersNow, heldFolders } from './useFolders'
+import { useLandedReadState } from './readStateSync'
+import { readMuted } from './useFeedJudges'
+import { nip44 } from './nip44'
+import { relay, signer } from './store'
 
 /**
  * Every topic the reader can read, held per tab (SHIPS-2) — interop's
  * `readTopics`, held as the Folder listing is (`useFolders`), so Add to topic
- * opened again draws at once while it reads again. Not retried on its own:
- * the next open reads, and a failed read never replaces a good one.
+ * opened again draws at once while it reads again, and opens filled once the
+ * Topics page has read them (SHIPS-3). Not retried on its own: the next open
+ * reads, or Try again, and a failed read never replaces a good one.
  */
 const held = createRetryingRead<TopicsRead>({ retryable: () => false })
 
@@ -23,6 +29,57 @@ async function topicsFresh(): Promise<TopicsRead> {
 export function resetTopicsForTests(): void {
   held.clear()
   choices = undefined
+}
+
+/** The Topics page's read: `undefined` while the first one is out, `failed` when it did not land. */
+export type TopicsState = TopicsRead | 'failed' | undefined
+
+/** Every topic the reader can read, for the Topics page (SHIPS-3): read once per tab, the held answer at once. */
+export function useTopics(): TopicsState {
+  const snapshot = useSyncExternalStore(held.subscribe, held.snapshot)
+  useEffect(() => void held.ensure(readAllTopics), [])
+  return snapshot.value ?? (snapshot.error === undefined ? undefined : 'failed')
+}
+
+/** Try again after a failed read: read every topic now. */
+export function reloadTopics(): Promise<void> {
+  return held.reload(readAllTopics)
+}
+
+/**
+ * Each topic's conversations in Peek and how many are new for you (SHIPS-3),
+ * for the Topics page to draw. `undefined` until the topics, your read state
+ * and your mute list are all in hand: a dot judged without them would light
+ * topics you have read or muted. Read again when one of them moves.
+ */
+export function useTopicConversations(read: TopicsRead | undefined): Map<string, TopicConversation> | undefined {
+  const merged = useLandedReadState()
+  const [muted, setMuted] = useState<ReadonlySet<string>>()
+  const [conversations, setConversations] = useState<Map<string, TopicConversation>>()
+
+  useEffect(() => {
+    let live = true
+    void readMuted((filters) => relay.query(filters as never), (ciphertext) => nip44.decrypt(ciphertext), signer.pubkey)
+      .then((keys) => live && keys && setMuted(keys))
+      .catch(() => undefined)
+    return () => {
+      live = false
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!read || !merged || !muted) return
+    let live = true
+    readTopicConversations(read, { merged, muted })
+      .then((next) => live && setConversations(next))
+      // A failed re-read keeps the counts already drawn.
+      .catch(() => undefined)
+    return () => {
+      live = false
+    }
+  }, [read, merged, muted])
+
+  return conversations
 }
 
 /** Add to topic's choices: the topics you are a member of, then the rest. */

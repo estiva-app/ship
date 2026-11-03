@@ -46,6 +46,8 @@ describe('useRoute', () => {
       [{ name: 'issue', d: UUID, slug: 'billing-entry' }, { name: 'issue', d: UUID }],
       [{ name: 'inbound', naddr: 'naddr1xyz' }, { name: 'inbound', naddr: 'naddr1xyz' }],
       [{ name: 'folder', id: UUID }, { name: 'folder', id: UUID }],
+      [{ name: 'topics' }, { name: 'topics' }],
+      [{ name: 'topics', folder: UUID }, { name: 'topics', folder: UUID }],
       [{ name: 'elsewhere', word: 'topic', ref: `level-2-${UUID}` }, { name: 'elsewhere', word: 'topic', ref: `level-2-${UUID}` }],
     ] as const
     for (const [route, expected] of routes) expect(parse(href(route))).toEqual(expected)
@@ -167,6 +169,15 @@ describe('the §7.7 root', () => {
     expect(parse('/issue/no-uuid-here').name).toBe('issues')
     expect(parse('/project/no-uuid-here').name).toBe('issues')
     expect(parse('/app/nonsense').name).toBe('issues')
+  })
+
+  it('serves Topics at /topics and a Folder’s Topics under its Folder, at the old Folder path too (SHIPS-3)', () => {
+    expect(href({ name: 'topics' })).toBe('/topics')
+    expect(href({ name: 'topics', folder: UUID })).toBe(`/app/folder/${UUID}/topics`)
+    expect(parse(`/folder/${UUID}/topics`)).toEqual({ name: 'topics', folder: UUID })
+    // Not another app's word: `/topics/<x>` is no hand-off.
+    expect(parse(`/topics/${UUID}`)).toEqual({ name: 'topics' })
+    expect(movedRedirect(`/folder/${UUID}/topics`)).toBe(null)
   })
 
   it('serves the Folder page under /app/', () => {
