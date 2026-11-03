@@ -1,31 +1,13 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { ShipSidebar, type SidebarFolder, type SidebarProject } from './ShipSidebar'
+import { ShipSidebar, type SidebarFolder } from './ShipSidebar'
 
-/** Shaped like the local sandbox — invented projects, nothing real. */
-const PROJECTS: SidebarProject[] = [
-  { addr: '30850:a:des', title: 'Design System', href: '#/p/des', openCount: 9 },
-  { addr: '30850:a:rel', title: 'Relay Migration', href: '#/p/rel', openCount: 6 },
-  { addr: '30850:a:pay', title: 'Payment integration', href: '#/p/pay', openCount: 3 },
-  { addr: '30850:a:onb', title: 'Onboarding flow for new workspaces', href: '#/p/onb', openCount: 0 },
-  { addr: '30850:a:mob', title: 'Mobile app', href: '#/p/mob', openCount: 0 },
-]
+const SHIP = '7b32200c-e4c0-4216-b79a-8490fc05e0bd'
+const HQ = '0212db6d-bcbf-40d0-890e-f4f056db2f5d'
 
-/**
- * The teams as the sidebar sees them: a name, what the team's state lists
- * (FOL-5), and deliberately no count. A state lists topics too; the sidebar
- * draws only the projects it holds.
- */
+/** The teams as the sidebar sees them: a name, and deliberately no count. */
 const FOLDERS: SidebarFolder[] = [
-  { id: '7b32200c-e4c0-4216-b79a-8490fc05e0bd', name: 'Ship', addresses: ['30850:a:rel', '30850:a:pay', '39000:r:ship-talk'] },
-  { id: '0212db6d-bcbf-40d0-890e-f4f056db2f5d', name: 'Estiva HQ', addresses: ['30850:a:des', '30850:a:onb'] },
-]
-/** The same projects, each with its own Folder; the last one in no team. */
-const FILED: SidebarProject[] = [
-  { ...PROJECTS[0]!, folder: '0212db6d-bcbf-40d0-890e-f4f056db2f5d' },
-  { ...PROJECTS[1]!, folder: '7b32200c-e4c0-4216-b79a-8490fc05e0bd' },
-  { ...PROJECTS[2]!, folder: '7b32200c-e4c0-4216-b79a-8490fc05e0bd' },
-  { ...PROJECTS[3]!, folder: '0212db6d-bcbf-40d0-890e-f4f056db2f5d' },
-  PROJECTS[4]!,
+  { id: SHIP, name: 'Ship', addresses: ['30850:a:rel', '30850:a:pay', '39000:r:ship-talk'] },
+  { id: HQ, name: 'Estiva HQ', addresses: ['30850:a:des', '30850:a:onb'] },
 ]
 
 const meta = {
@@ -33,11 +15,12 @@ const meta = {
   component: ShipSidebar,
   args: {
     openIssues: 18,
-    topicsHref: '#/topics',
-    issuesHref: '#/',
-    projectsHref: '#/projects',
-    projects: PROJECTS,
-    current: 'issues',
+    activeProjects: 5,
+    hrefFor: (entry, folder) => (folder ? `#/app/folder/${folder}/${entry}` : `#/${entry}`),
+    folders: FOLDERS,
+    onOpenFolder: () => {},
+    onNewFolder: () => {},
+    current: { entry: 'topics' },
   },
   parameters: { layout: 'fullscreen' },
   decorators: [
@@ -52,37 +35,24 @@ const meta = {
 export default meta
 type Story = StoryObj<typeof meta>
 
-/** On the Issues list. Issues counts open issues; Projects counts active projects; a project row with no open issues shows no number. */
-export const Issues: Story = {}
-
-export const Projects: Story = { args: { current: 'projects' } }
-
-/** A project route marks its own row, not the Projects entry. */
-export const OnAProject: Story = { args: { current: { projectAddr: '30850:a:rel' } } }
-
-/** A workspace with no active projects: no count on Projects, and no heading either. */
-export const Empty: Story = { args: { openIssues: 0, projects: [] } }
-
 /**
- * With teams (SHI-25): one fold per top-level Folder, the projects its state
- * lists as the rows (FOL-5), and a project in no Folder under "Not in a Folder"
- * after them — not a fold named like a Folder, because it is not one. A
- * team carries **no count**, unlike every other row here — a Folder holds
- * files from apps Ship does not own, so any number would be Ship's records
- * only, which is a lie about a container that also holds a topic.
+ * Where Ship opens (SHIPS-5): Topics, Projects ("5 active"), Issues ("18 open"),
+ * then the teams under a quiet "Folders" label, closed, alphabetically. A team
+ * carries **no count** — a Folder holds files from apps Ship does not own, so
+ * any number would be Ship's records only.
  */
-export const WithFolders: Story = { args: { folders: FOLDERS, projects: FILED, onOpenFolder: () => {} } }
+export const OnTopics: Story = {}
 
-/** A project row's menu (FOL-7): on hover or focus, over the count, with "Move to Folder…". */
-export const WithRowMenu: Story = { args: { folders: FOLDERS, projects: FILED, onOpenFolder: () => {}, onMoveProject: () => {} } }
+export const OnIssues: Story = { args: { current: { entry: 'issues' } } }
 
-/** "New folder" is the + on the quiet "Folders" label (FOL-8; Katerina, 30 September): the Folder it makes shows here beside them. */
-export const WithNewFolder: Story = { args: { folders: FOLDERS, projects: FILED, onOpenFolder: () => {}, onNewFolder: () => {} } }
+/** A project in Estiva HQ: its fold opens and its Projects is marked, not the top one. */
+export const OnAProject: Story = { args: { current: { entry: 'projects', folder: HQ } } }
 
-/** A folder route marks its own row, and leaves the project rows alone. */
-export const OnAFolder: Story = {
-  args: { folders: FOLDERS, current: { folderId: '7b32200c-e4c0-4216-b79a-8490fc05e0bd' } },
-}
+/** An issue whose project is in Ship: that fold opens, its Issues marked. */
+export const OnAnIssue: Story = { args: { current: { entry: 'issues', folder: SHIP } } }
+
+/** The Folder page: nothing is marked; the arrow on a fold's hover is how you get there. */
+export const OnAFolder: Story = { args: { current: { folderId: SHIP } } }
 
 /**
  * A Folder with no name falls back to its id.
@@ -91,36 +61,10 @@ export const OnAFolder: Story = {
  * `listFolders` reads the state's name and stops — the Peek team rendered as
  * its uuid on 2026-09-15.
  */
-export const FolderWithNoName: Story = {
-  args: { folders: [{ id: '9c69f247-be6a-4ae7-9703-71cb971f5f93' }] },
-}
+export const FolderWithNoName: Story = { args: { folders: [{ id: '9c69f247-be6a-4ae7-9703-71cb971f5f93' }] } }
 
-/**
- * The first workspace read has not landed — SHI-20.
- *
- * Issues and Projects are real links and work already, so they are drawn;
- * their counts are absent rather than zero, because a zero would be a claim.
- * Where the project list will be, the rows say a list is coming without
- * pretending to know how long it is.
- *
- * The placeholder holds back 150ms, so a fast read never flashes it. That
- * cannot be seen in a static story — only that the shape is the row's.
- */
-export const Loading: Story = { args: { openIssues: 0, projects: [], loading: true } }
+/** The first workspace read has not landed — SHI-20: the entries are links already, their counts absent rather than zero. */
+export const Loading: Story = { args: { loading: true } }
 
-/**
- * Loading, with Folders already in hand.
- *
- * Folders are read separately from the workspace, so they can arrive first.
- * The placeholder stands in for the projects only — a folder list that is
- * ready has nothing to wait for.
- */
-export const LoadingWithFolders: Story = {
-  args: { openIssues: 0, projects: [], loading: true, folders: FOLDERS },
-}
-
-/** The Folders have not landed yet, with the projects already in hand: the same placeholder rows, under their own heading. */
+/** The Folders have not landed: placeholder rows, and no "Folders" label yet. */
 export const FoldersLoading: Story = { args: { folders: [], foldersLoading: true } }
-
-/** The first moment of a session: neither the workspace nor the Folders have landed. Both headings, each over its placeholder rows. */
-export const LoadingEverything: Story = { args: { openIssues: 0, projects: [], loading: true, folders: [], foldersLoading: true } }

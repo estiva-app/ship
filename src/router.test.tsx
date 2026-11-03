@@ -75,11 +75,22 @@ describe('useRoute', () => {
  * lived here; these did not.
  */
 describe('parse, at the edges', () => {
-  it('falls back to the issue list for anything unrecognised', () => {
+  it('falls back to Topics, where Ship opens, for anything unrecognised (SHIPS-5)', () => {
     // Both of these reach a person: a typo'd link, and the bare app URL with no
     // fragment at all. Neither may render nothing.
-    expect(parse('/nonsense').name).toBe('issues')
-    expect(parse('').name).toBe('issues')
+    expect(parse('/nonsense')).toEqual({ name: 'topics' })
+    expect(parse('')).toEqual({ name: 'topics' })
+    expect(parse('/')).toEqual({ name: 'topics' })
+    expect(parse('/issues')).toEqual({ name: 'issues' })
+  })
+
+  it("serves a Folder's Projects and Issues under its Folder, as its Topics (SHIPS-5)", () => {
+    const UUID5 = 'b59fbb9c-0cd4-43c1-9f5b-3b5704072e6f'
+    expect(href({ name: 'projects', archived: false, folder: UUID5 })).toBe(`/app/folder/${UUID5}/projects`)
+    expect(href({ name: 'projects', archived: true, folder: UUID5 })).toBe(`/app/folder/${UUID5}/projects?archived`)
+    expect(href({ name: 'issues', folder: UUID5 })).toBe(`/app/folder/${UUID5}/issues`)
+    expect(parse(`/app/folder/${UUID5}/projects?archived`)).toEqual({ name: 'projects', archived: true, folder: UUID5 })
+    expect(parse(`/app/folder/${UUID5}/issues`)).toEqual({ name: 'issues', folder: UUID5 })
   })
 
   it('opens a block link on its own page, and still reads an old #/ link from its hash (RIC-18)', () => {
@@ -131,7 +142,7 @@ describe('the §7.2 grammar', () => {
 
   it('falls back to the list for a path carrying no identity', () => {
     // Rather than rendering a page for an object that cannot exist.
-    expect(parse('/issue/no-uuid-here').name).toBe('issues')
+    expect(parse('/issue/no-uuid-here').name).toBe('topics')
   })
 
   it('still resolves an old hash link, address and all', () => {
@@ -171,9 +182,9 @@ describe('the §7.7 root', () => {
   })
 
   it('keeps Ship’s own words, and a broken one of them, off the hand-off', () => {
-    expect(parse('/issue/no-uuid-here').name).toBe('issues')
-    expect(parse('/project/no-uuid-here').name).toBe('issues')
-    expect(parse('/app/nonsense').name).toBe('issues')
+    expect(parse('/issue/no-uuid-here').name).toBe('topics')
+    expect(parse('/project/no-uuid-here').name).toBe('topics')
+    expect(parse('/app/nonsense').name).toBe('topics')
   })
 
   it('serves Topics at /topics and a Folder’s Topics under its Folder, at the old Folder path too (SHIPS-3)', () => {

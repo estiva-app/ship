@@ -358,13 +358,17 @@ async function main() {
 
   await page.goto(`http://localhost:${PORT}/`)
 
-  // ── Lands straight on the issue list; there is no workspace to choose ─────
-  await page.waitForSelector('[data-surface="issues"]')
-  check('the app opens on Issues with no setup step', page.url().includes('/issues'))
-  await shot(page, '01-issues-empty')
+  // ── Lands straight on Topics (SHIPS-5); there is no workspace to choose ───
+  await page.waitForSelector('[data-surface="topics"]')
+  check('the app opens on Topics with no setup step', page.url().includes('/topics'))
+  check(
+    'the sidebar reads Topics, Projects, Issues',
+    (await sidebar().getByRole('link').allInnerTexts()).map((text) => text.replace(/\s*\d+$/, '')).join() === 'Topics,Projects,Issues',
+  )
+  await shot(page, '01-topics-empty')
 
   // ── Projects ──────────────────────────────────────────────────────────────
-  await sidebar().getByRole('link', { name: /^Projects/ }).click()
+  await sidebar().getByRole('link', { name: /^Projects/ }).first().click()
   await page.waitForSelector('[data-surface="projects"]')
   await page.getByRole('button', { name: 'Add project' }).click()
   // Scoped to the dialog throughout: a bare placeholder also matches controls on
@@ -985,7 +989,7 @@ async function main() {
   await shot(page, '07-inbound-deep-link')
 
   // ── Back to the issue list ────────────────────────────────────────────────
-  await sidebar().getByRole('link', { name: /^Issues/ }).click()
+  await sidebar().getByRole('link', { name: /^Issues/ }).first().click()
   await page.waitForSelector('[data-surface="issues"]')
   const issues = page.locator('[data-surface="issues"]')
   check('the issue appears in the workspace-wide list', (await issues.getByRole('link').count()) >= 1)
@@ -1028,10 +1032,11 @@ async function main() {
   await page.keyboard.press('Escape')
 
   // Scoped to the sidebar: the project detail's breadcrumb also says "Projects".
-  await sidebar().getByRole('link', { name: /^Projects/ }).click()
+  await sidebar().getByRole('link', { name: /^Projects/ }).first().click()
   await page.waitForSelector('[data-surface="projects"]')
-  // Topics, Issues and Projects are the links left: no project row (Topics joined them in SHIPS-3).
-  check('an archived project leaves the sidebar', (await sidebar().getByRole('link').count()) === 3)
+  // Projects counts the projects not archived, and this was the one (SHIPS-5: no project rows any more).
+  const projectsEntry = sidebar().getByRole('link', { name: /^Projects/ }).first()
+  check('an archived project leaves the sidebar’s count', (await projectsEntry.innerText()).trim() === 'Projects')
   const projects = page.locator('[data-surface="projects"]')
   check('  …and the active list', (await projects.getByRole('link').count()) === 0)
   check('  …but is reachable behind a tab', await page.getByRole('tab', { name: /^Archived/ }).isVisible())
@@ -1047,9 +1052,8 @@ async function main() {
   await page.waitForSelector('[data-surface="project"]')
   await pageAction('Unarchive project')
   await page.getByRole('button', { name: 'Unarchive', exact: true }).waitFor({ state: 'detached' })
-  const restoredRow = sidebar().getByRole('link', { name: /Payment integration/ })
-  await restoredRow.waitFor({ timeout: 10_000 }).catch(() => {})
-  check('unarchiving restores it to the sidebar', await restoredRow.isVisible())
+  await sidebar().getByRole('link', { name: /^Projects\s*1$/ }).first().waitFor({ timeout: 10_000 }).catch(() => {})
+  check('unarchiving restores it to the sidebar’s count', /^Projects\s*1$/.test((await projectsEntry.innerText()).trim()))
 
   // ── The profile menu ──────────────────────────────────────────────────────
   // By what it does, not by what it says: the trigger's accessible name is the

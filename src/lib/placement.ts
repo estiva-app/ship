@@ -17,3 +17,21 @@ export function placedIn<F extends { id: string; addresses?: readonly string[] }
   const own = project.folder ? folders.find((folder) => folder.id === project.folder) : undefined
   return own ? [own] : []
 }
+
+/** A team's name for a page title, as Topics names it: "Folder" until the listing has it. */
+export function folderName(folders: readonly { id: string; name?: string }[] | undefined, id: string): string {
+  return folders?.find((folder) => folder.id === id)?.name ?? 'Folder'
+}
+
+/**
+ * The projects in one team, by the same rule: what a Folder's Projects lists,
+ * and whose issues its Issues lists (SHIPS-5). An issue in no project is in
+ * no team's Issues, only in the top one.
+ */
+export function projectsIn<P extends { addr: string; contentFolder?: string }>(
+  projects: readonly P[],
+  folders: readonly { id: string; addresses?: readonly string[] }[],
+  id: string,
+): P[] {
+  return projects.filter((project) => placedIn({ addr: project.addr, folder: project.contentFolder }, folders).some((folder) => folder.id === id))
+}

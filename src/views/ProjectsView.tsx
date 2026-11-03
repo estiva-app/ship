@@ -14,6 +14,8 @@ import { ProjectCard, type ProjectCardProps } from '@/components/ProjectCard'
  * is not offered as one that can.
  */
 export interface ProjectsViewProps {
+  /** "Projects", or a Folder's ("Estiva HQ · Projects", SHIPS-5). */
+  title?: string
   active: ProjectCardProps[]
   archived: ProjectCardProps[]
   showArchived: boolean
@@ -23,13 +25,13 @@ export interface ProjectsViewProps {
   addDisabledReason?: string
 }
 
-export function ProjectsView({ active, archived, showArchived, onShowArchived, onAddProject, addDisabledReason }: ProjectsViewProps) {
+export function ProjectsView({ title = 'Projects', active, archived, showArchived, onShowArchived, onAddProject, addDisabledReason }: ProjectsViewProps) {
   const shown = showArchived ? archived : active
   return (
     // `data-surface` is the smoke test's waypoint — see IssuesView.
     <div data-surface="projects" className="flex flex-1 flex-col gap-4 px-6 py-5">
       <div className="flex items-center gap-3">
-        <h1 className="flex-1 text-h3 text-text-primary">Projects</h1>
+        <h1 className="flex-1 text-h3 text-text-primary">{title}</h1>
         <Button variant="primary" onClick={onAddProject} disabledReason={addDisabledReason}>
           Add project
         </Button>

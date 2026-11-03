@@ -62,9 +62,10 @@ import { useEffect, useState } from 'react'
 import { identifierFromRef, objectRef } from '@estiva-app/interop'
 
 export type Route =
-  | { name: 'issues' }
-  /** `archived` shows the archived list instead of the active one. */
-  | { name: 'projects'; archived: boolean }
+  /** With `folder`, only the issues of the projects in that Folder (SHIPS-5). */
+  | { name: 'issues'; folder?: string }
+  /** `archived` shows the archived list instead of the active one; `folder`, only that Folder's projects (SHIPS-5). */
+  | { name: 'projects'; archived: boolean; folder?: string }
   /**
    * `d` is the identity; `slug` is decoration that never resolves anything and
    * is absent when the caller has no title to hand (an inbound redirect, a
@@ -129,9 +130,11 @@ const DEFAULT_PROJECT_VIEW: ProjectView = 'table'
 export function href(route: Route): string {
   switch (route.name) {
     case 'issues':
-      return '/issues'
-    case 'projects':
-      return route.archived ? '/projects?archived' : '/projects'
+      return route.folder ? `/app/folder/${route.folder}/issues` : '/issues'
+    case 'projects': {
+      const base = route.folder ? `/app/folder/${route.folder}/projects` : '/projects'
+      return route.archived ? `${base}?archived` : base
+    }
     case 'project': {
       const base = `/project/${objectRef(route.d, route.slug)}`
       // The defaults are left out — a shared link should be the short one unless
@@ -158,7 +161,14 @@ export function href(route: Route): string {
 }
 
 /**
- * Parse a location. Anything unrecognised is the issue list.
+ * Where Ship opens: Topics (SHIPS-5; Miky, 2 November, once Home was parked).
+ * The bare address, a broken link and a reference that would not resolve all
+ * land here, so none of them renders nothing.
+ */
+export const HOME: Route = { name: 'topics' }
+
+/**
+ * Parse a location. Anything unrecognised is {@link HOME}.
  *
  * **Takes both shapes.** A path is the current grammar; a `#/...` hash is every
  * link published before SHI-16, including the ones sitting in other people's
@@ -204,9 +214,12 @@ export function parse(location: string): Route {
     if (d && !new URLSearchParams(query ?? '').has('thread')) return { name: 'topic', d }
     if (d) return { name: 'elsewhere', word: parts[0], ref: parts[1], query }
   }
-  // A Folder's Topics, under the Folder page's path, or the path it had before PRO-22.
+  // A Folder's Topics, Projects and Issues (SHIPS-5), under the Folder page's path, or the path it had before PRO-22.
   const folderAt = parts[0] === 'app' && parts[1] === 'folder' ? 2 : parts[0] === 'folder' ? 1 : -1
-  if (folderAt !== -1 && parts[folderAt] && parts[folderAt + 1] === 'topics') return { name: 'topics', folder: parts[folderAt] }
+  const folder = folderAt !== -1 ? parts[folderAt] : undefined
+  if (folder && parts[folderAt + 1] === 'topics') return { name: 'topics', folder }
+  if (folder && parts[folderAt + 1] === 'projects') return { name: 'projects', archived: new URLSearchParams(query ?? '').has('archived'), folder }
+  if (folder && parts[folderAt + 1] === 'issues') return { name: 'issues', folder }
   if (parts[0] === 'app' && parts[1] === 'folder' && parts[2]) {
     return { name: 'folder', id: parts[2] }
   }
@@ -221,7 +234,8 @@ export function parse(location: string): Route {
     const d = identifierFromRef(parts[1])
     if (d) return { name: 'issue', d }
   }
-  return { name: 'issues' }
+  if (parts[0] === 'issues') return { name: 'issues' }
+  return HOME
 }
 
 /**
@@ -235,9 +249,9 @@ export function hashRedirect(location: string): string | null {
   const hash = location.includes('#') ? location.slice(location.indexOf('#') + 1) : ''
   if (!hash || !hash.startsWith('/')) return null
   const route = parse(hash)
-  // An unrecognised hash falls through to the issue list, and rewriting the URL
-  // to `/issues` would hide that the link was broken rather than fix it.
-  if (route.name === 'issues' && !hash.startsWith('/issues')) return null
+  // An unrecognised hash falls through to Topics, and rewriting the URL to
+  // `/topics` would hide that the link was broken rather than fix it.
+  if (route.name === 'topics' && !route.folder && !hash.startsWith(href(HOME))) return null
   return href(route)
 }
 
