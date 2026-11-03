@@ -34,23 +34,28 @@ export function resetTopicsForTests(): void {
 /** The Topics page's read: `undefined` while the first one is out, `failed` when it did not land. */
 export type TopicsState = TopicsRead | 'failed' | undefined
 
-/** Start reading the topics, for a route that will draw them before the page mounts; joins a read on the way. */
-export function prefetchTopics(): void {
-  void held.ensure(readAllTopics)
+/**
+ * Read the topics afresh as the Topics route opens, beside the workspace and
+ * before the page mounts, so a topic started since shows; joins a read on the
+ * way. This is the open's one read: the page draws it, and reads only when
+ * nothing is held or on the way (155 relay reads were two of each, SHIPS-3).
+ */
+export function prefetchTopics(): Promise<void> {
+  return held.reload(readAllTopics)
 }
 
 /**
  * Every topic the reader can read, for the Topics page (SHIPS-3): the held
- * answer at once, read afresh on each open as Add to topic is, so a topic
- * started since shows. `failed` only once this open's read has failed: an
- * error left by an earlier read is not this one's.
+ * answer at once, or the route's read on the way ({@link prefetchTopics}).
+ * `failed` only once this open's read has failed: an error left by an earlier
+ * read is not this one's.
  */
 export function useTopics(): TopicsState {
   const snapshot = useSyncExternalStore(held.subscribe, held.snapshot)
   const [settled, setSettled] = useState(false)
   useEffect(() => {
     let live = true
-    void (held.snapshot().value ? held.reload(readAllTopics) : held.ensure(readAllTopics)).finally(() => live && setSettled(true))
+    void held.ensure(readAllTopics).finally(() => live && setSettled(true))
     return () => {
       live = false
     }
@@ -64,12 +69,15 @@ export function reloadTopics(): Promise<void> {
 }
 
 /**
- * Each topic's conversations in Peek and how many are new for you (SHIPS-3),
- * for the Topics page to draw. `undefined` until the topics, your read state
- * and your mute list are all in hand: a dot judged without them would light
- * topics you have read or muted. Read again when one of them moves.
+ * Each drawn topic's conversations in Peek and how many are new for you
+ * (SHIPS-3), for the Topics page to draw. `drawn` is the addresses on its
+ * tabs, space-separated: a read costs a request or two per topic, and most
+ * topics a reader can read list no work and are never drawn. `undefined`
+ * until the topics, your read state and your mute list are all in hand: a dot
+ * judged without them would light topics you have read or muted. Read again
+ * when one of them moves.
  */
-export function useTopicConversations(read: TopicsRead | undefined): Map<string, TopicConversation> | undefined {
+export function useTopicConversations(read: TopicsRead | undefined, drawn: string | undefined): Map<string, TopicConversation> | undefined {
   const merged = useLandedReadState()
   const [muted, setMuted] = useState<ReadonlySet<string>>()
   const [conversations, setConversations] = useState<Map<string, TopicConversation>>()
@@ -87,16 +95,17 @@ export function useTopicConversations(read: TopicsRead | undefined): Map<string,
   }, [muted, merged])
 
   useEffect(() => {
-    if (!read || !merged || !muted) return
+    if (!read || !drawn || !merged || !muted) return
     let live = true
-    readTopicConversations(read, { merged, muted })
+    const shown = new Set(drawn.split(' '))
+    readTopicConversations({ ...read, topics: read.topics.filter((topic) => shown.has(topic.address)) }, { merged, muted })
       .then((next) => live && setConversations(next))
       // A failed re-read keeps the counts already drawn.
       .catch(() => undefined)
     return () => {
       live = false
     }
-  }, [read, merged, muted])
+  }, [read, drawn, merged, muted])
 
   return conversations
 }

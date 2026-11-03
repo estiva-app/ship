@@ -270,7 +270,7 @@ function opens(route: Route, state: WorkspaceState | null): boolean {
 function Page({ route, state, loading, directory, teams, folders, archives, say, refresh }: { route: Route; state: WorkspaceState | null; loading: boolean; directory: DirectoryView; teams: FolderSummary[] | undefined; folders: FolderSummary[] | undefined; archives: Archives | undefined; say: Say; refresh: (folders?: string[]) => Promise<void> }) {
   // Topics reads its topics beside the workspace, not after it: the page itself waits for both.
   useEffect(() => {
-    if (route.name === 'topics') prefetchTopics()
+    if (route.name === 'topics') void prefetchTopics()
   }, [route.name])
   /*
     The first read has not landed. This used to render nothing at all, which is
@@ -295,7 +295,7 @@ function Page({ route, state, loading, directory, teams, folders, archives, say,
   if (!state || !archives) return null
   switch (route.name) {
     case 'topics':
-      return <TopicsPage state={state} archives={archives} folders={folders} folder={route.folder} />
+      return <TopicsPage state={state} folders={folders} folder={route.folder} />
     case 'projects':
       return <ProjectsPage state={state} directory={directory} teams={teams} archives={archives} archived={route.archived} say={say} refresh={refresh} />
     case 'issues':

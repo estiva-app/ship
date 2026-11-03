@@ -1,6 +1,5 @@
 import type { ReadTopic, TopicConversation, TopicsRead } from '@estiva-app/interop'
 import { topicAsDrawn } from '@/api/foreign'
-import type { Archives } from './archive'
 
 /** One row on Ship's Topics (SHIPS-3), as Linear draws an initiative. */
 export interface TopicRowData {
@@ -24,7 +23,6 @@ export type TopicsTab = 'all' | 'yours' | 'others' | 'archived'
 export interface TopicWork {
   projects: readonly { addr: string; status: string }[]
   issues: readonly { addr: string }[]
-  archives: Archives
 }
 
 const byTitle = (a: TopicRowData, b: TopicRowData) => a.title.localeCompare(b.title, undefined, { sensitivity: 'base' })
@@ -32,14 +30,15 @@ const byTitle = (a: TopicRowData, b: TopicRowData) => a.title.localeCompare(b.ti
 /**
  * Which topics Ship's Topics draws on each tab (Miky, 2–3 Nov, SHIPS-3), each
  * A–Z. Never a space: Ship is project management, conversation is Peek's.
- * Shown (All, Your topics, Other topics): the topic is not archived and lists a
- * project or issue that is not archived, done ones counting. Archived: it
- * lists work, and it is archived in Peek or all its work is. A topic that lists
- * no project or issue is on no tab. `folder` keeps only the topics filed in it.
+ * A topic is drawn when it lists a project or an issue Ship holds, archived and
+ * done ones counting; one that lists none is on no tab. It is under Archived
+ * when it is archived in Peek, and only then: a topic whose work is all
+ * archived stays on its tab until somebody archives it, so Ship, Peek and Add
+ * to topic agree (Miky, 3 Nov, on Widgets). `folder` keeps only the topics
+ * filed in it.
  *
  * Its work is judged by Ship's own fold: a listed address Ship holds as a
- * project or an issue, archived by FOL-46's rule (its own, its project's or its
- * team's), so a row agrees with the project and issue pages.
+ * project or an issue, so a row agrees with the project and issue pages.
  * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-space-is-the-teams-own-mark-on-a-topic-it-lists.md
  */
 export function topicsByTab(
@@ -54,7 +53,7 @@ export function topicsByTab(
 
   for (const topic of read.topics) {
     if (topic.space || (folder && topic.folder !== folder)) continue
-    const listed = listedWork(topic, projects, issues, work.archives)
+    const listed = listedWork(topic, projects, issues)
     if (listed.length === 0) continue
     const drawn = topicAsDrawn(topic.address, topic.folder, topic.object)
     const conversation = conversations?.get(topic.address)
@@ -69,7 +68,7 @@ export function topicsByTab(
       ...(conversation ? { conversations: conversation.conversations } : {}),
       fresh: conversation?.fresh ?? 0,
     }
-    if (drawn.archived || listed.every((item) => item.archived)) {
+    if (drawn.archived) {
       lists.archived.push(row)
       continue
     }
@@ -80,13 +79,13 @@ export function topicsByTab(
   return lists
 }
 
-/** The projects and issues a topic lists that Ship holds, each with its archive. */
-function listedWork(topic: ReadTopic, projects: Map<string, { addr: string; status: string }>, issues: Set<string>, archives: Archives) {
-  return topic.listed.flatMap(({ address }): { project?: { status: string }; archived: boolean }[] => {
+/** The projects and issues a topic lists that Ship holds. */
+function listedWork(topic: ReadTopic, projects: Map<string, { addr: string; status: string }>, issues: Set<string>) {
+  return topic.listed.flatMap(({ address }): { project?: { status: string } }[] => {
     if (!address) return []
     const project = projects.get(address)
-    if (project) return [{ project, archived: !!archives.ofProject(address) }]
-    if (issues.has(address)) return [{ project: undefined, archived: !!archives.ofIssue({ addr: address }) }]
+    if (project) return [{ project }]
+    if (issues.has(address)) return [{ project: undefined }]
     return []
   })
 }
