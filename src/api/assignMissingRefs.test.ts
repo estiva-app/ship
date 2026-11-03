@@ -12,7 +12,7 @@ type SetFieldArgs = { folder: string; target: string; field: string; value: stri
 const { setField } = vi.hoisted(() => ({
   setField: vi.fn(async (_args: { folder: string; target: string; field: string; value: string; note?: string }) => ({ ok: true })),
 }))
-vi.mock('./store', () => ({ store: { setField }, signer: { pubkey: 'a'.repeat(64) } }))
+vi.mock('./store', () => ({ store: { setField }, signer: { pubkey: 'a'.repeat(64) }, projectFieldsNow: async () => undefined }))
 vi.mock('./clock', () => ({ clockProblem: async () => undefined }))
 
 import type { Issue, Project } from '../nostr/fold'

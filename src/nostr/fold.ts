@@ -16,6 +16,7 @@
  * checkable rather than hopeful.
  */
 import { blockAnchorOf, contentFormatOf, quoteOf, type ContentFormat, type Quote, type SignedEvent } from '@estiva-app/protocol'
+import { fieldsSetBy } from '@estiva-app/interop'
 import { DEFAULT_ISSUE_STATUS, DEFAULT_PROJECT_STATUS, KIND } from './kinds'
 import { summaryText } from './summary'
 
@@ -126,7 +127,8 @@ export interface Change {
 }
 
 /** Fields on a Project or Issue that changes are allowed to set. */
-export type FoldedFields = Record<string, { value: string; by: string; at: number; format: ContentFormat }>
+/** Each field's winning change; `id` is that change's, the field's next `prev` (SPEC §6.2). */
+export type FoldedFields = Record<string, { value: string; by: string; at: number; format: ContentFormat; id: string }>
 
 export interface Project {
   addr: string
@@ -171,6 +173,15 @@ export interface Project {
    * separate and much narrower operation — see `buildDeletion`.
    */
   archived: boolean
+  /**
+   * Deleted by a `deleted` change (SPEC §6.13): who and when. Left out of every
+   * list and search; its link shows who deleted it, with Restore. An old kind-5
+   * delete never reaches the fold: the relay drops the record.
+   * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/every-file-is-an-artifact-the-relay-keeps-in-order.md
+   */
+  deleted?: { by: string; at: number }
+  /** The record's event id: the `prev` of a field's first change (SPEC §6.2). */
+  rootId?: string
   /** Provenance for every field a change touched. Drives "changed by" in the UI. */
   fields: FoldedFields
 }
@@ -225,6 +236,23 @@ export function parseChange(event: SignedEvent): Change | null {
     note: event.content,
     folder: event.tags.find((t) => t[0] === 'h' && t[1])?.[1],
   }
+}
+
+/**
+ * Every field one kind:1851 sets: `parseChange`'s one, or one per `set` tag of
+ * a change setting several fields (SPEC §6.2), each as its own Change with the
+ * event's id, which is each field's next `prev`. Read by interop's
+ * `fieldsSetBy`, as every manifest reader reads it.
+ * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/one-change-may-set-several-fields-taken-whole-or-refused-whole.md
+ */
+export function parseChanges(event: SignedEvent): Change[] {
+  const one = parseChange(event)
+  if (one) return [one]
+  if (event.kind !== KIND.CHANGE || !event.tags.some((t) => t[0] === 'set')) return []
+  // Read as a one-field change for its `a`, `ts` and `h`; the fields come from the `set` tags.
+  const head = parseChange({ ...event, tags: [...event.tags, ['field', 'set'], ['value', '']] })
+  if (!head) return []
+  return fieldsSetBy(event).map(({ field, value, format }) => ({ ...head, field, value, format: (format ?? head.format) as ContentFormat }))
 }
 
 /** The tags a root names its Folder with: `h`, or Ship's older `buzz-channel` (SPEC §7.3). */
@@ -320,7 +348,7 @@ function foldChanges(changes: Change[]): Map<string, FoldedFields> {
   }
   for (const change of winners.values()) {
     const fields = byTarget.get(change.target) ?? {}
-    fields[change.field] = { value: change.value, by: change.author, at: change.createdAt, format: change.format }
+    fields[change.field] = { value: change.value, by: change.author, at: change.createdAt, format: change.format, id: change.id }
     byTarget.set(change.target, fields)
   }
   return byTarget
@@ -649,10 +677,7 @@ export function foldFolder(
   const projectRoots = latestPerAddress(events, KIND.PROJECT)
   const issueRoots = latestPerAddress(events, KIND.ISSUE)
   const parsed: Change[] = []
-  for (const event of events) {
-    const change = parseChange(event)
-    if (change) parsed.push(change)
-  }
+  for (const event of events) parsed.push(...parseChanges(event))
   const changes = changesInTargetFolder(parsed, new Map([...projectRoots, ...issueRoots]))
   // Oldest first, in exactly the total order the fold replays, so the activity
   // feed can never disagree with the state it produced.
@@ -690,6 +715,8 @@ export function foldFolder(
       // rather than deleting the change, because an append-only stream has no
       // undo and "set to nothing" is a fact like any other.
       archived: !!fields.archived?.value,
+      ...(fields.deleted?.value ? { deleted: { by: fields.deleted.by, at: fields.deleted.at } } : {}),
+      rootId: event.id,
       fields,
     })
   }

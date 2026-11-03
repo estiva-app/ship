@@ -80,6 +80,8 @@ export {
   setIssueField,
   setMembership,
   setProjectField,
+  setProjectDeleted,
+  noteProjectText,
   startConversation,
   workFolder,
   type CardEdit,

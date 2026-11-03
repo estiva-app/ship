@@ -26,7 +26,7 @@ export type TopicsTab = 'all' | 'yours' | 'others' | 'archived'
 
 /** Ship's own projects and issues, by address, to judge what a topic lists. */
 export interface TopicWork {
-  projects: readonly { addr: string; status: string }[]
+  projects: readonly { addr: string; status: string; deleted?: unknown }[]
   issues: readonly { addr: string }[]
 }
 
@@ -52,7 +52,8 @@ export function topicsByTab(
   conversations: ReadonlyMap<string, TopicConversation> | undefined,
   folder?: string,
 ): Record<TopicsTab, TopicRowData[]> {
-  const projects = new Map(work.projects.map((project) => [project.addr, project]))
+  // A deleted project is in no list (SPEC §6.5): a topic listing only that is no row.
+  const projects = new Map(work.projects.filter((project) => !project.deleted).map((project) => [project.addr, project]))
   const issues = new Set(work.issues.map((issue) => issue.addr))
   const lists: Record<TopicsTab, TopicRowData[]> = { all: [], yours: [], others: [], archived: [] }
 
@@ -137,7 +138,7 @@ export interface TopicPageData {
 
 /** Ship's projects and issues, with what their rows say. */
 export interface TopicPageWork {
-  projects: readonly { addr: string; id: string; title: string; status: string }[]
+  projects: readonly { addr: string; id: string; title: string; status: string; deleted?: unknown }[]
   issues: readonly { addr: string; id: string; title: string; status: string; projectAddr?: string }[]
 }
 
@@ -148,7 +149,7 @@ export interface TopicPageWork {
  */
 export function topicPageOf(topic: ReadTopic, work: TopicPageWork, archives: Archives): TopicPageData {
   const drawn = topicAsDrawn(topic.address, topic.folder, topic.object)
-  const projects = new Map(work.projects.map((project) => [project.addr, project]))
+  const projects = new Map(work.projects.filter((project) => !project.deleted).map((project) => [project.addr, project]))
   const issues = new Map(work.issues.map((issue) => [issue.addr, issue]))
   const rows: { row: TopicWorkRow; archived: boolean }[] = []
   const documents: string[] = []

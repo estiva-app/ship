@@ -106,9 +106,9 @@ function Shell() {
   )
 
   // Names and faces for everyone in the snapshot; re-read in full on navigation.
-  const people = useMemo(() => (state ? peopleIn(state, me) : [me]), [state])
   // `@` offers the workspace's members, so their names are looked up too (CON-25); with no roster, the people in the snapshot.
   const roster = useRoster()
+  const people = useMemo(() => (state ? peopleIn(state, me, roster) : [me]), [state, roster])
   const mentionKeys = useMemo(() => [...(roster ?? people)], [roster, people])
   const named = useMemo(() => [...new Set([...people, ...mentionKeys])], [people, mentionKeys])
   const directory = useDirectory(named, href(route))
@@ -331,7 +331,8 @@ export function sidebarProps(
   const isOpen = (status: string) => status !== 'done' && status !== 'cancelled'
   const issues = (state?.issues ?? []).filter((i) => !archives?.ofIssue(i))
   const openIssues = issues.filter((i) => isOpen(i.status)).length
-  const activeProjects = projects.filter((p) => !archives?.ofProject(p.addr)).length
+  // A deleted project is in no list (SPEC §6.5); its link still opens it.
+  const activeProjects = projects.filter((p) => !p.deleted && !archives?.ofProject(p.addr)).length
   // The team a project is in, by its state's listing and then its own Folder (FOL-5); the first, if two list it.
   const teamOf = (projectAddr: string | undefined) => {
     const project = projectAddr ? projects.find((p) => p.addr === projectAddr) : undefined

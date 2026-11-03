@@ -3,6 +3,8 @@ import { MEMBER_FIELD_PREFIX, memberOfField } from '@estiva-app/conversation'
 import type { HistoryEntry } from '@/components/History'
 import { ISSUE_STATUSES, lookupStatus, type VocabEntry } from '@/nostr/kinds'
 import { ago } from '@/lib/time'
+import type { SignedEvent } from '@estiva-app/protocol'
+import { parseChanges, type Change as FoldChange } from '@/nostr/fold'
 
 /**
  * An issue's or a project's slice of the change stream, in words, newest
@@ -23,6 +25,25 @@ import { ago } from '@/lib/time'
  * when an earlier change in this stream says it; the root's own values are
  * not here (Miky, 2026-10-06).
  */
+/**
+ * `state` with the opened project's every change in its activity, from the
+ * page's own read of them (`useFeedJudges`'s `changes`), where projects are
+ * read by their fields (ALO-5) and the load holds only each field's current
+ * change. Oldest first, in the fold's order (SPEC §6.3). Until that read has
+ * come back, `state` as it is.
+ */
+export function withChangesOf(addr: string, state: FolderState, changes: readonly SignedEvent[] | undefined): FolderState {
+  if (!changes) return state
+  // Only changes filed in the project's own Folder, as the fold takes them: one filed elsewhere is not its history.
+  const folder = state.projects.find((project) => project.addr === addr)?.contentFolder
+  const at = (change: FoldChange) => (change.ts !== undefined && Math.floor(change.ts / 1000) === change.createdAt ? change.ts : change.createdAt * 1000)
+  const own = changes
+    .flatMap(parseChanges)
+    .filter((change) => change.target === addr && !!folder && change.folder === folder)
+    .sort((a, b) => at(a) - at(b) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+  return { ...state, activity: [...state.activity.filter((change) => change.target !== addr), ...own] }
+}
+
 export function historyFor(addr: string, state: FolderState, directory: DirectoryView, statuses: VocabEntry[] = ISSUE_STATUSES): HistoryEntry[] {
   const before = new Map<string, string>()
   return state.activity

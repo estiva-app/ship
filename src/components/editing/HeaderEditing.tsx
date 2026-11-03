@@ -62,9 +62,9 @@ export function TitleEditing({ title, titlePlaceholder, onRename, summary, onSum
 }
 
 /** The description: the shared document editor, only read for a reader who cannot write, and nothing when that reader has none. */
-export function DescriptionEditing({ description, format, onDescribe, onMention, descriptionBy, nameOf, upload, resolved, onCommentOnBlock, onCopyBlockLink, holdKey, readOnly = false, onEditor }: LiveHeaderProps & { resolved: Record<string, ForeignObjectData | null | undefined>; onEditor: (editor: Editor | null) => void }) {
+export function DescriptionEditing({ description, format, onDescribe, merges, textPending = false, onMention, descriptionBy, nameOf, upload, resolved, onCommentOnBlock, onCopyBlockLink, holdKey, readOnly = false, onEditor }: LiveHeaderProps & { resolved: Record<string, ForeignObjectData | null | undefined>; onEditor: (editor: Editor | null) => void }) {
   if (readOnly && description.trim() === '') return null
   return (
-    <LiveDescription value={description} format={format} onCommit={onDescribe} onMention={onMention} changedBy={descriptionBy} nameOf={nameOf} resolved={resolved} onEditor={onEditor} upload={upload} onCommentOnBlock={onCommentOnBlock} onCopyBlockLink={onCopyBlockLink} holdKey={holdKey} readOnly={readOnly} />
+    <LiveDescription value={description} format={format} onCommit={onDescribe} merges={merges} onMention={onMention} changedBy={descriptionBy} nameOf={nameOf} resolved={resolved} onEditor={onEditor} upload={upload} onCommentOnBlock={onCommentOnBlock} onCopyBlockLink={onCopyBlockLink} holdKey={holdKey} readOnly={readOnly || textPending} />
   )
 }

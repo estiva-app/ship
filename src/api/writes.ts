@@ -1,7 +1,10 @@
 import type { Embed, Imeta, NostrTag, PublishResult } from '@estiva-app/protocol'
-import { addrToNaddr, toRenderTree } from '@estiva-app/protocol'
+import { addrToNaddr, serializeBlockDocument, toRenderTree } from '@estiva-app/protocol'
 import { MAX_MENTIONED_PEOPLE, boxLinksOf, embedsToEdit, embedsToSend, namedBefore, withoutCard } from '@estiva-app/conversation'
-import { linksIn, listedBeneath, MAX_LINKS_ASKED, within, type OwnPlace } from '@estiva-app/interop'
+import { linksIn, listedBeneath, MAX_LINKS_ASKED, textOf, within, type OwnPlace } from '@estiva-app/interop'
+import type { FileText } from '@estiva-app/conversation'
+import type { DocumentAsks } from '@estiva-app/ui/editor'
+import { documentAsksOf } from '../nostr/textAsks'
 import type { Conversation, Issue, Project } from '../nostr/fold'
 import { clashes, explicitKey, keyOfRef, nextRef, projectKeys, suggestKey, takenKeys } from '../nostr/keys'
 import { RELAY_URL } from '../config'
@@ -11,7 +14,7 @@ import { links } from './linkCards'
 import { linkResolverFor } from '../lib/linksNamingCards'
 import { isRelayBusy } from '../lib/relayBudget'
 import { SignerTokenExpired } from '../nostr/signer'
-import { store } from './store'
+import { projectFieldsNow, store } from './store'
 
 /**
  * The writes (REW-5). Every one changes exactly one object, by design —
@@ -116,7 +119,9 @@ export async function createProject(draft: { title: string; description: string;
   const clock = await clockProblem()
   if (clock) return { ok: false, reason: clock }
   try {
-    const { result, placed, addr } = await store.createProject({ title: draft.title, description: draft.description, summary: draft.summary, key: draft.key, team: draft.team })
+    // Filed in its team's Folder by `h` where projects are kept in order (SPEC §6.13, D5), as Leaf and the agent file theirs.
+    const filedIn = !!(await projectFieldsNow())
+    const { result, placed, addr } = await store.createProject({ title: draft.title, description: draft.description, summary: draft.summary, key: draft.key, team: draft.team, filedIn })
     if (result.ok) claimedHere.add(addr)
     if (!result.ok) return { ok: false, reason: result.reason ?? 'no reason given' }
     if (placed && !placed.ok) return { ok: true, addr, unlisted: placed.reason ?? 'no reason given' }
@@ -126,8 +131,63 @@ export async function createProject(draft: { title: string; description: string;
   }
 }
 
+/**
+ * Per project, each text this page has shown or saved, and the change holding
+ * it (ALO-5): a save edited from that text follows that change, and the merge
+ * with a newer one starts from it (§13.3). A text edited from one nobody here
+ * holds would merge against the wrong base, so it is not saved.
+ */
+const textChanges = new Map<string, Map<string, string>>()
+
+const noteText = (project: string, content: string, id: string): void => {
+  const held = textChanges.get(project) ?? new Map<string, string>()
+  held.set(content, id)
+  textChanges.set(project, held)
+}
+
+/** The text the page shows, and the change it is: its first record's seed until one is written. Call as it is shown. */
+export function noteProjectText(project: Project): void {
+  const id = project.fields.description?.id ?? project.rootId
+  if (id) noteText(project.addr, project.description, id)
+}
+
+/** What a field save answers where projects are kept in order: a description save may ask instead (ALO-5). */
+export type FieldWriteResult = WriteResult | { ok: false; reason: string; asks: DocumentAsks }
+
+/**
+ * One field after the change it follows (SPEC §6.2), where projects are kept
+ * in order: `prev` is the field's change as read, or the record's id for its
+ * first; a description's is the change holding the text it was edited from.
+ */
+async function writeProjectField(project: Project, field: string, value: string, note: string, contentFormat?: string, from?: FileText): Promise<FieldWriteResult> {
+  const clock = await clockProblem()
+  if (clock) return refused(clock)
+  const text = field === 'description'
+  const edited = from && (typeof from.content === 'string' ? from.content : serializeBlockDocument(from.content))
+  const prev = text && edited !== undefined ? textChanges.get(project.addr)?.get(edited) : (project.fields[field]?.id ?? project.rootId)
+  if (!prev) return refused(text ? 'someone changed it while you were editing. Copy your text, then reload' : 'reload the page and try again')
+  try {
+    const result = await store.writeField({ folder: project.contentFolder, target: project.addr, field, value, note, contentFormat, prev })
+    if (result.ok) {
+      if (text) {
+        const saved = 'event' in result ? result.event : result.mergedOnto
+        noteText(project.addr, textOf(saved)?.value ?? value, result.id)
+      }
+      return { ok: true }
+    }
+    if ('refused' in result) return refused(result.refused)
+    const theirs = textOf(result.theirs)
+    noteText(project.addr, theirs?.value ?? '', result.theirs.id)
+    const base = { value: edited ?? '', ...(from?.format ? { format: from.format } : {}) }
+    return { ok: false, reason: 'asks', asks: documentAsksOf(base, theirs ?? { value: '' }, { value, ...(contentFormat ? { format: contentFormat } : {}) }, result.asks) }
+  } catch (error) {
+    return refused(error instanceof Error ? error.message : String(error))
+  }
+}
+
 /** One field of a project record: title, description, status, lead. The record's own Folder. */
-export function setProjectField(project: Project, field: 'title' | 'description' | 'summary' | 'status' | 'lead' | 'key', value: string, note: string, contentFormat?: string): Promise<WriteResult> {
+export async function setProjectField(project: Project, field: 'title' | 'description' | 'summary' | 'status' | 'lead' | 'key', value: string, note: string, contentFormat?: string, from?: FileText): Promise<FieldWriteResult> {
+  if (await projectFieldsNow()) return writeProjectField(project, field, value, note, field === 'description' ? contentFormat : undefined, from)
   /*
     A description is a rich text field (SPEC §13) and goes on the wire as a
     block document; every other field is a scalar and goes as it arrived.
@@ -151,8 +211,21 @@ export function setProjectField(project: Project, field: 'title' | 'description'
  * reversibly, by a change anyone in the Folder can make. `resolution` is shown
  * first when it is opened (FOL-46).
  */
-export function archiveProject(project: Project, archived: boolean, resolution?: string): Promise<WriteResult> {
+export async function archiveProject(project: Project, archived: boolean, resolution?: string): Promise<WriteResult> {
+  if (await projectFieldsNow()) return writeProjectField(project, 'archived', archived ? 'true' : '', archived ? (resolution ?? '') : '')
   return publish(() => store.archiveProject({ recordFolder: project.contentFolder, project: project.addr, archived, resolution }))
+}
+
+/**
+ * Delete or restore a project where projects are kept in order (SPEC §6.5): a
+ * change setting `deleted` to `true`, or to the empty value, after the one it
+ * follows, by anyone in its Folder. It leaves every list and search and keeps
+ * its id, record and changes, so Restore brings it back whole; nothing is
+ * unlisted and no `kind:5` is sent. The agent's `setDeleted` writes the same.
+ * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-file-is-its-fields-each-kept-in-order-by-the-relay.md
+ */
+export function setProjectDeleted(project: Project, deleted: boolean): Promise<WriteResult> {
+  return writeProjectField(project, 'deleted', deleted ? 'true' : '', deleted ? 'Delete' : 'Restore')
 }
 
 /** Archive one issue, or restore it — the project's rule, one level down (FOL-46). */
@@ -202,6 +275,7 @@ export async function deleteProject(
   project: Project,
   folders: readonly { id: string; hasState: boolean; addresses?: readonly string[] }[] | undefined,
 ): Promise<WriteResult & { stillListed?: string }> {
+  if (await projectFieldsNow()) return setProjectDeleted(project, true)
   const clock = await clockProblem()
   if (clock) return refused(clock)
   try {

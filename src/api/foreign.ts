@@ -49,7 +49,7 @@ export { pickWidget } from '@estiva-app/interop'
 import { KIND_CHANGE, type ReferenceCandidate } from '@estiva-app/conversation'
 import { relatedTo } from '@/lib/ownKinds'
 import { safeLink } from '@/lib/handoff'
-import { relay, signer } from './store'
+import { projectFieldsNow, relay, signer } from './store'
 
 export type { ForeignObject, ResolvedSlot, FolderContents, FolderSummary } from '@estiva-app/interop'
 
@@ -291,8 +291,17 @@ export async function applyCardAction(args: { reference: string; actionId: strin
  * this one read (`lib/ownKinds.ts`), and a Folder holding something neither app
  * has heard of still arrives through the widget chain like everything else.
  */
-export function readFolder(id: string, read: QueryFn = loadQuery()): Promise<FolderContents> {
-  return resolveFolderContents(id, read, profiles.viaRelay(query), manifests)
+export async function readFolder(id: string, read: QueryFn = loadQuery()): Promise<FolderContents> {
+  return resolveFolderContents(id, read, profiles.viaRelay(query), manifests, await listRead())
+}
+
+/**
+ * Where projects are read by their fields (ALO-5), a Folder's files are too:
+ * each as its first record and its fields' current changes, not every change
+ * ever made to it (§6.13). No row here draws a text, and a deleted file is left out.
+ */
+async function listRead(): Promise<{ listRead?: true }> {
+  return (await projectFieldsNow()) ? { listRead: true } : {}
 }
 
 /**
@@ -302,7 +311,7 @@ export function readFolder(id: string, read: QueryFn = loadQuery()): Promise<Fol
  * under an archived project, moves with it (SHI-37).
  */
 export async function readFolderListing(id: string, read: QueryFn = loadQuery()): Promise<FolderContents['files']> {
-  return (await resolveFolderContents(id, read, async () => ({}), manifests, { includeArchived: true })).files
+  return (await resolveFolderContents(id, read, async () => ({}), manifests, { includeArchived: true, ...(await listRead()) })).files
 }
 
 /**
@@ -453,8 +462,8 @@ export async function readRelated(folder: string, address: string): Promise<Rela
 }
 
 /** Every Folder this identity can see, for the sidebar. */
-export function readFolders(read: QueryFn = loadQuery()): Promise<FolderSummary[]> {
-  return listFolders(read)
+export async function readFolders(read: QueryFn = loadQuery()): Promise<FolderSummary[]> {
+  return listFolders(read, await listRead())
 }
 
 /**

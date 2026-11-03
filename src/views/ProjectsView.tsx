@@ -3,6 +3,8 @@ import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Tabs } from '@/components/ui/Tabs'
 import { ProjectCard, type ProjectCardProps } from '@/components/ProjectCard'
+import { DeletedProjectRow, type DeletedProjectRowProps } from '@/components/DeletedProjectRow'
+import { useState } from 'react'
 
 /**
  * The projects list, as production: the heading with "Add project", the
@@ -18,6 +20,8 @@ export interface ProjectsViewProps {
   title?: string
   active: ProjectCardProps[]
   archived: ProjectCardProps[]
+  /** Deleted projects, for the Archived tab's Deleted filter (ALO-5); none where delete is a request, which leaves nothing to list. */
+  deleted?: DeletedProjectRowProps[]
   showArchived: boolean
   onShowArchived: (archived: boolean) => void
   onAddProject?: () => void
@@ -25,7 +29,11 @@ export interface ProjectsViewProps {
   addDisabledReason?: string
 }
 
-export function ProjectsView({ title = 'Projects', active, archived, showArchived, onShowArchived, onAddProject, addDisabledReason }: ProjectsViewProps) {
+export function ProjectsView({ title = 'Projects', active, archived, deleted = [], showArchived, onShowArchived, onAddProject, addDisabledReason }: ProjectsViewProps) {
+  const [filter, setFilter] = useState<'archived' | 'deleted'>('archived')
+  // With nothing archived, the Archived tab opens on what is there: the deleted ones.
+  const current = archived.length ? filter : 'deleted'
+  const showDeleted = showArchived && current === 'deleted' && deleted.length > 0
   const shown = showArchived ? archived : active
   return (
     // `data-surface` is the smoke test's waypoint — see IssuesView.
@@ -36,17 +44,36 @@ export function ProjectsView({ title = 'Projects', active, archived, showArchive
           Add project
         </Button>
       </div>
-      {archived.length > 0 && (
+      {archived.length + deleted.length > 0 && (
         <Tabs
           tabs={[
             { id: 'active', label: 'Active', count: active.length },
-            { id: 'archived', label: 'Archived', count: archived.length },
+            { id: 'archived', label: 'Archived', count: archived.length + deleted.length },
           ]}
           active={showArchived ? 'archived' : 'active'}
           onChange={(id) => onShowArchived(id === 'archived')}
         />
       )}
-      {shown.length ? (
+      {/* Archived as before, and Deleted: every deleted project, with who deleted it and Restore (SPEC §6.5). */}
+      {showArchived && deleted.length > 0 && (
+        <Tabs
+          size="small"
+          aria-label="Show"
+          tabs={[
+            { id: 'archived', label: 'Archived', count: archived.length },
+            { id: 'deleted', label: 'Deleted', count: deleted.length },
+          ]}
+          active={current}
+          onChange={(id) => setFilter(id === 'deleted' ? 'deleted' : 'archived')}
+        />
+      )}
+      {showDeleted ? (
+        <div className="flex flex-col divide-y divide-border-subtle">
+          {deleted.map((project) => (
+            <DeletedProjectRow key={project.href} {...project} />
+          ))}
+        </div>
+      ) : shown.length ? (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-2.5">
           {shown.map((project) => (
             <ProjectCard key={project.href} {...project} />
