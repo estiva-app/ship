@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 */
 const query = vi.fn()
 const queryAll = vi.fn()
-vi.mock('./store', () => ({ relay: { query: (filters: unknown[]) => query(filters), queryAll: (filters: unknown[]) => queryAll(filters) } }))
+vi.mock('./store', () => ({ relay: { query: (filters: unknown[]) => query(filters), queryAll: (filters: unknown[]) => queryAll(filters) }, projectFieldsNow: async () => undefined }))
 
 import { encodeNevent } from '@estiva-app/protocol'
 import { isEventReference, loadQuery, readFolder, readFolders, resolveForeign } from './foreign'

@@ -13,7 +13,10 @@ vi.mock('./store', () => ({
     postMessage: vi.fn(),
     editMessage: vi.fn(),
     setListedInTopic: vi.fn(),
+    writeField: vi.fn(),
   },
+  // Off unless a test turns it on: the relay keeps no order (ALO-5).
+  projectFieldsNow: vi.fn(async () => undefined),
 }))
 vi.mock('./clock', () => ({ clockProblem: vi.fn() }))
 vi.mock('./foreign', () => ({ readFolders: vi.fn(), readFolderListing: vi.fn(), loadQuery: () => async () => [] }))
@@ -339,7 +342,7 @@ describe('creating a project', () => {
   it('a project is created in the team it names', async () => {
     s.createProject.mockResolvedValue({ result: { ok: true }, placed: { ok: true }, addr: 'a', id: 'i', folder: TEAM.folder })
     expect(await createProject({ title: 'X', description: '', key: 'XXX', team: TEAM })).toEqual({ ok: true, addr: 'a' })
-    expect(s.createProject).toHaveBeenCalledWith({ title: 'X', description: '', key: 'XXX', team: TEAM })
+    expect(s.createProject).toHaveBeenCalledWith({ title: 'X', description: '', key: 'XXX', team: TEAM, filedIn: false })
   })
 
   it('a refused record is no project', async () => {

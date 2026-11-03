@@ -66,7 +66,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { ProjectView } from '@/views/ProjectView'
 import { go, href, type ProjectTab, type ProjectView as ProjectViewName } from '../router'
 import { act, actInField, sayOnceLeft, type Say } from './act'
-import { editedFor, historyFor } from './history'
+import { editedFor, historyFor, withChangesOf } from './history'
 import { useSideColumn } from './sideColumn'
 import { FileTopicsOf } from '@/components/FileTopicsOf'
 import { hrefForIssue, rowFor } from './IssuesPage'
@@ -742,12 +742,14 @@ export function ProjectPage({
   const byFields = state.texts !== undefined
   const textPending = byFields && !state.texts!.includes(project.addr)
   const deleted = project.deleted
+  // Its History and "Edited" from every change to it, read with the page's facts: the load holds only the current ones.
+  const ownChanges = byFields ? withChangesOf(project.addr, state, judges.changes) : state
 
   return (
     <>
       <ProjectView
         // When it last changed, over the page (ONE-6, step 4a).
-        edited={editedFor(project.addr, state, directory, { at: project.createdAt, by: project.author })}
+        edited={editedFor(project.addr, ownChanges, directory, { at: project.createdAt, by: project.author })}
         archivedNotice={
           deleted ? (
             // A link to a deleted project still opens it: who deleted it, and Restore (SPEC §6.5).
@@ -864,7 +866,7 @@ export function ProjectPage({
         activity={activity.items}
         activityTruncated={activity.truncated}
         // Its own changes, as an issue's, in the project's words (pages/history.ts).
-        history={historyFor(project.addr, state, directory, PROJECT_STATUSES)}
+        history={historyFor(project.addr, ownChanges, directory, PROJECT_STATUSES)}
         /* A reply in Activity goes to the thread's own Folder, never this
            project's — CON-9. Refused when the thread's root carries no `h`,
            because filing somebody else's reply here is the wrong guess. */

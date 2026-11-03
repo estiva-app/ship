@@ -120,7 +120,19 @@ function firstDifference(a: unknown, b: unknown, path = ''): string | null {
   recorded answer, and enumerating the fields worth checking is how the next omission gets
   in — PEEK-165 was precisely a field nobody thought to check.
 */
-const difference = firstDifference(JSON.parse(JSON.stringify(actual)), fixture.expected)
+/*
+  Without the ids the fold now carries for the next write (ALO-5): a project's
+  `rootId` and each folded field's `id` are its record's and its winning
+  change's event ids, the `prev` a change names (SPEC §6.2), not a rule the
+  fold applies. Which change wins is still compared, by its value, author and time.
+*/
+const actualFolded = JSON.parse(JSON.stringify(actual, function (this: Record<string, unknown>, key, value) {
+  // A project's: a reply's `rootId` is its thread's, and stays compared.
+  if (key === 'rootId' && 'fields' in this) return undefined
+  if (key !== 'fields' || !value || typeof value !== 'object') return value
+  return Object.fromEntries(Object.entries(value as Record<string, Record<string, unknown>>).map(([field, { id: _id, ...folded }]) => [field, folded]))
+}))
+const difference = firstDifference(actualFolded, fixture.expected)
 check('this repo folds the events into the recorded state', difference === null, difference ?? '')
 
 const state = actual as { projects: unknown[]; issues: unknown[]; activity: unknown[]; conversations: unknown[] }

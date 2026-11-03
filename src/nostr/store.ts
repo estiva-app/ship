@@ -1450,7 +1450,7 @@ export class Store {
    * changes, the projects by their fields — the opened one with its current
    * text, and kept so every whole load reads that text again — and the issues'
    * changes by `#a`. Opening a project reads none of its history; its Overview
-   * reads that when it shows (`projectChanges`).
+   * reads them with the page's facts (`useFeedJudges`'s `changes`).
    */
   private async openedByFields(
     opened: { kind: 'project' | 'issue'; d: string },
@@ -1485,15 +1485,6 @@ export class Store {
       this.issueChanges(this.queryAll, state.issues.map((issue) => issue.addr)),
     ])
     return { events: mergeRead(events, [...projects.events, ...changes]), folders: [...read], readAt: {}, threadsAt, mentionsOf: [], texts: projects.texts }
-  }
-
-  /**
-   * Every change ever made to one project, oldest to newest as the relay keeps
-   * them: what its History in the Overview lists, read only when the Overview
-   * shows (Miky, 3 Nov) — opening the page stays light.
-   */
-  projectChanges(addr: string): Promise<SignedEvent[]> {
-    return this.queryAll([{ kinds: [KIND.CHANGE], '#a': [addr] }])
   }
 
   /**

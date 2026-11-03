@@ -17,9 +17,11 @@ export function DeletedProjectRow({ href, title, deleted, onRestore }: DeletedPr
   return (
     <div className="flex items-center gap-2 py-2">
       <IconTrash size={16} stroke={1.5} className="shrink-0 text-text-muted" aria-hidden />
-      <Link {...linkTo(href)} variant="plain" className="min-w-0 flex-1 truncate text-body-2 text-text-primary">
-        {title || 'Untitled project'}
-      </Link>
+      <span className="min-w-0 flex-1 text-body-2 text-text-primary">
+        <Link {...linkTo(href)} variant="plain" truncate>
+          {title || 'Untitled project'}
+        </Link>
+      </span>
       <span className="shrink-0 text-caption text-text-muted">{deleted}</span>
       <Button variant="outlined" size="small" className="shrink-0" onClick={onRestore}>
         Restore

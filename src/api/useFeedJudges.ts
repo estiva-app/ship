@@ -187,6 +187,12 @@ export interface FeedJudges {
    * `undefined` until the first read has come back.
    */
   members?: ReadonlyMap<string, Membership>
+  /**
+   * Every change to the file, from the same read: its History and "Edited"
+   * where projects are read by their fields (ALO-5), which the workspace's
+   * load no longer holds. `undefined` until it has come back.
+   */
+  changes?: readonly SignedEvent[]
   /** Read again now — after this page has joined, left or added somebody. */
   reload: () => Promise<void>
 }
@@ -202,6 +208,7 @@ export function useFeedJudges(file: FeedFile | undefined, channel: string | unde
   const createdAt = file?.createdAt
   const [facts, setFacts] = useState<{ addr: string; membership: Membership; muted: ReadonlySet<string> }>()
   const [roster, setRoster] = useState<{ addr: string; members: ReadonlyMap<string, Membership> }>()
+  const [changes, setChanges] = useState<{ addr: string; events: readonly SignedEvent[] }>()
   /* The file the page is about now: a read for the one it just left must not replace the new one's facts. */
   const current = useRef(addr)
   useEffect(() => {
@@ -216,6 +223,7 @@ export function useFeedJudges(file: FeedFile | undefined, channel: string | unde
         if (current.current === addr) setRoster({ addr, members })
       })
       if (current.current !== addr) return
+      setChanges({ addr, events: read.events.filter((event) => event.kind === KIND.CHANGE) })
       const { muted } = read
       // An unreadable mute list keeps the mutes this file was last judged with, and with none yet the page holds back its verdict.
       setFacts((held) => {
@@ -235,7 +243,8 @@ export function useFeedJudges(file: FeedFile | undefined, channel: string | unde
 
   return useMemo(() => {
     const members = roster && roster.addr === addr ? roster.members : addr === undefined ? undefined : rosters.get(addr)
-    if (!facts || facts.addr !== addr) return { members, reload: load }
+    const held = changes && changes.addr === addr ? changes.events : undefined
+    if (!facts || facts.addr !== addr) return { members, changes: held, reload: load }
     const me = signer.pubkey
     return {
       file: { stream: facts.addr, me, member: facts.membership.member, since: facts.membership.since, muted: facts.muted.has(facts.addr) },
@@ -243,7 +252,8 @@ export function useFeedJudges(file: FeedFile | undefined, channel: string | unde
         ? { stream: channel, me, member: false, muted: facts.muted.has(channel), floor: Number.MAX_SAFE_INTEGER }
         : undefined,
       members,
+      changes: held,
       reload: load,
     }
-  }, [facts, roster, addr, channel, load])
+  }, [facts, roster, changes, addr, channel, load])
 }
