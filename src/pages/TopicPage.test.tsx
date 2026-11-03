@@ -9,11 +9,14 @@ import type { FolderState } from '@/api'
 */
 const held: TestEvent[] = []
 let down = false
+/** The relay refuses a read of a Leaf document's root. */
+let refuseDocuments = false
 /** Every filter the page sent to the relay. */
 const asked: Record<string, unknown>[] = []
 const answer = async (filters: Record<string, unknown>[]) => {
   asked.push(...filters)
   if (down) throw new Error('relay unreachable')
+  if (refuseDocuments && filters.some((f) => (f.kinds as number[] | undefined)?.includes(30842))) throw new Error('rate limited')
   return held.filter((e) => filters.some((f) => matches(f, e)))
 }
 vi.mock('@/api/store', () => ({
@@ -96,6 +99,7 @@ beforeEach(() => {
   held.length = 0
   asked.length = 0
   down = false
+  refuseDocuments = false
   resetTopicsForTests()
   history.replaceState(null, '', `/topic/${D}`)
 })
@@ -162,6 +166,46 @@ describe("A topic's page in Ship", () => {
     expect(asked.filter((f) => (f.kinds as number[] | undefined)?.includes(30840)).length).toBe(before * 2)
   })
 
+  it('on a cold open, says a topic the reader cannot read is not available after one topics read, not two', async () => {
+    held.push(manifest('peek', 'peek.estiva.app', ['30840']), topic('other', 'Other'))
+    await prefetchTopics()
+    const one = asked.filter((f) => (f.kinds as number[] | undefined)?.includes(30840)).length
+    resetTopicsForTests()
+    asked.length = 0
+    const { state, archives } = ship([], [])
+    render(<TopicPage d={D} state={state} folders={[]} archives={archives} />)
+    await waitFor(() => expect(screen.getByText("You can't open this topic")).toBeTruthy())
+    expect(asked.filter((f) => (f.kinds as number[] | undefined)?.includes(30840)).length).toBe(one)
+  })
+
+  it('offers Try again, not "You can’t open this topic", when reading the topics again failed', async () => {
+    held.push(manifest('peek', 'peek.estiva.app', ['30840']), topic('other', 'Other'))
+    await prefetchTopics()
+    down = true
+    const { state, archives } = ship([], [])
+    render(<TopicPage d={D} state={state} folders={[]} archives={archives} />)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy())
+    expect(screen.queryByText("You can't open this topic")).toBeNull()
+    // The topic was started meanwhile, and the relay answers again.
+    down = false
+    held.push(topic(D, 'New one'))
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'New one' })).toBeTruthy())
+  })
+
+  it('says its documents did not load, with Try again, rather than drawing no Documents', async () => {
+    held.push(manifest('peek', 'peek.estiva.app', ['30840']), manifest('leaf', 'leaf.estiva.app', ['30842']), leafDocument('doc1', 'Testing widgets'))
+    held.push(topic(D, 'Widgets'), lists(D, 'doc1'))
+    await prefetchTopics()
+    refuseDocuments = true
+    const { state, archives } = ship([], [])
+    render(<TopicPage d={D} state={state} folders={[]} archives={archives} />)
+    await waitFor(() => expect(screen.getByText('Documents didn’t load.')).toBeTruthy())
+    refuseDocuments = false
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    await waitFor(() => expect(screen.getByRole('link', { name: /Testing widgets/ })).toBeTruthy())
+  })
+
   it('opens from a held read with no topics read of its own', async () => {
     held.push(manifest('peek', 'peek.estiva.app', ['30840']), topic(D, 'Held'))
     await prefetchTopics()
@@ -174,7 +218,7 @@ describe("A topic's page in Ship", () => {
 
   it('sends a space on to Peek rather than drawing it', async () => {
     const replace = vi.fn()
-    vi.stubGlobal('location', { ...window.location, replace, pathname: `/topic/${D}`, search: '', hash: '' })
+    vi.stubGlobal('location', { ...window.location, replace, hostname: 'ship.estiva.app', pathname: `/topic/${D}`, search: '', hash: '' })
     held.push(manifest('peek', 'peek.estiva.app', ['30840']), topic(D, 'Bugs'), spaceMark(D))
     const { state, archives } = ship([], [])
     render(<TopicPage d={D} state={state} folders={[]} archives={archives} />)
@@ -182,6 +226,7 @@ describe("A topic's page in Ship", () => {
     expect(screen.queryByRole('heading', { name: 'Bugs' })).toBeNull()
     vi.unstubAllGlobals()
   })
+
 
   it('offers Try again when the topics read failed', async () => {
     down = true

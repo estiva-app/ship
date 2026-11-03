@@ -118,6 +118,15 @@ describe('writtenLinkOf', () => {
     expect(writtenLinkOf(`${PEEK_TOPIC}#block-1`, TOPIC_ROUTE, SHIP, DECLARED)).toEqual({ place: 'app', href: `${PEEK_TOPIC}#block-1` })
   })
 
+  it('a link to one message in a topic written on Ship’s host keeps its thread, for the hand-off to Peek', () => {
+    expect(writtenLinkOf(`${SHIP}${TOPIC_ROUTE}?thread=abc`, TOPIC_ROUTE, SHIP, DECLARED)).toEqual({ place: 'here', href: `${TOPIC_ROUTE}?thread=abc` })
+  })
+
+  // SHIPS-4 security review: a file's `d` with dot segments must never turn its block route into another host.
+  it('a block of Ship’s own file whose route normalises to two slashes never becomes a route to another host', () => {
+    expect(writtenLinkOf('https://peek.estiva.app/issue/plan-x#block-1', '/issue/x/../..//evil.example/y', SHIP, DECLARED)).toBeUndefined()
+  })
+
   it('a space, which opens in Peek, opens Peek as written', () => {
     expect(writtenLinkOf(PEEK_TOPIC, 'https://peek.estiva.app/o/naddr1space', SHIP, DECLARED)).toEqual({ place: 'app', href: PEEK_TOPIC })
   })

@@ -36,6 +36,7 @@ async function topicsFresh(): Promise<TopicsRead> {
 export function resetTopicsForTests(): void {
   held.clear()
   choices = undefined
+  knowSpaces({ topics: [] } as unknown as TopicsRead)
 }
 
 /** The Topics page's read: `undefined` while the first one is out, `failed` when it did not land. */
@@ -83,8 +84,9 @@ export function ensureTopics(): Promise<unknown> {
  * all of them (SHIPS-4). `undefined` while it reads, `failed` when it did not
  * land. `key` is their addresses, space-separated.
  */
-export function useTopicDocuments(key: string): ForeignObject[] | 'failed' | undefined {
+export function useTopicDocuments(key: string): { documents: ForeignObject[] | 'failed' | undefined; retry: () => void } {
   const [answer, setAnswer] = useState<{ key: string; value: ForeignObject[] | 'failed' }>()
+  const [attempt, setAttempt] = useState(0)
   useEffect(() => {
     let live = true
     readTopicDocuments(key ? key.split(' ') : []).then(
@@ -94,8 +96,22 @@ export function useTopicDocuments(key: string): ForeignObject[] | 'failed' | und
     return () => {
       live = false
     }
-  }, [key])
-  return answer?.key === key ? answer.value : undefined
+  }, [key, attempt])
+  const documents = answer?.key === key ? answer.value : undefined
+  return { documents, retry: () => setAttempt((n) => n + 1) }
+}
+
+/** Read every topic again; whether that read landed (a failed one keeps the topics already held). */
+export async function rereadTopics(): Promise<boolean> {
+  // The held read says an error only while it has no answer to keep, so the failure is caught on its way.
+  let landed = true
+  await held.reload(() =>
+    readAllTopics().catch((error: unknown) => {
+      landed = false
+      throw error
+    }),
+  )
+  return landed
 }
 
 /** Try again after a failed read: read every topic now. */

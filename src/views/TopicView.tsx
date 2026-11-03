@@ -25,12 +25,13 @@ export interface TopicDocument {
 export interface TopicViewProps {
   topic: TopicPageData | 'loading' | 'failed' | 'unavailable'
   folderName?: string
-  /** `loading` while their titles are read; a failed read draws none. */
-  documents: TopicDocument[] | 'loading'
+  /** `loading` while their titles are read, `failed` when that read did not land. */
+  documents: TopicDocument[] | 'loading' | 'failed'
   onRetry: () => void
+  onRetryDocuments: () => void
 }
 
-export function TopicView({ topic, folderName, documents, onRetry }: TopicViewProps) {
+export function TopicView({ topic, folderName, documents, onRetry, onRetryDocuments }: TopicViewProps) {
   const [showArchived, setShowArchived] = useState(false)
   if (topic === 'unavailable') return <NoAccessNotice what="topic" />
   return (
@@ -71,6 +72,10 @@ export function TopicView({ topic, folderName, documents, onRetry }: TopicViewPr
           )}
           {documents === 'loading' ? (
             topic.documents.length > 0 && <SkeletonList rows={Math.min(topic.documents.length, 3)} />
+          ) : documents === 'failed' ? (
+            <Section label="Documents">
+              <EmptyState scope="section" message="Documents didn’t load." action={{ label: 'Try again', onClick: onRetryDocuments }} />
+            </Section>
           ) : (
             documents.length > 0 && (
               <Section label="Documents">
@@ -78,16 +83,19 @@ export function TopicView({ topic, folderName, documents, onRetry }: TopicViewPr
                   <div key={document.address} className="relative flex h-9 min-w-0 items-center gap-3 rounded-md px-3 transition-colors hover:bg-bg-hover">
                     <KindIcon kind="file" />
                     {document.href ? (
-                      <Link href={document.href} external variant="plain" cover className="flex min-w-0 flex-1">
-                        <span className="min-w-0 flex-1 truncate text-body-2 text-text-primary">{document.title}</span>
-                      </Link>
+                      <>
+                        <Link href={document.href} external variant="plain" cover className="flex min-w-0 flex-1">
+                          <span className="min-w-0 flex-1 truncate text-body-2 text-text-primary">{document.title}</span>
+                        </Link>
+                        <span className="flex items-center gap-1 text-caption text-text-muted">
+                          Leaf
+                          <IconExternalLink size={14} stroke={1.5} aria-hidden />
+                        </span>
+                      </>
                     ) : (
+                      // Nowhere to open it: no "Leaf ↗" that would look like a link.
                       <span className="min-w-0 flex-1 truncate text-body-2 text-text-primary">{document.title}</span>
                     )}
-                    <span className="flex items-center gap-1 text-caption text-text-muted">
-                      Leaf
-                      <IconExternalLink size={14} stroke={1.5} aria-hidden />
-                    </span>
                   </div>
                 ))}
               </Section>

@@ -31,6 +31,19 @@ export function topicInPeek(openUrl: string | undefined, address: string, title:
   return link ? `${new URL(link).origin}/topic/${objectRef(dOf(address), title)}` : undefined
 }
 
+/**
+ * Whether a link is on a host beside this one, under the same parent domain
+ * (`peek.estiva.app` from `ship.estiva.app`): the only place a page may send
+ * the reader without a click. Peek's link comes from the newest manifest any
+ * member may publish (until WOR-2), so anywhere else it stays a link.
+ */
+export function isSiblingHost(url: string, here: string): boolean {
+  const parent = here.split('.').slice(1).join('.')
+  if (!parent.includes('.')) return false
+  const host = new URL(url).hostname
+  return host !== here && host.endsWith(`.${parent}`) && host.split('.').length === here.split('.').length
+}
+
 /** The spaces the last topics read named. */
 let spaces: ReadonlySet<string> = new Set()
 

@@ -85,13 +85,17 @@ export function writtenLinkOf(
   const page = new URL(opens, origin)
   // A block, not `#/…`, an old hash route.
   const block = parsed.hash.length >= 2 && !parsed.hash.startsWith('#/')
-  if (page.origin === origin) {
+  // One message (`?thread=`) is shown by no page of Ship's: it opens as written, on Ship's host the hand-off.
+  const thread = parsed.searchParams.has('thread')
+  if (page.origin === origin && !thread) {
     // Written on Ship's host, it already opens here, at its route; only a block changes where.
     if (parsed.origin === origin && !block) return undefined
     // Written on another app's host, it opens Ship's page when that page shows what it points at.
-    if (parsed.origin !== origin && !parsed.searchParams.has('thread')) {
+    if (parsed.origin !== origin) {
       if (!block) return undefined
-      if (parse(page.pathname).name !== 'topic') return { place: 'here', href: `${page.pathname}${page.search}${parsed.hash}` }
+      const at = `${page.pathname}${page.search}${parsed.hash}`
+      // A path that normalised to `//…` would be another host: as everywhere here, it opens where its file opens.
+      if (parse(page.pathname).name !== 'topic') return new URL(at, origin).origin === origin ? { place: 'here', href: at } : undefined
     }
   }
   if (parsed.origin !== origin) return { place: 'app', href: link }

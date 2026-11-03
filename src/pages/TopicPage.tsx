@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FolderSummary } from '@estiva-app/interop'
 import type { FolderState } from '@/api'
-import { reloadTopics, useTopicDocuments, useTopics } from '@/api/topics'
+import { reloadTopics, rereadTopics, useTopicDocuments, useTopics } from '@/api/topics'
 import type { Archives } from '@/lib/archive'
 import { safeLink } from '@/lib/handoff'
 import { useTabTitle } from '@/lib/tabTitle'
-import { topicHref } from '@/lib/topicLinks'
+import { isSiblingHost, topicHref } from '@/lib/topicLinks'
 import { topicOfD, topicPageOf } from '@/lib/topics'
 import { TopicView, type TopicDocument } from '@/views/TopicView'
 
@@ -27,61 +27,76 @@ export function TopicPage({ d, state, folders, archives }: { d: string; state: F
   const held = read === 'failed' ? undefined : read
   const topic = held ? topicOfD(held, d) : undefined
 
-  const [readAgainFor, setReadAgainFor] = useState<string>()
-  const readingAgain = useRef<string>(undefined)
+  // A read this open made already has every topic the reader can read; only an older one is read again.
+  const heldAtOpen = useRef(read !== undefined && read !== 'failed')
+  const [readAgain, setReadAgain] = useState<'landed' | 'failed'>()
+  const readingAgain = useRef(false)
   useEffect(() => {
-    if (!held || topic || readingAgain.current === d) return
-    readingAgain.current = d
-    void reloadTopics().finally(() => setReadAgainFor(d))
-  }, [held, topic, d])
+    if (!held || topic || !heldAtOpen.current || readingAgain.current) return
+    readingAgain.current = true
+    void rereadTopics().then(
+      (landed) => setReadAgain(landed ? 'landed' : 'failed'),
+      () => setReadAgain('failed'),
+    )
+  }, [held, topic])
 
   const page = useMemo(() => (topic ? topicPageOf(topic, state, archives) : undefined), [topic, state, archives])
+  // A space goes on to Peek by itself only on a host beside Ship's; anywhere else its page is drawn, with the link.
+  const sendsOn = !!topic?.space && !!page?.peekUrl && isSiblingHost(page.peekUrl, location.hostname)
 
   useEffect(() => {
     if (!topic || !page) return
-    if (topic.space) {
-      if (page.peekUrl) window.location.replace(page.peekUrl)
+    if (sendsOn) {
+      window.location.replace(page.peekUrl!)
       return
     }
     const path = topicHref(topic.address, page.title)
     if (location.pathname !== path) history.replaceState(null, '', `${path}${location.search}${location.hash}`)
-  }, [topic, page])
+  }, [topic, page, sendsOn])
 
   const documentsKey = page?.documents.join(' ') ?? ''
-  const listed = useTopicDocuments(documentsKey)
-  const documents = useMemo((): TopicDocument[] | 'loading' => {
+  const { documents: listed, retry: retryDocuments } = useTopicDocuments(documentsKey)
+  const documents = useMemo((): TopicDocument[] | 'loading' | 'failed' => {
     if (listed === undefined) return 'loading'
-    if (listed === 'failed' || !page) return []
+    if (listed === 'failed') return 'failed'
+    if (!page) return []
     const order = new Map(page.documents.map((address, at) => [address, at]))
     return listed
       .flatMap((object): TopicDocument[] => {
-        if (!object.address) return []
+        // An archived document is left out, as Leaf's own lists leave it.
+        if (!object.address || object.archived) return []
         const href = safeLink(object.openUrl)
         return [{ address: object.address, title: object.slots.title?.value || 'Untitled document', ...(href ? { href } : {}) }]
       })
       .sort((a, b) => (order.get(a.address) ?? 0) - (order.get(b.address) ?? 0))
   }, [listed, page])
 
-  useTabTitle(page && !topic?.space ? page.title : undefined)
+  useTabTitle(page && !sendsOn ? page.title : undefined)
 
-  // A space draws nothing here while the browser goes on to Peek; one Peek gave no link for is not available here.
+  // A space draws nothing here while the browser goes on to Peek.
   const shown = page
-    ? topic?.space
-      ? page.peekUrl
-        ? 'loading'
-        : 'unavailable'
+    ? sendsOn
+      ? 'loading'
       : page
-    : held && !topic && readAgainFor === d
+    : held && !topic && (!heldAtOpen.current || readAgain === 'landed')
       ? 'unavailable'
-      : read === 'failed'
+      : read === 'failed' || readAgain === 'failed'
         ? 'failed'
         : 'loading'
   return (
     <TopicView
       topic={shown}
+      onRetryDocuments={retryDocuments}
       folderName={page ? folders?.find((folder) => folder.id === page.folder)?.name : undefined}
       documents={documents}
-      onRetry={() => void reloadTopics()}
+      onRetry={() => {
+        if (readAgain !== 'failed') return void reloadTopics()
+        setReadAgain(undefined)
+        void rereadTopics().then(
+          (landed) => setReadAgain(landed ? 'landed' : 'failed'),
+          () => setReadAgain('failed'),
+        )
+      }}
     />
   )
 }
