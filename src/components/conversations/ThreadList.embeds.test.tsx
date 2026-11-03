@@ -126,7 +126,8 @@ describe('a message that asks for a card', () => {
     // Long enough for the link's answer and the object's to have come back.
     await new Promise((r) => setTimeout(r, 50))
     expect(c.querySelector(`a[href="${GONE_URL}"]`)).not.toBeNull()
-    expect(c.textContent).not.toContain('not available')
+    // Changed on purpose: kit 0.103.0 (the chip's words are now "You can't open this issue", so the guard looks for both).
+    expect(c.textContent).not.toMatch(/not available|can't open/)
   })
 
   it('keeps a link nothing claims, and a link on words, as links with no card (OPT-18)', async () => {

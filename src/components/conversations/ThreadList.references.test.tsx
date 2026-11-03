@@ -48,7 +48,8 @@ describe('a comment that points at an object', () => {
   it('draws a mid-sentence pointer in place, keeping the sentence', async () => {
     const c = show(thread(`Fixed in ${NADDR} yesterday.`))
     // Nothing resolves here: the chip says so in its type's word (Miky, 15 Oct), inside the sentence.
-    await waitFor(() => expect(c.querySelector('[data-message-text] p')?.textContent).toBe('Fixed in Issue not available yesterday.'))
+    // Changed on purpose: kit 0.103.0 (a chip says what a row and a card say, "You can't open this issue", not "Issue not available").
+    await waitFor(() => expect(c.querySelector('[data-message-text] p')?.textContent).toBe("Fixed in You can't open this issue yesterday."))
     // Never the 200-character pointer the author typed.
     expect(c.textContent).not.toContain(NADDR)
   })
@@ -69,8 +70,9 @@ describe('a comment that points at an object', () => {
   it('renders a pointer in a reply, not only in the root', async () => {
     const c = show(thread('Have a look at this.', `Here: ${NADDR}`))
     fireEvent.click(screen.getByRole('button', { name: '1 reply, open the thread' }))
-    await waitFor(() => expect(c.querySelector('[data-reply-id="r1"] [data-message-text]')?.textContent).toBe('Here: Issue not available'))
-    expect(c.textContent?.match(/not available/g)).toHaveLength(1)
+    // Changed on purpose: kit 0.103.0 (a chip says what a row and a card say, "You can't open this issue", not "Issue not available").
+    await waitFor(() => expect(c.querySelector('[data-reply-id="r1"] [data-message-text]')?.textContent).toBe("Here: You can't open this issue"))
+    expect(c.textContent?.match(/can't open/g)).toHaveLength(1)
   })
 
   /*
