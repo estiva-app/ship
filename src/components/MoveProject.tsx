@@ -24,7 +24,7 @@ export function MoveProject({
   onClose,
 }: {
   project: Project
-  teams: readonly { id: string; name?: string; hasState: boolean; private?: boolean; addresses?: readonly string[] }[]
+  teams: readonly { id: string; name?: string; hasState: boolean; private?: boolean; company?: boolean; addresses?: readonly string[] }[]
   say: Say
   onClose: () => void
 }) {
@@ -47,7 +47,7 @@ export function MoveProject({
         const ok = await act(
           'Move',
           async () => {
-            const result = await moveProject(project, sources, to)
+            const result = await moveProject(project, sources, { ...to, company: teams.find((team) => team.id === to.id)?.company })
             if (result.ok) stillIn = result.stillIn
             return result
           },

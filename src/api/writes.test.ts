@@ -360,7 +360,7 @@ describe('moving a project', () => {
   it('moves by address, from the Folders that list it, to the one chosen, with what each lists', async () => {
     const sub = { ref: 'sub', address: '30840:x:sub', parentRef: PROJECT.addr }
     vi.mocked(readFolderListing).mockResolvedValue([sub] as never)
-    s.moveProject.mockResolvedValue({ added: { ok: true }, removed: [{ folder: FROM.id, result: { ok: true } }] })
+    s.moveProject.mockResolvedValue({})
     expect(await moveProject(PROJECT, [FROM], TO)).toEqual({ ok: true })
     // The source's listing, read at the move (SPEC §3.3); the planner puts the project in it when its card did not resolve.
     expect(readFolderListing).toHaveBeenCalledWith(FROM.id, expect.any(Function))
@@ -379,23 +379,29 @@ describe('moving a project', () => {
   })
 
   it('a move into a private Folder is refused, saying why', async () => {
-    s.moveProject.mockResolvedValue({ refused: 'target-is-private', removed: [] })
+    s.moveProject.mockResolvedValue({ refused: 'target-is-private' })
     expect(await moveProject(PROJECT, [FROM], { ...TO, private: true })).toEqual({ ok: false, reason: expect.stringMatching(/private/) })
   })
 
   it('a move planned as unsafe is refused, saying why', async () => {
-    s.moveProject.mockResolvedValue({ refused: 'target-has-no-state', removed: [] })
+    s.moveProject.mockResolvedValue({ refused: 'target-has-no-state' })
     expect(await moveProject(PROJECT, [FROM], TO)).toEqual({ ok: false, reason: expect.stringMatching(/no list of its own/) })
   })
 
-  it('a refused add is a refused move', async () => {
-    s.moveProject.mockResolvedValue({ added: { ok: false, reason: 'restricted: not a channel member' }, removed: [] })
-    expect(await moveProject(PROJECT, [FROM], TO)).toEqual({ ok: false, reason: 'restricted: not a channel member' })
+  // TEA-3: the person reads Ship's words for why, never the relay's text.
+  it.each([
+    ['team-archived', 'one of the Folders is archived, so nothing was moved'],
+    ['not-a-member', 'you need to be a member of both Folders to move this, so nothing was moved'],
+    ['changed-meanwhile', 'the Folders changed since this opened, so nothing was moved. Try again'],
+    ['refused', 'the move was not accepted, so nothing was moved. Try again'],
+  ])('a refused move says why in Ship’s words: %s', async (why, reason) => {
+    s.moveProject.mockResolvedValue({ moveRefused: { why, nothingMoved: true, notMovedFrom: [] } })
+    expect(await moveProject(PROJECT, [FROM], TO)).toEqual({ ok: false, reason })
   })
 
-  it('a refused remove is a move that says which Folder still lists it', async () => {
-    s.moveProject.mockResolvedValue({ added: { ok: true }, removed: [{ folder: FROM.id, result: { ok: false, reason: 'rate limited' } }] })
-    expect(await moveProject(PROJECT, [FROM], TO)).toEqual({ ok: true, stillIn: [{ folder: FROM.id, reason: 'rate limited' }] })
+  it('a move refused after an earlier one is a move that says which Folder still lists it', async () => {
+    s.moveProject.mockResolvedValue({ moveRefused: { why: 'changed-meanwhile', nothingMoved: false, notMovedFrom: [FROM.id] } })
+    expect(await moveProject(PROJECT, [FROM], TO)).toEqual({ ok: true, stillIn: [{ folder: FROM.id, reason: 'the Folders changed since this opened' }] })
   })
 })
 

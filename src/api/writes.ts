@@ -222,20 +222,21 @@ export async function deleteProject(
 }
 
 /**
- * Move a project to another top-level Folder (FOL-7): listed in `to`, then
- * unlisted from each Folder in `from` — the ones that list it now, each with
- * `hasState` from the caller's read. Its record, its issues and its
- * conversation are not touched (`Store.moveProject`).
+ * Move a project to another top-level Folder (FOL-7): one move into `to` from
+ * each Folder in `from` — the ones that list it now, each with `hasState` from
+ * the caller's read. Its record, its issues and its conversation are not
+ * touched (`Store.moveProject`).
  *
- * A refused `remove` is still a move — the project is in `to` — so it comes
- * back `ok` with `stillIn`, each Folder that still lists it and why, as
- * `createProject`'s `unlisted` does. Moving it again is the retry.
+ * A refusal after an earlier move is still a move — the project is in `to` —
+ * so it comes back `ok` with `stillIn`, each Folder that still lists it and
+ * why, as `createProject`'s `unlisted` does. Moving it again is the retry.
+ * Why is said in Ship's words, never the relay's text.
  */
 export async function moveProject(
   project: Project,
   /** With `addresses`, what each one's state lists: the project moves out of one that names it even when its card did not resolve. */
   from: readonly { id: string; hasState: boolean; addresses?: readonly string[] }[],
-  to: { id: string; hasState: boolean; private?: boolean },
+  to: { id: string; hasState: boolean; private?: boolean; company?: boolean },
 ): Promise<WriteResult & { stillIn?: { folder: string; reason: string }[] }> {
   const clock = await clockProblem()
   if (clock) return refused(clock)
@@ -248,13 +249,24 @@ export async function moveProject(
     const read = await Promise.all(sources.map((folder) => readFolderListing(folder.id, load).catch(() => null)))
     if (read.some((files) => files === null)) return refused('the Folder it is in could not be read, so nothing was moved. Try again')
     const listings = new Map(sources.map((folder, i) => [folder.id, read[i]!] as const))
-    const { refused: unsafe, added, removed } = await store.moveProject({ project: project.addr, from, to, listings })
+    const { refused: unsafe, moveRefused } = await store.moveProject({ project: project.addr, from, to, listings })
     if (unsafe === 'source-has-no-state') return refused('the Folder it is in has no list of its own, so taking it out would empty that Folder')
     if (unsafe === 'target-has-no-state') return refused('that Folder has no list of its own, so adding to it would hide what is already there')
     if (unsafe === 'target-is-private') return refused('that Folder is private, and this project would stay readable by the whole workspace')
-    if (added && !added.ok) return refused(added.reason)
-    const stillIn = removed.filter(({ result }) => !result.ok).map(({ folder, result }) => ({ folder, reason: result.reason ?? 'no reason given' }))
-    return stillIn.length > 0 ? { ok: true, stillIn } : { ok: true }
+    if (unsafe === 'target-is-not-home') return refused('it is in no Folder yet, so it can only go to the one it was started in')
+    if (!moveRefused) return { ok: true }
+    // Ship's words for why, never the relay's text (TEA-3).
+    const why =
+      moveRefused.why === 'team-archived'
+        ? 'one of the Folders is archived'
+        : moveRefused.why === 'not-a-member'
+          ? 'you need to be a member of both Folders to move this'
+          : moveRefused.why === 'changed-meanwhile'
+            ? 'the Folders changed since this opened'
+            : 'the move was not accepted'
+    const retry = moveRefused.why === 'changed-meanwhile' || moveRefused.why === 'refused' ? '. Try again' : ''
+    if (moveRefused.nothingMoved) return refused(`${why}, so nothing was moved${retry}`)
+    return { ok: true, stillIn: moveRefused.notMovedFrom.map((folder) => ({ folder, reason: why })) }
   } catch (error) {
     return refused(error instanceof Error ? error.message : String(error))
   }
