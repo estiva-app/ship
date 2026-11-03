@@ -48,6 +48,7 @@ describe('a link to one block in a description', () => {
     const link = container.querySelector('p a')
     expect(link?.getAttribute('href')).toBe(FILE_LINK)
     expect(link?.textContent).toContain(FILE_LINK)
-    expect(container.textContent).not.toContain('not available')
+    // Changed on purpose: kit 0.103.0 (the chip's words are now "You can't open this file", so the guard looks for both).
+    expect(container.textContent).not.toMatch(/not available|can't open/)
   })
 })

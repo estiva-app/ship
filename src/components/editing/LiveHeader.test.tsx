@@ -225,7 +225,8 @@ describe('LiveHeader draws its description (from Description.test.tsx)', () => {
     expect(editor.textContent).toContain('See')
     expect(editor.textContent).toContain('for the detail.')
     // A node view is a React portal, so it lands a tick after the editor does; the kit's chip, unavailable here.
-    await waitFor(() => expect(editor.querySelector('[data-node-view-wrapper]')?.textContent).toContain('not available'))
+    // Changed on purpose: kit 0.103.0 (a chip says what a row and a card say, "You can't open this issue", not "Issue not available").
+    await waitFor(() => expect(editor.querySelector('[data-node-view-wrapper]')?.textContent).toContain("You can't open this issue"))
     // Not the 200-character pointer, which is what a textarea showed.
     expect(editor.textContent!.length).toBeLessThan(NADDR.length)
   })
@@ -301,7 +302,8 @@ describe.each([
     const c = await show(`Tracked in ${NADDR} for now.`)
     expect(c.textContent).toContain('Tracked in')
     expect(c.textContent).toContain('for now.')
-    await waitFor(() => expect(c.querySelector('[data-node-view-wrapper]')?.textContent).toContain('not available'))
+    // Changed on purpose: kit 0.103.0 (a chip says what a row and a card say, "You can't open this issue", not "Issue not available").
+    await waitFor(() => expect(c.querySelector('[data-node-view-wrapper]')?.textContent).toContain("You can't open this issue"))
   })
 })
 
