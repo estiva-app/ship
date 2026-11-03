@@ -173,6 +173,9 @@ describe('hasRelated', () => {
     const reference = `nostr:${addrToNaddr(issue, [])}`
     const message = file({
       ref: 'm1',
+      // A message, not the topic the fixture's default is: a topic opens its page here (SHIPS-4).
+      kind: 9,
+      address: undefined,
       widget: 'message',
       slots: { title: { value: 'pk', isPubkey: true }, body: { value: `see\n\n${reference}` } },
       openUrl: 'https://peek.estiva.app/message/m1',

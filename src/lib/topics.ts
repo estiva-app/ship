@@ -1,5 +1,10 @@
 import type { ReadTopic, TopicConversation, TopicsRead } from '@estiva-app/interop'
 import { topicAsDrawn } from '@/api/foreign'
+import { ISSUE_STATUSES, PROJECT_STATUSES } from '@/nostr/kinds'
+import { href } from '@/router'
+import type { Archives } from './archive'
+import { statusLabel } from './issues'
+import { topicHref, topicInPeek } from './topicLinks'
 
 /** One row on Ship's Topics (SHIPS-3), as Linear draws an initiative. */
 export interface TopicRowData {
@@ -7,8 +12,8 @@ export interface TopicRowData {
   title: string
   /** The line under its name; absent, nothing is drawn there. */
   summary?: string
-  /** Where it opens: Peek, as its manifest says, until a topic has its page in Ship (SHIPS-4). */
-  href?: string
+  /** Its page here (SHIPS-4): a route for `linkTo`. */
+  href: string
   /** Its projects Completed, of all it lists, archived ones included (Linear's "2 / 10"). */
   projects: { done: number; total: number }
   /** Its conversations in Peek; `undefined` until they are read. */
@@ -63,7 +68,7 @@ export function topicsByTab(
       title: drawn.title,
       // A file's summary is its subtitle slot, built in for every kind (SPEC §6.12).
       ...(topic.object.slots.subtitle?.value ? { summary: topic.object.slots.subtitle.value } : {}),
-      ...(drawn.openUrl ? { href: drawn.openUrl } : {}),
+      href: topicHref(topic.address, drawn.title),
       projects: { done: listedProjects.filter((item) => item.project!.status === 'completed').length, total: listedProjects.length },
       ...(conversation ? { conversations: conversation.conversations } : {}),
       fresh: conversation?.fresh ?? 0,
@@ -88,4 +93,111 @@ function listedWork(topic: ReadTopic, projects: Map<string, { addr: string; stat
     if (issues.has(address)) return [{ project: undefined }]
     return []
   })
+}
+
+/** A Leaf document's kind: what a topic's Documents lists (interop's `LISTED_FILE_KINDS`). */
+export const DOCUMENT_KIND = 30842
+
+const dOf = (address: string) => address.split(':')[2] ?? ''
+
+/** The topic a `d` names in the read: none when no topic holds it, or two do (§13.1, as the hand-off reads it). */
+export function topicOfD(read: TopicsRead, d: string): ReadTopic | undefined {
+  const held = read.topics.filter((topic) => dOf(topic.address) === d)
+  return held.length === 1 ? held[0] : undefined
+}
+
+/** One project or issue on a topic's page: a project with its issues done, an issue with its status and project. */
+export interface TopicWorkRow {
+  address: string
+  kind: 'project' | 'issue'
+  title: string
+  href: string
+  status: { value: string; label: string }
+  /** A project's issues done of all, archived-with-it ones counting as its card counts them. */
+  progress?: { done: number; total: number }
+  /** An issue's project, by title. */
+  project?: string
+}
+
+export interface TopicPageData {
+  address: string
+  title: string
+  summary?: string
+  folder: string
+  archived: boolean
+  /** "Conversation in Peek". */
+  peekUrl?: string
+  /** Its projects then its issues that are not archived, each in the order the topic lists them. */
+  live: TopicWorkRow[]
+  /** The archived ones, archived with their project or team as well as by themselves (FOL-46). */
+  archivedWork: TopicWorkRow[]
+  /** The Leaf documents it lists, by address, for one read of their titles. */
+  documents: string[]
+}
+
+/** Ship's projects and issues, with what their rows say. */
+export interface TopicPageWork {
+  projects: readonly { addr: string; id: string; title: string; status: string }[]
+  issues: readonly { addr: string; id: string; title: string; status: string; projectAddr?: string }[]
+}
+
+/**
+ * A topic's page (SHIPS-4, the approved story `TopicPage`): what it lists that
+ * Ship holds as a project or an issue, projects first, split by archive; and
+ * the Leaf documents it lists. Judged by Ship's own fold, as Topics is.
+ */
+export function topicPageOf(topic: ReadTopic, work: TopicPageWork, archives: Archives): TopicPageData {
+  const drawn = topicAsDrawn(topic.address, topic.folder, topic.object)
+  const projects = new Map(work.projects.map((project) => [project.addr, project]))
+  const issues = new Map(work.issues.map((issue) => [issue.addr, issue]))
+  const rows: { row: TopicWorkRow; archived: boolean }[] = []
+  const documents: string[] = []
+  for (const { address } of topic.listed) {
+    if (!address) continue
+    const project = projects.get(address)
+    const issue = issues.get(address)
+    if (project) {
+      const of = work.issues.filter((i) => {
+        const archive = archives.ofIssue(i)
+        return i.projectAddr === project.addr && (!archive || !!archive.with)
+      })
+      rows.push({
+        archived: !!archives.ofProject(project.addr),
+        row: {
+          address,
+          kind: 'project',
+          title: project.title,
+          href: href({ name: 'project', d: project.id, slug: project.title, view: 'table' }),
+          status: { value: project.status, label: statusLabel(project.status, PROJECT_STATUSES) },
+          progress: { done: of.filter((i) => i.status === 'done').length, total: of.length },
+        },
+      })
+    } else if (issue) {
+      const parent = issue.projectAddr ? projects.get(issue.projectAddr) : undefined
+      rows.push({
+        archived: !!archives.ofIssue(issue),
+        row: {
+          address,
+          kind: 'issue',
+          title: issue.title,
+          href: href({ name: 'issue', d: issue.id, slug: issue.title }),
+          status: { value: issue.status, label: statusLabel(issue.status, ISSUE_STATUSES) },
+          ...(parent ? { project: parent.title } : {}),
+        },
+      })
+    } else if (address.startsWith(`${DOCUMENT_KIND}:`)) documents.push(address)
+  }
+  const projectsFirst = (list: TopicWorkRow[]) => [...list.filter((row) => row.kind === 'project'), ...list.filter((row) => row.kind === 'issue')]
+  const peekUrl = topicInPeek(topic.object.openUrl, topic.address, drawn.title)
+  return {
+    address: topic.address,
+    title: drawn.title,
+    ...(topic.object.slots.subtitle?.value ? { summary: topic.object.slots.subtitle.value } : {}),
+    folder: topic.folder,
+    archived: drawn.archived,
+    ...(peekUrl ? { peekUrl } : {}),
+    live: projectsFirst(rows.filter((item) => !item.archived).map((item) => item.row)),
+    archivedWork: projectsFirst(rows.filter((item) => item.archived).map((item) => item.row)),
+    documents,
+  }
 }

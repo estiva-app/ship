@@ -295,15 +295,17 @@ describe('a click on a link', () => {
   // The kit's AppProvider does it since ui 0.92 (Ship's own click capture went with it), as the app's root gives it a router.
   it('opens another app’s file in a new tab, never in Ship’s', async () => {
     const open = vi.spyOn(window, 'open').mockReturnValue(null)
-    objects.byReference[ref(TOPIC)] = { ...base(TOPIC, 'Weekly notes'), appName: 'Peek', openUrl: `https://peek.estiva.app/o/${TOPIC}` }
+    // A Leaf document: a topic has its page here since SHIPS-4.
+    const DOCUMENT = `30842:${BRUNO}:f0b27d90-d5b9-40e7-8078-865ab36a421c`
+    objects.byReference[ref(DOCUMENT)] = { ...base(DOCUMENT, 'Weekly notes'), kind: 30842, appName: 'Leaf', openUrl: `https://leaf.estiva.app/o/${DOCUMENT}` }
     const c = render(
       <AppProvider navigate={vi.fn()}>
-        <ThreadList threads={[thread(`Look at ${ref(TOPIC)} today.`)]} onStart={noop} onReply={noop} />
+        <ThreadList threads={[thread(`Look at ${ref(DOCUMENT)} today.`)]} onStart={noop} onReply={noop} />
       </AppProvider>,
     ).container
     await waitFor(() => expect(sentence(c)).toBe('Look at Weekly notes today.'))
     fireEvent.click(c.querySelector('[data-message-text] a') as HTMLAnchorElement)
-    expect(open).toHaveBeenCalledWith(`https://peek.estiva.app/o/${TOPIC}`, '_blank', 'noopener,noreferrer')
+    expect(open).toHaveBeenCalledWith(`https://leaf.estiva.app/o/${DOCUMENT}`, '_blank', 'noopener,noreferrer')
     open.mockRestore()
   })
 

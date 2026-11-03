@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { SignedEvent } from '@estiva-app/protocol'
+import { KIND_BARE_FILE } from '@estiva-app/interop'
 import { appNameOf, lookupFor, manifestOfLink, safeLink, samePathOn } from '@/lib/handoff'
 import { isOwnKind } from '@/lib/ownKinds'
 import { resolveForeign, type ForeignObject } from './foreign'
@@ -12,7 +13,8 @@ import { relay } from './store'
  * one of four things, which the page never collapses:
  *
  * - **`own`** — the file is Ship's after all: a word nobody declares that
- *   found a project or an issue (§7.7 rule 4). The page moves to Ship's own
+ *   found a project or an issue (§7.7 rule 4), or a topic, which has its page
+ *   here since SHIPS-4. The page moves to Ship's own
  *   route for it, the way a stale slug is refreshed.
  * - **`found`** — another app's file, resolved through the projection layer
  *   exactly as a reference in a comment is, so its title, its app and the
@@ -68,6 +70,10 @@ export async function resolveHandoff(word: string, ref: string, query?: string):
   const [event] = found
   if (!event) return { state: 'missing' }
   if (lookup.by === 'd' && isOwnKind(event.kind)) return { state: 'own', kind: event.kind, d: lookup.identifier }
+  // A topic has its page here too (SHIPS-4), unless the link names one message in it, which only Peek shows.
+  if (lookup.by === 'd' && event.kind === KIND_BARE_FILE && !new URLSearchParams(query ?? '').has('thread')) {
+    return { state: 'own', kind: event.kind, d: lookup.identifier }
+  }
   const object = await resolveForeign(lookup.by === 'd' ? `${event.kind}:${event.pubkey}:${lookup.identifier}` : event.id)
   if (!object) return { state: 'unclaimed' }
   const projected = safeLink(object.openUrl)

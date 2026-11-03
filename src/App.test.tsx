@@ -239,6 +239,13 @@ describe('App — the shell around the route', () => {
     }
   })
 
+  it('lands an inbound reference to a topic on its page here, which reads it itself (SHIPS-4)', async () => {
+    goTo(`/o/${addrToNaddr(`30840:${'a'.repeat(64)}:${D('12')}`)}`)
+    render(<App />)
+    await waitFor(() => expect(location.pathname).toBe(`/topic/${D('12')}`))
+    expect(resolveInbound).not.toHaveBeenCalled()
+  })
+
   it('falls back to the issue list, with a reason, when the reference cannot be resolved', async () => {
     vi.mocked(resolveInbound).mockResolvedValue(null)
     goTo('/o/naddr1unknown')

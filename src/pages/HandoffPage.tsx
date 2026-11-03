@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { KIND_BARE_FILE } from '@estiva-app/interop'
 import { Link, NoAccessNotice } from '@estiva-app/ui'
 import { IconLink } from '@tabler/icons-react'
 import { useHandoff } from '@/api/handoff'
@@ -13,8 +14,9 @@ import { replace } from '@/router'
  * Another app's file, opened on Ship's host, handed off to the app that draws
  * it — RFC 0.5 §7.7 rule 2, PRO-22.
  *
- * Ship has no view of a Peek topic and should not grow one to satisfy a URL:
- * the hand-off *is* the answer. So this draws the file the way a reference in
+ * A file Ship has no page for gets no page of its own to satisfy a URL: the
+ * hand-off *is* the answer. (A topic has had one since SHIPS-4, so a topic
+ * found under another word moves to it, as a project or an issue does.) So this draws the file the way a reference in
  * a comment is drawn — its title and its app — and the link that opens it
  * there. Never a 404 and never the issue list, because the link named a real
  * file.
@@ -26,7 +28,13 @@ export function HandoffPage({ word, fileRef, query }: { word: string; fileRef: s
   // 4): drawn at its right word, without a history entry to bounce off.
   useEffect(() => {
     if (handoff && handoff !== 'failed' && handoff.state === 'own') {
-      replace(handoff.kind === KIND.PROJECT ? { name: 'project', d: handoff.d, view: 'table' } : { name: 'issue', d: handoff.d })
+      replace(
+        handoff.kind === KIND.PROJECT
+          ? { name: 'project', d: handoff.d, view: 'table' }
+          : handoff.kind === KIND_BARE_FILE
+            ? { name: 'topic', d: handoff.d }
+            : { name: 'issue', d: handoff.d },
+      )
     }
   }, [handoff])
 

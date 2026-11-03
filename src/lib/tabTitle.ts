@@ -31,6 +31,8 @@ export function pageTitleOf(route: Route, state: WorkspaceState | null): string 
       return issue.ref ? `${issue.ref} ${issue.title}` : issue.title
     }
     case 'folder':
+    // A topic names itself from the topics read, which is the page's own (SHIPS-4).
+    case 'topic':
       return null
     default:
       return undefined

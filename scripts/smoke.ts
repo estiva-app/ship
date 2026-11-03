@@ -1178,11 +1178,12 @@ async function main() {
   await page.waitForSelector(`[data-folder="${FOLDER_ID}"]`)
   check('the old Folder path opens the page and moves under /app/', new URL(page.url()).pathname === `/app/folder/${FOLDER_ID}`, page.url())
 
-  // ── Another app's file on Ship's host: the hand-off (PRO-22) ──────────────
+  // ── A topic on Ship's host: its page here; one message in it: the hand-off ─
   // RFC 0.5 §7.7: a Peek topic's path with Ship's host in front names the same
-  // topic. Ship has no view of one, so it hands off — the file's title, its
-  // app, the link that opens it there — and the word `topic` is learnt from
-  // the manifest's `urls`, the way production's Peek manifest declares it.
+  // topic. Since SHIPS-4 Ship draws its own page of a topic there; a link to one
+  // message in it names what only Peek shows, so that hands off — the file's
+  // title, its app, the link that opens it there, learnt from the manifest's
+  // `urls`, the way production's Peek manifest declares it.
   const HANDOFF_D = '0d6c3a51-8a7e-4f2b-9c1d-5e4f3a2b1c0d'
   seed({
     kind: 31990,
@@ -1196,20 +1197,33 @@ async function main() {
     // no app owns 30840 — and what Peek's real manifest says.
     content: JSON.stringify({ name: 'Peek', aspect: 'conversation', projections: {} }),
   })
-  seed({ kind: 30840, tags: [['d', HANDOFF_D], ['title', 'Who will extract the conversation package']] })
+  seed({ kind: 30840, tags: [['d', HANDOFF_D], ['title', 'Who will extract the conversation package'], ['h', FOLDER_ID]] })
   await page.goto(`http://localhost:${PORT}/topic/who-will-extract-${HANDOFF_D}`)
+  await page.waitForSelector('[data-surface="topic"] [data-topic-loaded]', { timeout: 15_000 }).catch(() => {})
+  const topicPage = page.locator('[data-surface="topic"]')
+  check('a Peek topic link on Ship opens the topic’s page here (SHIPS-4)', await topicPage.isVisible())
+  check('  …with the topic’s title', (await topicPage.innerText().catch(() => '')).includes('Who will extract the conversation package'))
+  const conversationInPeek = topicPage.getByRole('link', { name: /Conversation in Peek/ })
+  // The same path on Peek's host — only the host changes (Miky, 2026-10-01) — with the topic's current slug.
+  check(
+    '  …and "Conversation in Peek" opens it in Peek',
+    (await conversationInPeek.getAttribute('href').catch(() => null)) === `https://peek.estiva.app/topic/who-will-extract-the-conversation-package-${HANDOFF_D}`,
+    (await conversationInPeek.getAttribute('href').catch(() => null)) ?? 'no link',
+  )
+  await shot(page, '10b-topic')
+
+  const THREAD = 'c'.repeat(64)
+  await page.goto(`http://localhost:${PORT}/topic/who-will-extract-${HANDOFF_D}?thread=${THREAD}`)
   await page.waitForSelector('[data-surface="handoff"]', { timeout: 10_000 }).catch(() => {})
   const handoff = page.locator('[data-surface="handoff"]')
-  check('a Peek topic link on Ship shows the hand-off, not the issue list', await handoff.isVisible())
-  check('  …with the topic’s title', (await handoff.innerText().catch(() => '')).includes('Who will extract the conversation package'))
+  check('a link to one message in a topic shows the hand-off to Peek', await handoff.isVisible())
   const openInPeek = handoff.getByRole('link', { name: 'Open in Peek' })
-  // The same path on Peek's host — only the host changes (Miky, 2026-10-01).
   check(
-    '  …and a link that opens it in Peek',
-    (await openInPeek.getAttribute('href').catch(() => null)) === `https://peek.estiva.app/topic/who-will-extract-${HANDOFF_D}`,
+    '  …and its link opens Peek on that message',
+    (await openInPeek.getAttribute('href').catch(() => null)) === `https://peek.estiva.app/topic/who-will-extract-${HANDOFF_D}?thread=${THREAD}`,
     (await openInPeek.getAttribute('href').catch(() => null)) ?? 'no link',
   )
-  await shot(page, '10b-handoff')
+  await shot(page, '10c-handoff')
 
   // ── Delete, and the team lets go of it ────────────────────────────────────
   // Last, because everything above reads the project. A team with state lists

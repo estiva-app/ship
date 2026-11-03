@@ -47,9 +47,9 @@
  *
  * RFC 0.5 §7.7 (PRO-22): the path names the file and the host names the
  * perspective, so `peek.estiva.app/topic/<slug>-<d>` and
- * `ship.estiva.app/topic/<slug>-<d>` are one file. Ship has no view of a
- * topic, so any `/<word>/<ref>` that is not one of Ship's own words is an
- * `elsewhere` route, and `HandoffPage` asks the manifests what the word means
+ * `ship.estiva.app/topic/<slug>-<d>` are one file, and since SHIPS-4 Ship draws
+ * its own page of a topic there. Any `/<word>/<ref>` that is not one of Ship's
+ * own words is an `elsewhere` route, and `HandoffPage` asks the manifests what the word means
  * and hands the file off to the app that draws it. The words are never listed
  * here — this file knows only Ship's own.
  *
@@ -82,6 +82,8 @@ export type Route =
   | { name: 'folder'; id: string }
   /** Topics (SHIPS-3); with `folder`, only the topics filed in that Folder. */
   | { name: 'topics'; folder?: string }
+  /** One topic's page (SHIPS-4), by its `d`, as an issue is. */
+  | { name: 'topic'; d: string; slug?: string }
   /** An inbound `nostr:naddr…`, not yet resolved to an object. */
   | { name: 'inbound'; naddr: string }
   /**
@@ -98,7 +100,7 @@ export type Route =
  * somebody's file, and goes to the hand-off. `folder` is here because the old
  * Folder path still opens the Folder page; it is not a word Ship serves.
  */
-const OWN_SEGMENTS = new Set(['app', 'o', 'project', 'projects', 'issue', 'issues', 'folder', 'topics'])
+const OWN_SEGMENTS = new Set(['app', 'o', 'project', 'projects', 'issue', 'issues', 'folder', 'topics', 'topic'])
 
 /**
  * How a project's issues are shown.
@@ -146,6 +148,8 @@ export function href(route: Route): string {
       return `/app/folder/${route.id}`
     case 'topics':
       return route.folder ? `/app/folder/${route.folder}/topics` : '/topics'
+    case 'topic':
+      return `/topic/${objectRef(route.d, route.slug)}`
     case 'inbound':
       return `/o/${route.naddr}`
     case 'elsewhere':
@@ -193,6 +197,13 @@ export function parse(location: string): Route {
     }
   }
   if (parts[0] === 'topics') return { name: 'topics' }
+  // A link to one message in a topic names what Ship's page does not show: it is Peek's, handed off as written
+  // (record a-link-opens-in-the-app-you-are-in-when-it-has-a-page-made-for-that-kind).
+  if (parts[0] === 'topic' && parts[1] && parts.length === 2) {
+    const d = identifierFromRef(parts[1])
+    if (d && !new URLSearchParams(query ?? '').has('thread')) return { name: 'topic', d }
+    if (d) return { name: 'elsewhere', word: parts[0], ref: parts[1], query }
+  }
   // A Folder's Topics, under the Folder page's path, or the path it had before PRO-22.
   const folderAt = parts[0] === 'app' && parts[1] === 'folder' ? 2 : parts[0] === 'folder' ? 1 : -1
   if (folderAt !== -1 && parts[folderAt] && parts[folderAt + 1] === 'topics') return { name: 'topics', folder: parts[folderAt] }
