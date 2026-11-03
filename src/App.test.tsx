@@ -626,6 +626,26 @@ describe('before the first read lands', () => {
   })
 
   /*
+    An issue and a project wait in the shape their page arrives in since ONE-6 (step 4e): the kit's header bar, and the
+    comments column beside the page under its "Comments", where the rail was. The project's tabs come with it; an issue
+    has none.
+  */
+  it.each([
+    ['an issue', `/issue/${D('11')}`, 'issue', 2],
+    ['a project', `/project/${D('20')}`, 'project', 3],
+  ])('waits for %s in its page’s shape, with the comments column beside it', (_, path, shape, rows) => {
+    goTo(path)
+    vi.mocked(useWorkspace).mockReturnValue({ state: null, partial: false, error: null, clock: null, loading: true, busy: false, refresh, wantThreads: () => {}, live: false })
+    const { container } = render(<App />)
+    const loading = container.querySelector(`[data-loading="workspace"][data-shape="${shape}"]`)
+    expect(loading).not.toBeNull()
+    // The page's column (header, tabs on a project, the reading column), then the comments column.
+    expect(loading!.children).toHaveLength(2)
+    expect(loading!.firstElementChild!.children).toHaveLength(rows)
+    expect(within(loading!.lastElementChild as HTMLElement).getByText('Comments')).toBeInTheDocument()
+  })
+
+  /*
     SHI-12 says a quota refusal must not be reported as a broken relay — true
     while a workspace is on screen, and the opposite before one is: the silence
     leaves nothing to distinguish "busy" from "stopped".

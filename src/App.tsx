@@ -234,8 +234,8 @@ function Shell() {
 const SKELETON: Partial<Record<Route['name'], PageSkeletonShape>> = {
   projects: 'cards',
   issues: 'list',
-  project: 'page',
-  issue: 'page',
+  project: 'project',
+  issue: 'issue',
 }
 
 /**

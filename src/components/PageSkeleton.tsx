@@ -1,6 +1,6 @@
-import { Card } from '@estiva-app/ui'
+import { Card, PageHeader, Panel, SkeletonConversation } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
-import { Divider } from '@/components/ui/Divider'
+import { Centred } from '@/components/layout/ReadingColumn'
 import { SkeletonBar, SkeletonList } from '@/components/ui/Skeleton'
 
 /**
@@ -16,48 +16,74 @@ import { SkeletonBar, SkeletonList } from '@/components/ui/Skeleton'
  *
  * - `cards` — the projects page: its heading, then a grid of project cards.
  * - `list` — the issues page: its heading, the tabs, then rows.
- * - `page` — one project or issue: the trail, the title and rows, and the
- *   rail beyond the hairline.
+ * - `issue` — one issue, as its page draws it since ONE-6 (step 4e): the
+ *   kit's PageHeader with the trail, then the title, the summary, the
+ *   fields' pills and the description, and the comments column beside it,
+ *   the kit's own placeholder under "Comments". It was the trail, the title,
+ *   rows and the rail.
+ * - `project` — one project: the same, with its tabs under the header.
  * - `rows` — rows alone, for any other route (an inbound reference while
  *   the workspace loads). A Folder is not here: it does not wait for the
  *   workspace, and draws its own rows while its files load.
  *
  * Revealed after 150ms, as the list is, so a fast read never flashes it.
  */
-export type PageSkeletonShape = 'cards' | 'list' | 'page' | 'rows'
+export type PageSkeletonShape = 'cards' | 'list' | 'issue' | 'project' | 'rows'
 
 /** A page in the shape it will arrive in, while the workspace's first read is in flight. */
 export function PageSkeleton({ shape }: { shape: PageSkeletonShape }) {
   // `data-loading` is what a test waits on; the shape rides beside it.
   const marks = { 'data-loading': 'workspace', 'data-shape': shape, 'aria-hidden': true } as const
 
-  if (shape === 'page') {
+  if (shape === 'issue' || shape === 'project') {
     return (
       <div {...marks} className="flex min-h-0 flex-1 animate-skeleton-in">
-        {/* The trail at the page's top, then the title and rows 16px below it,
-            as the issue and project pages lay them out. */}
-        <div className="flex min-w-0 flex-1 flex-col gap-4 px-6 pt-5">
-          <Line className="w-40" />
-          <div className="flex flex-col gap-6">
-            <div className="flex h-7 items-center">
-              <SkeletonBar className="h-5 w-2/3" />
+        {/* The page's column as IssueView and ProjectView lay it out: the header, the tabs on a project, then the
+            reading column 16px apart. */}
+        <div className="flex min-w-0 flex-1 flex-col gap-4">
+          <PageHeader title={<SkeletonBar className="h-3.5 w-40" />} />
+          {shape === 'project' && (
+            <div className="flex min-h-8 items-center gap-1 px-6">
+              <SkeletonBar className="h-7 w-20" />
+              <SkeletonBar className="h-7 w-14" />
             </div>
-            <SkeletonList rows={6} />
+          )}
+          <div className="px-6">
+            <Centred gap="block">
+              {/* The title, and the summary 4px under it: each bar on a line of the text's own size, so each is as
+                  tall as what replaces it. */}
+              <div className="flex flex-col gap-1">
+                <div className="py-1 text-h1">
+                  <span className="inline-block w-2/3 align-middle">
+                    <SkeletonBar className="h-6" />
+                  </span>
+                </div>
+                <div className="py-1 text-body-1">
+                  <span className="inline-block w-1/2 align-middle">
+                    <SkeletonBar className="h-4" />
+                  </span>
+                </div>
+              </div>
+              {/* The fields' pills: status, who, and the project on an issue. */}
+              <div className="flex h-6 items-center gap-2">
+                {(shape === 'issue' ? ['w-28', 'w-28', 'w-36'] : ['w-28', 'w-28']).map((width, i) => (
+                  <SkeletonBar key={i} shape="round" className={cn('h-6', width)} />
+                ))}
+              </div>
+              <div className="flex flex-col py-1">
+                <Line className="w-full" />
+                <Line className="w-11/12" />
+                <Line className="w-2/3" />
+              </div>
+            </Centred>
           </div>
         </div>
-        <Divider orientation="vertical" />
-        {/* The rail starts level with the title, below the trail's row. Three
-            properties: a label over a select. 256px (`w-64`): the rail's own
-            250px has no spacing token. */}
-        <div className="shrink-0 px-6 pt-14">
-          <div className="flex w-64 flex-col gap-4">
-            {['w-16', 'w-20', 'w-16'].map((label, i) => (
-              <div key={i} className="flex flex-col gap-3">
-                <SkeletonBar className={cn('h-3', label)} />
-                <SkeletonBar className="h-9 w-full" />
-              </div>
-            ))}
-          </div>
+        {/* The comments column the page opens with, 384px beside it under the kit's header, which lines up with the
+            page's: the kit's own placeholder for comments, as the column draws it while they are read. */}
+        <div className="flex shrink-0 flex-col border-l border-border-default">
+          <Panel title="Comments" className="min-h-0 w-96 flex-1" bodyClassName="p-3">
+            <SkeletonConversation />
+          </Panel>
         </div>
       </div>
     )
