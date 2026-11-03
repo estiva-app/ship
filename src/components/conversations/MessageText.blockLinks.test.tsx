@@ -86,12 +86,13 @@ describe('a link to one block reads as its file', () => {
 })
 
 /*
-  LTX-6: a file's path is the same on every app's host, and a click opens the
-  address as written, in the app it names — Leaf's address for a Ship issue
-  opens Leaf, not the issue's page here (why:
-  https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-files-path-is-the-same-on-every-apps-host.md).
+  LTX-6: a file's path is the same on every app's host. Since SHIPS-4 a click
+  stays in Ship when Ship has a page made for the file's kind and that page
+  shows what the link points at, so Leaf's address for a Ship issue opens the
+  issue's page here (why:
+  https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-link-opens-in-the-app-you-are-in-when-it-has-a-page-made-for-that-kind.md).
 */
-describe('an address on another Estiva app’s host opens as written', () => {
+describe('Ship’s own file written on another Estiva app’s host opens Ship’s page', () => {
   const ISSUE_D = 'c2a4a8f0-1b2c-4d3e-8f90-a1b2c3d4e5f6'
   const ISSUE = `30851:${'e'.repeat(64)}:${ISSUE_D}`
   const LEAF_ISSUE = `https://leaf.estiva.app/issue/plan-the-launch-${ISSUE_D}`
@@ -107,10 +108,19 @@ describe('an address on another Estiva app’s host opens as written', () => {
     answers.set(LEAF_ISSUE, ISSUE)
   })
 
-  it('in a sentence, its chip opens Leaf at the address, not the issue’s page in Ship', () => {
+  // Ship has a page made for an issue, so it opens there wherever the link was written (record
+  // a-link-opens-in-the-app-you-are-in-when-it-has-a-page-made-for-that-kind, SHIPS-4); it opened Leaf until then.
+  it('in a sentence, its chip opens the issue’s page in Ship, not Leaf', () => {
     const c = showIssue(`see ${LEAF_ISSUE} here`)
     const chip = [...c.querySelectorAll('[data-message-text] a')].find((a) => a.textContent?.includes('Plan the launch'))
-    expect(chip?.getAttribute('href')).toBe(LEAF_ISSUE)
+    expect(chip?.getAttribute('href')).toBe(`/issue/plan-the-launch-${ISSUE_D}`)
+  })
+
+  it('a block of it opens Ship’s issue page at the block, which that page shows', () => {
+    answers.set(`${LEAF_ISSUE}#block-b1`, ISSUE)
+    const c = showIssue(`see ${LEAF_ISSUE}#block-b1 here`)
+    const chip = [...c.querySelectorAll('[data-message-text] a')].find((a) => a.textContent?.includes('Plan the launch'))
+    expect(chip?.getAttribute('href')).toBe(`/issue/plan-the-launch-${ISSUE_D}#block-b1`)
   })
 
   it('on a host no app declares, opens the issue’s page here, never that site (security review)', () => {
@@ -128,14 +138,14 @@ describe('an address on another Estiva app’s host opens as written', () => {
     return [...c.querySelectorAll('[data-cards] a')].map((a) => a.getAttribute('href'))
   }
 
-  it('alone on its line with its card, the card opens Leaf at the address, not the issue’s page in Ship', () => {
+  it('alone on its line with its card, the card opens the issue’s page in Ship, not Leaf', () => {
     const hrefs = card(LEAF_ISSUE, 'detailed')
-    expect(hrefs).toContain(LEAF_ISSUE)
-    expect(hrefs.some((href) => href?.startsWith('/issue/'))).toBe(false)
+    expect(hrefs).toContain(`/issue/plan-the-launch-${ISSUE_D}`)
+    expect(hrefs).not.toContain(LEAF_ISSUE)
   })
 
-  it('an old message’s compact card opens Leaf at the address too', () => {
-    expect(card(LEAF_ISSUE, 'compact')).toEqual([LEAF_ISSUE])
+  it('an old message’s compact card opens Ship’s page too', () => {
+    expect(card(LEAF_ISSUE, 'compact')).toEqual([`/issue/plan-the-launch-${ISSUE_D}`])
   })
 
   it('a card for an address on a host no app declares opens the issue’s page here, never that site (security review)', () => {

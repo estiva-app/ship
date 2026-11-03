@@ -48,7 +48,8 @@ describe('useRoute', () => {
       [{ name: 'folder', id: UUID }, { name: 'folder', id: UUID }],
       [{ name: 'topics' }, { name: 'topics' }],
       [{ name: 'topics', folder: UUID }, { name: 'topics', folder: UUID }],
-      [{ name: 'elsewhere', word: 'topic', ref: `level-2-${UUID}` }, { name: 'elsewhere', word: 'topic', ref: `level-2-${UUID}` }],
+      [{ name: 'topic', d: UUID, slug: 'Level 2' }, { name: 'topic', d: UUID }],
+      [{ name: 'elsewhere', word: 'document', ref: `plan-${UUID}` }, { name: 'elsewhere', word: 'document', ref: `plan-${UUID}` }],
     ] as const
     for (const [route, expected] of routes) expect(parse(href(route))).toEqual(expected)
   })
@@ -159,10 +160,14 @@ describe('the §7.2 grammar', () => {
  */
 describe('the §7.7 root', () => {
   it('sends another app’s word to the hand-off, as written', () => {
-    expect(parse(`/topic/level-2-${UUID}`)).toEqual({ name: 'elsewhere', word: 'topic', ref: `level-2-${UUID}` })
-    // The query names a thread inside the topic, and the hand-off carries it on.
-    expect(parse(`/topic/level-2-${UUID}?thread=abc`)).toEqual({ name: 'elsewhere', word: 'topic', ref: `level-2-${UUID}`, query: 'thread=abc' })
+    expect(parse(`/document/plan-${UUID}`)).toEqual({ name: 'elsewhere', word: 'document', ref: `plan-${UUID}` })
     expect(href({ name: 'elsewhere', word: 'topic', ref: `x-${UUID}`, query: 'thread=abc' })).toBe(`/topic/x-${UUID}?thread=abc`)
+  })
+
+  it('opens a topic on its page here, but hands a link to one message in it to Peek with its thread (SHIPS-4)', () => {
+    expect(parse(`/topic/level-2-${UUID}`)).toEqual({ name: 'topic', d: UUID })
+    expect(href({ name: 'topic', d: UUID, slug: 'Level 2' })).toBe(`/topic/level-2-${UUID}`)
+    expect(parse(`/topic/level-2-${UUID}?thread=abc`)).toEqual({ name: 'elsewhere', word: 'topic', ref: `level-2-${UUID}`, query: 'thread=abc' })
   })
 
   it('keeps Ship’s own words, and a broken one of them, off the hand-off', () => {

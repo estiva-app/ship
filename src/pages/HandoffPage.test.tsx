@@ -63,4 +63,12 @@ describe('HandoffPage', () => {
     render(<HandoffPage word="topic" fileRef="x-d" />)
     expect(screen.getByText(/could not be read/)).toBeInTheDocument()
   })
+
+  it('moves a topic found under a word nobody declares to its page here (SHIPS-4, §7.7 rule 4)', () => {
+    const d = '9c69f247-be6a-4ae7-9703-71cb971f5f93'
+    history.replaceState(null, '', `/t/${d}`)
+    answer = { state: 'own', kind: 30840, d }
+    render(<HandoffPage word="t" fileRef={d} />)
+    expect(location.pathname).toBe(`/topic/${d}`)
+  })
 })

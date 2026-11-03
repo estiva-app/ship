@@ -21,10 +21,18 @@ const PEEK = {
   ],
 }
 const SHIP = { kind: 31990, tags: [['urls', 'https://ship.estiva.app/issue/<slug>-<d>', '30851']] }
+const LEAF = {
+  kind: 31990,
+  content: JSON.stringify({ name: 'Leaf' }),
+  tags: [
+    ['web', 'https://leaf.estiva.app/o/<bech32>', 'naddr'],
+    ['urls', 'https://leaf.estiva.app/document/<slug>-<d>', '30842'],
+  ],
+}
 
 /** The relay: manifests for a 31990 read, `files` for anything else. */
 function relayWith(files: { kind: number; pubkey: string; id: string; created_at: number }[]) {
-  query.mockImplementation(async (filters: { kinds?: number[] }[]) => (filters[0].kinds?.includes(31990) ? [PEEK, SHIP] : files))
+  query.mockImplementation(async (filters: { kinds?: number[] }[]) => (filters[0].kinds?.includes(31990) ? [PEEK, SHIP, LEAF] : files))
 }
 
 beforeEach(() => {
@@ -34,16 +42,21 @@ beforeEach(() => {
 
 describe('resolveHandoff', () => {
   it('asks for the declared kind by `d` and resolves the file through its app', async () => {
-    relayWith([{ kind: 30840, pubkey: PK, id: 'e1', created_at: 1 }])
-    // What production answers for a topic: drawn as a bare file, named "File".
-    const openUrl = `https://peek.estiva.app/o/${addrToNaddr(`30840:${PK}:${D}`)}`
-    resolveForeign.mockResolvedValue({ ref: 'r', appName: 'File', openUrl })
-    const handoff = await resolveHandoff('topic', `level-2-${D}`)
-    expect(query).toHaveBeenLastCalledWith([{ kinds: [30840], '#d': [D], limit: 2 }])
-    expect(resolveForeign).toHaveBeenCalledWith(`30840:${PK}:${D}`)
+    relayWith([{ kind: 30842, pubkey: PK, id: 'e1', created_at: 1 }])
+    const openUrl = `https://leaf.estiva.app/o/${addrToNaddr(`30842:${PK}:${D}`)}`
+    resolveForeign.mockResolvedValue({ ref: 'r', appName: 'Leaf', openUrl })
+    const handoff = await resolveHandoff('document', `plan-${D}`)
+    expect(query).toHaveBeenLastCalledWith([{ kinds: [30842], '#d': [D], limit: 2 }])
+    expect(resolveForeign).toHaveBeenCalledWith(`30842:${PK}:${D}`)
     // Named by the manifest whose `web` template built the projection's link,
     // and the link is the same path on that app's host, which serves it.
-    expect(handoff).toEqual({ state: 'found', object: expect.objectContaining({ appName: 'File' }), app: 'Peek', openUrl: `https://peek.estiva.app/topic/level-2-${D}` })
+    expect(handoff).toEqual({ state: 'found', object: expect.objectContaining({ appName: 'Leaf' }), app: 'Leaf', openUrl: `https://leaf.estiva.app/document/plan-${D}` })
+  })
+
+  it('says a topic under a word Ship does not serve is Ship’s to draw, unless the link names one message in it (SHIPS-4)', async () => {
+    relayWith([{ kind: 30840, pubkey: PK, id: 'e1', created_at: 1 }])
+    expect(await resolveHandoff('topic', `level-2-${D}`)).toEqual({ state: 'own', kind: 30840, d: D })
+    expect(resolveForeign).not.toHaveBeenCalled()
   })
 
   it('carries a thread link’s comment on to the owner’s host', async () => {
@@ -54,11 +67,11 @@ describe('resolveHandoff', () => {
   })
 
   it('names no app for a link no manifest’s template built, and follows only https', async () => {
-    relayWith([{ kind: 30840, pubkey: PK, id: 'e1', created_at: 1 }])
+    relayWith([{ kind: 30842, pubkey: PK, id: 'e1', created_at: 1 }])
     resolveForeign.mockResolvedValue({ ref: 'r', appName: 'File', openUrl: 'https://elsewhere.example/x' })
-    expect(await resolveHandoff('topic', D)).toEqual({ state: 'found', object: expect.anything(), openUrl: 'https://elsewhere.example/x' })
-    resolveForeign.mockResolvedValue({ ref: 'r', appName: 'File', openUrl: 'intent://peek.estiva.app/o/naddr1x' })
-    expect(await resolveHandoff('topic', D)).toEqual({ state: 'found', object: expect.anything() })
+    expect(await resolveHandoff('document', D)).toEqual({ state: 'found', object: expect.anything(), openUrl: 'https://elsewhere.example/x' })
+    resolveForeign.mockResolvedValue({ ref: 'r', appName: 'File', openUrl: 'intent://leaf.estiva.app/o/naddr1x' })
+    expect(await resolveHandoff('document', D)).toEqual({ state: 'found', object: expect.anything() })
   })
 
   it('says a file of Ship’s own is Ship’s, for the page to open it here (rule 4)', async () => {
@@ -84,8 +97,8 @@ describe('resolveHandoff', () => {
   })
 
   it('tells a file no app opens apart from a missing one', async () => {
-    relayWith([{ kind: 30840, pubkey: PK, id: 'e1', created_at: 1 }])
+    relayWith([{ kind: 30842, pubkey: PK, id: 'e1', created_at: 1 }])
     resolveForeign.mockResolvedValue(null)
-    expect(await resolveHandoff('topic', D)).toEqual({ state: 'unclaimed' })
+    expect(await resolveHandoff('document', D)).toEqual({ state: 'unclaimed' })
   })
 })

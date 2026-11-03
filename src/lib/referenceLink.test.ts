@@ -6,8 +6,9 @@
  * the `openUrl` its manifest gave, or nowhere.
  */
 import { describe, expect, it } from 'vitest'
-import type { ForeignObject } from '@estiva-app/interop'
+import type { ForeignObject, TopicsRead } from '@estiva-app/interop'
 import { href } from '@/router'
+import { knowSpaces } from './topicLinks'
 import { writtenLinkOf, referenceLink } from './referenceLink'
 
 const AUTHOR = 'ab'.repeat(32)
@@ -33,9 +34,19 @@ describe('referenceLink', () => {
     expect(link?.href).toBe(`/issue/${D}`)
   })
 
-  it("another app's object leads to the URL its manifest gave — a Peek topic opens in Peek", () => {
+  it("another app's object leads to the URL its manifest gave — a Peek Folder opens in Peek", () => {
     const link = referenceLink(object({ kind: 39000, openUrl: 'https://peek.estiva.app/o/naddr1topic' }))
     expect(link).toEqual({ place: 'app', href: 'https://peek.estiva.app/o/naddr1topic' })
+  })
+
+  const TOPIC = `30840:${AUTHOR}:${D}`
+  const topic = object({ kind: 30840, address: TOPIC, openUrl: 'https://peek.estiva.app/o/naddr1topic', slots: { title: { value: 'Widgets' } } })
+
+  it('a topic leads to its page here, a space to Peek once the topics read says it is one (SHIPS-4)', () => {
+    expect(referenceLink(topic)).toEqual({ place: 'here', href: `/topic/widgets-${D}` })
+    knowSpaces({ me: AUTHOR, membership: {}, topics: [{ address: TOPIC, space: true }] } as unknown as TopicsRead)
+    expect(referenceLink(topic)).toEqual({ place: 'app', href: 'https://peek.estiva.app/o/naddr1topic' })
+    knowSpaces({ me: AUTHOR, membership: {}, topics: [] } as unknown as TopicsRead)
   })
 
   it('a message — no address at all — leads to its openUrl too', () => {
@@ -88,9 +99,36 @@ describe('writtenLinkOf', () => {
   const DECLARED = new Set(['https://leaf.estiva.app', 'https://peek.estiva.app', SHIP])
   const ISSUE_ROUTE = '/issue/plan-x'
 
-  it('Ship’s own file written on another declared host opens there as written, block or not (LTX-6)', () => {
-    expect(writtenLinkOf('https://leaf.estiva.app/issue/plan-x', ISSUE_ROUTE, SHIP, DECLARED)).toEqual({ place: 'app', href: 'https://leaf.estiva.app/issue/plan-x' })
-    expect(writtenLinkOf('https://peek.estiva.app/issue/plan-x#block-1', ISSUE_ROUTE, SHIP, DECLARED)).toEqual({ place: 'app', href: 'https://peek.estiva.app/issue/plan-x#block-1' })
+  // Record a-link-opens-in-the-app-you-are-in-when-it-has-a-page-made-for-that-kind (SHIPS-4); LTX-6 opened them there.
+  it('Ship’s own file written on another declared host opens Ship’s page, at the block it names', () => {
+    expect(writtenLinkOf('https://leaf.estiva.app/issue/plan-x', ISSUE_ROUTE, SHIP, DECLARED)).toBeUndefined()
+    expect(writtenLinkOf('https://peek.estiva.app/issue/plan-x#block-1', ISSUE_ROUTE, SHIP, DECLARED)).toEqual({ place: 'here', href: '/issue/plan-x#block-1' })
+  })
+
+  it('a link to one message in Ship’s file opens as written, in the app that shows it', () => {
+    expect(writtenLinkOf('https://peek.estiva.app/issue/plan-x?thread=abc', ISSUE_ROUTE, SHIP, DECLARED)).toEqual({ place: 'app', href: 'https://peek.estiva.app/issue/plan-x?thread=abc' })
+  })
+
+  const TOPIC_ROUTE = `/topic/widgets-${D}`
+  const PEEK_TOPIC = `https://peek.estiva.app/topic/widgets-${D}`
+
+  it('a topic written with Peek’s address opens its page here; one message in it, or a block, opens Peek as written', () => {
+    expect(writtenLinkOf(PEEK_TOPIC, TOPIC_ROUTE, SHIP, DECLARED)).toBeUndefined()
+    expect(writtenLinkOf(`${PEEK_TOPIC}?thread=abc`, TOPIC_ROUTE, SHIP, DECLARED)).toEqual({ place: 'app', href: `${PEEK_TOPIC}?thread=abc` })
+    expect(writtenLinkOf(`${PEEK_TOPIC}#block-1`, TOPIC_ROUTE, SHIP, DECLARED)).toEqual({ place: 'app', href: `${PEEK_TOPIC}#block-1` })
+  })
+
+  it('a link to one message in a topic written on Ship’s host keeps its thread, for the hand-off to Peek', () => {
+    expect(writtenLinkOf(`${SHIP}${TOPIC_ROUTE}?thread=abc`, TOPIC_ROUTE, SHIP, DECLARED)).toEqual({ place: 'here', href: `${TOPIC_ROUTE}?thread=abc` })
+  })
+
+  // SHIPS-4 security review: a file's `d` with dot segments must never turn its block route into another host.
+  it('a block of Ship’s own file whose route normalises to two slashes never becomes a route to another host', () => {
+    expect(writtenLinkOf('https://peek.estiva.app/issue/plan-x#block-1', '/issue/x/../..//evil.example/y', SHIP, DECLARED)).toBeUndefined()
+  })
+
+  it('a space, which opens in Peek, opens Peek as written', () => {
+    expect(writtenLinkOf(PEEK_TOPIC, 'https://peek.estiva.app/o/naddr1space', SHIP, DECLARED)).toEqual({ place: 'app', href: PEEK_TOPIC })
   })
 
   it('another app’s file written on Ship’s host opens here, through the router', () => {

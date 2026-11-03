@@ -1,12 +1,13 @@
 import { IconMessages } from '@tabler/icons-react'
 import { KindIcon, Link, UnreadDot } from '@estiva-app/ui'
 import type { TopicRowData } from '@/lib/topics'
+import { linkTo } from '@/router'
 
 /**
  * One topic on Ship's Topics, as Linear draws an initiative (Miky, 2 Nov): its
  * name and summary, its projects done of all, its conversations and how many
  * are new for you. On a phone only the dot stays beside the name. It opens
- * where the topic lives, Peek, in a new tab, as "Conversation in Peek" does.
+ * the topic's page here (SHIPS-4).
  */
 export function TopicRow({ topic }: { topic: TopicRowData }) {
   const { done, total } = topic.projects
@@ -19,13 +20,9 @@ export function TopicRow({ topic }: { topic: TopicRowData }) {
   return (
     <div data-topic={topic.address} className="relative flex min-w-0 items-center gap-3 rounded-md px-3 py-2 transition-colors hover:bg-bg-hover">
       <KindIcon kind="topic" />
-      {topic.href ? (
-        <Link href={topic.href} external variant="plain" cover className="flex min-w-0 flex-1">
-          {name}
-        </Link>
-      ) : (
-        name
-      )}
+      <Link {...linkTo(topic.href)} variant="plain" cover className="flex min-w-0 flex-1">
+        {name}
+      </Link>
       {topic.fresh > 0 && (
         <span className="flex shrink-0 sm:hidden">
           <UnreadDot />

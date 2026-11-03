@@ -1,7 +1,8 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import { createRetryingRead } from '@estiva-app/platform'
 import { addableTopics, type ReadTopic, type TopicConversation, type TopicsRead } from '@estiva-app/interop'
-import { readAllTopics, readTopicConversations, topicAsDrawn, type FolderSummary, type TopicOfFile } from './foreign'
+import { readAllTopics, readTopicConversations, readTopicDocuments, topicAsDrawn, type ForeignObject, type FolderSummary, type TopicOfFile } from './foreign'
+import { knowSpaces } from '@/lib/topicLinks'
 import { foldersNow, heldFolders } from './useFolders'
 import { useLandedReadState } from './readStateSync'
 import { readMuted } from './useFeedJudges'
@@ -17,6 +18,12 @@ import { relay, signer } from './store'
  */
 const held = createRetryingRead<TopicsRead>({ retryable: () => false })
 
+// A link to a space opens Peek, not the topic's page (SHIPS-4): each read says which topics are spaces.
+held.subscribe(() => {
+  const read = held.snapshot().value
+  if (read) knowSpaces(read)
+})
+
 /** Every topic, read now or joining a read on the way; rejects while there is none to give. */
 async function topicsFresh(): Promise<TopicsRead> {
   await held.reload(readAllTopics)
@@ -29,6 +36,7 @@ async function topicsFresh(): Promise<TopicsRead> {
 export function resetTopicsForTests(): void {
   held.clear()
   choices = undefined
+  knowSpaces({ topics: [] } as unknown as TopicsRead)
 }
 
 /** The Topics page's read: `undefined` while the first one is out, `failed` when it did not land. */
@@ -61,6 +69,49 @@ export function useTopics(): TopicsState {
     }
   }, [])
   return snapshot.value ?? (settled && snapshot.error !== undefined ? 'failed' : undefined)
+}
+
+/**
+ * A topic's page reads the topics only when none are held or on the way
+ * (SHIPS-4): opened from Topics it draws from that read, with no request.
+ */
+export function ensureTopics(): Promise<unknown> {
+  return held.ensure(readAllTopics)
+}
+
+/**
+ * The Leaf documents a topic's page lists, with their titles: one read for
+ * all of them (SHIPS-4). `undefined` while it reads, `failed` when it did not
+ * land. `key` is their addresses, space-separated.
+ */
+export function useTopicDocuments(key: string): { documents: ForeignObject[] | 'failed' | undefined; retry: () => void } {
+  const [answer, setAnswer] = useState<{ key: string; value: ForeignObject[] | 'failed' }>()
+  const [attempt, setAttempt] = useState(0)
+  useEffect(() => {
+    let live = true
+    readTopicDocuments(key ? key.split(' ') : []).then(
+      (value) => live && setAnswer({ key, value }),
+      () => live && setAnswer({ key, value: 'failed' }),
+    )
+    return () => {
+      live = false
+    }
+  }, [key, attempt])
+  const documents = answer?.key === key ? answer.value : undefined
+  return { documents, retry: () => setAttempt((n) => n + 1) }
+}
+
+/** Read every topic again; whether that read landed (a failed one keeps the topics already held). */
+export async function rereadTopics(): Promise<boolean> {
+  // The held read says an error only while it has no answer to keep, so the failure is caught on its way.
+  let landed = true
+  await held.reload(() =>
+    readAllTopics().catch((error: unknown) => {
+      landed = false
+      throw error
+    }),
+  )
+  return landed
 }
 
 /** Try again after a failed read: read every topic now. */

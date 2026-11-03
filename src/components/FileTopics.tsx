@@ -3,6 +3,8 @@ import { IconPlus, IconX } from '@tabler/icons-react'
 import { CommandPalette, CommandPaletteSearch, KindIcon, type CommandPaletteRow } from '@estiva-app/ui'
 import type { TopicOfFile } from '@/api/foreign'
 import type { TopicChoices } from '@/api/topics'
+import { isKnownSpace, topicHref } from '@/lib/topicLinks'
+import { linkTo } from '@/router'
 import type { FileTopicsState } from '@/api/useFileTopics'
 import { Button } from '@/components/ui/Button'
 import { Chip } from '@/components/ui/Chip'
@@ -14,9 +16,9 @@ import { SkeletonBar } from '@/components/ui/Skeleton'
  * **A project's or an issue's topics** (TOP-5; why:
  * https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-topic-keeps-its-own-list-of-files.md),
  * in its Overview: one chip per topic whose list names this file, each opening the
- * topic in Peek, as the Per app prototype draws a file's Topics row (estiva-ui
- * `concept/cross-app-navigation`, `Lens.tsx` FilePage). "None" when no topic
- * lists it.
+ * topic's page here (SHIPS-4), or a space in Peek beside Ship, as the Per app
+ * prototype draws a file's Topics row (estiva-ui `concept/cross-app-navigation`,
+ * `Lens.tsx` FilePage). "None" when no topic lists it.
  *
  * Add to topic and each chip's ✕ are where the prototype draws nothing yet
  * (Miky, 1 Nov: Katerina polishes after). They follow the topic, not the file:
@@ -54,7 +56,11 @@ export function FileTopics({ topics, busy, onChange, readChoices, choicesNow }: 
         <div className="flex flex-wrap items-center gap-1">
           {topics.map((topic) => (
             <span key={topic.address} className="flex items-center" data-file-topic={topic.address}>
-              <Chip label={topic.archived ? `${topic.title} (archived)` : topic.title} leadingIcon={<KindIcon kind="topic" size={14} tone="inherit" />} href={topic.openUrl} onClick={(event) => openBeside(event, topic.openUrl)} />
+              <Chip
+                label={topic.archived ? `${topic.title} (archived)` : topic.title}
+                leadingIcon={<KindIcon kind="topic" size={14} tone="inherit" />}
+                {...(isKnownSpace(topic.address) ? { href: topic.openUrl, onClick: (event: { preventDefault: () => void }) => openBeside(event, topic.openUrl) } : linkTo(topicHref(topic.address, topic.title)))}
+              />
               {!topic.archived && !busy.has(topic.address) && (
                 <IconButton variant="muted" aria-label={`Remove from ${topic.title}`} tooltip={`Remove from ${topic.title}`} onClick={() => onChange(topic, false)}>
                   <IconX size={12} stroke={1.5} />

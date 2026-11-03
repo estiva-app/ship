@@ -363,6 +363,17 @@ export function readAllTopics(): Promise<TopicsRead> {
 }
 
 /**
+ * The Leaf documents a topic lists, as their roots and changes draw them: what
+ * each is called now and where it opens (SHIPS-4). One read for all of them,
+ * never their comments; one the reader cannot read is not returned.
+ */
+export async function readTopicDocuments(addresses: readonly string[]): Promise<ForeignObject[]> {
+  if (addresses.length === 0) return []
+  const objects = await resolveForeignRoots(addresses, query, manifests, { archivedWith: true })
+  return objects.filter((object) => !object.unreachable)
+}
+
+/**
  * Each topic's conversations in Peek and Peek's dot on it, for a page that
  * draws them (SHIPS-2). `merged` and `muted` are the app's: both are encrypted.
  */

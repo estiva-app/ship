@@ -20,8 +20,10 @@ import { ProjectPage } from '@/pages/ProjectPage'
 import { act, type Say } from '@/pages/act'
 import { MoveProject } from '@/components/MoveProject'
 import { ProjectsPage } from '@/pages/ProjectsPage'
+import { TopicPage } from '@/pages/TopicPage'
 import { TopicsPage } from '@/pages/TopicsPage'
-import { prefetchTopics } from '@/api/topics'
+import { ensureTopics, prefetchTopics } from '@/api/topics'
+import { isTopicAddress } from '@/lib/topicLinks'
 import { ID_CONFIG, RELAY_URL } from './config'
 import { beginSignIn, beginSignOut, signInAvailable, signedIn } from './auth/estivaId'
 import { identifierFromRef, type FolderSummary } from '@estiva-app/interop'
@@ -268,9 +270,11 @@ function opens(route: Route, state: WorkspaceState | null): boolean {
 
 /** Which page the route names; an inbound reference shows nothing until it resolves. */
 function Page({ route, state, loading, directory, teams, folders, archives, say, refresh }: { route: Route; state: WorkspaceState | null; loading: boolean; directory: DirectoryView; teams: FolderSummary[] | undefined; folders: FolderSummary[] | undefined; archives: Archives | undefined; say: Say; refresh: (folders?: string[]) => Promise<void> }) {
-  // Topics reads its topics beside the workspace, not after it: the page itself waits for both.
+  // Topics reads its topics beside the workspace, not after it: the page itself waits for both. A topic's page
+  // draws from the read Topics already holds, and reads only when there is none (SHIPS-4).
   useEffect(() => {
     if (route.name === 'topics') void prefetchTopics()
+    if (route.name === 'topic') void ensureTopics()
   }, [route.name])
   /*
     The first read has not landed. This used to render nothing at all, which is
@@ -296,6 +300,8 @@ function Page({ route, state, loading, directory, teams, folders, archives, say,
   switch (route.name) {
     case 'topics':
       return <TopicsPage state={state} folders={folders} folder={route.folder} />
+    case 'topic':
+      return <TopicPage key={route.d} d={route.d} state={state} folders={folders} archives={archives} />
     case 'projects':
       return <ProjectsPage state={state} directory={directory} teams={teams} archives={archives} archived={route.archived} say={say} refresh={refresh} />
     case 'issues':
@@ -349,7 +355,7 @@ export function sidebarProps(
         : route.name === 'elsewhere'
           ? // Another app's file is none of the sidebar's places, so none is lit.
             { projectAddr: '' }
-          : route.name === 'projects' ? ('projects' as const) : route.name === 'topics' ? ('topics' as const) : ('issues' as const)
+          : route.name === 'projects' ? ('projects' as const) : route.name === 'topics' || route.name === 'topic' ? ('topics' as const) : ('issues' as const)
   // An issue is under Issues; its project's team opens onto the project's row, unmarked (Katerina, 30 October).
   const issue = route.name === 'issue' ? state?.issues.find((i) => i.id === route.d) : undefined
   return {
@@ -428,6 +434,9 @@ function useInbound(route: Route, say: (text: string, tone?: 'ok' | 'error') => 
   const saidBusyFor = useRef<string | null>(null)
   useEffect(() => {
     if (naddr === null) return
+    // A topic has its page here (SHIPS-4): it reads the topic itself, and says when the reader cannot.
+    const topic = topicOfNaddr(naddr)
+    if (topic) return replace({ name: 'topic', d: topic })
     let cancelled = false
     let retry: ReturnType<typeof setTimeout> | undefined
     resolveInbound(naddr)
@@ -478,6 +487,16 @@ function useInbound(route: Route, say: (text: string, tone?: 'ok' | 'error') => 
       clearTimeout(retry)
     }
   }, [naddr, say, clear, n])
+}
+
+/** The `d` of the topic an inbound `/o/<naddr>` names, or undefined for any other file or a malformed link. */
+function topicOfNaddr(naddr: string): string | undefined {
+  try {
+    const addr = naddrToAddr(naddr)
+    return isTopicAddress(addr) ? (identifierFromRef(addr) ?? undefined) : undefined
+  } catch {
+    return undefined
+  }
 }
 
 /** How long an inbound link waits before asking a busy relay again (APP-9). */
