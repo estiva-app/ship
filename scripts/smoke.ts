@@ -1030,7 +1030,8 @@ async function main() {
   // Scoped to the sidebar: the project detail's breadcrumb also says "Projects".
   await sidebar().getByRole('link', { name: /^Projects/ }).click()
   await page.waitForSelector('[data-surface="projects"]')
-  check('an archived project leaves the sidebar', (await sidebar().getByRole('link').count()) === 2)
+  // Topics, Issues and Projects are the links left: no project row (Topics joined them in SHIPS-3).
+  check('an archived project leaves the sidebar', (await sidebar().getByRole('link').count()) === 3)
   const projects = page.locator('[data-surface="projects"]')
   check('  …and the active list', (await projects.getByRole('link').count()) === 0)
   check('  …but is reachable behind a tab', await page.getByRole('tab', { name: /^Archived/ }).isVisible())
