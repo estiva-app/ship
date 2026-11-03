@@ -65,6 +65,7 @@ import { go, href, type ProjectTab, type ProjectView as ProjectViewName } from '
 import { act, actInField, sayOnceLeft, type Say } from './act'
 import { editedFor, historyFor } from './history'
 import { useSideColumn } from './sideColumn'
+import { FileTopicsOf } from '@/components/FileTopicsOf'
 import { hrefForIssue, rowFor } from './IssuesPage'
 import { MoveProject } from '@/components/MoveProject'
 import { ArchiveDialog, ArchivedNotice } from '@estiva-app/ui'
@@ -790,6 +791,7 @@ export function ProjectPage({
         issueStatuses={ISSUE_STATUSES}
         hrefFor={hrefForIssue}
         related={related}
+        topics={<FileTopicsOf file={project.id} say={say} />}
         threads={threads}
         conversationsLoading={!held.folders}
         mentionsLoading={!held.all}

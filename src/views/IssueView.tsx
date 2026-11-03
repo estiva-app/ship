@@ -56,6 +56,8 @@ export interface IssueViewProps {
   descriptionBy?: string | null
   /** Foreign files placed under this issue — RFC 0.5 §10.7. Drawn only when there is something to say. */
   related?: RelatedState
+  /** The topics that list it, with Add to topic (TOP-5): the Overview's "Topics", where the rail had them. */
+  topics?: ReactNode
   /** Threads that are *about* this issue — a tag at the root, never a passing mention (§6.4). */
   threads: ThreadData[]
   /** Threads elsewhere that mention it, time-ordered, each carrying how it is related: the Overview's Activity. */
@@ -114,7 +116,7 @@ export interface IssueViewProps {
 }
 
 /** One issue's page, its comments or its Overview beside it. */
-export function IssueView({ crumbs, title, summary, onSummarize, description, descriptionFormat, nameOf, onRename, onCopyBlockLink, onDescribe, onMention, descriptionBy, related, threads, conversationsLoading, mentionsLoading, unread, stillUnread, onThreadShown, onStartConversation, onReply, activity, activityTruncated, history, fields, menu, comments, overview, about, onReact, onDeleteMessage, onEditMessage, readOnlyReason, lockedReason, commentsClosed, upload, archivedNotice, members, edited }: IssueViewProps) {
+export function IssueView({ crumbs, title, summary, onSummarize, description, descriptionFormat, nameOf, onRename, onCopyBlockLink, onDescribe, onMention, descriptionBy, related, topics, threads, conversationsLoading, mentionsLoading, unread, stillUnread, onThreadShown, onStartConversation, onReply, activity, activityTruncated, history, fields, menu, comments, overview, about, onReact, onDeleteMessage, onEditMessage, readOnlyReason, lockedReason, commentsClosed, upload, archivedNotice, members, edited }: IssueViewProps) {
   // `linkTo` on each crumb (S15, 0.10.0): the breadcrumbs were the last links in Ship that reloaded the app (SHI-20).
   const items: Crumb[] = [{ label: 'Issues', ...linkTo(crumbs.issuesHref) }]
   // The box before the project's name says it is a project, as the sidebar's entry does (Katerina, 2026-09-09).
@@ -144,7 +146,7 @@ export function IssueView({ crumbs, title, summary, onSummarize, description, de
       {/* Its Overview, in the comments' place (ONE-6, step 4d): Activity, History, and what is placed under it ("Related"). */}
       {overview.shown && (
         <div className="flex shrink-0 flex-col border-l border-border-default" data-overview-column>
-          <OverviewPanel activity={activity} activityTruncated={activityTruncated} loading={mentionsLoading} history={history} related={related} about={about} nameOf={nameOf} />
+          <OverviewPanel activity={activity} activityTruncated={activityTruncated} loading={mentionsLoading} history={history} topics={topics} related={related} about={about} nameOf={nameOf} />
         </div>
       )}
       {/* Its comments, the kit's one column, 384px beside the page, the full height of the page (Katerina, 2 November). */}

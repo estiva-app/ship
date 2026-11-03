@@ -1,7 +1,7 @@
 import type { Embed, Imeta, NostrTag, PublishResult } from '@estiva-app/protocol'
 import { addrToNaddr, toRenderTree } from '@estiva-app/protocol'
 import { MAX_MENTIONED_PEOPLE, boxLinksOf, embedsToEdit, embedsToSend, namedBefore, withoutCard } from '@estiva-app/conversation'
-import { linksIn, MAX_LINKS_ASKED, within, type OwnPlace } from '@estiva-app/interop'
+import { linksIn, listedBeneath, MAX_LINKS_ASKED, within, type OwnPlace } from '@estiva-app/interop'
 import type { Conversation, Issue, Project } from '../nostr/fold'
 import { clashes, explicitKey, keyOfRef, nextRef, projectKeys, suggestKey, takenKeys } from '../nostr/keys'
 import { RELAY_URL } from '../config'
@@ -9,6 +9,8 @@ import { clockProblem } from './clock'
 import { loadQuery, readFolderListing, readFolders } from './foreign'
 import { links } from './linkCards'
 import { linkResolverFor } from '../lib/linksNamingCards'
+import { isRelayBusy } from '../lib/relayBudget'
+import { SignerTokenExpired } from '../nostr/signer'
 import { store } from './store'
 
 /**
@@ -76,6 +78,16 @@ async function publish(action: () => Promise<PublishResult>): Promise<WriteResul
 export function setMembership(target: { kind: 'issue'; issue: Issue } | { kind: 'project'; project: Project }, person: string, member: boolean): Promise<WriteResult> {
   const [file, folder] = target.kind === 'issue' ? [target.issue.addr, target.issue.folder] : [target.project.addr, target.project.contentFolder]
   return publish(() => store.setMembership({ folder, file, person, member }))
+}
+
+/**
+ * Add this issue or project to a topic, or take it off (TOP-5): an entry on
+ * the topic's list, by the file's id, filed in the topic's Folder. Refused by
+ * the relay for someone outside that Folder.
+ * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-topic-keeps-its-own-list-of-files.md
+ */
+export function setListedInTopic(topic: { address: string; folder: string }, file: string, listed: boolean): Promise<WriteResult> {
+  return publish(() => store.setListedInTopic({ topic: { address: topic.address, folder: topic.folder }, file, listed }))
 }
 
 /**
@@ -211,42 +223,89 @@ export async function deleteProject(
   }
 }
 
+/** What a move says when it stopped: nothing moved (a sentence, and `changed` when the Folders must be read again), or half moved. */
+export type MoveResult =
+  | { ok: true; stillIn?: { folder: string; why?: string } }
+  | { ok: false; reason: string; changed?: true }
+
 /**
- * Move a project to another top-level Folder (FOL-7): listed in `to`, then
- * unlisted from each Folder in `from` — the ones that list it now, each with
- * `hasState` from the caller's read. Its record, its issues and its
+ * Why a move stopped where this side failed rather than the relay judging the
+ * move: said as that failure, on any command (TEA-3). A wait is the relay's
+ * quota (HTTP 429) or busy answer; an `accepted: false` is its judgement, read
+ * by `readMoveRefusal` whatever its words.
+ */
+function ownFailure(stopped: { reason?: string; httpStatus?: number; threw?: unknown }): string | undefined {
+  if (stopped.threw instanceof SignerTokenExpired) return 'your sign-in has ended. Sign in again.'
+  if (stopped.httpStatus === 429 || isRelayBusy(stopped.reason ?? '') || isRelayBusy(stopped.threw)) return 'the relay is too busy right now. Try again shortly.'
+  if ('threw' in stopped) return 'the move could not be sent. Try again.'
+  return undefined
+}
+
+/**
+ * Move a project to another top-level Folder (FOL-7): one move into `to` from
+ * each Folder in `from` — the ones it is under now, each with `hasState` and
+ * `addresses` from the caller's read. Its record, its issues and its
  * conversation are not touched (`Store.moveProject`).
  *
- * A refused `remove` is still a move — the project is in `to` — so it comes
- * back `ok` with `stillIn`, each Folder that still lists it and why, as
- * `createProject`'s `unlisted` does. Moving it again is the retry.
+ * **Only a Folder that holds some of it is moved from.** Each source's listing
+ * is read at the move; one whose state names the project, or lists it or a
+ * file beneath it, is a source, and the project is named in it so the two go
+ * together. One that holds none of it — the project's own Folder, where the
+ * sidebar places a project no Folder lists (`placedIn`) — is not: the relay
+ * refuses a move whose source lists none of its files, and the planner, seeing
+ * no source, places the project in `to` instead.
+ *
+ * A refusal after an earlier move is still a move — the project is in `to` —
+ * so it comes back `ok` with `stillIn`: the Folder whose move was refused and
+ * why, which moving again fixes. Why is said in Ship's words, never the
+ * relay's text, and a refusal as one sentence the person reads as it is.
  */
 export async function moveProject(
   project: Project,
-  /** With `addresses`, what each one's state lists: the project moves out of one that names it even when its card did not resolve. */
+  /** With `addresses`, what each one's state lists. */
   from: readonly { id: string; hasState: boolean; addresses?: readonly string[] }[],
   to: { id: string; hasState: boolean; private?: boolean },
-): Promise<WriteResult & { stillIn?: { folder: string; reason: string }[] }> {
+): Promise<MoveResult> {
   const clock = await clockProblem()
   if (clock) return refused(clock)
+  const nothing = (why?: string) => (why ? `Nothing was moved: ${why}` : 'Nothing was moved. Try again.')
   try {
     // What each source lists beneath the project moves with it (SPEC §3.3): one read per source, at the moment of the move.
     // Unread, a move would leave what is under the project behind, so nothing is sent.
-    const sources = from.filter((folder) => folder.id !== to.id && folder.hasState)
+    const read = from.filter((folder) => folder.id !== to.id && folder.hasState)
     // One load across the sources: a file listed in two of them has its changes asked for once (APP-2).
     const load = loadQuery()
-    const read = await Promise.all(sources.map((folder) => readFolderListing(folder.id, load).catch(() => null)))
-    if (read.some((files) => files === null)) return refused('the Folder it is in could not be read, so nothing was moved. Try again')
-    const listings = new Map(sources.map((folder, i) => [folder.id, read[i]!] as const))
-    const { refused: unsafe, added, removed } = await store.moveProject({ project: project.addr, from, to, listings })
-    if (unsafe === 'source-has-no-state') return refused('the Folder it is in has no list of its own, so taking it out would empty that Folder')
-    if (unsafe === 'target-has-no-state') return refused('that Folder has no list of its own, so adding to it would hide what is already there')
-    if (unsafe === 'target-is-private') return refused('that Folder is private, and this project would stay readable by the whole workspace')
-    if (added && !added.ok) return refused(added.reason)
-    const stillIn = removed.filter(({ result }) => !result.ok).map(({ folder, result }) => ({ folder, reason: result.reason ?? 'no reason given' }))
-    return stillIn.length > 0 ? { ok: true, stillIn } : { ok: true }
+    const files = await Promise.all(read.map((folder) => readFolderListing(folder.id, load).catch(() => null)))
+    if (files.some((listed) => listed === null)) return refused(nothing('the Folder it is in could not be read. Try again.'))
+    const listings = new Map(read.map((folder, i) => [folder.id, files[i]!] as const))
+    const holds = (folder: (typeof from)[number]) => {
+      const listing = listings.get(folder.id)
+      if (!listing) return true
+      return !!folder.addresses?.includes(project.addr) || listing.some((file) => file.address === project.addr) || listedBeneath(listing, { ref: project.addr }).length > 0
+    }
+    const sources = from.filter(holds).map((folder) => (listings.has(folder.id) ? { ...folder, addresses: [project.addr] } : folder))
+    const { refused: unsafe, moveRefused } = await store.moveProject({ project: project.addr, from: sources, to, listings })
+    // `target-is-not-home` is a topic's rule: a project has no home, so it is never planned.
+    if (unsafe === 'source-has-no-state') return refused(nothing('the Folder it is in has no list of its own, so taking it out would empty that Folder.'))
+    if (unsafe === 'target-is-private') return refused(nothing('that Folder is private, and this project would stay readable by the whole workspace.'))
+    if (unsafe) return refused(nothing('that Folder has no list of its own, so adding to it would hide what is already there.'))
+    if (!moveRefused) return { ok: true }
+    // Ship's words for why, never the relay's text (TEA-3).
+    const why =
+      ownFailure(moveRefused) ??
+      (moveRefused.why === 'team-archived'
+        ? 'one of the Folders is archived.'
+        : moveRefused.why === 'not-a-member'
+          ? 'you need to be a member of both Folders to move this.'
+          : moveRefused.why === 'changed-meanwhile'
+            ? 'the Folders changed since you opened this. Try again.'
+            : undefined)
+    // A list changed since it was read: the caller reads the Folders again, so moving again can succeed.
+    if (moveRefused.nothingMoved) return { ok: false, reason: nothing(why), ...(moveRefused.why === 'changed-meanwhile' ? { changed: true as const } : {}) }
+    // The earlier moves arrived. Only the refused command's Folder was asked; the ones after it were never sent to.
+    return { ok: true, stillIn: { folder: moveRefused.notMovedFrom[0], ...(why ? { why } : {}) } }
   } catch (error) {
-    return refused(error instanceof Error ? error.message : String(error))
+    return refused(nothing(ownFailure({ threw: error })))
   }
 }
 

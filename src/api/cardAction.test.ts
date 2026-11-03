@@ -8,10 +8,23 @@ import { addrToNaddr, type SignedEvent } from '@estiva-app/protocol'
 import { buildManifest } from '../nostr/manifest'
 
 // Read while the module mock is built, which runs before this file's own lines.
-const { READER, publish } = vi.hoisted(() => ({
+const { READER, publish, runtime } = vi.hoisted(() => ({
   READER: 'f3a38fa6c6a1e5d2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f7081920',
   publish: vi.fn(async (event: import('@estiva-app/protocol').SignedEvent) => ({ ok: true, eventId: event.id }) as { ok: boolean; reason?: string }),
+  /** What the runtime builds, rewritten: the reader signs only what it checked, whatever a manifest or a runtime hands it. */
+  runtime: { rewrite: undefined as undefined | ((tags: string[][]) => string[][]) },
 }))
+vi.mock('@estiva-app/interop', async (importOriginal) => {
+  const real = await importOriginal<typeof import('@estiva-app/interop')>()
+  return {
+    ...real,
+    buildActionEvents: (...args: Parameters<typeof real.buildActionEvents>) => {
+      const built = real.buildActionEvents(...args)
+      const rewrite = runtime.rewrite
+      return typeof built === 'string' || !rewrite ? built : built.map((event) => ({ ...event, tags: rewrite(event.tags) }))
+    },
+  }
+})
 const SHIP = 'cb77583ed45cac74ce4e46c626c1edada0204a6fc4c91f9c7be230b5af36156c'
 const ADA = 'b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46'
 const FOLDER = '05bebd5b-b699-4bd4-af50-f5377df0fd67'
@@ -55,6 +68,7 @@ beforeEach(() => {
   publish.mockClear()
   manifest = shipManifest
   changes = []
+  runtime.rewrite = undefined
 })
 
 describe('a change made from a card', () => {
@@ -107,6 +121,30 @@ describe('a change made from a card', () => {
       const { applyCardAction } = await import('./foreign')
       const result = await applyCardAction({ reference: `nostr:${addrToNaddr(ISSUE)}`, actionId: 'set-issue-status', value: 'done' })
       expect(result.ok, JSON.stringify(change)).toBe(false)
+    }
+    expect(publish).not.toHaveBeenCalled()
+  })
+
+  // Interop 0.73 (§6.2): a change names its file's id beside its address, and a status the stage its option means.
+  it('signs the change with its file’s id and its option’s stage', async () => {
+    expect(await applyCardAction({ reference: `nostr:${addrToNaddr(ISSUE)}`, actionId: 'set-issue-status', value: 'done' })).toEqual({ ok: true })
+    const tags = publish.mock.calls[0][0].tags
+    expect(tags.filter((t) => t[0] === 'O')).toEqual([['O', ISSUE.split(':')[2]]])
+    expect(tags.filter((t) => t[0] === 'stage')).toEqual([['stage', 'status', 'done']])
+  })
+
+  it('signs nothing whose id is another file’s or named twice, or whose stage is about another field', async () => {
+    const id = ISSUE.split(':')[2]
+    const rewrites: [string, (tags: string[][]) => string[][]][] = [
+      ['another file’s id', (tags) => tags.map((t) => (t[0] === 'O' ? ['O', 'another-file'] : t))],
+      ['a second id', (tags) => [...tags, ['O', id]]],
+      ['a stage about another field', (tags) => tags.map((t) => (t[0] === 'stage' ? ['stage', 'assignee', t[2]] : t))],
+      ['a second stage', (tags) => [...tags, ['stage', 'status', 'started']]],
+    ]
+    for (const [what, rewrite] of rewrites) {
+      runtime.rewrite = rewrite
+      const result = await applyCardAction({ reference: `nostr:${addrToNaddr(ISSUE)}`, actionId: 'set-issue-status', value: 'done' })
+      expect(result.ok, what).toBe(false)
     }
     expect(publish).not.toHaveBeenCalled()
   })

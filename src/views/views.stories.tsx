@@ -16,6 +16,8 @@ import { useSideColumn, type Side } from '@/pages/sideColumn'
 import type { Imeta } from '@estiva-app/protocol'
 import { ArchivedNotice } from '@estiva-app/ui'
 import { archivedNoticeOf } from '@/lib/archive'
+import type { TopicOfFile } from '@/api/foreign'
+import { FileTopics } from '@/components/FileTopics'
 
 /** Attach without a relay: the picked file, shown from the browser's own memory. */
 const pretendUpload = async (file: File) => ({ url: URL.createObjectURL(file), m: file.type || 'application/octet-stream', x: '0'.repeat(64), size: file.size, filename: file.name }) as unknown as Imeta
@@ -148,6 +150,22 @@ const archivedNotice = (withProject?: boolean) => (
   />
 )
 
+const topic = (d: string, title: string, archived = false): TopicOfFile => ({ address: `30840:${'a'.repeat(64)}:${d}`, folder: 'team', title, openUrl: `https://peek.estiva.app/topic/${d}`, archived })
+const TOPIC_CHOICES = { yours: [topic('w', 'Widgets'), topic('r', 'Roadmap')], others: [topic('d', 'Design review'), topic('q', 'Q4 planning')] }
+
+/** The topics that list a file (TOP-5), working: Add to topic and ✕ change the chips; an archived topic has no ✕. */
+function StoryTopics({ start }: { start: TopicOfFile[] }) {
+  const [topics, setTopics] = useState(start)
+  return (
+    <FileTopics
+      topics={topics}
+      busy={new Set()}
+      onChange={(t, listed) => setTopics((held) => (listed ? [...held, t] : held.filter((h) => h.address !== t.address)).sort((a, b) => a.title.localeCompare(b.title)))}
+      readChoices={async () => TOPIC_CHOICES}
+    />
+  )
+}
+
 const projectPage = (startTab: ProjectTab, startView: 'table' | 'board' = 'table', readOnlyReason?: string, archived = false, startSide: Side = 'comments'): Story => ({
   render: () => {
     const [tab, setTab] = useState<ProjectTab>(startTab)
@@ -175,6 +193,7 @@ const projectPage = (startTab: ProjectTab, startView: 'table' | 'board' = 'table
           issueStatuses={ISSUE_STATUSES}
           hrefFor={hrefFor}
           related={RELATED}
+          topics={<StoryTopics start={[]} />}
           threads={THREADS}
           onStartConversation={fn()}
           onReply={fn()}
@@ -246,6 +265,7 @@ const issuePage = (archivedWithProject = false, withSummary = true, newWhileHidd
           onReply={fn()}
           activity={ACTIVITY_ITEMS}
           history={ACTIVITY}
+          topics={<StoryTopics start={[topic('w', 'Widgets'), topic('o', 'Old launch', true)]} />}
           upload={pretendUpload}
           archivedNotice={archivedWithProject && archivedNotice(true)}
           lockedReason={archivedWithProject ? 'Unarchive its project to edit' : undefined}

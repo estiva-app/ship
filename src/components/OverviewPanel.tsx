@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { Panel, SectionHeader } from '@estiva-app/ui'
 import type { ActivityItem } from '@/components/Activity'
 import { History, type HistoryEntry } from '@/components/History'
@@ -14,6 +15,8 @@ export interface OverviewPanelProps {
   loading?: boolean
   /** Its own changes, in words. */
   history: HistoryEntry[]
+  /** The topics that list it, with Add to topic (TOP-5): `FileTopicsOf`, which reads and writes them itself. */
+  topics?: ReactNode
   /** Files placed under it from other apps (RFC 0.5 §10.7). Drawn only when there is something to say (`hasRelated`). */
   related?: RelatedState
   /** The page's own address: its links in the mentions keep their chip and draw no card (WID-3). */
@@ -24,10 +27,10 @@ export interface OverviewPanelProps {
 /**
  * An issue's or a project's Overview: Peek's third column, in the column beside the page in place of the comments
  * (Katerina, 2 November; ONE-6, step 4d). "Activity", the conversations elsewhere that name it, read-only as Peek
- * draws them; then its "History"; then "Related", what was placed under it, when there is any. One scroll for all
- * three, as Peek's (27 September).
+ * draws them; then its "History"; then its "Topics", the rail's until the rail went (TOP-5); then "Related", what
+ * was placed under it, when there is any. One scroll for all four, as Peek's (27 September).
  */
-export function OverviewPanel({ activity, activityTruncated, loading, history, related, about, nameOf }: OverviewPanelProps) {
+export function OverviewPanel({ activity, activityTruncated, loading, history, topics, related, about, nameOf }: OverviewPanelProps) {
   return (
     <Panel title="Overview" className="min-h-0 w-96 flex-1" bodyClassName="flex flex-col pb-4">
       {/* Peek's spacing: 16px above the heading, its own 8px inset brought to the cards' 16px edge, its count beside it. */}
@@ -39,6 +42,12 @@ export function OverviewPanel({ activity, activityTruncated, loading, history, r
       <div className="px-4 pt-1">
         <History entries={history} />
       </div>
+      {topics && (
+        <>
+          <SectionHeader title="Topics" hover="none" className="mx-2 mt-4" />
+          <div className="px-4 pt-1">{topics}</div>
+        </>
+      )}
       {hasRelated(related) && (
         <>
           <SectionHeader title="Related" hover="none" className="mx-2 mt-4" />

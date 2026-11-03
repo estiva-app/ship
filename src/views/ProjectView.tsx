@@ -68,6 +68,8 @@ export interface ProjectViewProps {
   hrefFor: (issue: IssueRowData) => string
   /** Foreign files placed under this project — RFC 0.5 §10.7: the Overview's "Related", drawn only when there is something to say; see `hasRelated`. */
   related?: RelatedState
+  /** The topics that list it, with Add to topic (TOP-5): the Overview's "Topics", where the rail had them. */
+  topics?: ReactNode
   threads: ThreadData[]
   /** The comments, and the Overview's Activity, are still on the way (APP-5): drawn as loading, never as none. */
   conversationsLoading?: boolean
@@ -130,7 +132,7 @@ const TABS: { id: ProjectTab; label: string }[] = [
 ]
 
 /** One project's page, in tabs: Overview and Issues; its comments or its Overview beside it. */
-export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onView, issues, issueStatuses, hrefFor, related, threads, conversationsLoading, mentionsLoading, unread, stillUnread, onThreadShown, onStartConversation, onReply, onCopyBlockLink, activity, activityTruncated, history, fields, menu, comments, overview, about, onReact, onDeleteMessage, onEditMessage, readOnlyReason, lockedReason, commentsClosed, upload, archivedNotice, members, edited }: ProjectViewProps) {
+export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onView, issues, issueStatuses, hrefFor, related, topics, threads, conversationsLoading, mentionsLoading, unread, stillUnread, onThreadShown, onStartConversation, onReply, onCopyBlockLink, activity, activityTruncated, history, fields, menu, comments, overview, about, onReact, onDeleteMessage, onEditMessage, readOnlyReason, lockedReason, commentsClosed, upload, archivedNotice, members, edited }: ProjectViewProps) {
   // A block menu's Comment shows the column, with that block above its box (RIC-18).
   const comment = useBlockComment(header.description, header.descriptionFormat, () => comments.onShownChange(true), onStartConversation)
   return (
@@ -193,7 +195,7 @@ export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onVi
       {/* Its Overview, in the comments' place (ONE-6, step 4d): Activity, History, and what is placed under it ("Related"). */}
       {overview.shown && (
         <div className="flex shrink-0 flex-col border-l border-border-default" data-overview-column>
-          <OverviewPanel activity={activity} activityTruncated={activityTruncated} loading={mentionsLoading} history={history} related={related} about={about} nameOf={header.nameOf} />
+          <OverviewPanel activity={activity} activityTruncated={activityTruncated} loading={mentionsLoading} history={history} topics={topics} related={related} about={about} nameOf={header.nameOf} />
         </div>
       )}
       {/* Its comments, the kit's one column, 384px beside the page on both tabs, Issues too (Katerina, 2 November: A). */}

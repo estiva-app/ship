@@ -17,6 +17,7 @@ import { go, href } from '../router'
 import { act, actInField, sayOnceLeft, type Say } from './act'
 import { editedFor, historyFor } from './history'
 import { useSideColumn } from './sideColumn'
+import { FileTopicsOf } from '@/components/FileTopicsOf'
 import { activityFor, cardEditOf, copyText, folderOfMessage, pickerPeople, refreshAfter, threadFor, useMentionLinks, withElsewhere } from './ProjectPage'
 import { useReferencePage } from '@/api/references'
 
@@ -200,6 +201,7 @@ export function IssuePage({ state, directory, archives, d, say, refresh }: { sta
         // The profile's name only: with none the line says "Someone", as Leaf's does, never a shortened key.
         descriptionBy={issue.fields.description && issue.fields.description.by !== me ? (directory.profileOf(issue.fields.description.by)?.name ?? null) : null}
         related={related}
+        topics={<FileTopicsOf file={issue.id} say={say} />}
         threads={threads}
         conversationsLoading={!held.folders}
         mentionsLoading={!held.all}

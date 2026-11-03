@@ -1223,7 +1223,8 @@ async function main() {
 
   // ── Move to Folder… (FOL-7) ───────────────────────────────────────────────
   // Listed in both now, as a half move leaves it: moving into the team takes
-  // it out of Onboarding — an add, then a remove, and never a kind:1851.
+  // it out of Onboarding — one move naming both Folders, and never a kind:1851
+  // (TEA-3).
   await page.goto(`http://localhost:${PORT}/#/project/${encodeURIComponent(projectAddr)}`)
   await page.waitForSelector('[data-surface="project"]')
   const beforeMove = stored.length
@@ -1235,10 +1236,10 @@ async function main() {
   await moveDialog.waitFor({ state: 'detached' })
   const moveWrites = stored.slice(beforeMove).filter((e) => e.kind === 1852 || e.kind === 1851)
   check(
-    '"Move to Folder…" publishes an add to the new Folder, then a remove from the other, and no kind:1851',
-    moveWrites.map((e) => `${e.kind} ${tagValue(e, 'op')} ${tagValue(e, 'h')?.slice(0, 8)} ${tagValue(e, 'a') === projectAddr}`).join(' | ') ===
-      `1852 add ${TEAM_ID.slice(0, 8)} true | 1852 remove ${FOLDER_ID.slice(0, 8)} true`,
-    moveWrites.map((e) => `${e.kind} ${tagValue(e, 'op')} ${tagValue(e, 'h')?.slice(0, 8)}`).join(' | ') || 'nothing published',
+    '"Move to Folder…" publishes one move into the new Folder, naming the one it leaves, and no kind:1851',
+    moveWrites.map((e) => `${e.kind} ${tagValue(e, 'op')} ${tagValue(e, 'h')?.slice(0, 8)} ${tagValue(e, 'from')?.slice(0, 8)} ${tagValue(e, 'a') === projectAddr}`).join(' | ') ===
+      `1852 move ${TEAM_ID.slice(0, 8)} ${FOLDER_ID.slice(0, 8)} true`,
+    moveWrites.map((e) => `${e.kind} ${tagValue(e, 'op')} ${tagValue(e, 'h')?.slice(0, 8)} from ${tagValue(e, 'from')?.slice(0, 8)}`).join(' | ') || 'nothing published',
   )
 
   // ── New folder, and rename it (FOL-8) ─────────────────────────────────────
