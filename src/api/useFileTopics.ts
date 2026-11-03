@@ -5,6 +5,14 @@ import { setListedInTopic, type WriteResult } from './writes'
 /** The topics that list a file: `undefined` while the first read runs, `'failed'` when it could not be read. */
 export type FileTopicsState = TopicOfFile[] | 'failed' | undefined
 
+/** A file's topics as {@link useFileTopics} holds them. */
+export interface FileTopicsOfFile {
+  state: FileTopicsState
+  /** Topic addresses with a write on the way. */
+  busy: ReadonlySet<string>
+  setListed: (topic: TopicOfFile, listed: boolean) => Promise<WriteResult>
+}
+
 /**
  * A Ship project's or issue's topics (TOP-5), and Add to topic and Remove.
  *
@@ -12,12 +20,7 @@ export type FileTopicsState = TopicOfFile[] | 'failed' | undefined
  * reload", so no live watch. A write shows at once and rolls back when the
  * relay refuses it, with the relay's reason for the caller to say.
  */
-export function useFileTopics(file: string | undefined): {
-  state: FileTopicsState
-  /** Topic addresses with a write on the way. */
-  busy: ReadonlySet<string>
-  setListed: (topic: TopicOfFile, listed: boolean) => Promise<WriteResult>
-} {
+export function useFileTopics(file: string | undefined): FileTopicsOfFile {
   const [state, setState] = useState<FileTopicsState>(undefined)
   const [busy, setBusy] = useState<ReadonlySet<string>>(new Set())
   const [nonce, setNonce] = useState(0)

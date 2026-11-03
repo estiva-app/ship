@@ -12,7 +12,9 @@ vi.mock('./store', () => ({
   signer: { pubkey: 'c'.repeat(64) },
 }))
 
-import { readFileTopics, readTopicChoices } from './foreign'
+import { readFileTopics } from './foreign'
+import { readTopicChoices, resetTopicsForTests, topicChoicesNow } from './topics'
+import { buildManifest } from '../nostr/manifest'
 
 interface TestEvent {
   id: string
@@ -41,8 +43,17 @@ const OWNER = 'a'.repeat(64)
 const FILE = 'issue-1'
 let seq = 0
 const event = (kind: number, tags: string[][], pubkey = OWNER, at = 1_700_000_000 + ++seq): TestEvent => ({ id: String(++seq).padStart(64, '0'), sig: '', pubkey, created_at: at, kind, tags, content: '' })
-const topic = (d: string, title: string, folder = 'team') => event(30840, [['d', d], ['title', title], ['h', folder]])
+const topic = (d: string, title: string, folder = 'team', parent?: string) => event(30840, [['d', d], ['title', title], ['h', folder], ...(parent ? [['a', parent]] : [])])
 const address = (d: string) => `30840:${OWNER}:${d}`
+/** Ship's own manifest, so a project resolves as the topic's parent does on production. */
+const shipManifest = () => {
+  const unsigned = buildManifest(OWNER, Date.now())
+  return { ...event(unsigned.kind, unsigned.tags, OWNER), content: unsigned.content }
+}
+const project = (d: string) => event(30850, [['d', d], ['title', 'Launch'], ['h', 'team']])
+const archivingProject = (d: string) => event(1851, [['a', `30850:${OWNER}:${d}`], ['O', d], ['field', 'archived'], ['value', 'true'], ['h', 'team']])
+/** A Folder the relay lists for the reader: its state, as `listFolders` reads it. */
+const folder = (id: string) => event(39000, [['d', id], ['name', id]])
 const listing = (d: string, file: string, listed: boolean, folder = 'team') =>
   event(1851, [['a', address(d)], ['O', d], ['field', `lists:${file}`], ['value', listed ? 'true' : 'false'], ['h', folder], ['ts', String(Date.now())], ['o', file]])
 const archiving = (d: string, folder = 'team') => event(1851, [['a', address(d)], ['O', d], ['field', 'archived'], ['value', 'true'], ['h', folder]])
@@ -50,6 +61,7 @@ const added = (d: string, person: string) => event(1851, [['a', address(d)], ['O
 
 beforeEach(() => {
   held.length = 0
+  resetTopicsForTests()
 })
 
 describe("a file's topics: the ones whose list names it now", () => {
@@ -72,16 +84,36 @@ describe("a file's topics: the ones whose list names it now", () => {
     held.push(topic('t-old', 'Old'), listing('t-old', FILE, true), archiving('t-old'))
     expect((await readFileTopics(FILE)).map((t) => [t.title, t.archived])).toEqual([['Old', true]])
   })
+
+  it('says a topic archived with its project is archived too', async () => {
+    held.push(shipManifest(), project('p'), archivingProject('p'), topic('t-under', 'Under', 'team', `30850:${OWNER}:p`), listing('t-under', FILE, true))
+    expect((await readFileTopics(FILE)).map((t) => [t.title, t.archived])).toEqual([['Under', true]])
+  })
 })
 
 describe("Add to topic's choices", () => {
   it('puts the topics you are a member of first, then the rest, each A–Z, and leaves archived ones out', async () => {
+    held.push(folder('team'))
     held.push(topic('t-z', 'Zeta'), topic('t-b', 'Beta'), topic('t-y', 'Yours'), topic('t-x', 'Archived'))
     held.push(added('t-y', ME), added('t-x', ME), archiving('t-x'))
     // A topic you created is yours from its root.
     held.push(event(30840, [['d', 't-mine'], ['title', 'Mine'], ['h', 'team']], ME))
+    // Archived with its project: read-only, so not offered either.
+    held.push(shipManifest(), project('p'), archivingProject('p'), topic('t-under', 'Under', 'team', `30850:${OWNER}:p`))
+    // In a Folder the relay does not list for you: it would refuse the entry.
+    held.push(topic('t-closed', 'Closed', 'elsewhere'))
     const { yours, others } = await readTopicChoices()
     expect(yours.map((t) => t.title)).toEqual(['Mine', 'Yours'])
     expect(others.map((t) => t.title)).toEqual(['Beta', 'Zeta'])
+  })
+
+  it('opened again, gives the held choices at once, and a topic made or archived since once the fresh read lands', async () => {
+    expect(topicChoicesNow()).toBeUndefined()
+    held.push(folder('team'), topic('t-b', 'Beta'), topic('t-o', 'Old'))
+    await readTopicChoices()
+    held.push(topic('t-c', 'Gamma'), archiving('t-o'))
+    expect(topicChoicesNow()?.others.map((t) => t.title)).toEqual(['Beta', 'Old'])
+    expect((await readTopicChoices()).others.map((t) => t.title)).toEqual(['Beta', 'Gamma'])
+    expect(topicChoicesNow()?.others.map((t) => t.title)).toEqual(['Beta', 'Gamma'])
   })
 })
