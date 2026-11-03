@@ -65,14 +65,15 @@ describe('ForeignObject', () => {
     expect(document.body.textContent).not.toContain('b'.repeat(64))
   })
 
-  it('says "not available" for a file this reader may not see, with the way to open it where it lives — never as an empty one', () => {
+  it('says "You can\'t open" a file this reader may not see, with no Open button — never as an empty one', () => {
     // The relay answers both with nothing. A screen that draws one state for
     // both quietly lies, and the reader cannot tell which they are looking at.
+    // No Open button: it would open a page saying the same (Decided 2026-11-03, ALO-4).
     const { rerender } = render(<ForeignObject object={base({ noun: 'topic', unreachable: true })} />)
-    expect(screen.getByText('Topic not available')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /Open in Peek/ }).getAttribute('href')).toBe('https://peek.estiva.app/o/naddr1topic')
+    expect(screen.getByText("You can't open this topic")).toBeInTheDocument()
+    expect(screen.queryByRole('link')).toBeNull()
     rerender(<ForeignObject object={base({ noun: 'topic', children: [] })} />)
-    expect(screen.queryByText(/not available/)).toBeNull()
+    expect(screen.queryByText(/can't open/)).toBeNull()
     expect(screen.getByText('design')).toBeInTheDocument()
   })
 

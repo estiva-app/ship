@@ -259,7 +259,14 @@ describe('a list item indented with Tab', () => {
     const onCommit = vi.fn<(value: string, format?: string) => boolean>(() => true)
     const { unmount } = render(<LiveDescription value={'- intro\n- after'} format="marker" onCommit={onCommit} resolved={{}} />)
     const box = await ready()
-    act(() => void box.editor.commands.focus('end'))
+    // The caret at the end of "after": since ui 0.102 the editor keeps an empty paragraph below a list, so 'end' is outside it.
+    act(() => {
+      let end = 0
+      box.editor.state.doc.descendants((node, pos) => {
+        if (node.isText && node.text === 'after') end = pos + node.nodeSize
+      })
+      box.editor.chain().focus().setTextSelection(end).run()
+    })
     await act(() => void fireEvent.keyDown(box, { key: 'Tab' }))
     fireEvent.blur(box)
     await waitFor(() => expect(onCommit).toHaveBeenCalled())

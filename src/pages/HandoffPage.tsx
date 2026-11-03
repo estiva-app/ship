@@ -59,7 +59,7 @@ export function HandoffPage({ word, fileRef, query }: { word: string; fileRef: s
       <div className="flex w-full max-w-prose flex-col gap-3">
         {/* The kit's card, labelled by the file's type ("Topic", PRO-24); where "not available" names an app to open it in, it is the one the link goes to. */}
         <ForeignObject object={{ ...object, appName: app ?? object.appName }} />
-        {/* An unreachable card already says where to open it. */}
+        {/* A file the reader can't open gets no Open link: its app would only say the same (Decided 2026-11-03, ALO-4). */}
         {openUrl && !object.unreachable && (
           <Link href={openUrl} variant="underlined">
             {app ? `Open in ${app}` : 'Open'}

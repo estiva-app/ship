@@ -61,7 +61,7 @@ describe('a comment that points at an object', () => {
   */
   it('does not render a pointer-only body as an empty message', async () => {
     const c = show(thread(NADDR))
-    await waitFor(() => expect(c.querySelector('[data-link-row]')?.textContent).toBe('Issue not available'))
+    await waitFor(() => expect(c.querySelector('[data-link-row]')?.textContent).toBe("You can't open this issue"))
     expect(c.textContent).not.toContain(NADDR)
   })
 

@@ -35,10 +35,12 @@ describe('HandoffPage', () => {
     expect(screen.getByText('Peek')).toBeInTheDocument()
   })
 
-  it('draws one way to open an unreachable file, the card’s own', () => {
+  it('says a file the reader can’t open is so, with no way to open it — neither the card’s nor the page’s', () => {
+    // Decided 2026-11-03 (ALO-4): no Open button on a file you can't open; the app would only say the same.
     answer = { state: 'found', object: { ...TOPIC, unreachable: true }, app: 'Peek', openUrl: TOPIC.openUrl }
     render(<HandoffPage word="topic" fileRef="x-d" />)
-    expect(screen.getAllByRole('link')).toHaveLength(1)
+    expect(screen.getByText(/You can't open this/)).toBeInTheDocument()
+    expect(screen.queryAllByRole('link')).toHaveLength(0)
   })
 
   it('says nothing was found, and why that may be, rather than a blank page', () => {
