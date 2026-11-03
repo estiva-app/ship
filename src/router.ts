@@ -80,6 +80,8 @@ export type Route =
    * for exactly that reason.
    */
   | { name: 'folder'; id: string }
+  /** Topics (SHIPS-3); with `folder`, only the topics filed in that Folder. */
+  | { name: 'topics'; folder?: string }
   /** An inbound `nostr:naddr…`, not yet resolved to an object. */
   | { name: 'inbound'; naddr: string }
   /**
@@ -96,7 +98,7 @@ export type Route =
  * somebody's file, and goes to the hand-off. `folder` is here because the old
  * Folder path still opens the Folder page; it is not a word Ship serves.
  */
-const OWN_SEGMENTS = new Set(['app', 'o', 'project', 'projects', 'issue', 'issues', 'folder'])
+const OWN_SEGMENTS = new Set(['app', 'o', 'project', 'projects', 'issue', 'issues', 'folder', 'topics'])
 
 /**
  * How a project's issues are shown.
@@ -142,6 +144,8 @@ export function href(route: Route): string {
       return `/issue/${objectRef(route.d, route.slug)}`
     case 'folder':
       return `/app/folder/${route.id}`
+    case 'topics':
+      return route.folder ? `/app/folder/${route.folder}/topics` : '/topics'
     case 'inbound':
       return `/o/${route.naddr}`
     case 'elsewhere':
@@ -188,6 +192,10 @@ export function parse(location: string): Route {
       return tab === 'overview' ? { name: 'project', d, view } : { name: 'project', d, view, tab }
     }
   }
+  if (parts[0] === 'topics') return { name: 'topics' }
+  // A Folder's Topics, under the Folder page's path, or the path it had before PRO-22.
+  const folderAt = parts[0] === 'app' && parts[1] === 'folder' ? 2 : parts[0] === 'folder' ? 1 : -1
+  if (folderAt !== -1 && parts[folderAt] && parts[folderAt + 1] === 'topics') return { name: 'topics', folder: parts[folderAt] }
   if (parts[0] === 'app' && parts[1] === 'folder' && parts[2]) {
     return { name: 'folder', id: parts[2] }
   }

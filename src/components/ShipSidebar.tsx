@@ -1,4 +1,4 @@
-import { IconArrowUpRight, IconBox, IconListDetails, IconPlus } from '@tabler/icons-react'
+import { IconArrowUpRight, IconBox, IconListDetails, IconPlus, IconTarget } from '@tabler/icons-react'
 import { NavItem, NavTree, Sidebar as SidebarShell, type NavTreeGroup, type NavTreeNode } from '@estiva-app/ui'
 import { MenuItem } from '@/components/ui/Menu'
 import { placedIn } from '@/lib/placement'
@@ -84,6 +84,8 @@ export interface SidebarFolder {
 export interface ShipSidebarProps {
   /** Open issues across the workspace, minus archived projects — as today. */
   openIssues: number
+  /** Topics (SHIPS-3), above Issues; no count, as the story draws it. */
+  topicsHref: string
   issuesHref: string
   projectsHref: string
   /** Active projects only, in the order the caller wants them shown. */
@@ -109,7 +111,7 @@ export interface ShipSidebarProps {
    */
   onNewFolder?: () => void
   /** Which entry the route is on. A project's `addr` marks its own row. */
-  current: 'issues' | 'projects' | { projectAddr: string } | { folderId: string }
+  current: 'topics' | 'issues' | 'projects' | { projectAddr: string } | { folderId: string }
   /**
    * The issue open, when the route is one. "Issues" stays the marked entry, and
    * the team holding the issue's project opens onto the project's row without
@@ -130,7 +132,7 @@ export interface ShipSidebarProps {
   className?: string
 }
 
-export function ShipSidebar({ openIssues, issuesHref, projectsHref, projects, folders = [], onOpenFolder, onMoveProject, onNewFolder, current, openIssue, loading = false, foldersLoading = false, className }: ShipSidebarProps) {
+export function ShipSidebar({ openIssues, topicsHref, issuesHref, projectsHref, projects, folders = [], onOpenFolder, onMoveProject, onNewFolder, current, openIssue, loading = false, foldersLoading = false, className }: ShipSidebarProps) {
   /*
     Both branches of `current` are objects now, so `typeof current === 'object'`
     no longer distinguishes them — it was correct while a project route was the
@@ -187,6 +189,7 @@ export function ShipSidebar({ openIssues, issuesHref, projectsHref, projects, fo
       ]
   return (
     <SidebarShell className={className}>
+      <NavItem label="Topics" href={topicsHref} icon={<IconTarget size={16} stroke={1.5} />} active={current === 'topics'} />
       <NavItem
         label="Issues"
         href={issuesHref}

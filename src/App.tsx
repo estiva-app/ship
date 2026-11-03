@@ -20,6 +20,8 @@ import { ProjectPage } from '@/pages/ProjectPage'
 import { act, type Say } from '@/pages/act'
 import { MoveProject } from '@/components/MoveProject'
 import { ProjectsPage } from '@/pages/ProjectsPage'
+import { TopicsPage } from '@/pages/TopicsPage'
+import { prefetchTopics } from '@/api/topics'
 import { ID_CONFIG, RELAY_URL } from './config'
 import { beginSignIn, beginSignOut, signInAvailable, signedIn } from './auth/estivaId'
 import { identifierFromRef, type FolderSummary } from '@estiva-app/interop'
@@ -266,6 +268,10 @@ function opens(route: Route, state: WorkspaceState | null): boolean {
 
 /** Which page the route names; an inbound reference shows nothing until it resolves. */
 function Page({ route, state, loading, directory, teams, folders, archives, say, refresh }: { route: Route; state: WorkspaceState | null; loading: boolean; directory: DirectoryView; teams: FolderSummary[] | undefined; folders: FolderSummary[] | undefined; archives: Archives | undefined; say: Say; refresh: (folders?: string[]) => Promise<void> }) {
+  // Topics reads its topics beside the workspace, not after it: the page itself waits for both.
+  useEffect(() => {
+    if (route.name === 'topics') prefetchTopics()
+  }, [route.name])
   /*
     The first read has not landed. This used to render nothing at all, which is
     what "Ship sometimes does not load the projects and issues" was: a full read
@@ -288,6 +294,8 @@ function Page({ route, state, loading, directory, teams, folders, archives, say,
   if (!state && loading) return <PageSkeleton shape={SKELETON[route.name] ?? 'rows'} />
   if (!state || !archives) return null
   switch (route.name) {
+    case 'topics':
+      return <TopicsPage state={state} archives={archives} folders={folders} folder={route.folder} />
     case 'projects':
       return <ProjectsPage state={state} directory={directory} teams={teams} archives={archives} archived={route.archived} say={say} refresh={refresh} />
     case 'issues':
@@ -341,11 +349,12 @@ export function sidebarProps(
         : route.name === 'elsewhere'
           ? // Another app's file is none of the sidebar's places, so none is lit.
             { projectAddr: '' }
-          : route.name === 'projects' ? ('projects' as const) : ('issues' as const)
+          : route.name === 'projects' ? ('projects' as const) : route.name === 'topics' ? ('topics' as const) : ('issues' as const)
   // An issue is under Issues; its project's team opens onto the project's row, unmarked (Katerina, 30 October).
   const issue = route.name === 'issue' ? state?.issues.find((i) => i.id === route.d) : undefined
   return {
     openIssues,
+    topicsHref: href({ name: 'topics' }),
     issuesHref: href({ name: 'issues' }),
     projectsHref: href({ name: 'projects', archived: false }),
     projects: active,

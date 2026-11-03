@@ -1,0 +1,188 @@
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { TopicConversation } from '@estiva-app/interop'
+import type { FolderState } from '@/api'
+import type { Archives } from '@/lib/archive'
+
+/*
+  SHIPS-3: Ship's Topics, drawn from the real topics read (interop's
+  `readTopics`) over a fake relay that answers filters as the relay does. The
+  conversations read is stubbed with what interop's `topicConversations` would
+  answer: its count and `fresh` are interop's own tests' (estiva-foundation#194);
+  what is under test here is which row shows them.
+*/
+const held: TestEvent[] = []
+let down = false
+const answer = async (filters: Record<string, unknown>[]) => {
+  if (down) throw new Error('relay unreachable')
+  return held.filter((e) => filters.some((f) => matches(f, e)))
+}
+vi.mock('@/api/store', () => ({
+  relay: { query: (filters: Record<string, unknown>[]) => answer(filters), queryAll: (filters: Record<string, unknown>[]) => answer(filters) },
+  signer: { pubkey: 'c'.repeat(64) },
+}))
+vi.mock('@/api/nip44', () => ({ nip44: { decrypt: async () => undefined } }))
+vi.mock('@/api/readStateSync', async (actual) => ({ ...(await actual<object>()), useLandedReadState: () => ({}) }))
+const conversations = new Map<string, TopicConversation>()
+vi.mock('@/api/foreign', async (actual) => ({ ...(await actual<object>()), readTopicConversations: async () => conversations }))
+
+import { TopicsPage } from './TopicsPage'
+import { resetTopicsForTests, topicChoicesNow } from '@/api/topics'
+import { foldersNow } from '@/api/useFolders'
+import { buildManifest } from '@/nostr/manifest'
+
+interface TestEvent {
+  id: string
+  sig: string
+  pubkey: string
+  created_at: number
+  kind: number
+  tags: string[][]
+  content: string
+}
+
+function matches(filter: Record<string, unknown>, e: TestEvent): boolean {
+  for (const [key, want] of Object.entries(filter)) {
+    if (key === 'limit' || key === 'since' || key === 'until') continue
+    const values = want as unknown[]
+    if (key === 'kinds' && !values.includes(e.kind)) return false
+    if (key === 'authors' && !values.includes(e.pubkey)) return false
+    if (key === 'ids' && !values.includes(e.id)) return false
+    if (key.startsWith('#') && !e.tags.some((t) => t[0] === key.slice(1) && values.includes(t[1]))) return false
+  }
+  return true
+}
+
+const ME = 'c'.repeat(64)
+const OWNER = 'a'.repeat(64)
+let seq = 0
+const event = (kind: number, tags: string[][], pubkey = OWNER): TestEvent => ({ id: String(++seq).padStart(64, '0'), sig: '', pubkey, created_at: 1_700_000_000 + ++seq, kind, tags, content: '' })
+const address = (d: string) => `30840:${OWNER}:${d}`
+const projectAddr = (d: string) => `30850:${OWNER}:${d}`
+const issueAddr = (d: string) => `30851:${OWNER}:${d}`
+const topic = (d: string, title: string, { folder = 'team', summary }: { folder?: string; summary?: string } = {}) =>
+  event(30840, [['d', d], ['title', title], ['h', folder], ...(summary ? [['summary', summary]] : [])])
+const lists = (d: string, file: string, folder = 'team') => event(1851, [['a', address(d)], ['O', d], ['field', `lists:${file}`], ['value', 'true'], ['h', folder], ['ts', String(Date.now())], ['o', file]])
+const archiving = (d: string) => event(1851, [['a', address(d)], ['O', d], ['field', 'archived'], ['value', 'true'], ['h', 'team']])
+const joined = (d: string) => event(1851, [['a', address(d)], ['O', d], ['field', `member:${ME}`], ['value', 'true'], ['p', ME], ['h', 'team']])
+/** A team's list marking a topic one of its spaces (§3.3). */
+const spaceMark = (d: string) => event(30890, [['d', 'team'], ['a', address(d), '', 'space']])
+const shipManifest = () => {
+  const unsigned = buildManifest(OWNER, Date.now())
+  return { ...event(unsigned.kind, unsigned.tags), content: unsigned.content }
+}
+const projectRoot = (d: string, folder = 'team') => event(30850, [['d', d], ['title', d], ['h', folder]])
+const issueRoot = (d: string, folder = 'team') => event(30851, [['d', d], ['title', d], ['h', folder]])
+
+/** Ship's fold of those projects and issues, and which of them are archived. */
+function ship(projects: { d: string; status: string }[], issues: string[], archived: string[] = []): { state: FolderState; archives: Archives } {
+  const gone = new Set(archived)
+  const archives: Archives = {
+    ofProject: (addr) => (gone.has(addr) ? { by: OWNER, at: 0 } as never : undefined),
+    ofIssue: ({ addr }) => (gone.has(addr) ? { by: OWNER, at: 0 } as never : undefined),
+  }
+  const state = {
+    projects: projects.map(({ d, status }) => ({ addr: projectAddr(d), id: d, title: d, status })),
+    issues: issues.map((d) => ({ addr: issueAddr(d), id: d, title: d })),
+  } as unknown as FolderState
+  return { state, archives }
+}
+
+const tabs = () => screen.getAllByRole('tab').map((tab) => tab.textContent)
+const rows = () => [...document.querySelectorAll('[data-topic]')].map((row) => row as HTMLElement)
+const titles = () => rows().map((row) => within(row).getAllByText(/./)[0].textContent)
+
+beforeEach(() => {
+  held.length = 0
+  conversations.clear()
+  down = false
+  resetTopicsForTests()
+})
+
+describe("Ship's Topics", () => {
+  it('opens on Your topics with every tab counted, A–Z, each row with its summary, projects done of all and what is new for you', async () => {
+    held.push(shipManifest(), projectRoot('p-done'), projectRoot('p-open'), projectRoot('p-gone'), issueRoot('i-1'))
+    held.push(topic('t-z', 'Zebra launch', { summary: 'Ship the zebra' }), joined('t-z'), lists('t-z', 'p-done'), lists('t-z', 'p-open'), lists('t-z', 'p-gone'))
+    held.push(topic('t-a', 'Alpha'), joined('t-a'), lists('t-a', 'i-1'))
+    held.push(topic('t-o', 'Others’ topic'), lists('t-o', 'i-1'))
+    conversations.set(address('t-z'), { conversations: 4, unread: true, fresh: 2 })
+    conversations.set(address('t-o'), { conversations: 1, unread: false, fresh: 0 })
+    const { state, archives } = ship(
+      [
+        { d: 'p-done', status: 'completed' },
+        { d: 'p-open', status: 'in_progress' },
+        { d: 'p-gone', status: 'completed' },
+      ],
+      ['i-1'],
+      [projectAddr('p-gone')],
+    )
+    render(<TopicsPage state={state} archives={archives} folders={[]} />)
+
+    await waitFor(() => expect(tabs()).toEqual(['All3', 'Your topics2', 'Other topics1', 'Archived0']))
+    expect(screen.getByRole('tab', { selected: true }).textContent).toBe('Your topics2')
+    expect(titles()).toEqual(['Alpha', 'Zebra launch'])
+    const zebra = rows()[1]
+    expect(within(zebra).getByText('Ship the zebra')).toBeTruthy()
+    // An archived project still counts among all of them, as Linear's Initiatives count.
+    expect(within(zebra).getByLabelText('2 of 3 projects completed')).toBeTruthy()
+    // Said once beside the count and once by the phone's dot, for a screen reader.
+    await waitFor(() => expect(within(zebra).getAllByText('2 new').length).toBeGreaterThan(0))
+    expect(within(zebra).getByText('4')).toBeTruthy()
+    // A topic with no summary has no second line, and nothing new says nothing.
+    expect(within(rows()[0]).queryByText(/new/)).toBeNull()
+
+    fireEvent.click(screen.getByRole('tab', { name: /Other topics/ }))
+    expect(titles()).toEqual(['Others’ topic'])
+  })
+
+  it('leaves out a space and a topic listing no project or issue, and puts a topic archived in Peek or with all its work archived under Archived only', async () => {
+    held.push(shipManifest(), projectRoot('p'), issueRoot('i-live'), issueRoot('i-gone'))
+    held.push(topic('t-space', 'Bugs'), joined('t-space'), lists('t-space', 'i-live'), spaceMark('t-space'))
+    held.push(topic('t-empty', 'Empty'), joined('t-empty'))
+    held.push(topic('t-peek', 'Archived in Peek'), joined('t-peek'), lists('t-peek', 'i-live'), archiving('t-peek'))
+    held.push(topic('t-done', 'All work archived'), joined('t-done'), lists('t-done', 'i-gone'))
+    held.push(topic('t-live', 'Live'), joined('t-live'), lists('t-live', 'i-live'), lists('t-live', 'i-gone'))
+    const { state, archives } = ship([{ d: 'p', status: 'planned' }], ['i-live', 'i-gone'], [issueAddr('i-gone')])
+    render(<TopicsPage state={state} archives={archives} folders={[]} />)
+
+    await waitFor(() => expect(tabs()).toEqual(['All1', 'Your topics1', 'Other topics0', 'Archived2']))
+    expect(titles()).toEqual(['Live'])
+    fireEvent.click(screen.getByRole('tab', { name: /Archived/ }))
+    expect(titles()).toEqual(['All work archived', 'Archived in Peek'])
+  })
+
+  it("a Folder's Topics shows only the topics filed in that Folder, under its name", async () => {
+    held.push(shipManifest(), issueRoot('i-1'), issueRoot('i-2', 'design'))
+    held.push(topic('t-team', 'Team topic'), joined('t-team'), lists('t-team', 'i-1'))
+    held.push(topic('t-design', 'Design topic', { folder: 'design' }), joined('t-design'), lists('t-design', 'i-2', 'design'))
+    const { state, archives } = ship([], ['i-1', 'i-2'])
+    render(<TopicsPage state={state} archives={archives} folders={[{ id: 'design', name: 'Design' } as never]} folder="design" />)
+
+    await waitFor(() => expect(titles()).toEqual(['Design topic']))
+    expect(screen.getByRole('heading', { name: 'Design · Topics' })).toBeTruthy()
+  })
+
+  it("says Topics didn't load when the read fails, and Try again reads them", async () => {
+    down = true
+    held.push(shipManifest(), issueRoot('i-1'), topic('t-a', 'Alpha'), joined('t-a'), lists('t-a', 'i-1'))
+    const { state, archives } = ship([], ['i-1'])
+    render(<TopicsPage state={state} archives={archives} folders={[]} />)
+
+    await waitFor(() => expect(screen.getByText('Topics didn’t load.')).toBeTruthy())
+    down = false
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    await waitFor(() => expect(titles()).toEqual(['Alpha']))
+  })
+
+  it("leaves Add to topic's list there at once on its first open after Topics has loaded", async () => {
+    held.push(event(39000, [['d', 'team'], ['name', 'team']]), shipManifest(), issueRoot('i-1'), topic('t-a', 'Alpha'), joined('t-a'), lists('t-a', 'i-1'))
+    // The app reads the Folders on its own; Add to topic waits for both.
+    await foldersNow()
+    expect(topicChoicesNow()).toBeUndefined()
+    const { state, archives } = ship([], ['i-1'])
+    render(<TopicsPage state={state} archives={archives} folders={[]} />)
+
+    await waitFor(() => expect(titles()).toEqual(['Alpha']))
+    expect(topicChoicesNow()?.yours.map((t) => t.title)).toEqual(['Alpha'])
+  })
+})

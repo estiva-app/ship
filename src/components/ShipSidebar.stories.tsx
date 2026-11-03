@@ -33,6 +33,7 @@ const meta = {
   component: ShipSidebar,
   args: {
     openIssues: 18,
+    topicsHref: '#/topics',
     issuesHref: '#/',
     projectsHref: '#/projects',
     projects: PROJECTS,

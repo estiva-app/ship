@@ -17,7 +17,7 @@ function Loading({ shape, current }: { shape: PageSkeletonShape; current: 'issue
       <AppShell
         logo="Estiva Ship"
         identity={<IdentityMenu me={ANA} signedIn idBase="https://id.estiva.app" relayUrl="http://localhost:3000" onCopyKey={fn()} onSignOut={fn()} />}
-        nav={<ShipSidebar openIssues={0} issuesHref="#/issues" projectsHref="#/projects" projects={[]} current={current} loading />}
+        nav={<ShipSidebar openIssues={0} topicsHref="#/topics" issuesHref="#/issues" projectsHref="#/projects" projects={[]} current={current} loading />}
       >
         <PageSkeleton shape={shape} />
       </AppShell>

@@ -11,6 +11,8 @@ import { IssueView } from './IssueView'
 import { IssuesView, type IssuesScope } from './IssuesView'
 import { ProjectView } from './ProjectView'
 import { ProjectsView } from './ProjectsView'
+import { TopicsView } from './TopicsView'
+import type { TopicRowData, TopicsTab } from '@/lib/topics'
 import type { ProjectTab } from '@/router'
 import { useSideColumn, type Side } from '@/pages/sideColumn'
 import type { Imeta } from '@estiva-app/protocol'
@@ -57,13 +59,13 @@ const RELATED: RelatedState = {
  * on invented data. What wiring (REW-3 step c) does is feed these the fold's
  * data instead of fixtures; the pages do not change.
  */
-function Shell({ current, children }: { current: 'issues' | 'projects' | { projectAddr: string }; children: React.ReactNode }) {
+function Shell({ current, children }: { current: 'topics' | 'issues' | 'projects' | { projectAddr: string }; children: React.ReactNode }) {
   return (
     <div className="h-screen">
       <AppShell
         logo="Estiva Ship"
         identity={<IdentityMenu me={ANA} signedIn idBase="https://id.estiva.app" relayUrl="http://localhost:3000" onCopyKey={fn()} onSignOut={fn()} />}
-        nav={<ShipSidebar openIssues={18} issuesHref="#/issues" projectsHref="#/projects" projects={SIDEBAR_PROJECTS} current={current} />}
+        nav={<ShipSidebar openIssues={18} topicsHref="#/topics" issuesHref="#/issues" projectsHref="#/projects" projects={SIDEBAR_PROJECTS} current={current} />}
       >
         {children}
       </AppShell>
@@ -103,6 +105,57 @@ export const ProjectsEmpty: Story = {
       </Shell>
     )
   },
+}
+
+const topicRow = (d: string, title: string, projects: [number, number], conversations: number, fresh = 0, summary?: string): TopicRowData => ({
+  address: `30840:${'a'.repeat(64)}:${d}`,
+  title,
+  ...(summary ? { summary } : {}),
+  href: `https://peek.estiva.app/topic/${d}`,
+  projects: { done: projects[0], total: projects[1] },
+  conversations,
+  fresh,
+})
+const YOUR_TOPICS = [
+  topicRow('nav', 'Cross-app navigation', [1, 3], 6, 2, 'Teams and topics instead of Folders, in every app.'),
+  topicRow('speed', 'Speed', [2, 2], 3, 0, 'Every app opens in under a second on Miky’s workspace.'),
+]
+const OTHER_TOPICS = [topicRow('brand', 'Brand refresh', [0, 1], 1)]
+const TOPICS: Record<TopicsTab, TopicRowData[]> = {
+  all: [YOUR_TOPICS[0], OTHER_TOPICS[0], YOUR_TOPICS[1]],
+  yours: YOUR_TOPICS,
+  others: OTHER_TOPICS,
+  archived: [topicRow('launch', 'Launch week', [3, 3], 9)],
+}
+
+/** Topics (SHIPS-3): All / Your topics / Other topics / Archived, opening on yours; a row's summary, projects done of all, conversations and what is new. */
+export const Topics: Story = {
+  render: () => {
+    const [tab, setTab] = useState<TopicsTab>('yours')
+    return (
+      <Shell current="topics">
+        <TopicsView title="Topics" lists={TOPICS} tab={tab} onTab={setTab} onRetry={fn()} />
+      </Shell>
+    )
+  },
+}
+
+/** Topics while the read is out: skeleton rows in the list's place. */
+export const TopicsLoading: Story = {
+  render: () => (
+    <Shell current="topics">
+      <TopicsView title="Topics" lists="loading" tab="yours" onTab={fn()} onRetry={fn()} />
+    </Shell>
+  ),
+}
+
+/** The topics read failed: the page says so and offers Try again. */
+export const TopicsFailed: Story = {
+  render: () => (
+    <Shell current="topics">
+      <TopicsView title="Topics" lists="failed" tab="yours" onTab={fn()} onRetry={fn()} />
+    </Shell>
+  ),
 }
 
 /** Every issue in the workspace: All / Open / Assigned to me, grouped by status. Forty rows, so the page scrolls — in the frame's bar, not a native one. */
