@@ -26,13 +26,17 @@ export const PROJECT_TYPE = 'osnova.project'
 
 const OPT_IN_KEY = 'ship.projectFields'
 
-/** This browser's opt-in, taken from `?fields=on|off` when the page opens and kept. */
+/**
+ * This tab's opt-in, taken from `?fields=on|off` when the page opens and kept
+ * for the tab only: nothing narrows it to the QA Folders, so a link carrying it
+ * must not switch a browser for good.
+ */
 export function optedIn(): boolean {
   try {
     const asked = new URLSearchParams(window.location.search).get('fields')
-    if (asked === 'on') localStorage.setItem(OPT_IN_KEY, 'on')
-    if (asked === 'off') localStorage.removeItem(OPT_IN_KEY)
-    return localStorage.getItem(OPT_IN_KEY) === 'on'
+    if (asked === 'on') sessionStorage.setItem(OPT_IN_KEY, 'on')
+    if (asked === 'off') sessionStorage.removeItem(OPT_IN_KEY)
+    return sessionStorage.getItem(OPT_IN_KEY) === 'on'
   } catch {
     return false
   }

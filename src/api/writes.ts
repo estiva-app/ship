@@ -165,7 +165,7 @@ async function writeProjectField(project: Project, field: string, value: string,
   const text = field === 'description'
   const edited = from && (typeof from.content === 'string' ? from.content : serializeBlockDocument(from.content))
   const prev = text && edited !== undefined ? textChanges.get(project.addr)?.get(edited) : (project.fields[field]?.id ?? project.rootId)
-  if (!prev) return refused(text ? 'the description changed while you were editing it — copy your text, then reload the page' : 'this project was read without its first record')
+  if (!prev) return refused(text ? 'someone changed it while you were editing. Copy your text, then reload' : 'reload the page and try again')
   try {
     const result = await store.writeField({ folder: project.contentFolder, target: project.addr, field, value, note, contentFormat, prev })
     if (result.ok) {

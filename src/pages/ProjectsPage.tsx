@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { PROJECT_STATUSES, createProject, keyProblem, lookupStatus, me, projectKeys, setProjectDeleted, suggestKey, takenKeys, type DirectoryView, type FolderState } from '@/api'
-import { ago } from '@/lib/time'
+import { day } from '@/lib/time'
 import type { FolderSummary } from '@estiva-app/interop'
 import { NewProjectDialog } from '@/components/NewProjectDialog'
 import type { ProjectCardProps } from '@/components/ProjectCard'
@@ -70,7 +70,7 @@ export function ProjectsPage({ state, directory, teams, archives, archived, fold
               {
                 href: href({ name: 'project', d: project.id, slug: project.title, view: 'table' }),
                 title: project.title,
-                deleted: `Deleted by ${project.deleted.by === me ? 'you' : directory.nameOf(project.deleted.by)} · ${ago(project.deleted.at)}`,
+                deleted: `Deleted by ${project.deleted.by === me ? 'you' : directory.nameOf(project.deleted.by)} · ${day(project.deleted.at)}`,
                 onRestore: () =>
                   act('Restore', () => setProjectDeleted(project, false), say, refresh).then((ok) => {
                     if (ok) say('Project restored')

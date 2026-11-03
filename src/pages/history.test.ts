@@ -5,7 +5,8 @@
 import { describe, expect, it } from 'vitest'
 import type { Change, DirectoryView, FolderState } from '@/api'
 import { PROJECT_STATUSES } from '@/nostr/kinds'
-import { editedFor, historyFor } from './history'
+import type { SignedEvent } from '@estiva-app/protocol'
+import { editedFor, historyFor, withChangesOf } from './history'
 
 const PROJECT = `30850:${'a'.repeat(64)}:the-project`
 const OTHER = `30850:${'a'.repeat(64)}:another`
@@ -64,5 +65,17 @@ describe('"Edited … ago" over a page (ONE-6, step 4a)', () => {
     const time = edited([at(`member:${LEAD}`, 'true', 60, LEAD)])
     expect(time.label).toBe('Created 2d ago')
     expect(time.exact).toMatch(/^Created by Ana Duarte · /)
+  })
+})
+
+describe("a project's History read by its page, where projects are read by their fields (ALO-5)", () => {
+  const FOLDER = 'f'.repeat(32)
+  const wire = (id: string, field: string, value: string, h: string): SignedEvent =>
+    ({ id: id.padEnd(64, '0'), kind: 1851, pubkey: AUTHOR, created_at: 1_700_000_100, content: '', sig: '0'.repeat(128), tags: [['a', PROJECT], ['field', field], ['value', value], ['h', h]] }) as SignedEvent
+
+  it('leaves out a change to it filed in another Folder, as the fold does', () => {
+    const state = { activity: [], projects: [{ addr: PROJECT, contentFolder: FOLDER }] } as unknown as FolderState
+    const own = withChangesOf(PROJECT, state, [wire('a1', 'title', 'Real', FOLDER), wire('a2', 'title', 'Planted', 'e'.repeat(32))])
+    expect(historyFor(PROJECT, own, directory, PROJECT_STATUSES).map((entry) => entry.text)).toEqual(['renamed it to "Real"'])
   })
 })

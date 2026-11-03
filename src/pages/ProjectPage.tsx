@@ -73,7 +73,7 @@ import { hrefForIssue, rowFor } from './IssuesPage'
 import { MoveProject } from '@/components/MoveProject'
 import { ArchiveDialog, ArchivedNotice, DeletedNotice } from '@estiva-app/ui'
 import type { DocumentAsks } from '@estiva-app/ui/editor'
-import { ago } from '@/lib/time'
+import { day } from '@/lib/time'
 import { ARCHIVE_WORDS, archivedLine, archivedNoticeOf, lockedReason, ownArchive, type Archives } from '@/lib/archive'
 import { KIND } from '@/nostr/kinds'
 
@@ -755,7 +755,7 @@ export function ProjectPage({
             // A link to a deleted project still opens it: who deleted it, and Restore (SPEC §6.5).
             <DeletedNotice
               by={deleted.by === me ? 'You' : directory.nameOf(deleted.by)}
-              when={ago(deleted.at)}
+              when={day(deleted.at)}
               onRestore={() =>
                 act('Restore', () => setProjectDeleted(project, false), say, refresh).then((ok) => {
                   if (ok) say('Project restored')
@@ -1013,17 +1013,20 @@ export function ProjectPage({
           }}
         >
           {byFields ? (
+            // Restorable, so archiving is no safer: nothing steers away from it (ALO-5).
             <p>It leaves every list and search. Its link still opens it, with Restore.</p>
           ) : (
-            <p>This publishes a NIP-09 deletion request. Relays may decline it, and copies held elsewhere are unaffected.</p>
+            <>
+              <p>This publishes a NIP-09 deletion request. Relays may decline it, and copies held elsewhere are unaffected.</p>
+              {issues.length > 0 && (
+                <p>
+                  Its {issues.length} {issues.length === 1 ? 'issue is a separate event and is' : 'issues are separate events and are'} not deleted — they stay in the Folder and stop being
+                  reachable from here.
+                </p>
+              )}
+              <p className="text-text-secondary">Archiving is reversible and usually what you want.</p>
+            </>
           )}
-          {issues.length > 0 && (
-            <p>
-              Its {issues.length} {issues.length === 1 ? 'issue is a separate event and is' : 'issues are separate events and are'} not deleted — they stay in the Folder and stop being
-              reachable from here.
-            </p>
-          )}
-          <p className="text-text-secondary">Archiving is reversible and usually what you want.</p>
         </ConfirmDialog>
       )}
     </>

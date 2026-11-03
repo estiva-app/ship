@@ -34,10 +34,12 @@ import { parseChanges, type Change as FoldChange } from '@/nostr/fold'
  */
 export function withChangesOf(addr: string, state: FolderState, changes: readonly SignedEvent[] | undefined): FolderState {
   if (!changes) return state
+  // Only changes filed in the project's own Folder, as the fold takes them: one filed elsewhere is not its history.
+  const folder = state.projects.find((project) => project.addr === addr)?.contentFolder
   const at = (change: FoldChange) => (change.ts !== undefined && Math.floor(change.ts / 1000) === change.createdAt ? change.ts : change.createdAt * 1000)
   const own = changes
     .flatMap(parseChanges)
-    .filter((change) => change.target === addr)
+    .filter((change) => change.target === addr && !!folder && change.folder === folder)
     .sort((a, b) => at(a) - at(b) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
   return { ...state, activity: [...state.activity.filter((change) => change.target !== addr), ...own] }
 }

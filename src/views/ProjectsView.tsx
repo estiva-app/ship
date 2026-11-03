@@ -31,7 +31,9 @@ export interface ProjectsViewProps {
 
 export function ProjectsView({ title = 'Projects', active, archived, deleted = [], showArchived, onShowArchived, onAddProject, addDisabledReason }: ProjectsViewProps) {
   const [filter, setFilter] = useState<'archived' | 'deleted'>('archived')
-  const showDeleted = showArchived && filter === 'deleted' && deleted.length > 0
+  // With nothing archived, the Archived tab opens on what is there: the deleted ones.
+  const current = archived.length ? filter : 'deleted'
+  const showDeleted = showArchived && current === 'deleted' && deleted.length > 0
   const shown = showArchived ? archived : active
   return (
     // `data-surface` is the smoke test's waypoint — see IssuesView.
@@ -61,7 +63,7 @@ export function ProjectsView({ title = 'Projects', active, archived, deleted = [
             { id: 'archived', label: 'Archived', count: archived.length },
             { id: 'deleted', label: 'Deleted', count: deleted.length },
           ]}
-          active={filter}
+          active={current}
           onChange={(id) => setFilter(id === 'deleted' ? 'deleted' : 'archived')}
         />
       )}

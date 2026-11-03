@@ -178,7 +178,7 @@ export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onVi
           // Blocks 16px apart (Katerina, 1 November).
           <Centred>
             {archivedNotice}
-            <LiveHeader fields={<ProjectFields {...fields} readOnlyReason={readOnlyReason} lockedReason={lockedReason} />} title={header.title} titlePlaceholder="Untitled project" onRename={header.onRename} summary={header.summary} onSummarize={header.onSummarize} description={header.description} format={header.descriptionFormat} onDescribe={header.onDescribe} merges={header.merges} textPending={header.textPending}onMention={header.onMention} descriptionBy={header.descriptionBy} nameOf={header.nameOf} readOnly={!!(readOnlyReason ?? lockedReason)} upload={upload} onCommentOnBlock={readOnlyReason ?? commentsClosed ? undefined : comment.start} onCopyBlockLink={onCopyBlockLink} holdKey={about && `description:${about}`} />
+            <LiveHeader fields={<ProjectFields {...fields} readOnlyReason={readOnlyReason} lockedReason={lockedReason} />} title={header.title} titlePlaceholder="Untitled project" onRename={header.onRename} summary={header.summary} onSummarize={header.onSummarize} description={header.description} format={header.descriptionFormat} onDescribe={header.onDescribe} merges={header.merges} textPending={header.textPending} onMention={header.onMention} descriptionBy={header.descriptionBy} nameOf={header.nameOf} readOnly={!!(readOnlyReason ?? lockedReason)} upload={upload} onCommentOnBlock={readOnlyReason ?? commentsClosed ? undefined : comment.start} onCopyBlockLink={onCopyBlockLink} holdKey={about && `description:${about}`} />
           </Centred>
         )}
 
