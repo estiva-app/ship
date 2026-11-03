@@ -3,7 +3,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite'
 import { fn } from 'storybook/test'
 import { AppShell } from '@/components/AppShell'
 import { IdentityMenu } from '@/components/IdentityMenu'
-import { ShipSidebar } from '@/components/ShipSidebar'
+import { ShipSidebar, type SidebarEntry } from '@/components/ShipSidebar'
 import { ACTIVITY, ARCHIVED_CARDS, PEOPLE, PROJECT_CARDS, PROJECT_STATUSES, SIDEBAR_PROJECTS } from '@/fixtures/projects'
 import { ACTIVITY_ITEMS, ANA, ISSUES, ISSUE_STATUSES, THREADS, hrefFor, makeIssues } from '@/fixtures/issues'
 import type { RelatedState } from '@/api/useRelated'
@@ -59,13 +59,13 @@ const RELATED: RelatedState = {
  * on invented data. What wiring (REW-3 step c) does is feed these the fold's
  * data instead of fixtures; the pages do not change.
  */
-function Shell({ current, children }: { current: 'topics' | 'issues' | 'projects' | { projectAddr: string }; children: React.ReactNode }) {
+function Shell({ current, children }: { current: SidebarEntry; children: React.ReactNode }) {
   return (
     <div className="h-screen">
       <AppShell
         logo="Estiva Ship"
         identity={<IdentityMenu me={ANA} signedIn idBase="https://id.estiva.app" relayUrl="http://localhost:3000" onCopyKey={fn()} onSignOut={fn()} />}
-        nav={<ShipSidebar openIssues={18} topicsHref="#/topics" issuesHref="#/issues" projectsHref="#/projects" projects={SIDEBAR_PROJECTS} current={current} />}
+        nav={<ShipSidebar openIssues={18} activeProjects={SIDEBAR_PROJECTS.length} hrefFor={(entry) => `#/${entry}`} current={{ entry: current }} />}
       >
         {children}
       </AppShell>
@@ -232,7 +232,7 @@ const projectPage = (startTab: ProjectTab, startView: 'table' | 'board' = 'table
     // The page's own: the comments or the Overview beside it, one at a time (ONE-6, step 4d).
     const side = useSideColumn(startSide)
     return (
-      <Shell current={{ projectAddr: '30850:a:rel' }}>
+      <Shell current="projects">
         <ProjectView
           edited={STORY_EDITED}
           {...(archived ? {} : { onAddIssue: fn() })}
@@ -300,7 +300,7 @@ const issuePage = (archivedWithProject = false, withSummary = true, newWhileHidd
     const [description, setDescription] = useState('After an archived project is restored, the board draws its columns in the order the folder union returned them rather than the vocabulary order.')
     const side = useSideColumn(newWhileHidden ? 'none' : startSide)
     return (
-      <Shell current={{ projectAddr: '30850:a:rel' }}>
+      <Shell current="projects">
         <IssueView
           edited={STORY_EDITED}
           crumbs={{ issuesHref: '#/issues', project: { title: 'Relay Migration', href: '#/project/30850%3Aa%3Arel' }, ref: issue.ref }}

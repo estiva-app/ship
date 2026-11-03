@@ -121,16 +121,22 @@ beforeEach(() => {
 })
 
 describe('sidebarProps — the old app\'s counting rules', () => {
-  it('counts open issues outside archived projects, and open issues per active project', () => {
+  it('counts open issues outside archived projects, and the projects not archived', () => {
     const props = sidebarProps(STATE, { name: 'issues' })
     // 1 (todo, live) + 4 (in_progress, no project); 2 is done, 3 is in an archived project.
     expect(props.openIssues).toBe(2)
-    expect(props.projects.map((p) => [p.title, p.openCount])).toEqual([['Live', 1], ['Mine', 0]])
-    expect(props.current).toBe('issues')
+    expect(props.activeProjects).toBe(2)
+    expect(props.current).toEqual({ entry: 'issues' })
   })
 
-  it('marks the open project as current', () => {
-    expect(sidebarProps(STATE, { name: 'project', d: LIVE, view: 'table' }).current).toEqual({ projectAddr: `30850:x:${LIVE}` })
+  // SHIPS-5: a project or an issue marks its team's entry; one in no team, the top entry.
+  it("marks the open project's team's Projects, and an issue's project's team's Issues", () => {
+    const teams = [{ id: 'f', name: 'Team' }]
+    expect(sidebarProps(STATE, { name: 'project', d: LIVE, view: 'table' }, teams).current).toEqual({ entry: 'projects', folder: 'f' })
+    expect(sidebarProps(STATE, { name: 'issue', d: D('11') }, teams).current).toEqual({ entry: 'issues', folder: 'f' })
+    expect(sidebarProps(STATE, { name: 'issue', d: D('14') }, teams).current).toEqual({ entry: 'issues', folder: undefined })
+    expect(sidebarProps(STATE, { name: 'project', d: LIVE, view: 'table' }).current).toEqual({ entry: 'projects', folder: undefined })
+    expect(sidebarProps(STATE, { name: 'issues', folder: 'f' }, teams).hrefFor('projects', 'f')).toBe('/app/folder/f/projects')
   })
 })
 
@@ -157,11 +163,11 @@ describe('App — the browser tab names the page, then Ship (SFX-2)', () => {
 })
 
 describe('App — the shell around the route', () => {
-  it('shows the viewer by name, the counts from the relay, and canonicalises an empty hash', async () => {
+  it('shows the viewer by name, the counts from the relay, and opens an empty address on Topics (SHIPS-5)', async () => {
     render(<App />)
     expect(within(screen.getByRole('banner')).getByText('Me Myself')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /^Issues/ })).toHaveTextContent('2')
-    await waitFor(() => expect(location.pathname).toBe('/issues'))
+    await waitFor(() => expect(location.pathname).toBe('/topics'))
   })
 
   it('shows the read error as a banner and keeps the shell', () => {
@@ -246,11 +252,11 @@ describe('App — the shell around the route', () => {
     expect(resolveInbound).not.toHaveBeenCalled()
   })
 
-  it('falls back to the issue list, with a reason, when the reference cannot be resolved', async () => {
+  it('falls back to Topics, with a reason, when the reference cannot be resolved', async () => {
     vi.mocked(resolveInbound).mockResolvedValue(null)
     goTo('/o/naddr1unknown')
     render(<App />)
-    await waitFor(() => expect(location.pathname).toBe('/issues'))
+    await waitFor(() => expect(location.pathname).toBe('/topics'))
     expect(screen.getByText(/Could not resolve that reference/)).toBeInTheDocument()
   })
 })
@@ -299,6 +305,22 @@ describe('Projects page — cards from the fold', () => {
     expect(refresh).not.toHaveBeenCalled()
   })
 
+  // SHIPS-5: the readFolders mock's team "Ship" lists Live; Mine's own Folder is no team, so it is in no team's Projects.
+  it("lists only a Folder's projects on its Projects, and Add project there starts on that Folder", async () => {
+    vi.mocked(createProject).mockResolvedValue({ ok: true, addr: '30850:x:new' })
+    goTo('/app/folder/3167adea-877f-43c4-96fb-517a2b2d5d24/projects')
+    render(<App />)
+    const main = within(screen.getByRole('main'))
+    expect(await main.findByRole('heading', { name: 'Ship · Projects' })).toBeInTheDocument()
+    expect(main.getByRole('link', { name: /Live/ })).toBeInTheDocument()
+    expect(main.queryByRole('link', { name: /Mine/ })).not.toBeInTheDocument()
+    fireEvent.click(main.getByRole('button', { name: 'Add project' }))
+    const dialog = within(screen.getByRole('dialog', { name: 'New project' }))
+    fireEvent.change(dialog.getByPlaceholderText('New project title'), { target: { value: 'Mobile app' } })
+    fireEvent.click(dialog.getByRole('button', { name: 'Create project' }))
+    await waitFor(() => expect(createProject).toHaveBeenCalledWith(expect.objectContaining({ title: 'Mobile app', team: { folder: '3167adea-877f-43c4-96fb-517a2b2d5d24', hasState: true } })))
+  })
+
   it('shows the archived list when the route asks for it', () => {
     goTo('/projects?archived')
     render(<App />)
@@ -309,14 +331,15 @@ describe('Projects page — cards from the fold', () => {
 })
 
 describe('Issues page — rows from the fold', () => {
-  it('groups every issue by status with its counts, and filters to mine', () => {
+  it('opens on your open issues, and All groups every issue by status with its counts, done included (SHIPS-5)', () => {
     goTo('/issues')
     render(<App />)
     const main = within(screen.getByRole('main'))
     // Issue 13 is in the archived project, so it is archived with it (FOL-46).
-    expect(main.getByRole('tab', { name: /^All/ })).toHaveTextContent('3')
-    expect(main.getByRole('tab', { name: /^Open/ })).toHaveTextContent('2')
-    expect(main.getByRole('tab', { name: /Assigned to me/ })).toHaveTextContent('1')
+    expect(main.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['All3', 'Assigned to me1'])
+    expect(main.getByRole('tab', { name: /Assigned to me/ })).toHaveAttribute('aria-selected', 'true')
+    expect(main.getByRole('link', { name: /X-4/ })).toBeInTheDocument()
+    fireEvent.click(main.getByRole('tab', { name: /^All/ }))
     // Issue links only: a row's project chip is a link of its own (S26), and so is its comment count, to the same page (ONE-6, step 4d).
     const counts = main.queryAllByRole('link', { name: /open the conversation/ })
     const issueLinks = () => main.getAllByRole('link').filter((a) => a.getAttribute('href')?.startsWith('/issue/') && !counts.includes(a))
@@ -329,6 +352,22 @@ describe('Issues page — rows from the fold', () => {
     fireEvent.click(main.getByRole('tab', { name: /Assigned to me/ }))
     expect(issueLinks()).toHaveLength(1)
     expect(main.getByRole('link', { name: /X-4/ })).toHaveAttribute('href', `/issue/issue-14-${D('14')}`)
+  })
+
+  // SHIPS-5: team "Ship" lists Live, so its Issues are Live's two; X-4 is in no project, so in no team's Issues.
+  it("lists only the issues of a Folder's projects on its Issues, and Add issue there offers only those projects", async () => {
+    goTo('/app/folder/3167adea-877f-43c4-96fb-517a2b2d5d24/issues')
+    render(<App />)
+    const main = within(screen.getByRole('main'))
+    expect(await main.findByRole('heading', { name: 'Ship · Issues' })).toBeInTheDocument()
+    expect(main.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['All2', 'Assigned to me0'])
+    fireEvent.click(main.getByRole('tab', { name: /^All/ }))
+    const hrefs = main.getAllByRole('link').map((a) => a.getAttribute('href') ?? '').filter((h) => h.startsWith('/issue/') && !h.includes('thread'))
+    expect(new Set(hrefs.map((h) => h.slice(-36)))).toEqual(new Set([D('11'), D('12')]))
+    fireEvent.click(main.getByRole('button', { name: 'Add issue' }))
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('combobox', { name: 'Project' }))
+    expect(await screen.findByRole('option', { name: 'Live' })).toBeInTheDocument()
+    expect(screen.getAllByRole('option')).toHaveLength(1)
   })
 })
 
@@ -349,7 +388,7 @@ describe('opened on a project, before the whole read lands', () => {
     // The sidebar lists no project and counts nothing: one Folder's issues are not the workspace's.
     const nav = within(container.querySelector('nav, aside') as HTMLElement)
     expect(nav.queryByRole('link', { name: /^Live/ })).toBeNull()
-    expect(nav.getByRole('link', { name: /^Issues/ })).toHaveTextContent(/^Issues$/)
+    expect(nav.getAllByRole('link', { name: /^Issues/ }).find((a) => a.getAttribute('href') === '/issues')).toHaveTextContent(/^Issues$/)
   })
 
   it("reads an issue opened from Peek's link first, before the link resolves", () => {

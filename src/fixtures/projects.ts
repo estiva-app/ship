@@ -1,6 +1,5 @@
 import type { ProjectCardProps } from '@/components/ProjectCard'
 import type { HistoryEntry } from '@/components/History'
-import type { SidebarProject } from '@/components/ShipSidebar'
 import { ANA, MARA, RAVI } from './issues'
 
 /** Invented projects — nothing real. */
@@ -79,7 +78,7 @@ export const ARCHIVED_CARDS: ProjectCardProps[] = [
   },
 ]
 
-export const SIDEBAR_PROJECTS: SidebarProject[] = [
+export const SIDEBAR_PROJECTS: { addr: string; title: string; href: string; openCount: number }[] = [
   { addr: '30850:a:des', title: 'Design System', href: '#/project/30850%3Aa%3Ades', openCount: 9 },
   { addr: '30850:a:rel', title: 'Relay Migration', href: '#/project/30850%3Aa%3Arel', openCount: 6 },
   { addr: '30850:a:pay', title: 'Payment integration', href: '#/project/30850%3Aa%3Apay', openCount: 3 },

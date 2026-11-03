@@ -4,7 +4,7 @@
  * row shows no count at all, never a wrong one (Katerina, 28 Oct).
  */
 import { describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import type { WorkspaceState } from '@/api'
 import { ThreadsContext } from '@/api/useThreads'
 import { IssuesPage } from './IssuesPage'
@@ -34,7 +34,7 @@ const archives = { ofIssue: () => undefined, ofProject: () => undefined } as nev
 
 const page = (held: boolean, want = vi.fn()) => (
   <ThreadsContext.Provider value={want}>
-    <IssuesPage state={state(held)} directory={directory} archives={archives} say={() => {}} refresh={async () => {}} />
+    <IssuesPage state={state(held)} directory={directory} teams={[]} archives={archives} say={() => {}} refresh={async () => {}} />
   </ThreadsContext.Provider>
 )
 
@@ -42,6 +42,7 @@ describe('Issues page counts (APP-5)', () => {
   it("draws the row with no count while the conversations are on the way, asks for every Folder's, then draws the count", () => {
     const want = vi.fn()
     const { rerender } = render(page(false, want))
+    fireEvent.click(screen.getByRole('tab', { name: /^All/ }))
     expect(screen.getByText('Counted')).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /open the conversation/ })).toBeNull()
     expect(want).toHaveBeenCalledWith({ folders: [FOLDER], about: [] })

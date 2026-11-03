@@ -15,7 +15,8 @@ import { SummaryField } from './SummaryField'
  * pairs with a pasted one: its issues and conversation live in the team's.
  *
  * **The team is required and starts unchosen.** A default would be a guess,
- * and a project filed into the wrong team is listed there for everyone.
+ * and a project filed into the wrong team is listed there for everyone. On a
+ * team's own Projects it is no guess, so it starts on that team (SHIPS-5).
  *
  * **The key is prefilled and editable** (SHI-4, Miky 2026-10-13): it follows
  * the title — the shortest free 3–6 letters — until the person types their
@@ -41,6 +42,8 @@ export interface NewProjectDraft {
 export interface NewProjectDialogProps {
   /** The teams a project can be filed into (`topLevelFolders`); `undefined` while they are read. */
   teams: NewProjectTeam[] | undefined
+  /** The team it starts on: the one whose Projects it was opened from. */
+  team?: string
   /** The shortest free key for a title (`suggestKey` over what is visible). */
   suggestKey: (title: string) => string
   /** Why a key cannot be used, or undefined when it can (`keyProblem`). */
@@ -61,7 +64,7 @@ interface HeldProject {
   teamId: string
 }
 
-export function NewProjectDialog({ teams, suggestKey, keyProblem, onClose, onCreate, holdKey }: NewProjectDialogProps) {
+export function NewProjectDialog({ teams, team: startTeam, suggestKey, keyProblem, onClose, onCreate, holdKey }: NewProjectDialogProps) {
   // What was typed here when the sign-in last ended, back after the passkey tap (AUT-4).
   const [held] = useState(() => heldFields<HeldProject>(holdKey))
   const [title, setTitle] = useState(held?.title ?? '')
@@ -69,7 +72,7 @@ export function NewProjectDialog({ teams, suggestKey, keyProblem, onClose, onCre
   const [description, setDescription] = useState(held?.description ?? '')
   // Undefined until the person types one: until then the key follows the title.
   const [typedKey, setTypedKey] = useState<string | undefined>(held?.typedKey)
-  const [teamId, setTeamId] = useState(held?.teamId ?? '')
+  const [teamId, setTeamId] = useState(held?.teamId ?? startTeam ?? '')
 
   useHeldTyping(holdKey, () =>
     title.trim() || summary.trim() || description.trim() || typedKey ? JSON.stringify({ title, summary, description, typedKey, teamId }) : undefined,

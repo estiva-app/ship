@@ -8,6 +8,7 @@ import type { Archives } from '@/lib/archive'
 import { go, href } from '../router'
 import { type Say } from './act'
 import { useReopenHeld } from '@/auth/heldTyping'
+import { folderName, projectsIn } from '@/lib/placement'
 
 /** Where the New project dialog holds its fields through a passkey trip (AUT-4). */
 const NEW_PROJECT_HOLD = 'new-project'
@@ -24,7 +25,7 @@ const NEW_PROJECT_HOLD = 'new-project'
  * team is on the Archived tab, and a card counts only the issues not archived
  * on their own.
  */
-export function ProjectsPage({ state, directory, teams, archives, archived, say, refresh }: { state: FolderState; directory: DirectoryView; teams: FolderSummary[] | undefined; archives: Archives; archived: boolean; say: Say; refresh: () => Promise<void> }) {
+export function ProjectsPage({ state, directory, teams, archives, archived, folder, say, refresh }: { state: FolderState; directory: DirectoryView; teams: FolderSummary[] | undefined; archives: Archives; archived: boolean; folder?: string; say: Say; refresh: () => Promise<void> }) {
   const [adding, setAdding] = useState(false)
   useReopenHeld(NEW_PROJECT_HOLD, () => setAdding(true))
   // Derived once per read, not per keystroke in the Add project dialog (SHI-4).
@@ -55,24 +56,28 @@ export function ProjectsPage({ state, directory, teams, archives, archived, say,
         archived: isArchived(project),
       }
     }
+    // A Folder's Projects lists only the projects in that team (SHIPS-5), by the sidebar's own rule.
+    const here = folder ? projectsIn(state.projects, teams ?? [], folder) : state.projects
     return {
-      active: state.projects.filter((p) => !isArchived(p)).map(toCard),
-      archived: state.projects.filter(isArchived).map(toCard),
+      active: here.filter((p) => !isArchived(p)).map(toCard),
+      archived: here.filter(isArchived).map(toCard),
     }
-  }, [state, directory, archives])
+  }, [state, directory, archives, folder, teams])
 
   return (
     <>
       <ProjectsView
+        title={folder ? `${folderName(teams, folder)} · Projects` : 'Projects'}
         active={cards.active}
         archived={cards.archived}
         showArchived={archived}
-        onShowArchived={(wantArchived) => go({ name: 'projects', archived: wantArchived })}
+        onShowArchived={(wantArchived) => go({ name: 'projects', archived: wantArchived, folder })}
         onAddProject={() => setAdding(true)}
       />
       {adding && (
         <NewProjectDialog
           teams={teams?.map((team) => ({ id: team.id, name: team.name ?? `Folder ${team.id.slice(0, 8)}…`, hasState: team.hasState }))}
+          team={folder}
           suggestKey={(title) => suggestKey(title, keys.taken)}
           keyProblem={(key) => keyProblem(key, state.projects, state.issues, keys.byProject)}
           holdKey={NEW_PROJECT_HOLD}

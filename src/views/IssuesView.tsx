@@ -6,13 +6,16 @@ import type { IssueRowData } from '@/components/IssueRow'
 
 /**
  * Every issue in the workspace, as production: the heading with "Add issue",
- * the All / Open / Assigned to me filters with their counts, and the grouped
- * list. Parentless issues are simply in it (ruling B10) — there is no
- * separate place for them.
+ * the All and Assigned to me tabs with their counts, and the grouped list.
+ * All keeps done issues, grouped by status; Assigned to me lists your open
+ * ones (Miky, 2 November; SHIPS-5 dropped the Open tab). Parentless issues
+ * are simply in it (ruling B10) — there is no separate place for them.
  */
-export type IssuesScope = 'all' | 'open' | 'mine'
+export type IssuesScope = 'all' | 'mine'
 
 export interface IssuesViewProps {
+  /** "Issues", or a Folder's ("Estiva HQ · Issues", SHIPS-5). */
+  title?: string
   issues: IssueRowData[]
   statuses: StatusEntry[]
   /** Which issues are the viewer's — by address. */
@@ -30,14 +33,12 @@ const isOpen = (issue: IssueRowData) => issue.status !== 'done' && issue.status 
 /** What an empty tab says: each tab's own emptiness, not the workspace's (UIG-14). */
 const EMPTY: Record<IssuesScope, string> = {
   all: 'No issues yet.',
-  open: 'No open issues.',
-  mine: 'Nothing assigned to you.',
+  mine: 'No open issue is assigned to you.',
 }
 
-export function IssuesView({ issues, statuses, mine, scope, onScope, hrefFor, onAddIssue, addDisabledReason }: IssuesViewProps) {
-  const open = issues.filter(isOpen)
-  const assigned = issues.filter((issue) => mine.has(issue.addr))
-  const shown = scope === 'open' ? open : scope === 'mine' ? assigned : issues
+export function IssuesView({ title = 'Issues', issues, statuses, mine, scope, onScope, hrefFor, onAddIssue, addDisabledReason }: IssuesViewProps) {
+  const assigned = issues.filter((issue) => mine.has(issue.addr) && isOpen(issue))
+  const shown = scope === 'mine' ? assigned : issues
   return (
     // `data-surface` is the smoke test's waypoint (REW-7). One attribute per
     // surface, on the element that *is* the surface, so a browser test can wait
@@ -45,7 +46,7 @@ export function IssuesView({ issues, statuses, mine, scope, onScope, hrefFor, on
     // which is a styling decision and free to change.
     <div data-surface="issues" className="flex flex-1 flex-col gap-4 px-6 py-5">
       <div className="flex items-center gap-3">
-        <h1 className="flex-1 text-h3 text-text-primary">Issues</h1>
+        <h1 className="flex-1 text-h3 text-text-primary">{title}</h1>
         <Button variant="primary" onClick={onAddIssue} disabledReason={addDisabledReason}>
           Add issue
         </Button>
@@ -53,7 +54,6 @@ export function IssuesView({ issues, statuses, mine, scope, onScope, hrefFor, on
       <Tabs<IssuesScope>
         tabs={[
           { id: 'all', label: 'All', count: issues.length },
-          { id: 'open', label: 'Open', count: open.length },
           { id: 'mine', label: 'Assigned to me', count: assigned.length },
         ]}
         active={scope}

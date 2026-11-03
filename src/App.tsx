@@ -8,7 +8,8 @@ import { ToastProvider, useToast, type ToastOptions } from '@/components/ui/Toas
 import { TooltipProvider } from '@/components/ui/Tooltip'
 import { PageSkeleton, type PageSkeletonShape } from '@/components/PageSkeleton'
 import { IdentityMenu } from '@/components/IdentityMenu'
-import { ShipSidebar, type SidebarFolder, type SidebarProject } from '@/components/ShipSidebar'
+import { ShipSidebar, type SidebarEntry, type SidebarFolder, type SidebarPlace } from '@/components/ShipSidebar'
+import { placedIn } from '@/lib/placement'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { reloadFolders, topLevelFolders, useFolders } from '@/api/useFolders'
 import { NewFolderDialog } from '@/components/NewFolderDialog'
@@ -18,7 +19,6 @@ import { IssuePage } from '@/pages/IssuePage'
 import { IssuesPage } from '@/pages/IssuesPage'
 import { ProjectPage } from '@/pages/ProjectPage'
 import { act, type Say } from '@/pages/act'
-import { MoveProject } from '@/components/MoveProject'
 import { ProjectsPage } from '@/pages/ProjectsPage'
 import { TopicPage } from '@/pages/TopicPage'
 import { TopicsPage } from '@/pages/TopicsPage'
@@ -36,7 +36,7 @@ import { pageTitleOf, useTabTitle } from '@/lib/tabTitle'
 import { MentionPeopleProvider, WorkspacePeopleProvider, mentionPeople, workspacePeople } from '@/components/editing/mentionables'
 import { useRoster } from '@/api/useRoster'
 import { isRelayBusy } from '@/lib/relayBudget'
-import { go, href, navigateTo, replace, useRoute, type Route } from './router'
+import { HOME, go, href, navigateTo, replace, useRoute, type Route } from './router'
 
 /**
  * The app: the shell around whichever page the hash names, fed from the
@@ -75,9 +75,6 @@ function Shell() {
   useTabTitle(pageTitleOf(route, state))
   const { showToast } = useToast()
   const { banner, say, clear } = useBanner(showToast)
-  // The project a sidebar row's "Move to Folder…" was chosen on (FOL-7), by address.
-  const [moving, setMoving] = useState<string | null>(null)
-  const movingProject = moving ? state?.projects.find((project) => project.addr === moving) : undefined
   const [creatingFolder, setCreatingFolder] = useState(false)
 
   /*
@@ -212,7 +209,6 @@ function Shell() {
             archives,
           )}
           onOpenFolder={(folder) => go({ name: 'folder', id: folder.id })}
-          {...(teams?.length ? { onMoveProject: (project: SidebarProject) => setMoving(project.addr) } : {})}
           onNewFolder={() => setCreatingFolder(true)}
           loading={(!state && loading) || partial}
           foldersLoading={folders === undefined}
@@ -228,7 +224,6 @@ function Shell() {
           </ThreadsContext.Provider>
         </WorkspacePeopleProvider>
       </MentionPeopleProvider>
-      {movingProject && teams && <MoveProject project={movingProject} teams={teams} say={say} onClose={() => setMoving(null)} />}
       {creatingFolder && <NewFolderDialog onCreate={newFolder} onClose={() => setCreatingFolder(false)} />}
     </AppShell>
   )
@@ -297,15 +292,17 @@ function Page({ route, state, loading, directory, teams, folders, archives, say,
   if (route.name === 'elsewhere') return <HandoffPage word={route.word} fileRef={route.ref} query={route.query} />
   if (!state && loading) return <PageSkeleton shape={SKELETON[route.name] ?? 'rows'} />
   if (!state || !archives) return null
+  // A Folder's Projects and Issues are placed by the Folders' listing: until it lands, what is in the Folder is unknown, not nothing (SHIPS-5).
+  if ((route.name === 'projects' || route.name === 'issues') && route.folder && !teams) return <PageSkeleton shape={SKELETON[route.name] ?? 'rows'} />
   switch (route.name) {
     case 'topics':
       return <TopicsPage state={state} folders={folders} folder={route.folder} />
     case 'topic':
       return <TopicPage key={route.d} d={route.d} state={state} folders={folders} archives={archives} />
     case 'projects':
-      return <ProjectsPage state={state} directory={directory} teams={teams} archives={archives} archived={route.archived} say={say} refresh={refresh} />
+      return <ProjectsPage key={route.folder} state={state} directory={directory} teams={teams} archives={archives} archived={route.archived} folder={route.folder} say={say} refresh={refresh} />
     case 'issues':
-      return <IssuesPage state={state} directory={directory} archives={archives} say={say} refresh={refresh} />
+      return <IssuesPage key={route.folder} state={state} directory={directory} teams={teams} archives={archives} folder={route.folder} say={say} refresh={refresh} />
     case 'project':
       return <ProjectPage state={state} directory={directory} teams={teams} archives={archives} d={route.d} view={route.view} tab={route.tab ?? 'overview'} say={say} refresh={refresh} />
     case 'issue':
@@ -317,9 +314,8 @@ function Page({ route, state, loading, directory, teams, folders, archives, say,
 
 /**
  * The sidebar's numbers, on the old app's rules (`renderSidebar`): Issues
- * counts open issues outside archived projects; a project counts its open
- * issues (the old app counted all of them — our tooltip says "open", so open
- * it is; noted for Jan); archived projects are out of the navigation.
+ * counts open issues outside archived projects; Projects counts the projects
+ * not archived.
  *
  * Archived is FOL-46's rule (`archivesOf`): an issue archived itself or with
  * its project is not counted, and a project archived itself or with its team
@@ -335,38 +331,37 @@ export function sidebarProps(
   const isOpen = (status: string) => status !== 'done' && status !== 'cancelled'
   const issues = (state?.issues ?? []).filter((i) => !archives?.ofIssue(i))
   const openIssues = issues.filter((i) => isOpen(i.status)).length
-  const active: SidebarProject[] = projects
-    .filter((p) => !archives?.ofProject(p.addr))
-    .map((p) => ({
-      addr: p.addr,
-      title: p.title,
-      href: href({ name: 'project', d: p.id, slug: p.title, view: 'table' }),
-      openCount: issues.filter((i) => i.projectAddr === p.addr && isOpen(i.status)).length,
-      // Its own Folder: the one its record names, or the one `ship
-      // link-project` re-pointed it at. The sidebar places it by the teams'
-      // state and falls back to this only when no state lists it (FOL-5).
-      ...(p.contentFolder ? { folder: p.contentFolder } : {}),
-    }))
-  const current =
+  const activeProjects = projects.filter((p) => !archives?.ofProject(p.addr)).length
+  // The team a project is in, by its state's listing and then its own Folder (FOL-5); the first, if two list it.
+  const teamOf = (projectAddr: string | undefined) => {
+    const project = projectAddr ? projects.find((p) => p.addr === projectAddr) : undefined
+    return project ? placedIn({ addr: project.addr, folder: project.contentFolder }, folders)[0]?.id : undefined
+  }
+  /*
+    A project or an issue marks its team's Projects or Issues and opens that
+    team's fold (Miky, 2 November); one in no team marks the top entry. A
+    topic's page is under Topics (SHIPS-4). Another app's file is none of the
+    sidebar's places, so none is lit.
+  */
+  const current: SidebarPlace | undefined =
     route.name === 'project'
-      ? { projectAddr: projects.find((p) => p.id === route.d)?.addr ?? '' }
-      : route.name === 'folder'
-        ? { folderId: route.id }
-        : route.name === 'elsewhere'
-          ? // Another app's file is none of the sidebar's places, so none is lit.
-            { projectAddr: '' }
-          : route.name === 'projects' ? ('projects' as const) : route.name === 'topics' || route.name === 'topic' ? ('topics' as const) : ('issues' as const)
-  // An issue is under Issues; its project's team opens onto the project's row, unmarked (Katerina, 30 October).
-  const issue = route.name === 'issue' ? state?.issues.find((i) => i.id === route.d) : undefined
+      ? { entry: 'projects', folder: teamOf(projects.find((p) => p.id === route.d)?.addr) }
+      : route.name === 'issue'
+        ? { entry: 'issues', folder: teamOf(state?.issues.find((i) => i.id === route.d)?.projectAddr) }
+        : route.name === 'folder'
+          ? { folderId: route.id }
+          : route.name === 'topic'
+            ? { entry: 'topics' }
+            : route.name === 'topics' || route.name === 'projects' || route.name === 'issues'
+              ? { entry: route.name, folder: route.folder }
+              : undefined
   return {
     openIssues,
-    topicsHref: href({ name: 'topics' }),
-    issuesHref: href({ name: 'issues' }),
-    projectsHref: href({ name: 'projects', archived: false }),
-    projects: active,
+    activeProjects,
+    hrefFor: (entry: SidebarEntry, folder?: string) =>
+      href(entry === 'projects' ? { name: 'projects', archived: false, folder } : { name: entry, folder }),
     folders,
     current,
-    openIssue: issue?.projectAddr ? { addr: issue.addr, projectAddr: issue.projectAddr } : undefined,
   }
 }
 
@@ -449,14 +444,14 @@ function useInbound(route: Route, say: (text: string, tone?: 'ok' | 'error') => 
         }
         if (!found) {
           say('Could not resolve that reference — you may not have access to its Folder.', 'error')
-          return replace({ name: 'issues' })
+          return replace(HOME)
         }
         // The resolved object's `d` — its uuid — is the tail of the address,
         // and §7.2's grammar carries nothing else.
         const d = identifierFromRef(found.addr)
         if (!d) {
           say('That reference resolved to something without an identifier.', 'error')
-          return replace({ name: 'issues' })
+          return replace(HOME)
         }
         replace(found.kind === 'project' ? { name: 'project', d, view: 'table' } : { name: 'issue', d })
       })
@@ -476,7 +471,7 @@ function useInbound(route: Route, say: (text: string, tone?: 'ok' | 'error') => 
         }
         if (saidBusyFor.current === naddr) saidBusyFor.current = null
         say('That reference is not a valid nostr address.', 'error')
-        replace({ name: 'issues' })
+        replace(HOME)
       })
       .finally(() => {
         // `replace` does not fire hashchange; tell the router by hand.
