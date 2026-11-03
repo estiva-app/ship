@@ -42,6 +42,36 @@ describe('FileTopics, a project’s or an issue’s Topics in its rail (TOP-5)',
     expect(onChange).toHaveBeenCalledWith(WIDGETS, false)
   })
 
+  it('says an archived topic is archived, and only that one', () => {
+    render(<FileTopics topics={[OLD, WIDGETS]} busy={new Set()} onChange={vi.fn()} readChoices={vi.fn()} />)
+    expect(screen.getByRole('link', { name: /Old \(archived\)/ })).toBeTruthy()
+    expect(screen.getByRole('link', { name: /Widgets/ }).textContent).not.toContain('archived')
+  })
+
+  it('Add to topic draws choices already in hand at once, never “Reading topics…”, and the fresh ones when they land', async () => {
+    let land: (choices: { yours: TopicOfFile[]; others: TopicOfFile[] }) => void = () => undefined
+    const readChoices = vi.fn(() => new Promise<{ yours: TopicOfFile[]; others: TopicOfFile[] }>((resolve) => (land = resolve)))
+    render(<FileTopics topics={[]} busy={new Set()} onChange={vi.fn()} readChoices={readChoices} choicesNow={() => ({ yours: [ROADMAP], others: [DESIGN] })} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Add to topic' }))
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByText('Roadmap')).toBeTruthy()
+    expect(within(dialog).queryByText('Reading topics…')).toBeNull()
+    expect(readChoices).toHaveBeenCalledTimes(1)
+    await act(async () => land({ yours: [ROADMAP], others: [DESIGN, WIDGETS] }))
+    expect(within(dialog).getByText('Widgets')).toBeTruthy()
+  })
+
+  it('Add to topic keeps the choices in hand when reading them again fails', async () => {
+    const readChoices = vi.fn().mockRejectedValue(new Error('relay down'))
+    render(<FileTopics topics={[]} busy={new Set()} onChange={vi.fn()} readChoices={readChoices} choicesNow={() => ({ yours: [ROADMAP], others: [] })} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Add to topic' }))
+    const dialog = screen.getByRole('dialog')
+    await waitFor(() => expect(readChoices).toHaveBeenCalled())
+    await act(async () => undefined)
+    expect(within(dialog).getByText('Roadmap')).toBeTruthy()
+    expect(within(dialog).queryByText('Topics could not be read.')).toBeNull()
+  })
+
   it('Add to topic offers your topics first, then the others, never one that lists it already, and adds the one picked', async () => {
     const onChange = vi.fn()
     const readChoices = vi.fn().mockResolvedValue({ yours: [WIDGETS, ROADMAP], others: [DESIGN] })

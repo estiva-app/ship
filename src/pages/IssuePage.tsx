@@ -6,7 +6,9 @@ import { ArchiveDialog, ArchivedNotice } from '@estiva-app/ui'
 import { ARCHIVE_WORDS, archivedLine, archivedNoticeOf, lockedReason, ownArchive, type Archives } from '@/lib/archive'
 import { ISSUE_STATUSES, addMentioned, archiveIssue, commentsOn, deleteIssue, deleteMessage, editMessage, react, reply, setIssueField, unreact, startConversation, type DirectoryView, type FolderState, type WorkspaceState, threadContext, fileContext, useMergedReadState, useFeedJudges, unreadByThread } from '@/api'
 import { me, useMentionsElsewhere } from '@/api'
-import { useRelated } from '@/api/useRelated'
+import { MEMBER_FIELD_PREFIX, memberOfField } from '@estiva-app/conversation'
+import { useRelated, withoutTopics } from '@/api/useRelated'
+import { useFileTopics } from '@/api/useFileTopics'
 import { useThreads } from '@/api/useThreads'
 import { Members } from '@/components/Members'
 import { membershipActions } from './membership'
@@ -111,6 +113,8 @@ export function IssuePage({ state, directory, archives, d, say, refresh }: { sta
      Read from the issue's own Folder, the one a file placed under it is
      written into; see the same line on ProjectPage. */
   const related = useRelated(issue?.folder, issue?.addr)
+  const topics = useFileTopics(issue?.id)
+  const shownRelated = useMemo(() => withoutTopics(related, topics.state), [related, topics.state])
   /* What `[` offers here (PEE-21): this issue's messages, then its project's
      (Miky, 2026-10-03); this Folder's files from the Related read, then the
      ones you read recently. This issue is never offered under Files. */
@@ -200,8 +204,8 @@ export function IssuePage({ state, directory, archives, d, say, refresh }: { sta
         onMention={(people) => addMentioned({ kind: 'issue', issue }, people, me)}
         // The profile's name only: with none the line says "Someone", as Leaf's does, never a shortened key.
         descriptionBy={issue.fields.description && issue.fields.description.by !== me ? (directory.profileOf(issue.fields.description.by)?.name ?? null) : null}
-        related={related}
-        topics={<FileTopicsOf file={issue.id} say={say} />}
+        related={shownRelated}
+        topics={<FileTopicsOf topics={topics} say={say} />}
         threads={threads}
         conversationsLoading={!held.folders}
         mentionsLoading={!held.all}

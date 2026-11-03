@@ -46,7 +46,8 @@ import {
   type FolderState,
   type WorkspaceState,
 } from '@/api'
-import { useRelated } from '@/api/useRelated'
+import { useRelated, withoutTopics } from '@/api/useRelated'
+import { useFileTopics } from '@/api/useFileTopics'
 import { useThreads } from '@/api/useThreads'
 import { editTargetOf, MEMBER_FIELD_PREFIX } from '@estiva-app/conversation'
 import { Members } from '@/components/Members'
@@ -683,6 +684,8 @@ export function ProjectPage({
   // (FOL-7). The record's own Folder until the listings are read.
   const listedIn = project && teams ? placedIn({ addr: project.addr, folder: project.contentFolder }, teams)[0]?.id : undefined
   const related = useRelated(listedIn ?? project?.contentFolder, project?.addr)
+  const topics = useFileTopics(project?.id)
+  const shownRelated = useMemo(() => withoutTopics(related, topics.state), [related, topics.state])
   /* What `[` offers here (PEE-21): this project's messages; the Folder that
      lists it, then the files you read recently. The project is never offered. */
   useReferencePage({ address: project?.addr, folder: typeof related === 'object' ? related.all : undefined, readState: merged })
@@ -790,8 +793,8 @@ export function ProjectPage({
         issues={issues}
         issueStatuses={ISSUE_STATUSES}
         hrefFor={hrefForIssue}
-        related={related}
-        topics={<FileTopicsOf file={project.id} say={say} />}
+        related={shownRelated}
+        topics={<FileTopicsOf topics={topics} say={say} />}
         threads={threads}
         conversationsLoading={!held.folders}
         mentionsLoading={!held.all}

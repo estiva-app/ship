@@ -29,7 +29,7 @@ Overview Panel** (two topics, one archived) and **Project Overview Panel**
 ## How
 
 ```tsx
-topics={<FileTopicsOf file={issue.id} say={say} />}
+topics={<FileTopicsOf topics={useFileTopics(issue.id)} say={say} />}
 ```
 
 ## What it owns

@@ -2,18 +2,13 @@ import { useEffect, useState } from 'react'
 import { IconPlus, IconX } from '@tabler/icons-react'
 import { CommandPalette, CommandPaletteSearch, KindIcon, type CommandPaletteRow } from '@estiva-app/ui'
 import type { TopicOfFile } from '@/api/foreign'
+import type { TopicChoices } from '@/api/topics'
 import type { FileTopicsState } from '@/api/useFileTopics'
 import { Button } from '@/components/ui/Button'
 import { Chip } from '@/components/ui/Chip'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { IconButton } from '@/components/ui/IconButton'
 import { SkeletonBar } from '@/components/ui/Skeleton'
-
-/** Add to topic's choices: the topics you are a member of, then the rest. */
-export interface TopicChoices {
-  yours: TopicOfFile[]
-  others: TopicOfFile[]
-}
 
 /**
  * **A project's or an issue's topics** (TOP-5; why:
@@ -26,16 +21,20 @@ export interface TopicChoices {
  * Add to topic and each chip's ✕ are where the prototype draws nothing yet
  * (Miky, 1 Nov: Katerina polishes after). They follow the topic, not the file:
  * the list is the topic's, so a file you cannot edit, or an archived one, can
- * still be put in a topic, and an archived topic keeps its chip with no ✕
+ * still be put in a topic, and an archived topic — by itself or with its
+ * project — keeps its chip, says "(archived)" and has no ✕
  * (why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/an-archived-file-is-read-only-in-every-app.md).
  */
-export function FileTopics({ topics, busy, onChange, readChoices }: {
+export function FileTopics({ topics, busy, onChange, readChoices, choicesNow }: {
   topics: FileTopicsState
   /** Topic addresses with a write on the way: their chip waits, with no ✕. */
   busy: ReadonlySet<string>
   /** Put the file on the topic's list, or take it off. */
   onChange: (topic: TopicOfFile, listed: boolean) => void
+  /** The choices, read afresh on each open of Add to topic. */
   readChoices: () => Promise<TopicChoices>
+  /** The choices already in hand, drawn while {@link readChoices} reads. */
+  choicesNow?: () => TopicChoices | undefined
 }) {
   const [picking, setPicking] = useState(false)
   if (topics === undefined) {
@@ -55,7 +54,7 @@ export function FileTopics({ topics, busy, onChange, readChoices }: {
         <div className="flex flex-wrap items-center gap-1">
           {topics.map((topic) => (
             <span key={topic.address} className="flex items-center" data-file-topic={topic.address}>
-              <Chip label={topic.title} leadingIcon={<KindIcon kind="topic" size={14} tone="inherit" />} href={topic.openUrl} onClick={(event) => openBeside(event, topic.openUrl)} />
+              <Chip label={topic.archived ? `${topic.title} (archived)` : topic.title} leadingIcon={<KindIcon kind="topic" size={14} tone="inherit" />} href={topic.openUrl} onClick={(event) => openBeside(event, topic.openUrl)} />
               {!topic.archived && !busy.has(topic.address) && (
                 <IconButton variant="muted" aria-label={`Remove from ${topic.title}`} tooltip={`Remove from ${topic.title}`} onClick={() => onChange(topic, false)}>
                   <IconX size={12} stroke={1.5} />
@@ -72,6 +71,7 @@ export function FileTopics({ topics, busy, onChange, readChoices }: {
         <AddToTopic
           listed={topics.map((topic) => topic.address)}
           readChoices={readChoices}
+          choicesNow={choicesNow}
           onPick={(topic) => {
             setPicking(false)
             onChange(topic, true)
@@ -106,20 +106,23 @@ function openBeside(event: { preventDefault: () => void }, url: string | undefin
  * A–Z, as Peek's Topics screen splits them; archived ones and the ones already
  * listing this file left out. Typing narrows both by title.
  */
-function AddToTopic({ listed, readChoices, onPick, onClose }: {
+function AddToTopic({ listed, readChoices, choicesNow, onPick, onClose }: {
   /** The addresses of the topics that list the file already. */
   listed: readonly string[]
   readChoices: () => Promise<TopicChoices>
+  choicesNow?: () => TopicChoices | undefined
   onPick: (topic: TopicOfFile) => void
   onClose: () => void
 }) {
   const [query, setQuery] = useState('')
-  const [choices, setChoices] = useState<TopicChoices | 'failed' | undefined>(undefined)
+  // Choices already in hand draw with the palette, so it never says "Reading topics…" for them.
+  const [choices, setChoices] = useState<TopicChoices | 'failed' | undefined>(() => choicesNow?.())
   useEffect(() => {
     let live = true
     readChoices()
       .then((next) => live && setChoices(next))
-      .catch(() => live && setChoices('failed'))
+      // A failed re-read keeps the choices already drawn.
+      .catch(() => live && setChoices((drawn) => (typeof drawn === 'object' ? drawn : 'failed')))
     return () => {
       live = false
     }
