@@ -25,14 +25,16 @@ import { SkeletonBar } from '@/components/ui/Skeleton'
  * project — keeps its chip, says "(archived)" and has no ✕
  * (why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/an-archived-file-is-read-only-in-every-app.md).
  */
-export function FileTopics({ topics, busy, onChange, readChoices }: {
+export function FileTopics({ topics, busy, onChange, readChoices, choicesNow }: {
   topics: FileTopicsState
   /** Topic addresses with a write on the way: their chip waits, with no ✕. */
   busy: ReadonlySet<string>
   /** Put the file on the topic's list, or take it off. */
   onChange: (topic: TopicOfFile, listed: boolean) => void
-  /** The choices, at once when they are already in hand. */
-  readChoices: () => TopicChoices | Promise<TopicChoices>
+  /** The choices, read afresh on each open of Add to topic. */
+  readChoices: () => Promise<TopicChoices>
+  /** The choices already in hand, drawn while {@link readChoices} reads. */
+  choicesNow?: () => TopicChoices | undefined
 }) {
   const [picking, setPicking] = useState(false)
   if (topics === undefined) {
@@ -69,6 +71,7 @@ export function FileTopics({ topics, busy, onChange, readChoices }: {
         <AddToTopic
           listed={topics.map((topic) => topic.address)}
           readChoices={readChoices}
+          choicesNow={choicesNow}
           onPick={(topic) => {
             setPicking(false)
             onChange(topic, true)
@@ -103,24 +106,23 @@ function openBeside(event: { preventDefault: () => void }, url: string | undefin
  * A–Z, as Peek's Topics screen splits them; archived ones and the ones already
  * listing this file left out. Typing narrows both by title.
  */
-function AddToTopic({ listed, readChoices, onPick, onClose }: {
+function AddToTopic({ listed, readChoices, choicesNow, onPick, onClose }: {
   /** The addresses of the topics that list the file already. */
   listed: readonly string[]
-  readChoices: () => TopicChoices | Promise<TopicChoices>
+  readChoices: () => Promise<TopicChoices>
+  choicesNow?: () => TopicChoices | undefined
   onPick: (topic: TopicOfFile) => void
   onClose: () => void
 }) {
   const [query, setQuery] = useState('')
   // Choices already in hand draw with the palette, so it never says "Reading topics…" for them.
-  const [choices, setChoices] = useState<TopicChoices | 'failed' | undefined>(() => {
-    const now = readChoices()
-    return now instanceof Promise ? undefined : now
-  })
+  const [choices, setChoices] = useState<TopicChoices | 'failed' | undefined>(() => choicesNow?.())
   useEffect(() => {
     let live = true
-    Promise.resolve(readChoices())
+    readChoices()
       .then((next) => live && setChoices(next))
-      .catch(() => live && setChoices('failed'))
+      // A failed re-read keeps the choices already drawn.
+      .catch(() => live && setChoices((drawn) => (typeof drawn === 'object' ? drawn : 'failed')))
     return () => {
       live = false
     }

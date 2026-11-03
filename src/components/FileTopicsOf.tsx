@@ -1,4 +1,4 @@
-import { readTopicChoices } from '@/api/topics'
+import { readTopicChoices, topicChoicesNow } from '@/api/topics'
 import type { FileTopicsOfFile } from '@/api/useFileTopics'
 import { FileTopics } from './FileTopics'
 import { act, type Say } from '@/pages/act'
@@ -17,6 +17,7 @@ export function FileTopicsOf({ topics, say }: { topics: FileTopicsOfFile; say: S
       busy={busy}
       onChange={(topic, listed) => void act(listed ? `Add to ${topic.title}` : `Remove from ${topic.title}`, () => setListed(topic, listed), say)}
       readChoices={readTopicChoices}
+      choicesNow={topicChoicesNow}
     />
   )
 }

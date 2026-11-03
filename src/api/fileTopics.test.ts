@@ -13,7 +13,7 @@ vi.mock('./store', () => ({
 }))
 
 import { readFileTopics } from './foreign'
-import { readTopicChoices, resetTopicsForTests } from './topics'
+import { readTopicChoices, resetTopicsForTests, topicChoicesNow } from './topics'
 import { buildManifest } from '../nostr/manifest'
 
 interface TestEvent {
@@ -107,12 +107,13 @@ describe("Add to topic's choices", () => {
     expect(others.map((t) => t.title)).toEqual(['Beta', 'Zeta'])
   })
 
-  it('opened again, gives the choices at once, without asking the relay', async () => {
-    held.push(folder('team'), topic('t-b', 'Beta'))
+  it('opened again, gives the held choices at once, and a topic made or archived since once the fresh read lands', async () => {
+    expect(topicChoicesNow()).toBeUndefined()
+    held.push(folder('team'), topic('t-b', 'Beta'), topic('t-o', 'Old'))
     await readTopicChoices()
-    held.push(topic('t-c', 'Gamma'))
-    const again = readTopicChoices()
-    expect(again).not.toBeInstanceOf(Promise)
-    expect((again as Awaited<typeof again>).others.map((t) => t.title)).toEqual(['Beta'])
+    held.push(topic('t-c', 'Gamma'), archiving('t-o'))
+    expect(topicChoicesNow()?.others.map((t) => t.title)).toEqual(['Beta', 'Old'])
+    expect((await readTopicChoices()).others.map((t) => t.title)).toEqual(['Beta', 'Gamma'])
+    expect(topicChoicesNow()?.others.map((t) => t.title)).toEqual(['Beta', 'Gamma'])
   })
 })

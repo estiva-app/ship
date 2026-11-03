@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { readFileTopics, type TopicOfFile } from './foreign'
-import { reloadTopics } from './topics'
 import { setListedInTopic, type WriteResult } from './writes'
 
 /** The topics that list a file: `undefined` while the first read runs, `'failed'` when it could not be read. */
@@ -19,8 +18,7 @@ export interface FileTopicsOfFile {
  *
  * Read once per file and again after each write: the project says "after a
  * reload", so no live watch. A write shows at once and rolls back when the
- * relay refuses it, with the relay's reason for the caller to say. A write
- * that lands reads the held topics again too, since a topic's list changed.
+ * relay refuses it, with the relay's reason for the caller to say.
  */
 export function useFileTopics(file: string | undefined): FileTopicsOfFile {
   const [state, setState] = useState<FileTopicsState>(undefined)
@@ -67,7 +65,6 @@ export function useFileTopics(file: string | undefined): FileTopicsOfFile {
       apply(listed)
       const result = await setListedInTopic(topic, file, listed).finally(() => (writing.current -= 1))
       if (!result.ok) apply(!listed)
-      else void reloadTopics()
       mark(false)
       setNonce((n) => n + 1)
       return result

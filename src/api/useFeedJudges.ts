@@ -143,37 +143,24 @@ export async function readFeedFacts(
   // Everyone's, from the same events: the Members dialog's roster (SHI-31).
   const members = membersOf(file.addr, folded)
   onMembers?.(members)
-  return { membership, members, muted: await mutedOf(events, me, decrypt), events }
-}
 
-/** The keys `me` muted, from events holding their mute list: `undefined` when the list would not decrypt. */
-async function mutedOf(events: readonly SignedEvent[], me: string, decrypt: (ciphertext: string) => Promise<string | undefined>): Promise<ReadonlySet<string> | undefined> {
   const list = newestMuted(events, me)
   if (!list) {
     mutedCache = undefined
     mutedFailed = undefined
-    return NO_MUTES
+    return { membership, members, muted: NO_MUTES, events }
   }
   if (mutedCache?.eventId !== list.id) {
-    if (mutedFailed?.eventId === list.id && Date.now() - mutedFailed.at < MUTED_RETRY_MS) return undefined
+    if (mutedFailed?.eventId === list.id && Date.now() - mutedFailed.at < MUTED_RETRY_MS) return { membership, members, muted: undefined, events }
     const parsed = parseMutedBlob((await decrypt(list.content)) ?? '')
     if (!parsed) {
       mutedFailed = { eventId: list.id, at: Date.now() }
-      return undefined
+      return { membership, members, muted: undefined, events }
     }
     mutedFailed = undefined
     mutedCache = { eventId: list.id, keys: new Set(parsed.keys) }
   }
-  return mutedCache.keys
-}
-
-/**
- * The keys `me` muted, alone — for a judge of many files at once, Ship's
- * Topics (SHIPS-2). The same cache as a page's read, so an unchanged list is
- * decrypted once between them; `undefined` as {@link readFeedFacts} says it.
- */
-export async function readMuted(query: QueryFn, decrypt: (ciphertext: string) => Promise<string | undefined>, me: string): Promise<ReadonlySet<string> | undefined> {
-  return mutedOf(await query([mutedFilter(me)]), me, decrypt)
+  return { membership, members, muted: mutedCache.keys, events }
 }
 
 /** The judges a feed asks `unreadByThread` with: one for the file's stream and one for the record channel's. */
