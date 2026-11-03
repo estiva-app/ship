@@ -281,6 +281,9 @@ export function buildChange(
     kind: KIND.CHANGE,
     tags: [
       ['a', args.target],
+      // The file it is about, by its id, as a comment names its file (SPEC §6.2).
+      // why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-change-is-about-its-file-as-a-comment-is.md
+      ['O', args.target.split(':').slice(2).join(':')],
       ['field', args.field],
       ['value', args.value],
       ['h', args.folder],

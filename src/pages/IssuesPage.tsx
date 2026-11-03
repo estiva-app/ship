@@ -66,7 +66,7 @@ export function IssuesPage({ state, directory, teams, archives, folder, say, ref
   const rows = useMemo(() => live.map((issue) => rowFor(issue, state, directory, counted)), [live, state, directory, counted])
   const mine = useMemo(() => new Set(live.filter((issue) => issue.assignee === me).map((issue) => issue.addr)), [live])
   const projectOptions = useMemo(
-    () => projects.filter((p) => !archives.ofProject(p.addr)).map((p) => ({ value: p.addr, label: p.title })),
+    () => projects.filter((p) => !p.deleted && !archives.ofProject(p.addr)).map((p) => ({ value: p.addr, label: p.title })),
     [projects, archives],
   )
 

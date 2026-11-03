@@ -104,7 +104,7 @@ export function IssuePage({ state, directory, archives, d, say, refresh }: { sta
   const people = useMemo(() => pickerPeople(state, directory), [state, directory])
   const projects = useMemo(
     // No move into an archived project, a new child under it (SPEC §6.5); its own stays listed, and moving out stays offered.
-    () => [{ value: '', label: 'No project' }, ...state.projects.filter((p) => p.addr === issue?.projectAddr || !archives.ofProject(p.addr)).map((p) => ({ value: p.addr, label: p.title }))],
+    () => [{ value: '', label: 'No project' }, ...state.projects.filter((p) => p.addr === issue?.projectAddr || (!p.deleted && !archives.ofProject(p.addr))).map((p) => ({ value: p.addr, label: p.title }))],
     [state, archives, issue?.projectAddr],
   )
   const [confirmingDelete, setConfirmingDelete] = useState(false)

@@ -14,8 +14,11 @@ import type { FolderState } from '../nostr/fold'
  * identity menu shows their raw key on the one screen whose job is saying who
  * they are.
  */
-export function peopleIn(state: FolderState, me: string): string[] {
-  const seen = new Set<string>()
+export function peopleIn(state: FolderState, me: string, roster?: ReadonlySet<string> | null): string[] {
+  // The workspace's members (kind 39002), so whoever only ever changed a
+  // project is still here where projects are read by their fields (ALO-5): no
+  // old change of theirs is read any more.
+  const seen = new Set<string>(roster ?? [])
   for (const project of state.projects) {
     seen.add(project.author)
     if (project.lead) seen.add(project.lead)

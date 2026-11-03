@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react'
-import { PROJECT_STATUSES, createProject, keyProblem, lookupStatus, projectKeys, suggestKey, takenKeys, type DirectoryView, type FolderState } from '@/api'
+import { PROJECT_STATUSES, createProject, keyProblem, lookupStatus, me, projectKeys, setProjectDeleted, suggestKey, takenKeys, type DirectoryView, type FolderState } from '@/api'
+import { ago } from '@/lib/time'
 import type { FolderSummary } from '@estiva-app/interop'
 import { NewProjectDialog } from '@/components/NewProjectDialog'
 import type { ProjectCardProps } from '@/components/ProjectCard'
 import { ProjectsView } from '@/views/ProjectsView'
 import type { Archives } from '@/lib/archive'
 import { go, href } from '../router'
-import { type Say } from './act'
+import { act, type Say } from './act'
 import { useReopenHeld } from '@/auth/heldTyping'
 import { folderName, projectsIn } from '@/lib/placement'
 
@@ -58,11 +59,28 @@ export function ProjectsPage({ state, directory, teams, archives, archived, fold
     }
     // A Folder's Projects lists only the projects in that team (SHIPS-5), by the sidebar's own rule.
     const here = folder ? projectsIn(state.projects, teams ?? [], folder) : state.projects
+    // A deleted project leaves both lists for the Archived tab's Deleted filter (SPEC §6.5).
+    const live = here.filter((p) => !p.deleted)
     return {
-      active: here.filter((p) => !isArchived(p)).map(toCard),
-      archived: here.filter(isArchived).map(toCard),
+      active: live.filter((p) => !isArchived(p)).map(toCard),
+      archived: live.filter(isArchived).map(toCard),
+      deleted: here.flatMap((project) =>
+        project.deleted
+          ? [
+              {
+                href: href({ name: 'project', d: project.id, slug: project.title, view: 'table' }),
+                title: project.title,
+                deleted: `Deleted by ${project.deleted.by === me ? 'you' : directory.nameOf(project.deleted.by)} · ${ago(project.deleted.at)}`,
+                onRestore: () =>
+                  act('Restore', () => setProjectDeleted(project, false), say, refresh).then((ok) => {
+                    if (ok) say('Project restored')
+                  }),
+              },
+            ]
+          : [],
+      ),
     }
-  }, [state, directory, archives, folder, teams])
+  }, [state, directory, archives, folder, teams, say, refresh])
 
   return (
     <>
@@ -70,6 +88,7 @@ export function ProjectsPage({ state, directory, teams, archives, archived, fold
         title={folder ? `${folderName(teams, folder)} · Projects` : 'Projects'}
         active={cards.active}
         archived={cards.archived}
+        deleted={cards.deleted}
         showArchived={archived}
         onShowArchived={(wantArchived) => go({ name: 'projects', archived: wantArchived, folder })}
         onAddProject={() => setAdding(true)}

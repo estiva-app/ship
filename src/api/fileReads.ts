@@ -9,14 +9,15 @@ import type { ProjectFields } from '../nostr/store'
  * `requires_prev` naming `osnova.project`) — the one announced moment, ALO-8 —
  * or when this browser opted in to try it on the QA Folders the relay already
  * fences: open Ship once with `?fields=on`, and `?fields=off` to leave. Either
- * way only where the relay offers the list read. Off, Ship reads and writes as
- * before.
+ * way only where the relay offers the list read and the opened file's text with
+ * it: without that a project's page could not read what it edits. Off, Ship
+ * reads and writes as before.
  *
  * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-file-is-its-fields-each-kept-in-order-by-the-relay.md
  */
 export function projectFieldsOf(reads: RelayFileReads, optedIn: boolean): ProjectFields | undefined {
   const announced = reads.switched && reads.inOrder.includes(PROJECT_TYPE)
-  if (!reads.list || !(announced || optedIn)) return undefined
+  if (!reads.list || !reads.text || !(announced || optedIn)) return undefined
   return { text: reads.text }
 }
 

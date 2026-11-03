@@ -172,6 +172,8 @@ export interface WorkspaceState extends FolderState {
   /** The Folders whose conversations were read, and the files whose mentions were (APP-5): see `WorkspaceEvents`. */
   threadsAt?: Readonly<Record<string, number>>
   mentionsOf?: readonly string[]
+  /** The projects whose current text this holds, where projects are read by their fields: see `WorkspaceEvents`. */
+  texts?: readonly string[]
   /**
    * The events this was folded from, as the relay answered them: what the
    * shared "Mentioned in" reader (interop's `mentionedInOf`) reads, since it
@@ -204,7 +206,7 @@ export function partsIndex(events: readonly SignedEvent[]): Record<string, PartP
   return out
 }
 
-function read(events: SignedEvent[], folders: string[], threads: Required<Pick<WorkspaceState, 'threadsAt' | 'mentionsOf'>> = { threadsAt: {}, mentionsOf: [] }): WorkspaceState {
+function read(events: SignedEvent[], folders: string[], threads: Required<Pick<WorkspaceState, 'threadsAt' | 'mentionsOf'>> & Pick<WorkspaceState, 'texts'> = { threadsAt: {}, mentionsOf: [] }): WorkspaceState {
   return {
     ...threads,
     ...foldFolder(events, referencedAddresses),
@@ -257,6 +259,13 @@ export interface WorkspaceEvents {
    * `readThreads`. Asked for again on every whole read.
    */
   mentionsOf: string[]
+  /**
+   * Where projects are read by their fields (ALO-5): the projects whose
+   * current text this holds. A list read carries none (§6.13), and a project
+   * missing here folds its first record's seed in place of its text, so nothing
+   * may be saved on it. Absent where every change is read: every text is held.
+   */
+  texts?: string[]
 }
 
 /** The Folders and files a screen draws conversations for (APP-5) — see `Store.readThreads`. */
@@ -360,8 +369,8 @@ class Deletions {
 }
 
 /** Fold a workspace read. `loadAll` is `foldWorkspace(await loadAllEvents())`. */
-export function foldWorkspace(snapshot: Pick<WorkspaceEvents, 'events' | 'folders'> & Partial<Pick<WorkspaceEvents, 'threadsAt' | 'mentionsOf'>>): WorkspaceState {
-  return read(snapshot.events, snapshot.folders, { threadsAt: snapshot.threadsAt ?? {}, mentionsOf: snapshot.mentionsOf ?? [] })
+export function foldWorkspace(snapshot: Pick<WorkspaceEvents, 'events' | 'folders'> & Partial<Pick<WorkspaceEvents, 'threadsAt' | 'mentionsOf' | 'texts'>>): WorkspaceState {
+  return read(snapshot.events, snapshot.folders, { threadsAt: snapshot.threadsAt ?? {}, mentionsOf: snapshot.mentionsOf ?? [], ...(snapshot.texts ? { texts: snapshot.texts } : {}) })
 }
 
 function folderOfEvent(event: SignedEvent): string | undefined {
@@ -421,10 +430,10 @@ export class Store {
    * its link's notice and the Archived view's deleted filter. On production
    * 3 Nov that was 18 of 154 projects, each a few changes.
    */
-  private async projectFileEvents(read: QueryFn, fields: ProjectFields, roots: readonly SignedEvent[], opened: ReadonlySet<string>, scope: 'all' | 'these' = 'all'): Promise<SignedEvent[]> {
+  private async projectFileEvents(read: QueryFn, fields: ProjectFields, roots: readonly SignedEvent[], opened: ReadonlySet<string>, scope: 'all' | 'these' = 'all'): Promise<{ events: SignedEvent[]; texts: string[] }> {
     const own = roots.filter((root) => root.kind === KIND.PROJECT)
     const dOf = (root: SignedEvent) => root.tags.find((t) => t[0] === 'd')?.[1] ?? ''
-    if (scope === 'these' && !own.length) return []
+    if (scope === 'these' && !own.length) return { events: [], texts: [] }
     const listed = await listFiles(read, { kinds: [KIND.PROJECT], ...(scope === 'these' ? { '#d': [...new Set(own.map(dOf))] } : {}) })
     const held = new Set(listed.map((file) => file.address))
     const open = (addr: string) => {
@@ -435,7 +444,31 @@ export class Store {
     const unlisted = addrs.filter((addr) => !held.has(addr))
     const withText = fields.text ? [...opened].filter((addr) => held.has(addr)) : []
     const [deleted, texts] = await Promise.all([this.changesOf(read, unlisted), Promise.all(withText.map(open))])
-    return [...listed, ...texts.flatMap((file) => (file ? [file] : []))].flatMap((file) => file.events).concat(deleted)
+    return {
+      events: [...listed, ...texts.flatMap((file) => (file ? [file] : []))].flatMap((file) => file.events).concat(deleted),
+      // Every change of a deleted one is read, its text with them.
+      texts: [...unlisted, ...withText.filter((_, i) => texts[i])],
+    }
+  }
+
+  /**
+   * The current text of each project in `addrs` not yet in `held`, read by its
+   * id (§6.13 "Opening a file reads its current text too"), and kept so every
+   * whole load reads it again: a project opened by navigating, not by the
+   * tab's first route. Nothing where projects are not read by their fields.
+   */
+  private async openTexts(addrs: readonly string[], held: readonly string[] | undefined): Promise<{ events: SignedEvent[]; texts: string[] }> {
+    const wanted = addrs.filter((addr) => addr.startsWith(`${KIND.PROJECT}:`) && !held?.includes(addr))
+    if (!held || !wanted.length || !(await this.projectFields())) return { events: [], texts: [] }
+    for (const addr of wanted) this.openedProjects.add(addr)
+    const query: QueryFn = (filters) => this.relay.query(filters as never)
+    const files = await Promise.all(
+      wanted.map((addr) => {
+        const [, pubkey, ...d] = addr.split(':')
+        return openFile(query, { kind: KIND.PROJECT, pubkey: pubkey!, d: d.join(':') }, { text: true })
+      }),
+    )
+    return { events: files.flatMap((file) => file?.events ?? []), texts: wanted.filter((_, i) => files[i]) }
   }
 
   /** Every change to `addrs`, by `#a` (§6.2), a few hundred addresses per filter. */
@@ -580,6 +613,8 @@ export class Store {
     summary?: string
     /** The team's Folder, and whether it has state — from a read, never a guess. */
     team: { folder: string; hasState: boolean }
+    /** Filed in the team's Folder by `h`, where the relay keeps projects in order: see `buildProject`. */
+    filedIn?: boolean
   }): Promise<{ result: PublishResult; placed?: PublishResult; addr: string; id: string; folder: string }> {
     assertFolderId(args.team.folder)
     const id = crypto.randomUUID()
@@ -595,6 +630,7 @@ export class Store {
         key: args.key,
         summary: args.summary,
         folder,
+        filedIn: args.filedIn,
       }),
     )
     if (!result.ok) return { result, addr, id, folder }
@@ -1344,10 +1380,12 @@ export class Store {
     const kinds = loadKinds(threads)
     const found = await read([{ kinds: [KIND.PROJECT] }, { kinds: [KIND.ISSUE] }])
     const issues = [...new Set(found.filter((event) => event.kind === KIND.ISSUE).map((event) => `${KIND.ISSUE}:${event.pubkey}:${event.tags.find((t) => t[0] === 'd')?.[1] ?? ''}`))]
-    const changes = Promise.all([this.projectFileEvents(read, fields, found, this.openedProjects), this.issueChanges(read, issues)]).then((parts) => parts.flat())
+    const projects = this.projectFileEvents(read, fields, found, this.openedProjects)
+    const changes = Promise.all([projects.then((p) => p.events), this.issueChanges(read, issues)]).then((parts) => parts.flat())
     changes.catch(() => undefined)
     const roots = await this.widen(found, fetched, {}, read, kinds, threadsAt)
     const all = await this.widen([...roots.events, ...(await changes)], fetched, {}, read, kinds, threadsAt)
+    const { texts } = await projects
     const folders = new Set(all.folders)
     const events = all.events.filter((event) => event.kind !== KIND.CHANGE || folders.has(folderOfEvent(event) ?? ''))
     return {
@@ -1356,6 +1394,7 @@ export class Store {
       readAt: Object.fromEntries([...foldersOf(events)].filter((folder) => folders.has(folder)).map((folder) => [folder, at])),
       threadsAt,
       mentionsOf: [],
+      texts,
     }
   }
 
@@ -1445,7 +1484,7 @@ export class Store {
       this.projectFileEvents(query, fields, events, this.openedProjects, 'these'),
       this.issueChanges(this.queryAll, state.issues.map((issue) => issue.addr)),
     ])
-    return { events: mergeRead(events, [...projects, ...changes]), folders: [...read], readAt: {}, threadsAt, mentionsOf: [] }
+    return { events: mergeRead(events, [...projects.events, ...changes]), folders: [...read], readAt: {}, threadsAt, mentionsOf: [], texts: projects.texts }
   }
 
   /**
@@ -1480,12 +1519,14 @@ export class Store {
       : new Set<string>()
     const folders = [...new Set([...wanted.folders, ...[...mentioning].filter((folder) => known.has(folder))])].filter((folder) => previous.threadsAt[folder] === undefined)
     const threadsAt = { ...previous.threadsAt }
-    const fresh = await this.readFolderEvents(folders, {}, {}, this.queryAll, THREAD_KINDS, threadsAt)
+    // A project the screen draws, opened by navigating: its current text, which no list read carries (ALO-5).
+    const [fresh, opened] = await Promise.all([this.readFolderEvents(folders, {}, {}, this.queryAll, THREAD_KINDS, threadsAt), this.openTexts(about, previous.texts)])
     return {
       ...previous,
-      events: this.deleted.drop(mergeRead(previous.events, fresh)),
+      events: this.deleted.drop(mergeRead(previous.events, [...fresh, ...opened.events])),
       threadsAt,
       mentionsOf: [...previous.mentionsOf, ...about],
+      ...(previous.texts ? { texts: [...previous.texts, ...opened.texts] } : {}),
     }
   }
 
@@ -1552,7 +1593,9 @@ export class Store {
     }
     const stillHeld = lost.size ? kept.filter((event) => !lost.has(folderOfEvent(event) ?? '')) : kept
     const read = mergeRead(stillHeld, fresh.filter((event) => event.kind !== KIND.DELETION))
-    return this.widen(this.deleted.drop(read), new Set([...previous.folders, ...scope]), readAt, this.queryAll, FOLDER_KINDS_BUT_THREADS, threadsAt, previous.mentionsOf)
+    const widened = await this.widen(this.deleted.drop(read), new Set([...previous.folders, ...scope]), readAt, this.queryAll, FOLDER_KINDS_BUT_THREADS, threadsAt, previous.mentionsOf)
+    // A text read before stays held: a newer one is a change in its Folder, which this re-read brings.
+    return previous.texts ? { ...widened, texts: previous.texts } : widened
   }
 
   /**

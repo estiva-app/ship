@@ -1,7 +1,9 @@
 import { Suspense, lazy, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { linksAsReferences, referencesIn, resolveBlockAnchor, toRenderTree, type ContentFormat, type Imeta, type LinkResolver } from '@estiva-app/protocol'
 import type { Editor } from '@tiptap/react'
+import type { FileText } from '@estiva-app/conversation'
 import { BlockHandle } from '@estiva-app/ui'
+import type { DocumentAsks } from '@estiva-app/ui/editor'
 import { Banner } from '@/components/Banner'
 import { useLinkValues } from '@/api/linkCards'
 import { blockRows, linkedBlock } from './blockRows'
@@ -32,8 +34,16 @@ export interface LiveHeaderProps {
   onSummarize?: (value: string) => Promise<true | string>
   description: string
   format: ContentFormat
-  /** The body, and the format tag the editor built it in — RIC-14. */
-  onDescribe: (value: string, contentFormat?: string, left?: () => boolean) => Promise<boolean> | boolean
+  /** The body, and the format tag the editor built it in — RIC-14; `from` is the text it was edited from. With `merges`, may answer what asks. */
+  onDescribe: (value: string, contentFormat?: string, left?: () => boolean, from?: FileText) => Promise<boolean | DocumentAsks> | boolean | DocumentAsks
+  /** Saves merge with someone else's newer one, and a block both changed asks (ALO-5). */
+  merges?: boolean
+  /**
+   * The description's current text is still being read: shown, not editable.
+   * A list read carries no text (§6.13), so until then `description` may be
+   * the first record's seed, and a save edited from it would follow the wrong change.
+   */
+  textPending?: boolean
   /** Add the people a description save names anew to the file, as the Add button does; answers who could not be added. */
   onMention?: (people: readonly string[]) => Promise<readonly string[]>
   /** Who saved the description last, by name, when it was not you: the "<name> saved a newer version" line (LTX-3). */

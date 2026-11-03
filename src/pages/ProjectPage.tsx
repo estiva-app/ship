@@ -28,6 +28,8 @@ import {
   assignMissingRefs,
   addMentioned,
   setProjectField,
+  setProjectDeleted,
+  noteProjectText,
   startConversation,
   workFolder,
   channelContext,
@@ -69,7 +71,9 @@ import { useSideColumn } from './sideColumn'
 import { FileTopicsOf } from '@/components/FileTopicsOf'
 import { hrefForIssue, rowFor } from './IssuesPage'
 import { MoveProject } from '@/components/MoveProject'
-import { ArchiveDialog, ArchivedNotice } from '@estiva-app/ui'
+import { ArchiveDialog, ArchivedNotice, DeletedNotice } from '@estiva-app/ui'
+import type { DocumentAsks } from '@estiva-app/ui/editor'
+import { ago } from '@/lib/time'
 import { ARCHIVE_WORDS, archivedLine, archivedNoticeOf, lockedReason, ownArchive, type Archives } from '@/lib/archive'
 import { KIND } from '@/nostr/kinds'
 
@@ -569,6 +573,10 @@ export function ProjectPage({
     draw no counts, so no other Folder's.
   */
   const held = useThreads(state, project ? [project.contentFolder, ...(record ? [record] : [])] : [], project ? [project.addr] : [])
+  // Each text shown is one a save may be edited from (ALO-5): the change it follows.
+  useEffect(() => {
+    if (project) noteProjectText(project)
+  }, [project])
 
   const issues = useMemo<IssuesTableRow[]>(() => {
     if (!project) return []
@@ -730,6 +738,10 @@ export function ProjectPage({
     act('Unarchive', () => archiveProject(project, false), say, refresh).then((ok) => {
       if (ok) say('Project restored')
     })
+  // Where projects are read by their fields (ALO-5): saves merge, and the text waits until it is read.
+  const byFields = state.texts !== undefined
+  const textPending = byFields && !state.texts!.includes(project.addr)
+  const deleted = project.deleted
 
   return (
     <>
@@ -737,17 +749,31 @@ export function ProjectPage({
         // When it last changed, over the page (ONE-6, step 4a).
         edited={editedFor(project.addr, state, directory, { at: project.createdAt, by: project.author })}
         archivedNotice={
-          archive && (
-            <ArchivedNotice
-              {...archivedNoticeOf(archive, directory.nameOf)}
-              onUnarchive={unarchive}
-              {...(archive.with?.id ? { onOpenParent: () => go({ name: 'folder', id: archive.with!.id! }) } : {})}
+          deleted ? (
+            // A link to a deleted project still opens it: who deleted it, and Restore (SPEC §6.5).
+            <DeletedNotice
+              by={deleted.by === me ? 'You' : directory.nameOf(deleted.by)}
+              when={ago(deleted.at)}
+              onRestore={() =>
+                act('Restore', () => setProjectDeleted(project, false), say, refresh).then((ok) => {
+                  if (ok) say('Project restored')
+                })
+              }
             />
+          ) : (
+            archive && (
+              <ArchivedNotice
+                {...archivedNoticeOf(archive, directory.nameOf)}
+                onUnarchive={unarchive}
+                {...(archive.with?.id ? { onOpenParent: () => go({ name: 'folder', id: archive.with!.id! }) } : {})}
+              />
+            )
           )
         }
         // Archived, its own fields stay shut until it is unarchived (SHI-36), and it takes no comment or reaction (Decided 2026-10-17).
-        lockedReason={lockedReason(archive)}
-        commentsClosed={archivedLine(archive)}
+        // Deleted, the same until it is restored.
+        lockedReason={deleted ? 'Restore to edit' : lockedReason(archive)}
+        commentsClosed={deleted ? 'This project is deleted.' : archivedLine(archive)}
         members={
           <Members
             key={project.addr}
@@ -775,8 +801,23 @@ export function ProjectPage({
           summary: project.summary,
           // A refusal is said under the field, with your text still in it — not in a toast (SUM-4).
           onSummarize: (value) => actInField('Summary', () => setProjectField(project, 'summary', value, 'Summary'), refresh),
-          onDescribe: (value, contentFormat, left) =>
-            act('Description', () => setProjectField(project, 'description', value, 'Description', contentFormat), sayOnceLeft(say, project.title || 'Untitled project', left), refresh),
+          onDescribe: async (value, contentFormat, left, from) => {
+            // A block both of you changed asks, nothing saved (§13.3): the editor holds it, with their words.
+            let asks: DocumentAsks | undefined
+            const ok = await act(
+              'Description',
+              async () => {
+                const result = await setProjectField(project, 'description', value, 'Description', contentFormat, from)
+                if ('asks' in result) asks = result.asks
+                return asks ? { ok: true } : result
+              },
+              sayOnceLeft(say, project.title || 'Untitled project', left),
+              refresh,
+            )
+            return asks ?? ok
+          },
+          merges: byFields,
+          textPending,
           // Whoever a save names anew is added to the project, as the Add button does (WBD-7).
           onMention: (people) => addMentioned({ kind: 'project', project }, people, me),
           // The profile's name only: with none the line says "Someone", as Leaf's does, never a shortened key.
@@ -969,7 +1010,11 @@ export function ProjectPage({
             return true
           }}
         >
-          <p>This publishes a NIP-09 deletion request. Relays may decline it, and copies held elsewhere are unaffected.</p>
+          {byFields ? (
+            <p>It leaves every list and search. Its link still opens it, with Restore.</p>
+          ) : (
+            <p>This publishes a NIP-09 deletion request. Relays may decline it, and copies held elsewhere are unaffected.</p>
+          )}
           {issues.length > 0 && (
             <p>
               Its {issues.length} {issues.length === 1 ? 'issue is a separate event and is' : 'issues are separate events and are'} not deleted — they stay in the Folder and stop being
