@@ -1,7 +1,8 @@
 import { Relay, type FetchLike } from '@estiva-app/protocol'
 import { isRateLimited, noteRateLimited } from '@/lib/relayBudget'
 import { estivaIdSigner, localSigner, type Signer } from '../nostr/signer'
-import { Store } from '../nostr/store'
+import { Store, type ProjectFields } from '../nostr/store'
+import { optedIn, projectFieldsOf, readFileReads } from './fileReads'
 import { ID_CONFIG, RELAY_URL } from '../config'
 import { relayClockSkew } from './clock'
 import { heldBearer, heldToken, renew } from '../auth/estivaId'
@@ -82,4 +83,10 @@ const fetchReportingQuota: FetchLike = async (url, init) => {
 
 export const relay = new Relay(RELAY_URL, signer, { fetch: fetchReportingQuota })
 
-export const store = new Store(relay, signer, relayClockSkew)
+/** The switch (ALO-5): the relay's NIP-11 asked once, on the first read that needs it. */
+let projectFields: Promise<ProjectFields | undefined> | undefined
+const opted = optedIn()
+export const projectFieldsNow = (): Promise<ProjectFields | undefined> =>
+  (projectFields ??= readFileReads(() => relay.info()).then((reads) => projectFieldsOf(reads, opted)))
+
+export const store = new Store(relay, signer, relayClockSkew, projectFieldsNow)

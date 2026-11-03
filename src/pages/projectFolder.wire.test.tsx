@@ -125,7 +125,7 @@ async function comment(path: string, text: string) {
 
 describe('an archived project offers no new issue until it is unarchived (PEEKM-2, Decided 2026-10-23)', () => {
   it('has no Add issue, where the same project unarchived has one', async () => {
-    const archived = { ...STATE.projects[0], fields: { archived: { value: 'true', by: AUTHOR, at: 2, format: 'marker' } } } as WorkspaceState['projects'][number]
+    const archived = { ...STATE.projects[0], fields: { archived: { value: 'true', by: AUTHOR, at: 2, format: 'marker', id: 'c'.repeat(64) } } } as WorkspaceState['projects'][number]
     vi.mocked(useWorkspace).mockReturnValue({ state: { ...STATE, projects: [archived, STATE.projects[1]] }, partial: false, error: null, clock: null, loading: false, busy: false, refresh, wantThreads: () => {}, live: false })
     goTo(`/project/billing-${D_PROJECT}`)
     const { unmount } = render(<App />)
@@ -162,7 +162,7 @@ describe('an archived project offers no new issue until it is unarchived (PEEKM-
 
   it('an issue cannot be moved into it: the Project picker leaves it out, and keeps the live ones', async () => {
     const D_ISSUE = 'c1d2e3f4-0000-4000-8000-000000000001'
-    const loose = { ...STATE.projects[1], fields: { archived: { value: 'true', by: AUTHOR, at: 2, format: 'marker' } } } as WorkspaceState['projects'][number]
+    const loose = { ...STATE.projects[1], fields: { archived: { value: 'true', by: AUTHOR, at: 2, format: 'marker', id: 'c'.repeat(64) } } } as WorkspaceState['projects'][number]
     const issue = { addr: `30851:${AUTHOR}:${D_ISSUE}`, id: D_ISSUE, author: AUTHOR, createdAt: 1, title: 'Rounding', description: '', descriptionFormat: 'marker', folder: OWN, projectAddr: STATE.projects[0].addr, ref: 'BIL-1', status: 'todo', fields: {} }
     vi.mocked(useWorkspace).mockReturnValue({ state: { ...STATE, projects: [STATE.projects[0], loose], issues: [issue] } as unknown as WorkspaceState, partial: false, error: null, clock: null, loading: false, busy: false, refresh, wantThreads: () => {}, live: false })
     goTo(`/issue/rounding-${D_ISSUE}`)

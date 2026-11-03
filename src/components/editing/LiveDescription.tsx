@@ -13,7 +13,7 @@ import {
   type Imeta,
 } from '@estiva-app/protocol'
 import { newlyNamedPeople, peopleNamedInText, type FileText } from '@estiva-app/conversation'
-import { DocumentEditor, type DocumentCodec, type HeldTyping, type MentionPerson } from '@estiva-app/ui/editor'
+import { DocumentEditor, type DocumentAsks, type DocumentCodec, type HeldTyping, type MentionPerson } from '@estiva-app/ui/editor'
 import { uploadAttachment } from '@/api/blobs'
 import { REFERENCE_COPY, fileSections, subscribeReferences } from '@/api/references'
 import { sessionEnded } from '@/auth/estivaId'
@@ -78,6 +78,7 @@ export function LiveDescription({
   onCopyBlockLink,
   holdKey,
   changedBy = null,
+  merges = false,
   readOnly = false,
 }: {
   value: string
@@ -85,7 +86,9 @@ export function LiveDescription({
   holdKey?: string
   format: ContentFormat
   /** `left()` is true once the description has gone from the page: a refusal then has no line under the field to say it. */
-  onCommit: (value: string, contentFormat?: string, left?: () => boolean) => Promise<boolean> | boolean
+  onCommit: (value: string, contentFormat?: string, left?: () => boolean, from?: FileText) => Promise<boolean | DocumentAsks> | boolean | DocumentAsks
+  /** Saves merge with someone else's newer one, and a block both changed asks (`onCommit` answers what asks). */
+  merges?: boolean
   /** Add the people a save names anew; answers the ones that could not be added, tried again at the next save that still names them. */
   onMention?: (people: readonly string[]) => Promise<readonly string[]>
   /** The name in "<name> saved a newer version": who saved `value` last, when it was not you. */
@@ -123,7 +126,8 @@ export function LiveDescription({
           ? lastSave.current
           : { content: editedFrom, ...(format === 'blocks' ? { format: BLOCK_DOCUMENT_FORMAT } : {}) }
       const saved: FileText = { content: next, ...(contentFormat ? { format: contentFormat } : {}) }
-      const ok = await onCommit(next, contentFormat, () => left.current)
+      const ok = await onCommit(next, contentFormat, () => left.current, from)
+      if (typeof ok === 'object') return ok
       if (!ok) return false
       lastSave.current = saved
       if (onMention) {
@@ -145,6 +149,7 @@ export function LiveDescription({
         format={format}
         codec={CODEC}
         onCommit={commit}
+        merges={merges}
         label="Description"
         placeholder="Add a description…"
         readOnly={readOnly}

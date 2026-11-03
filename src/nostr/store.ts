@@ -28,6 +28,7 @@ import {
   type CommentRef,
 } from './events'
 import { findNaddrs, naddrToAddr, buildReaction, buildEdit, buildDeletion as buildEventDeletion, imetaTag } from '@estiva-app/protocol'
+import { listFiles, openFile, writeChange, TEXT_FIELD, type WriteChangeResult } from '@estiva-app/interop'
 import { createLoadQuery, planArchiveFolder, planCreateFolder, planDeleteFolder, planListInTopic, planMoveFromFolders, planPlaceFile, planRemoveFromTopic, planRenameFolder, planUnlistFile, readMentionedIn, readMoveRefusal, type ListHolder, type FolderRef, type MovableFile, type MoveRefusal } from '@estiva-app/interop'
 import { foldFolder, type FolderState } from './fold'
 import { buildMembershipChange, decorationsOf, foldAttachments, foldEdits, foldEmbeds, URGENT_TAG, type Decorations, type EditFold, type QueryFn } from '@estiva-app/conversation'
@@ -378,6 +379,18 @@ const MENTION_THREAD_PAGE = 500
 /** The opened page's records by `d`, one request (`loadOpened`): one per author, so far fewer than this. */
 const OPENED_RECORDS_LIMIT = 100
 
+/** Issue addresses per `#a` filter: about 900 issues are a handful of filters in one request. */
+const ISSUES_PER_FILTER = 200
+
+/**
+ * The switch on (ALO-5, `api/fileReads.ts`): projects are read by the relay's
+ * list read and each change names the one it follows. `text`: the relay opens a
+ * file with its current text (`file_list.text`).
+ */
+export interface ProjectFields {
+  text: boolean
+}
+
 export class Store {
   /** What this tab deleted, which a re-read since a time cannot learn — see `reloadFolders`. */
   private readonly deleted = new Deletions()
@@ -392,7 +405,48 @@ export class Store {
      * unknown — see `RELAY_DRIFT_SECS`.
      */
     private readonly clockSkewMs: () => Promise<number | null> = () => Promise.resolve(null),
+    /** Whether projects are read by their fields and written in order (`api/fileReads.ts`); off when it answers nothing. */
+    readonly projectFields: () => Promise<ProjectFields | undefined> = () => Promise.resolve(undefined),
   ) {}
+
+  /** Projects opened on this page: each whole load reads its current text too, which a list never carries (§6.13). */
+  private readonly openedProjects = new Set<string>()
+
+  /**
+   * The current fields of the projects `addrs` names, read by the list read —
+   * and for each one in `opened`, its current text as well (§6.13: one text,
+   * however long its history). A deleted project is not in a list read, so it
+   * is opened by `#d` too: that answers its `deleted` change and who signed it,
+   * for its link's notice and the Archived view's deleted filter.
+   */
+  private async projectFileEvents(read: QueryFn, fields: ProjectFields, roots: readonly SignedEvent[], opened: ReadonlySet<string>, scope: 'all' | 'these' = 'all'): Promise<SignedEvent[]> {
+    const own = roots.filter((root) => root.kind === KIND.PROJECT)
+    const dOf = (root: SignedEvent) => root.tags.find((t) => t[0] === 'd')?.[1] ?? ''
+    if (scope === 'these' && !own.length) return []
+    const listed = await listFiles(read, { kinds: [KIND.PROJECT], ...(scope === 'these' ? { '#d': [...new Set(own.map(dOf))] } : {}) })
+    const held = new Set(listed.map((file) => file.address))
+    const open = (addr: string, text: boolean) => {
+      const [, pubkey, ...d] = addr.split(':')
+      return openFile(read, { kind: KIND.PROJECT, pubkey: pubkey!, d: d.join(':') }, { text })
+    }
+    const addrs = [...new Set(own.map((root) => `${KIND.PROJECT}:${root.pubkey}:${dOf(root)}`))]
+    const unlisted = addrs.filter((addr) => !held.has(addr))
+    const withText = fields.text ? [...opened].filter((addr) => held.has(addr)) : []
+    const more = await Promise.all([...unlisted.map((addr) => open(addr, false)), ...withText.map((addr) => open(addr, true))])
+    return [...listed, ...more.flatMap((file) => (file ? [file] : []))].flatMap((file) => file.events)
+  }
+
+  /**
+   * Every change to `issues`, by `#a` (§6.2): issues are not read by their
+   * fields until their stage, so their History and Updated column stay whole,
+   * while project changes leave the load. A few hundred addresses per filter.
+   */
+  private issueChanges(read: QueryFn, issues: readonly string[]): Promise<SignedEvent[]> {
+    if (!issues.length) return Promise.resolve([])
+    const filters: Record<string, unknown>[] = []
+    for (let at = 0; at < issues.length; at += ISSUES_PER_FILTER) filters.push({ kinds: [KIND.CHANGE], '#a': issues.slice(at, at + ISSUES_PER_FILTER) })
+    return read(filters)
+  }
 
   /**
    * Sign and publish.
@@ -1069,6 +1123,51 @@ export class Store {
   }
 
   /**
+   * Set one field of a project after the change it follows (SPEC §6.2), with
+   * the switch on: `prev` is the field's change as this page read it, or the
+   * record's id for its first. interop's `writeChange` answers the relay's
+   * `conflict:` — a field set again keeps the later without asking (Miky, 30
+   * Oct), a text merges onto the newer one, and a block both changed asks with
+   * nothing saved. A refused change is never written over.
+   * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/merging-two-changes-to-one-text-never-loses-words.md
+   */
+  writeField(args: {
+    folder: string
+    target: string
+    field: string
+    value: string
+    note?: string
+    contentFormat?: string
+    prev: string
+  }): Promise<WriteChangeResult> {
+    const [, pubkey, ...d] = args.target.split(':')
+    return writeChange({
+      field: args.field,
+      value: args.value,
+      ...(args.contentFormat ? { format: args.contentFormat } : {}),
+      prev: args.prev,
+      build: (input) =>
+        buildChange(this.signer.pubkey, input.createdAtMs, {
+          folder: args.folder,
+          target: args.target,
+          field: args.field,
+          value: input.value,
+          note: args.note,
+          contentFormat: input.format,
+          prev: input.prev,
+        }),
+      sign: (event) => this.signer.sign(event),
+      publish: async (event) => {
+        const result = await this.relay.publish(event)
+        return { ok: result.ok, reason: result.reason, eventId: event.id }
+      },
+      query: (filters) => this.relay.query(filters as never),
+      current: async (field) =>
+        (await openFile((filters) => this.relay.query(filters as never), { kind: KIND.PROJECT, pubkey: pubkey!, d: d.join(':') }, { text: field === TEXT_FIELD && !!(await this.projectFields())?.text }))?.fields[field]?.event,
+    })
+  }
+
+  /**
    * Join, leave, or add somebody to a file (SPEC §11.8 *The membership
    * change*): one `kind:1851` with `field: member:<person>`, the one Peek
    * publishes. A leave counts only when the person signs it, so `member: false`
@@ -1184,6 +1283,8 @@ export class Store {
    */
   async loadAllEvents(read: QueryFn = this.loadQuery(), threads: (folder: string) => boolean = () => true): Promise<WorkspaceEvents> {
     const at = Date.now()
+    const fields = await this.projectFields()
+    if (fields) return this.loadByFields(read, threads, fields, at)
     /*
       Two discovery queries, not one, and the second is the whole of SHI-7.
 
@@ -1222,6 +1323,36 @@ export class Store {
   }
 
   /**
+   * `loadAllEvents` with the switch on (ALO-5): no read of every change. Each
+   * project is its first record and its fields' current changes, without the
+   * text (§6.13) — about 3 KB however often it was edited, where every change
+   * to every project was 25.7 MB of a cold load on 29 Oct. Issue changes are
+   * read by the issues' `#a` once their roots are in: one more round trip.
+   * Every other step is `loadAllEvents`'s.
+   * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-file-is-its-fields-each-kept-in-order-by-the-relay.md
+   */
+  private async loadByFields(read: QueryFn, threads: (folder: string) => boolean, fields: ProjectFields, at: number): Promise<WorkspaceEvents> {
+    const fetched = new Set<string>()
+    const threadsAt: Record<string, number> = {}
+    const kinds = loadKinds(threads)
+    const found = await read([{ kinds: [KIND.PROJECT] }, { kinds: [KIND.ISSUE] }])
+    const issues = [...new Set(found.filter((event) => event.kind === KIND.ISSUE).map((event) => `${KIND.ISSUE}:${event.pubkey}:${event.tags.find((t) => t[0] === 'd')?.[1] ?? ''}`))]
+    const changes = Promise.all([this.projectFileEvents(read, fields, found, this.openedProjects), this.issueChanges(read, issues)]).then((parts) => parts.flat())
+    changes.catch(() => undefined)
+    const roots = await this.widen(found, fetched, {}, read, kinds, threadsAt)
+    const all = await this.widen([...roots.events, ...(await changes)], fetched, {}, read, kinds, threadsAt)
+    const folders = new Set(all.folders)
+    const events = all.events.filter((event) => event.kind !== KIND.CHANGE || folders.has(folderOfEvent(event) ?? ''))
+    return {
+      events,
+      folders: all.folders,
+      readAt: Object.fromEntries([...foldersOf(events)].filter((folder) => folders.has(folder)).map((folder) => [folder, at])),
+      threadsAt,
+      mentionsOf: [],
+    }
+  }
+
+  /**
    * The opened project or issue, read before the whole workspace (APP-4).
    *
    * Its record by `d`, which finds a global project record too, then its own
@@ -1245,7 +1376,9 @@ export class Store {
   async loadOpened(opened: { kind: 'project' | 'issue'; d: string }): Promise<WorkspaceEvents> {
     const byD = (kind: number, ds: string[]): Promise<SignedEvent[]> =>
       this.relay.query([{ kinds: [kind], '#d': ds, limit: OPENED_RECORDS_LIMIT }])
+    const fields = await this.projectFields()
     let events = await byD(opened.kind === 'project' ? KIND.PROJECT : KIND.ISSUE, [opened.d])
+    if (fields) return this.openedByFields(opened, events, fields, byD)
     const read = new Set<string>()
     const threadsAt: Record<string, number> = {}
     for (let round = 0; round < 3; round++) {
@@ -1264,6 +1397,57 @@ export class Store {
       events = mergeRead(events, [...inFolders, ...records])
     }
     return { events, folders: [...read], readAt: {}, threadsAt, mentionsOf: [] }
+  }
+
+  /**
+   * `loadOpened` with the switch on (ALO-5): the Folders are read without their
+   * changes, the projects by their fields — the opened one with its current
+   * text, and kept so every whole load reads that text again — and the issues'
+   * changes by `#a`. Opening a project reads none of its history; its Overview
+   * reads that when it shows (`projectChanges`).
+   */
+  private async openedByFields(
+    opened: { kind: 'project' | 'issue'; d: string },
+    found: SignedEvent[],
+    fields: ProjectFields,
+    byD: (kind: number, ds: string[]) => Promise<SignedEvent[]>,
+  ): Promise<WorkspaceEvents> {
+    let events = found
+    const read = new Set<string>()
+    const threadsAt: Record<string, number> = {}
+    const withoutChanges = FOLDER_KINDS.filter((kind) => kind !== KIND.CHANGE)
+    for (let round = 0; round < 3; round++) {
+      const state = foldFolder(events, referencedAddresses)
+      const issues = opened.kind === 'issue' ? state.issues.filter((issue) => issue.id === opened.d) : []
+      const parents = new Set(issues.flatMap((issue) => (issue.projectAddr ? [issue.projectAddr] : [])))
+      const projects = state.projects.filter((project) => (opened.kind === 'project' ? project.id === opened.d : parents.has(project.addr)))
+      const folders = [...new Set([...projects.map((project) => project.contentFolder), ...issues.map((issue) => issue.folder)])].filter((folder) => folder && !read.has(folder))
+      const missing = [...parents].filter((addr) => !projects.some((project) => project.addr === addr)).map((addr) => addr.split(':').slice(2).join(':'))
+      if (!folders.length && !missing.length) break
+      for (const folder of folders) read.add(folder)
+      const [inFolders, records] = await Promise.all([
+        this.readFolderEvents(folders, {}, {}, this.queryAll, withoutChanges, threadsAt),
+        missing.length ? byD(KIND.PROJECT, missing) : Promise.resolve([]),
+      ])
+      events = mergeRead(events, [...inFolders, ...records])
+    }
+    const state = foldFolder(events, referencedAddresses)
+    if (opened.kind === 'project') for (const project of state.projects.filter((p) => p.id === opened.d)) this.openedProjects.add(project.addr)
+    const query: QueryFn = (filters) => this.relay.query(filters as never)
+    const [projects, changes] = await Promise.all([
+      this.projectFileEvents(query, fields, events, this.openedProjects, 'these'),
+      this.issueChanges(this.queryAll, state.issues.map((issue) => issue.addr)),
+    ])
+    return { events: mergeRead(events, [...projects, ...changes]), folders: [...read], readAt: {}, threadsAt, mentionsOf: [] }
+  }
+
+  /**
+   * Every change ever made to one project, oldest to newest as the relay keeps
+   * them: what its History in the Overview lists, read only when the Overview
+   * shows (Miky, 3 Nov) — opening the page stays light.
+   */
+  projectChanges(addr: string): Promise<SignedEvent[]> {
+    return this.queryAll([{ kinds: [KIND.CHANGE], '#a': [addr] }])
   }
 
   /**

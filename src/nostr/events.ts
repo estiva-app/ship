@@ -124,6 +124,12 @@ export function buildProject(
     key?: string
     /** The one-line summary beside its name — SPEC §6.12. Only the seed: a later edit is a change. */
     summary?: string
+    /**
+     * File it in its Folder with `h`, so only that Folder's readers can read
+     * it (D5, since the switch), instead of the global `buzz-channel` above.
+     * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/every-file-is-an-artifact-the-relay-keeps-in-order.md
+     */
+    filedIn?: boolean
   },
 ): UnsignedEvent {
   assertFolderId(args.folder)
@@ -133,7 +139,7 @@ export function buildProject(
     ['name', args.title],
   ]
   if (args.description) tags.push(['description', args.description])
-  tags.push(['buzz-channel', args.folder])
+  tags.push([args.filedIn ? 'h' : 'buzz-channel', args.folder])
   if (args.lead) {
     // A lead set when the project is made is named as `p` too, as a change
     // setting it later is — SPEC §7.3: a creation tags each person a `pubkey`
@@ -260,6 +266,12 @@ export function buildChange(
      * body with nothing to say is marker text, permanently.
      */
     contentFormat?: string
+    /**
+     * The change this one follows for its field, or the record's id for a
+     * field's first change (SPEC §6.2): the relay refuses it when that is no
+     * longer the field's newest. Absent where the relay keeps no order.
+     */
+    prev?: string
   },
 ): UnsignedEvent {
   assertFolderId(args.folder)
@@ -277,6 +289,8 @@ export function buildChange(
       // order. An app that does not know `ts` ignores it and still folds — just
       // at one-second resolution.
       ['ts', String(Math.floor(createdAtMs))],
+      // After `ts`, where interop's builder puts it.
+      ...(args.prev ? [['prev', args.prev]] : []),
       /*
         Every file the document places inline, named again as an `imeta` —
         SPEC §13.3, SHI-2.
