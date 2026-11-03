@@ -61,6 +61,23 @@ export function reloadFolders(read?: QueryFn): Promise<void> {
   })
 }
 
+/** The Folders as last read, for a caller outside React; `undefined` until a read has landed. */
+export function heldFolders(): FolderSummary[] | undefined {
+  return listing.snapshot().value
+}
+
+/**
+ * The Folders, the sidebar's listing — joined while it is being read, read
+ * afresh only when the sidebar has not asked; rejects while there is no
+ * listing to give.
+ */
+export async function foldersNow(): Promise<FolderSummary[]> {
+  await listing.ensure(() => readFolders())
+  const { value, error } = listing.snapshot()
+  if (value) return value
+  throw error ?? new Error('The Folders could not be read.')
+}
+
 export function useFolders(): FolderSummary[] | undefined {
   const snapshot = useSyncExternalStore(listing.subscribe, listing.snapshot)
   useEffect(() => {

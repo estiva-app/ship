@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { readRelated, type RelatedFiles } from './foreign'
+import type { FileTopicsState } from './useFileTopics'
 import { useRefresh } from '@/lib/useRefresh'
 
 /**
@@ -62,4 +63,16 @@ export function useRelated(folder: string | undefined, address: string | undefin
   useRefresh(() => setNonce((n) => n + 1), { interval: false })
 
   return related
+}
+
+/**
+ * Related without the topics the rail's Topics already names (SHIPS-2): a
+ * topic started under a project that also lists the project shows once, as
+ * its topic chip. `all`, what `[` offers, keeps it.
+ */
+export function withoutTopics(related: RelatedState, topics: FileTopicsState): RelatedState {
+  if (typeof related !== 'object' || !Array.isArray(topics) || topics.length === 0) return related
+  const named = new Set(topics.map((topic) => topic.address))
+  const files = related.files.filter((file) => !file.address || !named.has(file.address))
+  return files.length === related.files.length ? related : { ...related, files }
 }

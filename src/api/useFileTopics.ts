@@ -1,23 +1,28 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { readFileTopics, type TopicOfFile } from './foreign'
+import { reloadTopics } from './topics'
 import { setListedInTopic, type WriteResult } from './writes'
 
 /** The topics that list a file: `undefined` while the first read runs, `'failed'` when it could not be read. */
 export type FileTopicsState = TopicOfFile[] | 'failed' | undefined
+
+/** A file's topics as {@link useFileTopics} holds them. */
+export interface FileTopicsOfFile {
+  state: FileTopicsState
+  /** Topic addresses with a write on the way. */
+  busy: ReadonlySet<string>
+  setListed: (topic: TopicOfFile, listed: boolean) => Promise<WriteResult>
+}
 
 /**
  * A Ship project's or issue's topics (TOP-5), and Add to topic and Remove.
  *
  * Read once per file and again after each write: the project says "after a
  * reload", so no live watch. A write shows at once and rolls back when the
- * relay refuses it, with the relay's reason for the caller to say.
+ * relay refuses it, with the relay's reason for the caller to say. A write
+ * that lands reads the held topics again too, since a topic's list changed.
  */
-export function useFileTopics(file: string | undefined): {
-  state: FileTopicsState
-  /** Topic addresses with a write on the way. */
-  busy: ReadonlySet<string>
-  setListed: (topic: TopicOfFile, listed: boolean) => Promise<WriteResult>
-} {
+export function useFileTopics(file: string | undefined): FileTopicsOfFile {
   const [state, setState] = useState<FileTopicsState>(undefined)
   const [busy, setBusy] = useState<ReadonlySet<string>>(new Set())
   const [nonce, setNonce] = useState(0)
@@ -62,6 +67,7 @@ export function useFileTopics(file: string | undefined): {
       apply(listed)
       const result = await setListedInTopic(topic, file, listed).finally(() => (writing.current -= 1))
       if (!result.ok) apply(!listed)
+      else void reloadTopics()
       mark(false)
       setNonce((n) => n + 1)
       return result

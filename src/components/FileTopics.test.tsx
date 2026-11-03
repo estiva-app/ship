@@ -42,6 +42,21 @@ describe('FileTopics, a project’s or an issue’s Topics in its rail (TOP-5)',
     expect(onChange).toHaveBeenCalledWith(WIDGETS, false)
   })
 
+  it('says an archived topic is archived, and only that one', () => {
+    render(<FileTopics topics={[OLD, WIDGETS]} busy={new Set()} onChange={vi.fn()} readChoices={vi.fn()} />)
+    expect(screen.getByRole('link', { name: /Old \(archived\)/ })).toBeTruthy()
+    expect(screen.getByRole('link', { name: /Widgets/ }).textContent).not.toContain('archived')
+  })
+
+  it('Add to topic draws choices already in hand at once, never “Reading topics…”', async () => {
+    const readChoices = vi.fn().mockReturnValue({ yours: [ROADMAP], others: [DESIGN] })
+    render(<FileTopics topics={[]} busy={new Set()} onChange={vi.fn()} readChoices={readChoices} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Add to topic' }))
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByText('Roadmap')).toBeTruthy()
+    expect(within(dialog).queryByText('Reading topics…')).toBeNull()
+  })
+
   it('Add to topic offers your topics first, then the others, never one that lists it already, and adds the one picked', async () => {
     const onChange = vi.fn()
     const readChoices = vi.fn().mockResolvedValue({ yours: [WIDGETS, ROADMAP], others: [DESIGN] })

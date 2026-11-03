@@ -477,6 +477,16 @@ export function useMergedReadState(): Record<string, number> {
 }
 
 /**
+ * {@link useMergedReadState}, but `undefined` until the tab's first whole
+ * frontier lands: a judge of many files waits rather than light every one of
+ * them for a moment (SHIPS-2's topic dots).
+ */
+export function useLandedReadState(): Record<string, number> | undefined {
+  const merged = useMergedReadState()
+  return fetched === undefined ? undefined : merged
+}
+
+/**
  * The frontier a page visit opened on, held until the visit ends (99557309).
  *
  * `visit` names the visit — the address of the issue or project on screen —
