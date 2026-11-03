@@ -267,6 +267,7 @@ describe('a list item indented with Tab', () => {
       })
       box.editor.chain().focus().setTextSelection(end).run()
     })
+    expect(box.editor.state.selection.$from.parent.textContent).toBe('after')
     await act(() => void fireEvent.keyDown(box, { key: 'Tab' }))
     fireEvent.blur(box)
     await waitFor(() => expect(onCommit).toHaveBeenCalled())

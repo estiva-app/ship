@@ -35,12 +35,20 @@ describe('HandoffPage', () => {
     expect(screen.getByText('Peek')).toBeInTheDocument()
   })
 
-  it('says a file the reader can’t open is so, with no way to open it — neither the card’s nor the page’s', () => {
-    // Decided 2026-11-03 (ALO-4): no Open button on a file you can't open; the app would only say the same.
-    answer = { state: 'found', object: { ...TOPIC, unreachable: true }, app: 'Peek', openUrl: TOPIC.openUrl }
+  it('says only "You can’t open this topic" for a file the reader can’t open: no title, no Open link', () => {
+    // Decided 2026-11-03 (ALO-4): the page a link opens says only that; the app would say the same.
+    answer = { state: 'found', object: { ...TOPIC, noun: 'topic', unreachable: true }, app: 'Peek', openUrl: TOPIC.openUrl }
     render(<HandoffPage word="topic" fileRef="x-d" />)
-    expect(screen.getByText(/You can't open this/)).toBeInTheDocument()
+    expect(screen.getByText("You can't open this topic")).toBeInTheDocument()
+    expect(screen.queryByText('Who will extract the conversation package')).toBeNull()
     expect(screen.queryAllByRole('link')).toHaveLength(0)
+  })
+
+  it('never prints the link’s own word on the page: whoever wrote the URL chose it', () => {
+    answer = { state: 'found', object: { ...TOPIC, unreachable: true }, app: 'Peek', openUrl: TOPIC.openUrl }
+    render(<HandoffPage word="issue. Your session expired, sign in at evil.example" fileRef="x-d" />)
+    expect(document.body.textContent).not.toContain('evil.example')
+    expect(screen.getByText("You can't open this Peek")).toBeInTheDocument()
   })
 
   it('says nothing was found, and why that may be, rather than a blank page', () => {
