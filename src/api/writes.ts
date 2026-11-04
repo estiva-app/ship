@@ -1,10 +1,9 @@
 import type { Embed, Imeta, NostrTag, PublishResult } from '@estiva-app/protocol'
-import { addrToNaddr, serializeBlockDocument, toRenderTree } from '@estiva-app/protocol'
+import { addrToNaddr, serializeBlockDocument, textAsksOf, toRenderTree } from '@estiva-app/protocol'
 import { MAX_MENTIONED_PEOPLE, boxLinksOf, embedsToEdit, embedsToSend, namedBefore, withoutCard } from '@estiva-app/conversation'
 import { linksIn, listedBeneath, MAX_LINKS_ASKED, textOf, within, type OwnPlace } from '@estiva-app/interop'
 import type { FileText } from '@estiva-app/conversation'
 import type { DocumentAsks } from '@estiva-app/ui/editor'
-import { documentAsksOf } from '../nostr/textAsks'
 import type { Conversation, Issue, Project } from '../nostr/fold'
 import { clashes, explicitKey, keyOfRef, nextRef, projectKeys, suggestKey, takenKeys } from '../nostr/keys'
 import { RELAY_URL } from '../config'
@@ -179,7 +178,7 @@ async function writeProjectField(project: Project, field: string, value: string,
     const theirs = textOf(result.theirs)
     noteText(project.addr, theirs?.value ?? '', result.theirs.id)
     const base = { value: edited ?? '', ...(from?.format ? { format: from.format } : {}) }
-    return { ok: false, reason: 'asks', asks: documentAsksOf(base, theirs ?? { value: '' }, { value, ...(contentFormat ? { format: contentFormat } : {}) }, result.asks) }
+    return { ok: false, reason: 'asks', asks: textAsksOf(base, theirs ?? { value: '' }, { value, ...(contentFormat ? { format: contentFormat } : {}) }, result.asks) }
   } catch (error) {
     return refused(error instanceof Error ? error.message : String(error))
   }

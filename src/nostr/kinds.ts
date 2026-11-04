@@ -196,6 +196,16 @@ export const ARCHIVED_STATES: VocabEntry[] = [
 ]
 
 /**
+ * A project's `deleted` field, as a vocabulary (SPEC §6.5, ALO-6): `true`
+ * deletes and the empty string restores, as `setProjectDeleted` writes. Like
+ * `archived`, not a status.
+ */
+export const DELETED_STATES: VocabEntry[] = [
+  { value: '', label: 'Restored', colour: 'neutral' },
+  { value: 'true', label: 'Deleted', colour: 'muted' },
+]
+
+/**
  * The status an object has before anyone has said otherwise.
  *
  * A root Issue carries no status at all — that is the whole point of §1.3 — so

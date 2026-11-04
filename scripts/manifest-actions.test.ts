@@ -233,24 +233,32 @@ await store.createIssue({ folder: FOLDER, title: 'Blank', summary: '   ' })
 check('a blank summary writes no tag', tag(sent[0], 'summary') === undefined)
 
 // ── delete-project ──────────────────────────────────────────────────────────
-console.log('\n# delete-project is deleteProject: the kind:5, then every unlisting\n')
+console.log('\n# delete-project is setProjectDeleted: one change on `deleted`, `true` or empty to restore (ALO-6)\n')
 
-const listedIn = [
-  { id: FOLDER, hasState: true },
-  { id: OTHER, hasState: true },
-]
-const deleted = build({ kind: KIND.PROJECT, address: PROJECT, objectAuthor: ME, folder: FOLDER, actionId: 'delete-project', value: '', listedIn })
-sent = []
-await store.deleteProject({ recordFolder: FOLDER, project: PROJECT, folders: listedIn.map((f) => ({ folder: f.id, hasState: f.hasState })) })
-const shape = (events: { kind: number; tags: string[][] }[]) => events.map((e) => `${e.kind} ${tag(e, 'op') ?? ''} ${e.kind === 5 ? tag(e, 'a') : (tag(e, 'h') ?? '')}`.trim())
+const PREV = projectRoot.id
+const deletedFolds = (...changes: UnsignedEvent[]) => foldFolder([projectRoot, ...changes.map((change, i) => sign(change, 11 + i))]).projects[0]?.deleted
+for (const [value, says] of [['true', 'deletes'], ['', 'restores']] as const) {
+  const declared = build({ kind: KIND.PROJECT, address: PROJECT, objectAuthor: ME, folder: FOLDER, actionId: 'delete-project', value, prev: PREV })
+  sent = []
+  await store.writeField({ folder: FOLDER, target: PROJECT, field: 'deleted', value, note: value ? 'Delete' : 'Restore', prev: PREV })
+  const own = sent[0]
+  const core = (event: { kind: number; tags: string[][] }) => [`kind=${event.kind}`, ...['a', 'field', 'value', 'h', 'prev'].map((name) => `${name}=${tag(event, name)}`)].join(' ')
+  const same = Array.isArray(declared) && declared.length === 1 && !!own && core(declared[0]) === core(own)
+  check(
+    `\`${value || "''"}\` ${says}: one change, the kind and tags Ship's own write sends, nothing unlisted`,
+    same,
+    same ? '' : Array.isArray(declared) ? `${declared.map(core).join(' | ')} vs ${own ? core(own) : 'nothing'}` : declared,
+  )
+}
+const deleteChange = build({ kind: KIND.PROJECT, address: PROJECT, objectAuthor: ME, folder: FOLDER, actionId: 'delete-project', value: 'true', prev: PREV })
+const restoreChange = buildActionEvents({ manifest, pubkey: ME, createdAtMs: NOW + 1000, kind: KIND.PROJECT, address: PROJECT, objectAuthor: ME, folder: FOLDER, actionId: 'delete-project', value: '', prev: PREV })
+if (Array.isArray(deleteChange) && Array.isArray(restoreChange)) {
+  check('Ship folds the delete as deleted, by whom', deletedFolds(deleteChange[0])?.by === ME)
+  check('and the later restore as not deleted', deletedFolds(deleteChange[0], restoreChange[0]) === undefined)
+}
 check(
-  'the kind:5 first, then a remove from each Folder listing it — what Ship sends',
-  Array.isArray(deleted) && JSON.stringify(shape(deleted)) === JSON.stringify(shape(sent)),
-  Array.isArray(deleted) ? `${shape(deleted).join(' | ')} vs ${shape(sent).join(' | ')}` : deleted,
-)
-check(
-  'and it is refused, not half-built, without the Folders that list it',
-  typeof build({ kind: KIND.PROJECT, address: PROJECT, objectAuthor: ME, folder: FOLDER, actionId: 'delete-project', value: '' }) === 'string',
+  'a value outside the vocabulary is refused, not written',
+  typeof build({ kind: KIND.PROJECT, address: PROJECT, objectAuthor: ME, folder: FOLDER, actionId: 'delete-project', value: 'gone', prev: PREV }) === 'string',
 )
 
 console.log(failures ? `\n${failures} failed` : '\nall passed')
