@@ -117,6 +117,7 @@ const topicRow = (d: string, title: string, projects: [number, number], conversa
 const YOUR_TOPICS = [
   topicRow('nav', 'Cross-app navigation', [1, 3], 6, 2, 'Teams and topics instead of Folders, in every app.'),
   topicRow('speed', 'Speed', [2, 2], 3, 0, 'Every app opens in under a second on Miky’s workspace.'),
+  topicRow('triage', 'Triage', [0, 0], 2, 0, 'Lists only issues, so its Projects cell is empty.'),
 ]
 const OTHER_TOPICS = [topicRow('brand', 'Brand refresh', [0, 1], 1)]
 const TOPICS: Record<TopicsTab, TopicRowData[]> = {
