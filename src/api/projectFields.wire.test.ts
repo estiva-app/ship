@@ -286,6 +286,13 @@ describe('a deleted project in the load, with the switch on', () => {
     expect(await loadedChanges('shelved')).toEqual(['shelved-x'])
   })
 
+  it('is read whole for its page opened by its link, and the next load reads its newest change only', async () => {
+    held = [root('linkgone'), change('linkgone', 'linkgone-t', 'title', 'Its current name', 110), change('linkgone', 'linkgone-x', 'deleted', 'true', 120)]
+    const opened = foldWorkspace(await store.loadOpened({ kind: 'project', d: 'linkgone' }))
+    expect(opened.projects.find((candidate) => candidate.id === 'linkgone')).toMatchObject({ title: 'Its current name', deleted: { by: PK, at: 120 } })
+    expect(await loadedChanges('linkgone')).toEqual(['linkgone-x'])
+  })
+
   it("is read whole for its page reached by navigating, and the next load reads its newest change only", async () => {
     held = [root('left'), change('left', 'left-t', 'title', 'Its current name', 110), change('left', 'left-x', 'deleted', 'true', 120)]
     const loaded = await store.loadAllEvents()

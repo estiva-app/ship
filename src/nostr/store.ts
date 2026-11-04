@@ -472,6 +472,8 @@ export class Store {
     const texts = opens.filter((file, i) => file && held.has(asked[i]!))
     const shown = unlisted.filter((addr) => opened.has(addr))
     const rest = unlisted.filter((addr) => !opened.has(addr))
+    // Read whole this once, not kept: its page, while it shows, asks for it again by `readThreads`.
+    for (const addr of shown) this.openedProjects.delete(addr)
     const [whole, newest] = await Promise.all([this.changesOf(read, shown), this.newestChanges(rest)])
     // A change written after the delete (a stale tab's) hides it: that one is read whole, as before.
     const resting = new Set(rest)

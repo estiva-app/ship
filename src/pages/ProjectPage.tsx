@@ -700,9 +700,6 @@ export function ProjectPage({
      lists it, then the files you read recently. The project is never offered. */
   useReferencePage({ address: project?.addr, folder: typeof related === 'object' ? related.all : undefined, readState: merged })
 
-  // A project you cannot read and one that is not there read the same, so the link says neither which nor its title (ALO-5).
-  if (!project) return <NoAccessNotice what="project" />
-
   /*
     Number the issues Ship has not numbered yet.
 
@@ -728,6 +725,10 @@ export function ProjectPage({
     for (const row of missing) attempted.current.add(row.addr)
     void assignMissingRefs(project, state).then(() => refresh())
   }, [project, issues, state, refresh])
+
+  // After every hook: a link followed before its project is held draws this, then the page, with the same hooks.
+  // A project you cannot read and one that is not there read the same, so the link says neither which nor its title (ALO-5).
+  if (!project) return <NoAccessNotice what="project" />
   // A deleted project reached by navigating is held by its newest change only (ALO-5): its first title would show until the rest lands.
   if (project.deleted && state.texts && !state.texts.includes(project.addr)) return <PageSkeleton shape="project" />
 
