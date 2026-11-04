@@ -1,4 +1,3 @@
-import { IconLinkOff } from '@tabler/icons-react'
 import { newestDrawn, useMarkRead, useShownThreads } from '@/lib/useMarkRead'
 import { useNewSince } from '@/lib/useNewSince'
 import { ownConversations, recordChannel } from '@/lib/ownConversation'
@@ -65,7 +64,6 @@ import { NewIssueDialog } from '@/components/NewIssueDialog'
 import type { WorkspacePerson } from '@/components/PageFields'
 import { placedIn } from '@/lib/placement'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
-import { EmptyState } from '@/components/ui/EmptyState'
 import { ProjectView } from '@/views/ProjectView'
 import { go, href, type ProjectTab, type ProjectView as ProjectViewName } from '../router'
 import { act, actInField, sayOnceLeft, type Say } from './act'
@@ -74,7 +72,7 @@ import { useSideColumn } from './sideColumn'
 import { FileTopicsOf } from '@/components/FileTopicsOf'
 import { hrefForIssue, rowFor } from './IssuesPage'
 import { MoveProject } from '@/components/MoveProject'
-import { ArchiveDialog, ArchivedNotice, DeletedNotice } from '@estiva-app/ui'
+import { ArchiveDialog, ArchivedNotice, DeletedNotice, NoAccessNotice } from '@estiva-app/ui'
 import type { DocumentAsks } from '@estiva-app/ui/editor'
 import { day } from '@/lib/time'
 import { ARCHIVE_WORDS, archivedLine, archivedNoticeOf, lockedReason, ownArchive, type Archives } from '@/lib/archive'
@@ -701,9 +699,9 @@ export function ProjectPage({
      lists it, then the files you read recently. The project is never offered. */
   useReferencePage({ address: project?.addr, folder: typeof related === 'object' ? related.all : undefined, readState: merged })
 
-  if (!project) {
-    return <EmptyState icon={<IconLinkOff size={16} stroke={1.5} />} message="That project is not in this workspace, or is in a Folder you cannot read." />
-  }
+  // A project you cannot read and one that is not there read the same, so the link says neither which nor its title (ALO-5).
+  if (!project) return <NoAccessNotice what="project" />
+
 
   /*
     Number the issues Ship has not numbered yet.
