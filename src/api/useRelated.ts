@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { readRelated, type RelatedFiles } from './foreign'
 import type { FileTopicsState } from './useFileTopics'
+import { isTopicAddress } from '@/lib/topicLinks'
 import { useRefresh } from '@/lib/useRefresh'
 
 /**
@@ -68,11 +69,14 @@ export function useRelated(folder: string | undefined, address: string | undefin
 /**
  * Related without the topics the rail's Topics already names (SHIPS-2): a
  * topic started under a project that also lists the project shows once, as
- * its topic chip. `all`, what `[` offers, keeps it.
+ * its topic chip. `all`, what `[` offers, keeps it. While the file's topics
+ * are still being read, every topic waits, so none shows here for a moment
+ * and then moves to the chips (Miky, 4 Nov: no flashes).
  */
 export function withoutTopics(related: RelatedState, topics: FileTopicsState): RelatedState {
-  if (typeof related !== 'object' || !Array.isArray(topics) || topics.length === 0) return related
-  const named = new Set(topics.map((topic) => topic.address))
-  const files = related.files.filter((file) => !file.address || !named.has(file.address))
+  if (typeof related !== 'object' || topics === 'failed' || (Array.isArray(topics) && topics.length === 0)) return related
+  const named = new Set(topics?.map((topic) => topic.address))
+  const hidden = (address: string | undefined) => !!address && (topics === undefined ? isTopicAddress(address) : named.has(address))
+  const files = related.files.filter((file) => !hidden(file.address))
   return files.length === related.files.length ? related : { ...related, files }
 }

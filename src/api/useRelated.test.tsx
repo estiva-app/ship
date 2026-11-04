@@ -7,6 +7,7 @@ const chip = (address: string, title: string): TopicOfFile => ({ address, folder
 
 const LAUNCH = '30840:a:launch'
 const NOTES = '30840:a:notes'
+const DOC = '30023:a:spec'
 
 describe('a project’s Related beside its Topics (SHIPS-2)', () => {
   it('leaves out a topic placed under the project that also lists it, so it shows once, as its chip', () => {
@@ -17,8 +18,21 @@ describe('a project’s Related beside its Topics (SHIPS-2)', () => {
     expect(typeof shown === 'object' && shown.all?.map((f) => f.address)).toEqual([LAUNCH, NOTES])
   })
 
-  it('keeps every placed file while the topics are still being read', () => {
+  it('holds every topic back while the file’s topics are still being read, so none flashes and then moves to the chips', () => {
+    const related = { files: [placed(LAUNCH, 'Launch'), placed(DOC, 'Spec')], inside: {}, counts: {} }
+    const shown = withoutTopics(related, undefined)
+    expect(typeof shown === 'object' && shown.files.map((f) => f.address)).toEqual([DOC])
+  })
+
+  it('shows a topic that is related but not one of the file’s own topics once they are known', () => {
+    const related = { files: [placed(LAUNCH, 'Launch'), placed(NOTES, 'Notes')], inside: {}, counts: {} }
+    expect(withoutTopics(related, [])).toBe(related)
+    const shown = withoutTopics(related, [chip(LAUNCH, 'Launch')])
+    expect(typeof shown === 'object' && shown.files.map((f) => f.address)).toEqual([NOTES])
+  })
+
+  it('keeps every placed file when the topics could not be read', () => {
     const related = { files: [placed(LAUNCH, 'Launch')], inside: {}, counts: {} }
-    expect(withoutTopics(related, undefined)).toBe(related)
+    expect(withoutTopics(related, 'failed')).toBe(related)
   })
 })
