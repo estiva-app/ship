@@ -391,6 +391,13 @@ const OPENED_RECORDS_LIMIT = 100
 /** Issue addresses per `#a` filter: about 900 issues are a handful of filters in one request. */
 const ISSUES_PER_FILTER = 200
 
+/** Every change to `addrs`, by `#a` (§6.2), {@link ISSUES_PER_FILTER} addresses per filter. */
+function changeFilters(addrs: readonly string[]): Record<string, unknown>[] {
+  const filters: Record<string, unknown>[] = []
+  for (let at = 0; at < addrs.length; at += ISSUES_PER_FILTER) filters.push({ kinds: [KIND.CHANGE], '#a': addrs.slice(at, at + ISSUES_PER_FILTER) })
+  return filters
+}
+
 /**
  * The switch on (ALO-5, `api/fileReads.ts`): projects are read by the relay's
  * list read and each change names the one it follows. `text`: the relay opens a
@@ -480,9 +487,7 @@ export class Store {
   /** Every change to `addrs`, by `#a` (§6.2), a few hundred addresses per filter. */
   private changesOf(read: QueryFn, addrs: readonly string[]): Promise<SignedEvent[]> {
     if (!addrs.length) return Promise.resolve([])
-    const filters: Record<string, unknown>[] = []
-    for (let at = 0; at < addrs.length; at += ISSUES_PER_FILTER) filters.push({ kinds: [KIND.CHANGE], '#a': addrs.slice(at, at + ISSUES_PER_FILTER) })
-    return read(filters)
+    return read(changeFilters(addrs))
   }
 
   /**
@@ -1473,7 +1478,7 @@ export class Store {
     // An opened project's fields and text need only its record, so they are read beside its Folder, not after it.
     const isOwn = (event: SignedEvent) => opened.kind === 'project' && event.kind === KIND.PROJECT && event.tags.some((t) => t[0] === 'd' && t[1] === opened.d)
     const own = found.filter(isOwn)
-    for (const root of own) this.openedProjects.add(`${KIND.PROJECT}:${root.pubkey}:${opened.d}`)
+    for (const project of foldFolder(own, referencedAddresses).projects) this.openedProjects.add(project.addr)
     const first = this.projectFileEvents(query, fields, own, this.openedProjects, 'these')
     first.catch(() => undefined)
     for (let round = 0; round < 3; round++) {
@@ -1484,8 +1489,9 @@ export class Store {
       const folders = [...new Set([...projects.map((project) => project.contentFolder), ...issues.map((issue) => issue.folder)])].filter((folder) => folder && !read.has(folder))
       const missing = [...parents].filter((addr) => !projects.some((project) => project.addr === addr)).map((addr) => addr.split(':').slice(2).join(':'))
       if (!folders.length && !missing.length) break
+      for (const folder of folders) assertFolderId(folder)
       for (const folder of folders) read.add(folder)
-      const said = this.readFolderEvents(folders, {}, {}, this.queryAll, THREAD_KINDS, threadsAt)
+      const said =this.readFolderEvents(folders, {}, {}, this.queryAll, THREAD_KINDS, threadsAt)
       said.catch(() => undefined)
       talk.push(said)
       const [inFolders, records] = await Promise.all([
@@ -1496,13 +1502,10 @@ export class Store {
     }
     const state = foldFolder(events, referencedAddresses)
     const rest = events.filter((event) => !isOwn(event))
-    const changes: Record<string, unknown>[] = []
-    const issues = state.issues.map((issue) => issue.addr)
-    for (let at = 0; at < issues.length; at += ISSUES_PER_FILTER) changes.push({ kinds: [KIND.CHANGE], '#a': issues.slice(at, at + ISSUES_PER_FILTER) })
     const [early, projects, changed, conversations] = await Promise.all([
       first,
       this.projectFileEvents(query, fields, rest, this.openedProjects, 'these'),
-      this.openedRead(changes),
+      this.openedRead(changeFilters(state.issues.map((issue) => issue.addr))),
       Promise.all(talk),
     ])
     return {

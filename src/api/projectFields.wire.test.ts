@@ -15,8 +15,8 @@ let held: SignedEvent[] = []
 let asked: Record<string, unknown>[][] = []
 /** The requests Ship paged (`queryAll`), each a separate round trip or more. */
 let paged: Record<string, unknown>[][] = []
-/** While set, a read of a Folder by `#h` waits for it: a Folder still being read. */
-let folderRead: Promise<void> | undefined
+/** While set, a paged read of a Folder by `#h` runs it before answering: what was asked while that Folder was still being read. */
+let folderRead: (() => Promise<void>) | undefined
 let count = 0
 
 const dOf = (event: SignedEvent) => event.tags.find((t) => t[0] === 'd')?.[1]
@@ -73,7 +73,7 @@ vi.mock('./store', async () => {
     query: async (filters: Record<string, unknown>[]) => answer(filters),
     queryAll: async (filters: Record<string, unknown>[]) => {
       paged.push(filters)
-      if (folderRead && filters.some((f) => f['#h'])) await folderRead
+      if (folderRead && filters.some((f) => f['#h'])) await folderRead()
       return answer(filters)
     },
     publish: async (event: SignedEvent) => {
@@ -203,15 +203,15 @@ describe('opening a project by its link, with the switch on', () => {
 
   it("asks for its fields, current text and its issues' changes while its Folder's conversation is still being read", async () => {
     held = [root('p'), change('p', 'd1', 'description', 'Current words', 110), issue('i1'), issueChange('i1', 'c1', 'status', 'done', 110)]
-    let release!: () => void
-    folderRead = new Promise((resolve) => (release = resolve))
-    const opening = store.loadOpened({ kind: 'project', d: 'p' })
-    await vi.waitFor(() => {
-      expect(asked.flat()).toContainEqual({ fields: 'newest', kinds: [30850], '#d': ['p'], text: true })
-      expect(asked.flat().some((f) => (f['#a'] as string[] | undefined)?.includes(`30851:${PK}:i1`))).toBe(true)
-    })
-    release()
-    const state = foldWorkspace(await opening)
+    let before: Record<string, unknown>[] = []
+    // Every other read answers at once; one turn of the event loop lets them all go before the conversation answers.
+    folderRead = async () => {
+      await new Promise((resolve) => setImmediate(resolve))
+      before = asked.flat()
+    }
+    const state = foldWorkspace(await store.loadOpened({ kind: 'project', d: 'p' }))
+    expect(before).toContainEqual({ fields: 'newest', kinds: [30850], '#d': ['p'], text: true })
+    expect(before.some((f) => (f['#a'] as string[] | undefined)?.includes(`30851:${PK}:i1`))).toBe(true)
     expect(state.projects.find((candidate) => candidate.id === 'p')!.description).toBe('Current words')
     expect(state.issues.find((candidate) => candidate.id === 'i1')!.status).toBe('done')
   })
