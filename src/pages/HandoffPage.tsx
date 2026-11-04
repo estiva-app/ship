@@ -55,7 +55,7 @@ export function HandoffPage({ word, fileRef, query }: { word: string; fileRef: s
     )
   }
   if (handoff.state === 'missing') {
-    return <EmptyState icon={<IconLink size={16} stroke={1.5} />} message="Nothing found at this link. It may be in a Folder you cannot see." />
+    return <EmptyState icon={<IconLink size={16} stroke={1.5} />} message="Nothing found at this link. It may be in a team you cannot see." />
   }
   if (handoff.state === 'unclaimed') {
     return <EmptyState icon={<IconLink size={16} stroke={1.5} />} message="No app here can open this yet. Ask whoever sent the link where it lives." />

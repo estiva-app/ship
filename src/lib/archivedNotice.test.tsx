@@ -20,8 +20,8 @@ describe('the archived card, in Ship’s words (FOL-46)', () => {
         onOpenParent={open}
       />,
     )
-    expect(screen.getByText('Archived with its Folder “Steer” by Ana · 1m ago')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Open Folder' }))
+    expect(screen.getByText('Archived with its team “Steer” by Ana · 1m ago')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Open team' }))
     expect(open).toHaveBeenCalled()
   })
 })

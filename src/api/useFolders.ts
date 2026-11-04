@@ -75,7 +75,7 @@ export async function foldersNow(): Promise<FolderSummary[]> {
   await listing.ensure(() => readFolders())
   const { value, error } = listing.snapshot()
   if (value) return value
-  throw error ?? new Error('The Folders could not be read.')
+  throw error ?? new Error('The teams could not be read.')
 }
 
 export function useFolders(): FolderSummary[] | undefined {

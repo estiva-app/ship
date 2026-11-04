@@ -79,7 +79,7 @@ export function PageActions({ what, comments, overview, archive, onArchive, onDe
       >
         {archive === 'none' && (
           <>
-            {onMove && <MenuItem label="Move to Folder…" onClick={onMove} disabledReason={readOnlyReason} />}
+            {onMove && <MenuItem label="Move to team…" onClick={onMove} disabledReason={readOnlyReason} />}
             <MenuItem label="Copy link" onClick={onCopyLink} />
             <MenuSeparator />
           </>

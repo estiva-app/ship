@@ -491,7 +491,7 @@ export function manifestContent(): ManifestContent {
         label: 'Comment',
         description:
           'Say something about a project or an issue that is not a change to one of its fields. ' +
-          'The comment lands in the Folder both apps read, so it appears in that Folder’s conversation as well as on the object.',
+          'The comment lands in the team both apps read, so it appears in that team’s conversation as well as on the object.',
         effect: 'writes',
         /**
          * Emits NIP-22 `kind:1111`. Ship moved to it because scoping a threaded
@@ -584,7 +584,7 @@ export function manifestContent(): ManifestContent {
         id: 'rename-issue',
         label: 'Rename',
         description:
-          'Give an issue a new title. A change event, so anyone in the Folder may; the issue root keeps the title ' +
+          'Give an issue a new title. A change event, so anyone in the team may; the issue root keeps the title ' +
           'it was filed with, and every app reading the issue folds the new one over it.',
         effect: 'writes',
         appliesTo: String(KIND.ISSUE),
@@ -596,7 +596,7 @@ export function manifestContent(): ManifestContent {
         label: 'Rename',
         description:
           'Give a whole project a new name. A change event on `title`, whichever of `name` or `title` the project ' +
-          'record carries, so anyone in the Folder may, and every app reading the project folds it over the root.',
+          'record carries, so anyone in the team may, and every app reading the project folds it over the root.',
         effect: 'writes',
         appliesTo: String(KIND.PROJECT),
         emits: { kind: KIND.CHANGE, field: 'title' },
@@ -671,7 +671,7 @@ export function manifestContent(): ManifestContent {
         id: 'describe-issue',
         label: 'Edit description',
         description:
-          'Replace the body of an issue with new text. A change event, so anyone in the Folder may, and every app ' +
+          'Replace the body of an issue with new text. A change event, so anyone in the team may, and every app ' +
           'reading the issue folds it over the body it was filed with; a block document keeps its headings and lists.',
         effect: 'writes',
         appliesTo: String(KIND.ISSUE),
@@ -683,7 +683,7 @@ export function manifestContent(): ManifestContent {
         label: 'Edit description',
         description:
           'Replace the description of a whole project — what it is for and what done means. A change event, so ' +
-          'anyone in the Folder may, folded over the description the record was created with.',
+          'anyone in the team may, folded over the description the record was created with.',
         effect: 'writes',
         appliesTo: String(KIND.PROJECT),
         emits: { kind: KIND.CHANGE, field: 'description' },
@@ -701,7 +701,7 @@ export function manifestContent(): ManifestContent {
         label: 'Edit summary',
         description:
           'Set the one- or two-sentence summary shown under an issue\'s title in lists and on cards, about 240 ' +
-          'characters of plain text; an empty value clears it. A change event, so anyone in the Folder may.',
+          'characters of plain text; an empty value clears it. A change event, so anyone in the team may.',
         effect: 'writes',
         appliesTo: String(KIND.ISSUE),
         emits: { kind: KIND.CHANGE, field: 'summary' },
@@ -712,7 +712,7 @@ export function manifestContent(): ManifestContent {
         label: 'Edit summary',
         description:
           'Set the one- or two-sentence summary shown under a project\'s name in lists and on cards, about 240 ' +
-          'characters of plain text; an empty value clears it. A change event, so anyone in the Folder may.',
+          'characters of plain text; an empty value clears it. A change event, so anyone in the team may.',
         effect: 'writes',
         appliesTo: String(KIND.PROJECT),
         emits: { kind: KIND.CHANGE, field: 'summary' },
@@ -723,7 +723,7 @@ export function manifestContent(): ManifestContent {
         label: 'Move to project',
         description:
           'Put an issue under another project, by the project’s address, or under none with an empty value. The ' +
-          'issue keeps its Folder, its conversation and its reference; only the project it is listed under changes.',
+          'issue keeps its team, its conversation and its reference; only the project it is listed under changes.',
         effect: 'writes',
         appliesTo: String(KIND.ISSUE),
         emits: { kind: KIND.CHANGE, field: 'project' },
@@ -733,7 +733,7 @@ export function manifestContent(): ManifestContent {
         id: 'add-project',
         label: 'New project',
         description:
-          'Start a project in a Folder: a name, and optionally a description of what it is for and a key. Issues are filed ' +
+          'Start a project in a team: a name, and optionally a description of what it is for and a key. Issues are filed ' +
           'under it afterwards with add-issue; its status and lead are their own actions. The key is 3–6 letters A–Z, ' +
           'the prefix of its issues\' refs (KEY-1, KEY-2…), and must be one no project you can see holds; it is fixed ' +
           'once the project exists. Left out, Ship gives the project one the first time it numbers an issue in it.',
@@ -767,7 +767,7 @@ export function manifestContent(): ManifestContent {
         id: 'delete-project',
         label: 'Delete',
         description:
-          'Ask the relay to delete a project outright, then take it out of every Folder that lists it. The relay ' +
+          'Ask the relay to delete a project outright, then take it out of every team that lists it. The relay ' +
           'decides who may; the issues filed under it are separate events and survive it.',
         effect: 'destructive',
         appliesTo: String(KIND.PROJECT),

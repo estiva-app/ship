@@ -484,7 +484,7 @@ export async function folderArchiveImpact(channel: string, folders?: FolderSumma
   const hides = impact.hides.map(({ kind, count }) => countOf(kind, count))
   const byFolder = new Map<string, number>()
   for (const file of impact.staysVisible) {
-    const name = file.in[0]?.name ?? 'another folder'
+    const name = file.in[0]?.name ?? 'another team'
     byFolder.set(name, (byFolder.get(name) ?? 0) + 1)
   }
   const staysVisible = [...byFolder].map(([name, n]) => `${n} ${n === 1 ? 'file' : 'files'} also in ${name}`)
@@ -501,5 +501,5 @@ const KIND_WORDS: Record<number, [string, string]> = {
   30850: ['project', 'projects'],
   30851: ['issue', 'issues'],
   30840: ['topic', 'topics'],
-  39000: ['folder', 'folders'],
+  39000: ['team', 'teams'],
 }

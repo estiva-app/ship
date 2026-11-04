@@ -927,7 +927,7 @@ export function ProjectPage({
         onEditMessage={(messageId, body, removeCard, files, dropped) => {
           const folder = folderOfMessage(acting, messageId)
           if (!folder) {
-            return Promise.resolve('That message has no Folder to publish an edit into.')
+            return Promise.resolve('That message has no team to publish an edit into.')
           }
           return actInField(removeCard ? 'Remove card' : 'Edit', () => editMessage(folder, messageId, body, cardEditOf(acting, messageId, removeCard, dropped), files), () => refreshAfter(state, folder, refresh, rereadElsewhere))
         }}
@@ -1006,7 +1006,7 @@ export function ProjectPage({
               say(`Delete rejected — ${result.reason}`, 'error')
               return false
             }
-            if (result.stillListed) say(`Project deleted, but its Folder refused to unlist it: ${result.stillListed}. Peek may keep showing a row for it.`, 'error')
+            if (result.stillListed) say(`Project deleted, but its team refused to unlist it: ${result.stillListed}. Peek may keep showing a row for it.`, 'error')
             else say('Project deleted')
             // Nothing left to render here.
             go({ name: 'projects' })
@@ -1022,7 +1022,7 @@ export function ProjectPage({
               <p>This publishes a NIP-09 deletion request. Relays may decline it, and copies held elsewhere are unaffected.</p>
               {issues.length > 0 && (
                 <p>
-                  Its {issues.length} {issues.length === 1 ? 'issue is a separate event and is' : 'issues are separate events and are'} not deleted — they stay in the Folder and stop being
+                  Its {issues.length} {issues.length === 1 ? 'issue is a separate event and is' : 'issues are separate events and are'} not deleted — they stay in the team and stop being
                   reachable from here.
                 </p>
               )}

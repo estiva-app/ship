@@ -70,14 +70,14 @@ async function move(listed: string[], teams: [string, string][], to: string) {
   listing = new Set(listed)
   const say = vi.fn()
   render(<MoveProject project={project} teams={teams.map(([id, name]) => team(id, name))} say={say} onClose={() => {}} />)
-  fireEvent.click(screen.getByRole('combobox', { name: 'Destination Folder' }))
+  fireEvent.click(screen.getByRole('combobox', { name: 'Team' }))
   await userEvent.click(await screen.findByRole('option', { name: to }))
   fireEvent.click(screen.getByRole('button', { name: 'Move' }))
   await waitFor(() => expect(say).toHaveBeenCalled())
   return say
 }
 
-describe('Move to Folder…', () => {
+describe('Move to team…', () => {
   it('a project no Folder lists is placed in the one chosen — never moved out of its own Folder, which holds none of it', async () => {
     const say = await move([], [[OWN, 'Own'], [TARGET, 'Target']], 'Target')
     expect(moves()).toEqual([['add', TARGET, null]])
@@ -89,7 +89,7 @@ describe('Move to Folder…', () => {
     const say = await move([A, C, D], [[A, 'Alpha'], [C, 'Gamma'], [D, 'Delta'], [TARGET, 'Target']], 'Target')
     // The third Folder was never sent to: publishing stops at the refusal.
     expect(moves()).toEqual([['move', TARGET, A], ['move', TARGET, C]])
-    expect(say).toHaveBeenCalledWith('Moved to Target, but Gamma still lists it too: one of the Folders is archived.', 'error')
+    expect(say).toHaveBeenCalledWith('Moved to Target, but Gamma still lists it too: one of the teams is archived.', 'error')
   })
 
   it('a second move refused for a reason Ship has no words for asks to move it again', async () => {
@@ -101,7 +101,7 @@ describe('Move to Folder…', () => {
   it('a move refused because the Folders changed says so in Ship’s words, and reads the Folders again so Move can succeed', async () => {
     wire.refuse = () => 'invalid: the team a move leaves lists none of its files'
     const say = await move([A], [[A, 'Alpha'], [TARGET, 'Target']], 'Target')
-    expect(say).toHaveBeenCalledWith('Nothing was moved: the Folders changed since you opened this. Try again.', 'error')
+    expect(say).toHaveBeenCalledWith('Nothing was moved: the teams changed since you opened this. Try again.', 'error')
     expect(reloadFolders).toHaveBeenCalled()
   })
 })

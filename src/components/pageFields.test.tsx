@@ -114,8 +114,8 @@ describe('the page’s ⋯', () => {
     const onArchive = vi.fn()
     const onDelete = vi.fn()
     render(menu({ what: 'project', onMove, onCopyLink, onArchive, onDelete }))
-    expect(await openMenu(user)).toEqual(['Move to Folder…', 'Copy link', 'Archive project', 'Delete project'])
-    await user.click(screen.getByRole('menuitem', { name: 'Move to Folder…' }))
+    expect(await openMenu(user)).toEqual(['Move to team…', 'Copy link', 'Archive project', 'Delete project'])
+    await user.click(screen.getByRole('menuitem', { name: 'Move to team…' }))
     expect(onMove).toHaveBeenCalledTimes(1)
     for (const [name, called] of [['Copy link', onCopyLink], ['Archive project', onArchive], ['Delete project', onDelete]] as const) {
       await openMenu(user)
@@ -174,14 +174,14 @@ describe('the page’s ⋯', () => {
   it('a project archived only with its Folder: Archive shown, shut, saying why; Delete open', async () => {
     const user = userEvent.setup()
     const onArchive = vi.fn()
-    render(menu({ what: 'project', archive: 'with', onArchive, lockedReason: 'Unarchive its Folder to edit' }))
+    render(menu({ what: 'project', archive: 'with', onArchive, lockedReason: 'Unarchive its team to edit' }))
     expect(await openMenu(user)).toEqual(['Archive project', 'Delete project'])
     const row = screen.getByRole('menuitem', { name: 'Archive project' })
     expect(shut(row)).toBe(true)
     await user.click(row)
     expect(onArchive).not.toHaveBeenCalled()
     await user.hover(row)
-    expect((await screen.findByRole('tooltip')).textContent).toBe('Unarchive its Folder to edit')
+    expect((await screen.findByRole('tooltip')).textContent).toBe('Unarchive its team to edit')
     expect(shut(screen.getByRole('menuitem', { name: 'Delete project' }))).toBe(false)
   })
 
@@ -194,7 +194,7 @@ describe('the page’s ⋯', () => {
     const onCopyLink = vi.fn()
     render(menu({ what: 'project', onMove, onArchive, onDelete, onCopyLink, readOnlyReason: REASON }))
     await openMenu(user)
-    for (const name of ['Move to Folder…', 'Archive project', 'Delete project']) {
+    for (const name of ['Move to team…', 'Archive project', 'Delete project']) {
       const row = screen.getByRole('menuitem', { name })
       expect(shut(row)).toBe(true)
       await user.click(row)

@@ -76,7 +76,7 @@ describe('FolderPage', () => {
       () => new Promise((_resolve, reject) => setTimeout(() => reject(new Error('nope')), 0)),
     )
     render(<FolderPage id="f1" say={say} />)
-    await waitFor(() => expect(screen.getByText('This folder could not be read.')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('This team could not be read.')).toBeInTheDocument())
   })
 
   it('names the Folder in the browser tab from its own read, so a rename made elsewhere shows (SFX-2)', async () => {
@@ -115,7 +115,7 @@ describe('FolderPage', () => {
     )
     render(<FolderPage id="f1" say={say} />)
     await waitFor(() => expect(screen.getByText('No projects or issues here · 4 other files, listed in Peek')).toBeInTheDocument())
-    expect(screen.queryByText('Nothing in this folder yet.')).not.toBeInTheDocument()
+    expect(screen.queryByText('Nothing in this team yet.')).not.toBeInTheDocument()
     expect(document.querySelectorAll('[data-foreign-object]')).toHaveLength(0)
   })
 
@@ -141,13 +141,13 @@ describe('FolderPage', () => {
     // line nothing on screen would say why a topic is missing.
     readFolder.mockResolvedValue(folder({ hasState: false, source: 'channel' }))
     render(<FolderPage id="f1" say={say} />)
-    await waitFor(() => expect(screen.getByText(/no folder state yet/)).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText(/has no list of its own yet/)).toBeInTheDocument())
   })
 
   it('an empty folder says so rather than rendering nothing', async () => {
     readFolder.mockResolvedValue(folder({ files: [] }))
     render(<FolderPage id="f1" say={say} />)
-    await waitFor(() => expect(screen.getByText('Nothing in this folder yet.')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('Nothing in this team yet.')).toBeInTheDocument())
   })
 })
 
@@ -160,8 +160,8 @@ describe('FolderPage renames its Folder (FOL-8)', () => {
   })
 
   const rename = async (to: string) => {
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit folder name' }))
-    const field = screen.getByRole('textbox', { name: 'Folder name' })
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit team name' }))
+    const field = screen.getByRole('textbox', { name: 'Team name' })
     fireEvent.change(field, { target: { value: to } })
     fireEvent.keyDown(field, { key: 'Enter' })
   }
@@ -187,7 +187,7 @@ describe('FolderPage renames its Folder (FOL-8)', () => {
     renameFolder.mockResolvedValue({ ok: true })
     render(<FolderPage id="f1" say={say} />)
     await rename('Onboarding 2')
-    await waitFor(() => expect(say).toHaveBeenCalledWith('Renamed to Onboarding 2, but the folder could not be read back — reload to see it.', 'error'))
+    await waitFor(() => expect(say).toHaveBeenCalledWith('Renamed to Onboarding 2, but the team could not be read back — reload to see it.', 'error'))
   })
 
   it('a refusal is said with its reason, the field stays open, and nothing is re-read', async () => {
@@ -196,7 +196,7 @@ describe('FolderPage renames its Folder (FOL-8)', () => {
     render(<FolderPage id="f1" say={say} />)
     await rename('Nope')
     await waitFor(() => expect(say).toHaveBeenCalledWith('Rename rejected — restricted: not an admin', 'error'))
-    expect(screen.getByRole('textbox', { name: 'Folder name' })).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Team name' })).toBeInTheDocument()
     expect(reloadFolders).not.toHaveBeenCalled()
   })
 
@@ -204,7 +204,7 @@ describe('FolderPage renames its Folder (FOL-8)', () => {
     readFolder.mockResolvedValue(folder())
     render(<FolderPage id="f1" say={say} />)
     await rename('   ')
-    await waitFor(() => expect(say).toHaveBeenCalledWith('A folder needs a name.', 'error'))
+    await waitFor(() => expect(say).toHaveBeenCalledWith('A team needs a name.', 'error'))
     expect(renameFolder).not.toHaveBeenCalled()
   })
 })
@@ -217,14 +217,14 @@ describe('FolderPage offers Archive only to the Folder’s owners and admins', (
     readFolder.mockResolvedValue(folder({ channel, admins: ['b'.repeat(64)] }))
     render(<FolderPage id="f1" say={say} />)
     expect(await screen.findByRole('heading', { name: 'Onboarding' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Archive folder' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Archive team' })).not.toBeInTheDocument()
     // The relay refuses a member's rename too, so the title is not editable.
-    expect(screen.queryByRole('button', { name: 'Edit folder name' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Edit team name' })).not.toBeInTheDocument()
   })
 
   it('to an admin', async () => {
     readFolder.mockResolvedValue(folder({ channel, admins: ['a'.repeat(64)] }))
     render(<FolderPage id="f1" say={say} />)
-    expect(await screen.findByRole('button', { name: 'Archive folder' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Archive team' })).toBeInTheDocument()
   })
 })

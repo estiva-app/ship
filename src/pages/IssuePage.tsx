@@ -128,7 +128,7 @@ export function IssuePage({ state, directory, archives, d, say, refresh }: { sta
     return (
       <EmptyState
         icon={<IconLinkOff size={16} stroke={1.5} />}
-        message="That issue is not in this workspace, or is in a Folder you cannot read."
+        message="That issue is not in this workspace, or is in a team you cannot read."
       />
     )
   }
@@ -277,7 +277,7 @@ export function IssuePage({ state, directory, archives, d, say, refresh }: { sta
         onEditMessage={(messageId, body, removeCard, files, dropped) => {
           const folder = folderOfMessage(acting, messageId)
           if (!folder) {
-            return Promise.resolve('That message has no Folder to publish an edit into.')
+            return Promise.resolve('That message has no team to publish an edit into.')
           }
           return actInField(removeCard ? 'Remove card' : 'Edit', () => editMessage(folder, messageId, body, cardEditOf(acting, messageId, removeCard, dropped), files), () => refreshAfter(state, folder, refresh, rereadElsewhere))
         }}
@@ -345,7 +345,7 @@ export function IssuePage({ state, directory, archives, d, say, refresh }: { sta
           {conversations.length > 0 && (
             <p>
               Its {conversations.length} {conversations.length === 1 ? 'conversation is a separate event and is' : 'conversations are separate events and are'} not deleted — they stay
-              in the Folder and stop being reachable from here.
+              in the team and stop being reachable from here.
             </p>
           )}
         </ConfirmDialog>

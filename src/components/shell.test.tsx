@@ -66,7 +66,7 @@ describe('ShipSidebar', () => {
   it("the arrow on a team's fold opens the Folder", async () => {
     const onOpenFolder = vi.fn()
     render(<ShipSidebar openIssues={0} activeProjects={0} hrefFor={hrefFor} folders={teams} onOpenFolder={onOpenFolder} />)
-    await userEvent.click(screen.getAllByRole('button', { name: 'Open folder' })[1]!)
+    await userEvent.click(screen.getAllByRole('button', { name: 'Open team' })[1]!)
     expect(onOpenFolder).toHaveBeenCalledWith(teams[0])
   })
 

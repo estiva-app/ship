@@ -18,9 +18,9 @@ export function placedIn<F extends { id: string; addresses?: readonly string[] }
   return own ? [own] : []
 }
 
-/** A team's name for a page title, as Topics names it: "Folder" until the listing has it. */
+/** A team's name for a page title, as Topics names it: "Team" until the listing has it. */
 export function folderName(folders: readonly { id: string; name?: string }[] | undefined, id: string): string {
-  return folders?.find((folder) => folder.id === id)?.name ?? 'Folder'
+  return folders?.find((folder) => folder.id === id)?.name ?? 'Untitled team'
 }
 
 /**

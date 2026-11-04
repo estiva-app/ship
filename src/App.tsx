@@ -87,7 +87,7 @@ function Shell() {
       let id: string | undefined
       let unlisted: string | undefined
       const ok = await act(
-        'New folder',
+        'New team',
         async () => {
           const result = await createFolder(name)
           if (result.ok) ({ id, unlisted } = result)
@@ -444,7 +444,7 @@ function useInbound(route: Route, say: (text: string, tone?: 'ok' | 'error') => 
           clear()
         }
         if (!found) {
-          say('Could not resolve that reference — you may not have access to its Folder.', 'error')
+          say('Could not resolve that reference — you may not have access to its team.', 'error')
           return replace(HOME)
         }
         // The resolved object's `d` — its uuid — is the tail of the address,

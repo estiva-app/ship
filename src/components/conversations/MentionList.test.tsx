@@ -99,7 +99,7 @@ describe('MentionList', () => {
   */
   it('says the list is what this reader can see, not what exists', () => {
     show()
-    expect(screen.getByText(/Folders you cannot read are absent/i)).toBeTruthy()
+    expect(screen.getByText(/teams you cannot read are absent/i)).toBeTruthy()
   })
 
   /*

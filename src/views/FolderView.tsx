@@ -62,11 +62,11 @@ export function FolderView({ folder, onRename, onArchive, archivedNotice }: {
             button's own name ("Edit folder name") would otherwise be the
             heading's.
           */
-          <h1 className="text-h3 text-text-primary" aria-label={folder.name ?? 'Untitled folder'}>
-            <EditableText label="Folder name" value={folder.name ?? ''} placeholder="Untitled folder" onCommit={onRename} className="-mx-2" />
+          <h1 className="text-h3 text-text-primary" aria-label={folder.name ?? 'Untitled team'}>
+            <EditableText label="Team name" value={folder.name ?? ''} placeholder="Untitled team" onCommit={onRename} className="-mx-2" />
           </h1>
         ) : (
-          <h1 className="text-h3 text-text-primary">{folder.name ?? 'Folder'}</h1>
+          <h1 className="text-h3 text-text-primary">{folder.name ?? 'Untitled team'}</h1>
         )}
         <p className="text-caption text-text-muted" data-own={own.length} data-foreign={foreign.length}>
           {countLine(own.length, foreign.length)}
@@ -78,11 +78,11 @@ export function FolderView({ folder, onRename, onArchive, archivedNotice }: {
             state event shows less than it holds, and nothing else on screen
             would say why.
           */}
-          {folder.source === 'channel' && ' · from channel contents; this folder has no folder state yet'}
+          {folder.source === 'channel' && ' · from channel contents; this team has no list of its own yet'}
         </p>
         {onArchive && (
           <Button size="small" variant="muted" className="mt-2 self-start" onClick={onArchive}>
-            Archive folder
+            Archive team
           </Button>
         )}
       </div>
@@ -108,7 +108,7 @@ export function FolderView({ folder, onRename, onArchive, archivedNotice }: {
 export function countLine(own: number, foreign: number): string {
   const files = (n: number) => `${n} ${n === 1 ? 'file' : 'files'}`
   const others = `${foreign} other ${foreign === 1 ? 'file' : 'files'}, listed in Peek`
-  if (own === 0 && foreign === 0) return 'Nothing in this folder yet.'
+  if (own === 0 && foreign === 0) return 'Nothing in this team yet.'
   if (foreign === 0) return files(own)
   if (own === 0) return `No projects or issues here · ${others}`
   return `${files(own)} · ${others}`

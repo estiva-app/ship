@@ -123,7 +123,7 @@ export function ShipSidebar({ openIssues, activeProjects, hrefFor, folders = [],
         id: team.id,
         title: team.name ?? team.id,
         actions: onOpenFolder
-          ? [{ icon: <IconArrowUpRight size={16} stroke={1.5} />, tooltip: 'Open folder', onClick: () => onOpenFolder(team) }]
+          ? [{ icon: <IconArrowUpRight size={16} stroke={1.5} />, tooltip: 'Open team', onClick: () => onOpenFolder(team) }]
           : undefined,
         nodes: ENTRIES.map(({ entry, label, icon }) => ({ id: rowId(team.id, entry), label, icon, href: hrefFor(entry, team.id) })),
       }))
@@ -144,8 +144,8 @@ export function ShipSidebar({ openIssues, activeProjects, hrefFor, folders = [],
         which teams are coming is exactly what is not known yet.
       */}
       <NavTree
-        title={pending ? undefined : 'Folders'}
-        titleActions={onNewFolder ? [{ icon: <IconPlus size={16} stroke={1.5} />, tooltip: 'New folder', onClick: onNewFolder }] : undefined}
+        title={pending ? undefined : 'Teams'}
+        titleActions={onNewFolder ? [{ icon: <IconPlus size={16} stroke={1.5} />, tooltip: 'New team', onClick: onNewFolder }] : undefined}
         groups={groups}
         selected={at?.folder ? rowId(at.folder, at.entry) : undefined}
         onSelect={(selected, event) => linkTo(selected.href).onClick(event)}
