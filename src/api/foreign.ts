@@ -354,10 +354,10 @@ export function topicAsDrawn(address: string, folder: string, object: ForeignObj
  * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-topic-keeps-its-own-list-of-files.md
  */
 export async function readFileTopics(file: string): Promise<TopicOfFile[]> {
-  const listing = await topicsOfFile(query, file)
+  const [listing, read] = await Promise.all([topicsOfFile(query, file), listRead()])
   if (listing.length === 0) return []
   const roots = new Map(listing.map((topic) => [topic.address, topic.root]))
-  const objects = await resolveForeignRoots([...roots.keys()], query, manifests, { archivedWith: true, ...(await listRead()) })
+  const objects = await resolveForeignRoots([...roots.keys()], query, manifests, { archivedWith: true, ...read })
   return objects
     .flatMap((object) => {
       const root = object.address ? roots.get(object.address) : undefined
