@@ -1,0 +1,39 @@
+import { Meta } from '@storybook/addon-docs/blocks'
+
+<Meta title="Projects/ProjectProgress" />
+
+# ProjectProgress
+
+A project's issues done of all: the package's `ProgressBar` with "6 / 10"
+beside it, the cancelled ones out of both numbers.
+
+**Seen in** — *Projects/ProjectCard*: **Default**, **No Issues No Lead** and
+**Archived**; *Pages/In the shell*: **Projects**.
+
+## When
+
+- Beside a project in a list: a row on Projects, a project on a topic's page,
+  and, `wide`, across a project's card.
+
+## When not
+
+- On the project's own page, whose fields row draws the package's
+  `ProgressRing`.
+- For a topic's projects done of all on Topics, which is a count with the
+  project icon, not a bar.
+
+## How
+
+```tsx
+import { ProjectProgress } from '@/components/ProjectProgress'
+
+<ProjectProgress {...row.progress} archived={row.archived} />
+<ProjectProgress {...project.progress} wide />
+```
+
+- Give it `progressOf`'s `{ done, total }`, so every place counts the same way.
+
+## What it owns
+
+- **The phone**: in a row only the count stays below `sm`; `wide` keeps the bar.
+- **Archived** draws the bar `quiet`.
