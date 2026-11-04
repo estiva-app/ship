@@ -128,26 +128,30 @@ describe('the Projects page', () => {
     expect(screen.getByRole('button', { name: /Restore/ })).toBeTruthy()
   })
 
-  it("asks for every change of the deleted projects on the Archived tab only, the load holding each one's newest (ALO-5)", () => {
-    const state = {
-      projects: [project('Billing', 'in_progress'), project('Gone', 'in_progress', { deleted: { by: LEAD, at: 1 } })],
-      issues: [],
-      conversations: [],
-      activity: [],
-      threadsAt: {},
-      mentionsOf: [],
-    } as unknown as WorkspaceState
-    const want = vi.fn()
-    const at = (tab: 'active' | 'archived') => (
-      <ThreadsContext.Provider value={want}>
-        <ProjectsPage state={state} directory={directory} teams={[]} archives={archivesOf()} tab={tab} say={vi.fn()} refresh={vi.fn()} />
+  it("draws a deleted project's row on the Archived tab only once its every change is read, never by a title it has since lost (ALO-5)", () => {
+    // The load holds its newest change only, so its title is still the first one until the tab's read lands.
+    const state = (texts: string[]) =>
+      ({
+        projects: [project('Billing', 'in_progress'), project('gone', 'in_progress', { title: 'First name', deleted: { by: LEAD, at: 1 } })],
+        issues: [],
+        conversations: [],
+        activity: [],
+        threadsAt: {},
+        mentionsOf: [],
+        texts,
+      }) as unknown as WorkspaceState
+    const at = (texts: string[]) => (
+      <ThreadsContext.Provider value={vi.fn()}>
+        <ProjectsPage state={state(texts)} directory={directory} teams={[]} archives={archivesOf()} tab="archived" say={vi.fn()} refresh={vi.fn()} />
       </ThreadsContext.Provider>
     )
-    const { unmount } = render(at('active'))
-    expect(want.mock.calls.flatMap(([wanted]) => wanted.about)).toEqual([])
-    unmount()
-    render(at('archived'))
-    expect(want).toHaveBeenLastCalledWith({ folders: [], about: ['30850:a:Gone'] })
+    const { rerender } = render(at([]))
+    expect(within(screen.getByRole('tablist', { name: 'Show' })).getByRole('tab', { name: /Deleted/ }).textContent).toContain('1')
+    expect(screen.queryByRole('link', { name: 'First name' })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Restore/ })).toBeNull()
+    rerender(at(['30850:a:gone']))
+    expect(screen.getByRole('link', { name: 'First name' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Restore/ })).toBeTruthy()
   })
 
   it('switches to cards and opens on cards next time on this device', () => {

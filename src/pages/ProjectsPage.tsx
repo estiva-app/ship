@@ -77,8 +77,9 @@ export function ProjectsPage({ state, directory, teams, archives, tab, folder, s
       ),
     }
   }, [state, directory, archives, folder, teams, say, refresh])
-  // The load holds a deleted project's newest change only (ALO-5): the Archived tab reads all of them, for its current title.
-  useThreads(state, [], tab === 'archived' ? state.projects.filter((p) => p.deleted).map((p) => p.addr) : [])
+  // The load holds a deleted project's newest change only (ALO-5): the Archived tab reads all of them, for its current
+  // title, and draws its rows as loading until then rather than by a title it has since lost.
+  const deletedHeld = useThreads(state, [], [], tab === 'archived' ? state.projects.filter((p) => p.deleted).map((p) => p.addr) : []).all
 
   return (
     <>
@@ -86,6 +87,7 @@ export function ProjectsPage({ state, directory, teams, archives, tab, folder, s
         title={folder ? `${folderName(teams, folder)} · Projects` : 'Projects'}
         lists={lists}
         deleted={deleted}
+        deletedLoading={!deletedHeld}
         tab={tab}
         onTab={(next) => go({ name: 'projects', tab: next, folder })}
         layout={layout}

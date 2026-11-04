@@ -271,12 +271,27 @@ describe('a deleted project in the load, with the switch on', () => {
     expect(p.status).toBe('planned')
   })
 
-  it('is read whole when the Archived tab asks for it: its current title', async () => {
+  /** Each change to `d` a whole load reads. */
+  const loadedChanges = async (d: string) => (await store.loadAllEvents()).events.filter((event) => event.kind === 1851 && tagOf(event, 'a') === `30850:${PK}:${d}`).map((event) => event.id.replace(/0+$/, ''))
+
+  it('is read whole when the Archived tab asks for it, with no conversation: its current title, and the next load reads its newest change only', async () => {
     held = [root('shelved'), change('shelved', 'shelved-t', 'title', 'Its current name', 110), change('shelved', 'shelved-x', 'deleted', 'true', 120)]
     const loaded = await store.loadAllEvents()
     const addr = `30850:${PK}:shelved`
-    const read = foldWorkspace(await store.readThreads(loaded, { folders: [], about: [addr] }))
+    asked = []
+    const read = foldWorkspace(await store.readThreads(loaded, { folders: [], about: [], changes: [addr] }))
     expect(read.projects.find((candidate) => candidate.id === 'shelved')).toMatchObject({ title: 'Its current name', deleted: { by: PK, at: 120 } })
+    // Its changes by `#a`, and nothing else: no message, comment or Folder that mentions it.
+    expect(asked.flat()).toEqual([expect.objectContaining({ kinds: [1851], '#a': [addr] })])
+    expect(await loadedChanges('shelved')).toEqual(['shelved-x'])
+  })
+
+  it("is read whole for its page reached by navigating, and the next load reads its newest change only", async () => {
+    held = [root('left'), change('left', 'left-t', 'title', 'Its current name', 110), change('left', 'left-x', 'deleted', 'true', 120)]
+    const loaded = await store.loadAllEvents()
+    const read = foldWorkspace(await store.readThreads(loaded, { folders: [], about: [`30850:${PK}:left`] }))
+    expect(read.projects.find((candidate) => candidate.id === 'left')).toMatchObject({ title: 'Its current name', deleted: { by: PK, at: 120 } })
+    expect(await loadedChanges('left')).toEqual(['left-x'])
   })
 })
 

@@ -274,11 +274,21 @@ export interface ThreadsWanted {
   folders: readonly string[]
   /** Files whose Mentioned in the screen draws: the Folders mentioning one are read too. */
   about: readonly string[]
+  /**
+   * Projects whose every change the screen draws, and no conversation of them:
+   * the Archived tab's deleted ones, which the load holds by their newest change
+   * only (ALO-5). Held once `texts` holds them.
+   */
+  changes?: readonly string[]
 }
 
-/** Whether `events` holds every conversation `wanted` asks for. */
-export function holdsThreads(events: Pick<WorkspaceState, 'threadsAt' | 'mentionsOf'>, wanted: ThreadsWanted): boolean {
-  return wanted.folders.every((folder) => events.threadsAt?.[folder] !== undefined) && wanted.about.every((addr) => events.mentionsOf?.includes(addr))
+/** Whether `events` holds every conversation `wanted` asks for, and every project's changes. */
+export function holdsThreads(events: Pick<WorkspaceState, 'threadsAt' | 'mentionsOf' | 'texts'>, wanted: ThreadsWanted): boolean {
+  return (
+    wanted.folders.every((folder) => events.threadsAt?.[folder] !== undefined) &&
+    wanted.about.every((addr) => events.mentionsOf?.includes(addr)) &&
+    (!events.texts || (wanted.changes ?? []).every((addr) => events.texts!.includes(addr)))
+  )
 }
 
 /**
@@ -464,7 +474,8 @@ export class Store {
     const rest = unlisted.filter((addr) => !opened.has(addr))
     const [whole, newest] = await Promise.all([this.changesOf(read, shown), this.newestChanges(rest)])
     // A change written after the delete (a stale tab's) hides it: that one is read whole, as before.
-    const unsure = foldFolder([...own.filter((root) => rest.includes(`${KIND.PROJECT}:${root.pubkey}:${dOf(root)}`)), ...newest], referencedAddresses)
+    const resting = new Set(rest)
+    const unsure = foldFolder([...own.filter((root) => resting.has(`${KIND.PROJECT}:${root.pubkey}:${dOf(root)}`)), ...newest], referencedAddresses)
       .projects.filter((project) => !project.deleted)
       .map((project) => project.addr)
     const strays = await this.changesOf(read, unsure)
@@ -488,13 +499,16 @@ export class Store {
    * id (§6.13 "Opening a file reads its current text too"), and kept so every
    * whole load reads it again: a project opened by navigating, not by the
    * tab's first route. A deleted one answers no text (§6.13): every change of it
-   * is read instead, for its page and the Archived tab, which asks for each.
-   * Nothing where projects are not read by their fields.
+   * is read instead, for its page, and only while it is shown — kept, every
+   * whole load would read it whole again. `changes` (the Archived tab's deleted
+   * ones) is read that way alone, with no text asked for. Nothing where
+   * projects are not read by their fields.
    */
-  private async openTexts(addrs: readonly string[], held: readonly string[] | undefined): Promise<{ events: SignedEvent[]; texts: string[] }> {
-    const wanted = addrs.filter((addr) => addr.startsWith(`${KIND.PROJECT}:`) && !held?.includes(addr))
-    if (!held || !wanted.length || !(await this.projectFields())) return { events: [], texts: [] }
-    for (const addr of wanted) this.openedProjects.add(addr)
+  private async openTexts(addrs: readonly string[], changes: readonly string[], held: readonly string[] | undefined): Promise<{ events: SignedEvent[]; texts: string[] }> {
+    const unheld = (addr: string) => addr.startsWith(`${KIND.PROJECT}:`) && !held?.includes(addr)
+    const wanted = addrs.filter(unheld)
+    const whole = changes.filter((addr) => unheld(addr) && !wanted.includes(addr))
+    if (!held || !(wanted.length || whole.length) || !(await this.projectFields())) return { events: [], texts: [] }
     const query: QueryFn = (filters) => this.relay.query(filters as never)
     const files = await Promise.all(
       wanted.map((addr) => {
@@ -502,9 +516,9 @@ export class Store {
         return openFile(query, { kind: KIND.PROJECT, pubkey: pubkey!, d: d.join(':') }, { text: true })
       }),
     )
-    const absent = wanted.filter((_, i) => !files[i])
-    const changes = await this.changesOf(this.queryAll, absent)
-    return { events: [...files.flatMap((file) => file?.events ?? []), ...changes], texts: wanted }
+    for (const addr of wanted.filter((_, i) => files[i])) this.openedProjects.add(addr)
+    const read = await this.changesOf(this.queryAll, [...wanted.filter((_, i) => !files[i]), ...whole])
+    return { events: [...files.flatMap((file) => file?.events ?? []), ...read], texts: [...wanted, ...whole] }
   }
 
   /** Every change to `addrs`, by `#a` (§6.2), a few hundred addresses per filter. */
@@ -1583,7 +1597,7 @@ export class Store {
     const folders = [...new Set([...wanted.folders, ...[...mentioning].filter((folder) => known.has(folder))])].filter((folder) => previous.threadsAt[folder] === undefined)
     const threadsAt = { ...previous.threadsAt }
     // A project the screen draws, opened by navigating: its current text, which no list read carries (ALO-5).
-    const [fresh, opened] = await Promise.all([this.readFolderEvents(folders, {}, {}, this.queryAll, THREAD_KINDS, threadsAt), this.openTexts(about, previous.texts)])
+    const [fresh, opened] = await Promise.all([this.readFolderEvents(folders, {}, {}, this.queryAll, THREAD_KINDS, threadsAt), this.openTexts(about, wanted.changes ?? [], previous.texts)])
     return {
       ...previous,
       events: this.deleted.drop(mergeRead(previous.events, [...fresh, ...opened.events])),

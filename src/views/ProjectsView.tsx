@@ -4,6 +4,7 @@ import { DeletedProjectRow, type DeletedProjectRowProps } from '@/components/Del
 import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { IconButton } from '@/components/ui/IconButton'
+import { SkeletonList } from '@/components/ui/Skeleton'
 import { Tabs } from '@/components/ui/Tabs'
 import { ProjectCard } from '@/components/ProjectCard'
 import { ProjectRow } from '@/components/ProjectRow'
@@ -31,6 +32,8 @@ export interface ProjectsViewProps {
   addDisabledReason?: string
   /** Deleted projects, for the Archived tab's Deleted filter (ALO-5); none where delete is a request, which leaves nothing to list. */
   deleted?: DeletedProjectRowProps[]
+  /** The deleted ones' titles are still on their way: their rows draw as loading. */
+  deletedLoading?: boolean
 }
 
 export type ProjectsLayout = 'table' | 'cards'
@@ -44,7 +47,7 @@ const EMPTY: Record<ProjectsTab, string> = {
   archived: 'No archived projects.',
 }
 
-export function ProjectsView({ title = 'Projects', lists, tab, onTab, layout, onLayout, showFolder, onAddProject, addDisabledReason, deleted = [] }: ProjectsViewProps) {
+export function ProjectsView({ title = 'Projects', lists, tab, onTab, layout, onLayout, showFolder, onAddProject, addDisabledReason, deleted = [], deletedLoading = false }: ProjectsViewProps) {
   const [filter, setFilter] = useState<'archived' | 'deleted'>('archived')
   // With nothing archived, the Archived tab opens on what is there: the deleted ones.
   const showDeleted = tab === 'archived' && deleted.length > 0 && (lists.archived.length === 0 || filter === 'deleted')
@@ -87,7 +90,9 @@ export function ProjectsView({ title = 'Projects', lists, tab, onTab, layout, on
           onChange={(id) => setFilter(id === 'deleted' ? 'deleted' : 'archived')}
         />
       )}
-      {showDeleted ? (
+      {showDeleted && deletedLoading ? (
+        <SkeletonList rows={deleted.length} />
+      ) : showDeleted ? (
         <div className="flex flex-col divide-y divide-border-subtle">
           {deleted.map((project) => (
             <DeletedProjectRow key={project.href} {...project} />
