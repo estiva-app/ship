@@ -36,13 +36,16 @@ export function projectTabs(
   folders?: readonly { id: string; name?: string; addresses?: readonly string[] }[],
 ): Record<ProjectsTab, ProjectRowData[]> {
   const tabs: Record<ProjectsTab, ProjectRowData[]> = { all: [], planned: [], active: [], completed: [], archived: [] }
+  // Each project's issues, read once: one archived with its project is still that project's to count, one archived on its own is not.
+  const issuesOf = new Map<string, string[]>()
+  for (const issue of issues) {
+    const archive = archives.ofIssue(issue)
+    if (!issue.projectAddr || (archive && !archive.with)) continue
+    issuesOf.set(issue.projectAddr, [...(issuesOf.get(issue.projectAddr) ?? []), issue.status])
+  }
   const byTitle = [...projects].sort((a, b) => a.title.localeCompare(b.title))
   for (const project of byTitle) {
     const status = projectStatus(project.status)
-    const own = issues.filter((issue) => {
-      const archive = archives.ofIssue(issue)
-      return issue.projectAddr === project.addr && (!archive || !!archive.with)
-    })
     const archived = !!archives.ofProject(project.addr)
     const row: ProjectRowData = {
       addr: project.addr,
@@ -51,7 +54,7 @@ export function projectTabs(
       ...(folders ? { folder: placedIn({ addr: project.addr, folder: project.contentFolder }, folders)[0]?.name } : {}),
       status: { value: status.value, label: status.label },
       ...(project.lead ? { lead: personOf(project.lead) } : {}),
-      progress: progressOf(own.map((issue) => issue.status), (value) => lookupStatus(ISSUE_STATUSES, value)),
+      progress: progressOf(issuesOf.get(project.addr) ?? [], (value) => lookupStatus(ISSUE_STATUSES, value)),
       archived,
     }
     if (archived) {

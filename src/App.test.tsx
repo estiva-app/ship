@@ -121,11 +121,15 @@ beforeEach(() => {
 })
 
 describe('sidebarProps — the old app\'s counting rules', () => {
-  it('counts open issues outside archived projects, and the projects not archived', () => {
+  it('counts open issues outside archived projects, and the projects on the Active tab', () => {
     const props = sidebarProps(STATE, { name: 'issues' })
     // 1 (todo, live) + 4 (in_progress, no project); 2 is done, 3 is in an archived project.
     expect(props.openIssues).toBe(2)
-    expect(props.activeProjects).toBe(2)
+    // Every project here is Planned, so none is on Active, the tab the entry opens (SHIPS-7).
+    expect(props.activeProjects).toBe(0)
+    const started = { ...STATE, projects: STATE.projects.map((p) => ({ ...p, status: 'in_progress' })) }
+    // Old is archived; Live and Mine are in progress.
+    expect(sidebarProps(started, { name: 'issues' }).activeProjects).toBe(2)
     expect(props.current).toEqual({ entry: 'issues' })
   })
 

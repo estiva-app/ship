@@ -15,6 +15,7 @@ import {
   PROJECT_STATUSES,
   lookupStatus,
   progressOf,
+  projectStatus,
   archiveProject,
   createIssue,
   deleteMessage,
@@ -933,7 +934,8 @@ export function ProjectPage({
           return actInField(removeCard ? 'Remove card' : 'Edit', () => editMessage(folder, messageId, body, cardEditOf(acting, messageId, removeCard, dropped), files), () => refreshAfter(state, folder, refresh, rereadElsewhere))
         }}
         fields={{
-          status: project.status,
+          // An older writer's `active` or `done` reads as the status it meant, as on Projects (SHIPS-7).
+          status: projectStatus(project.status).value,
           // Each with its colour, so the picker draws the status's shape (ONE-6, step 4b).
           statuses: PROJECT_STATUSES.map(({ value, label, colour }) => ({ value, label, colour })),
           onStatusChange: (value) => void set('status', value, `Status → ${value}`),

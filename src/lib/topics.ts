@@ -169,7 +169,7 @@ export function topicPageOf(topic: ReadTopic, work: TopicPageWork, archives: Arc
           kind: 'project',
           title: project.title,
           href: href({ name: 'project', d: project.id, slug: project.title, view: 'table' }),
-          status: { value: projectStatus(project.status).value, label: projectStatus(project.status).label },
+          status: (({ value, label }) => ({ value, label }))(projectStatus(project.status)),
           progress: progressOf(of.map((i) => i.status), (value) => lookupStatus(ISSUE_STATUSES, value)),
         },
       })

@@ -1,7 +1,7 @@
 import { IconLink } from '@tabler/icons-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AppProvider } from '@estiva-app/ui'
-import { createFolder, me, peopleIn, resolveInbound, settleClaims, useDirectory, useWorkspace, type DirectoryView, type FolderState, type WorkspaceState, installReadStateFlush } from '@/api'
+import { createFolder, me, peopleIn, projectStatus, resolveInbound, settleClaims, useDirectory, useWorkspace, type DirectoryView, type FolderState, type WorkspaceState, installReadStateFlush } from '@/api'
 import { AppShell } from '@/components/AppShell'
 import { Banner } from '@/components/Banner'
 import { ToastProvider, useToast, type ToastOptions } from '@/components/ui/Toast'
@@ -331,8 +331,8 @@ export function sidebarProps(
   const isOpen = (status: string) => status !== 'done' && status !== 'cancelled'
   const issues = (state?.issues ?? []).filter((i) => !archives?.ofIssue(i))
   const openIssues = issues.filter((i) => isOpen(i.status)).length
-  // A deleted project is in no list (SPEC §6.5); its link still opens it.
-  const activeProjects = projects.filter((p) => !p.deleted && !archives?.ofProject(p.addr)).length
+  // The number on Projects' Active tab, the one the entry opens (SHIPS-7). A deleted project is in no list (SPEC §6.5).
+  const activeProjects = projects.filter((p) => !p.deleted && !archives?.ofProject(p.addr) && projectStatus(p.status).stage === 'started').length
   // The team a project is in, by its state's listing and then its own Folder (FOL-5); the first, if two list it.
   const teamOf = (projectAddr: string | undefined) => {
     const project = projectAddr ? projects.find((p) => p.addr === projectAddr) : undefined
