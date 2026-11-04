@@ -132,6 +132,22 @@ describe('a file read by its address: by the list read where the switch is on', 
     expect(asked.flat().some((f) => (f['#a'] as string[] | undefined)?.includes(PROJECT))).toBe(false)
   })
 
+  it("an issue's row is read the same way and named by its current title, as with the switch off", async () => {
+    const ISSUE = `30851:${OWNER}:i1`
+    held.push(
+      event(30851, [['d', 'i1'], ['title', 'Old name'], ['h', 'team'], ['a', PROJECT], ['ref', 'LAU-1']]),
+      event(1851, [['a', ISSUE], ['O', 'i1'], ['field', 'title'], ['value', 'New name'], ['h', 'team']]),
+    )
+    const rows = async () => (await fileCandidatesOf({ addresses: [ISSUE], at: new Map() }, 2)).map((row) => row.title)
+    fields = undefined
+    const off = await rows()
+    asked.length = 0
+    fields = { text: true }
+    expect(await rows()).toEqual(off)
+    expect(off).toEqual(['New name'])
+    expect(asked.flat().some((f) => (f['#a'] as string[] | undefined)?.includes(ISSUE))).toBe(false)
+  })
+
   it('with the switch off, reads every change by #a, as before', async () => {
     fields = undefined
     await readTopicDocuments([PROJECT])
