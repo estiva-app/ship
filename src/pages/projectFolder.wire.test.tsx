@@ -71,7 +71,7 @@ const project = (id: string, title: string, contentFolder: string, key: string) 
   ({ addr: `30850:${AUTHOR}:${id}`, id, author: AUTHOR, createdAt: 1, title, description: '', descriptionFormat: 'marker', contentFolder, key, status: 'planned', archived: false, fields: {} })
 
 const STATE: WorkspaceState = {
-  // "Loose" is a record that names no Folder; the team Folder lists it.
+  // "Loose" is a record that names no team; the team Folder lists it.
   projects: [project(D_PROJECT, 'Billing', OWN, 'BIL'), project(D_LOOSE, 'Loose', '', 'LOO')],
   issues: [],
   activity: [],
@@ -149,7 +149,7 @@ describe('an archived project offers no new issue until it is unarchived (PEEKM-
       await reloadFolders()
       goTo(`/project/billing-${D_PROJECT}`)
       render(<App />)
-      await screen.findByText(/Archived with its Folder/)
+      await screen.findByText(/Archived with its team/)
       expect(screen.queryByRole('button', { name: 'Add issue' })).toBeNull()
     } finally {
       vi.mocked(readFolders).mockResolvedValue([
@@ -196,12 +196,12 @@ describe("a moved project's new work goes into its own Folder, not the one that 
   })
 })
 
-describe('a project that names no Folder of its own writes nothing, not even into the Folder that lists it', () => {
+describe('a project that names no team of its own writes nothing, not even into the Folder that lists it', () => {
   /** Whichever comes first, any refusal said or an event sent; then only this refusal may be there. */
   async function refusedNotSent(kind: number) {
     await waitFor(() => expect(sent(kind).length + screen.queryAllByText(/rejected/).length).toBeGreaterThan(0))
     expect(sent(kind)).toHaveLength(0)
-    expect(screen.getByText(/names no Folder/)).toBeInTheDocument()
+    expect(screen.getByText(/names no team/)).toBeInTheDocument()
   }
 
   it('New issue is refused with the reason, and nothing reaches the relay', async () => {
@@ -212,7 +212,7 @@ describe('a project that names no Folder of its own writes nothing, not even int
   it('A comment is refused with the reason, and nothing reaches the relay', async () => {
     await comment(`/project/loose-${D_LOOSE}?tab=activity`, 'hello')
     // Said under the box with the words still in it, not in a toast (COMM-7, Decided 2026-10-17).
-    expect(await screen.findByText(/^Not sent: .*names no Folder/, undefined, { timeout: 5000 })).toBeInTheDocument()
+    expect(await screen.findByText(/^Not sent: .*names no team/, undefined, { timeout: 5000 })).toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: 'Start a conversation…' }).textContent).toBe('hello')
     expect(sent(1111)).toHaveLength(0)
   })

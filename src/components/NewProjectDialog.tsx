@@ -110,17 +110,17 @@ export function NewProjectDialog({ teams, team: startTeam, suggestKey, keyProble
         <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description (optional)" className="h-[80px]" />
       </Field>
       <Field
-        label="Folder"
+        label="Team"
         required
-        helper={teams?.length === 0 ? 'No Folders to file into — the relay did not answer, or there are none yet.' : 'Its issues and conversation live in this Folder.'}
+        helper={teams?.length === 0 ? 'No teams to file into — the relay did not answer, or there are none yet.' : 'Its issues and conversation live in this team.'}
       >
         <Select
           value={teamId}
           onChange={setTeamId}
           options={(teams ?? []).map((candidate) => ({ value: candidate.id, label: candidate.name }))}
-          placeholder="Choose a Folder"
+          placeholder="Choose a team"
           disabled={!teams?.length}
-          disabledReason={teams === undefined ? 'Reading the Folders…' : teams.length === 0 ? 'No Folders to file into' : undefined}
+          disabledReason={teams === undefined ? 'Reading the teams…' : teams.length === 0 ? 'No teams to file into' : undefined}
         />
       </Field>
     </FormDialog>

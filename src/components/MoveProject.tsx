@@ -28,13 +28,13 @@ export function MoveProject({
   say: Say
   onClose: () => void
 }) {
-  const folders: MoveProjectFolder[] = teams.map((team) => ({ id: team.id, name: team.name ?? 'Untitled Folder', hasState: team.hasState, ...(team.private ? { private: true } : {}) }))
+  const folders: MoveProjectFolder[] = teams.map((team) => ({ id: team.id, name: team.name ?? 'Untitled team', hasState: team.hasState, ...(team.private ? { private: true } : {}) }))
   const here = new Set(placedIn({ addr: project.addr, folder: project.contentFolder }, teams).map((team) => team.id))
   const current = folders.filter((folder) => here.has(folder.id))
   // What each one's state lists, as read: its own Folder, where `placedIn` puts a project no Folder lists, may hold none of
   // it, and `moveProject` then places it rather than moving it out of a Folder that does not list it.
   const sources = teams.filter((team) => here.has(team.id)).map((team) => ({ id: team.id, hasState: team.hasState, addresses: team.addresses }))
-  const nameOf = (id: string) => folders.find((folder) => folder.id === id)?.name ?? 'Untitled Folder'
+  const nameOf = (id: string) => folders.find((folder) => folder.id === id)?.name ?? 'Untitled team'
 
   return (
     <MoveProjectDialog

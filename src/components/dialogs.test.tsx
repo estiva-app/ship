@@ -21,7 +21,7 @@ describe('MoveProjectDialog', () => {
   const peek = { id: OTHER, name: 'Peek', hasState: true }
   const bare = { id: 'bare', name: 'Bare', hasState: false }
   const options = async () => {
-    fireEvent.click(screen.getByRole('combobox', { name: 'Destination Folder' }))
+    fireEvent.click(screen.getByRole('combobox', { name: 'Destination team' }))
     // The label alone, without the selected row's check mark.
     return (await screen.findAllByRole('option')).map((option) => option.textContent?.replace(/\W+$/u, ''))
   }
@@ -54,7 +54,7 @@ describe('MoveProjectDialog', () => {
 
   it('says when there is nowhere else to go', () => {
     render(<MoveProjectDialog title="P" current={[ship]} folders={[ship, bare]} onMove={vi.fn()} onClose={vi.fn()} />)
-    expect(screen.getByText('There is no other Folder it can be moved to.')).toBeInTheDocument()
+    expect(screen.getByText('There is no other team it can be moved to.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Move' })).toBeDisabled()
   })
 })
@@ -65,7 +65,7 @@ describe('NewProjectDialog', () => {
     { id: OTHER, name: 'Peek', hasState: true },
   ]
   const chooseTeam = async (name: string) => {
-    fireEvent.click(screen.getByRole('combobox', { name: 'Folder' }))
+    fireEvent.click(screen.getByRole('combobox', { name: 'Team' }))
     await userEvent.click(await screen.findByRole('option', { name }))
   }
 
@@ -116,7 +116,7 @@ describe('NewProjectDialog', () => {
   it('offers no Folder of its own and no pairing', () => {
     render(<NewProjectDialog {...KEYS} teams={teams} onClose={vi.fn()} onCreate={vi.fn()} />)
     expect(screen.queryByPlaceholderText(/Paste a Peek topic link/)).not.toBeInTheDocument()
-    expect(screen.queryByText(/Folder of its own/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/team of its own/)).not.toBeInTheDocument()
   })
 
   it('cannot be submitted while the teams are read, or when there are none', () => {
@@ -124,7 +124,7 @@ describe('NewProjectDialog', () => {
     fireEvent.change(screen.getByPlaceholderText('New project title'), { target: { value: 'X' } })
     expect(screen.getByRole('button', { name: 'Create project' })).toBeDisabled()
     rerender(<NewProjectDialog {...KEYS} teams={[]} onClose={vi.fn()} onCreate={vi.fn()} />)
-    expect(screen.getByText(/No Folders to file into/)).toBeInTheDocument()
+    expect(screen.getByText(/No teams to file into/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Create project' })).toBeDisabled()
   })
 
@@ -145,9 +145,9 @@ describe('NewFolderDialog (FOL-8)', () => {
     const onCreate = vi.fn(() => new Promise<boolean>((resolve) => (answer = resolve)))
     const onClose = vi.fn()
     render(<NewFolderDialog onClose={onClose} onCreate={onCreate} />)
-    expect(screen.getByRole('button', { name: 'Create folder' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Create team' })).toBeDisabled()
     fireEvent.change(screen.getByPlaceholderText('What is it for?'), { target: { value: '  Steer  ' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Create folder' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Create team' }))
     expect(onCreate).toHaveBeenCalledWith('Steer')
     await waitFor(() => expect(screen.getByRole('button', { name: 'Creating…' })).toBeDisabled())
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled()
@@ -159,8 +159,8 @@ describe('NewFolderDialog (FOL-8)', () => {
     const onClose = vi.fn()
     render(<NewFolderDialog onClose={onClose} onCreate={vi.fn().mockResolvedValue(false)} />)
     fireEvent.change(screen.getByPlaceholderText('What is it for?'), { target: { value: 'Steer' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Create folder' }))
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Create folder' })).toBeEnabled())
+    fireEvent.click(screen.getByRole('button', { name: 'Create team' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Create team' })).toBeEnabled())
     expect(onClose).not.toHaveBeenCalled()
   })
 })

@@ -384,7 +384,7 @@ async function main() {
   await projectDialog
     .getByPlaceholder('Description (optional)')
     .fill('Stripe Checkout for workspace billing.')
-  await pick('Folder', 'Smoke team')
+  await pick('Team', 'Smoke team')
   await page.getByRole('button', { name: 'Create project' }).click()
   await page.getByRole('link', { name: /Payment integration/ }).first().waitFor()
   check('the modal closes once the project is created', (await projectDialog.count()) === 0)
@@ -1254,10 +1254,10 @@ async function main() {
   await page.goto(`http://localhost:${PORT}/#/project/${encodeURIComponent(projectAddr)}`)
   await page.waitForSelector('[data-surface="project"]')
   const beforeMove = stored.length
-  await pageAction('Move to Folder…')
-  const moveDialog = page.getByRole('dialog', { name: 'Move to Folder' })
+  await pageAction('Move to team…')
+  const moveDialog = page.getByRole('dialog', { name: 'Move to team' })
   await moveDialog.waitFor()
-  await pick('Destination Folder', 'Smoke team')
+  await pick('Destination team', 'Smoke team')
   await moveDialog.getByRole('button', { name: 'Move', exact: true }).click()
   await moveDialog.waitFor({ state: 'detached' })
   const moveWrites = stored.slice(beforeMove).filter((e) => e.kind === 1852 || e.kind === 1851)
@@ -1273,11 +1273,11 @@ async function main() {
   // naming and listing nothing; a rename is the 9002 alone — the title is the
   // channel's (SPEC §3.2, MAN-17).
   const beforeCreate = stored.length
-  await sidebar().getByRole('button', { name: 'New folder' }).click()
-  const folderDialog = page.getByRole('dialog', { name: 'New folder' })
+  await sidebar().getByRole('button', { name: 'New team' }).click()
+  const folderDialog = page.getByRole('dialog', { name: 'New team' })
   await folderDialog.waitFor()
-  await folderDialog.getByRole('textbox', { name: 'Folder name' }).fill('Smoke folder')
-  await folderDialog.getByRole('button', { name: 'Create folder' }).click()
+  await folderDialog.getByRole('textbox', { name: 'Team name' }).fill('Smoke folder')
+  await folderDialog.getByRole('button', { name: 'Create team' }).click()
   await folderDialog.waitFor({ state: 'detached' })
   const createWrites = stored.slice(beforeCreate).filter((e) => e.kind === 9007 || e.kind === 1852)
   const newFolderId = (createWrites[0] && tagValue(createWrites[0], 'h')) ?? ''
@@ -1298,8 +1298,8 @@ async function main() {
   await page.goto(`http://localhost:${PORT}/#/folder/${newFolderId}`)
   await page.waitForSelector(`[data-folder="${newFolderId}"]`)
   const beforeRename = stored.length
-  await page.getByRole('button', { name: 'Edit folder name' }).click()
-  const nameField = page.getByRole('textbox', { name: 'Folder name' })
+  await page.getByRole('button', { name: 'Edit team name' }).click()
+  const nameField = page.getByRole('textbox', { name: 'Team name' })
   await nameField.fill('Smoke folder renamed')
   await nameField.press('Enter')
   await nameField.waitFor({ state: 'detached' })

@@ -549,7 +549,7 @@ export class Store {
         name,
         visibility: 'open',
         channelType: 'forum',
-        about: 'Ship Folder',
+        about: 'Ship team',
       }),
     )
   }

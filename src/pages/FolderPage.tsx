@@ -42,7 +42,7 @@ export function FolderPage({ id, folders, nameOf = (pubkey) => `${pubkey.slice(0
   // The Folder on screen now, so a rename's re-read that lands after navigating away is dropped.
   const shown = useRef(id)
   // The tab names the Folder from this page's own read, as its heading does (SFX-2).
-  useTabTitle(contents ? (contents.name ?? 'Untitled folder') : undefined)
+  useTabTitle(contents ? (contents.name ?? 'Untitled team') : undefined)
 
   useEffect(() => {
     shown.current = id
@@ -66,7 +66,7 @@ export function FolderPage({ id, folders, nameOf = (pubkey) => `${pubkey.slice(0
     async (name: string) => {
       if (!contents) return false
       if (!name) {
-        say('A folder needs a name.', 'error')
+        say('A team needs a name.', 'error')
         return false
       }
       // The channel's name is the title and its only home (SPEC §3.2), so there is nothing to read first.
@@ -78,7 +78,7 @@ export function FolderPage({ id, folders, nameOf = (pubkey) => `${pubkey.slice(0
           if (next.value.id === shown.current) setContents(next.value)
         } else {
           // Accepted, and not read back: without this the title would show the old name as though nothing happened.
-          say(`Renamed to ${name}, but the folder could not be read back — reload to see it.`, 'error')
+          say(`Renamed to ${name}, but the team could not be read back — reload to see it.`, 'error')
         }
       })
     },
@@ -111,7 +111,7 @@ export function FolderPage({ id, folders, nameOf = (pubkey) => `${pubkey.slice(0
     async (archived: boolean, resolution?: string) => {
       if (!contents?.channel) return false
       const ok = await act(archived ? 'Archive' : 'Unarchive', () => archiveFolder({ id: contents.id, channel: contents.channel! }, archived, resolution), say, reread)
-      if (ok) say(archived ? 'Folder archived' : 'Folder restored')
+      if (ok) say(archived ? 'Team archived' : 'Team restored')
       return ok
     },
     [contents, say, reread],
@@ -120,7 +120,7 @@ export function FolderPage({ id, folders, nameOf = (pubkey) => `${pubkey.slice(0
   if (failed) {
     return (
       <div className="p-6 text-body-2 text-text-muted" data-folder-error={id}>
-        This folder could not be read.
+        This team could not be read.
       </div>
     )
   }
@@ -152,8 +152,8 @@ export function FolderPage({ id, folders, nameOf = (pubkey) => `${pubkey.slice(0
       {archiving && (
         <ArchiveDialog
           {...ARCHIVE_WORDS}
-          title={contents.name ?? 'Untitled folder'}
-          what="folder"
+          title={contents.name ?? 'Untitled team'}
+          what="team"
           hides={archiving.hides.map((part) => `${part} only in it`)}
           staysVisible={archiving.staysVisible}
           onClose={() => setArchiving(null)}

@@ -326,7 +326,7 @@ export function MentionListView(props: MentionListViewProps) {
       ))}
       <p className="text-caption text-text-muted">
         {truncated > 0 && `The ${items.length} most recent, of ${items.length + truncated}. The rest are on the issues themselves. `}
-        What this reader can see. Conversations in Folders you cannot read are absent, without being counted.
+        What this reader can see. Conversations in teams you cannot read are absent, without being counted.
       </p>
     </div>
   )

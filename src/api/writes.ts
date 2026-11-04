@@ -350,7 +350,7 @@ export async function moveProject(
     // One load across the sources: a file listed in two of them has its changes asked for once (APP-2).
     const load = loadQuery()
     const files = await Promise.all(read.map((folder) => readFolderListing(folder.id, load).catch(() => null)))
-    if (files.some((listed) => listed === null)) return refused(nothing('the Folder it is in could not be read. Try again.'))
+    if (files.some((listed) => listed === null)) return refused(nothing('the team it is in could not be read. Try again.'))
     const listings = new Map(read.map((folder, i) => [folder.id, files[i]!] as const))
     const holds = (folder: (typeof from)[number]) => {
       const listing = listings.get(folder.id)
@@ -360,19 +360,19 @@ export async function moveProject(
     const sources = from.filter(holds).map((folder) => (listings.has(folder.id) ? { ...folder, addresses: [project.addr] } : folder))
     const { refused: unsafe, moveRefused } = await store.moveProject({ project: project.addr, from: sources, to, listings })
     // `target-is-not-home` is a topic's rule: a project has no home, so it is never planned.
-    if (unsafe === 'source-has-no-state') return refused(nothing('the Folder it is in has no list of its own, so taking it out would empty that Folder.'))
-    if (unsafe === 'target-is-private') return refused(nothing('that Folder is private, and this project would stay readable by the whole workspace.'))
-    if (unsafe) return refused(nothing('that Folder has no list of its own, so adding to it would hide what is already there.'))
+    if (unsafe === 'source-has-no-state') return refused(nothing('the team it is in has no list of its own, so taking it out would empty that team.'))
+    if (unsafe === 'target-is-private') return refused(nothing('that team is private, and this project would stay readable by the whole workspace.'))
+    if (unsafe) return refused(nothing('that team has no list of its own, so adding to it would hide what is already there.'))
     if (!moveRefused) return { ok: true }
     // Ship's words for why, never the relay's text (TEA-3).
     const why =
       ownFailure(moveRefused) ??
       (moveRefused.why === 'team-archived'
-        ? 'one of the Folders is archived.'
+        ? 'one of the teams is archived.'
         : moveRefused.why === 'not-a-member'
-          ? 'you need to be a member of both Folders to move this.'
+          ? 'you need to be a member of both teams to move this.'
           : moveRefused.why === 'changed-meanwhile'
-            ? 'the Folders changed since you opened this. Try again.'
+            ? 'the teams changed since you opened this. Try again.'
             : undefined)
     // A list changed since it was read: the caller reads the Folders again, so moving again can succeed.
     if (moveRefused.nothingMoved) return { ok: false, reason: nothing(why), ...(moveRefused.why === 'changed-meanwhile' ? { changed: true as const } : {}) }
@@ -446,7 +446,7 @@ export function deleteIssue(issue: Issue): Promise<WriteResult> {
  * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/what-belongs-to-a-file-is-stored-with-it.md
  */
 export function workFolder(project: Project): string {
-  if (!project.contentFolder) throw new Error('This project names no Folder of its own')
+  if (!project.contentFolder) throw new Error('This project names no team of its own')
   return project.contentFolder
 }
 

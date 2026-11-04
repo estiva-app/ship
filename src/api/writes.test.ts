@@ -399,44 +399,44 @@ describe('moving a project', () => {
 
   it('sends nothing when a source cannot be read — what is under the project would be left behind', async () => {
     vi.mocked(readFolderListing).mockRejectedValue(new Error('rate-limited'))
-    expect(await moveProject(PROJECT, [FROM], TO)).toEqual({ ok: false, reason: 'Nothing was moved: the Folder it is in could not be read. Try again.' })
+    expect(await moveProject(PROJECT, [FROM], TO)).toEqual({ ok: false, reason: 'Nothing was moved: the team it is in could not be read. Try again.' })
     expect(s.moveProject).not.toHaveBeenCalled()
   })
 
   it('a move into a private Folder is refused, saying why, and nothing is sent', async () => {
     vi.mocked(readFolderListing).mockResolvedValue(listing as never)
     const { sent } = relayAnswering()
-    expect(await moveProject(PROJECT, [FROM], { ...TO, private: true })).toEqual({ ok: false, reason: 'Nothing was moved: that Folder is private, and this project would stay readable by the whole workspace.' })
+    expect(await moveProject(PROJECT, [FROM], { ...TO, private: true })).toEqual({ ok: false, reason: 'Nothing was moved: that team is private, and this project would stay readable by the whole workspace.' })
     expect(sent).toEqual([])
   })
 
   it('a move into a Folder with no list of its own is refused, saying why, and nothing is sent', async () => {
     vi.mocked(readFolderListing).mockResolvedValue(listing as never)
     const { sent } = relayAnswering()
-    expect(await moveProject(PROJECT, [FROM], { ...TO, hasState: false })).toEqual({ ok: false, reason: 'Nothing was moved: that Folder has no list of its own, so adding to it would hide what is already there.' })
+    expect(await moveProject(PROJECT, [FROM], { ...TO, hasState: false })).toEqual({ ok: false, reason: 'Nothing was moved: that team has no list of its own, so adding to it would hide what is already there.' })
     expect(sent).toEqual([])
   })
 
   // TEA-3: the relay's real refusals of the one move, and what the person reads for each — never the relay's text.
   it.each([
-    ["invalid: only the team's members mark or unmark its spaces", 'Nothing was moved: you need to be a member of both Folders to move this.'],
-    ['invalid: channel is archived', 'Nothing was moved: one of the Folders is archived.'],
-    ['invalid: team 31afb7af is archived; its list does not change', 'Nothing was moved: one of the Folders is archived.'],
-    [`invalid: the team a move leaves does not list ${PROJECT.addr}`, 'Nothing was moved: the Folders changed since you opened this. Try again.'],
-    ['invalid: the team a move leaves lists none of its files', 'Nothing was moved: the Folders changed since you opened this. Try again.'],
-    ["invalid: a topic is listed by one team: take it off the other team's list first", 'Nothing was moved: the Folders changed since you opened this. Try again.'],
+    ["invalid: only the team's members mark or unmark its spaces", 'Nothing was moved: you need to be a member of both teams to move this.'],
+    ['invalid: channel is archived', 'Nothing was moved: one of the teams is archived.'],
+    ['invalid: team 31afb7af is archived; its list does not change', 'Nothing was moved: one of the teams is archived.'],
+    [`invalid: the team a move leaves does not list ${PROJECT.addr}`, 'Nothing was moved: the teams changed since you opened this. Try again.'],
+    ['invalid: the team a move leaves lists none of its files', 'Nothing was moved: the teams changed since you opened this. Try again.'],
+    ["invalid: a topic is listed by one team: take it off the other team's list first", 'Nothing was moved: the teams changed since you opened this. Try again.'],
     ['invalid: rate-limited', 'Nothing was moved. Try again.'],
   ])('the relay refusing the move with %j reads: %s', async (message, reason) => {
     vi.mocked(readFolderListing).mockResolvedValue(listing as never)
     const { sent } = relayAnswering(() => refuse(message))
-    expect(await moveProject(PROJECT, [FROM], TO)).toEqual({ ok: false, reason, ...(/Folders changed/.test(reason) ? { changed: true } : {}) })
+    expect(await moveProject(PROJECT, [FROM], TO)).toEqual({ ok: false, reason, ...(/teams changed/.test(reason) ? { changed: true } : {}) })
     expect(wire(sent)).toEqual([[1852, 'move', TO.id, FROM.id, [PROJECT.addr]]])
   })
 
   it('a refused second move leaves the first standing and names only the Folder that refused; the one after it is never sent', async () => {
     vi.mocked(readFolderListing).mockResolvedValue(listing as never)
     const { sent } = relayAnswering((_, index) => (index === 1 ? refuse('invalid: channel is archived') : { status: 200, body: { accepted: true } }))
-    expect(await moveProject(PROJECT, [FROM, OTHER, THIRD], TO)).toEqual({ ok: true, stillIn: { folder: OTHER.id, why: 'one of the Folders is archived.' } })
+    expect(await moveProject(PROJECT, [FROM, OTHER, THIRD], TO)).toEqual({ ok: true, stillIn: { folder: OTHER.id, why: 'one of the teams is archived.' } })
     expect(wire(sent).map((move) => move[3])).toEqual([FROM.id, OTHER.id])
   })
 

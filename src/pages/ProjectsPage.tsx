@@ -92,7 +92,7 @@ export function ProjectsPage({ state, directory, teams, archives, tab, folder, s
       />
       {adding && (
         <NewProjectDialog
-          teams={teams?.map((team) => ({ id: team.id, name: team.name ?? `Folder ${team.id.slice(0, 8)}…`, hasState: team.hasState }))}
+          teams={teams?.map((team) => ({ id: team.id, name: team.name ?? `Team ${team.id.slice(0, 8)}…`, hasState: team.hasState }))}
           team={folder}
           suggestKey={(title) => suggestKey(title, keys.taken)}
           keyProblem={(key) => keyProblem(key, state.projects, state.issues, keys.byProject)}
@@ -107,7 +107,7 @@ export function ProjectsPage({ state, directory, teams, archives, tab, folder, s
             await refresh()
             // A new project is Planned: show it where it now is, not on a tab it is missing from.
             if (tab !== 'all' && tab !== 'planned') go({ name: 'projects', tab: 'planned', folder })
-            if (result.unlisted) say(`Project created, but not listed in its Folder, so Peek will not show it there — ${result.unlisted}`, 'error')
+            if (result.unlisted) say(`Project created, but not listed in its team, so Peek will not show it there — ${result.unlisted}`, 'error')
             else say('Project created')
             return true
           }}

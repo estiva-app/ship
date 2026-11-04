@@ -10,6 +10,11 @@ staging workspace.
 and two `TES-1`. The address is the identity; the ref is decoration. Use the
 `addr` when you must be sure it is the same object.
 
+**Say team to people; tool names and flags still say folder.** Every word a
+person reads (labels, dialogs, notices, the manifest's action descriptions)
+says team: "Teams" as a heading, "team" in a sentence. Code names, routes
+(`/app/folder/…`), kinds and the `folder:` link prefix keep folder (TEA-8).
+
 **The UI Guardrails project:** where it stands is `docs/GATES.md` §0 in the `estiva-ui` checkout beside this repository.
 `npm run gates:status` here shows Ship's part of it, read from the code.
 

@@ -158,7 +158,7 @@ describe('a summary typed in a New dialog is the root’s `summary` tag', () => 
     const box = dialog.queryByRole('textbox', { name: 'Summary' })
     expect(box).not.toBeNull()
     fireEvent.change(box!, { target: { value: 'Take card payments.' } })
-    await userEvent.click(dialog.getByRole('combobox', { name: 'Folder' }))
+    await userEvent.click(dialog.getByRole('combobox', { name: 'Team' }))
     await userEvent.click(await screen.findByRole('option', { name: 'Ship' }))
     fireEvent.click(dialog.getByRole('button', { name: 'Create project' }))
     await waitFor(() => expect(sent(30850)).toHaveLength(1))

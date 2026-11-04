@@ -76,7 +76,7 @@ describe('archivesOf — the cascade is read, never written', () => {
     expect(archives.ofProject(OTHER_PROJECT)).toBeUndefined()
     // …and its issues with it, naming what is actually archived: the team, not the project (PEEKM-2).
     expect(archives.ofIssue({ addr: ISSUE })?.with).toEqual({ kind: 'folder', addr: '39000:r:team', id: 'team', title: 'Apiary' })
-    expect(archivedLine(archives.ofIssue({ addr: ISSUE }))).toBe('Unarchive the Folder to comment.')
+    expect(archivedLine(archives.ofIssue({ addr: ISSUE }))).toBe('Unarchive the team to comment.')
   })
 
   it('a project also listed by a live team stays visible', () => {
@@ -108,6 +108,6 @@ describe('lockedReason — an archived file is read until it is unarchived (SHI-
   it('names what to unarchive: the file itself, its project, or its Folder', () => {
     expect(lockedReason({ by: A, at: 10 })).toBe('Unarchive to edit')
     expect(lockedReason({ by: A, at: 10, with: { kind: 'project', addr: PROJECT, title: 'Hive' } })).toBe('Unarchive its project to edit')
-    expect(lockedReason({ by: A, at: 10, with: { kind: 'folder', addr: 'f', id: 'f', title: 'Steer' } })).toBe('Unarchive its Folder to edit')
+    expect(lockedReason({ by: A, at: 10, with: { kind: 'folder', addr: 'f', id: 'f', title: 'Steer' } })).toBe('Unarchive its team to edit')
   })
 })

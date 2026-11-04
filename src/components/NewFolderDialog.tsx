@@ -23,9 +23,9 @@ export function NewFolderDialog({ onClose, onCreate }: NewFolderDialogProps) {
 
   return (
     // The kit's FormDialog owns the send: its busy words, everything waiting, closing once it went through.
-    <FormDialog title="New folder" submitLabel="Create folder" busyLabel="Creating…" ready={trimmed !== ''} onSubmit={() => onCreate(trimmed)} onClose={onClose}>
+    <FormDialog title="New team" submitLabel="Create team" busyLabel="Creating…" ready={trimmed !== ''} onSubmit={() => onCreate(trimmed)} onClose={onClose}>
       <p className="text-body-2 text-text-secondary">A place for projects, shown to everyone at the top of the sidebar.</p>
-      <Field label="Folder name">
+      <Field label="Team name">
         <TextInput value={name} onChange={(event) => setName(event.target.value)} placeholder="What is it for?" autoFocus />
       </Field>
     </FormDialog>

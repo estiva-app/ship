@@ -78,7 +78,7 @@ export function ownArchive(file: Archivable, activity: readonly ChangeLike[]): A
 export function lockedReason(archive: ArchiveState | undefined): string | undefined {
   if (!archive) return undefined
   if (archive.with?.kind === 'project') return 'Unarchive its project to edit'
-  if (archive.with?.kind === 'folder') return 'Unarchive its Folder to edit'
+  if (archive.with?.kind === 'folder') return 'Unarchive its team to edit'
   return 'Unarchive to edit'
 }
 
@@ -91,7 +91,7 @@ export function lockedReason(archive: ArchiveState | undefined): string | undefi
  * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-file-is-archived-with-the-closest-archived-file-above-it.md
  */
 export function archivedLine(archive: ArchiveState | undefined): string | undefined {
-  return sharedArchivedLine(archive && (archive.with ? { with: archive.with.addr } : {}), archive?.with?.kind)
+  return sharedArchivedLine(archive && (archive.with ? { with: archive.with.addr } : {}), archive?.with?.kind === 'folder' ? 'team' : archive?.with?.kind)
 }
 
 /** The kit's `ArchiveDialog`, in Ship's words: the apps whose lists it leaves, and how to get it back (FOL-46). */
@@ -110,7 +110,7 @@ export function archivedNoticeOf(archive: ArchiveState, nameOf: (pubkey: string)
     by: nameOf(archive.by),
     when: ago(archive.at),
     ...(archive.resolution ? { resolution: archive.resolution } : {}),
-    ...(archive.with ? { withWhat: archive.with.kind === 'folder' ? 'Folder' : archive.with.kind, withTitle: archive.with.title } : {}),
+    ...(archive.with ? { withWhat: archive.with.kind === 'folder' ? 'team' : archive.with.kind, withTitle: archive.with.title } : {}),
   }
 }
 
@@ -152,7 +152,7 @@ export function archivesOf(
       archivedTeam?.archived
         ? {
             ...archivedTeam.archived,
-            with: { kind: 'folder', addr: archivedTeam.channel ?? archivedTeam.id, id: archivedTeam.id, title: archivedTeam.name ?? 'Untitled Folder' },
+            with: { kind: 'folder', addr: archivedTeam.channel ?? archivedTeam.id, id: archivedTeam.id, title: archivedTeam.name ?? 'Untitled team' },
           }
         : undefined,
     )
