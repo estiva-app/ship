@@ -56,7 +56,9 @@ function answer(filters: Record<string, unknown>[]): SignedEvent[] {
       }
       continue
     }
-    for (const event of held) if (matches(event)) out.add(event)
+    // `limit` per filter, newest first, as the relay clamps it.
+    const found = held.filter(matches).sort((x, y) => y.created_at - x.created_at)
+    for (const event of typeof f.limit === 'number' ? found.slice(0, f.limit) : found) out.add(event)
   }
   return [...out]
 }
@@ -242,6 +244,61 @@ describe('opening a project by its link, with the switch on', () => {
     held = [root('p'), change('p', 'x1', 'deleted', 'true', 120)]
     const p = foldWorkspace(await store.loadOpened({ kind: 'project', d: 'p' })).projects.find((candidate) => candidate.id === 'p')!
     expect(p.deleted).toEqual({ by: PK, at: 120 })
+  })
+
+  it('shows a deleted one by its current title and text, read from all its changes', async () => {
+    held = [root('linked'), change('linked', 't1', 'title', 'Renamed', 110), change('linked', 'd1', 'description', 'Last words', 111), change('linked', 'x1', 'deleted', 'true', 120)]
+    const p = foldWorkspace(await store.loadOpened({ kind: 'project', d: 'linked' })).projects.find((candidate) => candidate.id === 'linked')!
+    expect(p).toMatchObject({ title: 'Renamed', description: 'Last words', deleted: { by: PK, at: 120 } })
+  })
+})
+
+describe('a deleted project in the load, with the switch on', () => {
+  const edits = (d: string, n: number) => Array.from({ length: n }, (_, i) => change(d, `${d}-e${i}`, 'title', `Title ${i}`, 110 + i))
+
+  it('reads its newest change only, however often it was edited, and shows it deleted by whom', async () => {
+    held = [root('gone'), ...edits('gone', 50), change('gone', 'gone-x', 'deleted', 'true', 300)]
+    const events = await store.loadAllEvents()
+    const its = events.events.filter((event) => event.kind === 1851 && tagOf(event, 'a') === `30850:${PK}:gone`)
+    expect(its.map((event) => event.id)).toEqual(['gone-x'.padEnd(64, '0')])
+    expect(foldWorkspace(events).projects.find((candidate) => candidate.id === 'gone')!.deleted).toEqual({ by: PK, at: 300 })
+  })
+
+  it('reads it whole when a change written after the delete hides it, and it stays deleted', async () => {
+    held = [root('stale'), change('stale', 'stale-x', 'deleted', 'true', 120), change('stale', 'stale-s', 'status', 'planned', 130)]
+    const { project: p } = await project('stale')
+    expect(p.deleted).toEqual({ by: PK, at: 120 })
+    expect(p.status).toBe('planned')
+  })
+
+  /** Each change to `d` a whole load reads. */
+  const loadedChanges = async (d: string) => (await store.loadAllEvents()).events.filter((event) => event.kind === 1851 && tagOf(event, 'a') === `30850:${PK}:${d}`).map((event) => event.id.replace(/0+$/, ''))
+
+  it('is read whole when the Archived tab asks for it, with no conversation: its current title, and the next load reads its newest change only', async () => {
+    held = [root('shelved'), change('shelved', 'shelved-t', 'title', 'Its current name', 110), change('shelved', 'shelved-x', 'deleted', 'true', 120)]
+    const loaded = await store.loadAllEvents()
+    const addr = `30850:${PK}:shelved`
+    asked = []
+    const read = foldWorkspace(await store.readThreads(loaded, { folders: [], about: [], changes: [addr] }))
+    expect(read.projects.find((candidate) => candidate.id === 'shelved')).toMatchObject({ title: 'Its current name', deleted: { by: PK, at: 120 } })
+    // Its changes by `#a`, and nothing else: no message, comment or Folder that mentions it.
+    expect(asked.flat()).toEqual([expect.objectContaining({ kinds: [1851], '#a': [addr] })])
+    expect(await loadedChanges('shelved')).toEqual(['shelved-x'])
+  })
+
+  it('is read whole for its page opened by its link, and the next load reads its newest change only', async () => {
+    held = [root('linkgone'), change('linkgone', 'linkgone-t', 'title', 'Its current name', 110), change('linkgone', 'linkgone-x', 'deleted', 'true', 120)]
+    const opened = foldWorkspace(await store.loadOpened({ kind: 'project', d: 'linkgone' }))
+    expect(opened.projects.find((candidate) => candidate.id === 'linkgone')).toMatchObject({ title: 'Its current name', deleted: { by: PK, at: 120 } })
+    expect(await loadedChanges('linkgone')).toEqual(['linkgone-x'])
+  })
+
+  it("is read whole for its page reached by navigating, and the next load reads its newest change only", async () => {
+    held = [root('left'), change('left', 'left-t', 'title', 'Its current name', 110), change('left', 'left-x', 'deleted', 'true', 120)]
+    const loaded = await store.loadAllEvents()
+    const read = foldWorkspace(await store.readThreads(loaded, { folders: [], about: [`30850:${PK}:left`] }))
+    expect(read.projects.find((candidate) => candidate.id === 'left')).toMatchObject({ title: 'Its current name', deleted: { by: PK, at: 120 } })
+    expect(await loadedChanges('left')).toEqual(['left-x'])
   })
 })
 

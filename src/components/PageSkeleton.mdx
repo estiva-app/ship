@@ -1,0 +1,43 @@
+import { Meta } from '@storybook/addon-docs/blocks'
+
+<Meta title="Pages/Loading/Usage" />
+
+# PageSkeleton
+
+A whole page while what it shows is still on its way, in the shape it will
+arrive in (UIG-14): the projects grid, the issues list, one issue, one project,
+or rows.
+
+**Seen in** *Pages/Loading*: **Projects**, **Issues**, **Issue**, **Project**
+and **Rows**, one story per shape inside the shell.
+
+## When
+
+- **The workspace's first read is in flight**: `App` draws it for the route's
+  shape until the first state lands.
+- **A deleted project's page reached by navigating** (ALO-5): the load holds
+  such a project by its newest change only, so its title would be the first
+  one until its every change is read. The project page draws the `project`
+  shape until then.
+
+## When not
+
+- **Part of a page is loading** (the Archived tab's Deleted rows, a
+  conversation): draw the package's `SkeletonList` or the part's own
+  placeholder in that place, and keep the rest of the page.
+- **A Folder**: it does not wait for the workspace and draws its own rows
+  while its files load.
+
+## How
+
+```tsx
+if (!state && loading) return <PageSkeleton shape={SKELETON[route.name] ?? 'rows'} />
+```
+
+## What it owns
+
+- One shape per kind of page, built from the package's bars, lists, `Card`,
+  `PageHeader`, `Panel` and `SkeletonConversation`.
+- `data-loading="workspace"` and `data-shape`, which tests wait on; the page is
+  hidden from assistive technology while it stands in.
+- The 150 ms reveal, so a fast read never flashes it.

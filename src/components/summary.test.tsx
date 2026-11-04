@@ -9,7 +9,7 @@
 import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import type { DirectoryView, FolderState } from '@/api'
+import type { DirectoryView, WorkspaceState } from '@/api'
 import type { Archives } from '@/lib/archive'
 import { ProjectsPage } from '@/pages/ProjectsPage'
 import { BoardCard } from './Board'
@@ -111,7 +111,7 @@ describe('the projects page', () => {
     fields: {},
   })
   const page = (projects: ReturnType<typeof project>[]) => {
-    const state = { projects, issues: [], conversations: [], activity: [] } as unknown as FolderState
+    const state = { projects, issues: [], conversations: [], activity: [] } as unknown as WorkspaceState
     const directory = { nameOf: () => 'Ana', personOf: () => ({ name: 'Ana' }) } as unknown as DirectoryView
     const archives = { ofProject: () => undefined, ofIssue: () => undefined } as unknown as Archives
     return <ProjectsPage state={state} directory={directory} teams={[]} archives={archives} tab="planned" say={vi.fn()} refresh={vi.fn()} />
