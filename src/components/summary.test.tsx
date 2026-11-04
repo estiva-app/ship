@@ -1,8 +1,8 @@
 /**
- * A file's summary in Ship's lists (SUM-4, part 2): the board's card and the
- * project card draw it as its own line under the title, and with none draw
- * the title alone. The project card's summary replaces the description it
- * used to cut short. As the short-summary prototype draws them (Miky, 15 Oct).
+ * A file's summary in Ship's lists (SUM-4, part 2): the board's card draws it
+ * as its own line under the title, and with none draws the title alone. As the
+ * short-summary prototype draws them (Miky, 15 Oct); Projects draws a project
+ * by its name since SHIPS-7.
  * The issue list's row and the table's Title cell draw the title alone and
  * show the summary on hover (Miky, SUM-9, 17 Oct).
  */
@@ -15,7 +15,6 @@ import { ProjectsPage } from '@/pages/ProjectsPage'
 import { BoardCard } from './Board'
 import { IssueRow, type IssueRowData } from './IssueRow'
 import { IssuesTable } from './IssuesTable'
-import { ProjectCard } from './ProjectCard'
 
 const STATUSES = [{ value: 'todo', label: 'Todo' }]
 const SUMMARY = 'Totals on the invoice are off by one cent.'
@@ -97,24 +96,6 @@ describe('the issues table', () => {
   })
 })
 
-const CARD = {
-  href: '#/p/x',
-  title: 'Billing',
-  status: { value: 'planned', label: 'Planned' },
-  issueCount: 0,
-  doneCount: 0,
-  author: { name: 'Ana Duarte' },
-  createdAt: Math.floor(Date.now() / 1000) - 86400,
-}
-
-describe('the project card', () => {
-  it('draws the summary under the title', () => {
-    render(<ProjectCard {...CARD} summary={SUMMARY} />)
-    expect(within(screen.getByRole('link')).queryByText(SUMMARY)).not.toBeNull()
-    expectAfterTitle('Billing', SUMMARY)
-  })
-})
-
 describe('the projects page', () => {
   const project = (id: string, title: string, description: string, summary?: string) => ({
     addr: `30850:a:${id}`,
@@ -133,18 +114,13 @@ describe('the projects page', () => {
     const state = { projects, issues: [], conversations: [], activity: [] } as unknown as FolderState
     const directory = { nameOf: () => 'Ana', personOf: () => ({ name: 'Ana' }) } as unknown as DirectoryView
     const archives = { ofProject: () => undefined, ofIssue: () => undefined } as unknown as Archives
-    return <ProjectsPage state={state} directory={directory} teams={[]} archives={archives} archived={false} say={vi.fn()} refresh={vi.fn()} />
+    return <ProjectsPage state={state} directory={directory} teams={[]} archives={archives} tab="planned" say={vi.fn()} refresh={vi.fn()} />
   }
 
-  it('shows a project’s summary on its card, never its description cut short', () => {
-    render(page([project('1', 'Billing', 'The whole plan for billing, written out at length.', SUMMARY)]))
-    const card = screen.getByRole('link', { name: /Billing/ })
-    expect(within(card).queryByText(SUMMARY)).not.toBeNull()
-    expect(card.textContent).not.toContain('The whole plan for billing')
-  })
-
-  it('shows no description line on a project with no summary', () => {
-    render(page([project('2', 'Payments', 'Take card payments, and everything around them.')]))
-    expect(screen.getByRole('link', { name: /Payments/ }).textContent).not.toContain('Take card payments')
+  // Since SHIPS-7 a project is its name, as the approved story draws Projects (Miky, 2 Nov); its description never stands in.
+  it('never cuts a project’s description into its row', () => {
+    render(page([project('2', 'Payments', 'Take card payments, and everything around them.', SUMMARY)]))
+    expect(screen.getByRole('link', { name: 'Payments' })).toBeTruthy()
+    expect(document.body.textContent).not.toContain('Take card payments')
   })
 })

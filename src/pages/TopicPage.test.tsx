@@ -109,7 +109,10 @@ describe("A topic's page in Ship", () => {
     held.push(manifest('ship', 'ship.estiva.app', ['30850', '30851']), manifest('peek', 'peek.estiva.app', ['30840']), manifest('leaf', 'leaf.estiva.app', ['30842']))
     held.push(projectRoot('p1'), issueRoot('i1'), leafDocument('doc1', 'Testing widgets'))
     held.push(topic(D, 'Widgets', { summary: 'Small live cards' }), lists(D, 'i1'), lists(D, 'p1'), lists(D, 'doc1'))
-    const { state, archives } = ship([{ d: 'p1', status: 'in_progress' }], [{ d: 'i1', status: 'todo', project: 'p1' }, { d: 'i2', status: 'done' }])
+    const { state, archives } = ship(
+      [{ d: 'p1', status: 'in_progress' }],
+      [{ d: 'i1', status: 'todo', project: 'p1' }, { d: 'i2', status: 'done' }, { d: 'i3', status: 'done', project: 'p1' }, { d: 'i4', status: 'cancelled', project: 'p1' }],
+    )
     render(<TopicPage d={D} state={state} folders={[{ id: 'team', name: 'HQ' } as never]} archives={archives} />)
 
     await waitFor(() => expect(page().querySelector('[data-topic-loaded]')).not.toBeNull())
@@ -121,7 +124,8 @@ describe("A topic's page in Ship", () => {
     const [project, issue, ...rest] = [...page().querySelectorAll<HTMLElement>('[data-topic-work]')]
     expect(rest).toEqual([])
     expect(within(project).getByRole('link').textContent).toBe('Project p1')
-    expect(within(project).getByText('0 / 1')).toBeTruthy()
+    // Done of all but the cancelled one, so a finished project reads full (Miky, 3 Nov, SHIPS-7).
+    expect(within(project).getByText('1 / 2')).toBeTruthy()
     expect(within(issue).getByRole('link').textContent).toBe('Issue i1')
     expect(within(issue).getByText('Project p1')).toBeTruthy()
     expect(within(issue).getByText('Todo')).toBeTruthy()

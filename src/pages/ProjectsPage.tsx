@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react'
-import { PROJECT_STATUSES, createProject, keyProblem, lookupStatus, me, projectKeys, setProjectDeleted, suggestKey, takenKeys, type DirectoryView, type FolderState } from '@/api'
+import { createProject, keyProblem, me, projectKeys, setProjectDeleted, suggestKey, takenKeys, type DirectoryView, type FolderState } from '@/api'
 import { day } from '@/lib/time'
 import type { FolderSummary } from '@estiva-app/interop'
 import { NewProjectDialog } from '@/components/NewProjectDialog'
-import type { ProjectCardProps } from '@/components/ProjectCard'
-import { ProjectsView } from '@/views/ProjectsView'
+import { ProjectsView, type ProjectsLayout } from '@/views/ProjectsView'
 import type { Archives } from '@/lib/archive'
-import { go, href } from '../router'
+import { projectTabs } from '@/lib/projects'
+import { go, href, type ProjectsTab } from '../router'
 import { act, type Say } from './act'
 import { useReopenHeld } from '@/auth/heldTyping'
 import { folderName, projectsIn } from '@/lib/placement'
@@ -14,20 +14,37 @@ import { folderName, projectsIn } from '@/lib/placement'
 /** Where the New project dialog holds its fields through a passkey trip (AUT-4). */
 const NEW_PROJECT_HOLD = 'new-project'
 
+/** The table or the cards, as this device last chose (SHIPS-7). */
+const LAYOUT_KEY = 'ship.projects-layout'
+
+function storedLayout(): ProjectsLayout {
+  try {
+    return localStorage.getItem(LAYOUT_KEY) === 'cards' ? 'cards' : 'table'
+  } catch {
+    return 'table'
+  }
+}
+
 /**
- * The projects list from the fold, as the old app draws it
- * (`projectsView`): active or archived by the route, each card with its
- * issue and done counts, its author's face and its age. Nothing here
- * recomputes what the fold decided — `archived` and `status` are read off
- * the folded project. "Add project" opens the form in a dialog; a created
- * project is on screen only once the relay has been read again.
+ * The projects list from the fold, in tabs by what each status means (SHIPS-7): the route's tab, Active when it
+ * names none, as a table or cards. Nothing here recomputes what the fold decided — `archived`, `status` and `lead`
+ * are read off the folded project. "Add project" opens the form in a dialog; a created project is on screen only
+ * once the relay has been read again.
  *
- * Archived is FOL-46's (`archivesOf`): a project archived itself or with its
- * team is on the Archived tab, and a card counts only the issues not archived
- * on their own.
+ * Archived is FOL-46's (`archivesOf`): a project archived itself or with its team is on the Archived tab, and a
+ * project counts only the issues not archived on their own.
  */
-export function ProjectsPage({ state, directory, teams, archives, archived, folder, say, refresh }: { state: FolderState; directory: DirectoryView; teams: FolderSummary[] | undefined; archives: Archives; archived: boolean; folder?: string; say: Say; refresh: () => Promise<void> }) {
+export function ProjectsPage({ state, directory, teams, archives, tab, folder, say, refresh }: { state: FolderState; directory: DirectoryView; teams: FolderSummary[] | undefined; archives: Archives; tab: ProjectsTab; folder?: string; say: Say; refresh: () => Promise<void> }) {
   const [adding, setAdding] = useState(false)
+  const [layout, setLayout] = useState<ProjectsLayout>(storedLayout)
+  const chooseLayout = (next: ProjectsLayout) => {
+    setLayout(next)
+    try {
+      localStorage.setItem(LAYOUT_KEY, next)
+    } catch {
+      // A device that keeps nothing still switches; it opens on the table next time.
+    }
+  }
   useReopenHeld(NEW_PROJECT_HOLD, () => setAdding(true))
   // Derived once per read, not per keystroke in the Add project dialog (SHI-4).
   const keys = useMemo(() => {
@@ -35,35 +52,13 @@ export function ProjectsPage({ state, directory, teams, archives, archived, fold
     return { byProject, taken: takenKeys(state.projects, state.issues, byProject) }
   }, [state.projects, state.issues])
 
-  const cards = useMemo(() => {
-    const isArchived = (project: FolderState['projects'][number]) => !!archives.ofProject(project.addr)
-    const toCard = (project: FolderState['projects'][number]): ProjectCardProps => {
-      // An issue archived with its project is still that project's to count; one archived on its own is not.
-      const issues = state.issues.filter((issue) => {
-        const archive = archives.ofIssue(issue)
-        return issue.projectAddr === project.addr && (!archive || !!archive.with)
-      })
-      const status = lookupStatus(PROJECT_STATUSES, project.status)
-      return {
-        href: href({ name: 'project', d: project.id, slug: project.title, view: 'table' }),
-        title: project.title,
-        // The summary, never the description cut short (SUM-4): a project without one gets a shorter card.
-        summary: project.summary,
-        status: { value: status.value, label: status.label },
-        issueCount: issues.length,
-        doneCount: issues.filter((issue) => issue.status === 'done').length,
-        author: directory.personOf(project.author),
-        createdAt: project.createdAt,
-        archived: isArchived(project),
-      }
-    }
-    // A Folder's Projects lists only the projects in that team (SHIPS-5), by the sidebar's own rule.
+  const { lists, deleted } = useMemo(() => {
+    // A Folder's Projects lists only the projects in that team (SHIPS-5), by the sidebar's own rule, and names no Folder.
     const here = folder ? projectsIn(state.projects, teams ?? [], folder) : state.projects
-    // A deleted project leaves both lists for the Archived tab's Deleted filter (SPEC §6.5).
+    // A deleted project leaves every tab for the Archived tab's Deleted filter (SPEC §6.5).
     const live = here.filter((p) => !p.deleted)
     return {
-      active: live.filter((p) => !isArchived(p)).map(toCard),
-      archived: live.filter(isArchived).map(toCard),
+      lists: folder ? projectTabs(live, state.issues, archives, directory.personOf) : projectTabs(live, state.issues, archives, directory.personOf, teams ?? []),
       deleted: here.flatMap((project) =>
         project.deleted
           ? [
@@ -86,11 +81,13 @@ export function ProjectsPage({ state, directory, teams, archives, archived, fold
     <>
       <ProjectsView
         title={folder ? `${folderName(teams, folder)} · Projects` : 'Projects'}
-        active={cards.active}
-        archived={cards.archived}
-        deleted={cards.deleted}
-        showArchived={archived}
-        onShowArchived={(wantArchived) => go({ name: 'projects', archived: wantArchived, folder })}
+        lists={lists}
+        deleted={deleted}
+        tab={tab}
+        onTab={(next) => go({ name: 'projects', tab: next, folder })}
+        layout={layout}
+        onLayout={chooseLayout}
+        showFolder={!folder}
         onAddProject={() => setAdding(true)}
       />
       {adding && (
@@ -108,6 +105,8 @@ export function ProjectsPage({ state, directory, teams, archives, archived, fold
               return false
             }
             await refresh()
+            // A new project is Planned: show it where it now is, not on a tab it is missing from.
+            if (tab !== 'all' && tab !== 'planned') go({ name: 'projects', tab: 'planned', folder })
             if (result.unlisted) say(`Project created, but not listed in its Folder, so Peek will not show it there — ${result.unlisted}`, 'error')
             else say('Project created')
             return true

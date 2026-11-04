@@ -64,8 +64,8 @@ import { identifierFromRef, objectRef } from '@estiva-app/interop'
 export type Route =
   /** With `folder`, only the issues of the projects in that Folder (SHIPS-5). */
   | { name: 'issues'; folder?: string }
-  /** `archived` shows the archived list instead of the active one; `folder`, only that Folder's projects (SHIPS-5). */
-  | { name: 'projects'; archived: boolean; folder?: string }
+  /** `tab` is the status tab, Active when absent (SHIPS-7); `folder`, only that Folder's projects (SHIPS-5). */
+  | { name: 'projects'; tab?: ProjectsTab; folder?: string }
   /**
    * `d` is the identity; `slug` is decoration that never resolves anything and
    * is absent when the caller has no title to hand (an inbound redirect, a
@@ -123,6 +123,18 @@ export type ProjectView = 'table' | 'board'
 export type ProjectTab = 'overview' | 'issues'
 const PROJECT_TABS: ProjectTab[] = ['overview', 'issues']
 
+/** The Projects page's tabs, by what each status means (SHIPS-7); Active is the one a bare link opens. */
+export type ProjectsTab = 'all' | 'planned' | 'active' | 'completed' | 'archived'
+export const PROJECTS_TABS: ProjectsTab[] = ['all', 'planned', 'active', 'completed', 'archived']
+
+/** The tab a Projects link asks for: `?tab=`, or `?archived` as links said it before the tabs. */
+function projectsTab(query: string | undefined): ProjectsTab | undefined {
+  const params = new URLSearchParams(query ?? '')
+  if (params.has('archived')) return 'archived'
+  const asked = params.get('tab') as ProjectsTab
+  return PROJECTS_TABS.includes(asked) && asked !== 'active' ? asked : undefined
+}
+
 const PROJECT_VIEWS: ProjectView[] = ['table', 'board']
 const DEFAULT_PROJECT_VIEW: ProjectView = 'table'
 
@@ -133,7 +145,7 @@ export function href(route: Route): string {
       return route.folder ? `/app/folder/${route.folder}/issues` : '/issues'
     case 'projects': {
       const base = route.folder ? `/app/folder/${route.folder}/projects` : '/projects'
-      return route.archived ? `${base}?archived` : base
+      return route.tab && route.tab !== 'active' ? `${base}?tab=${route.tab}` : base
     }
     case 'project': {
       const base = `/project/${objectRef(route.d, route.slug)}`
@@ -189,7 +201,8 @@ export function parse(location: string): Route {
 
   if (parts[0] === 'o' && parts[1]) return { name: 'inbound', naddr: parts[1] }
   if (parts[0] === 'projects') {
-    return { name: 'projects', archived: new URLSearchParams(query ?? '').has('archived') }
+    const tab = projectsTab(query)
+    return tab ? { name: 'projects', tab } : { name: 'projects' }
   }
   if (parts[0] === 'project' && parts[1]) {
     const d = identifierFromRef(parts[1])
@@ -218,7 +231,10 @@ export function parse(location: string): Route {
   const folderAt = parts[0] === 'app' && parts[1] === 'folder' ? 2 : parts[0] === 'folder' ? 1 : -1
   const folder = folderAt !== -1 ? parts[folderAt] : undefined
   if (folder && parts[folderAt + 1] === 'topics') return { name: 'topics', folder }
-  if (folder && parts[folderAt + 1] === 'projects') return { name: 'projects', archived: new URLSearchParams(query ?? '').has('archived'), folder }
+  if (folder && parts[folderAt + 1] === 'projects') {
+    const tab = projectsTab(query)
+    return tab ? { name: 'projects', tab, folder } : { name: 'projects', folder }
+  }
   if (folder && parts[folderAt + 1] === 'issues') return { name: 'issues', folder }
   if (parts[0] === 'app' && parts[1] === 'folder' && parts[2]) {
     return { name: 'folder', id: parts[2] }

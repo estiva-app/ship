@@ -217,3 +217,20 @@ export function lookupStatus(vocab: VocabEntry[], value: string): VocabEntry {
     }
   )
 }
+
+/** Words an older writer left on projects, read as the status they meant: 16 `active` and 6 `done` on production, 3 Nov (SHIPS-7). */
+const PROJECT_STATUS_ALIASES: Record<string, string> = { active: 'in_progress', done: 'completed' }
+
+/** A project's status as the vocabulary has it, an older writer's word read as the one it meant. */
+export function projectStatus(value: string): VocabEntry {
+  return lookupStatus(PROJECT_STATUSES, PROJECT_STATUS_ALIASES[value] ?? value)
+}
+
+/**
+ * Done of all, as Ship counts progress everywhere: by what each status means, so a company that renames Done still
+ * counts it, and with the dropped ones out of both numbers, so a finished project reads full (Miky, 3 Nov, SHIPS-7).
+ */
+export function progressOf(statuses: readonly string[], status: (value: string) => VocabEntry): { done: number; total: number } {
+  const stages = statuses.map((value) => status(value).stage)
+  return { done: stages.filter((stage) => stage === 'done').length, total: stages.filter((stage) => stage !== 'dropped').length }
+}

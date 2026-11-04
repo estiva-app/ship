@@ -388,6 +388,12 @@ async function main() {
   await page.getByRole('button', { name: 'Create project' }).click()
   await page.getByRole('link', { name: /Payment integration/ }).first().waitFor()
   check('the modal closes once the project is created', (await projectDialog.count()) === 0)
+  // A new project is Planned, so the page moves to that tab, which is drawn as the selected one (SHIPS-7).
+  const plannedTab = page.getByRole('tab', { name: /^Planned/ })
+  check(
+    '  …and Projects moves to Planned, where it now is',
+    (await plannedTab.getAttribute('aria-selected')) === 'true',
+  )
 
   const project = stored.find((e) => e.kind === 30850)
   check('no kind:9007 — a project gets no Folder of its own (FOL-2)', !stored.some((e) => e.kind === 9007))

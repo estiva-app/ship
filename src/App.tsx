@@ -300,7 +300,7 @@ function Page({ route, state, loading, directory, teams, folders, archives, say,
     case 'topic':
       return <TopicPage key={route.d} d={route.d} state={state} folders={folders} archives={archives} />
     case 'projects':
-      return <ProjectsPage key={route.folder} state={state} directory={directory} teams={teams} archives={archives} archived={route.archived} folder={route.folder} say={say} refresh={refresh} />
+      return <ProjectsPage key={route.folder} state={state} directory={directory} teams={teams} archives={archives} tab={route.tab ?? 'active'} folder={route.folder} say={say} refresh={refresh} />
     case 'issues':
       return <IssuesPage key={route.folder} state={state} directory={directory} teams={teams} archives={archives} folder={route.folder} say={say} refresh={refresh} />
     case 'project':
@@ -360,7 +360,7 @@ export function sidebarProps(
     openIssues,
     activeProjects,
     hrefFor: (entry: SidebarEntry, folder?: string) =>
-      href(entry === 'projects' ? { name: 'projects', archived: false, folder } : { name: entry, folder }),
+      href({ name: entry, folder }),
     folders,
     current,
   }

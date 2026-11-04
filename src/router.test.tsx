@@ -21,9 +21,9 @@ afterEach(() => {
 
 describe('useRoute', () => {
   it('starts on the current path and follows changes', () => {
-    goTo('/projects?archived')
+    goTo('/projects?tab=archived')
     const { result } = renderHook(() => useRoute())
-    expect(result.current).toEqual({ name: 'projects', archived: true })
+    expect(result.current).toEqual({ name: 'projects', tab: 'archived' })
 
     act(() => goTo(`/issue/billing-entry-${UUID}`))
     expect(result.current).toEqual({ name: 'issue', d: UUID })
@@ -37,8 +37,11 @@ describe('useRoute', () => {
     // loss: §7.2 says it is decoration and nothing resolves through it.
     const routes = [
       [{ name: 'issues' }, { name: 'issues' }],
-      [{ name: 'projects', archived: false }, { name: 'projects', archived: false }],
-      [{ name: 'projects', archived: true }, { name: 'projects', archived: true }],
+      [{ name: 'projects' }, { name: 'projects' }],
+      [{ name: 'projects', tab: 'archived' }, { name: 'projects', tab: 'archived' }],
+      [{ name: 'projects', tab: 'planned' }, { name: 'projects', tab: 'planned' }],
+      // Active is what a bare link opens, so it is written as one.
+      [{ name: 'projects', tab: 'active' }, { name: 'projects' }],
       [{ name: 'project', d: UUID, slug: 'payments', view: 'table' }, { name: 'project', d: UUID, view: 'table' }],
       // The board is on the Issues tab, so a link that asks for it opens that tab (Katerina, 30 September).
       [{ name: 'project', d: UUID, view: 'board' }, { name: 'project', d: UUID, view: 'board', tab: 'issues' }],
@@ -86,11 +89,18 @@ describe('parse, at the edges', () => {
 
   it("serves a Folder's Projects and Issues under its Folder, as its Topics (SHIPS-5)", () => {
     const UUID5 = 'b59fbb9c-0cd4-43c1-9f5b-3b5704072e6f'
-    expect(href({ name: 'projects', archived: false, folder: UUID5 })).toBe(`/app/folder/${UUID5}/projects`)
-    expect(href({ name: 'projects', archived: true, folder: UUID5 })).toBe(`/app/folder/${UUID5}/projects?archived`)
+    expect(href({ name: 'projects', folder: UUID5 })).toBe(`/app/folder/${UUID5}/projects`)
+    expect(href({ name: 'projects', tab: 'completed', folder: UUID5 })).toBe(`/app/folder/${UUID5}/projects?tab=completed`)
     expect(href({ name: 'issues', folder: UUID5 })).toBe(`/app/folder/${UUID5}/issues`)
-    expect(parse(`/app/folder/${UUID5}/projects?archived`)).toEqual({ name: 'projects', archived: true, folder: UUID5 })
+    expect(parse(`/app/folder/${UUID5}/projects?tab=completed`)).toEqual({ name: 'projects', tab: 'completed', folder: UUID5 })
     expect(parse(`/app/folder/${UUID5}/issues`)).toEqual({ name: 'issues', folder: UUID5 })
+  })
+
+  it('a Projects link from before the tabs still opens Archived, on the whole list and in a Folder (SHIPS-7)', () => {
+    const UUID5 = 'b59fbb9c-0cd4-43c1-9f5b-3b5704072e6f'
+    expect(parse('/projects?archived')).toEqual({ name: 'projects', tab: 'archived' })
+    expect(parse(`/app/folder/${UUID5}/projects?archived`)).toEqual({ name: 'projects', tab: 'archived', folder: UUID5 })
+    expect(parse('/projects?tab=nonsense')).toEqual({ name: 'projects' })
   })
 
   it('opens a block link on its own page, and still reads an old #/ link from its hash (RIC-18)', () => {
