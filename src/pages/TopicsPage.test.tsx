@@ -142,6 +142,9 @@ describe("Ship's Topics", () => {
     expect(within(zebra).getByText('4')).toBeTruthy()
     // A topic with no summary has no second line, and nothing new says nothing.
     expect(within(rows()[0]).queryByText(/new/)).toBeNull()
+    // A topic that lists only issues shows nothing in the Projects column.
+    expect(within(rows()[0]).queryByLabelText(/projects completed/)).toBeNull()
+    expect(within(rows()[0]).queryByText(/\d+ \/ \d+/)).toBeNull()
 
     fireEvent.click(screen.getByRole('tab', { name: /Other topics/ }))
     expect(titles()).toEqual(['Others’ topic'])

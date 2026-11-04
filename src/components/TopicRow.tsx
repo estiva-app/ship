@@ -29,12 +29,17 @@ export function TopicRow({ topic }: { topic: TopicRowData }) {
           <span className="sr-only">{topic.fresh} new</span>
         </span>
       )}
-      <span className="hidden w-16 shrink-0 items-center gap-1 text-caption text-text-secondary sm:flex" aria-label={`${done} of ${total} projects completed`}>
-        <KindIcon kind="project" />
-        <span className="font-mono tabular-nums">
-          {done} / {total}
+      {/* A topic that lists no project leaves the cell empty, not "0 / 0" (Miky, 4 Nov). */}
+      {total > 0 ? (
+        <span className="hidden w-16 shrink-0 items-center gap-1 text-caption text-text-secondary sm:flex" aria-label={`${done} of ${total} projects completed`}>
+          <KindIcon kind="project" />
+          <span className="font-mono tabular-nums">
+            {done} / {total}
+          </span>
         </span>
-      </span>
+      ) : (
+        <span className="hidden w-16 shrink-0 sm:block" />
+      )}
       <span className="hidden w-28 shrink-0 items-center gap-1 text-caption text-text-secondary sm:flex">
         <IconMessages size={16} stroke={1.5} aria-hidden />
         {/* A dash while the conversations are read: the rows draw from the topics read alone. */}
