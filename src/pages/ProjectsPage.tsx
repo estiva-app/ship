@@ -92,7 +92,7 @@ export function ProjectsPage({ state, directory, teams, archives, tab, folder, s
       />
       {adding && (
         <NewProjectDialog
-          teams={teams?.map((team) => ({ id: team.id, name: team.name ?? `Team ${team.id.slice(0, 8)}…`, hasState: team.hasState }))}
+          teams={teams?.map((team) => ({ id: team.id, name: team.name ?? 'Untitled team', hasState: team.hasState }))}
           team={folder}
           suggestKey={(title) => suggestKey(title, keys.taken)}
           keyProblem={(key) => keyProblem(key, state.projects, state.issues, keys.byProject)}

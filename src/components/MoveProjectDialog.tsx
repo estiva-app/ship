@@ -50,7 +50,7 @@ export function MoveProjectDialog({ title, current, folders, onMove, onClose }: 
       heading="Move to team"
       title={title}
       description="Only the team it is listed in changes. Its issues and its conversation stay exactly as they are."
-      folderLabel="Destination team"
+      folderLabel="Team"
       noFolder="There is no other team it can be moved to."
       from={from}
       folders={withState.map(({ id, name }) => ({ id, name }))}

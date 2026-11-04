@@ -20,7 +20,7 @@ export function placedIn<F extends { id: string; addresses?: readonly string[] }
 
 /** A team's name for a page title, as Topics names it: "Team" until the listing has it. */
 export function folderName(folders: readonly { id: string; name?: string }[] | undefined, id: string): string {
-  return folders?.find((folder) => folder.id === id)?.name ?? 'Team'
+  return folders?.find((folder) => folder.id === id)?.name ?? 'Untitled team'
 }
 
 /**

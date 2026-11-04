@@ -66,7 +66,7 @@ export function FolderView({ folder, onRename, onArchive, archivedNotice }: {
             <EditableText label="Team name" value={folder.name ?? ''} placeholder="Untitled team" onCommit={onRename} className="-mx-2" />
           </h1>
         ) : (
-          <h1 className="text-h3 text-text-primary">{folder.name ?? 'Team'}</h1>
+          <h1 className="text-h3 text-text-primary">{folder.name ?? 'Untitled team'}</h1>
         )}
         <p className="text-caption text-text-muted" data-own={own.length} data-foreign={foreign.length}>
           {countLine(own.length, foreign.length)}

@@ -27,7 +27,7 @@ export function TopicsPage({ state, folders, folder }: { state: FolderState; fol
     () => (held ? topicsByTab(held, { projects: state.projects, issues: state.issues }, conversations, folder) : undefined),
     [held, state.projects, state.issues, conversations, folder],
   )
-  const folderName = folder ? (folders?.find((summary) => summary.id === folder)?.name ?? 'Team') : undefined
+  const folderName = folder ? (folders?.find((summary) => summary.id === folder)?.name ?? 'Untitled team') : undefined
   return (
     <TopicsView
       title={folderName ? `${folderName} · Topics` : 'Topics'}

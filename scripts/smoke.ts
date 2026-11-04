@@ -1257,7 +1257,7 @@ async function main() {
   await pageAction('Move to team…')
   const moveDialog = page.getByRole('dialog', { name: 'Move to team' })
   await moveDialog.waitFor()
-  await pick('Destination team', 'Smoke team')
+  await pick('Team', 'Smoke team')
   await moveDialog.getByRole('button', { name: 'Move', exact: true }).click()
   await moveDialog.waitFor({ state: 'detached' })
   const moveWrites = stored.slice(beforeMove).filter((e) => e.kind === 1852 || e.kind === 1851)

@@ -70,7 +70,7 @@ async function move(listed: string[], teams: [string, string][], to: string) {
   listing = new Set(listed)
   const say = vi.fn()
   render(<MoveProject project={project} teams={teams.map(([id, name]) => team(id, name))} say={say} onClose={() => {}} />)
-  fireEvent.click(screen.getByRole('combobox', { name: 'Destination team' }))
+  fireEvent.click(screen.getByRole('combobox', { name: 'Team' }))
   await userEvent.click(await screen.findByRole('option', { name: to }))
   fireEvent.click(screen.getByRole('button', { name: 'Move' }))
   await waitFor(() => expect(say).toHaveBeenCalled())

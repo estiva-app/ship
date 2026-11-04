@@ -21,7 +21,7 @@ describe('MoveProjectDialog', () => {
   const peek = { id: OTHER, name: 'Peek', hasState: true }
   const bare = { id: 'bare', name: 'Bare', hasState: false }
   const options = async () => {
-    fireEvent.click(screen.getByRole('combobox', { name: 'Destination team' }))
+    fireEvent.click(screen.getByRole('combobox', { name: 'Team' }))
     // The label alone, without the selected row's check mark.
     return (await screen.findAllByRole('option')).map((option) => option.textContent?.replace(/\W+$/u, ''))
   }
