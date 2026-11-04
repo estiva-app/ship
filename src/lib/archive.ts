@@ -102,8 +102,8 @@ export const ARCHIVE_WORDS: Pick<ArchiveDialogProps, 'apps' | 'getBack'> = {
 
 /**
  * The kit's `ArchivedNotice`, said in Ship's words: who by name, when as Ship
- * says a time ("3h ago"), and what it is archived with by its kind, a Folder
- * being a proper noun in every app's copy (FOL-46).
+ * says a time ("3h ago"), and what it is archived with by its kind, a team
+ * by its noun (FOL-46, TEA-8).
  */
 export function archivedNoticeOf(archive: ArchiveState, nameOf: (pubkey: string) => string): Pick<ArchivedNoticeProps, 'by' | 'when' | 'resolution' | 'withWhat' | 'withTitle'> {
   return {

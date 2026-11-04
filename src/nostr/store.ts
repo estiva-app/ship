@@ -549,7 +549,8 @@ export class Store {
         name,
         visibility: 'open',
         channelType: 'forum',
-        about: 'Ship team',
+        // Event content no screen reads, kept as published since FOL-8 (TEA-8 review).
+        about: 'Ship Folder',
       }),
     )
   }

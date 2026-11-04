@@ -1247,7 +1247,7 @@ async function main() {
   // the relay's would read by now — and Onboarding's, above, lists it too.
   seed({ kind: 30890, created_at: Math.floor(Date.now() / 1000) + 1, tags: [['d', TEAM_ID], ['name', 'Smoke team'], ['a', projectAddr]] })
 
-  // ── Move to Folder… (FOL-7) ───────────────────────────────────────────────
+  // ── Move to team… (FOL-7) ───────────────────────────────────────────────
   // Listed in both now, as a half move leaves it: moving into the team takes
   // it out of Onboarding — one move naming both Folders, and never a kind:1851
   // (TEA-3).
@@ -1262,13 +1262,13 @@ async function main() {
   await moveDialog.waitFor({ state: 'detached' })
   const moveWrites = stored.slice(beforeMove).filter((e) => e.kind === 1852 || e.kind === 1851)
   check(
-    '"Move to Folder…" publishes one move into the new Folder, naming the one it leaves, and no kind:1851',
+    '"Move to team…" publishes one move into the new team, naming the one it leaves, and no kind:1851',
     moveWrites.map((e) => `${e.kind} ${tagValue(e, 'op')} ${tagValue(e, 'h')?.slice(0, 8)} ${tagValue(e, 'from')?.slice(0, 8)} ${tagValue(e, 'a') === projectAddr}`).join(' | ') ===
       `1852 move ${TEAM_ID.slice(0, 8)} ${FOLDER_ID.slice(0, 8)} true`,
     moveWrites.map((e) => `${e.kind} ${tagValue(e, 'op')} ${tagValue(e, 'h')?.slice(0, 8)} from ${tagValue(e, 'from')?.slice(0, 8)}`).join(' | ') || 'nothing published',
   )
 
-  // ── New folder, and rename it (FOL-8) ─────────────────────────────────────
+  // ── New team, and rename it (FOL-8) ─────────────────────────────────────
   // Peek's two writes, event for event: 9007 with the name, then a 1852 add
   // naming and listing nothing; a rename is the 9002 alone — the title is the
   // channel's (SPEC §3.2, MAN-17).
@@ -1282,7 +1282,7 @@ async function main() {
   const createWrites = stored.slice(beforeCreate).filter((e) => e.kind === 9007 || e.kind === 1852)
   const newFolderId = (createWrites[0] && tagValue(createWrites[0], 'h')) ?? ''
   check(
-    '"New folder" publishes a kind:9007 with the name, then a kind:1852 add with none, on the same id',
+    '"New team" publishes a kind:9007 with the name, then a kind:1852 add with none, on the same id',
     createWrites.map((e) => `${e.kind} ${tagValue(e, 'op') ?? '-'} ${tagValue(e, 'name')} ${tagValue(e, 'h') === newFolderId}`).join(' | ') ===
       '9007 - Smoke folder true | 1852 add undefined true',
     createWrites.map((e) => `${e.kind} ${tagValue(e, 'op') ?? '-'} ${tagValue(e, 'name')}`).join(' | ') || 'nothing published',
