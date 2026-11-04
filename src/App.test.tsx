@@ -561,10 +561,13 @@ describe('Project page — one project from the fold', () => {
     await waitFor(() => expect(refresh).toHaveBeenCalled())
   })
 
-  it('says so when the project is not in this workspace', () => {
-    goTo(`/project/nope-${D('99')}`)
+  // Not there and in a Folder you cannot read look the same, so the link says neither and gives no title (ALO-5).
+  it('says "You can\'t open this project", with no title, when the project is not one you can read', () => {
+    goTo(`/project/launch-plan-${D('99')}`)
     render(<App />)
-    expect(screen.getByText(/not in this workspace/)).toBeInTheDocument()
+    const main = within(screen.getByRole('main'))
+    expect(main.getByText("You can't open this project")).toBeInTheDocument()
+    expect(main.queryByText(/launch plan/i)).toBeNull()
   })
 })
 
