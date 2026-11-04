@@ -49,6 +49,7 @@ export { pickWidget } from '@estiva-app/interop'
 import { KIND_CHANGE, type ReferenceCandidate } from '@estiva-app/conversation'
 import { relatedTo } from '@/lib/ownKinds'
 import { safeLink } from '@/lib/handoff'
+import { KIND } from '../nostr/kinds'
 import { projectFieldsNow, relay, signer } from './store'
 
 export type { ForeignObject, ResolvedSlot, FolderContents, FolderSummary } from '@estiva-app/interop'
@@ -317,10 +318,14 @@ export async function readFolderListing(id: string, read: QueryFn = loadQuery())
 /**
  * `[`'s search tier (PEE-21): the files whose current title or ref holds
  * `text`, as this identity can read them. Rejects on a refused read, which
- * `referenceSearch` answers as no hits for a while.
+ * `referenceSearch` answers as no hits for a while. Where the relay finds
+ * projects by their words (ALO-5), they are found by their current summary,
+ * key and text too, through the list read (§6.13).
  */
-export function searchFiles(text: string): Promise<ReferenceCandidate[]> {
-  return searchFileReferences(text, query, { cache: manifests })
+export async function searchFiles(text: string): Promise<ReferenceCandidate[]> {
+  const fields = await projectFieldsNow()
+  const byFields = fields?.search ? { kinds: [KIND.PROJECT], query: (filters: Record<string, unknown>[]) => relay.queryWithMatches(filters as never) } : undefined
+  return searchFileReferences(text, query, { cache: manifests, ...(fields ? { listRead: true } : {}), ...(byFields ? { byFields } : {}) })
 }
 
 /** A topic as the Topics line draws it and a list entry names it (TOP-5). */
@@ -352,7 +357,7 @@ export async function readFileTopics(file: string): Promise<TopicOfFile[]> {
   const listing = await topicsOfFile(query, file)
   if (listing.length === 0) return []
   const roots = new Map(listing.map((topic) => [topic.address, topic.root]))
-  const objects = await resolveForeignRoots([...roots.keys()], query, manifests, { archivedWith: true })
+  const objects = await resolveForeignRoots([...roots.keys()], query, manifests, { archivedWith: true, ...(await listRead()) })
   return objects
     .flatMap((object) => {
       const root = object.address ? roots.get(object.address) : undefined
@@ -378,7 +383,7 @@ export function readAllTopics(): Promise<TopicsRead> {
  */
 export async function readTopicDocuments(addresses: readonly string[]): Promise<ForeignObject[]> {
   if (addresses.length === 0) return []
-  const objects = await resolveForeignRoots(addresses, query, manifests, { archivedWith: true })
+  const objects = await resolveForeignRoots(addresses, query, manifests, { archivedWith: true, ...(await listRead()) })
   return objects.filter((object) => !object.unreachable)
 }
 
@@ -400,9 +405,10 @@ export async function fileCandidatesOf(
   files: readonly ForeignObject[] | { addresses: readonly string[]; at: ReadonlyMap<string, number> },
   tier: number,
 ): Promise<ReferenceCandidate[]> {
-  if (!('addresses' in files)) return fileCandidates(files, tier, query, { cache: manifests })
-  const objects = await resolveForeignRoots(files.addresses, query, manifests)
-  return fileCandidates(objects, tier, query, { cache: manifests, at: files.at })
+  const read = await listRead()
+  if (!('addresses' in files)) return fileCandidates(files, tier, query, { cache: manifests, ...read })
+  const objects = await resolveForeignRoots(files.addresses, query, manifests, read)
+  return fileCandidates(objects, tier, query, { cache: manifests, at: files.at, ...read })
 }
 
 /** The foreign files placed under one of Ship's objects, with their conversation counts. */

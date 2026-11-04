@@ -401,10 +401,12 @@ function changeFilters(addrs: readonly string[]): Record<string, unknown>[] {
 /**
  * The switch on (ALO-5, `api/fileReads.ts`): projects are read by the relay's
  * list read and each change names the one it follows. `text`: the relay opens a
- * file with its current text (`file_list.text`).
+ * file with its current text (`file_list.text`); `search`: it finds projects by
+ * the words of their current fields (`file_search.types`).
  */
 export interface ProjectFields {
   text: boolean
+  search?: true
 }
 
 export class Store {
