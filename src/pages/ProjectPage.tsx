@@ -67,7 +67,7 @@ import { placedIn } from '@/lib/placement'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { ProjectView } from '@/views/ProjectView'
 import { go, href, type ProjectTab, type ProjectView as ProjectViewName } from '../router'
-import { act, actInField, sayOnceLeft, type Say } from './act'
+import { act, actInField, answerOf, deleteAnswer, sayOnceLeft, type Say } from './act'
 import { editedFor, historyFor, withChangesOf } from './history'
 import { useSideColumn } from './sideColumn'
 import { FileTopicsOf } from '@/components/FileTopicsOf'
@@ -858,14 +858,15 @@ export function ProjectPage({
           } catch (error) {
             return error instanceof Error ? error.message : String(error)
           }
-          return actInField('Message', () => startConversation({ folder, about: project.addr, withReference: false, body, blockId, files, urgent: picks?.urgent, embeds: picks?.embeds }), () => refresh([folder]))
+          // Each conversation write answers the relay's refusal as it came; the kit says it in the shared words (ONE-4).
+          return answerOf(() => startConversation({ folder, about: project.addr, withReference: false, body, blockId, files, urgent: picks?.urgent, embeds: picks?.embeds }), () => refresh([folder]))
         }}
         onCopyBlockLink={(link) => void copyText(link, 'Link copied', 'Copy this link:', say)}
         onReply={(threadId, body, files, picks) => {
           const conversation = conversations.find((c) => c.id === threadId)
           if (!conversation) return Promise.resolve('That conversation is no longer on this page.')
           // The reply goes to the thread's own Folder, which need not be the project's.
-          return actInField('Reply', () => reply(conversation, project.contentFolder, body, files, picks?.urgent, picks?.embeds), () => refresh([conversation.root.folder || project.contentFolder]))
+          return answerOf(() => reply(conversation, project.contentFolder, body, files, picks?.urgent, picks?.embeds), () => refresh([conversation.root.folder || project.contentFolder]))
         }}
         activity={activity.items}
         activityTruncated={activity.truncated}
@@ -889,7 +890,7 @@ export function ProjectPage({
           The reaction surface re-reads its own query instead — one request.
         */
         onReact={(messageId, emoji, mine) =>
-          actInField('Reaction', () => (mine ? unreact(mine) : react(messageId, emoji)))
+          answerOf(() => (mine ? unreact(mine) : react(messageId, emoji)))
         }
         /*
           Deleting a comment — CON-3.
@@ -902,12 +903,13 @@ export function ProjectPage({
           No author check. The relay accepts a kind:5 from the target's author
           or from the NIP-OA owner of an authoring agent, and no client can
           evaluate the second half — so the control is offered and the refusal
-          is reported (SPEC §6.5, corrected 2026-09-06). `act` returns false on
-          a refusal, which keeps the confirm dialog open behind the banner.
+          is reported (SPEC §6.5, corrected 2026-09-06), in the shared words.
+          A refusal answers false, which keeps the confirm dialog open behind
+          the banner.
         */
         onDeleteMessage={(messageId) => {
           const folder = folderOfMessage(acting, messageId)
-          return act('Delete', () => deleteMessage(messageId), say, () => refreshAfter(state, folder, refresh, rereadElsewhere))
+          return deleteAnswer(() => deleteMessage(messageId), say, () => refreshAfter(state, folder, refresh, rereadElsewhere))
         }}
         /*
           Editing a comment — CON-4.
@@ -932,7 +934,7 @@ export function ProjectPage({
           if (!folder) {
             return Promise.resolve('That message has no team to publish an edit into.')
           }
-          return actInField(removeCard ? 'Remove card' : 'Edit', () => editMessage(folder, messageId, body, cardEditOf(acting, messageId, removeCard, dropped), files), () => refreshAfter(state, folder, refresh, rereadElsewhere))
+          return answerOf(() => editMessage(folder, messageId, body, cardEditOf(acting, messageId, removeCard, dropped), files), () => refreshAfter(state, folder, refresh, rereadElsewhere))
         }}
         fields={{
           // An older writer's `active` or `done` reads as the status it meant, as on Projects (SHIPS-7).

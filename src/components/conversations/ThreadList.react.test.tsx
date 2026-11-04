@@ -72,14 +72,15 @@ describe('the message tools', () => {
     expect(onReact.mock.calls[0]).toEqual(['m1', '🙏', 'r1'])
   })
 
-  it('says a refused reaction under the row, in the relay’s words', async () => {
+  // Changed on purpose (ONE-4): the relay's answer goes back to the kit's card, which says it in the shared words.
+  it('says a refused reaction under the row in the shared words, never the relay’s', async () => {
     const user = userEvent.setup()
     show({ onReact: vi.fn(async () => 'rate-limited: slow down') })
     pointAt()
     await user.click(screen.getByRole('button', { name: 'React' }))
     await user.click(await screen.findByRole('button', { name: 'Thank you' }))
-    // The kit says it as a sentence, with its full stop.
-    expect(await screen.findByText('Not reacted: rate-limited: slow down.')).toBeInTheDocument()
+    expect(await screen.findByText('Not reacted: too many at once, try again in a moment.')).toBeInTheDocument()
+    expect(screen.queryByText(/rate-limited/)).toBeNull()
   })
 
   it('offers no reaction, edit or delete where nothing can be written, and draws the pills only', () => {

@@ -162,20 +162,22 @@ describe('the edit control', () => {
     expect(onEditMessage).not.toHaveBeenCalled()
   })
 
-  it('will not save an empty one, and says so under the box', async () => {
+  // Changed on purpose (ONE-4): the kit's Save is off while the box holds no words and no file, so nothing is said.
+  it('will not save one holding nothing', async () => {
     const onEditMessage = vi.fn(async (): Promise<true | string> => true)
     open({ onEditMessage })
     const box = await openEditor()
     replace(box, '   ')
+    await waitFor(() => expect(save().disabled).toBe(true))
     fireEvent.click(save())
-    expect(await screen.findByText(/Not saved: a message needs words; Delete removes it/)).toBeInTheDocument()
     expect(onEditMessage).not.toHaveBeenCalled()
   })
 
   /* The refusal path. Closing would throw away what was typed to no purpose —
-     the same rule the composer and the delete dialog keep. The relay's words go
-     under the box, not in a toast (Decided 2026-10-17). */
-  it('stays open when the relay refuses, with the words still in it and why under it', async () => {
+     the same rule the composer and the delete dialog keep. Why goes under the
+     box, not in a toast (Decided 2026-10-17), in the shared words and never the
+     relay's (ONE-4). */
+  it('stays open when the relay refuses, with the words still in it and why under it in the shared words', async () => {
     const onEditMessage = vi.fn(async (): Promise<true | string> => 'blocked: not your message')
     open({ onEditMessage })
     const box = await openEditor()
@@ -183,7 +185,8 @@ describe('the edit control', () => {
     fireEvent.click(save())
     await waitFor(() => expect(onEditMessage).toHaveBeenCalled())
     expect(screen.getByRole('textbox', { name: 'Edit message' }).textContent).toBe('a change')
-    expect(await screen.findByText(/Not saved: blocked: not your message/)).toBeInTheDocument()
+    expect(await screen.findByText('Not saved: you can no longer write here. Your changes are still in the box.')).toBeInTheDocument()
+    expect(screen.queryByText(/blocked:/)).toBeNull()
   })
 
   /* SHI-49: the edit box showed a message reference as "nevent1…" and a person as "npub1…". Changed on purpose (Katerina,
@@ -246,6 +249,16 @@ describe('the files of a message being edited', () => {
     await waitFor(() => expect(onEditMessage).toHaveBeenCalledWith('root-1', 'Blocked on the Stripe key.', undefined, [kept, added], undefined))
   })
 
+  // ONE-4: the upload's error is handed on as it came, and the file's card says it in the kit's words.
+  it('says a refused upload on the file’s card in the shared words, never the HTTP answer', async () => {
+    vi.mocked(uploadAttachment).mockRejectedValue(new Error('upload failed: 415 {"error":"unsupported content type"}'))
+    open({ threads: [withFile], onEditMessage: vi.fn(async (): Promise<true | string> => true) })
+    await openEditor()
+    await act(async () => void fireEvent.change(picker(), { target: { files: [new File(['x'], 'notes.exe', { type: 'application/x-msdownload' })] } }))
+    expect(await screen.findByText('This type of file can’t be added')).toBeInTheDocument()
+    expect(screen.queryByText(/upload failed|415/)).toBeNull()
+  })
+
   it('lists the files again on an edit that did not touch them, since an edit is the whole new message', async () => {
     const onEditMessage = vi.fn(async (): Promise<true | string> => true)
     open({ threads: [withFile], onEditMessage })
@@ -253,6 +266,19 @@ describe('the files of a message being edited', () => {
     replace(box, 'Key is in 1Password.')
     fireEvent.click(save())
     await waitFor(() => expect(onEditMessage).toHaveBeenCalledWith('root-1', 'Key is in 1Password.', undefined, [kept], undefined))
+  })
+
+  // An edit is the whole new message, and files alone are one: its words cleared, it saves with its files, as in Peek
+  // and Leaf (ONE-4), where Ship refused it.
+  it('saves an edit whose words are gone but that keeps its file', async () => {
+    const onEditMessage = vi.fn(async (): Promise<true | string> => true)
+    open({ threads: [withFile], onEditMessage })
+    const box = await openEditor()
+    replace(box, '   ')
+    await waitFor(() => expect(save().disabled).toBe(false))
+    fireEvent.click(save())
+    await waitFor(() => expect(onEditMessage).toHaveBeenCalledWith('root-1', '', undefined, [kept], undefined))
+    expect(screen.queryByText(/Not saved/)).toBeNull()
   })
 
   it('takes the last one off: the edit saves with no files (SPEC §6.8)', async () => {

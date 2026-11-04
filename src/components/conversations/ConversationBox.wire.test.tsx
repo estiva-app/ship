@@ -113,9 +113,11 @@ describe('a comment written in the shared box', () => {
     expect(tags(sent, 'q')).toEqual([QUOTED])
   })
 
-  it('puts the words back with the relay’s reason under the box when the relay refuses, and no toast', async () => {
+  it('puts the words back with why under the box in the shared words when the relay refuses, and no toast', async () => {
     const { main, box } = await write('please refuse this')
-    expect(await main.findByText('Not sent: blocked: not allowed here. Your text is back in the box.', undefined, { timeout: 5000 })).toBeInTheDocument()
+    expect(await main.findByText('Not sent: you can no longer write here. Your text is back in the box.', undefined, { timeout: 5000 })).toBeInTheDocument()
+    // Never the relay's own words (ONE-4).
+    expect(screen.queryByText(/blocked:/)).toBeNull()
     expect(box.textContent).toBe('please refuse this')
     expect(comments()).toHaveLength(0)
     // No toast: the page's banner says nothing.

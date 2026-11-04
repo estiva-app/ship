@@ -34,6 +34,15 @@ describe('✕ on a sent comment’s card', () => {
     expect(onEditMessage).toHaveBeenCalledWith('t1', `see ${NADDR}`, ADDR)
   })
 
+  // ✕ is an edit, so its refusal is an edit's, in the shared words, never the relay's (ONE-4).
+  it('says a refused ✕ in the shared words, never the relay’s', async () => {
+    const onEditMessage = vi.fn(async (): Promise<true | string> => 'blocked: not your message')
+    render(<ThreadList threads={[thread('detailed')]} onStart={noop} onReply={noop} viewer={BOB} onEditMessage={onEditMessage} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Remove' }))
+    expect(await screen.findByText('Not saved: you can no longer write here.')).toBeInTheDocument()
+    expect(screen.queryByText(/blocked:|Card not removed/)).toBeNull()
+  })
+
   it('is not offered on somebody else’s comment', async () => {
     const { container } = render(<ThreadList threads={[thread('detailed')]} onStart={noop} onReply={noop} viewer={'c'.repeat(64)} onEditMessage={vi.fn(async (): Promise<true | string> => true)} />)
     await waitFor(() => expect(container.querySelector('[data-card="detailed"]')).not.toBeNull())

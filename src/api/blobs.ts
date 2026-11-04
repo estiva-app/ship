@@ -114,9 +114,11 @@ export function clearBlobCache(): void {
  * it stored, not the browser's guess from a file extension; `imetaFor` maps the
  * upload descriptor for exactly that reason.
  *
- * Rejects with the relay's own words. The composer draws them: a refusal here
- * is usually about the file (too large, a type the relay will not take), which
- * is something the person can act on.
+ * Rejects with protocol's `upload failed: <status> <body>`, as it came. The
+ * box hands that on and the file's card says it in the kit's words
+ * (`uploadRefusal`: "Too large: the most is 10 MB", "This type of file can't
+ * be added", …), the same in every app (ONE-4). The size limits are the
+ * server's, checked by the box as a file is picked, so none is checked here.
  */
 export async function uploadAttachment(file: File): Promise<Imeta> {
   const blob = await uploadBlob({

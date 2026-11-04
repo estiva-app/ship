@@ -76,9 +76,11 @@ export interface Picks {
 }
 
 /**
- * What a write from the box answered: `true`, or the words for why the relay
- * said no, which the box says under itself with your words still in it — never
- * a toast (record a-refused-action-is-undone-and-your-text-comes-back).
+ * What a write from the box or a card answered: `true`, or the refusal as it
+ * came (the relay's words, an error's), never a sentence of Ship's. The kit
+ * says it under the box with your words still in it, or under the card, in
+ * `@estiva-app/conversation`'s plain words, the same in every app (ONE-4) —
+ * never a toast (record a-refused-action-is-undone-and-your-text-comes-back).
  */
 export type Answer = true | string
 

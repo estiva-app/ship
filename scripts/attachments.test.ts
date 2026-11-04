@@ -178,6 +178,10 @@ function editOf(target: string, at: number, files: string[], id?: string): Signe
 
   await store.editMessage({ folder: FOLDER, messageEventId: 'd'.repeat(64), body: 'words only' })
   check('an edit handed no files carries no imeta', sent[1].kind === 40003 && imetas(sent[1]).length === 0)
+
+  // ONE-4: an edit whose words are gone but that keeps a file is a message, as in Peek and Leaf.
+  await store.editMessage({ folder: FOLDER, messageEventId: 'd'.repeat(64), body: '', files: [meta] })
+  check('an edit with no words that keeps a file is a kind:40003 with empty content and that file', sent[2]?.kind === 40003 && sent[2].content === '' && imetas(sent[2]).length === 1)
 }
 
 console.log(`\n${passed} checks passed.\n`)
