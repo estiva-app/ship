@@ -110,6 +110,23 @@ describe('the Projects page', () => {
     expect(screen.getByText('No active projects.')).toBeTruthy()
   })
 
+  it('keeps a deleted project out of every tab but Archived, where it is under Deleted with Restore (ALO-5)', () => {
+    const state = {
+      projects: [project('Billing', 'in_progress'), project('Gone', 'in_progress', { deleted: { by: LEAD, at: 1 } })],
+      issues: [],
+      conversations: [],
+      activity: [],
+    } as unknown as FolderState
+    const { unmount } = render(<ProjectsPage state={state} directory={directory} teams={[]} archives={archivesOf()} tab="active" say={vi.fn()} refresh={vi.fn()} />)
+    expect(tab(/^Active/).textContent).toContain('1')
+    expect(tab(/^Archived/).textContent).toContain('1')
+    expect(screen.queryByRole('link', { name: 'Gone' })).toBeNull()
+    unmount()
+    render(<ProjectsPage state={state} directory={directory} teams={[]} archives={archivesOf()} tab="archived" say={vi.fn()} refresh={vi.fn()} />)
+    expect(screen.getByText('Gone')).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Restore/ })).toBeTruthy()
+  })
+
   it('switches to cards and opens on cards next time on this device', () => {
     const { unmount } = render(page('active'))
     fireEvent.click(screen.getByRole('button', { name: 'Cards' }))
