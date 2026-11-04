@@ -1,4 +1,5 @@
-import { KindIcon, Link, ProgressBar } from '@estiva-app/ui'
+import { KindIcon, Link } from '@estiva-app/ui'
+import { ProjectProgress } from './ProjectProgress'
 import { cn } from '@/lib/cn'
 import type { TopicWorkRow as Row } from '@/lib/topics'
 import { StatusLabel } from '@/components/ui/StatusLabel'
@@ -19,12 +20,7 @@ export function TopicWorkRow({ row, archived = false }: { row: Row; archived?: b
       </Link>
       {row.project && <span className="hidden max-w-48 truncate text-caption text-text-muted sm:inline">{row.project}</span>}
       {row.progress ? (
-        <span className="flex shrink-0 items-center gap-2 text-caption text-text-secondary sm:w-36">
-          <ProgressBar value={row.progress.done} max={row.progress.total} label="Issues done" variant={archived ? 'quiet' : 'default'} className="hidden flex-1 sm:block" />
-          <span className="w-12 text-right font-mono tabular-nums">
-            {row.progress.done} / {row.progress.total}
-          </span>
-        </span>
+        <ProjectProgress {...row.progress} archived={archived} />
       ) : (
         <StatusLabel value={row.status.value} label={row.status.label} size="small" className="w-28 shrink-0 justify-end" />
       )}

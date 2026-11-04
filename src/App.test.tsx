@@ -121,11 +121,15 @@ beforeEach(() => {
 })
 
 describe('sidebarProps — the old app\'s counting rules', () => {
-  it('counts open issues outside archived projects, and the projects not archived', () => {
+  it('counts open issues outside archived projects, and the projects on the Active tab', () => {
     const props = sidebarProps(STATE, { name: 'issues' })
     // 1 (todo, live) + 4 (in_progress, no project); 2 is done, 3 is in an archived project.
     expect(props.openIssues).toBe(2)
-    expect(props.activeProjects).toBe(2)
+    // Every project here is Planned, so none is on Active, the tab the entry opens (SHIPS-7).
+    expect(props.activeProjects).toBe(0)
+    const started = { ...STATE, projects: STATE.projects.map((p) => ({ ...p, status: 'in_progress' })) }
+    // Old is archived; Live and Mine are in progress.
+    expect(sidebarProps(started, { name: 'issues' }).activeProjects).toBe(2)
     expect(props.current).toEqual({ entry: 'issues' })
   })
 
@@ -262,12 +266,15 @@ describe('App — the shell around the route', () => {
 })
 
 describe('Projects page — cards from the fold', () => {
-  it('draws the active projects with their counts, and the archived one behind the tab', () => {
+  // Every project here is Planned, so Active, the tab a bare link opens, is empty (SHIPS-7).
+  it('draws the projects with their progress on their tab, and the archived one behind its own', () => {
     goTo('/projects')
     render(<App />)
     const main = within(screen.getByRole('main'))
     expect(main.getByRole('heading', { name: 'Projects' })).toBeInTheDocument()
-    expect(main.getByRole('link', { name: /Live/ })).toHaveTextContent('2 issues')
+    expect(main.getByText('No active projects.')).toBeInTheDocument()
+    fireEvent.click(main.getByRole('tab', { name: /^Planned/ }))
+    expect(main.getByRole('link', { name: 'Live' }).closest('[data-project]')).toHaveTextContent('1 / 2')
     expect(main.queryByRole('link', { name: /Old/ })).not.toBeInTheDocument()
     expect(main.getByRole('button', { name: 'Add project' })).toBeEnabled()
   })
@@ -287,6 +294,8 @@ describe('Projects page — cards from the fold', () => {
     await waitFor(() => expect(refresh).toHaveBeenCalled())
     expect(await screen.findByText('Project created')).toBeInTheDocument()
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'New project' })).not.toBeInTheDocument())
+    // A new project is Planned, so the page moves off Active to where it is (SHIPS-7).
+    expect(screen.getByRole('tab', { name: /^Planned/ })).toHaveAttribute('aria-selected', 'true')
   })
 
   it('keeps the dialog open and says why when the relay refuses', async () => {
@@ -308,7 +317,7 @@ describe('Projects page — cards from the fold', () => {
   // SHIPS-5: the readFolders mock's team "Ship" lists Live; Mine's own Folder is no team, so it is in no team's Projects.
   it("lists only a Folder's projects on its Projects, and Add project there starts on that Folder", async () => {
     vi.mocked(createProject).mockResolvedValue({ ok: true, addr: '30850:x:new' })
-    goTo('/app/folder/3167adea-877f-43c4-96fb-517a2b2d5d24/projects')
+    goTo('/app/folder/3167adea-877f-43c4-96fb-517a2b2d5d24/projects?tab=planned')
     render(<App />)
     const main = within(screen.getByRole('main'))
     expect(await main.findByRole('heading', { name: 'Ship · Projects' })).toBeInTheDocument()

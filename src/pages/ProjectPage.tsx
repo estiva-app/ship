@@ -13,6 +13,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ISSUE_STATUSES,
   PROJECT_STATUSES,
+  lookupStatus,
+  progressOf,
+  projectStatus,
   archiveProject,
   createIssue,
   deleteMessage,
@@ -728,7 +731,7 @@ export function ProjectPage({
     void assignMissingRefs(project, state).then(() => refresh())
   }, [project, issues, state, refresh])
 
-  const done = issues.filter((issue) => issue.status === 'done').length
+  const progress = progressOf(issues.map((issue) => issue.status), (value) => lookupStatus(ISSUE_STATUSES, value))
   const set = (field: 'title' | 'description' | 'status' | 'lead', value: string, note: string, contentFormat?: string) => act(note, () => setProjectField(project, field, value, note, contentFormat), say, refresh)
   // Its own archive, which the ⋯ toggles; and the one the page shows, which may be its team's (FOL-46).
   const own = ownArchive(project, state.activity)
@@ -792,7 +795,7 @@ export function ProjectPage({
             })}
           />
         }
-        crumbs={{ projectsHref: href({ name: 'projects', archived: false }), title: project.title }}
+        crumbs={{ projectsHref: href({ name: 'projects' }), title: project.title }}
         header={{
           title: project.title,
           description: project.description,
@@ -931,7 +934,8 @@ export function ProjectPage({
           return actInField(removeCard ? 'Remove card' : 'Edit', () => editMessage(folder, messageId, body, cardEditOf(acting, messageId, removeCard, dropped), files), () => refreshAfter(state, folder, refresh, rereadElsewhere))
         }}
         fields={{
-          status: project.status,
+          // An older writer's `active` or `done` reads as the status it meant, as on Projects (SHIPS-7).
+          status: projectStatus(project.status).value,
           // Each with its colour, so the picker draws the status's shape (ONE-6, step 4b).
           statuses: PROJECT_STATUSES.map(({ value, label, colour }) => ({ value, label, colour })),
           onStatusChange: (value) => void set('status', value, `Status → ${value}`),
@@ -939,8 +943,8 @@ export function ProjectPage({
           people,
           // PEEK-22 calls this "assignee"; the spec's tag is `lead`. Same field.
           onLeadChange: (value) => void set('lead', value, value ? 'Assign project' : 'Unassign project'),
-          done,
-          total: issues.length,
+          done: progress.done,
+          total: progress.total,
         }}
         menu={{
           // The page never names its Folder (Katerina, 1 November); Move to Folder… is the ⋯'s first row, once there
@@ -1007,7 +1011,7 @@ export function ProjectPage({
             if (result.stillListed) say(`Project deleted, but its Folder refused to unlist it: ${result.stillListed}. Peek may keep showing a row for it.`, 'error')
             else say('Project deleted')
             // Nothing left to render here.
-            go({ name: 'projects', archived: false })
+            go({ name: 'projects' })
             await refresh()
             return true
           }}

@@ -4,16 +4,16 @@ import { fn } from 'storybook/test'
 import { AppShell } from '@/components/AppShell'
 import { IdentityMenu } from '@/components/IdentityMenu'
 import { ShipSidebar, type SidebarEntry } from '@/components/ShipSidebar'
-import { ACTIVITY, ARCHIVED_CARDS, PEOPLE, PROJECT_CARDS, PROJECT_STATUSES, SIDEBAR_PROJECTS } from '@/fixtures/projects'
+import { ACTIVITY, PEOPLE, PROJECT_STATUSES, PROJECT_TABS, SIDEBAR_PROJECTS } from '@/fixtures/projects'
 import { ACTIVITY_ITEMS, ANA, ISSUES, ISSUE_STATUSES, THREADS, hrefFor, makeIssues } from '@/fixtures/issues'
 import type { RelatedState } from '@/api/useRelated'
 import { IssueView } from './IssueView'
 import { IssuesView, type IssuesScope } from './IssuesView'
 import { ProjectView } from './ProjectView'
-import { ProjectsView } from './ProjectsView'
+import { ProjectsView, type ProjectsLayout } from './ProjectsView'
 import { TopicsView } from './TopicsView'
 import type { TopicRowData, TopicsTab } from '@/lib/topics'
-import type { ProjectTab } from '@/router'
+import type { ProjectTab, ProjectsTab } from '@/router'
 import { useSideColumn, type Side } from '@/pages/sideColumn'
 import type { Imeta } from '@estiva-app/protocol'
 import { ArchivedNotice } from '@estiva-app/ui'
@@ -83,29 +83,27 @@ const meta = {
 export default meta
 type Story = StoryObj<typeof meta>
 
-/** The projects list: heading, Active / Archived tabs, the card grid. */
-export const Projects: Story = {
-  render: () => {
-    const [showArchived, setShowArchived] = useState(false)
-    return (
-      <Shell current="projects">
-        <ProjectsView active={PROJECT_CARDS} archived={ARCHIVED_CARDS} showArchived={showArchived} onShowArchived={setShowArchived} onAddProject={fn()} />
-      </Shell>
-    )
-  },
+/** Projects in tabs by status, opening on Active as a table; the switch beside Add project shows cards (SHIPS-7). */
+function ProjectsStory({ lists, firstLayout = 'table', folder }: { lists: Record<ProjectsTab, typeof PROJECT_TABS.all>; firstLayout?: ProjectsLayout; folder?: string }) {
+  const [tab, setTab] = useState<ProjectsTab>('active')
+  const [layout, setLayout] = useState<ProjectsLayout>(firstLayout)
+  return (
+    <Shell current="projects">
+      <ProjectsView title={folder ? `${folder} · Projects` : 'Projects'} lists={lists} tab={tab} onTab={setTab} layout={layout} onLayout={setLayout} showFolder={!folder} onAddProject={fn()} />
+    </Shell>
+  )
 }
 
-/** No projects at all: the whole page is empty, so the empty state keeps its icon and its centre — the `page` manner (B18). */
-export const ProjectsEmpty: Story = {
-  render: () => {
-    const [showArchived, setShowArchived] = useState(false)
-    return (
-      <Shell current="projects">
-        <ProjectsView active={[]} archived={[]} showArchived={showArchived} onShowArchived={setShowArchived} onAddProject={fn()} />
-      </Shell>
-    )
-  },
-}
+export const Projects: Story = { render: () => <ProjectsStory lists={PROJECT_TABS} /> }
+
+/** The same list as cards. */
+export const ProjectsCards: Story = { render: () => <ProjectsStory lists={PROJECT_TABS} firstLayout="cards" /> }
+
+/** A Folder's Projects: its name before the title, no Folder column. */
+export const ProjectsInAFolder: Story = { render: () => <ProjectsStory lists={PROJECT_TABS} folder="Estiva HQ" /> }
+
+/** No projects at all: every tab says so in one line. */
+export const ProjectsEmpty: Story = { render: () => <ProjectsStory lists={{ all: [], planned: [], active: [], completed: [], archived: [] }} /> }
 
 const topicRow = (d: string, title: string, projects: [number, number], conversations: number, fresh = 0, summary?: string): TopicRowData => ({
   address: `30840:${'a'.repeat(64)}:${d}`,

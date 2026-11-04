@@ -1,4 +1,5 @@
-import type { ProjectCardProps } from '@/components/ProjectCard'
+import type { ProjectRowData } from '@/lib/projects'
+import type { ProjectsTab } from '@/router'
 import type { HistoryEntry } from '@/components/History'
 import { ANA, MARA, RAVI } from './issues'
 
@@ -12,71 +13,41 @@ export const PROJECT_STATUSES = [
   { value: 'cancelled', label: 'Cancelled', colour: 'muted' as const },
 ]
 
-export const PROJECT_CARDS: ProjectCardProps[] = [
-  {
-    href: '#/project/30850%3Aa%3Ades',
-    title: 'Design System',
-    summary: 'Tokens, primitives and the Storybook that reviews them.',
-    status: { value: 'in_progress', label: 'In Progress' },
-    issueCount: 11,
-    doneCount: 2,
-    author: ANA,
-    createdAt: NOW - 86400,
-  },
-  {
-    href: '#/project/30850%3Aa%3Arel',
-    title: 'Relay Migration',
-    summary: 'Moving every workspace read and write onto the relay, one surface at a time, with the old path kept until each is proven.',
-    status: { value: 'in_progress', label: 'In Progress' },
-    issueCount: 9,
-    doneCount: 2,
-    author: RAVI,
-    createdAt: NOW - 86400 * 2,
-  },
-  {
-    href: '#/project/30850%3Aa%3Apay',
-    title: 'Payment integration',
-    summary: 'Take card payments.',
-    status: { value: 'planned', label: 'Planned' },
-    issueCount: 11,
-    doneCount: 1,
-    author: RAVI,
-    createdAt: NOW - 86400 * 2,
-  },
-  {
-    href: '#/project/30850%3Aa%3Aonb',
-    title: 'Onboarding flow for new workspaces',
-    summary: 'The first ten minutes, from an invite to a first issue.',
-    status: { value: 'planned', label: 'Planned' },
-    issueCount: 6,
-    doneCount: 0,
-    author: ANA,
-    createdAt: NOW - 3600 * 5,
-  },
-  {
-    href: '#/project/30850%3Aa%3Amob',
-    title: 'Mobile app',
-    status: { value: 'planned', label: 'Planned' },
-    issueCount: 0,
-    doneCount: 0,
-    author: {},
-    createdAt: NOW - 120,
-  },
-]
+const IN_PROGRESS = { value: 'in_progress', label: 'In Progress' }
+const PLANNED = { value: 'planned', label: 'Planned' }
+const COMPLETED = { value: 'completed', label: 'Completed' }
+const row = (d: string, title: string, folder: string, status: ProjectRowData['status'], done: number, total: number, extra: Partial<ProjectRowData> = {}): ProjectRowData => ({
+  addr: `30850:a:${d}`,
+  href: `#/project/30850%3Aa%3A${d}`,
+  title,
+  folder,
+  status,
+  progress: { done, total },
+  archived: false,
+  ...extra,
+})
 
-export const ARCHIVED_CARDS: ProjectCardProps[] = [
-  {
-    href: '#/project/30850%3Aa%3Aweb',
-    title: 'Website refresh',
-    summary: 'The marketing site on the new tokens.',
-    status: { value: 'completed', label: 'Completed' },
-    issueCount: 6,
-    doneCount: 6,
-    author: RAVI,
-    createdAt: NOW - 86400 * 40,
-    archived: true,
-  },
+const ACTIVE_ROWS = [
+  row('des', 'Design System', 'Product', IN_PROGRESS, 2, 11, { lead: ANA }),
+  row('rel', 'Relay Migration, every workspace read and write moved onto the relay one surface at a time', 'Engineering', IN_PROGRESS, 2, 9, { lead: RAVI }),
+  row('sea', 'Search', 'Engineering', IN_PROGRESS, 0, 0),
 ]
+const PLANNED_ROWS = [
+  row('pay', 'Payment integration', 'Engineering', PLANNED, 1, 11, { lead: RAVI }),
+  row('onb', 'Onboarding flow for new workspaces', 'Product', PLANNED, 0, 6, { lead: MARA }),
+  // A lead nobody has published a profile for: a face with no name, never a key.
+  row('mob', 'Mobile app', 'Product', PLANNED, 0, 0, { lead: {} }),
+]
+const COMPLETED_ROWS = [row('doc', 'Docs site', 'Product', COMPLETED, 5, 5, { lead: ANA })]
+
+/** Projects' tabs as `projectTabs` hands them over, every branch drawn: a lead or none, no issues, a long name. */
+export const PROJECT_TABS: Record<ProjectsTab, ProjectRowData[]> = {
+  all: [...ACTIVE_ROWS, ...COMPLETED_ROWS, ...PLANNED_ROWS].sort((a, b) => a.title.localeCompare(b.title)),
+  planned: PLANNED_ROWS,
+  active: ACTIVE_ROWS,
+  completed: COMPLETED_ROWS,
+  archived: [row('web', 'Website refresh', 'Product', COMPLETED, 6, 6, { lead: RAVI, archived: true })],
+}
 
 export const SIDEBAR_PROJECTS: { addr: string; title: string; href: string; openCount: number }[] = [
   { addr: '30850:a:des', title: 'Design System', href: '#/project/30850%3Aa%3Ades', openCount: 9 },

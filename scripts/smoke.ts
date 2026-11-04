@@ -388,6 +388,12 @@ async function main() {
   await page.getByRole('button', { name: 'Create project' }).click()
   await page.getByRole('link', { name: /Payment integration/ }).first().waitFor()
   check('the modal closes once the project is created', (await projectDialog.count()) === 0)
+  // A new project is Planned, so the page moves to that tab, which is drawn as the selected one (SHIPS-7).
+  const plannedTab = page.getByRole('tab', { name: /^Planned/ })
+  check(
+    '  …and Projects moves to Planned, where it now is',
+    (await plannedTab.getAttribute('aria-selected')) === 'true',
+  )
 
   const project = stored.find((e) => e.kind === 30850)
   check('no kind:9007 — a project gets no Folder of its own (FOL-2)', !stored.some((e) => e.kind === 9007))
@@ -1034,9 +1040,9 @@ async function main() {
   // Scoped to the sidebar: the project detail's breadcrumb also says "Projects".
   await sidebar().getByRole('link', { name: /^Projects/ }).first().click()
   await page.waitForSelector('[data-surface="projects"]')
-  // Projects counts the projects not archived, and this was the one (SHIPS-5: no project rows any more).
-  const projectsEntry = sidebar().getByRole('link', { name: /^Projects/ }).first()
-  check('an archived project leaves the sidebar’s count', (await projectsEntry.innerText()).trim() === 'Projects')
+  // All counts the projects not archived, and this was the one (SHIPS-7: the sidebar counts only the Active tab's).
+  const tabCount = async (name: RegExp) => (await page.getByRole('tab', { name }).innerText()).replace(/\D+/g, '')
+  check('an archived project leaves All', (await tabCount(/^All/)) === '0')
   const projects = page.locator('[data-surface="projects"]')
   check('  …and the active list', (await projects.getByRole('link').count()) === 0)
   check('  …but is reachable behind a tab', await page.getByRole('tab', { name: /^Archived/ }).isVisible())
@@ -1052,8 +1058,9 @@ async function main() {
   await page.waitForSelector('[data-surface="project"]')
   await pageAction('Unarchive project')
   await page.getByRole('button', { name: 'Unarchive', exact: true }).waitFor({ state: 'detached' })
-  await sidebar().getByRole('link', { name: /^Projects\s*1$/ }).first().waitFor({ timeout: 10_000 }).catch(() => {})
-  check('unarchiving restores it to the sidebar’s count', /^Projects\s*1$/.test((await projectsEntry.innerText()).trim()))
+  await sidebar().getByRole('link', { name: /^Projects/ }).first().click()
+  await page.getByRole('tab', { name: /^All\s*1$/ }).waitFor({ timeout: 10_000 }).catch(() => {})
+  check('unarchiving restores it to All', (await tabCount(/^All/)) === '1' && (await tabCount(/^Archived/)) === '0')
 
   // ── The profile menu ──────────────────────────────────────────────────────
   // By what it does, not by what it says: the trigger's accessible name is the

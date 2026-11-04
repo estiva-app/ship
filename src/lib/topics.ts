@@ -1,6 +1,6 @@
 import type { ReadTopic, TopicConversation, TopicsRead } from '@estiva-app/interop'
 import { topicAsDrawn } from '@/api/foreign'
-import { ISSUE_STATUSES, PROJECT_STATUSES } from '@/nostr/kinds'
+import { ISSUE_STATUSES, lookupStatus, progressOf, projectStatus } from '@/nostr/kinds'
 import { href } from '@/router'
 import type { Archives } from './archive'
 import { statusLabel } from './issues'
@@ -70,7 +70,7 @@ export function topicsByTab(
       // A file's summary is its subtitle slot, built in for every kind (SPEC §6.12).
       ...(topic.object.slots.subtitle?.value ? { summary: topic.object.slots.subtitle.value } : {}),
       href: topicHref(topic.address, drawn.title),
-      projects: { done: listedProjects.filter((item) => item.project!.status === 'completed').length, total: listedProjects.length },
+      projects: progressOf(listedProjects.map((item) => item.project!.status), projectStatus),
       ...(conversation ? { conversations: conversation.conversations } : {}),
       fresh: conversation?.fresh ?? 0,
     }
@@ -169,8 +169,8 @@ export function topicPageOf(topic: ReadTopic, work: TopicPageWork, archives: Arc
           kind: 'project',
           title: project.title,
           href: href({ name: 'project', d: project.id, slug: project.title, view: 'table' }),
-          status: { value: project.status, label: statusLabel(project.status, PROJECT_STATUSES) },
-          progress: { done: of.filter((i) => i.status === 'done').length, total: of.length },
+          status: (({ value, label }) => ({ value, label }))(projectStatus(project.status)),
+          progress: progressOf(of.map((i) => i.status), (value) => lookupStatus(ISSUE_STATUSES, value)),
         },
       })
     } else if (issue) {
