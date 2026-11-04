@@ -16,7 +16,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { IssueView } from '@/views/IssueView'
 import { go, href } from '../router'
-import { act, actInField, sayOnceLeft, type Say } from './act'
+import { act, actInField, answerOf, deleteAnswer, sayOnceLeft, type Say } from './act'
 import { editedFor, historyFor } from './history'
 import { useSideColumn } from './sideColumn'
 import { FileTopicsOf } from '@/components/FileTopicsOf'
@@ -214,11 +214,12 @@ export function IssuePage({ state, directory, archives, d, say, refresh }: { sta
         onThreadShown={onThreadShown}
         // Threads about an issue carry a reference in the body so Peek renders
         // the issue's widget above them (withReference: true), as the old app has it.
-        onStartConversation={(body, files, picks, blockId) => actInField('Message', () => startConversation({ folder: issue.folder, about: issue.addr, withReference: true, body, blockId, files, urgent: picks?.urgent, embeds: picks?.embeds }), () => refresh([issue.folder]))}
+        // Each conversation write answers the relay's refusal as it came; the kit says it in the shared words (ONE-4).
+        onStartConversation={(body, files, picks, blockId) => answerOf(() => startConversation({ folder: issue.folder, about: issue.addr, withReference: true, body, blockId, files, urgent: picks?.urgent, embeds: picks?.embeds }), () => refresh([issue.folder]))}
         onReply={(threadId, body, files, picks) => {
           const conversation = conversations.find((c) => c.id === threadId)
           if (!conversation) return Promise.resolve('That conversation is no longer on this page.')
-          return actInField('Reply', () => reply(conversation, issue.folder, body, files, picks?.urgent, picks?.embeds), () => refresh([issue.folder]))
+          return answerOf(() => reply(conversation, issue.folder, body, files, picks?.urgent, picks?.embeds), () => refresh([issue.folder]))
         }}
         activity={activity.items}
         activityTruncated={activity.truncated}
@@ -237,7 +238,7 @@ export function IssuePage({ state, directory, archives, d, say, refresh }: { sta
           The reaction surface re-reads its own query instead — one request.
         */
         onReact={(messageId, emoji, mine) =>
-          actInField('Reaction', () => (mine ? unreact(mine) : react(messageId, emoji)))
+          answerOf(() => (mine ? unreact(mine) : react(messageId, emoji)))
         }
         /*
           Deleting a comment — CON-3.
@@ -250,12 +251,13 @@ export function IssuePage({ state, directory, archives, d, say, refresh }: { sta
           No author check. The relay accepts a kind:5 from the target's author
           or from the NIP-OA owner of an authoring agent, and no client can
           evaluate the second half — so the control is offered and the refusal
-          is reported (SPEC §6.5, corrected 2026-09-06). `act` returns false on
-          a refusal, which keeps the confirm dialog open behind the banner.
+          is reported (SPEC §6.5, corrected 2026-09-06), in the shared words.
+          A refusal answers false, which keeps the confirm dialog open behind
+          the banner.
         */
         onDeleteMessage={(messageId) => {
           const folder = folderOfMessage(acting, messageId)
-          return act('Delete', () => deleteMessage(messageId), say, () => refreshAfter(state, folder, refresh, rereadElsewhere))
+          return deleteAnswer(() => deleteMessage(messageId), say, () => refreshAfter(state, folder, refresh, rereadElsewhere))
         }}
         /*
           Editing a comment — CON-4.
@@ -279,7 +281,7 @@ export function IssuePage({ state, directory, archives, d, say, refresh }: { sta
           if (!folder) {
             return Promise.resolve('That message has no team to publish an edit into.')
           }
-          return actInField(removeCard ? 'Remove card' : 'Edit', () => editMessage(folder, messageId, body, cardEditOf(acting, messageId, removeCard, dropped), files), () => refreshAfter(state, folder, refresh, rereadElsewhere))
+          return answerOf(() => editMessage(folder, messageId, body, cardEditOf(acting, messageId, removeCard, dropped), files), () => refreshAfter(state, folder, refresh, rereadElsewhere))
         }}
         history={history}
         fields={{

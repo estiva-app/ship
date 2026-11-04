@@ -6,7 +6,7 @@
  * and both were found in production rather than here.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { act } from './act'
+import { act, answerOf, deleteAnswer } from './act'
 import { resetRelayBudget } from '@/lib/relayBudget'
 import { RELAY_BUSY_MESSAGE } from '@estiva-app/protocol'
 
@@ -82,5 +82,33 @@ describe('act', () => {
   */
   it('resolves false on a quota refusal, so a composer keeps what was typed', async () => {
     expect(await act('Message', refusedWith('rate-limited: quota exceeded; retry in 14s'), () => {})).toBe(false)
+  })
+})
+
+/*
+  ONE-4: a conversation's writes hand the refusal on as it came, and the kit
+  says it in the shared words. Ship's own sentence round it ("Reaction rejected
+  — …", "Too busy right now — …") was read by the kit as a refusal of its own.
+*/
+describe('answerOf', () => {
+  it('answers the relay’s refusal as it came, with no words of Ship’s round it', async () => {
+    expect(await answerOf(refusedWith('restricted: not a channel member'))).toBe('restricted: not a channel member')
+    expect(await answerOf(refusedWith('rate-limited: quota exceeded; retry in 14s'))).toBe('rate-limited: quota exceeded; retry in 14s')
+  })
+
+  it('answers a write that threw with its error’s words', async () => {
+    expect(await answerOf(() => Promise.reject(new Error('the relay is busy, try again in a moment')))).toBe('the relay is busy, try again in a moment')
+  })
+
+  it('answers true once taken, even when the re-read after it fails, so the words are not sent twice', async () => {
+    expect(await answerOf(ok, () => Promise.reject(new Error('read failed')))).toBe(true)
+  })
+})
+
+describe('deleteAnswer', () => {
+  it('says a refused delete in the shared plain reason, never the relay’s words, and resolves false', async () => {
+    const said: string[] = []
+    expect(await deleteAnswer(refusedWith('blocked: not your message'), (t) => said.push(t))).toBe(false)
+    expect(said).toEqual(['Not deleted: you can no longer write here.'])
   })
 })

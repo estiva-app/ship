@@ -1,3 +1,4 @@
+import { refusalReason } from '@estiva-app/conversation'
 import type { WriteResult } from '@/api'
 import { isRateLimited, isRelayBusy, retryHintMs } from '@/lib/relayBudget'
 
@@ -14,7 +15,7 @@ export function sayOnceLeft(say: Say, title: string, left?: () => boolean): Say 
 }
 
 /**
- * Every write the pages make goes through here — the old app's `publish`:
+ * Every write the pages make goes through here, but a conversation's (`answerOf`) — the old app's `publish`:
  * a refusal is said with its reason ("<what> rejected — …"), and a success
  * is followed by a re-read of the workspace, so what the page shows next is
  * what the relay holds, never what the UI hoped. Resolves whether it worked,
@@ -68,6 +69,38 @@ export async function act(
   }
   await refresh?.()
   return true
+}
+
+/**
+ * A conversation's write — a message, a reply, an edit, a reaction — for the
+ * kit's box and cards: `true` once the relay took it and what changed was read
+ * again, or the refusal **as it came**, the relay's words or the error's. Ship
+ * puts no words of its own round it: the kit says every refusal in
+ * `@estiva-app/conversation`'s plain words (`refusalReason`), the same in every
+ * app (ONE-4). A busy relay is one of those refusals, so it is not said here.
+ */
+export async function answerOf(write: () => Promise<WriteResult>, refresh?: () => Promise<void>): Promise<true | string> {
+  let result: WriteResult
+  try {
+    result = await write()
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error)
+  }
+  if (!result.ok) return result.reason
+  // Taken is taken: a re-read that fails after it must not hand the words back to be sent twice.
+  await refresh?.().catch(() => {})
+  return true
+}
+
+/**
+ * Delete a message: `true` once the relay took it and the page was read again,
+ * or `false` with the refusal said in the same plain reason the box and the
+ * cards give, "Not deleted: <reason>." (ONE-4), never the relay's words.
+ */
+export async function deleteAnswer(write: () => Promise<WriteResult>, say: Say, refresh?: () => Promise<void>): Promise<boolean> {
+  const answer = await answerOf(write, refresh)
+  if (answer !== true) say(`Not deleted: ${refusalReason(answer)}.`, 'error')
+  return answer === true
 }
 
 /**

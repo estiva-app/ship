@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { Imeta, Quote } from '@estiva-app/protocol'
+import { refusalReason } from '@estiva-app/conversation'
 import { ConversationCard, FieldLine, QuotedLine, ReplyCard, type ReactionRowProps, type RepliesRowProps } from '@estiva-app/ui'
 import { ago } from '@/lib/time'
 import type { DraftStore } from '@/lib/drafts'
@@ -14,6 +15,9 @@ import { useReopenHeld } from '@/auth/heldTyping'
 import { MessageText } from './MessageText'
 import { Box } from './lazyBox'
 import type { Answer } from './shared'
+
+/** What the relay said about a reaction, as the kit's row takes it back (its `ReactionAnswer`, not exported by name). */
+type ReactionAnswer = Exclude<Awaited<ReturnType<NonNullable<ReactionRowProps['onToggle']>>>, void>
 
 /** The five reactions, each named, as the package's row and picker take them (SPEC §6.6). */
 const REACTION_OPTIONS = REACTION_EMOJI.map(({ emoji, name }) => ({ emoji, label: name }))
@@ -92,14 +96,14 @@ function useMessageWrites({ message, reactions, onToggleReaction, onEdit, nameOf
   // One ✕ at a time: the next one reads the set this one leaves, once the page has read it back.
   const [removing, setRemoving] = useState(false)
   const [cardRefused, setCardRefused] = useState<string | null>(null)
-  const [reactionRefused, setReactionRefused] = useState<string | undefined>()
   const removeCard =
     onEdit && !removing
       ? (value: string) => {
           setRemoving(true)
           setCardRefused(null)
+          // ✕ on a sent card is an edit: its refusal is an edit's, in the shared words (ONE-4).
           void onEdit(message.body, value)
-            .then((answer) => setCardRefused(answer === true ? null : `Card not removed: ${answer}`))
+            .then((answer) => setCardRefused(answer === true ? null : `Not saved: ${refusalReason(answer)}.`))
             .finally(() => setRemoving(false))
         }
       : undefined
@@ -108,28 +112,27 @@ function useMessageWrites({ message, reactions, onToggleReaction, onEdit, nameOf
   useEffect(() => {
     pending.current = false
   }, [reactions])
+  // The relay's answer goes back to the card, which says a refusal under the reactions, "Not reacted: <reason>.", in the
+  // shared words (ONE-4). A click while one is pending answers nothing, so the last refusal stays said.
   const react =
     onToggleReaction &&
-    (async (emoji: string) => {
-      if (pending.current) return
+    (async (emoji: string): Promise<ReactionAnswer | undefined> => {
+      if (pending.current) return undefined
       pending.current = true
-      setReactionRefused(undefined)
       const answer = await onToggleReaction(emoji, reactions?.find((r) => r.emoji === emoji)?.mine)
-      if (answer !== true) {
-        pending.current = false
-        // The kit says the sentence round it, "Not reacted: … ." — so the reason's own full stop goes.
-        setReactionRefused(answer.replace(/\.+$/, ''))
-      }
+      if (answer === true) return { accepted: true }
+      pending.current = false
+      return { accepted: false, reason: answer }
     })
   const named = (pubkey: string) => nameOf?.(pubkey) ?? `${pubkey.slice(0, 8)}…`
-  const reactionRow: ReactionRowProps = { reactions: reactions ?? [], options: REACTION_OPTIONS, nameOf: named, viewer, onToggle: react ? (emoji) => void react(emoji) : undefined }
-  return { editing, setEditing, editHold, removeCard, cardRefused, reactionRefused, reactionRow }
+  const reactionRow: ReactionRowProps = { reactions: reactions ?? [], options: REACTION_OPTIONS, nameOf: named, viewer, onToggle: react || undefined }
+  return { editing, setEditing, editHold, removeCard, cardRefused, reactionRow }
 }
 
 /** The props both kit cards take from one Ship message: who, when, the words, files, reactions, the menu in Ship's words. */
 function cardProps(props: ShipMessageProps, writes: ReturnType<typeof useMessageWrites>) {
   const { message, resolved, here, boxHere, nameOf, viewer, onDelete, onEdit, references, captions, drafts, closed = false, isNew = false } = props
-  const { editing, setEditing, editHold, removeCard, cardRefused, reactionRefused, reactionRow } = writes
+  const { editing, setEditing, editHold, removeCard, cardRefused, reactionRow } = writes
   return {
     ...SHIP_WORDS,
     author: { name: message.author.name ?? '—', picture: message.author.picture, bot: message.author.bot },
@@ -137,7 +140,6 @@ function cardProps(props: ShipMessageProps, writes: ReturnType<typeof useMessage
     at: message.at * 1000,
     edited: message.editedAt !== undefined ? `Edited ${ago(message.editedAt)}` : undefined,
     reactions: reactionRow,
-    reactionRefused,
     isNew,
     // An urgent message for you, not read yet: the amber mark (CON-24).
     urgent: isNew && !!viewer && !!message.urgent?.includes(viewer),

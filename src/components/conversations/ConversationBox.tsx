@@ -156,11 +156,13 @@ export function ConversationBox({ kind, onSend, references, captions, nameOf, re
       : []),
   ])
 
+  // The upload's error as it came, `upload failed: <status> <body>` or any other: the file's card says it in the kit's
+  // words, and the kit stops a file over the server's limit before this is called (ONE-4).
   const uploadOne = async (file: File): Promise<UploadAnswer> => {
     try {
       return { accepted: true, value: await upload(file) }
     } catch (error) {
-      return { accepted: false, reason: error instanceof Error ? error.message : String(error) }
+      return { accepted: false, reason: error }
     }
   }
 
@@ -168,8 +170,9 @@ export function ConversationBox({ kind, onSend, references, captions, nameOf, re
     const { text, urgent } = composerText(body as EditorDocument)
     const attached = files.flatMap((f) => (f.value ? [f.value as Imeta] : []))
     // An edit makes nobody urgent (CON-24), and keeps the message's cards by its own rule (`cardEditOf`).
-    // An edit with no words is refused here (Delete removes a message), and an unchanged one closes with nothing published.
-    if (editing && !text) return { accepted: false, reason: 'a message needs words; Delete removes it' }
+    // An unchanged one closes with nothing published. One whose words are gone but that keeps a file saves, as in Peek
+    // and Leaf: an edit is the whole new message, and files alone are one; the kit's Save is off while it holds neither.
+    // why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/an-edit-is-the-whole-new-message.md
     // A file can be added or taken off while editing (Miky, 26 Oct, PEEKM-4): the whole set rides the edit as `imeta`,
     // and an edit with none takes every file off (SPEC §6.8).
     // The card the edit box read, gone from what it saved: its ✕ took it off, and the save leaves it off (the message's
@@ -182,8 +185,8 @@ export function ConversationBox({ kind, onSend, references, captions, nameOf, re
       : editing
         ? await onSend(withoutNewUrgency(text, editing.body), attached, dropped ? { dropped } : {})
         : await onSend(text, attached, { urgent, embeds: embedsToSend({ card: shown.card }, new Set()) })
-    // The box writes the sentence round the reason ("Not sent: … . Your text is back in the box."), so the reason's own full stop goes.
-    if (answer !== true) return { accepted: false, reason: answer.replace(/\.+$/, '') }
+    // The refusal as it came: the box says it in the shared words ("Not sent: <reason>. Your text is back in the box.").
+    if (answer !== true) return { accepted: false, reason: answer }
     if (editing) {
       if (holdKey) releaseHeld(holdKey)
       editing.onCancel()

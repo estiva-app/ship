@@ -209,10 +209,11 @@ describe('a project that names no team of its own writes nothing, not even into 
     await refusedNotSent(30851)
   })
 
-  it('A comment is refused with the reason, and nothing reaches the relay', async () => {
+  it('A comment is refused, and nothing reaches the relay', async () => {
     await comment(`/project/loose-${D_LOOSE}?tab=activity`, 'hello')
-    // Said under the box with the words still in it, not in a toast (COMM-7, Decided 2026-10-17).
-    expect(await screen.findByText(/^Not sent: .*names no team/, undefined, { timeout: 5000 })).toBeInTheDocument()
+    // Said under the box with the words still in it, not in a toast (COMM-7, Decided 2026-10-17), in the shared words:
+    // a project with no team is no cause the kit names (ONE-4).
+    expect(await screen.findByText('Not sent: something went wrong, try again. Your text is back in the box.', undefined, { timeout: 5000 })).toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: 'Start a conversation…' }).textContent).toBe('hello')
     expect(sent(1111)).toHaveLength(0)
   })
