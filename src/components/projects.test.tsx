@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { DirectoryView, FolderState } from '@/api'
+import type { DirectoryView, FolderState, WorkspaceState } from '@/api'
+import { ThreadsContext } from '@/api/useThreads'
 import type { Archives } from '@/lib/archive'
 import { projectTabs } from '@/lib/projects'
 import { ago } from '@/lib/time'
@@ -81,7 +82,7 @@ describe('the Projects page', () => {
       issues: [issue('i1', 'Billing', 'done'), issue('i2', 'Billing', 'todo'), issue('i3', 'Billing', 'cancelled')],
       conversations: [],
       activity: [],
-    } as unknown as FolderState
+    } as unknown as WorkspaceState
     return <ProjectsPage key={tab} state={state} directory={directory} teams={teams as never} archives={archivesOf()} tab={tab} folder={folder} say={vi.fn()} refresh={vi.fn()} />
   }
   const tab = (name: RegExp) => screen.getByRole('tab', { name })
@@ -105,7 +106,7 @@ describe('the Projects page', () => {
   })
 
   it('says so in one line on a tab with nothing in it', () => {
-    const state = { projects: [], issues: [], conversations: [], activity: [] } as unknown as FolderState
+    const state = { projects: [], issues: [], conversations: [], activity: [] } as unknown as WorkspaceState
     render(<ProjectsPage state={state} directory={directory} teams={[]} archives={archivesOf()} tab="active" say={vi.fn()} refresh={vi.fn()} />)
     expect(screen.getByText('No active projects.')).toBeTruthy()
   })
@@ -116,7 +117,7 @@ describe('the Projects page', () => {
       issues: [],
       conversations: [],
       activity: [],
-    } as unknown as FolderState
+    } as unknown as WorkspaceState
     const { unmount } = render(<ProjectsPage state={state} directory={directory} teams={[]} archives={archivesOf()} tab="active" say={vi.fn()} refresh={vi.fn()} />)
     expect(tab(/^Active/).textContent).toContain('1')
     expect(tab(/^Archived/).textContent).toContain('1')
@@ -125,6 +126,28 @@ describe('the Projects page', () => {
     render(<ProjectsPage state={state} directory={directory} teams={[]} archives={archivesOf()} tab="archived" say={vi.fn()} refresh={vi.fn()} />)
     expect(screen.getByText('Gone')).toBeTruthy()
     expect(screen.getByRole('button', { name: /Restore/ })).toBeTruthy()
+  })
+
+  it("asks for every change of the deleted projects on the Archived tab only, the load holding each one's newest (ALO-5)", () => {
+    const state = {
+      projects: [project('Billing', 'in_progress'), project('Gone', 'in_progress', { deleted: { by: LEAD, at: 1 } })],
+      issues: [],
+      conversations: [],
+      activity: [],
+      threadsAt: {},
+      mentionsOf: [],
+    } as unknown as WorkspaceState
+    const want = vi.fn()
+    const at = (tab: 'active' | 'archived') => (
+      <ThreadsContext.Provider value={want}>
+        <ProjectsPage state={state} directory={directory} teams={[]} archives={archivesOf()} tab={tab} say={vi.fn()} refresh={vi.fn()} />
+      </ThreadsContext.Provider>
+    )
+    const { unmount } = render(at('active'))
+    expect(want.mock.calls.flatMap(([wanted]) => wanted.about)).toEqual([])
+    unmount()
+    render(at('archived'))
+    expect(want).toHaveBeenLastCalledWith({ folders: [], about: ['30850:a:Gone'] })
   })
 
   it('switches to cards and opens on cards next time on this device', () => {

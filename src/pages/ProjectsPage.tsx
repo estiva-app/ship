@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
-import { createProject, keyProblem, me, projectKeys, setProjectDeleted, suggestKey, takenKeys, type DirectoryView, type FolderState } from '@/api'
+import { createProject, keyProblem, me, projectKeys, setProjectDeleted, suggestKey, takenKeys, type DirectoryView, type WorkspaceState } from '@/api'
+import { useThreads } from '@/api/useThreads'
 import { day } from '@/lib/time'
 import type { FolderSummary } from '@estiva-app/interop'
 import { NewProjectDialog } from '@/components/NewProjectDialog'
@@ -34,7 +35,7 @@ function storedLayout(): ProjectsLayout {
  * Archived is FOL-46's (`archivesOf`): a project archived itself or with its team is on the Archived tab, and a
  * project counts only the issues not archived on their own.
  */
-export function ProjectsPage({ state, directory, teams, archives, tab, folder, say, refresh }: { state: FolderState; directory: DirectoryView; teams: FolderSummary[] | undefined; archives: Archives; tab: ProjectsTab; folder?: string; say: Say; refresh: () => Promise<void> }) {
+export function ProjectsPage({ state, directory, teams, archives, tab, folder, say, refresh }: { state: WorkspaceState; directory: DirectoryView; teams: FolderSummary[] | undefined; archives: Archives; tab: ProjectsTab; folder?: string; say: Say; refresh: () => Promise<void> }) {
   const [adding, setAdding] = useState(false)
   const [layout, setLayout] = useState<ProjectsLayout>(storedLayout)
   const chooseLayout = (next: ProjectsLayout) => {
@@ -76,6 +77,8 @@ export function ProjectsPage({ state, directory, teams, archives, tab, folder, s
       ),
     }
   }, [state, directory, archives, folder, teams, say, refresh])
+  // The load holds a deleted project's newest change only (ALO-5): the Archived tab reads all of them, for its current title.
+  useThreads(state, [], tab === 'archived' ? state.projects.filter((p) => p.deleted).map((p) => p.addr) : [])
 
   return (
     <>

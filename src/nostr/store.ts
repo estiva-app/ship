@@ -434,10 +434,12 @@ export class Store {
    * The current fields of the projects `addrs` names, read by the list read —
    * and for each one in `opened`, its current text as well (§6.13: one text,
    * however long its history). A deleted project is in no read by its fields,
-   * `#d` included (§6.13), but stays readable by its id: its changes are read
-   * plainly by `#a`, which answers its `deleted` change and who signed it, for
-   * its link's notice and the Archived view's deleted filter. On production
-   * 3 Nov that was 18 of 154 projects, each a few changes.
+   * `#d` included (§6.13), but stays readable by its id. Only its newest change
+   * is read by `#a`: its `deleted` change and who signed it, for the Archived
+   * view's deleted filter and count. Every change of it is read where it is
+   * shown — its page (`opened`) here, the Archived tab by `openTexts` — or when
+   * its newest change is not the delete. On production 4 Nov every change of the
+   * 19 deleted was 138 KB of each cold load, one throwaway's 121 changes 86 KB.
    */
   private async projectFileEvents(read: QueryFn, fields: ProjectFields, roots: readonly SignedEvent[], opened: ReadonlySet<string>, scope: 'all' | 'these' = 'all'): Promise<{ events: SignedEvent[]; texts: string[] }> {
     const own = roots.filter((root) => root.kind === KIND.PROJECT)
@@ -458,19 +460,36 @@ export class Store {
     const unlisted = addrs.filter((addr) => !held.has(addr))
     const withText = asked.filter((addr, i) => held.has(addr) && opens[i])
     const texts = opens.filter((file, i) => file && held.has(asked[i]!))
-    const deleted = await this.changesOf(read, unlisted)
+    const shown = unlisted.filter((addr) => opened.has(addr))
+    const rest = unlisted.filter((addr) => !opened.has(addr))
+    const [whole, newest] = await Promise.all([this.changesOf(read, shown), this.newestChanges(rest)])
+    // A change written after the delete (a stale tab's) hides it: that one is read whole, as before.
+    const unsure = foldFolder([...own.filter((root) => rest.includes(`${KIND.PROJECT}:${root.pubkey}:${dOf(root)}`)), ...newest], referencedAddresses)
+      .projects.filter((project) => !project.deleted)
+      .map((project) => project.addr)
+    const strays = await this.changesOf(read, unsure)
     return {
-      events: [...listed, ...texts.flatMap((file) => (file ? [file] : []))].flatMap((file) => file.events).concat(deleted),
-      // Every change of a deleted one is read, its text with them.
-      texts: [...unlisted, ...withText],
+      events: [...listed, ...texts.flatMap((file) => (file ? [file] : []))].flatMap((file) => file.events).concat(whole, newest, strays),
+      // Every change of a deleted one read whole is held, its text with them.
+      texts: [...shown, ...unsure, ...withText],
     }
+  }
+
+  /** The newest change to each of `addrs`, by `#a`, one filter each: `limit` is per filter, which the paged read does not keep. */
+  private async newestChanges(addrs: readonly string[]): Promise<SignedEvent[]> {
+    const filters = addrs.map((addr) => ({ kinds: [KIND.CHANGE], '#a': [addr], limit: 1 }))
+    const reads: Promise<SignedEvent[]>[] = []
+    for (let at = 0; at < filters.length; at += MAX_FILTERS_PER_QUERY) reads.push(this.relay.query(filters.slice(at, at + MAX_FILTERS_PER_QUERY) as never))
+    return (await Promise.all(reads)).flat()
   }
 
   /**
    * The current text of each project in `addrs` not yet in `held`, read by its
    * id (§6.13 "Opening a file reads its current text too"), and kept so every
    * whole load reads it again: a project opened by navigating, not by the
-   * tab's first route. Nothing where projects are not read by their fields.
+   * tab's first route. A deleted one answers no text (§6.13): every change of it
+   * is read instead, for its page and the Archived tab, which asks for each.
+   * Nothing where projects are not read by their fields.
    */
   private async openTexts(addrs: readonly string[], held: readonly string[] | undefined): Promise<{ events: SignedEvent[]; texts: string[] }> {
     const wanted = addrs.filter((addr) => addr.startsWith(`${KIND.PROJECT}:`) && !held?.includes(addr))
@@ -483,7 +502,9 @@ export class Store {
         return openFile(query, { kind: KIND.PROJECT, pubkey: pubkey!, d: d.join(':') }, { text: true })
       }),
     )
-    return { events: files.flatMap((file) => file?.events ?? []), texts: wanted.filter((_, i) => files[i]) }
+    const absent = wanted.filter((_, i) => !files[i])
+    const changes = await this.changesOf(this.queryAll, absent)
+    return { events: [...files.flatMap((file) => file?.events ?? []), ...changes], texts: wanted }
   }
 
   /** Every change to `addrs`, by `#a` (§6.2), a few hundred addresses per filter. */
