@@ -13,6 +13,10 @@ const FOLDER = '3167adea-877f-43c4-96fb-517a2b2d5d24'
 
 let held: SignedEvent[] = []
 let asked: Record<string, unknown>[][] = []
+/** The requests Ship paged (`queryAll`), each a separate round trip or more. */
+let paged: Record<string, unknown>[][] = []
+/** While set, a paged read of a Folder by `#h` runs it before answering: what was asked while that Folder was still being read. */
+let folderRead: (() => Promise<void>) | undefined
 let count = 0
 
 const dOf = (event: SignedEvent) => event.tags.find((t) => t[0] === 'd')?.[1]
@@ -67,7 +71,11 @@ vi.mock('./store', async () => {
   }
   const relay = {
     query: async (filters: Record<string, unknown>[]) => answer(filters),
-    queryAll: async (filters: Record<string, unknown>[]) => answer(filters),
+    queryAll: async (filters: Record<string, unknown>[]) => {
+      paged.push(filters)
+      if (folderRead && filters.some((f) => f['#h'])) await folderRead()
+      return answer(filters)
+    },
     publish: async (event: SignedEvent) => {
       sent.push(event)
       held.push(event)
@@ -98,6 +106,8 @@ async function project(d: string) {
 beforeEach(() => {
   held = []
   asked = []
+  paged = []
+  folderRead = undefined
   sent.length = 0
 })
 
@@ -182,6 +192,56 @@ describe('the load, with the switch on', () => {
     const { state, project: p } = await project('p')
     expect(p.description).toBe('Current words')
     expect(state.texts).toEqual([`30850:${PK}:p`])
+  })
+})
+
+describe('opening a project by its link, with the switch on', () => {
+  const issue = (d: string): SignedEvent =>
+    ({ id: `i-${d}`.padEnd(64, '0'), kind: 30851, pubkey: PK, created_at: 100, content: '', sig: '0'.repeat(128), tags: [['d', d], ['title', d], ['h', FOLDER], ['a', `30850:${PK}:p`]] }) as SignedEvent
+  const issueChange = (d: string, id: string, field: string, value: string, at: number): SignedEvent =>
+    ({ id: id.padEnd(64, '0'), kind: 1851, pubkey: PK, created_at: at, content: '', sig: '0'.repeat(128), tags: [['a', `30851:${PK}:${d}`], ['field', field], ['value', value], ['h', FOLDER]] }) as SignedEvent
+
+  it("asks for its fields, current text and its issues' changes while its Folder's conversation is still being read", async () => {
+    held = [root('p'), change('p', 'd1', 'description', 'Current words', 110), issue('i1'), issueChange('i1', 'c1', 'status', 'done', 110)]
+    let before: Record<string, unknown>[] = []
+    // Every other read answers at once; one turn of the event loop lets them all go before the conversation answers.
+    folderRead = async () => {
+      await new Promise((resolve) => setImmediate(resolve))
+      before = asked.flat()
+    }
+    const state = foldWorkspace(await store.loadOpened({ kind: 'project', d: 'p' }))
+    expect(before).toContainEqual({ fields: 'newest', kinds: [30850], '#d': ['p'], text: true })
+    expect(before.some((f) => (f['#a'] as string[] | undefined)?.includes(`30851:${PK}:i1`))).toBe(true)
+    expect(state.projects.find((candidate) => candidate.id === 'p')!.description).toBe('Current words')
+    expect(state.issues.find((candidate) => candidate.id === 'i1')!.status).toBe('done')
+  })
+
+  it("still shows its Folder's conversation", async () => {
+    const message = { id: 'm1'.padEnd(64, '0'), kind: 9, pubkey: PK, created_at: 120, content: 'Hello', sig: '0'.repeat(128), tags: [['h', FOLDER]] } as SignedEvent
+    held = [root('p'), message]
+    const opened = await store.loadOpened({ kind: 'project', d: 'p' })
+    expect(opened.events.map((event) => event.id)).toContain(message.id)
+    expect(opened.threadsAt[FOLDER]).toBeTypeOf('number')
+  })
+
+  it("reads its issues' changes in one request, unpaged, and shows their status", async () => {
+    held = [root('p'), issue('i1'), issueChange('i1', 'c1', 'status', 'done', 110)]
+    const state = foldWorkspace(await store.loadOpened({ kind: 'project', d: 'p' }))
+    expect(state.issues.find((candidate) => candidate.id === 'i1')!.status).toBe('done')
+    expect(paged.flat().filter((f) => f['#a'])).toEqual([])
+    expect(asked.flat()).toContainEqual({ kinds: [1851], '#a': [`30851:${PK}:i1`], limit: 1000 })
+  })
+
+  it("pages its issues' changes when one request may have been cut short at the relay's ceiling", async () => {
+    held = [root('p'), issue('i1'), ...Array.from({ length: 1000 }, (_, n) => issueChange('i1', `c${n}`, 'title', `t${n}`, 110 + n))]
+    await store.loadOpened({ kind: 'project', d: 'p' })
+    expect(paged.flat()).toContainEqual({ kinds: [1851], '#a': [`30851:${PK}:i1`] })
+  })
+
+  it('shows a deleted one as deleted, by whom', async () => {
+    held = [root('p'), change('p', 'x1', 'deleted', 'true', 120)]
+    const p = foldWorkspace(await store.loadOpened({ kind: 'project', d: 'p' })).projects.find((candidate) => candidate.id === 'p')!
+    expect(p.deleted).toEqual({ by: PK, at: 120 })
   })
 })
 

@@ -8,7 +8,7 @@
  * cache rather than the shared record.
  */
 import type { Embed, Imeta, NostrTag, PartPointer, PublishResult, Relay } from '@estiva-app/protocol'
-import { partsOf } from '@estiva-app/protocol'
+import { MAX_FILTERS_PER_QUERY, RELAY_PAGE_CEILING, partsOf } from '@estiva-app/protocol'
 import type { Signer } from './signer'
 import {
   buildCreateChannel,
@@ -391,6 +391,13 @@ const OPENED_RECORDS_LIMIT = 100
 /** Issue addresses per `#a` filter: about 900 issues are a handful of filters in one request. */
 const ISSUES_PER_FILTER = 200
 
+/** Every change to `addrs`, by `#a` (§6.2), {@link ISSUES_PER_FILTER} addresses per filter. */
+function changeFilters(addrs: readonly string[]): Record<string, unknown>[] {
+  const filters: Record<string, unknown>[] = []
+  for (let at = 0; at < addrs.length; at += ISSUES_PER_FILTER) filters.push({ kinds: [KIND.CHANGE], '#a': addrs.slice(at, at + ISSUES_PER_FILTER) })
+  return filters
+}
+
 /**
  * The switch on (ALO-5, `api/fileReads.ts`): projects are read by the relay's
  * list read and each change names the one it follows. `text`: the relay opens a
@@ -434,20 +441,26 @@ export class Store {
     const own = roots.filter((root) => root.kind === KIND.PROJECT)
     const dOf = (root: SignedEvent) => root.tags.find((t) => t[0] === 'd')?.[1] ?? ''
     if (scope === 'these' && !own.length) return { events: [], texts: [] }
-    const listed = await listFiles(read, { kinds: [KIND.PROJECT], ...(scope === 'these' ? { '#d': [...new Set(own.map(dOf))] } : {}) })
-    const held = new Set(listed.map((file) => file.address))
     const open = (addr: string) => {
       const [, pubkey, ...d] = addr.split(':')
       return openFile(read, { kind: KIND.PROJECT, pubkey: pubkey!, d: d.join(':') }, { text: true })
     }
     const addrs = [...new Set(own.map((root) => `${KIND.PROJECT}:${root.pubkey}:${dOf(root)}`))]
+    // The texts beside the list, not after it: a deleted one answers no text either (§6.13), and is dropped below.
+    const asked = fields.text ? [...opened].filter((addr) => scope === 'all' || addrs.includes(addr)) : []
+    const [listed, opens] = await Promise.all([
+      listFiles(read, { kinds: [KIND.PROJECT], ...(scope === 'these' ? { '#d': [...new Set(own.map(dOf))] } : {}) }),
+      Promise.all(asked.map(open)),
+    ])
+    const held = new Set(listed.map((file) => file.address))
     const unlisted = addrs.filter((addr) => !held.has(addr))
-    const withText = fields.text ? [...opened].filter((addr) => held.has(addr)) : []
-    const [deleted, texts] = await Promise.all([this.changesOf(read, unlisted), Promise.all(withText.map(open))])
+    const withText = asked.filter((addr, i) => held.has(addr) && opens[i])
+    const texts = opens.filter((file, i) => file && held.has(asked[i]!))
+    const deleted = await this.changesOf(read, unlisted)
     return {
       events: [...listed, ...texts.flatMap((file) => (file ? [file] : []))].flatMap((file) => file.events).concat(deleted),
       // Every change of a deleted one is read, its text with them.
-      texts: [...unlisted, ...withText.filter((_, i) => texts[i])],
+      texts: [...unlisted, ...withText],
     }
   }
 
@@ -474,9 +487,7 @@ export class Store {
   /** Every change to `addrs`, by `#a` (§6.2), a few hundred addresses per filter. */
   private changesOf(read: QueryFn, addrs: readonly string[]): Promise<SignedEvent[]> {
     if (!addrs.length) return Promise.resolve([])
-    const filters: Record<string, unknown>[] = []
-    for (let at = 0; at < addrs.length; at += ISSUES_PER_FILTER) filters.push({ kinds: [KIND.CHANGE], '#a': addrs.slice(at, at + ISSUES_PER_FILTER) })
-    return read(filters)
+    return read(changeFilters(addrs))
   }
 
   /**
@@ -1461,7 +1472,15 @@ export class Store {
     let events = found
     const read = new Set<string>()
     const threadsAt: Record<string, number> = {}
-    const withoutChanges = FOLDER_KINDS.filter((kind) => kind !== KIND.CHANGE)
+    // Each Folder's conversation is paged as every Folder read is; its projects and issues come at once, so their changes need not wait for it.
+    const talk: Promise<SignedEvent[]>[] = []
+    const query: QueryFn = (filters) => this.relay.query(filters as never)
+    // An opened project's fields and text need only its record, so they are read beside its Folder, not after it.
+    const isOwn = (event: SignedEvent) => opened.kind === 'project' && event.kind === KIND.PROJECT && event.tags.some((t) => t[0] === 'd' && t[1] === opened.d)
+    const own = found.filter(isOwn)
+    for (const project of foldFolder(own, referencedAddresses).projects) this.openedProjects.add(project.addr)
+    const first = this.projectFileEvents(query, fields, own, this.openedProjects, 'these')
+    first.catch(() => undefined)
     for (let round = 0; round < 3; round++) {
       const state = foldFolder(events, referencedAddresses)
       const issues = opened.kind === 'issue' ? state.issues.filter((issue) => issue.id === opened.d) : []
@@ -1470,21 +1489,51 @@ export class Store {
       const folders = [...new Set([...projects.map((project) => project.contentFolder), ...issues.map((issue) => issue.folder)])].filter((folder) => folder && !read.has(folder))
       const missing = [...parents].filter((addr) => !projects.some((project) => project.addr === addr)).map((addr) => addr.split(':').slice(2).join(':'))
       if (!folders.length && !missing.length) break
+      for (const folder of folders) assertFolderId(folder)
       for (const folder of folders) read.add(folder)
+      const said =this.readFolderEvents(folders, {}, {}, this.queryAll, THREAD_KINDS, threadsAt)
+      said.catch(() => undefined)
+      talk.push(said)
       const [inFolders, records] = await Promise.all([
-        this.readFolderEvents(folders, {}, {}, this.queryAll, withoutChanges, threadsAt),
+        this.openedRead(folders.map((folder) => ({ kinds: [KIND.PROJECT, KIND.ISSUE], '#h': [folder] }))),
         missing.length ? byD(KIND.PROJECT, missing) : Promise.resolve([]),
       ])
       events = mergeRead(events, [...inFolders, ...records])
     }
     const state = foldFolder(events, referencedAddresses)
-    if (opened.kind === 'project') for (const project of state.projects.filter((p) => p.id === opened.d)) this.openedProjects.add(project.addr)
-    const query: QueryFn = (filters) => this.relay.query(filters as never)
-    const [projects, changes] = await Promise.all([
-      this.projectFileEvents(query, fields, events, this.openedProjects, 'these'),
-      this.issueChanges(this.queryAll, state.issues.map((issue) => issue.addr)),
+    const rest = events.filter((event) => !isOwn(event))
+    const [early, projects, changed, conversations] = await Promise.all([
+      first,
+      this.projectFileEvents(query, fields, rest, this.openedProjects, 'these'),
+      this.openedRead(changeFilters(state.issues.map((issue) => issue.addr))),
+      Promise.all(talk),
     ])
-    return { events: mergeRead(events, [...projects.events, ...changes]), folders: [...read], readAt: {}, threadsAt, mentionsOf: [], texts: projects.texts }
+    return {
+      events: mergeRead(events, [...conversations.flat(), ...early.events, ...projects.events, ...changed]),
+      folders: [...read],
+      readAt: {},
+      threadsAt,
+      mentionsOf: [],
+      texts: [...early.texts, ...projects.texts],
+    }
+  }
+
+  /**
+   * `filters` for the opened page, in one request where it can be. Paged, a
+   * cold tab spends a second round trip confirming each page it has no bound
+   * for yet, and with the switch on the issues' changes waited for the Folder's
+   * confirmation and then their own: the project's title drew 0.6 s later
+   * than with it off (3 Nov). Unpaged is enough here because this page is shown
+   * only until the whole load lands, which reads all of it again paged; an
+   * answer that may have been cut short at the relay's ceiling is paged here too.
+   */
+  private async openedRead(filters: Record<string, unknown>[]): Promise<SignedEvent[]> {
+    if (!filters.length) return []
+    if (filters.length <= MAX_FILTERS_PER_QUERY) {
+      const events = await this.relay.query(filters.map((filter) => ({ ...filter, limit: RELAY_PAGE_CEILING })) as never)
+      if (events.length < RELAY_PAGE_CEILING) return events
+    }
+    return this.queryAll(filters)
   }
 
   /**
