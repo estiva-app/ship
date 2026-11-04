@@ -18,7 +18,7 @@ import type { ProjectFields } from '../nostr/store'
 export function projectFieldsOf(reads: RelayFileReads, optedIn: boolean): ProjectFields | undefined {
   const announced = reads.switched && reads.inOrder.includes(PROJECT_TYPE)
   if (!reads.list || !reads.text || !(announced || optedIn)) return undefined
-  return { text: reads.text }
+  return { text: reads.text, ...(reads.search.includes(PROJECT_TYPE) ? { search: true as const } : {}) }
 }
 
 /** A project's type, as NIP-11 names it (TYPES.md). */
