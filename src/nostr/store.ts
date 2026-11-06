@@ -758,7 +758,9 @@ export class Store {
    *
    * A change event, so it is reversible, attributable and available to anyone
    * in the Folder rather than only the project's author. This is the operation
-   * that should be reached for; `deleteProject` is the narrow one.
+   * that should be reached for. `deleteProject` below is the permanent `kind:5`,
+   * which the app no longer sends (ALO-6: Delete is the restorable `deleted`
+   * change, `setProjectDeleted`); only scripts clearing their own fixtures use it.
    *
    * `resolution` is what the person archiving said about it (FOL-46), carried
    * as the change's `content` — one event, so it cannot land without the
