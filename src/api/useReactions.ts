@@ -3,7 +3,7 @@ import { reactionHorizon, type RootState } from '@estiva-app/conversation'
 import { useRefresh } from '@/lib/useRefresh'
 import { threadsOn, type ReactionsByTarget, type Resolution, type ThreadToRead } from './index'
 
-type Read = { reactions: ReactionsByTarget; cut: boolean; resolved: Record<string, Resolution>; gone: Record<string, Exclude<RootState, 'present'>> }
+type Read = { reactions: ReactionsByTarget; omitted?: number; cut: boolean; resolved: Record<string, Resolution>; gone: Record<string, Exclude<RootState, 'present'>> }
 const NOTHING: Read = { reactions: {}, cut: false, resolved: {}, gone: {} }
 
 /**
@@ -61,7 +61,10 @@ export function useReactions(threads: readonly ThreadToRead[]): {
    */
   refresh: () => void
 } {
-  const { omitted } = reactionHorizon(threads.flatMap((thread) => thread.messages))
+  const { omitted } = reactionHorizon([
+    ...threads.flatMap((thread) => thread.messages),
+    ...threads.filter((thread) => thread.gone).map((thread) => ({ id: thread.id, at: thread.messages[0]?.at ?? 0 })),
+  ])
   const [read, setRead] = useState<Read | undefined>(undefined)
   const [nonce, setNonce] = useState(0)
 
@@ -76,8 +79,8 @@ export function useReactions(threads: readonly ThreadToRead[]): {
     }
     let cancelled = false
     threadsOn(threads)
-      .then(({ reactions, cut, resolved, gone }) => {
-        if (!cancelled) setRead({ reactions, cut, resolved, gone })
+      .then(({ reactions, omitted: left, cut, resolved, gone }) => {
+        if (!cancelled) setRead({ reactions, omitted: left, cut, resolved, gone })
       })
       .catch(() => {
         // A failed reaction read is not a failed page. The conversation is
@@ -97,7 +100,8 @@ export function useReactions(threads: readonly ThreadToRead[]): {
 
   return {
     reactions: read?.reactions ?? {},
-    omitted,
+    // The read's own count once it lands: it also asked about each gone comment, for its thread's resolution.
+    omitted: read?.omitted ?? omitted,
     cut: read?.cut ?? false,
     resolved: read?.resolved ?? {},
     gone: read?.gone ?? {},

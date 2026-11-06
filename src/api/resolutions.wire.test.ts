@@ -9,8 +9,10 @@ import type { SignedEvent } from '@estiva-app/protocol'
 /** What the relay holds; it answers each query with what the filters ask for by kind and `#e`. */
 let held: SignedEvent[] = []
 let asked: Record<string, unknown>[][] = []
+let failDeletions = false
 const answer = (filters: Record<string, unknown>[]) => {
   asked.push(filters)
+  if (failDeletions && filters.some((f) => (f.kinds as number[]).includes(5))) throw new Error('relay: rate-limited')
   return held.filter((event) =>
     filters.some((f) => (f.kinds as number[] | undefined)?.includes(event.kind) && (f['#e'] as string[] | undefined)?.some((id) => event.tags.some((t) => t[0] === 'e' && t[1] === id))),
   )
@@ -47,6 +49,7 @@ const goneThread = { id: COMMENT, gone: true, messages: [{ id: REPLY, at: 60, ev
 beforeEach(() => {
   held = []
   asked = []
+  failDeletions = false
 })
 
 describe('a resolve made in Peek or Leaf', () => {
@@ -75,6 +78,12 @@ describe('a thread whose comment was not read', () => {
     held = [deletion(PEEK_USER)]
     const { gone } = await threadsOn([goneThread])
     expect(gone[COMMENT]).toBe('missing')
+  })
+
+  it('is never called "can’t be shown" when the deletion read failed', async () => {
+    failDeletions = true
+    const { gone } = await threadsOn([goneThread])
+    expect(gone[COMMENT]).toBeUndefined()
   })
 
   it('asks for a deletion only when a thread’s comment was not read', async () => {

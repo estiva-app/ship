@@ -161,7 +161,7 @@ export async function threadsOn(threads: readonly ThreadToRead[]): Promise<{
     ...threads.flatMap((thread) => thread.messages.map(({ id, at }) => ({ id, at }))),
     ...threads.filter((thread) => thread.gone).map((thread) => ({ id: thread.id, at: thread.messages[0]?.at ?? 0 })),
   ]
-  const { decorations, events } = await store.threadEvents(targets, goneIds)
+  const { decorations, events, deletionsRead } = await store.threadEvents(targets, goneIds)
   const folded = foldThreads([...threads.flatMap((thread) => thread.messages.flatMap((m) => m.event ?? [])), ...events], { viewer: signer.pubkey })
   const reactions: ReactionsByTarget = {}
   const resolved: Record<string, Resolution> = {}
@@ -171,7 +171,8 @@ export async function threadsOn(threads: readonly ThreadToRead[]): Promise<{
       if (message.reactions.length) reactions[message.id] = [...message.reactions].sort((a, b) => b.count - a.count)
     }
     if (thread.resolution?.action === 'resolved') resolved[thread.id] = thread.resolution
-    if (thread.state !== 'present') gone[thread.id] = thread.state
+    // With the deletion read failed, "missing" is unproven: leave it out, and the thread keeps reading as deleted.
+    if (thread.state === 'deleted' || (thread.state === 'missing' && deletionsRead)) gone[thread.id] = thread.state
   }
   return { reactions, omitted: decorations.reactionTargetsOmitted, cut: decorations.reactionEventsCut, resolved, gone }
 }
