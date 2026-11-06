@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { MUTED_D_TAG, serializeMutedBlob } from '@estiva-app/conversation'
 import type { TopicConversation } from '@estiva-app/interop'
 import type { FolderState } from '@/api'
 
@@ -24,7 +25,8 @@ vi.mock('@/api/store', () => ({
   signer: { pubkey: 'c'.repeat(64) },
   projectFieldsNow: async () => undefined,
 }))
-vi.mock('@/api/nip44', () => ({ nip44: { decrypt: async () => undefined } }))
+// A `cipher:` content is its plaintext encrypted to you; anything else would not decrypt.
+vi.mock('@/api/nip44', () => ({ nip44: { decrypt: async (ciphertext: string) => (ciphertext.startsWith('cipher:') ? ciphertext.slice('cipher:'.length) : undefined) } }))
 /** Your read state, one answer held across renders as the real hook holds it. */
 const landed = vi.hoisted(() => ({}))
 vi.mock('@/api/readStateSync', async (actual) => ({ ...(await actual<object>()), useLandedReadState: () => landed }))
@@ -39,6 +41,7 @@ vi.mock('@/api/foreign', async (actual) => {
 import { TopicsPage } from './TopicsPage'
 import { prefetchTopics, resetTopicsForTests, topicChoicesNow } from '@/api/topics'
 import { foldersNow } from '@/api/useFolders'
+import { resetFeedFactsForTests } from '@/api/useFeedJudges'
 import { buildManifest } from '@/nostr/manifest'
 
 interface TestEvent {
@@ -74,7 +77,12 @@ const topic = (d: string, title: string, { folder = 'team', summary }: { folder?
   event(30840, [['d', d], ['title', title], ['h', folder], ...(summary ? [['summary', summary]] : [])])
 const lists = (d: string, file: string, folder = 'team') => event(1851, [['a', address(d)], ['O', d], ['field', `lists:${file}`], ['value', 'true'], ['h', folder], ['ts', String(Date.now())], ['o', file]])
 const archiving = (d: string) => event(1851, [['a', address(d)], ['O', d], ['field', 'archived'], ['value', 'true'], ['h', 'team']])
-const joined = (d: string) => event(1851, [['a', address(d)], ['O', d], ['field', `member:${ME}`], ['value', 'true'], ['p', ME], ['h', 'team']])
+/** Your Join, filed in the topic's own Folder: one filed in another is ignored (§6.2). */
+const joined = (d: string, folder = 'team') => event(1851, [['a', address(d)], ['O', d], ['field', `member:${ME}`], ['value', 'true'], ['p', ME], ['h', folder]])
+/** A comment you wrote in a topic's conversation (NIP-22, the topic as its root). */
+const commented = (d: string) => event(1111, [['A', address(d)], ['K', '30840'], ['a', address(d)], ['k', '30840'], ['h', 'team']], ME)
+/** Your mute list, encrypted to you. */
+const mutes = (...keys: string[]) => ({ ...event(30078, [['d', MUTED_D_TAG], ['t', 'estiva-appdata']], ME), content: `cipher:${serializeMutedBlob(keys, Date.now())}` })
 /** A team's list marking a topic one of its spaces (§3.3). */
 const spaceMark = (d: string) => event(30890, [['d', 'team'], ['a', address(d), '', 'space']])
 const shipManifest = () => {
@@ -110,6 +118,7 @@ beforeEach(() => {
   realConversations = false
   down = false
   resetTopicsForTests()
+  resetFeedFactsForTests()
 })
 
 describe("Ship's Topics", () => {
@@ -165,10 +174,36 @@ describe("Ship's Topics", () => {
     expect(titles()).toEqual(['Archived in Peek'])
   })
 
+  it('a topic you only commented in is under Other topics, not Your topics: writing in a topic is not following it', async () => {
+    held.push(shipManifest(), issueRoot('i-1'))
+    held.push(topic('t-in', 'Joined'), joined('t-in'), lists('t-in', 'i-1'))
+    held.push(topic('t-said', 'Commented'), commented('t-said'), lists('t-said', 'i-1'))
+    const { state } = ship([], ['i-1'])
+    render(<TopicsPage state={state} folders={[]} />)
+
+    await waitFor(() => expect(tabs()).toEqual(['All2', 'Your topics1', 'Other topics1', 'Archived0']))
+    expect(titles()).toEqual(['Joined'])
+    fireEvent.click(screen.getByRole('tab', { name: /Other topics/ }))
+    expect(titles()).toEqual(['Commented'])
+  })
+
+  it('a topic you joined and then muted is under Other topics, not Your topics, as Peek shows a mute as Not following', async () => {
+    held.push(shipManifest(), issueRoot('i-1'), mutes(address('t-hush')))
+    held.push(topic('t-in', 'Joined'), joined('t-in'), lists('t-in', 'i-1'))
+    held.push(topic('t-hush', 'Muted'), joined('t-hush'), lists('t-hush', 'i-1'))
+    const { state } = ship([], ['i-1'])
+    render(<TopicsPage state={state} folders={[]} />)
+
+    await waitFor(() => expect(tabs()).toEqual(['All2', 'Your topics1', 'Other topics1', 'Archived0']))
+    expect(titles()).toEqual(['Joined'])
+    fireEvent.click(screen.getByRole('tab', { name: /Other topics/ }))
+    expect(titles()).toEqual(['Muted'])
+  })
+
   it("a Folder's Topics shows only the topics filed in that Folder, under its name", async () => {
     held.push(shipManifest(), issueRoot('i-1'), issueRoot('i-2', 'design'))
     held.push(topic('t-team', 'Team topic'), joined('t-team'), lists('t-team', 'i-1'))
-    held.push(topic('t-design', 'Design topic', { folder: 'design' }), joined('t-design'), lists('t-design', 'i-2', 'design'))
+    held.push(topic('t-design', 'Design topic', { folder: 'design' }), joined('t-design', 'design'), lists('t-design', 'i-2', 'design'))
     const { state } = ship([], ['i-1', 'i-2'])
     render(<TopicsPage state={state} folders={[{ id: 'design', name: 'Design' } as never]} folder="design" />)
 

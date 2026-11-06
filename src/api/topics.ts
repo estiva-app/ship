@@ -120,20 +120,13 @@ export function reloadTopics(): Promise<void> {
 }
 
 /**
- * Each drawn topic's conversations in Peek and how many are new for you
- * (SHIPS-3), for the Topics page to draw. `drawn` is the addresses on its
- * tabs, space-separated: a read costs a request or two per topic, and most
- * topics a reader can read list no work and are never drawn. `undefined`
- * until the topics, your read state and your mute list are all in hand: a dot
- * judged without them would light topics you have read or muted. Read again
- * when one of them moves.
+ * The files and channels you muted (`estiva:muted:v1`, encrypted to you):
+ * `undefined` until the list is in hand. Asked again when your read state
+ * moves while the list would not decrypt (a busy nip44), rather than never.
  */
-export function useTopicConversations(read: TopicsRead | undefined, drawn: string | undefined): Map<string, TopicConversation> | undefined {
+export function useMuted(): ReadonlySet<string> | undefined {
   const merged = useLandedReadState()
   const [muted, setMuted] = useState<ReadonlySet<string>>()
-  const [conversations, setConversations] = useState<Map<string, TopicConversation>>()
-
-  // Asked again when the read state moves while the list would not decrypt (a busy nip44), rather than never.
   useEffect(() => {
     if (muted) return
     let live = true
@@ -144,6 +137,21 @@ export function useTopicConversations(read: TopicsRead | undefined, drawn: strin
       live = false
     }
   }, [muted, merged])
+  return muted
+}
+
+/**
+ * Each drawn topic's conversations in Peek and how many are new for you
+ * (SHIPS-3), for the Topics page to draw. `drawn` is the addresses on its
+ * tabs, space-separated: a read costs a request or two per topic, and most
+ * topics a reader can read list no work and are never drawn. `undefined`
+ * until the topics, your read state and your mute list ({@link useMuted}) are
+ * all in hand: a dot judged without them would light topics you have read or
+ * muted. Read again when one of them moves.
+ */
+export function useTopicConversations(read: TopicsRead | undefined, drawn: string | undefined, muted: ReadonlySet<string> | undefined): Map<string, TopicConversation> | undefined {
+  const merged = useLandedReadState()
+  const [conversations, setConversations] = useState<Map<string, TopicConversation>>()
 
   useEffect(() => {
     if (!read || !drawn || !merged || !muted) return
