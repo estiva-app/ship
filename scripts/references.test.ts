@@ -140,7 +140,7 @@ const late = [
 {
   const events = [
     peekMessage('r1', 'Unrelated discussion.'),
-    event({ id: 'r2', kind: 1111, tags: [['A', ISSUE], ['e', 'r1', '', 'reply'], ['E', 'r1']], content: 'see also' }),
+    event({ id: 'r2', kind: 1111, tags: [['A', ISSUE], ['e', 'r1', '', 'reply']], content: 'see also' }),
   ]
   const state = foldFolder(events, refs)
   const anchors = anchorIndex(events)
@@ -155,16 +155,18 @@ const late = [
 
 {
   /*
-    NIP-22's case split, two deep. Every other reply in this file has `E` equal
-    to `e`, so reading the root from the lowercase tag passes them all. Here
-    they differ — `E` is the thread's first comment, `e` the reply being
-    answered — and only the uppercase one says which conversation this is.
-    Read the other way, a reply to a reply splits off into its own thread.
+    Two deep, as every app writes it (ONE-9): a comment on an issue roots at its
+    address, so a reply names no `E`, only its parent by `e` — the reply it
+    answers. The shared fold walks up from there to the thread's comment
+    (`foldThreads`, §6.4); read by the parent alone, a reply to a reply split
+    off into its own thread. (An `E` equal to `e` is NIP-22's top-level comment
+    on that event, not a reply: none of the 3,685 `kind:1111` on production
+    carried an `E`, 6 November.)
   */
   const events = [
     shipComment('t1', 'Is the Stripe key in?'),
-    event({ id: 't2', kind: 1111, tags: [['A', ISSUE], ['E', 't1'], ['e', 't1', '', 'reply'], ['K', '1111']], content: 'Not yet.' }),
-    event({ id: 't3', kind: 1111, tags: [['A', ISSUE], ['E', 't1'], ['e', 't2', '', 'reply'], ['K', '1111']], content: 'Asking finance today.' }),
+    event({ id: 't2', kind: 1111, tags: [['A', ISSUE], ['e', 't1', '', 'reply'], ['K', '30851'], ['k', '1111']], content: 'Not yet.' }),
+    event({ id: 't3', kind: 1111, tags: [['A', ISSUE], ['e', 't2', '', 'reply'], ['K', '30851'], ['k', '1111']], content: 'Asking finance today.' }),
   ]
   const state = foldFolder(events, refs)
   const anchors = anchorIndex(events)

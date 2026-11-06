@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
-import { reactionHorizon } from '@estiva-app/conversation'
+import { reactionHorizon, type RootState } from '@estiva-app/conversation'
 import { useRefresh } from '@/lib/useRefresh'
-import { reactionsOn, type ReactionsByTarget, type Resolution } from './index'
+import { threadsOn, type ReactionsByTarget, type Resolution, type ThreadToRead } from './index'
+
+type Read = { reactions: ReactionsByTarget; omitted?: number; cut: boolean; resolved: Record<string, Resolution>; gone: Record<string, Exclude<RootState, 'present'>> }
+const NOTHING: Read = { reactions: {}, cut: false, resolved: {}, gone: {} }
 
 /**
  * The reactions on a set of messages — CON-2.
@@ -31,14 +34,20 @@ import { reactionsOn, type ReactionsByTarget, type Resolution } from './index'
  * the same cadence the rest of the page does, rather than needing a reload —
  * which is the whole cross-app claim CON-2 is about.
  */
-export function useReactions(targets: readonly { id: string; at: number }[]): {
+export function useReactions(threads: readonly ThreadToRead[]): {
   reactions: ReactionsByTarget
   /** How many messages were past the horizon and not asked about. */
   omitted: number
   /** Whether a read came back at the relay's page ceiling, so some reactions may be missing. */
   cut: boolean
-  /** By message id, each message that stands resolved, by the resolution Peek or Leaf wrote (PEEK-128). */
+  /** By thread id, each thread that stands resolved, by the resolution Peek or Leaf wrote (PEEK-128, SPEC §6.4). */
   resolved: Record<string, Resolution>
+  /**
+   * By thread id, each thread whose comment is gone (SPEC §6.5, ONE-9): `deleted` by its author, or `missing`, not
+   * readable here. Absent until the read lands: a thread whose comment was not returned is then drawn as deleted,
+   * which 3 of 3 such threads on production were (6 November).
+   */
+  gone: Record<string, Exclude<RootState, 'present'>>
   /** The first read has not landed yet. Distinct from "nobody reacted". */
   loading: boolean
   /**
@@ -52,30 +61,33 @@ export function useReactions(targets: readonly { id: string; at: number }[]): {
    */
   refresh: () => void
 } {
-  const { omitted } = reactionHorizon(targets)
-  const [read, setRead] = useState<{ reactions: ReactionsByTarget; cut: boolean; resolved: Record<string, Resolution> } | undefined>(undefined)
+  const { omitted } = reactionHorizon([
+    ...threads.flatMap((thread) => thread.messages),
+    ...threads.filter((thread) => thread.gone).map((thread) => ({ id: thread.id, at: thread.messages[0]?.at ?? 0 })),
+  ])
+  const [read, setRead] = useState<Read | undefined>(undefined)
   const [nonce, setNonce] = useState(0)
 
   // The joined string rather than the array: a new array every render would
   // re-query on every keystroke in the composer above.
-  const key = targets.map((t) => `${t.id}@${t.at}`).join(',')
+  const key = threads.map((t) => `${t.id}${t.gone ? '!' : ''}:${t.messages.map((m) => `${m.id}@${m.at}`).join(',')}`).join(';')
 
   const load = useCallback(() => {
-    if (targets.length === 0) {
-      setRead({ reactions: {}, cut: false, resolved: {} })
+    if (threads.length === 0) {
+      setRead(NOTHING)
       return undefined
     }
     let cancelled = false
-    reactionsOn(targets)
-      .then(({ reactions, cut, resolved }) => {
-        if (!cancelled) setRead({ reactions, cut, resolved })
+    threadsOn(threads)
+      .then(({ reactions, omitted: left, cut, resolved, gone }) => {
+        if (!cancelled) setRead({ reactions, omitted: left, cut, resolved, gone })
       })
       .catch(() => {
         // A failed reaction read is not a failed page. The conversation is
         // already on screen and correct; saying "could not load reactions"
         // over it would report a working app as broken, and the next refresh
         // is a moment away.
-        if (!cancelled) setRead((held) => held ?? { reactions: {}, cut: false, resolved: {} })
+        if (!cancelled) setRead((held) => held ?? NOTHING)
       })
     return () => {
       cancelled = true
@@ -88,9 +100,11 @@ export function useReactions(targets: readonly { id: string; at: number }[]): {
 
   return {
     reactions: read?.reactions ?? {},
-    omitted,
+    // The read's own count once it lands: it also asked about each gone comment, for its thread's resolution.
+    omitted: read?.omitted ?? omitted,
     cut: read?.cut ?? false,
     resolved: read?.resolved ?? {},
+    gone: read?.gone ?? {},
     loading: read === undefined,
     refresh: () => setNonce((n) => n + 1),
   }

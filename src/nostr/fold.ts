@@ -17,6 +17,7 @@
  */
 import { blockAnchorOf, contentFormatOf, quoteOf, type ContentFormat, type Quote, type SignedEvent } from '@estiva-app/protocol'
 import { fieldsSetBy } from '@estiva-app/interop'
+import { foldThreads, isAbout } from '@estiva-app/conversation'
 import { DEFAULT_ISSUE_STATUS, DEFAULT_PROJECT_STATUS, KIND } from './kinds'
 import { summaryText } from './summary'
 
@@ -393,6 +394,31 @@ export interface Message {
   quote?: Quote
 }
 
+/*
+  The event each message was read from, beside the fold's output rather than in
+  it: the page reads it again through the shared fold with its reactions and
+  resolutions (ONE-9), and the recorded state the conformance fixture holds, which
+  estiva-agent folds too, stays what it was.
+*/
+const eventOfMessage = new WeakMap<Message, SignedEvent>()
+
+/** The event `message` was read from, when the fold read it (not for a message built by hand). */
+export function eventOf(message: Message): SignedEvent | undefined {
+  return eventOfMessage.get(message)
+}
+
+/** `to`, a copy of `from`, read from the same event. */
+function sameEvent<T extends Message>(from: Message, to: T): T {
+  const event = eventOfMessage.get(from)
+  if (event) eventOfMessage.set(to, event)
+  return to
+}
+
+function withEvent(message: Message, event: SignedEvent): Message {
+  eventOfMessage.set(message, event)
+  return message
+}
+
 /**
  * A conversation: a root message and its replies, oldest first.
  *
@@ -419,11 +445,12 @@ export interface Conversation {
   /** Newest message in the thread — what a list should sort on. */
   lastAt: number
   /**
-   * The message the thread hangs from is not in the read: it was deleted (the
-   * relay stops returning a deleted event, and a thread is read whole). `root`
-   * is then the earliest reply, standing in for it as before; the one
-   * conversation draws "This comment was deleted." in its place, with every
-   * message under it and no new reply (PER-24, as Peek draws it).
+   * The message the thread hangs from is not in the read (SPEC §6.5): deleted,
+   * or outside what this reader can read. `root` is then the earliest reply,
+   * standing in for it; which of the two it is, the page learns with its
+   * reactions (its author's `kind:5`, `useReactions`), and the one conversation
+   * draws "This comment was deleted." or "This comment can't be shown." in its
+   * place, with every message under it and no new reply (ONE-9).
    */
   rootMissing?: true
 }
@@ -445,7 +472,7 @@ export function parseMessage(event: SignedEvent, resolveRefs: (body: string) => 
   const parentId = marked('reply') ?? es[es.length - 1]?.[1] ?? rootId
 
   const rawTs = Number.parseInt(tag(event, 'ts') ?? '', 10)
-  return {
+  return withEvent({
     id: event.id,
     author: event.pubkey,
     createdAt: event.created_at,
@@ -458,7 +485,7 @@ export function parseMessage(event: SignedEvent, resolveRefs: (body: string) => 
     // `nostr:naddr…` typed into the body by a person in Peek.
     about: [...new Set([...tags(event, 'a'), ...resolveRefs(event.content)])],
     ...(blockAnchorOf(event) ? { blockId: blockAnchorOf(event) } : {}),
-  }
+  }, event)
 }
 
 /**
@@ -503,7 +530,7 @@ function parseNip22Comment(
   const rootEvent = tag(event, 'E')
   const parentEvent = tag(event, 'e')
   const rawTs = Number.parseInt(tag(event, 'ts') ?? '', 10)
-  return {
+  return withEvent({
     id: event.id,
     author: event.pubkey,
     createdAt: event.created_at,
@@ -522,43 +549,87 @@ function parseNip22Comment(
     ...(tag(event, 'A') ? { anchor: tag(event, 'A') } : {}),
     ...(blockAnchorOf(event) ? { blockId: blockAnchorOf(event) } : {}),
     ...(quoteOf(event) ? { quote: quoteOf(event) } : {}),
-  }
+  }, event)
 }
 
-/** Group messages into conversations. */
-function foldConversations(messages: Message[]): Conversation[] {
-  const threads = new Map<string, Message[]>()
-  for (const message of messages) {
-    const key = message.rootId ?? message.id
-    threads.set(key, [...(threads.get(key) ?? []), message])
-  }
-
+/**
+ * Group messages into conversations, by the one shared fold (`foldThreads`,
+ * SPEC §6.3–§6.5), as Peek and Leaf group them: a reply to a reply is filed
+ * under its thread's comment (§6.4), and a thread whose comment the read did
+ * not return keeps its replies. Newest activity first.
+ *
+ * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-conversation-is-one-shared-thing-and-only-its-colours-are-the-apps.md
+ */
+function conversationsOf(messages: Message[]): Conversation[] {
+  const byId = new Map(messages.map((message) => [message.id.toLowerCase(), message]))
   const conversations: Conversation[] = []
-  for (const [id, group] of threads) {
-    group.sort(byOrder)
-    // The root is the message whose id is the thread key. It can be absent —
-    // truncated history, or a reply that arrived before its parent — and a
-    // thread with no visible root is still worth showing, so the earliest
-    // message stands in rather than the whole conversation disappearing.
-    const found = group.find((message) => message.id === id)
-    const root = found ?? group[0]
+  for (const thread of foldThreads(messages.flatMap((message) => eventOf(message) ?? []))) {
+    const found = thread.root ? byId.get(thread.root.id) : undefined
+    // A reply's thread is the fold's, however deep it answers: a reply to a reply names only its parent (NIP-22 `e`).
+    const answers = thread.replies.flatMap((reply) => {
+      const message = byId.get(reply.id)
+      return message ? [sameEvent(message, { ...message, rootId: thread.id })] : []
+    })
+    // A thread whose comment is not here — deleted, or outside the read — is
+    // still worth showing: its earliest reply stands in for it, and keeps the
+    // thread's place (the cards then say "deleted" or "can't be shown" in its place).
+    const root = found ?? answers[0]
+    if (!root) continue
     // A reply copies its comment's `block` (SPEC §13.6): the thread's place,
     // which the root already shows, so a reply draws none of its own. A reply
-    // standing in for a deleted comment keeps it, and with it the thread's place.
+    // standing in for a gone comment keeps it, and with it the thread's place.
     // why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-reply-on-a-page-keeps-its-threads-place.md
-    const replies = group.filter((message) => message !== root).map(({ blockId: _, ...reply }) => reply)
+    const replies = answers.filter((message) => message !== root).map((message) => {
+      const { blockId: _, ...reply } = message
+      return sameEvent(message, reply)
+    })
+    const group = [root, ...replies]
     conversations.push({
-      id,
+      id: thread.id,
       root,
       replies,
       about: [...new Set(group.flatMap((message) => message.about))],
       createdAt: root.createdAt,
-      lastAt: group[group.length - 1].createdAt,
+      lastAt: Math.max(...group.map((message) => message.createdAt)),
       ...(found ? {} : { rootMissing: true as const }),
     })
   }
   conversations.sort((a, b) => b.lastAt - a.lastAt)
   return conversations
+}
+
+/**
+ * A thread as the page at `address` takes it. A thread whose comment is gone
+ * keeps only the messages that are themselves about the page (`isAbout`, §6.4),
+ * as a comment must be: the workspace read files any reply naming the gone id
+ * under it, and one about another page must not speak for this page's thread —
+ * its team (§6.5), and with it which resolve counts. `null` when none is. A
+ * thread whose comment is here is the comment's, and is returned as it is.
+ * Leaf keeps the same (leaf#110).
+ */
+export function threadOnPage(conversation: Conversation, address: string): Conversation | null {
+  if (!conversation.rootMissing) return conversation
+  const kept = [conversation.root, ...conversation.replies].filter((message) => {
+    const event = eventOf(message)
+    return event !== undefined && isAbout(event, address)
+  })
+  const [first, ...rest] = kept
+  if (!first) return null
+  if (first === conversation.root) {
+    if (rest.length === conversation.replies.length) return conversation
+  }
+  // A reply that now stands in for the comment takes back the thread's place, which `conversationsOf` took off it.
+  const block = first === conversation.root ? first.blockId : blockAnchorOf(eventOf(first)!)
+  const root = first === conversation.root ? first : sameEvent(first, { ...first, ...(block ? { blockId: block } : {}) })
+  const group = [root, ...rest]
+  return {
+    ...conversation,
+    root,
+    replies: rest,
+    about: [...new Set(group.flatMap((message) => message.about))],
+    createdAt: root.createdAt,
+    lastAt: Math.max(...group.map((message) => message.createdAt)),
+  }
 }
 
 /** Conversations that concern a particular object. */
@@ -766,7 +837,7 @@ export function foldFolder(
     const message = parseMessage(event, resolveRefs)
     if (message) messages.push(message)
   }
-  const conversations = foldConversations(messages)
+  const conversations = conversationsOf(messages)
 
   const byNewest = (a: { createdAt: number }, b: { createdAt: number }) => b.createdAt - a.createdAt
   projects.sort(byNewest)

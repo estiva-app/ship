@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
-import type { BlockAnchor, Embed, Imeta, PartPointer, Quote } from '@estiva-app/protocol'
+import type { BlockAnchor, Embed, Imeta, PartPointer, Quote, SignedEvent } from '@estiva-app/protocol'
+import type { RootState } from '@estiva-app/conversation'
 import { referencesIn, toRenderTree } from '@estiva-app/protocol'
 import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
 import { byReference, useForeignObjects } from '@/api/useForeignObjects'
@@ -46,6 +47,8 @@ import type { Answer, Picks } from '@/components/conversations/shared'
  */
 export interface MessageData {
   id: string
+  /** The event as read: what the shared fold reads again with the page's reactions and resolutions (ONE-9). */
+  event?: SignedEvent
   /** `9` for chat, `1111` for a comment — what a `[` reference to it carries (CON-25). */
   kind?: number
   /**
@@ -185,18 +188,20 @@ export function useThreadReactions(threads: readonly ThreadData[]): {
   reactionsBy: Record<string, readonly Reaction[]>
   omitted: number
   cut: boolean
-  /** By message id, each one that stands resolved, by the resolution Peek or Leaf wrote: Ship shows it and writes none. */
+  /** By thread id, each one that stands resolved, by the resolution Peek or Leaf wrote: Ship shows it and writes none. */
   resolvedBy: Record<string, Resolution>
+  /** By thread id, each one whose comment is gone: deleted, or not readable here (SPEC §6.5, ONE-9). */
+  goneBy: Record<string, Exclude<RootState, 'present'>>
   refresh: () => void
 } {
   // Every root and reply with its `created_at`: the horizon is the newest 100
   // by time across both (SPEC §6.6), so the order passed no longer matters.
-  const targets = useMemo(
-    () => threads.flatMap((thread) => [thread.root, ...thread.replies]).map((message) => ({ id: message.id, at: message.at })),
+  const read = useMemo(
+    () => threads.map((thread) => ({ id: thread.id, gone: thread.rootMissing === true, messages: [thread.root, ...thread.replies].map(({ id, at, event }) => ({ id, at, event })) })),
     [threads],
   )
-  const { reactions, omitted, cut, resolved, refresh } = useReactions(targets)
-  return { reactionsBy: reactions, omitted, cut, resolvedBy: resolved, refresh }
+  const { reactions, omitted, cut, resolved, gone, refresh } = useReactions(read)
+  return { reactionsBy: reactions, omitted, cut, resolvedBy: resolved, goneBy: gone, refresh }
 }
 
 export interface ThreadData {
@@ -204,8 +209,9 @@ export interface ThreadData {
   root: MessageData
   replies: MessageData[]
   /**
-   * Its comment was deleted (PER-24): `root` is then the earliest reply, standing in for it, and the one
-   * conversation draws "This comment was deleted." with every message under it and no new reply, as Peek does.
+   * Its comment was not in the read (SPEC §6.5): `root` is then the earliest reply, standing in for it, and the one
+   * conversation draws "This comment was deleted." or "This comment can't be shown." (`useThreadReactions`' `goneBy`)
+   * with every message under it and no new reply, as Peek and Leaf do.
    */
   rootMissing?: true
 }

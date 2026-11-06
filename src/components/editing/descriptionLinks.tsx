@@ -9,7 +9,7 @@ import { Attachment } from '@/components/ui/Attachment'
 import { MessageCard, MessageChip, MessageRow } from '@/components/ui/MessageLinks'
 import { Reference } from '@/components/ui/Reference'
 import { drawAttachment } from '@/components/ui/ShipRichText'
-import { placeDocumentLines, ROW_BLOCK, type RowLine } from '@/lib/messageLines'
+import { placeDocumentLines, ROW_BLOCK, type RowLine } from '@/lib/documentLines'
 
 type Resolved = Record<string, ForeignObjectData | null | undefined>
 

@@ -41,7 +41,7 @@
  */
 import { anchorsOf, isReply, type Strength } from '@estiva-app/conversation'
 import type { SignedEvent } from '@estiva-app/protocol'
-import type { Conversation } from './fold'
+import { threadOnPage, type Conversation } from './fold'
 
 /**
  * Message id → the addresses that message is a **comment on**, by SPEC §6.4.
@@ -121,7 +121,8 @@ export function commentsOn(
   address: string,
   anchors: AnchorIndex,
 ): Conversation[] {
-  return conversations.filter((c) => attachmentOf(c, address, anchors) === 'comment')
+  // A thread whose comment is gone counts here only by its replies about this page (`threadOnPage`, §6.4–§6.5).
+  return conversations.flatMap((c) => threadOnPage(c, address) ?? []).filter((c) => attachmentOf(c, address, anchors) === 'comment')
 }
 
 /**

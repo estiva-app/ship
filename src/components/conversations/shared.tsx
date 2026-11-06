@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { IconBox, IconListDetails } from '@tabler/icons-react'
 import { addressToPointer, cardsIn, encodeNaddr, encodeNevent, referenceOfLink, referencesIn, valueOfReference, type Embed, type Imeta, type LinkResolver, type PartPointer, type RenderBlock } from '@estiva-app/protocol'
+import type { RootState } from '@estiva-app/conversation'
 import type { DraftStore } from '@/lib/drafts'
 import type { Reaction, Resolution } from '@/api'
 import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
@@ -111,8 +112,10 @@ export const PLACE_ICON: Record<'project' | 'issue', ReactNode> = {
 export interface ThreadListViewProps extends ConversationsProps {
   resolved?: Record<string, ForeignObjectData | null | undefined>
   reactionsBy?: Record<string, readonly Reaction[]>
-  /** By message id, each comment resolved in Peek or Leaf: Ship shows it and offers no Resolve (Katerina, 2 November). */
+  /** By thread id, each thread resolved in Peek or Leaf: Ship shows it and offers no Resolve (Katerina, 2 November). */
   resolvedBy?: Record<string, Resolution>
+  /** By thread id, each thread whose comment is gone: deleted, or not readable here (SPEC §6.5). Absent reads as deleted. */
+  goneBy?: Record<string, Exclude<RootState, 'present'>>
   /** Messages past the reactions horizon — CON-1. */
   omitted?: number
   /** The reaction read came back at the relay's page ceiling, so some may be missing — SPEC §6.6. */
@@ -126,6 +129,8 @@ export interface ThreadListViewProps extends ConversationsProps {
 export interface MentionListViewProps extends ActivityProps {
   resolved?: Record<string, ForeignObjectData | null | undefined>
   reactionsBy?: Record<string, readonly Reaction[]>
-  /** By message id, each comment resolved in Peek or Leaf. */
+  /** By thread id, each thread resolved in Peek or Leaf. */
   resolvedBy?: Record<string, Resolution>
+  /** By thread id, each thread whose comment is gone: deleted, or not readable here (SPEC §6.5). Absent reads as deleted. */
+  goneBy?: Record<string, Exclude<RootState, 'present'>>
 }

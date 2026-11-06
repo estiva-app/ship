@@ -11,6 +11,7 @@ import { addrToNaddr, findNaddrs, naddrToAddr, type SignedEvent } from '@estiva-
 import { describe, expect, it, vi } from 'vitest'
 import { renderHook } from '@testing-library/react'
 import { links } from '@/api/linkCards'
+import { foldThreads } from '@estiva-app/conversation'
 import { foldFolder } from '../nostr/fold'
 import { anchorIndex } from '../nostr/references'
 import { foldWorkspace, type WorkspaceState } from '../nostr/store'
@@ -232,6 +233,17 @@ describe('threadFor, for the one conversation’s cards (ONE-6)', () => {
     const thread = threadFor(conversation!, directory)
     expect(thread.rootMissing).toBe(true)
     expect(thread.root.id).toBe('r1')
+  })
+
+  // ONE-9: the page folds its threads again with their resolves and reactions, from the events threadFor hands on.
+  it('hands on the events it was read from, so a resolve read for the page finds its thread', () => {
+    const [C1, R1] = ['c'.repeat(64), 'd'.repeat(64)]
+    const comment = event(C1, [['A', ISSUE], ['K', '30851'], ['h', FOLDER]], 'Ship it?')
+    const reply = event(R1, [['A', ISSUE], ['K', '30851'], ['e', C1], ['k', '1111'], ['h', FOLDER]], 'Yes.')
+    const resolve = { ...event('e'.repeat(64), [['e', C1], ['t', 'resolution'], ['action', 'resolved'], ['h', FOLDER]], 'Done.'), kind: 9101 }
+    const thread = threadFor(foldFolder([comment, reply], refs).conversations[0]!, directory)
+    const events = [thread.root, ...thread.replies].flatMap((m) => m.event ?? [])
+    expect(foldThreads([...events, resolve])[0]?.resolution).toMatchObject({ action: 'resolved', message: 'Done.' })
   })
 
   it('keeps the words a comment written on a selection quotes', () => {

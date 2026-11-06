@@ -1096,6 +1096,29 @@ export class Store {
   }
 
   /**
+   * What the shared fold needs beside a page's messages (ONE-9): every event
+   * `decorationsFor`'s reads return — reactions, resolutions, edits — and, only
+   * for a thread whose comment the read did not return, the `kind:5`s naming it
+   * by `#e`, so the fold can tell a comment its author deleted from one this
+   * reader cannot read (SPEC §6.5). One read more, and only then: 3 such threads
+   * across production on 6 November.
+   */
+  async threadEvents(targets: readonly { id: string; at: number }[], gone: readonly string[]): Promise<{ decorations: Decorations; events: SignedEvent[]; deletionsRead: boolean }> {
+    const events: SignedEvent[] = []
+    const recording: QueryFn = async (filters) => {
+      const answer = (await this.relay.query(filters as never)) as SignedEvent[]
+      events.push(...answer)
+      return answer
+    }
+    // A failed deletion read says nothing about the comments it asked for: the caller must not read it as "none deleted".
+    const [decorations, deletionsRead] = await Promise.all([
+      decorationsOf(targets, recording),
+      gone.length ? recording([{ kinds: [KIND.DELETION], '#e': [...gone], limit: 500 }]).then(() => true, () => false) : true,
+    ])
+    return { decorations, events, deletionsRead }
+  }
+
+  /**
    * React to a message.
    *
    * No `h`, deliberately — `buildReaction` mirrors Buzz's own builder, which

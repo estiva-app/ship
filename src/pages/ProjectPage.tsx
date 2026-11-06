@@ -45,6 +45,7 @@ import {
   commentsOnAny,
   foldWorkspace,
   useMentionsElsewhere,
+  eventOf,
   type CardEdit,
   type DirectoryView,
   type FolderState,
@@ -164,6 +165,8 @@ export function threadFor(
     const edit = edits?.[m.id]
     return {
       id: m.id,
+      // Read again by the shared fold with the page's reactions and resolutions (ONE-9).
+      event: eventOf(m),
       // A NIP-22 comment, or a reply to one, carries an `A`; chat does not (fold.ts).
       kind: m.anchor ? 1111 : 9,
       author: directory.personOf(m.author),
@@ -198,7 +201,7 @@ export function threadFor(
     id: conversation.id,
     root: message(conversation.root),
     replies: conversation.replies.map(message),
-    // Its comment was deleted: `root` is the earliest reply standing in for it (PER-24).
+    // Its comment was not read (deleted, or not readable here): `root` is the earliest reply standing in for it (SPEC §6.5).
     ...(conversation.rootMissing ? { rootMissing: true as const } : {}),
   }
 }
