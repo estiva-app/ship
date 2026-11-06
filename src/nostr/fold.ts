@@ -17,7 +17,7 @@
  */
 import { blockAnchorOf, contentFormatOf, quoteOf, type ContentFormat, type Quote, type SignedEvent } from '@estiva-app/protocol'
 import { fieldsSetBy } from '@estiva-app/interop'
-import { foldThreads } from '@estiva-app/conversation'
+import { foldThreads, isAbout } from '@estiva-app/conversation'
 import { DEFAULT_ISSUE_STATUS, DEFAULT_PROJECT_STATUS, KIND } from './kinds'
 import { summaryText } from './summary'
 
@@ -596,6 +596,40 @@ function conversationsOf(messages: Message[]): Conversation[] {
   }
   conversations.sort((a, b) => b.lastAt - a.lastAt)
   return conversations
+}
+
+/**
+ * A thread as the page at `address` takes it. A thread whose comment is gone
+ * keeps only the messages that are themselves about the page (`isAbout`, §6.4),
+ * as a comment must be: the workspace read files any reply naming the gone id
+ * under it, and one about another page must not speak for this page's thread —
+ * its team (§6.5), and with it which resolve counts. `null` when none is. A
+ * thread whose comment is here is the comment's, and is returned as it is.
+ * Leaf keeps the same (leaf#110).
+ */
+export function threadOnPage(conversation: Conversation, address: string): Conversation | null {
+  if (!conversation.rootMissing) return conversation
+  const kept = [conversation.root, ...conversation.replies].filter((message) => {
+    const event = eventOf(message)
+    return event !== undefined && isAbout(event, address)
+  })
+  const [first, ...rest] = kept
+  if (!first) return null
+  if (first === conversation.root) {
+    if (rest.length === conversation.replies.length) return conversation
+  }
+  // A reply that now stands in for the comment takes back the thread's place, which `conversationsOf` took off it.
+  const block = first === conversation.root ? first.blockId : blockAnchorOf(eventOf(first)!)
+  const root = first === conversation.root ? first : sameEvent(first, { ...first, ...(block ? { blockId: block } : {}) })
+  const group = [root, ...rest]
+  return {
+    ...conversation,
+    root,
+    replies: rest,
+    about: [...new Set(group.flatMap((message) => message.about))],
+    createdAt: root.createdAt,
+    lastAt: Math.max(...group.map((message) => message.createdAt)),
+  }
 }
 
 /** Conversations that concern a particular object. */

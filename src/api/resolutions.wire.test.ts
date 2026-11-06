@@ -25,7 +25,9 @@ vi.mock('./store', async () => {
   return { relay, signer, store: new Store(relay as never, signer as never) }
 })
 
-const { threadsOn } = await import('./index')
+const { threadsOn, commentsOn, eventOf } = await import('./index')
+const { foldFolder } = await import('../nostr/fold')
+const { anchorIndex } = await import('../nostr/references')
 
 const ISSUE = '30851:' + 'a'.repeat(64) + ':issue-1'
 const ANA = 'a'.repeat(64)
@@ -84,6 +86,23 @@ describe('a thread whose comment was not read', () => {
     failDeletions = true
     const { gone } = await threadsOn([goneThread])
     expect(gone[COMMENT]).toBeUndefined()
+  })
+
+  it('is this page’s by its replies about this page: two replies about another page, in another team, do not take its resolve', async () => {
+    // The workspace read files every reply naming the gone comment under it, whatever page and team it was written in.
+    const OTHER = '30851:' + 'a'.repeat(64) + ':issue-2'
+    const elsewhere = (id: string, at: number) =>
+      signed({ id, kind: 1111, pubkey: PEEK_USER, created_at: at, tags: [['A', OTHER], ['K', '30851'], ['e', COMMENT], ['k', '1111'], ['h', 'f2']] })
+    const events = [reply, elsewhere('7'.repeat(64), 61), elsewhere('8'.repeat(64), 62)]
+    const page = commentsOn(foldFolder(events).conversations, ISSUE, anchorIndex(events))
+    expect(page.map((c) => [c.root.id, ...c.replies.map((r) => r.id)])).toEqual([[REPLY]])
+    // A resolve filed in the other team does not count on this page; this page's team's does.
+    const inF2 = signed({ ...assertion('1'.repeat(64), 'resolved', 100, 'Steered.'), tags: [['e', COMMENT], ['t', 'resolution'], ['action', 'resolved'], ['h', 'f2']] })
+    held = [inF2, deletion(ANA)]
+    const read = page.map((c) => ({ id: c.id, gone: c.rootMissing === true, messages: [c.root, ...c.replies].map((m) => ({ id: m.id, at: m.createdAt, event: eventOf(m) })) }))
+    expect((await threadsOn(read)).resolved[COMMENT]).toBeUndefined()
+    held = [assertion('2'.repeat(64), 'resolved', 100, 'Done.'), deletion(ANA)]
+    expect((await threadsOn(read)).resolved[COMMENT]).toMatchObject({ message: 'Done.' })
   })
 
   it('asks for a deletion only when a thread’s comment was not read', async () => {
