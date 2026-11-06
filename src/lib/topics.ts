@@ -18,7 +18,7 @@ export interface TopicRowData {
   projects: { done: number; total: number }
   /** Its conversations in Peek; `undefined` until they are read. */
   conversations?: number
-  /** How many of them have something new for you: only on your own open topics, as Peek's dot. */
+  /** How many of them have something new for you, as Peek's dot: at your level on a topic you follow, and a mention on any. */
   fresh: number
 }
 
@@ -42,6 +42,13 @@ const byTitle = (a: TopicRowData, b: TopicRowData) => a.title.localeCompare(b.ti
  * to topic agree (Miky, 3 Nov, on Widgets). `folder` keeps only the topics
  * filed in it.
  *
+ * Your topics are the ones you follow, by the shared fold (interop's
+ * `following.in`): made, joined, added or a level chosen since your last
+ * leave; writing in one is not following it. A topic you muted is with the
+ * others, as Peek's switch shows a mute as Not following (`muted`, your
+ * `estiva:muted:v1`; until it is read, nothing is taken out).
+ * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/writing-in-a-place-never-follows-it.md
+ *
  * Its work is judged by Ship's own fold: a listed address Ship holds as a
  * project or an issue, so a row agrees with the project and issue pages.
  * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-space-is-the-teams-own-mark-on-a-topic-it-lists.md
@@ -51,6 +58,7 @@ export function topicsByTab(
   work: TopicWork,
   conversations: ReadonlyMap<string, TopicConversation> | undefined,
   folder?: string,
+  muted?: ReadonlySet<string>,
 ): Record<TopicsTab, TopicRowData[]> {
   // A deleted project is in no list (SPEC §6.5): a topic listing only that is no row.
   const projects = new Map(work.projects.filter((project) => !project.deleted).map((project) => [project.addr, project]))
@@ -79,7 +87,7 @@ export function topicsByTab(
       continue
     }
     lists.all.push(row)
-    lists[topic.yours ? 'yours' : 'others'].push(row)
+    lists[topic.yours && !muted?.has(topic.address) ? 'yours' : 'others'].push(row)
   }
   for (const list of Object.values(lists)) list.sort(byTitle)
   return lists

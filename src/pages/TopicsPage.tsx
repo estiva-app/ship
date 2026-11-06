@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { FolderSummary } from '@estiva-app/interop'
 import type { FolderState } from '@/api'
-import { reloadTopics, useTopicConversations, useTopics } from '@/api/topics'
+import { reloadTopics, useMuted, useTopicConversations, useTopics } from '@/api/topics'
 import { topicsByTab, type TopicsTab } from '@/lib/topics'
 import { TopicsView } from '@/views/TopicsView'
 
@@ -22,10 +22,11 @@ export function TopicsPage({ state, folders, folder }: { state: FolderState; fol
     const { all, archived } = topicsByTab(held, { projects: state.projects, issues: state.issues }, undefined, folder)
     return [...all, ...archived].map((row) => row.address).sort().join(' ')
   }, [held, state.projects, state.issues, folder])
-  const conversations = useTopicConversations(held, drawn)
+  const muted = useMuted()
+  const conversations = useTopicConversations(held, drawn, muted)
   const lists = useMemo(
-    () => (held ? topicsByTab(held, { projects: state.projects, issues: state.issues }, conversations, folder) : undefined),
-    [held, state.projects, state.issues, conversations, folder],
+    () => (held ? topicsByTab(held, { projects: state.projects, issues: state.issues }, conversations, folder, muted) : undefined),
+    [held, state.projects, state.issues, conversations, folder, muted],
   )
   const folderName = folder ? (folders?.find((summary) => summary.id === folder)?.name ?? 'Untitled team') : undefined
   return (
