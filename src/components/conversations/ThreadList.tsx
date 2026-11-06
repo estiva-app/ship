@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { IconX } from '@tabler/icons-react'
 import type { Imeta } from '@estiva-app/protocol'
-import { ConversationLayout, ConversationPlace, EmptyState, IconButton, SkeletonList, Thread as KitThread, type ConversationItem } from '@estiva-app/ui'
+import { ConversationLayout, ConversationPlace, EmptyState, GONE_CLOSED, IconButton, SkeletonList, Thread as KitThread, type ConversationItem } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
 import { ago } from '@/lib/time'
 import { draftKeys, type DraftStore } from '@/lib/drafts'
-import { offersEditAndDelete } from '@estiva-app/conversation'
+import { offersEditAndDelete, type RootState } from '@estiva-app/conversation'
 import { REACTION_HORIZON, me, type Reaction, type Resolution } from '@/api'
 import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
 import { BlockAnchorNote } from '@/components/ui/BlockAnchorNote'
@@ -78,12 +78,20 @@ function useThreadScope(pageThreads: readonly ThreadData[], threadId: string, na
 }
 
 interface ShipThreadProps extends ThreadProps {
-  /** By message id, each comment resolved in Peek or Leaf. */
+  /** By thread id, each thread resolved in Peek or Leaf. */
   resolvedBy?: Record<string, Resolution>
+  /** By thread id, each thread whose comment is gone, as the page's read found it. */
+  goneBy?: Record<string, Exclude<RootState, 'present'>>
 }
 
-/** A deleted comment's stand-in is its earliest reply: every message hangs under "This comment was deleted." (PER-24). */
+/** A gone comment's stand-in is its earliest reply: every message hangs under "This comment was deleted." or "can't be shown." (SPEC §6.5). */
 const repliesOf = (thread: ThreadData) => (thread.rootMissing ? [thread.root, ...thread.replies] : thread.replies)
+
+/**
+ * Whether a thread's comment is gone, and how (SPEC §6.5, ONE-9): `deleted` by its author, or `missing`, not readable
+ * here. Until the page's read says which, it reads as deleted, as every such thread on production was (6 November).
+ */
+const goneOf = (thread: ThreadData, goneBy?: Record<string, Exclude<RootState, 'present'>>) => (thread.rootMissing ? (goneBy?.[thread.id] ?? 'deleted') : undefined)
 
 /** Who replied, once each, for the replies row's faces. */
 const facesOf = (replies: readonly MessageData[]) =>
@@ -107,9 +115,10 @@ function toolsFor(message: MessageData, { disabledReason, viewer, reactionsBy, o
  * React, Edit, Delete or Reply of its own (PER-24).
  */
 function ShipThreadComment(props: ShipThreadProps) {
-  const { thread, pageThreads, disabledReason, stillUnread, resolved, here, nameOf, viewer, drafts, resolvedBy } = props
+  const { thread, pageThreads, disabledReason, stillUnread, resolved, here, nameOf, viewer, drafts, resolvedBy, goneBy } = props
   const { references, captions } = useThreadScope(pageThreads, thread.id, nameOf)
-  const deleted = thread.rootMissing === true
+  const gone = goneOf(thread, goneBy)
+  const deleted = gone !== undefined
   const replies = repliesOf(thread)
   const isNew = (id: string) => !!stillUnread?.includes(id)
   const last = replies.at(-1)
@@ -125,13 +134,15 @@ function ShipThreadComment(props: ShipThreadProps) {
       references={references}
       captions={captions}
       closed={!!disabledReason}
-      // A deleted comment has nothing of its own to react to, edit or delete: its stand-in is a reply below.
+      // A gone comment has nothing of its own to react to, edit or delete: its stand-in is a reply below.
       {...(deleted ? {} : toolsFor(thread.root, props))}
-      deleted={deleted}
+      deleted={gone === 'deleted'}
+      unseen={gone === 'missing'}
       isNew={!deleted && isNew(thread.root.id)}
       repliesLeftBehind={thread.replies.length}
       replies={last ? { count: replies.length, faces: facesOf(replies), last: ago(last.at), newCount: replies.filter((reply) => isNew(reply.id)).length } : undefined}
-      resolution={deleted ? undefined : resolvedBy?.[thread.root.id]}
+      // A thread stays as its last resolve or reopen left it, its comment gone or not (SPEC §6.4).
+      resolution={resolvedBy?.[thread.id]}
     />
   )
 }
@@ -145,7 +156,7 @@ function ShipThreadReplies(props: ShipThreadProps) {
   const { references, captions } = useThreadScope(pageThreads, thread.id, nameOf)
   const writable = !disabledReason
   const deleted = thread.rootMissing === true
-  const common = { resolved, here, boxHere: here, nameOf, viewer, drafts, references, captions, closed: !writable }
+  const common ={ resolved, here, boxHere: here, nameOf, viewer, drafts, references, captions, closed: !writable }
   return (
     <KitThread
       place="under"
@@ -167,7 +178,7 @@ function ShipThreadReplies(props: ShipThreadProps) {
         ) : undefined
       }
       // Closed (an archived file, signed out): no box and no line; the start box's line already says why.
-      notice={writable && deleted ? 'The comment was deleted, so this thread takes no new replies.' : undefined}
+      notice={writable && deleted ? GONE_CLOSED : undefined}
     >
       {repliesOf(thread).map((reply) => (
         <ShipReply key={reply.id} message={reply} {...common} {...toolsFor(reply, props)} isNew={!!stillUnread?.includes(reply.id)} />
@@ -206,13 +217,13 @@ export function ThreadListView(props: ThreadListViewProps) {
     return () => onShown(openId, false)
   }, [openId, onShown])
   const items: ConversationItem[] = threads.map((thread) => {
-    const shared: ShipThreadProps = { thread, pageThreads: threads, stillUnread: (props.stillUnread ?? unread)?.[thread.id], resolvedBy: props.resolvedBy, ...threadProps(props) }
+    const shared: ShipThreadProps = { thread, pageThreads: threads, stillUnread: (props.stillUnread ?? unread)?.[thread.id], resolvedBy: props.resolvedBy, goneBy: props.goneBy, ...threadProps(props) }
     return {
       id: thread.id,
       card: <ShipThreadComment {...shared} />,
       thread: () => <ShipThreadReplies {...shared} />,
       // Resolved in Peek or Leaf: closed under "Resolved", at the end (Katerina, 2 November).
-      resolved: !thread.rootMissing && !!props.resolvedBy?.[thread.root.id],
+      resolved: !!props.resolvedBy?.[thread.id],
       // On a block since removed from the description (§13.6): closed under "On deleted blocks", before "Resolved".
       gone: thread.root.anchor?.state === 'detached',
     }
@@ -283,9 +294,9 @@ export function ThreadListView(props: ThreadListViewProps) {
  * resolution and its replies row as they are. A press on it, or on its replies, opens the page it was said on, when
  * Ship has that page.
  */
-function MentionCard({ item, here, nameOf, viewer, resolved, reactions, resolution }: { item: ActivityItem; here?: string; nameOf?: (pubkey: string) => string; viewer?: string; resolved?: MentionListViewProps['resolved']; reactions?: readonly Reaction[]; resolution?: Resolution }) {
+function MentionCard({ item, here, nameOf, viewer, resolved, reactions, resolution, gone }: { item: ActivityItem; here?: string; nameOf?: (pubkey: string) => string; viewer?: string; resolved?: MentionListViewProps['resolved']; reactions?: readonly Reaction[]; resolution?: Resolution; gone?: Exclude<RootState, 'present'> }) {
   const { thread } = item
-  const deleted = thread.rootMissing === true
+  const deleted = gone !== undefined
   const replies = repliesOf(thread)
   const last = replies.at(-1)
   const where = item.href
@@ -299,10 +310,11 @@ function MentionCard({ item, here, nameOf, viewer, resolved, reactions, resoluti
       viewer={viewer}
       closed
       reactions={reactions}
-      deleted={deleted}
+      deleted={gone === 'deleted'}
+      unseen={gone === 'missing'}
       replies={last ? { count: replies.length, faces: facesOf(replies), last: ago(last.at) } : undefined}
       onClick={where ? () => navigateTo(where) : undefined}
-      resolution={deleted ? undefined : resolution}
+      resolution={resolution}
     />
   )
 }
@@ -313,7 +325,7 @@ function MentionCard({ item, here, nameOf, viewer, resolved, reactions, resoluti
  * Ship's note on what this reader cannot see, and on the horizon.
  */
 export function MentionListView(props: MentionListViewProps) {
-  const { items, truncated = 0, className, about, nameOf, viewer, resolved, reactionsBy, resolvedBy } = props
+  const { items, truncated = 0, className, about, nameOf, viewer, resolved, reactionsBy, resolvedBy, goneBy } = props
   if (props.loading) return <SkeletonList rows={2} />
   if (!items.length) return <EmptyState scope="section" className={className} message="No related conversations yet." />
   return (
@@ -321,7 +333,7 @@ export function MentionListView(props: MentionListViewProps) {
       {items.map((item) => (
         // A place Ship cannot name gets no invented one (ActivityItem.where): the chip alone.
         <ConversationPlace key={item.thread.id} relation={(RELATION[item.relation] ?? { label: item.relation }).label} place={item.where} data-relation={item.relation}>
-          <MentionCard item={item} here={about} nameOf={nameOf} viewer={viewer} resolved={resolved} reactions={reactionsBy?.[item.thread.root.id]} resolution={resolvedBy?.[item.thread.root.id]} />
+          <MentionCard item={item} here={about} nameOf={nameOf} viewer={viewer} resolved={resolved} reactions={item.thread.rootMissing ? undefined : reactionsBy?.[item.thread.root.id]} resolution={resolvedBy?.[item.thread.id]} gone={goneOf(item.thread, goneBy)} />
         </ConversationPlace>
       ))}
       <p className="text-caption text-text-muted">
@@ -339,7 +351,7 @@ export function MentionListView(props: MentionListViewProps) {
  */
 export function ThreadList(props: ConversationsProps & Pick<ThreadListViewProps, 'upload' | 'drafts'>) {
   const { resolved } = useThreadReferences(props.threads)
-  const { reactionsBy, omitted, cut, resolvedBy, refresh } = useThreadReactions(props.threads)
+  const { reactionsBy, omitted, cut, resolvedBy, goneBy, refresh } = useThreadReactions(props.threads)
   const onReact = props.onReact
     ? async (messageId: string, emoji: string, mine?: string) => {
         const answer = await props.onReact!(messageId, emoji, mine)
@@ -347,13 +359,13 @@ export function ThreadList(props: ConversationsProps & Pick<ThreadListViewProps,
         return answer
       }
     : undefined
-  return <ThreadListView {...props} onReact={onReact} resolved={resolved} reactionsBy={reactionsBy} resolvedBy={resolvedBy} omitted={omitted} reactionsCut={cut} viewer={props.viewer ?? me} />
+  return <ThreadListView {...props} onReact={onReact} resolved={resolved} reactionsBy={reactionsBy} resolvedBy={resolvedBy} goneBy={goneBy} omitted={omitted} reactionsCut={cut} viewer={props.viewer ?? me} />
 }
 
 /** "Mentioned in" with production's `Activity` props and its reads: the files they link, their reactions and resolutions. */
 export function MentionList(props: ActivityProps) {
   const threads = useMemo(() => props.items.map((item) => item.thread), [props.items])
   const { resolved } = useThreadReferences(threads)
-  const { reactionsBy, resolvedBy } = useThreadReactions(threads)
-  return <MentionListView {...props} resolved={resolved} reactionsBy={reactionsBy} resolvedBy={resolvedBy} viewer={props.viewer ?? me} />
+  const { reactionsBy, resolvedBy, goneBy } = useThreadReactions(threads)
+  return <MentionListView {...props} resolved={resolved} reactionsBy={reactionsBy} resolvedBy={resolvedBy} goneBy={goneBy} viewer={props.viewer ?? me} />
 }

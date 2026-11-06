@@ -22,7 +22,7 @@ export { useMentionsElsewhere } from './mentionsElsewhere'
 export type { Directory, Profile } from '../nostr/profiles'
 export { initials } from '../nostr/profiles'
 export { ISSUE_STATUSES, PROJECT_STATUSES, lookupStatus, progressOf, projectStatus, type VocabEntry } from '../nostr/kinds'
-export { conversationsAbout } from '../nostr/fold'
+export { conversationsAbout, eventOf } from '../nostr/fold'
 export { keyProblem, projectKeys, suggestKey, takenKeys } from '../nostr/keys'
 /*
   The two lists, and the rule that separates them — SPEC §6.4, CON-7.
@@ -91,8 +91,8 @@ export {
 export { clockProblem } from './clock'
 import { signer, store } from './store'
 import { firstLoad } from './foreign'
-import { groupReactions, type EditFold, type Reaction, type Resolution } from '@estiva-app/conversation'
-import type { Imeta } from '@estiva-app/protocol'
+import { foldThreads, type EditFold, type Reaction, type Resolution, type RootState } from '@estiva-app/conversation'
+import type { Imeta, SignedEvent } from '@estiva-app/protocol'
 
 
 /**
@@ -119,40 +119,61 @@ export function reloadFolders(previous: WorkspaceEvents, folders: string[]): Pro
   return store.reloadFolders(previous, folders)
 }
 
+/** A thread of a page, as `threadsOn` reads it: its messages' events, and whether its comment was not in the read. */
+export interface ThreadToRead {
+  id: string
+  /** Its messages, the comment first when it is there: their ids and `created_at`, and the events themselves. */
+  messages: readonly { id: string; at: number; event?: SignedEvent }[]
+  /** Its comment was not in the workspace read (`Conversation.rootMissing`). */
+  gone: boolean
+}
+
 /**
- * Reactions on a set of messages, folded into counts — CON-2.
+ * A page's threads, folded by the one shared fold (`foldThreads`, SPEC
+ * §6.4–§6.6, ONE-9) with what is read about them by target — CON-2, PEEK-128.
  *
  * Addressed by target because a `kind:7` carries no `h` (SPEC §6.6), through
  * the package's `decorationsOf`: the newest 100 targets by `created_at`, one
- * per `(target, pubkey, emoji)`, and both cuts reported. Sorted most reacted
- * first here, which §6.6 leaves to the app.
+ * per `(target, pubkey, emoji)`, and both cuts reported. Reactions come keyed
+ * by person, as Peek and Leaf count them; sorted most reacted first here,
+ * which §6.6 leaves to the app.
  *
- * The same read brings each message's resolutions (`kind:9101`, PEEK-128):
- * `resolved` keeps the ones whose last word is "resolved", whoever wrote it,
- * as Peek reads them. Ship writes none (Katerina, 2 November); it shows the
- * ones made in Peek and Leaf.
+ * The same read brings each thread's resolutions (`kind:9101`): the one that
+ * counts by §6.4 is the thread's state, whoever wrote it, also under a comment
+ * that is gone. Ship writes none yet (Katerina, 2 November). And a thread whose
+ * comment was not returned asks for its `kind:5`: deleted by its author, or
+ * `missing`, one this reader cannot read (§6.5).
  */
-export async function reactionsOn(targets: readonly { id: string; at: number }[]): Promise<{
+export async function threadsOn(threads: readonly ThreadToRead[]): Promise<{
   reactions: ReactionsByTarget
   /** Targets past the horizon, not asked about. */
   omitted: number
   /** Whether the relay may hold reactions this read did not bring back. */
   cut: boolean
-  /** By message id, the resolution of each message that stands resolved; a reopened one is absent. */
+  /** By thread id, the resolution of each thread that stands resolved; a reopened one is absent. */
   resolved: Record<string, Resolution>
+  /** By thread id, each thread whose comment is gone: deleted by its author, or not readable here. */
+  gone: Record<string, Exclude<RootState, 'present'>>
 }> {
-  const decorations = await store.decorationsFor(targets)
-  const reactions = groupReactions(
-    Object.values(decorations.byId).flatMap((d) => d.reactions),
-    signer.pubkey,
-  )
-  for (const list of Object.values(reactions)) list.sort((a, b) => b.count - a.count)
+  // A gone comment is a target too, for its thread's resolution: dated by its earliest reply.
+  const goneIds = threads.filter((thread) => thread.gone).map((thread) => thread.id)
+  const targets = [
+    ...threads.flatMap((thread) => thread.messages.map(({ id, at }) => ({ id, at }))),
+    ...threads.filter((thread) => thread.gone).map((thread) => ({ id: thread.id, at: thread.messages[0]?.at ?? 0 })),
+  ]
+  const { decorations, events } = await store.threadEvents(targets, goneIds)
+  const folded = foldThreads([...threads.flatMap((thread) => thread.messages.flatMap((m) => m.event ?? [])), ...events], { viewer: signer.pubkey })
+  const reactions: ReactionsByTarget = {}
   const resolved: Record<string, Resolution> = {}
-  for (const [id, decoration] of Object.entries(decorations.byId)) {
-    const last = decoration.resolutions.at(-1)
-    if (last?.action === 'resolved') resolved[id] = last
+  const gone: Record<string, Exclude<RootState, 'present'>> = {}
+  for (const thread of folded) {
+    for (const message of [...(thread.root ? [thread.root] : []), ...thread.replies]) {
+      if (message.reactions.length) reactions[message.id] = [...message.reactions].sort((a, b) => b.count - a.count)
+    }
+    if (thread.resolution?.action === 'resolved') resolved[thread.id] = thread.resolution
+    if (thread.state !== 'present') gone[thread.id] = thread.state
   }
-  return { reactions, omitted: decorations.reactionTargetsOmitted, cut: decorations.reactionEventsCut, resolved }
+  return { reactions, omitted: decorations.reactionTargetsOmitted, cut: decorations.reactionEventsCut, resolved, gone }
 }
 
 /** kind:0 profiles for a set of pubkeys — names and faces, never keys. */

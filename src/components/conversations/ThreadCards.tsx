@@ -189,6 +189,8 @@ function cardProps(props: ShipMessageProps, writes: ReturnType<typeof useMessage
 export interface ShipCommentProps extends ShipMessageProps {
   /** Its comment was deleted (PER-24): "This comment was deleted.", its replies under it, and no new reply. */
   deleted?: boolean
+  /** Its comment was not read and nothing says it was deleted (SPEC §6.5, ONE-9): "This comment can't be shown.", drawn as a deleted one is. */
+  unseen?: boolean
   /** Its thread's row: how many replied, their faces, the last time, how many are new. */
   replies?: Omit<RepliesRowProps, 'urgent'>
   /** How many replies a deletion leaves behind, said in the question. */
@@ -204,13 +206,14 @@ export interface ShipCommentProps extends ShipMessageProps {
 /** A thread's comment on the kit's `ConversationCard`, in Ship's words. */
 export function ShipComment(props: ShipCommentProps) {
   const writes = useMessageWrites(props)
-  const { message, nameOf, deleted = false, replies, repliesLeftBehind = 0, onReply, onClick, resolution } = props
+  const { message, nameOf, deleted = false, unseen = false, replies, repliesLeftBehind = 0, onReply, onClick, resolution } = props
   const named = (pubkey: string) => nameOf?.(pubkey) ?? `${pubkey.slice(0, 8)}…`
   return (
     <ConversationCard
       {...cardProps(props, writes)}
       about={aboutOf(message, nameOf)}
       deleted={deleted}
+      unseen={unseen}
       deleteNote={deleteNote(repliesLeftBehind)}
       replies={replies}
       onReply={onReply}

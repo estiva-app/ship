@@ -33,6 +33,16 @@ describe('a thread whose comment was deleted', () => {
   })
 })
 
+// ONE-9: NIP-22 nests a reply to a reply by its lowercase `e` alone, with no `E`, as Peek's thread column writes it.
+describe('a reply to a reply', () => {
+  it('is filed in its thread, under the thread’s comment, not as a thread of its own', () => {
+    const { conversations } = foldFolder([comment('c1', 5), replyTo('c1', 'r1', 10), replyTo('r1', 'r2', 20)])
+    expect(conversations).toHaveLength(1)
+    expect(conversations[0]!.root.id).toBe('c1')
+    expect(conversations[0]!.replies.map((r) => r.id)).toEqual(['r1', 'r2'])
+  })
+})
+
 describe('a comment written on a selection (Leaf, LEAF-7)', () => {
   it('keeps the words it quotes, start and end', () => {
     const { conversations } = foldFolder([comment('c1', 5, [['quote', 'The board loses', 'its order']])])

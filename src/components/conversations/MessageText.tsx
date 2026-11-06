@@ -3,12 +3,12 @@ import { linksAsReferences, toRenderTree, valueOfReference, valuesIn, type Embed
 import { RichText } from '@estiva-app/ui'
 import type { ForeignObject } from '@/api/foreign'
 import { knownLinkValue } from '@/api/linkCards'
-import { MAX_PARTS_PER_MESSAGE, urlNamesAddress } from '@/api/part'
+import { placeLines, ROW_BLOCK, urlNames, type RowLine } from '@estiva-app/conversation'
+import { MAX_PARTS_PER_MESSAGE } from '@/api/part'
 import { linksIn } from '@estiva-app/interop'
 import { MessageCard, MessageChip, MessageRow } from '@/components/ui/MessageLinks'
 import { PartCard } from '@/components/ui/PartCard'
 import { drawAttachment } from '@/components/ui/ShipRichText'
-import { placeLines, ROW_BLOCK, type RowLine } from '@/lib/messageLines'
 import { linkResolverFor } from '@/lib/linksNamingCards'
 import { MESSAGE_FORMAT, cardsOf, referenceOfValue } from './shared'
 
@@ -59,7 +59,7 @@ export function MessageText({
   const tree = !partTags?.length ? [] : toRenderTree(body, MESSAGE_FORMAT)
   const named = new Set(valuesIn(tree, () => undefined))
   const urls = linksIn(tree)
-  const parts = (partTags ?? []).filter((part) => named.has(part.address) || urls.some((url) => urlNamesAddress(url, part.address))).slice(0, MAX_PARTS_PER_MESSAGE)
+  const parts = (partTags ?? []).filter((part) => named.has(part.address) || urls.some((url) => urlNames(url, part.address))).slice(0, MAX_PARTS_PER_MESSAGE)
   // A bare link reads as that file's link once what it names has come back and can be read; until then, and for good
   // when it cannot, it stays the URL it was written as (OPT-18).
   const resolveLink = (url: string) => {
