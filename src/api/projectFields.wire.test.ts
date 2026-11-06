@@ -18,6 +18,8 @@ let paged: Record<string, unknown>[][] = []
 /** While set, a paged read of a Folder by `#h` runs it before answering: what was asked while that Folder was still being read. */
 let folderRead: (() => Promise<void>) | undefined
 let count = 0
+/** The relay announces no switch (its NIP-11 has no `files`), as production's does until ALO-8. */
+let switchOff = false
 
 const dOf = (event: SignedEvent) => event.tags.find((t) => t[0] === 'd')?.[1]
 const tagOf = (event: SignedEvent, name: string) => event.tags.find((t) => t[0] === name)?.[1]
@@ -84,7 +86,8 @@ vi.mock('./store', async () => {
       return { ok: true }
     },
   }
-  const projectFieldsNow = async () => ({ text: true })
+  // `switchOff` is read at call time, so a test can run Ship as production does today: no switch announced.
+  const projectFieldsNow = async () => (switchOff ? undefined : { text: true })
   return { relay, signer, projectFieldsNow, store: new Store(relay as never, signer as never, async () => 0, projectFieldsNow) }
 })
 vi.mock('./clock', () => ({ clockProblem: async () => undefined }))
@@ -110,6 +113,7 @@ beforeEach(() => {
   asked = []
   paged = []
   folderRead = undefined
+  switchOff = false
   sent.length = 0
 })
 
@@ -151,7 +155,7 @@ describe('deleting a project, with the switch on', () => {
   it('is a change setting deleted, and no kind 5 and no unlisting', async () => {
     held = [root('p')]
     const { project: p } = await project('p')
-    expect(await deleteProject(p, [{ id: FOLDER, hasState: true, addresses: [p.addr] }])).toEqual({ ok: true })
+    expect(await deleteProject(p)).toEqual({ ok: true })
     expect(sent).toHaveLength(1)
     expect(sent[0]).toMatchObject({ kind: 1851 })
     expect(tagOf(sent[0], 'field')).toBe('deleted')
@@ -166,6 +170,32 @@ describe('deleting a project, with the switch on', () => {
     expect(await setProjectDeleted(gone, false)).toEqual({ ok: true })
     expect(tagOf(sent.at(-1)!, 'value')).toBe('')
     expect(sent.at(-1)!.tags).toContainEqual(['prev', 'x1'.padEnd(64, '0')])
+    const { project: back } = await project('p')
+    expect(back.deleted).toBeUndefined()
+  })
+})
+
+describe('deleting a project, with the switch off (ALO-6)', () => {
+  it('is the same restorable change Peek and Claude write: no kind 5 only its author could send, and no unlisting', async () => {
+    switchOff = true
+    held = [root('p')]
+    const { project: p } = await project('p')
+    expect(await deleteProject(p)).toEqual({ ok: true })
+    expect(sent.map((event) => event.kind)).toEqual([1851])
+    expect(tagOf(sent[0], 'field')).toBe('deleted')
+    expect(tagOf(sent[0], 'value')).toBe('true')
+    expect(sent[0].tags).toContainEqual(['prev', root('p').id])
+  })
+
+  it('leaves the project out of the switch-off load as deleted, and Restore from its link brings it back', async () => {
+    switchOff = true
+    held = [root('p')]
+    const { project: p } = await project('p')
+    await deleteProject(p)
+    const { project: gone } = await project('p')
+    expect(gone.deleted).toEqual({ by: PK, at: expect.any(Number) })
+    expect(await setProjectDeleted(gone, false)).toEqual({ ok: true })
+    expect(sent.at(-1)!.tags).toContainEqual(['prev', sent[0].id])
     const { project: back } = await project('p')
     expect(back.deleted).toBeUndefined()
   })

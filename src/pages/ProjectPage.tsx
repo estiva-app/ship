@@ -1009,34 +1009,20 @@ export function ProjectPage({
           destructive
           onClose={() => setDialog(null)}
           onConfirm={async () => {
-            const result = await deleteProject(project, teams)
+            const result = await deleteProject(project)
             if (!result.ok) {
               say(`Delete rejected — ${result.reason}`, 'error')
               return false
             }
-            if (result.stillListed) say(`Project deleted, but its team refused to unlist it: ${result.stillListed}. Peek may keep showing a row for it.`, 'error')
-            else say('Project deleted')
+            say('Project deleted')
             // Nothing left to render here.
             go({ name: 'projects' })
             await refresh()
             return true
           }}
         >
-          {byFields ? (
-            // Restorable, so archiving is no safer: nothing steers away from it (ALO-5).
-            <p>It leaves every list and search. Its link still opens it, with Restore.</p>
-          ) : (
-            <>
-              <p>This publishes a NIP-09 deletion request. Relays may decline it, and copies held elsewhere are unaffected.</p>
-              {issues.length > 0 && (
-                <p>
-                  Its {issues.length} {issues.length === 1 ? 'issue is a separate event and is' : 'issues are separate events and are'} not deleted — they stay in the team and stop being
-                  reachable from here.
-                </p>
-              )}
-              <p className="text-text-secondary">Archiving is reversible and usually what you want.</p>
-            </>
-          )}
+          {/* Restorable, so archiving is no safer: nothing steers away from it (ALO-5, ALO-6). */}
+          <p>It leaves every list and search. Its link still opens it, with Restore.</p>
         </ConfirmDialog>
       )}
     </>

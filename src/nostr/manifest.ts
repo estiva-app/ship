@@ -671,7 +671,8 @@ export function manifestContent(): ManifestContent {
           it follows. It stays listed in its Folders and keeps its id, record
           and changes; readers leave it out (SPEC §6.5). It was the `kind:5`
           and a `kind:1852 remove` from every Folder naming it (FOL-48), which
-          nobody could undo; Ship still sends those with the switch off.
+          nobody could undo. Ship's own Delete writes this change too, with
+          the switch on or off.
           why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-file-is-its-fields-each-kept-in-order-by-the-relay.md
       */
       {

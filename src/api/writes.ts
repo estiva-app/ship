@@ -8,7 +8,7 @@ import type { Conversation, Issue, Project } from '../nostr/fold'
 import { clashes, explicitKey, keyOfRef, nextRef, projectKeys, suggestKey, takenKeys } from '../nostr/keys'
 import { RELAY_URL } from '../config'
 import { clockProblem } from './clock'
-import { loadQuery, readFolderListing, readFolders } from './foreign'
+import { loadQuery, readFolderListing } from './foreign'
 import { links } from './linkCards'
 import { linkResolverFor } from '../lib/linksNamingCards'
 import { isRelayBusy } from '../lib/relayBudget'
@@ -249,51 +249,18 @@ export async function archiveFolder(folder: { id: string; channel: string }, arc
 }
 
 /**
- * Delete is a NIP-09 *request*: relays may decline, copies elsewhere are
- * untouched, and it removes the record, not the issues.
+ * Delete a project: the `deleted` change, whether or not the relay announces
+ * the switch, because Ship's manifest declares Delete as that change and every
+ * app writing it must be restorable by anyone who may edit (ALO-6). It used to
+ * be a `kind:5` and an unlist from every team listing it (FOL-48) with the
+ * switch off, which only its author could send and nobody could undo, while
+ * Peek's and Claude's Delete of the same project could be restored.
  *
- * The page offers it to everyone and lets the relay adjudicate, the way
- * archiving already does. It used to be hidden from anyone but the author,
- * which was narrower than the rule it was modelling: the relay accepts a
- * deletion from the author **or** from the owner of an authoring agent
- * (`is_agent_owner`). Ship cannot evaluate that half — ownership lives in
- * `users.agent_owner_pubkey`, which no event carries and no route returns —
- * so guessing it hid the control from the one person most likely to want it,
- * and left an agent-authored project nobody could remove (SHI-14).
- *
- * Then it is unlisted from its team (FOL-48). Whether the team has state comes
- * from the Folder read the caller already holds (`useFolders`), or a fresh one
- * if that has not landed — never a guess. A refused unlist is still a deleted
- * project, so it comes back `ok` with `stillListed` saying why Peek keeps the row.
- *
- * **The team is whichever Folders list it** (FOL-7): after a move that is no
- * longer its content Folder, which keeps its conversation. Only when none of
- * the caller's Folders lists it is the content Folder the one unlisted.
+ * Everyone is offered it and the relay adjudicates, as with archiving (SHI-14).
+ * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/every-file-is-an-artifact-the-relay-keeps-in-order.md
  */
-export async function deleteProject(
-  project: Project,
-  folders: readonly { id: string; hasState: boolean; addresses?: readonly string[] }[] | undefined,
-): Promise<WriteResult & { stillListed?: string }> {
-  if (await projectFieldsNow()) return setProjectDeleted(project, true)
-  const clock = await clockProblem()
-  if (clock) return refused(clock)
-  try {
-    type Read = readonly { id: string; hasState: boolean; addresses?: readonly string[] }[]
-    const listing = (list: Read) => list.filter((folder) => folder.addresses?.includes(project.addr)).map((folder) => ({ folder: folder.id, hasState: folder.hasState }))
-    const own = (list: Read) => list.find((folder) => folder.id === project.contentFolder)
-    // Neither listed in nor holding its content Folder is not "no state": the
-    // read may not have landed, or it lists Folders the caller did not pass. Ask the relay.
-    const held = folders ?? []
-    const read = listing(held).length > 0 || own(held) ? held : await readFolders()
-    const lists = listing(read)
-    const unlistFrom = lists.length > 0 ? lists : [{ folder: project.contentFolder, hasState: own(read)?.hasState ?? false }]
-    const { result, unlisted } = await store.deleteProject({ recordFolder: project.contentFolder, project: project.addr, folders: unlistFrom })
-    if (!result.ok) return refused(result.reason)
-    if (unlisted && !unlisted.ok) return { ok: true, stillListed: unlisted.reason ?? 'no reason given' }
-    return { ok: true }
-  } catch (error) {
-    return refused(error instanceof Error ? error.message : String(error))
-  }
+export function deleteProject(project: Project): Promise<WriteResult> {
+  return setProjectDeleted(project, true)
 }
 
 /** What a move says when it stopped: nothing moved (a sentence, and `changed` when the Folders must be read again), or half moved. */
