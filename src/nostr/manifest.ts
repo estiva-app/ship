@@ -39,6 +39,7 @@
 import { BLOCK_DOCUMENT_FORMAT, toNostrSeconds, type NostrTag, type UnsignedEvent } from '@estiva-app/protocol'
 import {
   ARCHIVED_STATES,
+  DELETED_STATES,
   DEFAULT_ISSUE_STATUS,
   DEFAULT_PROJECT_STATUS,
   ISSUE_STATUSES,
@@ -391,6 +392,8 @@ export function manifestContent(): ManifestContent {
         picker already treats it.
       */
       archived: ARCHIVED_STATES,
+      // `delete-project`'s two values, for the same reason (ALO-6).
+      deleted: DELETED_STATES,
     },
 
     // ── What another app may DO ───────────────────────────────────────────
@@ -414,9 +417,9 @@ export function manifestContent(): ManifestContent {
       the owner of an authoring agent too (SPEC §6.5, SHI-14) — no client can
       evaluate that half, so every app offers the control and reports the
       relay's answer, which is exactly what a declared action lets a consumer
-      do. Deleting a project waited on MAN-1, because Ship also unlists it from
-      its Folder and a consumer given only the `kind:5` would leave that half
-      behind; `listed: true` (SPEC §7.3) is how it now says so.
+      do. A project's delete is a change since ALO-6, `true` or empty like
+      archive, so it can be restored; still `destructive`, since it takes the
+      project out of every list for everyone.
 
       Archive is `writes`, not `destructive`: it is a folded field, reversible
       by anyone in the Folder, and nothing is removed.
@@ -663,9 +666,14 @@ export function manifestContent(): ManifestContent {
           reaches it yet**: a consumer resolves one manifest per kind, and a
           Folder's is Peek's, so an action one app declares on a kind another
           app owns is found by nobody until interop collects them.
-        - **delete-project** is `deleteProject`: the `kind:5`, then a
-          `kind:1852 remove` from every Folder whose state names it (FOL-48,
-          FOL-7).
+        - **delete-project** is `setProjectDeleted` (ALO-6): a change setting
+          `deleted` to `true`, or to the empty value to restore, after the one
+          it follows. It stays listed in its Folders and keeps its id, record
+          and changes; readers leave it out (SPEC §6.5). It was the `kind:5`
+          and a `kind:1852 remove` from every Folder naming it (FOL-48), which
+          nobody could undo. Ship's own Delete writes this change too, with
+          the switch on or off.
+          why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-file-is-its-fields-each-kept-in-order-by-the-relay.md
       */
       {
         id: 'describe-issue',
@@ -767,11 +775,13 @@ export function manifestContent(): ManifestContent {
         id: 'delete-project',
         label: 'Delete',
         description:
-          'Ask the relay to delete a project outright, then take it out of every team that lists it. The relay ' +
-          'decides who may; the issues filed under it are separate events and survive it.',
+          'Delete a project, or bring a deleted one back: `true` deletes, an empty value restores. Anyone in its ' +
+          'team may. A deleted project leaves every list and search but keeps its id, its issues and its history, ' +
+          'so a link to it says who deleted it and when.',
         effect: 'destructive',
         appliesTo: String(KIND.PROJECT),
-        emits: { kind: KIND.DELETION, listed: true },
+        emits: { kind: KIND.CHANGE, field: 'deleted' },
+        input: { type: 'string', enum: 'deleted' },
       },
     ],
   }

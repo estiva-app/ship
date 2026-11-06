@@ -1318,15 +1318,15 @@ async function main() {
   await deleteDialog.waitFor()
   await deleteDialog.getByRole('button', { name: 'Delete project' }).click()
   await page.waitForSelector('[data-surface="projects"]')
-  const projectDeletion = stored.findIndex((e) => e.kind === 5 && e.tags.some((t) => t[0] === 'a' && t[1] === projectAddr))
-  check('deleting a project publishes a kind:5 for its record', projectDeletion >= 0)
-  const unlists = stored.slice(projectDeletion + 1).filter((e) => e.kind === 1852 && tagValue(e, 'op') === 'remove' && tagValue(e, 'a') === projectAddr)
-  const unlistedFrom = unlists.map((e) => tagValue(e, 'h')).sort()
+  // ALO-6: Delete is the restorable `deleted` change, never the kind:5 or an unlist.
+  const deletedChange = stored.find((e) => e.kind === 1851 && tagValue(e, 'a') === projectAddr && tagValue(e, 'field') === 'deleted')
   check(
-    '  …then a kind:1852 removes it from every Folder that lists it',
-    projectDeletion >= 0 && JSON.stringify(unlistedFrom) === JSON.stringify([TEAM_ID, FOLDER_ID].sort()),
-    `from ${unlistedFrom.map((h) => h?.slice(0, 8)).join(', ') || 'none'}`,
+    'deleting a project publishes a kind:1851 setting deleted to true, after the change it follows',
+    !!deletedChange && tagValue(deletedChange, 'value') === 'true' && !!tagValue(deletedChange, 'prev'),
+    deletedChange ? `value ${tagValue(deletedChange, 'value')}, prev ${tagValue(deletedChange, 'prev') ?? 'none'}` : 'nothing published',
   )
+  const permanent = stored.filter((e) => (e.kind === 5 && e.tags.some((t) => t[0] === 'a' && t[1] === projectAddr)) || (e.kind === 1852 && tagValue(e, 'op') === 'remove' && tagValue(e, 'a') === projectAddr))
+  check('  …and no kind:5 and no unlisting, so it can be restored', permanent.length === 0, `${permanent.length} sent`)
 
   check(
     "it measured the relay's clock before signing anything",

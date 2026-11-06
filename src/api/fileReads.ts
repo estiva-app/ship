@@ -1,28 +1,14 @@
-import { relayFileReadsOf, type RelayFileReads } from '@estiva-app/protocol'
-import type { ProjectFields } from '../nostr/store'
+import { fieldsOptedIn, relayFileReadsOf, type RelayFileReads } from '@estiva-app/protocol'
 
-/**
- * Ship's switch for projects (ALO-5, SPEC §6.13): read them by the relay's
- * list read and write each change after the one it follows.
- *
- * On when the relay announces it keeps projects in order (NIP-11 `files`,
- * `requires_prev` naming `osnova.project`) — the one announced moment, ALO-8 —
- * or when this browser opted in to try it on the QA Folders the relay already
- * fences: open Ship once with `?fields=on`, and `?fields=off` to leave. Either
- * way only where the relay offers the list read and the opened file's text with
- * it: without that a project's page could not read what it edits. Off, Ship
- * reads and writes as before.
- *
- * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-file-is-its-fields-each-kept-in-order-by-the-relay.md
- */
-export function projectFieldsOf(reads: RelayFileReads, optedIn: boolean): ProjectFields | undefined {
-  const announced = reads.switched && reads.inOrder.includes(PROJECT_TYPE)
-  if (!reads.list || !reads.text || !(announced || optedIn)) return undefined
-  return { text: reads.text, ...(reads.search.includes(PROJECT_TYPE) ? { search: true as const } : {}) }
-}
+/*
+  Ship's switch for projects (ALO-5, SPEC §6.13) is protocol's `projectFieldsOf`,
+  the one rule Ship, Leaf and Peek switch by (ALO-6): on when the relay announces
+  it keeps projects in order, or this tab opted in with `?fields=on` on the QA
+  Folders the relay already fences, and only where the relay offers the list
+  read and the opened file's text with it.
 
-/** A project's type, as NIP-11 names it (TYPES.md). */
-export const PROJECT_TYPE = 'osnova.project'
+  why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-file-is-its-fields-each-kept-in-order-by-the-relay.md
+*/
 
 const OPT_IN_KEY = 'ship.projectFields'
 
@@ -33,10 +19,7 @@ const OPT_IN_KEY = 'ship.projectFields'
  */
 export function optedIn(): boolean {
   try {
-    const asked = new URLSearchParams(window.location.search).get('fields')
-    if (asked === 'on') sessionStorage.setItem(OPT_IN_KEY, 'on')
-    if (asked === 'off') sessionStorage.removeItem(OPT_IN_KEY)
-    return sessionStorage.getItem(OPT_IN_KEY) === 'on'
+    return fieldsOptedIn(window.location.search, sessionStorage, OPT_IN_KEY)
   } catch {
     return false
   }

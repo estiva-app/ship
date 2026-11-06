@@ -6,7 +6,6 @@ vi.mock('./store', () => ({
     createIssue: vi.fn(),
     setField: vi.fn(),
     archiveProject: vi.fn(),
-    deleteProject: vi.fn(),
     moveProject: vi.fn(),
     createFolder: vi.fn(),
     renameFolder: vi.fn(),
@@ -19,12 +18,12 @@ vi.mock('./store', () => ({
   projectFieldsNow: vi.fn(async () => undefined),
 }))
 vi.mock('./clock', () => ({ clockProblem: vi.fn() }))
-vi.mock('./foreign', () => ({ readFolders: vi.fn(), readFolderListing: vi.fn(), loadQuery: () => async () => [] }))
+vi.mock('./foreign', () => ({ readFolderListing: vi.fn(), loadQuery: () => async () => [] }))
 
 import { clockProblem } from './clock'
-import { readFolderListing, readFolders } from './foreign'
+import { readFolderListing } from './foreign'
 import { store } from './store'
-import { archiveProject, createFolder, createIssue, createProject, deleteProject, editMessage, moveProject, renameFolder, reply, setIssueField, setListedInTopic, setProjectField, startConversation } from './writes'
+import { archiveProject, createFolder, createIssue, createProject, editMessage, moveProject, renameFolder, reply, setIssueField, setListedInTopic, setProjectField, startConversation } from './writes'
 import { addrToNaddr, Relay, type SignedEvent, type UnsignedEvent } from '@estiva-app/protocol'
 import { Store } from '../nostr/store'
 import { SignerTokenExpired, type Signer } from '../nostr/signer'
@@ -38,7 +37,6 @@ const ISSUE = { addr: `30851:${PK}:2`, id: '2', author: PK, createdAt: 1, title:
 beforeEach(() => {
   vi.mocked(clockProblem).mockResolvedValue(null)
   for (const fn of Object.values(s)) fn.mockReset()
-  vi.mocked(readFolders).mockReset().mockResolvedValue([])
   vi.mocked(readFolderListing).mockReset().mockResolvedValue([])
 })
 
@@ -78,71 +76,13 @@ describe('which Folder each write goes to', () => {
     expect(s.setField).toHaveBeenCalledWith({ folder: 'issue-folder', target: ISSUE.addr, field: 'status', value: 'in_progress', note: 'Status → in_progress' })
   })
 
-  it("a project's record change, archive and delete go to the Folder the record names", async () => {
+  it("a project's record change and archive go to the Folder the record names", async () => {
     s.setField.mockResolvedValue({ ok: true })
     s.archiveProject.mockResolvedValue({ ok: true })
-    s.deleteProject.mockResolvedValue({ result: { ok: true } })
     await setProjectField(PROJECT, 'lead', 'k', 'Assign project')
     expect(s.setField).toHaveBeenCalledWith({ folder: 'content-folder', target: PROJECT.addr, field: 'lead', value: 'k', note: 'Assign project' })
     await archiveProject(PROJECT, true)
     expect(s.archiveProject).toHaveBeenCalledWith({ recordFolder: 'content-folder', project: PROJECT.addr, archived: true })
-    await deleteProject(PROJECT, [{ id: 'content-folder', hasState: true }])
-    expect(s.deleteProject).toHaveBeenCalledWith({ recordFolder: 'content-folder', project: PROJECT.addr, folders: [{ folder: 'content-folder', hasState: true }] })
-  })
-})
-
-describe('deleting a project unlists it from its team (FOL-48)', () => {
-  it("takes hasState from the caller's Folder read, without reading again", async () => {
-    s.deleteProject.mockResolvedValue({ result: { ok: true }, unlisted: { ok: true } })
-    expect(await deleteProject(PROJECT, [{ id: 'content-folder', hasState: true }])).toEqual({ ok: true })
-    expect(readFolders).not.toHaveBeenCalled()
-  })
-
-  it('reads the Folders when the caller has none, or does not hold this one', async () => {
-    s.deleteProject.mockResolvedValue({ result: { ok: true } })
-    vi.mocked(readFolders).mockResolvedValue([{ id: 'content-folder', hasState: true }] as never)
-    await deleteProject(PROJECT, undefined)
-    await deleteProject(PROJECT, [{ id: 'another-team', hasState: true }])
-    expect(readFolders).toHaveBeenCalledTimes(2)
-    expect(s.deleteProject).toHaveBeenLastCalledWith(expect.objectContaining({ folders: [{ folder: 'content-folder', hasState: true }] }))
-  })
-
-  it('a moved project is unlisted from the Folders that list it, not its content Folder (FOL-7)', async () => {
-    s.deleteProject.mockResolvedValue({ result: { ok: true }, unlisted: { ok: true } })
-    const folders = [
-      { id: 'content-folder', hasState: true, addresses: [] },
-      { id: 'new-team', hasState: true, addresses: [PROJECT.addr] },
-    ]
-    expect(await deleteProject(PROJECT, folders)).toEqual({ ok: true })
-    expect(s.deleteProject).toHaveBeenCalledWith(expect.objectContaining({ folders: [{ folder: 'new-team', hasState: true }] }))
-    expect(readFolders).not.toHaveBeenCalled()
-  })
-
-  it('a moved project deleted before the caller has Folders is unlisted from what the fresh read lists it in', async () => {
-    s.deleteProject.mockResolvedValue({ result: { ok: true }, unlisted: { ok: true } })
-    vi.mocked(readFolders).mockResolvedValue([
-      { id: 'content-folder', hasState: true, addresses: [] },
-      { id: 'new-team', hasState: true, addresses: [PROJECT.addr] },
-    ] as never)
-    await deleteProject(PROJECT, undefined)
-    expect(s.deleteProject).toHaveBeenCalledWith(expect.objectContaining({ folders: [{ folder: 'new-team', hasState: true }] }))
-  })
-
-  it('a Folder nobody can read has no state to change', async () => {
-    s.deleteProject.mockResolvedValue({ result: { ok: true } })
-    vi.mocked(readFolders).mockResolvedValue([])
-    await deleteProject(PROJECT, [])
-    expect(s.deleteProject).toHaveBeenCalledWith(expect.objectContaining({ folders: [{ folder: 'content-folder', hasState: false }] }))
-  })
-
-  it('a refused delete is refused, whatever the unlist did', async () => {
-    s.deleteProject.mockResolvedValue({ result: { ok: false, reason: 'not the author' } })
-    expect(await deleteProject(PROJECT, [])).toEqual({ ok: false, reason: 'not the author' })
-  })
-
-  it('a refused unlist is a deleted project that says why its row stays', async () => {
-    s.deleteProject.mockResolvedValue({ result: { ok: true }, unlisted: { ok: false, reason: 'rate limited' } })
-    expect(await deleteProject(PROJECT, [{ id: 'content-folder', hasState: true }])).toEqual({ ok: true, stillListed: 'rate limited' })
   })
 
   it("a new issue goes to the project's content Folder with the next ref among what is visible", async () => {
