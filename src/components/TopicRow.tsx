@@ -1,54 +1,39 @@
-import { IconMessages } from '@tabler/icons-react'
-import { KindIcon, Link, UnreadDot } from '@estiva-app/ui'
+import { IconArchive } from '@tabler/icons-react'
+import { KindIcon, Link } from '@estiva-app/ui'
 import type { TopicRowData } from '@/lib/topics'
+import { Button } from '@/components/ui/Button'
+import { ago } from '@/lib/time'
 import { linkTo } from '@/router'
 
 /**
- * One topic on Ship's Topics, as Linear draws an initiative (Miky, 2 Nov): its
- * name and summary, its projects done of all, its conversations and how many
- * are new for you. On a phone only the dot stays beside the name. It opens
- * the topic's page here (SHIPS-4).
+ * One topic on Explore topics (TOPI-9): its name and summary, then the
+ * columns every app's Explore draws (Miky, 6 Nov) — its team, how many
+ * people it lists, when anything last happened in it — and Join on a topic
+ * you are not in. A dash while a column is read; on a phone only the name
+ * stays. It opens the topic's page here (SHIPS-4), an archived one read-only.
  */
-export function TopicRow({ topic }: { topic: TopicRowData }) {
-  const { done, total } = topic.projects
-  const name = (
-    <span className="flex min-w-0 flex-1 flex-col">
-      <span className="truncate text-body-2 font-medium text-text-primary">{topic.title}</span>
-      {topic.summary && <span className="truncate text-caption text-text-secondary">{topic.summary}</span>}
-    </span>
-  )
+export function TopicRow({ topic, onJoin, joining = false }: { topic: TopicRowData; onJoin?: () => void; joining?: boolean }) {
   return (
     <div data-topic={topic.address} className="relative flex min-w-0 items-center gap-3 rounded-md px-3 py-2 transition-colors hover:bg-bg-hover">
       <KindIcon kind="topic" />
       <Link {...linkTo(topic.href)} variant="plain" cover className="flex min-w-0 flex-1">
-        {name}
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="truncate text-body-2 font-medium text-text-primary">{topic.title}</span>
+          {topic.summary && <span className="truncate text-caption text-text-secondary">{topic.summary}</span>}
+        </span>
       </Link>
-      {topic.fresh > 0 && (
-        <span className="flex shrink-0 sm:hidden">
-          <UnreadDot />
-          <span className="sr-only">{topic.fresh} new</span>
-        </span>
-      )}
-      {/* A topic that lists no project leaves the cell empty, not "0 / 0" (Miky, 4 Nov). */}
-      {total > 0 ? (
-        <span className="hidden w-16 shrink-0 items-center gap-1 text-caption text-text-secondary sm:flex" aria-label={`${done} of ${total} projects completed`}>
-          <KindIcon kind="project" />
-          <span className="font-mono tabular-nums">
-            {done} / {total}
-          </span>
-        </span>
-      ) : (
-        <span className="hidden w-16 shrink-0 sm:block" />
-      )}
-      <span className="hidden w-28 shrink-0 items-center gap-1 text-caption text-text-secondary sm:flex">
-        <IconMessages size={16} stroke={1.5} aria-hidden />
-        {/* A dash while the conversations are read: the rows draw from the topics read alone. */}
-        <span className="font-mono tabular-nums">{topic.conversations ?? '–'}</span>
-        {topic.fresh > 0 && (
-          <span className="ml-1 flex items-center gap-1 text-text-primary">
-            <UnreadDot />
-            {topic.fresh} new
-          </span>
+      <span className="hidden w-28 shrink-0 truncate text-caption text-text-secondary sm:block">{topic.team ?? '–'}</span>
+      <span className="hidden w-20 shrink-0 text-caption text-text-secondary sm:block">{topic.members ?? '–'}</span>
+      <span className="hidden w-24 shrink-0 items-center gap-1 text-caption text-text-secondary sm:flex">
+        {topic.archived && <IconArchive size={14} stroke={1.5} aria-label="Archived" />}
+        {topic.active ? ago(topic.active) : '–'}
+      </span>
+      {/* Join on a topic you are not in (Explore, Miky 6 Nov). After the covering link, `relative`, so it stays its own button. */}
+      <span className="relative flex w-16 shrink-0 justify-end">
+        {onJoin && (
+          <Button size="small" variant="outlined" onClick={onJoin} disabled={joining}>
+            Join
+          </Button>
         )}
       </span>
     </div>

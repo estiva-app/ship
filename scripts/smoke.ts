@@ -362,8 +362,9 @@ async function main() {
   await page.waitForSelector('[data-surface="topics"]')
   check('the app opens on Topics with no setup step', page.url().includes('/topics'))
   check(
-    'the sidebar reads Topics, Projects, Issues',
-    (await sidebar().getByRole('link').allInnerTexts()).map((text) => text.replace(/\s*\d+$/, '')).join() === 'Topics,Projects,Issues',
+    // A new person is in no topic: no topic rows, then Explore topics where the top Topics was (TOPI-9).
+    'the sidebar reads Projects, Issues, Explore topics',
+    (await sidebar().getByRole('link').allInnerTexts()).map((text) => text.replace(/\s*\d+$/, '')).join() === 'Projects,Issues,Explore topics',
   )
   await shot(page, '01-topics-empty')
 

@@ -31,7 +31,7 @@ import { findNaddrs, naddrToAddr, buildReaction, buildResolution, buildEdit, bui
 import { listFiles, openFile, writeChange, TEXT_FIELD, type WriteChangeResult } from '@estiva-app/interop'
 import { createLoadQuery, planArchiveFolder, planCreateFolder, planDeleteFolder, planListInTopic, planMoveFromFolders, planPlaceFile, planRemoveFromTopic, planRenameFolder, planUnlistFile, readMentionedIn, readMoveRefusal, type ListHolder, type FolderRef, type MovableFile, type MoveRefusal } from '@estiva-app/interop'
 import { foldFolder, type FolderState } from './fold'
-import { buildMembershipChange, decorationsOf, foldAttachments, foldEdits, foldEmbeds, URGENT_TAG, type Decorations, type EditFold, type QueryFn } from '@estiva-app/conversation'
+import { buildMembershipChange, buildMutedEvent, switchWrites, type Following, type Place, decorationsOf, foldAttachments, foldEdits, foldEmbeds, URGENT_TAG, type Decorations, type EditFold, type QueryFn } from '@estiva-app/conversation'
 import { anchorIndex, type AnchorIndex } from './references'
 import { directoryFrom, type Directory } from './profiles'
 import { KIND } from './kinds'
@@ -1325,6 +1325,28 @@ export class Store {
     const plan = args.listed ? planListInTopic : planRemoveFromTopic
     const [entry] = plan(this.signer.pubkey, Date.now(), { topic: args.topic, file: args.file })
     return this.publish(entry)
+  }
+
+  /**
+   * Join a topic (TOPI-9, Explore topics' Join): the public changes
+   * conversation's `switchWrites` gives for All, the ones Peek's switch signs
+   * for the same pick — a `follow:<you>` = `all` on the topic, after a leave
+   * when you had left. Whether a mute is to be taken out is the answer's
+   * `clearsMute`; the caller does it ({@link publishMuted}).
+   * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-persons-level-on-a-place-is-theirs-alone.md
+   */
+  async joinPlace(args: { place: Place; following: Following }): Promise<PublishResult & { clearsMute?: boolean }> {
+    const writes = switchWrites(this.signer.pubkey, Date.now(), { place: args.place, folder: args.place.team, choice: 'all', following: args.following })
+    for (const change of writes.changes) {
+      const result = await this.publish(change)
+      if (!result.ok) return result
+    }
+    return { ok: true, clearsMute: writes.clearsMute }
+  }
+
+  /** Write your whole mute list (`estiva:muted:v1`, §11.8 *Muting*), already encrypted to you: last write wins, so read it just before. */
+  publishMuted(ciphertext: string): Promise<PublishResult> {
+    return this.publish(buildMutedEvent(this.signer.pubkey, Date.now(), ciphertext))
   }
 
   /**

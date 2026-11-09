@@ -1,7 +1,7 @@
-import { useEffect, useState, useSyncExternalStore } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { createRetryingRead } from '@estiva-app/platform'
-import { addableTopics, type ReadTopic, type TopicConversation, type TopicsRead } from '@estiva-app/interop'
-import { readAllTopics, readTopicConversations, readTopicDocuments, topicAsDrawn, type ForeignObject, type FolderSummary, type TopicOfFile } from './foreign'
+import { activityTopics, addableTopics, readTopicActivity, type ReadTopic, type TopicsRead } from '@estiva-app/interop'
+import { readAllTopics, readTopicDocuments, readTopicMembers, topicAsDrawn, type ForeignObject, type FolderSummary, type TopicOfFile } from './foreign'
 import { knowSpaces } from '@/lib/topicLinks'
 import { foldersNow, heldFolders } from './useFolders'
 import { useLandedReadState } from './readStateSync'
@@ -35,6 +35,8 @@ async function topicsFresh(): Promise<TopicsRead> {
 /** Test seam: forget the held topics and choices. */
 export function resetTopicsForTests(): void {
   held.clear()
+  activity.reset()
+  members.reset()
   choices = undefined
   knowSpaces({ topics: [] } as unknown as TopicsRead)
 }
@@ -140,33 +142,143 @@ export function useMuted(): ReadonlySet<string> | undefined {
   return muted
 }
 
+/** How long after a read coming back to the tab reads again: a quick look away and back reads nothing. */
+export const REREAD_AFTER_MS = 60_000
+
+/** A per-topic answer as a page draws it: `undefined` while it is read, `failed` when it did not land. */
+export interface PerTopic<T> {
+  values: ReadonlyMap<string, T> | undefined
+  failed: boolean
+  retry: () => void
+}
+
 /**
- * Each drawn topic's conversations in Peek and how many are new for you
- * (SHIPS-3), for the Topics page to draw. `drawn` is the addresses on its
- * tabs, space-separated: a read costs a request or two per topic, and most
- * topics a reader can read list no work and are never drawn. `undefined`
- * until the topics, your read state and your mute list ({@link useMuted}) are
- * all in hand: a dot judged without them would light topics you have read or
- * muted. Read again when one of them moves.
+ * One answer per topic, read for a set of topics at a time and held in this
+ * tab across pages, so the sidebar and Explore topics share it and a page
+ * opened again reads nothing it holds (TOPI-9). Read again when you come back
+ * to the tab, {@link REREAD_AFTER_MS} after the last read, and never while
+ * you are working in it: a topic moves on the next open or the next return,
+ * not under the pointer (Miky, 6 Nov). No live watch.
  */
-export function useTopicConversations(read: TopicsRead | undefined, drawn: string | undefined, muted: ReadonlySet<string> | undefined): Map<string, TopicConversation> | undefined {
-  const merged = useLandedReadState()
-  const [conversations, setConversations] = useState<Map<string, TopicConversation>>()
+function perTopicRead<T>(read: (topics: ReadTopic[]) => Promise<ReadonlyMap<string, T>>) {
+  let values = new Map<string, T>()
+  const failed = new Set<string>()
+  const inFlight = new Map<string, Promise<void>>()
+  /** When each topic's answer was last read, by its address. */
+  const readAt = new Map<string, number>()
+  const listeners = new Set<() => void>()
+  let version = 0
+  const subscribe = (listener: () => void) => {
+    listeners.add(listener)
+    return () => void listeners.delete(listener)
+  }
+  const load = (key: string, topics: ReadTopic[]): Promise<void> => {
+    const on = inFlight.get(key)
+    if (on) return on
+    const reading = read(topics)
+      .then(
+        (next) => {
+          values = new Map([...values, ...next])
+          failed.delete(key)
+          for (const address of next.keys()) readAt.set(address, Date.now())
+        },
+        (error: unknown) => {
+          console.warn('[topics] could not read:', error)
+          failed.add(key)
+        },
+      )
+      .finally(() => {
+        inFlight.delete(key)
+        version += 1
+        for (const listener of listeners) listener()
+      })
+    inFlight.set(key, reading)
+    return reading
+  }
+  return {
+    reset() {
+      values = new Map()
+      failed.clear()
+      inFlight.clear()
+      readAt.clear()
+    },
+    /** `addresses`: the topics to answer for; `undefined` while which ones is not known. */
+    /**
+     * `values` once every topic asked is answered, and from then on: a topic
+     * asked later (joined, or started) is read on its own and has no answer
+     * until it lands, so what is drawn never goes back to loading.
+     */
+    useRead(topics: TopicsRead | undefined, addresses: readonly string[] | undefined): PerTopic<T> {
+      useSyncExternalStore(subscribe, () => version)
+      const key = addresses ? [...addresses].sort().join(' ') : undefined
+      const asked = () => {
+        const wanted = new Set(key ? key.split(' ') : [])
+        return topics?.topics.filter((topic) => wanted.has(topic.address)) ?? []
+      }
+      const drew = useRef(false)
+      useEffect(() => {
+        if (!topics || key === undefined) return
+        const wanted = asked()
+        // Only what is not held: the sidebar's topics are held when Explore asks for all of them.
+        const missing = wanted.filter((topic) => !values.has(topic.address))
+        if (missing.length > 0) void load(missing.map((topic) => topic.address).join(' '), missing)
+        const onReturn = () => {
+          const stale = wanted.some((topic) => Date.now() - (readAt.get(topic.address) ?? 0) > REREAD_AFTER_MS)
+          if (document.visibilityState === 'visible' && stale) void load(key, wanted)
+        }
+        document.addEventListener('visibilitychange', onReturn)
+        return () => document.removeEventListener('visibilitychange', onReturn)
+        // `asked` is `topics` and `key`.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+      }, [topics, key])
+      const all = key !== undefined && (key === '' || key.split(' ').every((address) => values.has(address)))
+      if (all) drew.current = true
+      const missingKey = () =>
+        asked()
+          .filter((topic) => !values.has(topic.address))
+          .map((topic) => topic.address)
+          .join(' ')
+      return {
+        values: all || drew.current ? values : undefined,
+        failed: !all && !drew.current && key !== undefined && failed.has(missingKey()),
+        retry: () => {
+          const missing = asked().filter((topic) => !values.has(topic.address))
+          if (missing.length > 0) void load(missingKey(), missing)
+        },
+      }
+    },
+  }
+}
 
+/**
+ * Each topic's newest activity, the one rule Peek, Ship and Leaf order topics
+ * by (interop's `readTopicActivity`, TOPI-10): the sidebar's five and Your
+ * topics, and Explore's Last active.
+ */
+const activity = perTopicRead<number>(async (topics) => (await readTopicActivity((filters) => relay.query(filters as never), activityTopics(topics))).at)
+
+/** How many people each topic lists (record a-place-lists-who-chose-a-level-and-its-teams-members): Explore's Members. */
+const members = perTopicRead<number | undefined>((topics) => readTopicMembers(topics))
+
+export const useTopicActivity = activity.useRead
+export const useTopicMembers = members.useRead
+
+/**
+ * Read the topics again when you come back to the tab (TOPI-9), at most once
+ * a {@link REREAD_AFTER_MS}: a topic joined in Peek, or started since, enters
+ * the sidebar's five then, never while you work.
+ */
+export function useTopicsOnReturn(): void {
   useEffect(() => {
-    if (!read || !drawn || !merged || !muted) return
-    let live = true
-    const shown = new Set(drawn.split(' '))
-    readTopicConversations({ ...read, topics: read.topics.filter((topic) => shown.has(topic.address)) }, { merged, muted })
-      .then((next) => live && setConversations(next))
-      // A failed re-read keeps the counts already drawn.
-      .catch(() => undefined)
-    return () => {
-      live = false
+    let last = Date.now()
+    const onReturn = () => {
+      if (document.visibilityState !== 'visible' || Date.now() - last <= REREAD_AFTER_MS) return
+      last = Date.now()
+      void rereadTopics()
     }
-  }, [read, drawn, merged, muted])
-
-  return conversations
+    document.addEventListener('visibilitychange', onReturn)
+    return () => document.removeEventListener('visibilitychange', onReturn)
+  }, [])
 }
 
 /** Add to topic's choices: the topics you are a member of, then the rest. */

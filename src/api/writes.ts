@@ -13,7 +13,10 @@ import { links } from './linkCards'
 import { linkResolverFor } from '../lib/linksNamingCards'
 import { isRelayBusy } from '../lib/relayBudget'
 import { SignerTokenExpired } from '../nostr/signer'
-import { projectFieldsAgain, projectFieldsNow, relay, store } from './store'
+import { projectFieldsAgain, projectFieldsNow, relay, signer, store } from './store'
+import { nip44 } from './nip44'
+import { mutedFilter, parseMutedBlob, serializeMutedBlob } from '@estiva-app/conversation'
+import type { ReadTopic } from '@estiva-app/interop'
 
 /**
  * The writes (REW-5). Every one changes exactly one object, by design —
@@ -90,6 +93,35 @@ export function setMembership(target: { kind: 'issue'; issue: Issue } | { kind: 
  */
 export function setListedInTopic(topic: { address: string; folder: string }, file: string, listed: boolean): Promise<WriteResult> {
   return publish(() => store.setListedInTopic({ topic: { address: topic.address, folder: topic.folder }, file, listed }))
+}
+
+/**
+ * Join a topic from Explore topics (TOPI-9): you follow it at All, as Peek's
+ * Join does, and a mute you kept on it is taken out (§11.8 *Muting*), so it
+ * is yours in both apps. The mute list is read just before and never written
+ * over when it cannot be read.
+ */
+export async function joinTopic(topic: ReadTopic): Promise<WriteResult> {
+  const clock = await clockProblem()
+  if (clock) return refused(clock)
+  try {
+    const joined = await store.joinPlace({ place: { address: topic.address, team: topic.folder }, following: topic.following })
+    if (!joined.ok) return refused(joined.reason)
+    if (!joined.clearsMute) return { ok: true }
+    const me = signer.pubkey
+    const events = await relay.query([mutedFilter(me)] as never)
+    const newest = [...events].sort((a, b) => b.created_at - a.created_at)[0]
+    if (!newest) return { ok: true }
+    const plaintext = await nip44.decrypt(newest.content)
+    const list = plaintext === undefined ? undefined : parseMutedBlob(plaintext)
+    if (!list) return refused('You joined, but your muted list could not be read, so it is still muted. Try again.')
+    if (!list.keys.includes(topic.address)) return { ok: true }
+    const ciphertext = await nip44.encrypt(serializeMutedBlob(list.keys.filter((key) => key !== topic.address), Date.now()))
+    const unmuted = await store.publishMuted(ciphertext)
+    return unmuted.ok ? { ok: true } : refused('You joined, but it is still muted. Try again.')
+  } catch (error) {
+    return refused(error instanceof Error ? error.message : String(error))
+  }
 }
 
 /**
