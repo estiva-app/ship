@@ -10,7 +10,9 @@ import { documentText, parseBlockDocument, serializeBlockDocument, type SignedEv
 
 const PK = 'ab'.repeat(32)
 const FOLDER = '3167adea-877f-43c4-96fb-517a2b2d5d24'
-const SWITCH_REFUSAL = 'invalid: a project change names the change it follows in prev; read the relay information again'
+/** The relay's own words (buzz `fence_refusal`, SPEC §6.13): apps match up to the `;`. */
+const SWITCH_REFUSAL =
+  'invalid: a project change names the change it follows in prev; this app read the relay before it kept projects in order: reload it, or update estiva-agent, and save again'
 
 let held: SignedEvent[] = []
 /** Every event the tab sent, accepted or not. */
