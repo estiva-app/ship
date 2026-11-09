@@ -1,7 +1,7 @@
 import type { Embed, Imeta, NostrTag, PublishResult } from '@estiva-app/protocol'
-import { addrToNaddr, serializeBlockDocument, textAsksOf, toRenderTree } from '@estiva-app/protocol'
+import { BLOCK_DOCUMENT_FORMAT, addrToNaddr, serializeBlockDocument, textAsksOf, toRenderTree } from '@estiva-app/protocol'
 import { MAX_MENTIONED_PEOPLE, boxLinksOf, embedsToEdit, embedsToSend, namedBefore, withoutCard } from '@estiva-app/conversation'
-import { linksIn, listedBeneath, MAX_LINKS_ASKED, textOf, within, type OwnPlace } from '@estiva-app/interop'
+import { isSwitchRefusal, linksIn, listedBeneath, MAX_LINKS_ASKED, prevsAfterSwitch, textOf, within, type OwnPlace } from '@estiva-app/interop'
 import type { FileText } from '@estiva-app/conversation'
 import type { DocumentAsks } from '@estiva-app/ui/editor'
 import type { Conversation, Issue, Project } from '../nostr/fold'
@@ -13,7 +13,7 @@ import { links } from './linkCards'
 import { linkResolverFor } from '../lib/linksNamingCards'
 import { isRelayBusy } from '../lib/relayBudget'
 import { SignerTokenExpired } from '../nostr/signer'
-import { projectFieldsNow, store } from './store'
+import { projectFieldsAgain, projectFieldsNow, relay, store } from './store'
 
 /**
  * The writes (REW-5). Every one changes exactly one object, by design —
@@ -158,15 +158,15 @@ export type FieldWriteResult = WriteResult | { ok: false; reason: string; asks: 
  * in order: `prev` is the field's change as read, or the record's id for its
  * first; a description's is the change holding the text it was edited from.
  */
-async function writeProjectField(project: Project, field: string, value: string, note: string, contentFormat?: string, from?: FileText): Promise<FieldWriteResult> {
+async function writeProjectField(project: Project, field: string, value: string, note: string, contentFormat?: string, from?: FileText, afterSwitch?: { prev: string; base?: { value: string; format?: string } }): Promise<FieldWriteResult> {
   const clock = await clockProblem()
   if (clock) return refused(clock)
   const text = field === 'description'
-  const edited = from && (typeof from.content === 'string' ? from.content : serializeBlockDocument(from.content))
-  const prev = text && edited !== undefined ? textChanges.get(project.addr)?.get(edited) : (project.fields[field]?.id ?? project.rootId)
+  const edited = afterSwitch?.base?.value ?? (from && (typeof from.content === 'string' ? from.content : serializeBlockDocument(from.content)))
+  const prev = afterSwitch?.prev ?? (text && edited !== undefined ? textChanges.get(project.addr)?.get(edited) : (project.fields[field]?.id ?? project.rootId))
   if (!prev) return refused(text ? 'someone changed it while you were editing. Copy your text, then reload' : 'reload the page and try again')
   try {
-    const result = await store.writeField({ folder: project.contentFolder, target: project.addr, field, value, note, contentFormat, prev })
+    const result = await store.writeField({ folder: project.contentFolder, target: project.addr, field, value, note, contentFormat, prev, base: afterSwitch?.base })
     if (result.ok) {
       if (text) {
         const saved = 'event' in result ? result.event : result.mergedOnto
@@ -177,7 +177,7 @@ async function writeProjectField(project: Project, field: string, value: string,
     if ('refused' in result) return refused(result.refused)
     const theirs = textOf(result.theirs)
     noteText(project.addr, theirs?.value ?? '', result.theirs.id)
-    const base = { value: edited ?? '', ...(from?.format ? { format: from.format } : {}) }
+    const base = afterSwitch?.base ?? { value: edited ?? '', ...(from?.format ? { format: from.format } : {}) }
     return { ok: false, reason: 'asks', asks: textAsksOf(base, theirs ?? { value: '' }, { value, ...(contentFormat ? { format: contentFormat } : {}) }, result.asks) }
   } catch (error) {
     return refused(error instanceof Error ? error.message : String(error))
@@ -202,7 +202,41 @@ export async function setProjectField(project: Project, field: 'title' | 'descri
     §13.4 says a body's format is on the event and is never guessed.
   */
   const body = field === 'description' ? { value, contentFormat } : { value, contentFormat: undefined }
-  return publish(() => store.setField({ folder: project.contentFolder, target: project.addr, field, ...body, note }))
+  return switchedIfRefused(project, { field, value, note, contentFormat: body.contentFormat, from }, () => store.setField({ folder: project.contentFolder, target: project.addr, field, ...body, note }))
+}
+
+/**
+ * A project change written the old way, with no `prev`, by a tab that read
+ * the relay's NIP-11 before it made the switch (ALO-8). Refused for that, the
+ * tab reads NIP-11 again and, now switched, writes the change again in order:
+ * after the field's current change, and the text merged onto words saved
+ * since it loaded. Once: a second refusal, or no switch, is shown as any
+ * refusal is. The person sees nothing when it saves (Miky, 9 Nov).
+ * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-file-is-its-fields-each-kept-in-order-by-the-relay.md
+ */
+async function switchedIfRefused(
+  project: Project,
+  change: { field: string; value: string; note: string; contentFormat?: string; from?: FileText },
+  write: () => Promise<PublishResult>,
+): Promise<FieldWriteResult> {
+  const result = await publish(write)
+  if (result.ok || !isSwitchRefusal(result.reason)) return result
+  try {
+    if (!(await projectFieldsAgain())) return result
+    const [kind, pubkey, ...d] = project.addr.split(':')
+    const prev = (await prevsAfterSwitch((filters) => relay.query(filters as never), { kind: Number(kind), pubkey: pubkey!, d: d.join(':') }, [change.field]))?.[change.field]
+    if (!prev) return result
+    const { from } = change
+    const base =
+      change.field !== 'description'
+        ? undefined
+        : from
+          ? { value: typeof from.content === 'string' ? from.content : serializeBlockDocument(from.content), ...(from.format ? { format: from.format } : {}) }
+          : { value: project.description, ...(project.descriptionFormat === 'blocks' ? { format: BLOCK_DOCUMENT_FORMAT } : {}) }
+    return await writeProjectField(project, change.field, change.value, change.note, change.contentFormat, from, { prev, base })
+  } catch {
+    return result
+  }
 }
 
 /**
@@ -212,7 +246,9 @@ export async function setProjectField(project: Project, field: 'title' | 'descri
  */
 export async function archiveProject(project: Project, archived: boolean, resolution?: string): Promise<WriteResult> {
   if (await projectFieldsNow()) return writeProjectField(project, 'archived', archived ? 'true' : '', archived ? (resolution ?? '') : '')
-  return publish(() => store.archiveProject({ recordFolder: project.contentFolder, project: project.addr, archived, resolution }))
+  return switchedIfRefused(project, { field: 'archived', value: archived ? 'true' : '', note: archived ? (resolution ?? '') : '' }, () =>
+    store.archiveProject({ recordFolder: project.contentFolder, project: project.addr, archived, resolution }),
+  )
 }
 
 /**
