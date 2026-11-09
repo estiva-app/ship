@@ -1274,6 +1274,8 @@ export class Store {
     note?: string
     contentFormat?: string
     prev: string
+    /** The text the tab loaded, for a text written again after the switch (ALO-8): words saved since are merged, not written over. */
+    base?: { value: string; format?: string }
   }): Promise<WriteChangeResult> {
     const [, pubkey, ...d] = args.target.split(':')
     return writeChange({
@@ -1281,6 +1283,7 @@ export class Store {
       value: args.value,
       ...(args.contentFormat ? { format: args.contentFormat } : {}),
       prev: args.prev,
+      ...(args.base ? { base: args.base } : {}),
       build: (input) =>
         buildChange(this.signer.pubkey, input.createdAtMs, {
           folder: args.folder,

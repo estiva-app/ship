@@ -89,4 +89,14 @@ const opted = optedIn()
 export const projectFieldsNow = (): Promise<ProjectFields | undefined> =>
   (projectFields ??= readFileReads(() => relay.info()).then((reads) => projectFieldsOf(reads, opted)))
 
+/**
+ * The relay refused a change for naming no `prev`: it has made the switch
+ * since this tab read its NIP-11 (ALO-8). Read it again, so every later read
+ * and write in this tab is switched too.
+ */
+export const projectFieldsAgain = (): Promise<ProjectFields | undefined> => {
+  projectFields = undefined
+  return projectFieldsNow()
+}
+
 export const store = new Store(relay, signer, relayClockSkew, projectFieldsNow)
