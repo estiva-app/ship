@@ -17,10 +17,15 @@ const wire = vi.hoisted(() => ({
 }))
 const held = wire.held
 let down = false
+/** Kinds the relay refuses to take. */
+const refuseKinds = new Set<number>()
 /** Every filter the page sent to the relay. */
 const asked: Record<string, unknown>[] = []
+/** While set, the mute list's read waits for it to settle: a slow mute list. */
+let muteGate: Promise<void> | undefined
 const answer = async (filters: Record<string, unknown>[]) => {
   asked.push(...filters)
+  if (muteGate && filters.some((f) => (f.kinds as number[] | undefined)?.includes(30078))) await muteGate
   if (down) throw new Error('relay unreachable')
   return held.filter((e) => filters.some((f) => matches(f, e)))
 }
@@ -129,13 +134,16 @@ const page = (folder?: string, folders = TEAMS) => <TopicsPage folders={folders}
 beforeEach(() => {
   held.length = 0
   wire.sent.length = 0
+  refuseKinds.clear()
   asked.length = 0
   down = false
+  muteGate = undefined
   say.mockReset()
   resetTopicsForTests()
   resetFeedFactsForTests()
   const relay = {
     publish: async (signed: TestEvent) => {
+      if (refuseKinds.has(signed.kind)) return { ok: false, reason: 'blocked: test' }
       wire.sent.push(signed)
       held.push(signed)
       return { ok: true }
@@ -218,12 +226,15 @@ describe("Ship's Topics (Explore topics)", () => {
   })
 
   it('finds a topic by the start of a word of its title, and says so when nothing matches', async () => {
-    held.push(shipManifest(), topic('t-z', 'Zebra launch'), joined('t-z'), topic('t-a', 'Alpha'), joined('t-a'))
+    held.push(shipManifest(), topic('t-z', 'Zebra launch'), joined('t-z'), topic('t-a', 'Alpha'), joined('t-a'), topic('t-q', 'Q4-plan'), joined('t-q'))
     render(page())
-    await waitFor(() => expect(titles()).toHaveLength(2))
+    await waitFor(() => expect(titles()).toHaveLength(3))
 
     fireEvent.change(screen.getByLabelText('Find a topic'), { target: { value: 'lau' } })
     expect(titles()).toEqual(['Zebra launch'])
+    // Typed as the title is written, hyphen and all.
+    fireEvent.change(screen.getByLabelText('Find a topic'), { target: { value: 'q4-pl' } })
+    expect(titles()).toEqual(['Q4-plan'])
     // Never the middle of a word.
     fireEvent.change(screen.getByLabelText('Find a topic'), { target: { value: 'aunch' } })
     expect(titles()).toEqual([])
@@ -250,17 +261,38 @@ describe("Ship's Topics (Explore topics)", () => {
     expect(say).not.toHaveBeenCalled()
   })
 
-  it('Join on a topic you muted takes it out of your mute list, keeping the rest', async () => {
+  it('Join on a topic you muted takes it out of your mute list, keeping the rest, and counts you once', async () => {
     held.push(shipManifest(), mutes(address('t-hush'), address('t-other')), topic('t-hush', 'Muted'), joined('t-hush'), topic('t-other', 'Other'))
+    render(page())
+    fireEvent.click(await screen.findByRole('tab', { name: /Other topics/ }))
+    // Its maker and you, muted.
+    await waitFor(() => expect(within(rowOf('Muted')).getByText('2')).toBeTruthy())
+
+    fireEvent.click(within(rowOf('Muted')).getByRole('button', { name: 'Join' }))
+
+    await waitFor(() => expect(wire.sent.map((e) => e.kind)).toEqual([1851, 30078]))
+    const unmute = wire.sent[1]
+    expect(unmute.pubkey).toBe(ME)
+    expect(unmute.tags).toContainEqual(['d', MUTED_D_TAG])
+    const list = JSON.parse(unmute.content.slice('cipher:'.length)) as { keys: string[] }
+    expect(list.keys).toEqual([address('t-other')])
+    // You were following it already, muted: still two members, not three.
+    await waitFor(() => expect(within(rowOf('Muted')).queryByRole('button', { name: 'Join' })).toBeNull())
+    expect(within(rowOf('Muted')).getByText('2')).toBeTruthy()
+  })
+
+  it('Join that lands while the relay refuses the unmute says you joined but it is still muted, and keeps Join to try again', async () => {
+    refuseKinds.add(30078)
+    held.push(shipManifest(), mutes(address('t-hush')), topic('t-hush', 'Muted'), joined('t-hush'))
     render(page())
     fireEvent.click(await screen.findByRole('tab', { name: /Other topics/ }))
     await waitFor(() => expect(titles()).toContain('Muted'))
 
     fireEvent.click(within(rowOf('Muted')).getByRole('button', { name: 'Join' }))
 
-    await waitFor(() => expect(wire.sent.map((e) => e.kind)).toEqual([1851, 30078]))
-    const list = JSON.parse(wire.sent[1].content.slice('cipher:'.length)) as { keys: string[] }
-    expect(list.keys).toEqual([address('t-other')])
+    await waitFor(() => expect(say).toHaveBeenCalledWith('Joined “Muted”, but it is still muted. Join again to unmute it.', 'error'))
+    expect(wire.sent.map((e) => e.kind)).toEqual([1851])
+    expect(within(rowOf('Muted')).getByRole('button', { name: 'Join' })).toBeTruthy()
   })
 
   it("a Folder's Topics shows only the topics filed in that Folder, under its name", async () => {
@@ -309,13 +341,14 @@ describe("Ship's Topics (Explore topics)", () => {
 
   it('reads who is in a topic only for the tab shown: a cold open on Your topics reads none of the others', async () => {
     held.push(shipManifest(), topic('t-in', 'Mine'), joined('t-in'), topic('t-o', 'Theirs'))
-    // The members read is the only one asking a team's roster commands.
+    // The members read is the only one asking a team's roster commands, and a topic's own Folder commands.
     const rosterReads = () => asked.filter((f) => (f.kinds as number[] | undefined)?.includes(9000)).flatMap((f) => (f['#h'] as string[]) ?? [])
-    const membersOf = () => asked.filter((f) => (f.kinds as number[] | undefined)?.includes(1851) && !f.authors && !f['#p']).flatMap((f) => (f['#a'] as string[]) ?? [])
+    const membersOf = () => asked.filter((f) => (f.kinds as number[] | undefined)?.includes(1852)).flatMap((f) => (f['#a'] as string[]) ?? [])
     render(page())
     await waitFor(() => expect(rosterReads().length).toBeGreaterThan(0))
     const before = membersOf()
     expect(before).toContain(address('t-in'))
+    expect(before).not.toContain(address('t-o'))
 
     fireEvent.click(screen.getByRole('tab', { name: /Other topics/ }))
     await waitFor(() => expect(membersOf().length).toBeGreaterThan(before.length))
@@ -324,9 +357,9 @@ describe("Ship's Topics (Explore topics)", () => {
 })
 
 /** The sidebar as the app wires it: the same reads, your five, each folding to its work. */
-function Sidebar({ state }: { state: FolderState }) {
+function Sidebar({ state, topicD }: { state: FolderState; topicD?: string }) {
   const archives: Archives = { ofIssue: () => undefined, ofProject: () => undefined }
-  const topics = useSidebarTopics({ projects: state.projects, issues: state.issues }, archives, undefined)
+  const topics = useSidebarTopics({ projects: state.projects, issues: state.issues }, archives, topicD)
   return <ShipSidebar openIssues={0} activeProjects={0} hrefFor={(entry) => `/${entry}`} {...topics} />
 }
 const sidebarTopics = () =>
@@ -346,6 +379,33 @@ describe("Ship's sidebar: your five newest topics", () => {
 
     await waitFor(() => expect(sidebarTopics()).toEqual(['Topic 2', 'Topic 6', 'Topic 5', 'Topic 4', 'Topic 3']))
     expect(screen.getAllByRole('link').at(-1)?.textContent).toBe('Explore topics')
+  })
+
+  it('with fewer than five of yours, shows only those, and waits for the mute list so a muted topic never shows', async () => {
+    let release = () => {}
+    muteGate = new Promise((resolve) => (release = resolve))
+    held.push(shipManifest(), mutes(address('t-hush')))
+    held.push(topic('t-1', 'Topic 1'), joined('t-1'), topic('t-2', 'Topic 2'), joined('t-2'))
+    held.push(topic('t-hush', 'T muted'), joined('t-hush'), topic('t-old', 'T archived'), joined('t-old'), archiving('t-old'), topic('t-not', 'T not mine'))
+    render(<Sidebar state={ship([], [])} />)
+
+    // The topics are read; the mute list is not back yet: no topic is drawn.
+    await waitFor(() => expect(asked.some((f) => (f.kinds as number[] | undefined)?.includes(30840))).toBe(true))
+    for (let turn = 0; turn < 10; turn++) await act(async () => {})
+    expect(sidebarTopics()).toEqual([])
+
+    release()
+    await waitFor(() => expect(sidebarTopics()).toEqual(['Topic 2', 'Topic 1']))
+  })
+
+  it("opens a topic's fold when its page is opened later, not only on the first draw", async () => {
+    held.push(shipManifest(), projectRoot('p-1'), topic('t-1', 'Topic 1'), joined('t-1'), lists('t-1', 'p-1'))
+    const { rerender } = render(<Sidebar state={ship(['p-1'], [])} />)
+    await waitFor(() => expect(sidebarTopics()).toEqual(['Topic 1']))
+    expect(screen.queryByRole('link', { name: 'p-1' })).toBeNull()
+
+    rerender(<Sidebar state={ship(['p-1'], [])} topicD="t-1" />)
+    await waitFor(() => expect(screen.getByRole('link', { name: 'p-1' })).toBeTruthy())
   })
 
   it('folds a topic to its projects, then its issues, in the order it lists them', async () => {
@@ -369,8 +429,14 @@ describe("Ship's sidebar: your five newest topics", () => {
     for (let turn = 0; turn < 10; turn++) await act(async () => {})
     expect(sidebarTopics()).toEqual(['Topic 2', 'Topic 1'])
 
-    // You come back to the tab two minutes later: Topic 1 is on top.
-    vi.setSystemTime(Date.now() + 120_000)
+    // A quick look away and back, 30 seconds: still nothing moves.
+    vi.setSystemTime(Date.now() + 30_000)
+    await act(async () => document.dispatchEvent(new Event('visibilitychange')))
+    for (let turn = 0; turn < 10; turn++) await act(async () => {})
+    expect(sidebarTopics()).toEqual(['Topic 2', 'Topic 1'])
+
+    // You come back to the tab two minutes after the read: Topic 1 is on top.
+    vi.setSystemTime(Date.now() + 90_000)
     await act(async () => document.dispatchEvent(new Event('visibilitychange')))
     await waitFor(() => expect(sidebarTopics()).toEqual(['Topic 1', 'Topic 2']))
   })

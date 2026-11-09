@@ -3,6 +3,7 @@ import type { FolderSummary } from '@estiva-app/interop'
 import type { Say } from '@/pages/act'
 import { reloadTopics, useMuted, useTopicActivity, useTopicMembers, useTopics } from '@/api/topics'
 import { joinTopic } from '@/api/writes'
+import { topicAsDrawn } from '@/api/foreign'
 import { topicsByTab, yourTopics, type TopicRowData, type TopicsTab } from '@/lib/topics'
 import { TopicsView } from '@/views/TopicsView'
 
@@ -25,7 +26,7 @@ export function TopicsPage({ folders, folder, say }: { folders: FolderSummary[] 
   const [joined, setJoined] = useState<ReadonlySet<string>>(new Set())
   const read = useTopics()
   const held = read === 'failed' ? undefined : read
-  const muted = useMuted()
+  const { muted } = useMuted()
   const yours = useMemo(() => (held ? yourTopics(held, muted) : undefined), [held, muted])
   const order = useTopicActivity(held, yours)
   const teamName = useMemo(() => {
@@ -40,7 +41,10 @@ export function TopicsPage({ folders, folder, say }: { folders: FolderSummary[] 
     if (!held || (!order.values && !order.failed)) return undefined
     const drawn = topicsByTab(held, { at: active.values ?? order.values, members: members.values, teamName }, folder, muted)
     if (joined.size === 0) return drawn
-    const withJoined = (row: TopicRowData): TopicRowData => (joined.has(row.address) && !row.yours ? { ...row, yours: true, ...(row.members !== undefined ? { members: row.members + 1 } : {}) } : row)
+    // One more member only for who was not following: a muted topic you follow already counts you.
+    const following = new Set(held.topics.filter((topic) => topic.following.in).map((topic) => topic.address))
+    const withJoined = (row: TopicRowData): TopicRowData =>
+      joined.has(row.address) && !row.yours ? { ...row, yours: true, ...(row.members !== undefined && !following.has(row.address) ? { members: row.members + 1 } : {}) } : row
     return Object.fromEntries(Object.entries(drawn).map(([id, rows]) => [id, rows.map(withJoined)])) as typeof drawn
   }, [held, order.values, order.failed, active.values, members.values, teamName, folder, muted, joined])
   const folderName = folder ? (folders?.find((summary) => summary.id === folder)?.name ?? 'Untitled team') : undefined
@@ -55,8 +59,11 @@ export function TopicsPage({ folders, folder, say }: { folders: FolderSummary[] 
       next.delete(address)
       return next
     })
-    if (result.ok) setJoined((now) => new Set(now).add(address))
-    else say(`Not joined — ${result.reason}`, 'error')
+    const title = topicAsDrawn(topic.address, topic.folder, topic.object).title
+    // As Peek's Join says it (useFileControls). Joined while the mute stays: Join stays too, so a second click takes the mute out.
+    if (!result.ok) say(`Nothing changed: “${title}” could not be joined. ${result.reason}`, 'error')
+    else if ('stillMuted' in result) say(`Joined “${title}”, but it is still muted. Join again to unmute it.`, 'error')
+    else setJoined((now) => new Set(now).add(address))
   }
 
   return (

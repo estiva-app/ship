@@ -123,23 +123,26 @@ export function reloadTopics(): Promise<void> {
 
 /**
  * The files and channels you muted (`estiva:muted:v1`, encrypted to you):
- * `undefined` until the list is in hand. Asked again when your read state
- * moves while the list would not decrypt (a busy nip44), rather than never.
+ * `muted` is `undefined` until the list is in hand, and `settled` once the
+ * first read came back, in hand or not. Asked again when your read state
+ * moves while the list would not decrypt (a busy nip44), rather than never,
+ * and each time `again` changes: the sidebar passes its topics read, so a
+ * topic muted or unmuted elsewhere moves when you come back to the tab.
  */
-export function useMuted(): ReadonlySet<string> | undefined {
+export function useMuted(again?: unknown): { muted: ReadonlySet<string> | undefined; settled: boolean } {
   const merged = useLandedReadState()
-  const [muted, setMuted] = useState<ReadonlySet<string>>()
+  const [read, setRead] = useState<{ muted?: ReadonlySet<string>; settled: boolean; for?: unknown }>({ settled: false })
   useEffect(() => {
-    if (muted) return
+    if (read.muted && Object.is(read.for, again)) return
     let live = true
     void readMuted((filters) => relay.query(filters as never), (ciphertext) => nip44.decrypt(ciphertext), signer.pubkey)
-      .then((keys) => live && keys && setMuted(keys))
-      .catch(() => undefined)
+      .then((keys) => live && setRead((now) => (keys ? { muted: keys, settled: true, for: again } : { ...now, settled: true })))
+      .catch(() => live && setRead((now) => ({ ...now, settled: true })))
     return () => {
       live = false
     }
-  }, [muted, merged])
-  return muted
+  }, [read.muted, read.for, again, merged])
+  return { muted: read.muted, settled: read.settled }
 }
 
 /** How long after a read coming back to the tab reads again: a quick look away and back reads nothing. */
@@ -160,7 +163,7 @@ export interface PerTopic<T> {
  * you are working in it: a topic moves on the next open or the next return,
  * not under the pointer (Miky, 6 Nov). No live watch.
  */
-function perTopicRead<T>(read: (topics: ReadTopic[]) => Promise<ReadonlyMap<string, T>>) {
+function perTopicRead<T>(read: (topics: ReadTopic[]) => Promise<ReadonlyMap<string, T>>, { onReturn: rereads = true } = {}) {
   let values = new Map<string, T>()
   const failed = new Set<string>()
   const inFlight = new Map<string, Promise<void>>()
@@ -222,6 +225,7 @@ function perTopicRead<T>(read: (topics: ReadTopic[]) => Promise<ReadonlyMap<stri
         // Only what is not held: the sidebar's topics are held when Explore asks for all of them.
         const missing = wanted.filter((topic) => !values.has(topic.address))
         if (missing.length > 0) void load(missing.map((topic) => topic.address).join(' '), missing)
+        if (!rereads) return
         const onReturn = () => {
           const stale = wanted.some((topic) => Date.now() - (readAt.get(topic.address) ?? 0) > REREAD_AFTER_MS)
           if (document.visibilityState === 'visible' && stale) void load(key, wanted)
@@ -257,8 +261,11 @@ function perTopicRead<T>(read: (topics: ReadTopic[]) => Promise<ReadonlyMap<stri
  */
 const activity = perTopicRead<number>(async (topics) => (await readTopicActivity((filters) => relay.query(filters as never), activityTopics(topics))).at)
 
-/** How many people each topic lists (record a-place-lists-who-chose-a-level-and-its-teams-members): Explore's Members. */
-const members = perTopicRead<number | undefined>((topics) => readTopicMembers(topics))
+/**
+ * How many people each topic lists (record a-place-lists-who-chose-a-level-and-its-teams-members): Explore's Members.
+ * Read once per topic in a tab, not again on return: it reads each topic's whole roster and changes, and a count a minute old orders nothing.
+ */
+const members = perTopicRead<number | undefined>((topics) => readTopicMembers(topics), { onReturn: false })
 
 export const useTopicActivity = activity.useRead
 export const useTopicMembers = members.useRead

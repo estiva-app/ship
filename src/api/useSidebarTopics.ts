@@ -21,14 +21,15 @@ export function useSidebarTopics(work: TopicPageWork | undefined, archives: Arch
   useTopicsOnReturn()
   const read = useTopics()
   const held = read === 'failed' ? undefined : read
-  const muted = useMuted()
-  const yours = useMemo(() => (held ? yourTopics(held, muted) : undefined), [held, muted])
+  const { muted, settled } = useMuted(held)
+  // Your five wait for the mute list's first answer, so a muted topic is never drawn and then taken out.
+  const yours = useMemo(() => (held && settled ? yourTopics(held, muted) : undefined), [held, settled, muted])
   const order = useTopicActivity(held, yours)
   const topics = useMemo(() => {
     if (read === 'failed' || order.failed) return 'failed' as const
-    if (!held || !order.values) return 'loading' as const
+    if (!held || !yours || !order.values) return 'loading' as const
     return sidebarTopicsOf(held, order.values, work ?? { projects: [], issues: [] }, archives ?? NO_ARCHIVES, muted)
-  }, [read, held, order.values, order.failed, work, archives, muted])
+  }, [read, held, yours, order.values, order.failed, work, archives, muted])
   const openTopic = held && topicD ? topicOfD(held, topicD)?.address : undefined
   return {
     topics,

@@ -176,8 +176,9 @@ export function ShipSidebar({ openIssues, activeProjects, hrefFor, folders = [],
               href={topic.href}
               icon={<KindIcon kind="topic" />}
               active={openTopic === topic.id}
-              openFor={topic.work.some((work) => work.id === openFile) ? openFile : undefined}
-              defaultOpen={openTopic === topic.id}
+              // Opens each time its page or one of its files is opened, as a click would; folded by hand, it stays so until then.
+              openFor={openTopic === topic.id ? topic.id : topic.work.some((work) => work.id === openFile) ? openFile : undefined}
+              defaultOpen={false}
             >
               {topic.work.length > 0
                 ? topic.work.map((work) => <NavItem key={work.id} label={work.title} href={work.href} icon={<KindIcon kind={work.kind} />} active={openFile === work.id} />)

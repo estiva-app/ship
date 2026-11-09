@@ -101,12 +101,14 @@ export function setListedInTopic(topic: { address: string; folder: string }, fil
  * is yours in both apps. The mute list is read just before and never written
  * over when it cannot be read.
  */
-export async function joinTopic(topic: ReadTopic): Promise<WriteResult> {
+export async function joinTopic(topic: ReadTopic): Promise<WriteResult | { ok: true; stillMuted: true }> {
   const clock = await clockProblem()
   if (clock) return refused(clock)
+  let followed = false
   try {
     const joined = await store.joinPlace({ place: { address: topic.address, team: topic.folder }, following: topic.following })
-    if (!joined.ok) return refused(joined.reason)
+    if (!joined.ok) return refused('The relay did not take it. Try again.')
+    followed = true
     if (!joined.clearsMute) return { ok: true }
     const me = signer.pubkey
     const events = await relay.query([mutedFilter(me)] as never)
@@ -114,13 +116,15 @@ export async function joinTopic(topic: ReadTopic): Promise<WriteResult> {
     if (!newest) return { ok: true }
     const plaintext = await nip44.decrypt(newest.content)
     const list = plaintext === undefined ? undefined : parseMutedBlob(plaintext)
-    if (!list) return refused('You joined, but your muted list could not be read, so it is still muted. Try again.')
+    // Joined, but the mute stays: said as that, not as a failure (Join again takes it out).
+    if (!list) return { ok: true, stillMuted: true }
     if (!list.keys.includes(topic.address)) return { ok: true }
     const ciphertext = await nip44.encrypt(serializeMutedBlob(list.keys.filter((key) => key !== topic.address), Date.now()))
     const unmuted = await store.publishMuted(ciphertext)
-    return unmuted.ok ? { ok: true } : refused('You joined, but it is still muted. Try again.')
+    return unmuted.ok ? { ok: true } : { ok: true, stillMuted: true }
   } catch (error) {
-    return refused(error instanceof Error ? error.message : String(error))
+    console.warn('[topics] join:', error)
+    return followed ? { ok: true, stillMuted: true } : refused('Try again.')
   }
 }
 

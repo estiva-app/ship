@@ -43,7 +43,8 @@ const EMPTY: Record<TopicsTab, string> = {
 
 /** A topic is found by the start of a word of its title, as search is everywhere (Miky, 19 Oct). */
 export function findsTopic(title: string, query: string): boolean {
-  const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean)
+  // Split as the title is, so "q4-pl" finds "Q4-plan".
+  const words = query.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean)
   const titleWords = title.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean)
   return words.every((word) => titleWords.some((titleWord) => titleWord.startsWith(word)))
 }
