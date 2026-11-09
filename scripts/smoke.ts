@@ -585,8 +585,9 @@ async function main() {
     !!comment && tagValue(comment, 'A') === issueAddr && tagValue(comment, 'a') === issueAddr,
   )
   check(
-    '  …carrying the issue reference so Peek can render it',
-    !!comment && comment.content.includes('nostr:naddr'),
+    // ONE-11: its tags say which issue it is on; a link to it in the words drew an extra row in Peek and Leaf.
+    '  …carrying its words only, no link to the issue it is on',
+    !!comment && !comment.content.includes('nostr:naddr'),
   )
   check('  …and it is a root message, not a reply', !comment!.tags.some((t) => t[0] === 'e'))
   check('  …and no kind:9 was written for it', !stored.some((e) => e.kind === 9))
