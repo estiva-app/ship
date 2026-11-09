@@ -223,7 +223,21 @@ export function ShipComment(props: ShipCommentProps) {
           return answer === true
         }
       : undefined
-  const reopen = onResolve && resolution ? () => void onResolve(false) : undefined
+  // One reopen at a time, until the read after it lands, as a reaction is: a second click would sign a second 9101.
+  const reopening = useRef(false)
+  useEffect(() => {
+    reopening.current = false
+  }, [resolution])
+  const reopen =
+    onResolve && resolution
+      ? () => {
+          if (reopening.current) return
+          reopening.current = true
+          void onResolve(false).then((answer) => {
+            if (answer !== true) reopening.current = false
+          })
+        }
+      : undefined
   return (
     <ConversationCard
       {...cardProps(props, writes)}
