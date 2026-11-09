@@ -4,7 +4,7 @@ import type { Imeta } from '@estiva-app/protocol'
 import { ConversationLayout, ConversationPlace, EmptyState, GONE_CLOSED, IconButton, SkeletonList, Thread as KitThread, type ConversationItem } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
 import { ago } from '@/lib/time'
-import { draftKeys, type DraftStore } from '@/lib/drafts'
+import { appDrafts, draftKeys, type DraftStore } from '@/lib/drafts'
 import { offersEditAndDelete, type RootState } from '@estiva-app/conversation'
 import { REACTION_HORIZON, me, type Reaction, type Resolution } from '@/api'
 import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
@@ -85,7 +85,10 @@ interface ShipThreadProps extends ThreadProps {
 }
 
 /** A gone comment's stand-in is its earliest reply: every message hangs under "This comment was deleted." or "can't be shown." (SPEC §6.5). */
-const repliesOf = (thread: ThreadData) => (thread.rootMissing ? [thread.root, ...thread.replies] : thread.replies)
+const repliesOf = (thread: ThreadData) => (thread.rootMissing && !thread.held ? [thread.root, ...thread.replies] : thread.replies)
+
+/** The reply box of this thread holds text (its draft keeps every change). */
+const replyHoldsText = (threadId: string, drafts: DraftStore = appDrafts) => !!drafts.read(draftKeys.thread(threadId))?.trim()
 
 /**
  * Whether a thread's comment is gone, and how (SPEC §6.5, ONE-9): `deleted` by its author, or `missing`, not readable
@@ -156,12 +159,14 @@ function ShipThreadReplies(props: ShipThreadProps) {
   const { references, captions } = useThreadScope(pageThreads, thread.id, nameOf)
   const writable = !disabledReason
   const deleted = thread.rootMissing === true
+  // A comment deleted while a reply to it is written keeps its box and the text; Send is then refused, saying why (ONE-10).
+  const boxed = writable && (!deleted || replyHoldsText(thread.id, drafts))
   const common ={ resolved, here, boxHere: here, nameOf, viewer, drafts, references, captions, closed: !writable }
   return (
     <KitThread
       place="under"
       box={
-        writable && !deleted ? (
+        boxed ? (
           <Box
             key={thread.id}
             kind="reply"
@@ -178,7 +183,7 @@ function ShipThreadReplies(props: ShipThreadProps) {
         ) : undefined
       }
       // Closed (an archived file, signed out): no box and no line; the start box's line already says why.
-      notice={writable && deleted ? GONE_CLOSED : undefined}
+      notice={writable && !boxed ? GONE_CLOSED : undefined}
     >
       {repliesOf(thread).map((reply) => (
         <ShipReply key={reply.id} message={reply} {...common} {...toolsFor(reply, props)} isNew={!!stillUnread?.includes(reply.id)} />
@@ -195,8 +200,8 @@ function ShipThreadReplies(props: ShipThreadProps) {
  * the box is at the column's foot, with the block a comment will be about above it.
  */
 export function ThreadListView(props: ThreadListViewProps) {
-  const { threads, onStart, disabledReason, className, unread, nameOf, about, omitted = 0, reactionsCut = false, upload, drafts, anchor, onDropAnchor } = props
-  const scope = useMemo(() => messageScope(threads), [threads])
+  const { threads: read, onStart, disabledReason, className, unread, nameOf, about, omitted = 0, reactionsCut = false, upload, drafts, anchor, onDropAnchor } = props
+  const scope = useMemo(() => messageScope(read), [read])
   const references = useCallback((query: string) => referenceSections(scope, query, nameOf), [scope, nameOf])
   const captions = useMemo(() => referenceCaptions(scope, nameOf), [scope, nameOf])
   const blockId = anchor && anchor.state !== 'unanchored' ? anchor.id : undefined
@@ -206,9 +211,22 @@ export function ThreadListView(props: ThreadListViewProps) {
   const [openedByItself, setOpenedByItself] = useState(false)
   if (unread !== undefined && !openedByItself) {
     setOpenedByItself(true)
-    const first = threads.find((thread) => thread.replies.some((reply) => unread[thread.id]?.includes(reply.id)))
+    const first = read.find((thread) => thread.replies.some((reply) => unread[thread.id]?.includes(reply.id)))
     if (first && openId === undefined) setOpenId(first.id)
   }
+  /*
+    The open thread as last read, and where it stood. A comment with no replies leaves the read the moment it is
+    deleted; while its reply box holds text it stays where it was, as "This comment was deleted." with the box, so the
+    text is not lost and Send says why it is refused (ONE-10, Decided 9 November). Emptied, closed or sent, it goes.
+  */
+  const [last, setLast] = useState<{ thread: ThreadData; at: number }>()
+  const liveAt = openId === undefined ? -1 : read.findIndex((thread) => thread.id === openId)
+  if (liveAt >= 0 && (last?.thread !== read[liveAt] || last.at !== liveAt)) setLast({ thread: read[liveAt]!, at: liveAt })
+  const held = liveAt < 0 && last && last.thread.id === openId && replyHoldsText(openId, drafts) ? last : undefined
+  const threads = useMemo(
+    () => (held ? [...read.slice(0, held.at), { ...held.thread, replies: [], rootMissing: true as const, held: true as const }, ...read.slice(held.at)] : read),
+    [read, held],
+  )
   // An open thread is read as it is shown, as before (CON-34).
   const onShown = props.onThreadShown
   useEffect(() => {

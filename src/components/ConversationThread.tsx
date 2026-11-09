@@ -214,6 +214,12 @@ export interface ThreadData {
    * with every message under it and no new reply, as Peek and Leaf do.
    */
   rootMissing?: true
+  /**
+   * Gone from the read while its reply box held text (ONE-10, Decided 9 November): kept on screen as "This comment was
+   * deleted." with the box, so the text is not lost. `root` is then the comment as last read, not a reply, and is not
+   * drawn. Set only by `ThreadListView`, never by a read.
+   */
+  held?: true
 }
 
 /** Thread id → the ids of its unread messages, oldest first. Omitted threads have nothing new. */

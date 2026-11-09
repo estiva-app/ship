@@ -18,3 +18,6 @@ export function browserDrafts(): DraftStore {
     return NO_DRAFTS
   }
 }
+
+/** The one store every box uses when it is handed none, and what the thread list reads to know a box holds text. */
+export const appDrafts = browserDrafts()
