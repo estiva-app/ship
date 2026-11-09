@@ -112,7 +112,7 @@ export const PLACE_ICON: Record<'project' | 'issue', ReactNode> = {
 export interface ThreadListViewProps extends ConversationsProps {
   resolved?: Record<string, ForeignObjectData | null | undefined>
   reactionsBy?: Record<string, readonly Reaction[]>
-  /** By thread id, each thread resolved in Peek or Leaf: Ship shows it and offers no Resolve (Katerina, 2 November). */
+  /** By thread id, each thread that stands resolved, by whichever app resolved it (SPEC §6.4). */
   resolvedBy?: Record<string, Resolution>
   /** By thread id, each thread whose comment is gone: deleted, or not readable here (SPEC §6.5). Absent reads as deleted. */
   goneBy?: Record<string, Exclude<RootState, 'present'>>

@@ -74,6 +74,7 @@ export {
   renameFolder,
   react,
   unreact,
+  resolveThread,
   reply,
   assignMissingRefs,
   settleClaims,
@@ -140,7 +141,7 @@ export interface ThreadToRead {
  *
  * The same read brings each thread's resolutions (`kind:9101`): the one that
  * counts by §6.4 is the thread's state, whoever wrote it, also under a comment
- * that is gone. Ship writes none yet (Katerina, 2 November). And a thread whose
+ * that is gone. Ship writes them too since ONE-8 (`resolveThread`). And a thread whose
  * comment was not returned asks for its `kind:5`: deleted by its author, or
  * `missing`, one this reader cannot read (§6.5).
  */

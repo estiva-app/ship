@@ -47,6 +47,7 @@ interface ThreadProps {
   nameOf?: (pubkey: string) => string
   reactionsBy?: Record<string, readonly Reaction[]>
   onReact?: (messageId: string, emoji: string, mine?: string) => Promise<Answer>
+  onResolve?: (threadId: string, resolved: boolean, note?: string) => Promise<Answer>
   onDeleteMessage?: (messageId: string) => Promise<boolean | void> | boolean | void
   onEditMessage?: (messageId: string, body: string, removeCard?: string, files?: readonly Imeta[], dropped?: string) => Promise<Answer>
   upload?: (file: File) => Promise<Imeta>
@@ -62,6 +63,7 @@ const threadProps = (p: ThreadListViewProps) => ({
   nameOf: p.nameOf,
   reactionsBy: p.reactionsBy,
   onReact: p.onReact,
+  onResolve: p.onResolve,
   onDeleteMessage: p.onDeleteMessage,
   onEditMessage: p.onEditMessage,
   viewer: p.viewer,
@@ -118,10 +120,12 @@ function toolsFor(message: MessageData, { disabledReason, viewer, reactionsBy, o
  * React, Edit, Delete or Reply of its own (PER-24).
  */
 function ShipThreadComment(props: ShipThreadProps) {
-  const { thread, pageThreads, disabledReason, stillUnread, resolved, here, nameOf, viewer, drafts, resolvedBy, goneBy } = props
+  const { thread, pageThreads, disabledReason, stillUnread, resolved, here, nameOf, viewer, drafts, resolvedBy, goneBy, onResolve } = props
   const { references, captions } = useThreadScope(pageThreads, thread.id, nameOf)
   const gone = goneOf(thread, goneBy)
   const deleted = gone !== undefined
+  // Resolve and Reopen while the page takes writes, and never under a gone comment (SPEC §6.4, "What a thread offers").
+  const resolves = !disabledReason && !deleted && onResolve ? (resolve: boolean, note?: string) => onResolve(thread.id, resolve, note) : undefined
   const replies = repliesOf(thread)
   const isNew = (id: string) => !!stillUnread?.includes(id)
   const last = replies.at(-1)
@@ -146,6 +150,7 @@ function ShipThreadComment(props: ShipThreadProps) {
       replies={last ? { count: replies.length, faces: facesOf(replies), last: ago(last.at), newCount: replies.filter((reply) => isNew(reply.id)).length } : undefined}
       // A thread stays as its last resolve or reopen left it, its comment gone or not (SPEC §6.4).
       resolution={resolvedBy?.[thread.id]}
+      onResolve={resolves}
     />
   )
 }
@@ -377,7 +382,15 @@ export function ThreadList(props: ConversationsProps & Pick<ThreadListViewProps,
         return answer
       }
     : undefined
-  return <ThreadListView {...props} onReact={onReact} resolved={resolved} reactionsBy={reactionsBy} resolvedBy={resolvedBy} goneBy={goneBy} omitted={omitted} reactionsCut={cut} viewer={props.viewer ?? me} />
+  // A resolve or reopen is a kind:9101, read with the reactions: the same one request re-reads it.
+  const onResolve = props.onResolve
+    ? async (threadId: string, resolve: boolean, note?: string) => {
+        const answer = await props.onResolve!(threadId, resolve, note)
+        if (answer === true) refresh()
+        return answer
+      }
+    : undefined
+  return <ThreadListView {...props} onReact={onReact} onResolve={onResolve} resolved={resolved} reactionsBy={reactionsBy} resolvedBy={resolvedBy} goneBy={goneBy} omitted={omitted} reactionsCut={cut} viewer={props.viewer ?? me} />
 }
 
 /** "Mentioned in" with production's `Activity` props and its reads: the files they link, their reactions and resolutions. */

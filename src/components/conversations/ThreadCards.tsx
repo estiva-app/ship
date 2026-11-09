@@ -199,15 +199,31 @@ export interface ShipCommentProps extends ShipMessageProps {
   onReply?: () => void
   /** A press on the comment: its thread opens or closes. */
   onClick?: () => void
-  /** Resolved in Peek or Leaf: who, the note and when. Ship offers no Resolve (Katerina, 2 November). */
+  /** Its thread stands resolved, by whichever app: who, the note and when. */
   resolution?: Resolution
+  /**
+   * Resolve with the dialog's note, or reopen (ONE-8): an open thread offers Resolve, a resolved one Reopen. Absent,
+   * neither is offered. A resolve's refusal is said in the dialog, which stays open; a reopen's by the page.
+   */
+  onResolve?: (resolve: boolean, note?: string) => Promise<Answer>
 }
 
 /** A thread's comment on the kit's `ConversationCard`, in Ship's words. */
 export function ShipComment(props: ShipCommentProps) {
   const writes = useMessageWrites(props)
-  const { message, nameOf, deleted = false, unseen = false, replies, repliesLeftBehind = 0, onReply, onClick, resolution } = props
+  const { message, nameOf, deleted = false, unseen = false, replies, repliesLeftBehind = 0, onReply, onClick, resolution, onResolve } = props
   const named = (pubkey: string) => nameOf?.(pubkey) ?? `${pubkey.slice(0, 8)}…`
+  const [resolveRefused, setResolveRefused] = useState<string>()
+  const resolve =
+    onResolve && !resolution
+      ? async (note: string) => {
+          setResolveRefused(undefined)
+          const answer = await onResolve(true, note)
+          if (answer !== true) setResolveRefused(`Not resolved: ${refusalReason(answer)}.`)
+          return answer === true
+        }
+      : undefined
+  const reopen = onResolve && resolution ? () => void onResolve(false) : undefined
   return (
     <ConversationCard
       {...cardProps(props, writes)}
@@ -219,6 +235,9 @@ export function ShipComment(props: ShipCommentProps) {
       onReply={onReply}
       onClick={onClick}
       resolved={resolution ? { by: named(resolution.by), note: resolution.message, at: ago(resolution.at) } : undefined}
+      onResolve={resolve}
+      resolveRefused={resolveRefused}
+      onReopen={reopen}
     />
   )
 }

@@ -27,7 +27,7 @@ import {
   projectAddr,
   type CommentRef,
 } from './events'
-import { findNaddrs, naddrToAddr, buildReaction, buildEdit, buildDeletion as buildEventDeletion, imetaTag } from '@estiva-app/protocol'
+import { findNaddrs, naddrToAddr, buildReaction, buildResolution, buildEdit, buildDeletion as buildEventDeletion, imetaTag } from '@estiva-app/protocol'
 import { listFiles, openFile, writeChange, TEXT_FIELD, type WriteChangeResult } from '@estiva-app/interop'
 import { createLoadQuery, planArchiveFolder, planCreateFolder, planDeleteFolder, planListInTopic, planMoveFromFolders, planPlaceFile, planRemoveFromTopic, planRenameFolder, planUnlistFile, readMentionedIn, readMoveRefusal, type ListHolder, type FolderRef, type MovableFile, type MoveRefusal } from '@estiva-app/interop'
 import { foldFolder, type FolderState } from './fold'
@@ -1133,6 +1133,22 @@ export class Store {
       buildReaction(this.signer.pubkey, Date.now(), {
         targetEventId: args.targetEventId,
         emoji: args.emoji,
+      }),
+    )
+  }
+
+  /**
+   * Resolve or reopen a thread (SPEC §6.4, ONE-8): a `kind:9101` about its
+   * top-level comment, the same assertion Peek and Leaf write. `folder` is the
+   * comment's own `h`: a reader ignores a resolve filed in any other team.
+   */
+  resolve(args: { folder: string; targetEventId: string; action: 'resolved' | 'reopened'; note?: string }): Promise<PublishResult> {
+    return this.publish(
+      buildResolution(this.signer.pubkey, Date.now(), {
+        channelUuid: args.folder,
+        targetEventId: args.targetEventId,
+        action: args.action,
+        ...(args.note ? { rationale: args.note } : {}),
       }),
     )
   }

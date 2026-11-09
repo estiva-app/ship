@@ -20,7 +20,7 @@ import { act, actInField, answerOf, deleteAnswer, sayOnceLeft, type Say } from '
 import { editedFor, historyFor } from './history'
 import { useSideColumn } from './sideColumn'
 import { FileTopicsOf } from '@/components/FileTopicsOf'
-import { activityFor, cardEditOf, copyText, folderOfMessage, pickerPeople, refreshAfter, threadFor, useMentionLinks, withElsewhere } from './ProjectPage'
+import { activityFor, cardEditOf, copyText, folderOfMessage, pickerPeople, refreshAfter, resolveAnswer, threadFor, useMentionLinks, withElsewhere } from './ProjectPage'
 import { useReferencePage } from '@/api/references'
 
 /**
@@ -240,6 +240,8 @@ export function IssuePage({ state, directory, archives, d, say, refresh }: { sta
         onReact={(messageId, emoji, mine) =>
           answerOf(() => (mine ? unreact(mine) : react(messageId, emoji)))
         }
+        // A resolve is a kind:9101, re-read with the reactions, so no workspace re-read either (ONE-8).
+        onResolve={(threadId, resolved, note) => resolveAnswer(acting, threadId, resolved, note, say)}
         /*
           Deleting a comment — CON-3.
 

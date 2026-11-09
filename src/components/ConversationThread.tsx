@@ -283,6 +283,12 @@ export interface ConversationsProps {
    */
   onReact?: (messageId: string, emoji: string, mine?: string) => Promise<Answer>
   /**
+   * Resolve a thread, with the note from the dialog, or reopen it (SPEC §6.4,
+   * ONE-8). Answers why not on a refusal, said in the dialog that stays open.
+   * Omitted where nobody may write; a thread whose comment is gone offers neither.
+   */
+  onResolve?: (threadId: string, resolved: boolean, note?: string) => Promise<Answer>
+  /**
    * Publish a deletion for one message — CON-3.
    *
    * Resolves `false` on a refusal, which is what keeps the confirm dialog open

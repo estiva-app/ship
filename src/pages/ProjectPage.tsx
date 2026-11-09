@@ -27,6 +27,7 @@ import {
   reply,
 
   unreact,
+  resolveThread,
   assignMissingRefs,
   addMentioned,
   setProjectField,
@@ -54,7 +55,7 @@ import {
 import { useRelated, withoutTopics } from '@/api/useRelated'
 import { useFileTopics } from '@/api/useFileTopics'
 import { useThreads } from '@/api/useThreads'
-import { editTargetOf, MEMBER_FIELD_PREFIX } from '@estiva-app/conversation'
+import { editTargetOf, MEMBER_FIELD_PREFIX, refusalReason } from '@estiva-app/conversation'
 import { Members } from '@/components/Members'
 import { membershipActions } from './membership'
 import { useReferencePage } from '@/api/references'
@@ -226,6 +227,19 @@ export function folderOfMessage(state: FolderState, messageId: string): string |
     }
   }
   return undefined
+}
+
+/**
+ * Resolve or reopen a thread on this page (ONE-8), filed in its comment's own Folder (SPEC §6.4). A resolve's refusal
+ * goes back to its dialog; a reopen has none, so the page says it.
+ */
+export function resolveAnswer(state: FolderState, threadId: string, resolved: boolean, note: string | undefined, say: Say): Promise<true | string> {
+  const folder = folderOfMessage(state, threadId)
+  if (!folder) return Promise.resolve('That conversation is no longer on this page.')
+  return answerOf(() => resolveThread({ folder, threadId, resolved, note })).then((answer) => {
+    if (answer !== true && !resolved) say(`Not reopened: ${refusalReason(answer)}.`, 'error')
+    return answer
+  })
 }
 
 /**
@@ -895,6 +909,8 @@ export function ProjectPage({
         onReact={(messageId, emoji, mine) =>
           answerOf(() => (mine ? unreact(mine) : react(messageId, emoji)))
         }
+        // A resolve is a kind:9101, re-read with the reactions, so no workspace re-read either (ONE-8).
+        onResolve={(threadId, resolved, note) => resolveAnswer(acting, threadId, resolved, note, say)}
         /*
           Deleting a comment — CON-3.
 

@@ -95,6 +95,8 @@ export interface IssueViewProps {
   about?: string
   /** Add or take back a reaction on a message — CON-2. */
   onReact?: (messageId: string, emoji: string, mine?: string) => Promise<Answer>
+  /** Resolve a thread with a note, or reopen it (ONE-8). */
+  onResolve?: (threadId: string, resolved: boolean, note?: string) => Promise<Answer>
   /** Publish a deletion for one message — CON-3. Omitted where nobody may write. */
   onDeleteMessage?: (messageId: string) => Promise<boolean | void> | boolean | void
   /** Publish an edit of one message — CON-4. Omitted where nobody may write. */
@@ -116,7 +118,7 @@ export interface IssueViewProps {
 }
 
 /** One issue's page, its comments or its Overview beside it. */
-export function IssueView({ crumbs, title, summary, onSummarize, description, descriptionFormat, nameOf, onRename, onCopyBlockLink, onDescribe, onMention, descriptionBy, related, topics, threads, conversationsLoading, mentionsLoading, unread, stillUnread, onThreadShown, onStartConversation, onReply, activity, activityTruncated, history, fields, menu, comments, overview, about, onReact, onDeleteMessage, onEditMessage, readOnlyReason, lockedReason, commentsClosed, upload, archivedNotice, members, edited }: IssueViewProps) {
+export function IssueView({ crumbs, title, summary, onSummarize, description, descriptionFormat, nameOf, onRename, onCopyBlockLink, onDescribe, onMention, descriptionBy, related, topics, threads, conversationsLoading, mentionsLoading, unread, stillUnread, onThreadShown, onStartConversation, onReply, activity, activityTruncated, history, fields, menu, comments, overview, about, onReact, onResolve, onDeleteMessage, onEditMessage, readOnlyReason, lockedReason, commentsClosed, upload, archivedNotice, members, edited }: IssueViewProps) {
   // `linkTo` on each crumb (S15, 0.10.0): the breadcrumbs were the last links in Ship that reloaded the app (SHI-20).
   const items: Crumb[] = [{ label: 'Issues', ...linkTo(crumbs.issuesHref) }]
   // The box before the project's name says it is a project, as the sidebar's entry does (Katerina, 2026-09-09).
@@ -152,7 +154,7 @@ export function IssueView({ crumbs, title, summary, onSummarize, description, de
       {/* Its comments, the kit's one column, 384px beside the page, the full height of the page (Katerina, 2 November). */}
       {comments.shown && (
         <div className="flex shrink-0 flex-col border-l border-border-default" data-comments-column>
-          <ThreadList threads={threads} loading={conversationsLoading} unread={unread} stillUnread={stillUnread} onThreadShown={onThreadShown} onStart={comment.post} anchor={comment.anchor} onDropAnchor={comment.drop} onReply={onReply} disabledReason={readOnlyReason ?? commentsClosed} nameOf={nameOf} onReact={onReact} onDeleteMessage={onDeleteMessage} onEditMessage={onEditMessage} about={about} upload={upload} className="min-h-0 flex-1" />
+          <ThreadList threads={threads} loading={conversationsLoading} unread={unread} stillUnread={stillUnread} onThreadShown={onThreadShown} onStart={comment.post} anchor={comment.anchor} onDropAnchor={comment.drop} onReply={onReply} disabledReason={readOnlyReason ?? commentsClosed} nameOf={nameOf} onReact={onReact} onResolve={onResolve} onDeleteMessage={onDeleteMessage} onEditMessage={onEditMessage} about={about} upload={upload} className="min-h-0 flex-1" />
         </div>
       )}
     </div>
