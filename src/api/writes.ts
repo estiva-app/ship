@@ -687,6 +687,19 @@ export function react(targetEventId: string, emoji: string): Promise<WriteResult
 }
 
 /**
+ * Resolve a thread, with an optional note, or reopen it (SPEC §6.4, ONE-8).
+ *
+ * Filed in the comment's own Folder (`folder`, its `h`), never the page's: a
+ * resolve in another team is ignored by every reader. Anyone who may comment
+ * may resolve, and the newest counts, so nothing is checked here; a refusal
+ * comes back as the relay or Estiva ID gave it.
+ */
+export function resolveThread(args: { folder: string; threadId: string; resolved: boolean; note?: string }): Promise<WriteResult> {
+  const note = args.note?.trim()
+  return publish(() => store.resolve({ folder: args.folder, targetEventId: args.threadId, action: args.resolved ? 'resolved' : 'reopened', note: args.resolved ? note : undefined }))
+}
+
+/**
  * Take a reaction back.
  *
  * Targets **the reaction's own event**, never the message — a `kind:5` naming
