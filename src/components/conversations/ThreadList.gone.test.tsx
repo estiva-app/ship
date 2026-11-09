@@ -14,6 +14,7 @@ vi.mock(import('@/api/foreign'), async (importOriginal) => ({
 import { ThreadListView } from './ThreadList'
 import type { ThreadData } from '@/components/ConversationThread'
 import type { Resolution } from '@/api'
+import { createDraftStore, draftKeys } from '@/lib/drafts'
 
 const ANA = 'a'.repeat(64)
 const RAVI = 'b'.repeat(64)
@@ -45,6 +46,55 @@ describe('a thread whose comment was deleted', () => {
     // No new reply under a gone comment, and Ship offers no Resolve or Reopen.
     expect(screen.getByText('This thread takes no new replies.')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^(Reply|Resolve|Reopen)$/ })).toBeNull()
+  })
+})
+
+describe('a comment deleted while a reply to it is being written (ONE-10)', () => {
+  const comment: ThreadData = { id: COMMENT, root: { id: COMMENT, author: { name: 'Ana' }, at: 1_790_000_000, body: 'Is this ready?', by: ANA }, replies: [] }
+  const memory = () => {
+    const kept = new Map<string, string>()
+    return createDraftStore({ getItem: (key) => kept.get(key) ?? null, setItem: (key, value) => void kept.set(key, value), removeItem: (key) => void kept.delete(key) })
+  }
+
+  it('with no replies, stays as "This comment was deleted." with the reply box and its text, not taken away', async () => {
+    const drafts = memory()
+    drafts.write(draftKeys.thread(COMMENT), 'Almost, one more test')
+    const { rerender } = show({ threads: [comment], drafts })
+    fireEvent.click(screen.getByText('Is this ready?'))
+    expect(await screen.findByRole('textbox', { name: 'Reply…' })).toHaveTextContent('Almost, one more test')
+    // The live delete: the comment, with no replies, leaves the read.
+    rerender(<ThreadListView threads={[]} onStart={noop} onReply={noop} viewer={RAVI} drafts={drafts} />)
+    expect(screen.getByText('This comment was deleted.')).toBeInTheDocument()
+    expect(screen.queryByText('Is this ready?')).toBeNull()
+    expect(screen.getByRole('textbox', { name: 'Reply…' })).toHaveTextContent('Almost, one more test')
+    expect(screen.queryByText('This thread takes no new replies.')).toBeNull()
+    // Send: the page no longer has the conversation, and says so as IssuePage does; the box says the message was deleted.
+    const refused = async () => 'That conversation is no longer on this page.'
+    rerender(<ThreadListView threads={[]} onStart={noop} onReply={refused} viewer={RAVI} drafts={drafts} />)
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Reply…' }), { key: 'Enter' })
+    expect(await screen.findByText('Not sent: this message was deleted, or you can no longer write here. Your text is back in the box.')).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Reply…' })).toHaveTextContent('Almost, one more test')
+  })
+
+  it('goes once its box is empty, as a deleted comment with no replies does', async () => {
+    const drafts = memory()
+    drafts.write(draftKeys.thread(COMMENT), 'Almost')
+    const { rerender } = show({ threads: [comment], drafts })
+    fireEvent.click(screen.getByText('Is this ready?'))
+    await screen.findByRole('textbox', { name: 'Reply…' })
+    drafts.clear(draftKeys.thread(COMMENT))
+    rerender(<ThreadListView threads={[]} onStart={noop} onReply={noop} viewer={RAVI} drafts={drafts} />)
+    expect(screen.queryByText('This comment was deleted.')).toBeNull()
+  })
+
+  it('with replies, keeps the reply box and its text under "This comment was deleted."', async () => {
+    const drafts = memory()
+    drafts.write(draftKeys.thread(COMMENT), 'Almost, one more test')
+    show({ threads: [gone], goneBy: { [COMMENT]: 'deleted' }, drafts })
+    fireEvent.click(screen.getByText('This comment was deleted.'))
+    expect(await screen.findByRole('textbox', { name: 'Reply…' })).toHaveTextContent('Almost, one more test')
+    expect(screen.getByText('The reply stays')).toBeInTheDocument()
+    expect(screen.queryByText('This thread takes no new replies.')).toBeNull()
   })
 })
 

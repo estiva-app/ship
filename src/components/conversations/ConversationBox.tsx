@@ -11,7 +11,7 @@ import { subscribeReferences, type ReferenceSection } from '@/api/references'
 import { uploadAttachment } from '@/api/blobs'
 import { useForeignObjects } from '@/api/useForeignObjects'
 import { heldText, releaseHeld, useHeldTyping } from '@/auth/heldTyping'
-import { browserDrafts, type DraftStore } from '@/lib/drafts'
+import { appDrafts, type DraftStore } from '@/lib/drafts'
 import { useMentionPeople } from '@/components/editing/mentionables'
 import { MessageCard, MessageChip } from '@/components/ui/MessageLinks'
 import { PartCard } from '@/components/ui/PartCard'
@@ -52,7 +52,7 @@ const INSERT = [commentBoxRows.file, commentBoxRows.mention, commentBoxRows.urge
 /** How many of a box's links are asked about — `LinkChips`' default `limit`, and the send's. */
 const MAX_LINKS_ASKED = 24
 
-const DEFAULT_DRAFTS = browserDrafts()
+const DEFAULT_DRAFTS = appDrafts
 
 /** A file's card in the box, under the text, drawn as a sent message draws it. */
 function BoxCard({ uri }: { uri: string }) {
@@ -218,6 +218,7 @@ export function ConversationBox({ kind, onSend, references, captions, nameOf, re
       <CommentBox
         label={LABEL[kind]}
         placeholder={<Placeholder kind={kind} />}
+        reply={kind === 'reply'}
         people={people}
         references={references}
         referencesChanged={subscribeReferences}
