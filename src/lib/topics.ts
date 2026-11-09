@@ -1,4 +1,4 @@
-import type { ReadTopic, TopicConversation, TopicsRead } from '@estiva-app/interop'
+import { byActivity, type ReadTopic, type TopicsRead } from '@estiva-app/interop'
 import { topicAsDrawn } from '@/api/foreign'
 import { ISSUE_STATUSES, lookupStatus, progressOf, projectStatus } from '@/nostr/kinds'
 import { href } from '@/router'
@@ -6,7 +6,7 @@ import type { Archives } from './archive'
 import { statusLabel } from './issues'
 import { topicHref, topicInPeek } from './topicLinks'
 
-/** One row on Ship's Topics (SHIPS-3), as Linear draws an initiative. */
+/** One row on Ship's Topics, which is Explore topics (TOPI-9): the same columns in every app. */
 export interface TopicRowData {
   address: string
   title: string
@@ -14,94 +14,132 @@ export interface TopicRowData {
   summary?: string
   /** Its page here (SHIPS-4): a route for `linkTo`. */
   href: string
-  /** Its projects Completed, of all it lists, archived ones included (Linear's "2 / 10"). */
-  projects: { done: number; total: number }
-  /** Its conversations in Peek; `undefined` until they are read. */
-  conversations?: number
-  /** How many of them have something new for you, as Peek's dot: at your level on a topic you follow, and a mention on any. */
-  fresh: number
+  /** Its team's name; absent until the teams are read. */
+  team?: string
+  /** How many people it lists (record a-place-lists-who-chose-a-level-and-its-teams-members); `undefined` until read. */
+  members?: number
+  /** When anything last happened in it, Unix seconds (the shared rule, TOPI-10); `undefined` until read. */
+  active?: number
+  archived: boolean
+  /** You are in it: no Join on it. */
+  yours: boolean
 }
 
 export type TopicsTab = 'all' | 'yours' | 'others' | 'archived'
 
-/** Ship's own projects and issues, by address, to judge what a topic lists. */
-export interface TopicWork {
-  projects: readonly { addr: string; status: string; deleted?: unknown }[]
-  issues: readonly { addr: string }[]
+/** What the rows draw beside the topics read: each read on its own, `undefined` until it lands. */
+export interface TopicFacts {
+  /** Each topic's newest activity (interop's `readTopicActivity`). */
+  at?: ReadonlyMap<string, number>
+  /** `undefined` for a topic whose people could not be judged. */
+  members?: ReadonlyMap<string, number | undefined>
+  /** A team's name, by its id. */
+  teamName?: (id: string) => string | undefined
 }
 
 const byTitle = (a: TopicRowData, b: TopicRowData) => a.title.localeCompare(b.title, undefined, { sensitivity: 'base' })
 
 /**
- * Which topics Ship's Topics draws on each tab (Miky, 2–3 Nov, SHIPS-3), each
- * A–Z. Never a space: Ship is project management, conversation is Peek's.
- * A topic is drawn when it lists a project or an issue Ship holds, archived and
- * done ones counting; one that lists none is on no tab. It is under Archived
- * when it is archived in Peek, and only then: a topic whose work is all
- * archived stays on its tab until somebody archives it, so Ship, Peek and Add
- * to topic agree (Miky, 3 Nov, on Widgets). `folder` keeps only the topics
- * filed in it.
- *
- * Your topics are the ones you follow, by the shared fold (interop's
- * `following.in`): made, joined, added or a level chosen since your last
- * leave; writing in one is not following it. A topic you muted is with the
- * others, as Peek's switch shows a mute as Not following (`muted`, your
- * `estiva:muted:v1`; until it is read, nothing is taken out).
+ * Whether a topic is yours, for the sidebar's five and the Your topics tab
+ * alike: you follow it by the shared fold (interop's `following.in`: made,
+ * joined, added or a level chosen since your last leave; writing in one is not
+ * following it), it is not archived, and you did not mute it, as Peek's switch
+ * shows a mute as Not following (`muted`, your `estiva:muted:v1`; until it is
+ * read, nothing is taken out). Peek's column leaves out the same two, so the
+ * two apps' orders agree.
  * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/writing-in-a-place-never-follows-it.md
+ */
+const isYours = (topic: ReadTopic, archived: boolean, muted?: ReadonlySet<string>) => topic.yours && !archived && !muted?.has(topic.address)
+
+/**
+ * Which topics Ship's Topics draws on each tab: every topic you can open
+ * (TOPI-9; Miky, 6 Nov — also those listing no project or issue), never a
+ * space: Ship is project management, conversation is Peek's. It is under
+ * Archived when it is archived in Peek, and only then. `folder` keeps only the
+ * topics filed in it.
  *
- * Its work is judged by Ship's own fold: a listed address Ship holds as a
- * project or an issue, so a row agrees with the project and issue pages.
+ * Your topics come newest activity first, the order of the sidebar's five and
+ * of Peek's list (`byActivity`); All, Other topics and Archived A to Z. Your
+ * topics' order needs `facts.at`; without it they are A to Z too.
  * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-space-is-the-teams-own-mark-on-a-topic-it-lists.md
  */
-export function topicsByTab(
-  read: TopicsRead,
-  work: TopicWork,
-  conversations: ReadonlyMap<string, TopicConversation> | undefined,
-  folder?: string,
-  muted?: ReadonlySet<string>,
-): Record<TopicsTab, TopicRowData[]> {
-  // A deleted project is in no list (SPEC §6.5): a topic listing only that is no row.
-  const projects = new Map(work.projects.filter((project) => !project.deleted).map((project) => [project.addr, project]))
-  const issues = new Set(work.issues.map((issue) => issue.addr))
+export function topicsByTab(read: TopicsRead, facts: TopicFacts = {}, folder?: string, muted?: ReadonlySet<string>): Record<TopicsTab, TopicRowData[]> {
   const lists: Record<TopicsTab, TopicRowData[]> = { all: [], yours: [], others: [], archived: [] }
 
   for (const topic of read.topics) {
     if (topic.space || (folder && topic.folder !== folder)) continue
-    const listed = listedWork(topic, projects, issues)
-    if (listed.length === 0) continue
     const drawn = topicAsDrawn(topic.address, topic.folder, topic.object)
-    const conversation = conversations?.get(topic.address)
-    const listedProjects = listed.filter((item) => item.project)
+    const team = facts.teamName?.(topic.folder)
+    const members = facts.members?.get(topic.address)
+    const active = facts.at?.get(topic.address)
+    const yours = isYours(topic, drawn.archived, muted)
     const row: TopicRowData = {
       address: topic.address,
       title: drawn.title,
       // A file's summary is its subtitle slot, built in for every kind (SPEC §6.12).
       ...(topic.object.slots.subtitle?.value ? { summary: topic.object.slots.subtitle.value } : {}),
       href: topicHref(topic.address, drawn.title),
-      projects: progressOf(listedProjects.map((item) => item.project!.status), projectStatus),
-      ...(conversation ? { conversations: conversation.conversations } : {}),
-      fresh: conversation?.fresh ?? 0,
+      ...(team ? { team } : {}),
+      ...(members !== undefined ? { members } : {}),
+      ...(active ? { active } : {}),
+      archived: drawn.archived,
+      yours: topic.yours && !muted?.has(topic.address),
     }
     if (drawn.archived) {
       lists.archived.push(row)
       continue
     }
     lists.all.push(row)
-    lists[topic.yours && !muted?.has(topic.address) ? 'yours' : 'others'].push(row)
+    lists[yours ? 'yours' : 'others'].push(row)
   }
   for (const list of Object.values(lists)) list.sort(byTitle)
+  if (facts.at) {
+    const newest = byActivity(facts.at)
+    lists.yours.sort((a, b) => newest(a.address, b.address))
+  }
   return lists
 }
 
-/** The projects and issues a topic lists that Ship holds. */
-function listedWork(topic: ReadTopic, projects: Map<string, { addr: string; status: string }>, issues: Set<string>) {
-  return topic.listed.flatMap(({ address }): { project?: { status: string } }[] => {
-    if (!address) return []
-    const project = projects.get(address)
-    if (project) return [{ project }]
-    if (issues.has(address)) return [{ project: undefined }]
-    return []
-  })
+/** The topics yours by {@link isYours}, by address: what the sidebar and Your topics order. */
+export function yourTopics(read: TopicsRead, muted?: ReadonlySet<string>): string[] {
+  return read.topics
+    .filter((topic) => !topic.space && isYours(topic, topicAsDrawn(topic.address, topic.folder, topic.object).archived, muted))
+    .map((topic) => topic.address)
+}
+
+/** One of your topics in the sidebar: its page, and the projects and issues it lists, in its page's order. */
+export interface SidebarTopic {
+  /** Its address. */
+  id: string
+  title: string
+  href: string
+  work: { id: string; kind: 'project' | 'issue'; title: string; href: string }[]
+}
+
+/** How many of your topics the sidebar shows; the rest are on Explore topics, under Your topics (Miky, 6 Nov). */
+export const TOPICS_SHOWN = 5
+
+/**
+ * The sidebar's topics (TOPI-9): your five newest, by the same rule and the
+ * same "yours" as the Your topics tab, each with what its page lists that is
+ * not archived, projects then issues, each in the order the topic lists them
+ * ({@link topicPageOf}) — the topic's arranged order once arranging ships.
+ */
+export function sidebarTopicsOf(read: TopicsRead, at: ReadonlyMap<string, number>, work: TopicPageWork, archives: Archives, muted?: ReadonlySet<string>): SidebarTopic[] {
+  const newest = byActivity(at)
+  const byAddress = new Map(read.topics.map((topic) => [topic.address, topic]))
+  return yourTopics(read, muted)
+    .sort(newest)
+    .slice(0, TOPICS_SHOWN)
+    .map((address) => {
+      const page = topicPageOf(byAddress.get(address)!, work, archives)
+      return {
+        id: address,
+        title: page.title,
+        href: topicHref(address, page.title),
+        work: page.live.map((row) => ({ id: row.address, kind: row.kind, title: row.title, href: row.href })),
+      }
+    })
 }
 
 /** A Leaf document's kind: what a topic's Documents lists (interop's `LISTED_FILE_KINDS`). */

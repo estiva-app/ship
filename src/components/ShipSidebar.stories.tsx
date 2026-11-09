@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { ShipSidebar, type SidebarFolder } from './ShipSidebar'
+import type { SidebarTopic } from '@/lib/topics'
 
 const SHIP = '7b32200c-e4c0-4216-b79a-8490fc05e0bd'
 const HQ = '0212db6d-bcbf-40d0-890e-f4f056db2f5d'
@@ -8,6 +9,23 @@ const HQ = '0212db6d-bcbf-40d0-890e-f4f056db2f5d'
 const FOLDERS: SidebarFolder[] = [
   { id: SHIP, name: 'Ship', addresses: ['30850:a:rel', '30850:a:pay', '39000:r:ship-talk'] },
   { id: HQ, name: 'Estiva HQ', addresses: ['30850:a:des', '30850:a:onb'] },
+]
+
+/** Your five newest topics, newest activity first, each folding to the projects then issues it lists (TOPI-9). */
+const TOPICS: SidebarTopic[] = [
+  {
+    id: '30840:a:nav',
+    title: 'Cross-app navigation',
+    href: '#/topic/nav',
+    work: [
+      { id: '30850:a:rel', kind: 'project', title: 'Release 2', href: '#/project/rel' },
+      { id: '30851:a:1', kind: 'issue', title: 'Explore topics opens Topics', href: '#/issue/1' },
+    ],
+  },
+  { id: '30840:a:speed', title: 'Speed', href: '#/topic/speed', work: [{ id: '30850:a:pay', kind: 'project', title: 'Payments', href: '#/project/pay' }] },
+  { id: '30840:a:triage', title: 'Triage', href: '#/topic/triage', work: [] },
+  { id: '30840:a:brand', title: 'Brand refresh', href: '#/topic/brand', work: [] },
+  { id: '30840:a:hiring', title: 'Hiring', href: '#/topic/hiring', work: [] },
 ]
 
 const meta = {
@@ -21,6 +39,8 @@ const meta = {
     onOpenFolder: () => {},
     onNewFolder: () => {},
     current: { entry: 'topics' },
+    topics: TOPICS,
+    onRetryTopics: () => {},
   },
   parameters: { layout: 'fullscreen' },
   decorators: [
@@ -36,12 +56,28 @@ export default meta
 type Story = StoryObj<typeof meta>
 
 /**
- * Where Ship opens (SHIPS-5): Topics, Projects ("5 active"), Issues ("18 open"),
- * then the teams under a quiet "Folders" label, closed, alphabetically. A team
- * carries **no count** — a Folder holds files from apps Ship does not own, so
- * any number would be Ship's records only.
+ * Where Ship opens (SHIPS-5, TOPI-9): Projects ("5 active"), Issues ("18 open"),
+ * your five newest topics folded, Explore topics (no icon, lit: Ship opens on
+ * it), then the teams under a quiet "Teams" label, closed, alphabetically. A
+ * team carries **no count** — a Folder holds files from apps Ship does not own,
+ * so any number would be Ship's records only.
  */
 export const OnTopics: Story = {}
+
+/** A project a topic lists: that topic opens, the project lit under it, and its team's Projects. */
+export const OnAProjectInATopic: Story = { args: { current: { entry: 'projects', folder: SHIP }, openFile: '30850:a:rel' } }
+
+/** A topic's page: its row is lit, not Explore topics. */
+export const OnATopic: Story = { args: { current: undefined, openTopic: '30840:a:speed' } }
+
+/** You are in no topic yet: the line says so, and Explore topics is the way in. */
+export const NoTopics: Story = { args: { topics: [] } }
+
+/** The topics or their order are being read. */
+export const TopicsLoading: Story = { args: { topics: 'loading' } }
+
+/** The topics or their order did not load. */
+export const TopicsFailed: Story = { args: { topics: 'failed' } }
 
 export const OnIssues: Story = { args: { current: { entry: 'issues' } } }
 

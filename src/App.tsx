@@ -23,6 +23,7 @@ import { ProjectsPage } from '@/pages/ProjectsPage'
 import { TopicPage } from '@/pages/TopicPage'
 import { TopicsPage } from '@/pages/TopicsPage'
 import { ensureTopics, prefetchTopics } from '@/api/topics'
+import { useSidebarTopics } from '@/api/useSidebarTopics'
 import { isTopicAddress } from '@/lib/topicLinks'
 import { ID_CONFIG, RELAY_URL } from './config'
 import { beginSignIn, beginSignOut, signInAvailable, signedIn } from './auth/estivaId'
@@ -72,6 +73,9 @@ function Shell() {
   const teams = useMemo(() => (folders ? topLevelFolders(folders) : undefined), [folders])
   // What is archived, and what with (FOL-46): read against every Folder, archived teams included.
   const archives = useMemo(() => (state ? archivesOf(state, folders ?? []) : undefined), [state, folders])
+  // Your five newest topics (TOPI-9), each folding to the work it lists once the workspace is read.
+  const topicWork = useMemo(() => (state && !partial ? { projects: state.projects, issues: state.issues } : undefined), [state, partial])
+  const sidebarTopics = useSidebarTopics(topicWork, archives, route.name === 'topic' ? route.d : undefined)
   useTabTitle(pageTitleOf(route, state))
   const { showToast } = useToast()
   const { banner, say, clear } = useBanner(showToast)
@@ -208,6 +212,7 @@ function Shell() {
             (teams ?? []).map((f) => ({ id: f.id, name: f.name, addresses: f.addresses })),
             archives,
           )}
+          {...sidebarTopics}
           onOpenFolder={(folder) => go({ name: 'folder', id: folder.id })}
           onNewFolder={() => setCreatingFolder(true)}
           loading={(!state && loading) || partial}
@@ -296,7 +301,7 @@ function Page({ route, state, loading, directory, teams, folders, archives, say,
   if ((route.name === 'projects' || route.name === 'issues') && route.folder && !teams) return <PageSkeleton shape={SKELETON[route.name] ?? 'rows'} />
   switch (route.name) {
     case 'topics':
-      return <TopicsPage state={state} folders={folders} folder={route.folder} />
+      return <TopicsPage folders={folders} folder={route.folder} say={say} />
     case 'topic':
       return <TopicPage key={route.d} d={route.d} state={state} folders={folders} archives={archives} />
     case 'projects':
@@ -351,11 +356,12 @@ export function sidebarProps(
         ? { entry: 'issues', folder: teamOf(state?.issues.find((i) => i.id === route.d)?.projectAddr) }
         : route.name === 'folder'
           ? { folderId: route.id }
-          : route.name === 'topic'
-            ? { entry: 'topics' }
-            : route.name === 'topics' || route.name === 'projects' || route.name === 'issues'
-              ? { entry: route.name, folder: route.folder }
-              : undefined
+          : route.name === 'topics' || route.name === 'projects' || route.name === 'issues'
+            ? { entry: route.name, folder: route.folder }
+            : undefined
+  // A topic's page lights its own row among your topics (`openTopic`), and a project or an issue its row under each topic listing it.
+  const openFile =
+    route.name === 'project' ? projects.find((p) => p.id === route.d)?.addr : route.name === 'issue' ? state?.issues.find((i) => i.id === route.d)?.addr : undefined
   return {
     openIssues,
     activeProjects,
@@ -363,6 +369,7 @@ export function sidebarProps(
       href({ name: entry, folder }),
     folders,
     current,
+    ...(openFile ? { openFile } : {}),
   }
 }
 

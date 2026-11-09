@@ -1,12 +1,18 @@
 import type { ReactNode } from 'react'
 import { IconArrowUpRight, IconBox, IconListDetails, IconPlus, IconTarget } from '@tabler/icons-react'
-import { NavItem, NavTree, Sidebar as SidebarShell, type NavTreeGroup } from '@estiva-app/ui'
+import { KindIcon, NavItem, NavTree, Sidebar as SidebarShell, type NavTreeGroup } from '@estiva-app/ui'
+import { EmptyState } from '@/components/ui/EmptyState'
+import { SkeletonList } from '@/components/ui/Skeleton'
+import { TOPICS_SHOWN, type SidebarTopic } from '@/lib/topics'
 import { linkTo } from '@/router'
 
 /**
- * The sidebar: Topics, Projects, Issues, then each team folding to its own
- * Topics, Projects and Issues (SHIPS-5; Miky, 2 November, on the prototype
- * `ShipTopics.tsx`). There is no Home, no Views and no Starred: Home is
+ * The sidebar: Projects, Issues, your five newest topics then Explore topics
+ * (TOPI-9; Miky, 4 and 6 Nov, on the approved story), then each team folding
+ * to its own Topics, Projects and Issues (SHIPS-5; Miky, 2 November, on the
+ * prototype `ShipTopics.tsx`). Each of your topics folds to the projects and
+ * issues it lists; the order is the caller's, set when Ship opens or you come
+ * back to the tab, so a row never moves under the pointer. There is no Home, no Views and no Starred: Home is
  * parked, and Ship has neither of the others. No inbox, no "my issues"; a
  * personal filter belongs to the list it filters, so Assigned to me is a tab
  * of Issues. The column itself is the shared shell (2026-09-02); what fills
@@ -85,6 +91,16 @@ export interface ShipSidebarProps {
    */
   onNewFolder?: () => void
   current?: SidebarPlace
+  /**
+   * Your five newest topics ({@link sidebarTopicsOf}), newest activity first;
+   * `loading` before the topics and their order land, `failed` when either did not.
+   */
+  topics: SidebarTopic[] | 'loading' | 'failed'
+  onRetryTopics: () => void
+  /** The topic whose page is open, by address: its row is lit and opens. */
+  openTopic?: string
+  /** The project or issue open, by address: lit under the topic listing it, which opens. */
+  openFile?: string
   /** The first workspace read has not landed, so the counts are unknown rather than zero — SHI-20. */
   loading?: boolean
   /**
@@ -100,11 +116,13 @@ const ENTRIES: { entry: SidebarEntry; label: string; icon: ReactNode }[] = [
   { entry: 'projects', label: 'Projects', icon: <IconBox size={16} stroke={1.5} /> },
   { entry: 'issues', label: 'Issues', icon: <IconListDetails size={16} stroke={1.5} /> },
 ]
+/** The top: Projects and Issues. Topics is the section under them now (TOPI-9); a team's fold keeps all three. */
+const TOP = ENTRIES.filter(({ entry }) => entry !== 'topics')
 
 /** A team entry's row id: the tree's `selected` names one. */
 const rowId = (folder: string, entry: SidebarEntry) => `${folder}/${entry}`
 
-export function ShipSidebar({ openIssues, activeProjects, hrefFor, folders = [], onOpenFolder, onNewFolder, current, loading = false, foldersLoading = false, className }: ShipSidebarProps) {
+export function ShipSidebar({ openIssues, activeProjects, hrefFor, folders = [], onOpenFolder, onNewFolder, current, topics, onRetryTopics, openTopic, openFile, loading = false, foldersLoading = false, className }: ShipSidebarProps) {
   const at = current && 'entry' in current ? current : undefined
   // Alphabetical teams, as Peek's column draws them; the relay's order tells the person nothing.
   const teams = [...folders].sort((a, b) =>
@@ -135,9 +153,42 @@ export function ShipSidebar({ openIssues, activeProjects, hrefFor, folders = [],
       }
   return (
     <SidebarShell className={className}>
-      {ENTRIES.map(({ entry, label, icon }) => (
+      {TOP.map(({ entry, label, icon }) => (
         <NavItem key={entry} label={label} href={hrefFor(entry)} icon={icon} {...counts[entry]} active={!!at && !at.folder && at.entry === entry} />
       ))}
+      {/* Your five newest topics, each folding to what Ship opens of it; then the way to every topic. */}
+      <NavTree title="Topics">
+        {topics === 'loading' ? (
+          <SkeletonList rows={TOPICS_SHOWN} />
+        ) : topics === 'failed' ? (
+          <div className="px-2 py-1">
+            <EmptyState scope="section" message="Didn’t load." action={{ label: 'Try again', onClick: onRetryTopics }} />
+          </div>
+        ) : topics.length === 0 ? (
+          <div className="px-2 py-1">
+            <EmptyState scope="section" message="You are in no topic yet." />
+          </div>
+        ) : (
+          topics.map((topic) => (
+            <NavItem
+              key={topic.id}
+              label={topic.title}
+              href={topic.href}
+              icon={<KindIcon kind="topic" />}
+              active={openTopic === topic.id}
+              // Opens each time its page or one of its files is opened, as a click would; folded by hand, it stays so until then.
+              openFor={openTopic === topic.id ? topic.id : topic.work.some((work) => work.id === openFile) ? openFile : undefined}
+              defaultOpen={false}
+            >
+              {topic.work.length > 0
+                ? topic.work.map((work) => <NavItem key={work.id} label={work.title} href={work.href} icon={<KindIcon kind={work.kind} />} active={openFile === work.id} />)
+                : undefined}
+            </NavItem>
+          ))
+        )}
+        {/* No icon: it is a way in, not another topic (Miky, 6 Nov). Where the top "Topics" entry went. */}
+        <NavItem label="Explore topics" href={hrefFor('topics')} active={!!at && !at.folder && at.entry === 'topics'} />
+      </NavTree>
       {/*
         A quiet "Folders" label, its + on the right for a new top-level Folder
         (FOL-8), over the teams. No label while the Folders are being read:

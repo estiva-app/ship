@@ -12,7 +12,7 @@ import { IssuesView, type IssuesScope } from './IssuesView'
 import { ProjectView } from './ProjectView'
 import { ProjectsView, type ProjectsLayout } from './ProjectsView'
 import { TopicsView } from './TopicsView'
-import type { TopicRowData, TopicsTab } from '@/lib/topics'
+import type { SidebarTopic, TopicRowData, TopicsTab } from '@/lib/topics'
 import type { ProjectTab, ProjectsTab } from '@/router'
 import { useSideColumn, type Side } from '@/pages/sideColumn'
 import type { Imeta } from '@estiva-app/protocol'
@@ -59,13 +59,28 @@ const RELATED: RelatedState = {
  * on invented data. What wiring (REW-3 step c) does is feed these the fold's
  * data instead of fixtures; the pages do not change.
  */
+/** Your five newest topics, as the sidebar draws them (TOPI-9). */
+const SIDEBAR_TOPICS: SidebarTopic[] = [
+  {
+    id: `30840:${'a'.repeat(64)}:nav`,
+    title: 'Cross-app navigation',
+    href: '#/topic/nav',
+    work: [
+      { id: '30850:a:nav-ship', kind: 'project', title: 'Ship’s Topics navigation', href: '#/project/nav-ship' },
+      { id: '30851:a:nav-1', kind: 'issue', title: 'Explore topics opens Topics', href: '#/issue/nav-1' },
+    ],
+  },
+  { id: `30840:${'a'.repeat(64)}:speed`, title: 'Speed', href: '#/topic/speed', work: [] },
+  { id: `30840:${'a'.repeat(64)}:triage`, title: 'Triage', href: '#/topic/triage', work: [] },
+]
+
 function Shell({ current, children }: { current: SidebarEntry; children: React.ReactNode }) {
   return (
     <div className="h-screen">
       <AppShell
         logo="Estiva Ship"
         identity={<IdentityMenu me={ANA} signedIn idBase="https://id.estiva.app" relayUrl="http://localhost:3000" onCopyKey={fn()} onSignOut={fn()} />}
-        nav={<ShipSidebar openIssues={18} activeProjects={SIDEBAR_PROJECTS.length} hrefFor={(entry) => `#/${entry}`} current={{ entry: current }} />}
+        nav={<ShipSidebar openIssues={18} activeProjects={SIDEBAR_PROJECTS.length} hrefFor={(entry) => `#/${entry}`} current={{ entry: current }} topics={SIDEBAR_TOPICS} onRetryTopics={fn()} />}
       >
         {children}
       </AppShell>
@@ -105,45 +120,68 @@ export const ProjectsInAFolder: Story = { render: () => <ProjectsStory lists={PR
 /** No projects at all: every tab says so in one line. */
 export const ProjectsEmpty: Story = { render: () => <ProjectsStory lists={{ all: [], planned: [], active: [], completed: [], archived: [] }} /> }
 
-const topicRow = (d: string, title: string, projects: [number, number], conversations: number, fresh = 0, summary?: string): TopicRowData => ({
+const HOUR = 3600
+const NOW = Math.floor(Date.now() / 1000)
+const topicRow = (d: string, title: string, team: string, members: number, hoursAgo: number, yours: boolean, summary?: string, archived = false): TopicRowData => ({
   address: `30840:${'a'.repeat(64)}:${d}`,
   title,
   ...(summary ? { summary } : {}),
   href: `https://peek.estiva.app/topic/${d}`,
-  projects: { done: projects[0], total: projects[1] },
-  conversations,
-  fresh,
+  team,
+  members,
+  active: NOW - hoursAgo * HOUR,
+  archived,
+  yours,
 })
+// Newest activity first, as the sidebar's five.
 const YOUR_TOPICS = [
-  topicRow('nav', 'Cross-app navigation', [1, 3], 6, 2, 'Teams and topics instead of Folders, in every app.'),
-  topicRow('speed', 'Speed', [2, 2], 3, 0, 'Every app opens in under a second on Miky’s workspace.'),
-  topicRow('triage', 'Triage', [0, 0], 2, 0, 'Lists only issues, so its Projects cell is empty.'),
+  topicRow('nav', 'Cross-app navigation', 'Product', 4, 0.2, true, 'Teams and topics instead of Folders, in every app.'),
+  topicRow('speed', 'Speed', 'Engineering', 3, 5, true, 'Every app opens in under a second on Miky’s workspace.'),
+  topicRow('triage', 'Triage', 'Engineering', 2, 30, true),
 ]
-const OTHER_TOPICS = [topicRow('brand', 'Brand refresh', [0, 1], 1)]
+const OTHER_TOPICS = [topicRow('brand', 'Brand refresh', 'Design', 2, 72, false, 'Lists no project or issue: Explore shows it anyway.')]
 const TOPICS: Record<TopicsTab, TopicRowData[]> = {
-  all: [YOUR_TOPICS[0], OTHER_TOPICS[0], YOUR_TOPICS[1]],
+  all: [OTHER_TOPICS[0], YOUR_TOPICS[0], YOUR_TOPICS[1], YOUR_TOPICS[2]],
   yours: YOUR_TOPICS,
   others: OTHER_TOPICS,
-  archived: [topicRow('launch', 'Launch week', [3, 3], 9)],
+  archived: [topicRow('launch', 'Launch week', 'Company', 9, 400, false, undefined, true)],
 }
 
-/** Topics (SHIPS-3): All / Your topics / Other topics / Archived, opening on yours; a row's summary, projects done of all, conversations and what is new. */
+/** Topics, which the sidebar's Explore topics opens (TOPI-9): a search, All / Your topics / Other topics / Archived opening on yours, newest first; team, members, last active, and Join on a topic you are not in. */
 export const Topics: Story = {
   render: () => {
     const [tab, setTab] = useState<TopicsTab>('yours')
     return (
       <Shell current="topics">
-        <TopicsView title="Topics" lists={TOPICS} tab={tab} onTab={setTab} onRetry={fn()} />
+        <TopicsView title="Topics" lists={TOPICS} tab={tab} onTab={setTab} onRetry={fn()} onJoin={fn()} />
       </Shell>
     )
   },
+}
+
+/** Other topics, where Join is. */
+export const TopicsOthers: Story = {
+  render: () => (
+    <Shell current="topics">
+      <TopicsView title="Topics" lists={TOPICS} tab="others" onTab={fn()} onRetry={fn()} onJoin={fn()} />
+    </Shell>
+  ),
+}
+
+/** A search that finds nothing says so, in the words asked. */
+export const TopicsNoMatch: Story = {
+  render: () => (
+    <Shell current="topics">
+      <TopicsView title="Topics" lists={TOPICS} tab="all" onTab={fn()} onRetry={fn()} onJoin={fn()} query="zebra" />
+    </Shell>
+  ),
 }
 
 /** Topics while the read is out: skeleton rows in the list's place. */
 export const TopicsLoading: Story = {
   render: () => (
     <Shell current="topics">
-      <TopicsView title="Topics" lists="loading" tab="yours" onTab={fn()} onRetry={fn()} />
+      <TopicsView title="Topics" lists="loading" tab="yours" onTab={fn()} onRetry={fn()} onJoin={fn()} />
     </Shell>
   ),
 }
@@ -152,7 +190,7 @@ export const TopicsLoading: Story = {
 export const TopicsFailed: Story = {
   render: () => (
     <Shell current="topics">
-      <TopicsView title="Topics" lists="failed" tab="yours" onTab={fn()} onRetry={fn()} />
+      <TopicsView title="Topics" lists="failed" tab="yours" onTab={fn()} onRetry={fn()} onJoin={fn()} />
     </Shell>
   ),
 }
