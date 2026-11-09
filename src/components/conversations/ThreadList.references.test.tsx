@@ -15,7 +15,7 @@
  * and a time — which is exactly what the report describes.
  */
 import { describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 // Only the network call is stubbed. Resolving nothing is a real answer, and it
 // is the one that isolates "which text reached the screen" from "what the relay
@@ -117,5 +117,30 @@ describe('a comment’s line that only links the file it is on', () => {
   it('keeps a link to it written inside a sentence', async () => {
     const c = show(on(ADDR, `Same as ${NADDR} then.`))
     await waitFor(() => expect(c.querySelector('[data-message-text] p')?.textContent).toBe("Same as You can't open this issue then."))
+  })
+
+  /* Editing an old comment must not hand the author back the line Ship used to
+     append, or saving would keep it. jsdom has no client rects on text, and the
+     edit box (ProseMirror) asks for them when it scrolls its caret into view. */
+  it('is not in the edit box, nor in what saving an edit publishes', async () => {
+    const rects = () => ({ length: 0, item: () => null, [Symbol.iterator]: function* () {} }) as unknown as DOMRectList
+    const empty = () => ({ top: 0, left: 0, bottom: 0, right: 0, width: 0, height: 0, x: 0, y: 0, toJSON: () => ({}) }) as DOMRect
+    for (const proto of [Element.prototype, Range.prototype] as { getClientRects?: unknown; getBoundingClientRect?: unknown }[]) {
+      proto.getClientRects = rects
+      proto.getBoundingClientRect = empty
+    }
+    const onEditMessage = vi.fn(async (): Promise<true | string> => true)
+    render(<ThreadList threads={[on(ADDR, `Looks right.\n\n${NADDR}`)]} onStart={noop} onReply={noop} viewer="bob" onEditMessage={onEditMessage} />)
+    document.querySelectorAll('[data-comment-body]').forEach((card) => fireEvent.mouseEnter(card))
+    fireEvent.click(screen.getByRole('button', { name: 'Message actions' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Edit message' }))
+    type Box = HTMLElement & { editor: { isInitialized: boolean; chain: () => { focus: (at: 'start') => { insertContent: (s: string) => { run: () => boolean } } } } }
+    const box = (await screen.findByRole('textbox', { name: 'Edit message' })) as Box
+    await waitFor(() => expect(box.editor.isInitialized).toBe(true))
+    expect(box.textContent).toBe('Looks right.')
+    // The author adds a word and saves: only their words go out, never the link back to the issue.
+    act(() => void box.editor.chain().focus('start').insertContent('Yes. ').run())
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(onEditMessage).toHaveBeenCalledWith('t1', 'Yes. Looks right.', undefined, [], undefined))
   })
 })
