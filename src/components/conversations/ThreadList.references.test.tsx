@@ -107,6 +107,9 @@ describe('a comment’s line that only links the file it is on', () => {
   it('draws nothing, leaving the comment’s words', async () => {
     const c = show(on(ADDR, `Looks right.\n\n${NADDR}`))
     await waitFor(() => expect(c.querySelector('[data-message-text]')?.textContent).toBe('Looks right.'))
+    // Not the issue's row under the words either: what Peek and Leaf drew before ONE-11.
+    expect(c.querySelector('[data-link-row]')).toBeNull()
+    expect(c.textContent).not.toContain("can't open")
   })
 
   it('is still the other file’s row on a comment on another file', async () => {

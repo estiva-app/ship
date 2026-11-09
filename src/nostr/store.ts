@@ -1049,11 +1049,10 @@ export class Store {
     /** The card it asks for under it (SPEC §13.6.2) — `embedsToSend`. */
     embeds?: readonly Embed[]
   }): Promise<PublishResult> {
-    const body = args.body
     return this.publish(
       buildConversationMessage(this.signer.pubkey, Date.now(), {
         folder: args.folder,
-        body,
+        body: args.body,
         replyTo: args.replyTo,
         replyToComment: args.replyToComment,
         about: args.about,

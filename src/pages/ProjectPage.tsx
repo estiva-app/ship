@@ -1,7 +1,7 @@
 import { newestDrawn, useMarkRead, useShownThreads } from '@/lib/useMarkRead'
 import { useNewSince } from '@/lib/useNewSince'
 import { ownConversations, recordChannel } from '@/lib/ownConversation'
-import { pointerToAddress, referenceToPointer, resolveBlockAnchor, toRenderTree, type ContentFormat, type Embed, type LinkResolver, type PartPointer, type SignedEvent } from '@estiva-app/protocol'
+import { resolveBlockAnchor, toRenderTree, type ContentFormat, type Embed, type LinkResolver, type PartPointer, type SignedEvent } from '@estiva-app/protocol'
 import { linksIn, mentionedInOf } from '@estiva-app/interop'
 import { knownLinkValue, links, useAskLinks } from '@/api/linkCards'
 import { MAX_LINKS_PER_MESSAGE } from '@/lib/linksNamingCards'
@@ -96,7 +96,7 @@ export function threadFor(
     anchor is then reported unaddressable rather than silently dropped.
   */
   body?: { value: string; format: ContentFormat },
-  /** The object this surface is: its own pointer is dropped, every other one is drawn (SHI-1). */
+  /** The object this surface is. No longer read: a comment's line linking its own file is left out by the shared line rule (ONE-11). */
   self?: string,
   /*
     Edits, applied here rather than in the fold — CON-4.
@@ -132,9 +132,7 @@ export function threadFor(
       author: directory.personOf(m.author),
       at: m.createdAt,
       // The edited text, if there is one — an edit changes the body and its
-      // attachments (RFC 0.4 §7.2.1, amended 2026-09-23). The reference still
-      // comes out of it, so an edit that keeps the pointer keeps the widget.
-      // As written: the line linking the comment's own file is the shared line rule's to leave out (ONE-11, `MessageText`).
+      // attachments (RFC 0.4 §7.2.1, amended 2026-09-23). As written: the line linking the comment's own file is the shared line rule's to leave out (ONE-11, `MessageText`).
       body: edit?.body ?? m.body,
       // Milliseconds from the fold, seconds everywhere else on this shape.
       // Only a body change marks it: an edit that re-attaches files under the
