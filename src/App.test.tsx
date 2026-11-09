@@ -557,7 +557,7 @@ describe('Project page — one project from the fold', () => {
     const box = (await main.findByRole('textbox', { name: 'Start a conversation…' })) as HTMLElement & { editor: { commands: { insertContent: (s: string) => void } } }
     act(() => box.editor.commands.insertContent('hello'))
     fireEvent.click(main.getByRole('button', { name: 'Send' }))
-    await waitFor(() => expect(startConversation).toHaveBeenCalledWith({ folder: 'f', about: `30850:x:${LIVE}`, withReference: false, body: 'hello', files: [], embeds: [] }))
+    await waitFor(() => expect(startConversation).toHaveBeenCalledWith({ folder: 'f', about: `30850:x:${LIVE}`, body: 'hello', files: [], embeds: [] }))
     await waitFor(() => expect(refresh).toHaveBeenCalled())
   })
 
@@ -642,7 +642,8 @@ describe('Issue page — one issue from the fold', () => {
     expect(location.pathname).toBe(`/issue/${D('14')}`)
   })
 
-  it('starts a thread about the issue with the reference Peek needs', async () => {
+  // Changed on purpose (ONE-11): the words go as written, with no line linking the issue; its tags say which issue.
+  it('starts a thread about the issue with its words as written', async () => {
     vi.mocked(startConversation).mockResolvedValue({ ok: true })
     goTo(`/issue/${D('14')}?tab=activity`)
     render(<App />)
@@ -650,7 +651,35 @@ describe('Issue page — one issue from the fold', () => {
     const box = (await main.findByRole('textbox', { name: 'Start a conversation…' })) as HTMLElement & { editor: { commands: { insertContent: (s: string) => void } } }
     act(() => box.editor.commands.insertContent('seen this?'))
     fireEvent.click(main.getByRole('button', { name: 'Send' }))
-    await waitFor(() => expect(startConversation).toHaveBeenCalledWith({ folder: 'f', about: `30851:x:${D('14')}`, withReference: true, body: 'seen this?', files: [], embeds: [] }))
+    await waitFor(() => expect(startConversation).toHaveBeenCalledWith({ folder: 'f', about: `30851:x:${D('14')}`, body: 'seen this?', files: [], embeds: [] }))
+  })
+
+  // A comment started from one paragraph's menu goes out on that paragraph, so it shows beside it, not in the issue's general conversation.
+  it('starts a thread on the description block it was started from', async () => {
+    vi.mocked(startConversation).mockResolvedValue({ ok: true })
+    const description = JSON.stringify({
+      type: 'doc',
+      content: [
+        { type: 'paragraph', id: 'b1', content: [{ type: 'text', text: 'first part' }] },
+        { type: 'paragraph', id: 'b2', content: [{ type: 'text', text: 'second part' }] },
+      ],
+    })
+    const blocks = { ...STATE, issues: STATE.issues.map((i) => (i.id === D('14') ? { ...i, description, descriptionFormat: 'blocks' as const } : i)) }
+    vi.mocked(useWorkspace).mockReturnValue({ state: blocks, partial: false, error: null, clock: null, loading: false, busy: false, refresh, wantThreads: () => {}, live: false })
+    goTo(`/issue/${D('14')}`)
+    render(<App />)
+    const user = userEvent.setup()
+    const main = within(screen.getByRole('main'))
+    // The description is the shared editor once it has arrived; jsdom lays nothing out, so every top is 0 and the pointer is on the last block.
+    const editor = await main.findByRole('textbox', { name: 'Description' }, { timeout: 5000 })
+    await user.hover(within(editor).getByText('second part'))
+    // The handle's menu opens on the click, as Notion's does (a pointer travelling to it in jsdom loses the block).
+    fireEvent.click(main.getByRole('button', { name: 'Block menu' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Comment' }))
+    const box = (await main.findByRole('textbox', { name: 'Start a conversation…' })) as HTMLElement & { editor: { commands: { insertContent: (s: string) => void } } }
+    act(() => box.editor.commands.insertContent('why this part?'))
+    fireEvent.click(main.getByRole('button', { name: 'Send' }))
+    await waitFor(() => expect(startConversation).toHaveBeenCalledWith(expect.objectContaining({ about: `30851:x:${D('14')}`, body: 'why this part?', blockId: 'b2' })))
   })
 
   it('links the project in the trail when the issue has one', () => {

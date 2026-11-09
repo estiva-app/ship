@@ -15,7 +15,7 @@
  * and a time — which is exactly what the report describes.
  */
 import { describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 // Only the network call is stubbed. Resolving nothing is a real answer, and it
 // is the one that isolates "which text reached the screen" from "what the relay
@@ -27,7 +27,6 @@ vi.mock(import('@/api/foreign'), async (importOriginal) => ({
 
 import { ThreadList } from './ThreadList'
 import type { ThreadData } from '@/components/ConversationThread'
-import { omitOwnReference } from '@/pages/ProjectPage'
 
 const NADDR =
   'nostr:naddr1qqjxzde5xfjnvdee943kzwrr956rswr995uxgd3s95unsvekvd3nsvtzv3jnyqg4dp68gup69uhkcmmrv9kxsmmnwsarxvpsxqpzpvankwem8vankwem8vankwem8vankwem8vankwem8vankwem8vanqvzqqqrcsvczkget'
@@ -94,33 +93,57 @@ describe('a comment that points at an object', () => {
   })
 })
 
-describe('omitOwnReference', () => {
-  it('drops the pointer at the object whose page this is', () => {
-    expect(omitOwnReference(`Looks right.\n\n${NADDR}`, ADDR)).toBe('Looks right.')
+/*
+  ONE-11 (Miky, 2026-11-09): a line that is only a link to the file a comment is
+  on draws nothing, in every app — the line Ship appended to every issue comment.
+*/
+describe('a comment’s line that only links the file it is on', () => {
+  const on = (address: string, body: string): ThreadData => ({
+    id: 't1',
+    root: { id: 't1', author: { name: 'Bob' }, at: 1000, body, by: 'bob', event: { id: 't1', pubkey: 'b'.repeat(64), created_at: 1, kind: 1111, tags: [['A', address], ['K', '30851']], content: body, sig: '' } },
+    replies: [],
   })
 
-  it('keeps a pointer at any other object', () => {
-    expect(omitOwnReference(`Looks right.\n\n${NADDR}`, `${ADDR}-other`)).toContain(NADDR)
+  it('draws nothing, leaving the comment’s words', async () => {
+    const c = show(on(ADDR, `Looks right.\n\n${NADDR}`))
+    await waitFor(() => expect(c.querySelector('[data-message-text]')?.textContent).toBe('Looks right.'))
+    // Not the issue's row under the words either: what Peek and Leaf drew before ONE-11.
+    expect(c.querySelector('[data-link-row]')).toBeNull()
+    expect(c.textContent).not.toContain("can't open")
   })
 
-  /*
-    Only a *standalone* pointer goes. One inside a sentence is somebody's prose,
-    and deleting it would take the sentence's meaning with it — the mistake the
-    old `stripReferences` made on every body it touched.
-  */
-  it('keeps a pointer written inside a sentence, even to this object', () => {
-    const body = `Same as ${NADDR} then.`
-    expect(omitOwnReference(body, ADDR)).toBe(body)
+  it('is still the other file’s row on a comment on another file', async () => {
+    const c = show(on(`${ADDR}-other`, `Looks right.\n\n${NADDR}`))
+    await waitFor(() => expect(c.querySelector('[data-link-row]')?.textContent).toBe("You can't open this issue"))
   })
 
-  it('leaves the body alone when there is no object to omit', () => {
-    const body = `Looks right.\n\n${NADDR}`
-    expect(omitOwnReference(body, undefined)).toBe(body)
+  it('keeps a link to it written inside a sentence', async () => {
+    const c = show(on(ADDR, `Same as ${NADDR} then.`))
+    await waitFor(() => expect(c.querySelector('[data-message-text] p')?.textContent).toBe("Same as You can't open this issue then."))
   })
 
-  /* A pointer that will not decode is not this object's, and is not deleted on a parse failure. */
-  it('keeps a malformed pointer', () => {
-    const body = 'nostr:naddr1qqqqq'
-    expect(omitOwnReference(body, ADDR)).toBe(body)
+  /* Editing an old comment must not hand the author back the line Ship used to
+     append, or saving would keep it. jsdom has no client rects on text, and the
+     edit box (ProseMirror) asks for them when it scrolls its caret into view. */
+  it('is not in the edit box, nor in what saving an edit publishes', async () => {
+    const rects = () => ({ length: 0, item: () => null, [Symbol.iterator]: function* () {} }) as unknown as DOMRectList
+    const empty = () => ({ top: 0, left: 0, bottom: 0, right: 0, width: 0, height: 0, x: 0, y: 0, toJSON: () => ({}) }) as DOMRect
+    for (const proto of [Element.prototype, Range.prototype] as { getClientRects?: unknown; getBoundingClientRect?: unknown }[]) {
+      proto.getClientRects = rects
+      proto.getBoundingClientRect = empty
+    }
+    const onEditMessage = vi.fn(async (): Promise<true | string> => true)
+    render(<ThreadList threads={[on(ADDR, `Looks right.\n\n${NADDR}`)]} onStart={noop} onReply={noop} viewer="bob" onEditMessage={onEditMessage} />)
+    document.querySelectorAll('[data-comment-body]').forEach((card) => fireEvent.mouseEnter(card))
+    fireEvent.click(screen.getByRole('button', { name: 'Message actions' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Edit message' }))
+    type Box = HTMLElement & { editor: { isInitialized: boolean; chain: () => { focus: (at: 'start') => { insertContent: (s: string) => { run: () => boolean } } } } }
+    const box = (await screen.findByRole('textbox', { name: 'Edit message' })) as Box
+    await waitFor(() => expect(box.editor.isInitialized).toBe(true))
+    expect(box.textContent).toBe('Looks right.')
+    // The author adds a word and saves: only their words go out, never the link back to the issue.
+    act(() => void box.editor.chain().focus('start').insertContent('Yes. ').run())
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(onEditMessage).toHaveBeenCalledWith('t1', 'Yes. Looks right.', undefined, [], undefined))
   })
 })

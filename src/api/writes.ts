@@ -1,12 +1,11 @@
 import type { Embed, Imeta, NostrTag, PublishResult } from '@estiva-app/protocol'
-import { BLOCK_DOCUMENT_FORMAT, addrToNaddr, serializeBlockDocument, textAsksOf, toRenderTree } from '@estiva-app/protocol'
+import { BLOCK_DOCUMENT_FORMAT, serializeBlockDocument, textAsksOf, toRenderTree } from '@estiva-app/protocol'
 import { MAX_MENTIONED_PEOPLE, boxLinksOf, embedsToEdit, embedsToSend, namedBefore, withoutCard } from '@estiva-app/conversation'
 import { isSwitchRefusal, linksIn, listedBeneath, MAX_LINKS_ASKED, prevsAfterSwitch, textOf, within, type OwnPlace } from '@estiva-app/interop'
 import type { FileText } from '@estiva-app/conversation'
 import type { DocumentAsks } from '@estiva-app/ui/editor'
 import type { Conversation, Issue, Project } from '../nostr/fold'
 import { clashes, explicitKey, keyOfRef, nextRef, projectKeys, suggestKey, takenKeys } from '../nostr/keys'
-import { RELAY_URL } from '../config'
 import { clockProblem } from './clock'
 import { loadQuery, readFolderListing } from './foreign'
 import { links } from './linkCards'
@@ -585,13 +584,12 @@ function tagsEarnedBy(body: string, own: OwnPlace, edit = false): Promise<NostrT
 }
 
 /**
- * Start a conversation about an object, in its Folder. About an issue, the
- * body also carries a `nostr:naddr` reference, so a reader of the Folder in
- * Peek sees which issue it is about, as that issue's chip; about a project,
- * the message is already in the topic it belongs to and a reference would be
- * noise.
+ * Start a conversation about an object, in its Folder. The comment names the
+ * object in its tags only: until ONE-11 an issue comment's words also ended
+ * with a `nostr:naddr` of the issue, which every reader now draws as nothing.
+ * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-comment-draws-no-line-for-the-file-it-is-on.md
  */
-export function startConversation(args: { folder: string; about: string; withReference: boolean; body: string; blockId?: string; files?: readonly Imeta[]; urgent?: readonly string[]; embeds?: readonly Embed[] }): Promise<WriteResult> {
+export function startConversation(args: { folder: string; about: string; body: string; blockId?: string; files?: readonly Imeta[]; urgent?: readonly string[]; embeds?: readonly Embed[] }): Promise<WriteResult> {
   return publish(async () => {
     // A pasted block link shows that block (SPEC §13.6.1, COM-2); a pasted app link is a mention, as a `nostr:`
     // reference is (SPEC §13.1, OPT-19).
@@ -604,7 +602,6 @@ export function startConversation(args: { folder: string; about: string; withRef
       embeds: args.embeds ? [...args.embeds] : cardToSend(args.body, args.about),
       // SPEC §13.6 — present only when the author was commenting on one block.
       blockId: args.blockId,
-      aboutRef: args.withReference ? `nostr:${addrToNaddr(args.about, [RELAY_URL])}` : undefined,
       // Already on the relay by the time this runs — `uploadAttachment` had to
       // resolve before the composer would submit, because ingest refuses a
       // message naming a blob it does not hold.

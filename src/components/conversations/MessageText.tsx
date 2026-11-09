@@ -32,6 +32,7 @@ export function MessageText({
   between,
   onRemoveCard,
   words = false,
+  ownFile,
 }: {
   body: string
   /** The cards its author asked for, after edits (SPEC §13.6.2). */
@@ -50,6 +51,8 @@ export function MessageText({
   onRemoveCard?: (value: string) => void
   /** Its cards' values as words, no pickers: the reader cannot act here — an archived file's conversation, or signed out (Katerina, 30 Oct). */
   words?: boolean
+  /** The file the comment is on (its `A` and `O`): a line that is only a link to it draws nothing (ONE-11; why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-comment-draws-no-line-for-the-file-it-is-on.md). */
+  ownFile?: readonly string[]
 }) {
   // What each app link names by §7.7; a link to one block names its file, so it is that file's chip, the block live under the message (WBM-11).
   const claimed = linkResolverFor(body, knownLinkValue)
@@ -71,7 +74,7 @@ export function MessageText({
   const blocks = linksAsReferences(toRenderTree(body, MESSAGE_FORMAT), resolveLink)
   const isHere = (value: string) => !!here && value.toLowerCase() === here.toLowerCase()
   const cards = cardsOf(blocks, embeds, parts, claimed).filter((card) => !isHere(card.value))
-  const placed = placeLines(blocks, { cards, parts, resolveLink, stayChip: isHere })
+  const placed = placeLines(blocks, { cards, parts, resolveLink, stayChip: isHere, ...(ownFile?.length ? { ownFile } : {}) })
   const shown = cards.filter((card) => card.layout !== 'none')
   // A chip whose file's card is already under the message shows no hover card: it would cover that card (Katerina, 30 Oct).
   const carded = new Set(shown.map((card) => card.value.toLowerCase()))

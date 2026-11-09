@@ -212,10 +212,8 @@ export function IssuePage({ state, directory, archives, d, say, refresh }: { sta
         unread={unread}
         stillUnread={stillUnread}
         onThreadShown={onThreadShown}
-        // Threads about an issue carry a reference in the body so Peek renders
-        // the issue's widget above them (withReference: true), as the old app has it.
         // Each conversation write answers the relay's refusal as it came; the kit says it in the shared words (ONE-4).
-        onStartConversation={(body, files, picks, blockId) => answerOf(() => startConversation({ folder: issue.folder, about: issue.addr, withReference: true, body, blockId, files, urgent: picks?.urgent, embeds: picks?.embeds }), () => refresh([issue.folder]))}
+        onStartConversation={(body, files, picks, blockId) => answerOf(() => startConversation({ folder: issue.folder, about: issue.addr, body, blockId, files, urgent: picks?.urgent, embeds: picks?.embeds }), () => refresh([issue.folder]))}
         onReply={(threadId, body, files, picks) => {
           const conversation = conversations.find((c) => c.id === threadId)
           if (!conversation) return Promise.resolve('That conversation is no longer on this page.')

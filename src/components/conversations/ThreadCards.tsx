@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { Imeta, Quote } from '@estiva-app/protocol'
-import { refusalReason } from '@estiva-app/conversation'
+import { ownFileOf, refusalReason, withoutOwnFileLines } from '@estiva-app/conversation'
 import { ConversationCard, FieldLine, QuotedLine, ReplyCard, type ReactionRowProps, type RepliesRowProps } from '@estiva-app/ui'
 import { ago } from '@/lib/time'
 import type { DraftStore } from '@/lib/drafts'
@@ -133,6 +133,8 @@ function useMessageWrites({ message, reactions, onToggleReaction, onEdit, nameOf
 function cardProps(props: ShipMessageProps, writes: ReturnType<typeof useMessageWrites>) {
   const { message, resolved, here, boxHere, nameOf, viewer, onDelete, onEdit, references, captions, drafts, closed = false, isNew = false } = props
   const { editing, setEditing, editHold, removeCard, cardRefused, reactionRow } = writes
+  // The file the comment is on: a line that is only a link to it draws nothing, and an edit opens without it (ONE-11).
+  const ownFile = message.event ? ownFileOf(message.event) : []
   return {
     ...SHIP_WORDS,
     author: { name: message.author.name ?? '—', picture: message.author.picture, bot: message.author.bot },
@@ -152,7 +154,7 @@ function cardProps(props: ShipMessageProps, writes: ReturnType<typeof useMessage
       ? (done: () => void) => (
           <Box
             kind="edit"
-            editing={{ body: message.body, urgent: message.urgent, files: message.files, embeds: message.embeds, holdKey: editHold, onCancel: done }}
+            editing={{ body: withoutOwnFileLines(message.body, ownFile), urgent: message.urgent, files: message.files, embeds: message.embeds, holdKey: editHold, onCancel: done }}
             references={references}
             captions={captions}
             resolved={resolved}
@@ -175,6 +177,7 @@ function cardProps(props: ShipMessageProps, writes: ReturnType<typeof useMessage
           resolved={resolved}
           nameOf={nameOf}
           here={here}
+          ownFile={ownFile}
           // Files stay between the words and the cards, where Ship draws them (SHI-2).
           between={<FileAttachments files={message.files} />}
           onRemoveCard={removeCard}

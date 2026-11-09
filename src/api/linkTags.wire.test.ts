@@ -58,11 +58,19 @@ afterEach(() => {
 describe('a comment sent from Ship tags what its words link', () => {
   it('a URL in a code span earns nothing, and [A](B) earns B only', async () => {
     const body = `Not this: \`${issueAt(1)}\`. This: [${issueAt(2)}](${issueAt(3)}).`
-    expect(await startConversation({ folder: FOLDER, about: ISSUE, withReference: false, body })).toEqual({ ok: true })
+    expect(await startConversation({ folder: FOLDER, about: ISSUE, body })).toEqual({ ok: true })
     const comment = wire.sent.at(-1)!
     expect(comment.kind).toBe(1111)
     // The comment's own file (NIP-22's lowercase a), then the one file the words link.
     expect(values(comment, 'a')).toEqual([ISSUE, `30851:${PK}:${d(3)}`])
+  })
+
+  // ONE-11: an issue comment's words used to end with `\n\nnostr:naddr…` of the issue, drawn as an extra row in Peek and Leaf.
+  it('a comment on an issue sends only its words; its tags say which issue it is on', async () => {
+    expect(await startConversation({ folder: FOLDER, about: ISSUE, body: 'Looks right.' })).toEqual({ ok: true })
+    const comment = wire.sent.at(-1)!
+    expect(comment.content).toBe('Looks right.')
+    expect(values(comment, 'A')).toEqual([ISSUE])
   })
 })
 
