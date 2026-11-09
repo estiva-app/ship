@@ -83,47 +83,6 @@ import { KIND } from '@/nostr/kinds'
 
 export type { Say } from './act'
 
-/**
- * Drop the reference that points at the page you are already on — SHI-1.
- *
- * This replaces the old app's `stripReferences`, which removed **every**
- * `nostr:naddr…` from a body before drawing it. That was right about one
- * reference and wrong about all the others: `startConversation` appends the
- * issue's own pointer to each comment, and showing bech32 for the object whose
- * page you are reading is noise — but a thread on a project naming one of its
- * issues, or a Peek message naming something else entirely, carried a pointer
- * that Ship then deleted rather than resolving. Katerina saw the result as
- * "avatar + name + timestamp only".
- *
- * So the rule narrows from *"references are not text to read"* to *"the object
- * this surface already is, is not worth repeating"*. Everything else is drawn
- * by `Conversations` as the object it names.
- *
- * Only a **standalone** reference is removed — a paragraph that is nothing but
- * the pointer, which is exactly the shape `postMessage` appends (`\n\n${ref}`).
- * A pointer written inside a sentence is somebody's prose and stays where they
- * put it, resolved in place (§13.1, RIC-10).
- */
-export function omitOwnReference(body: string, addr?: string): string {
-  if (!addr) return body
-  const paragraphs = body.split(/\n[ \t]*\n/)
-  const kept = paragraphs.filter((paragraph) => {
-    const text = paragraph.trim()
-    if (!NADDR_ONLY.test(text)) return true
-    try {
-      return pointerToAddress(referenceToPointer(text)) !== addr
-    } catch {
-      // A pointer that will not decode is not this object's; leave it alone
-      // rather than deleting somebody's text on a parse failure.
-      return true
-    }
-  })
-  return kept.join('\n\n').trim()
-}
-
-/** A paragraph that is nothing but one `nostr:` pointer. */
-const NADDR_ONLY = /^nostr:naddr1[0-9acdefghjklmnpqrstuvwxyz]+$/i
-
 /** A conversation from the fold as the thread card draws it: names and faces for keys, the fold's order kept. */
 export function threadFor(
   conversation: FolderState['conversations'][number],
@@ -175,7 +134,8 @@ export function threadFor(
       // The edited text, if there is one — an edit changes the body and its
       // attachments (RFC 0.4 §7.2.1, amended 2026-09-23). The reference still
       // comes out of it, so an edit that keeps the pointer keeps the widget.
-      body: omitOwnReference(edit?.body ?? m.body, self),
+      // As written: the line linking the comment's own file is the shared line rule's to leave out (ONE-11, `MessageText`).
+      body: edit?.body ?? m.body,
       // Milliseconds from the fold, seconds everywhere else on this shape.
       // Only a body change marks it: an edit that re-attaches files under the
       // same text is not "edited" (§7.2.1, CON-5).
@@ -865,8 +825,6 @@ export function ProjectPage({
         unread={unread}
         stillUnread={stillUnread}
         onThreadShown={onThreadShown}
-        // A project conversation is already in the topic it belongs to, so a
-        // reference would be noise (withReference: false), as the old app has it.
         onStartConversation={async (body, files, picks, blockId) => {
           // The project's own Folder (workFolder), written into and then re-read.
           let folder: string
@@ -876,7 +834,7 @@ export function ProjectPage({
             return error instanceof Error ? error.message : String(error)
           }
           // Each conversation write answers the relay's refusal as it came; the kit says it in the shared words (ONE-4).
-          return answerOf(() => startConversation({ folder, about: project.addr, withReference: false, body, blockId, files, urgent: picks?.urgent, embeds: picks?.embeds }), () => refresh([folder]))
+          return answerOf(() => startConversation({ folder, about: project.addr, body, blockId, files, urgent: picks?.urgent, embeds: picks?.embeds }), () => refresh([folder]))
         }}
         onCopyBlockLink={(link) => void copyText(link, 'Link copied', 'Copy this link:', say)}
         onReply={(threadId, body, files, picks) => {

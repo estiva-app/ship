@@ -557,7 +557,7 @@ describe('Project page — one project from the fold', () => {
     const box = (await main.findByRole('textbox', { name: 'Start a conversation…' })) as HTMLElement & { editor: { commands: { insertContent: (s: string) => void } } }
     act(() => box.editor.commands.insertContent('hello'))
     fireEvent.click(main.getByRole('button', { name: 'Send' }))
-    await waitFor(() => expect(startConversation).toHaveBeenCalledWith({ folder: 'f', about: `30850:x:${LIVE}`, withReference: false, body: 'hello', files: [], embeds: [] }))
+    await waitFor(() => expect(startConversation).toHaveBeenCalledWith({ folder: 'f', about: `30850:x:${LIVE}`, body: 'hello', files: [], embeds: [] }))
     await waitFor(() => expect(refresh).toHaveBeenCalled())
   })
 
@@ -642,7 +642,8 @@ describe('Issue page — one issue from the fold', () => {
     expect(location.pathname).toBe(`/issue/${D('14')}`)
   })
 
-  it('starts a thread about the issue with the reference Peek needs', async () => {
+  // Changed on purpose (ONE-11): the words go as written, with no line linking the issue; its tags say which issue.
+  it('starts a thread about the issue with its words as written', async () => {
     vi.mocked(startConversation).mockResolvedValue({ ok: true })
     goTo(`/issue/${D('14')}?tab=activity`)
     render(<App />)
@@ -650,7 +651,7 @@ describe('Issue page — one issue from the fold', () => {
     const box = (await main.findByRole('textbox', { name: 'Start a conversation…' })) as HTMLElement & { editor: { commands: { insertContent: (s: string) => void } } }
     act(() => box.editor.commands.insertContent('seen this?'))
     fireEvent.click(main.getByRole('button', { name: 'Send' }))
-    await waitFor(() => expect(startConversation).toHaveBeenCalledWith({ folder: 'f', about: `30851:x:${D('14')}`, withReference: true, body: 'seen this?', files: [], embeds: [] }))
+    await waitFor(() => expect(startConversation).toHaveBeenCalledWith({ folder: 'f', about: `30851:x:${D('14')}`, body: 'seen this?', files: [], embeds: [] }))
   })
 
   it('links the project in the trail when the issue has one', () => {

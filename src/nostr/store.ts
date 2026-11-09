@@ -1040,8 +1040,6 @@ export class Store {
     about?: string
     /** A block of that object, when the comment is about one part — §13.6. */
     blockId?: string
-    /** Reference to append so other apps can see what this is about. */
-    aboutRef?: string
     /** Files already uploaded to the relay — SHI-2. See `buildConversationMessage`. */
     files?: readonly Imeta[]
     /** Who the composer's urgent picks name — CON-25. */
@@ -1051,7 +1049,7 @@ export class Store {
     /** The card it asks for under it (SPEC §13.6.2) — `embedsToSend`. */
     embeds?: readonly Embed[]
   }): Promise<PublishResult> {
-    const body = args.aboutRef ? `${args.body}\n\n${args.aboutRef}` : args.body
+    const body = args.body
     return this.publish(
       buildConversationMessage(this.signer.pubkey, Date.now(), {
         folder: args.folder,

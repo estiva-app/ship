@@ -27,7 +27,6 @@ vi.mock(import('@/api/foreign'), async (importOriginal) => ({
 
 import { ThreadList } from './ThreadList'
 import type { ThreadData } from '@/components/ConversationThread'
-import { omitOwnReference } from '@/pages/ProjectPage'
 
 const NADDR =
   'nostr:naddr1qqjxzde5xfjnvdee943kzwrr956rswr995uxgd3s95unsvekvd3nsvtzv3jnyqg4dp68gup69uhkcmmrv9kxsmmnwsarxvpsxqpzpvankwem8vankwem8vankwem8vankwem8vankwem8vankwem8vanqvzqqqrcsvczkget'
@@ -94,33 +93,29 @@ describe('a comment that points at an object', () => {
   })
 })
 
-describe('omitOwnReference', () => {
-  it('drops the pointer at the object whose page this is', () => {
-    expect(omitOwnReference(`Looks right.\n\n${NADDR}`, ADDR)).toBe('Looks right.')
+/*
+  ONE-11 (Miky, 2026-11-09): a line that is only a link to the file a comment is
+  on draws nothing, in every app — the line Ship appended to every issue comment.
+*/
+describe('a comment’s line that only links the file it is on', () => {
+  const on = (address: string, body: string): ThreadData => ({
+    id: 't1',
+    root: { id: 't1', author: { name: 'Bob' }, at: 1000, body, by: 'bob', event: { id: 't1', pubkey: 'b'.repeat(64), created_at: 1, kind: 1111, tags: [['A', address], ['K', '30851']], content: body, sig: '' } },
+    replies: [],
   })
 
-  it('keeps a pointer at any other object', () => {
-    expect(omitOwnReference(`Looks right.\n\n${NADDR}`, `${ADDR}-other`)).toContain(NADDR)
+  it('draws nothing, leaving the comment’s words', async () => {
+    const c = show(on(ADDR, `Looks right.\n\n${NADDR}`))
+    await waitFor(() => expect(c.querySelector('[data-message-text]')?.textContent).toBe('Looks right.'))
   })
 
-  /*
-    Only a *standalone* pointer goes. One inside a sentence is somebody's prose,
-    and deleting it would take the sentence's meaning with it — the mistake the
-    old `stripReferences` made on every body it touched.
-  */
-  it('keeps a pointer written inside a sentence, even to this object', () => {
-    const body = `Same as ${NADDR} then.`
-    expect(omitOwnReference(body, ADDR)).toBe(body)
+  it('is still the other file’s row on a comment on another file', async () => {
+    const c = show(on(`${ADDR}-other`, `Looks right.\n\n${NADDR}`))
+    await waitFor(() => expect(c.querySelector('[data-link-row]')?.textContent).toBe("You can't open this issue"))
   })
 
-  it('leaves the body alone when there is no object to omit', () => {
-    const body = `Looks right.\n\n${NADDR}`
-    expect(omitOwnReference(body, undefined)).toBe(body)
-  })
-
-  /* A pointer that will not decode is not this object's, and is not deleted on a parse failure. */
-  it('keeps a malformed pointer', () => {
-    const body = 'nostr:naddr1qqqqq'
-    expect(omitOwnReference(body, ADDR)).toBe(body)
+  it('keeps a link to it written inside a sentence', async () => {
+    const c = show(on(ADDR, `Same as ${NADDR} then.`))
+    await waitFor(() => expect(c.querySelector('[data-message-text] p')?.textContent).toBe("Same as You can't open this issue then."))
   })
 })

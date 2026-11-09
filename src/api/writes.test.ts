@@ -95,13 +95,6 @@ describe('which Folder each write goes to', () => {
 })
 
 describe('conversations', () => {
-  it('a new thread about an issue carries the nostr:naddr reference; about a project it does not', async () => {
-    s.postMessage.mockResolvedValue({ ok: true })
-    await startConversation({ folder: 'issue-folder', about: ISSUE.addr, withReference: true, body: 'hi' })
-    expect(s.postMessage).toHaveBeenLastCalledWith(expect.objectContaining({ folder: 'issue-folder', body: 'hi', about: ISSUE.addr, aboutRef: expect.stringMatching(/^nostr:naddr1/) }))
-    await startConversation({ folder: 'content-folder', about: PROJECT.addr, withReference: false, body: 'hi' })
-    expect(s.postMessage).toHaveBeenLastCalledWith({ folder: 'content-folder', body: 'hi', about: PROJECT.addr, aboutRef: undefined, linkTags: [], embeds: [] })
-  })
 
   it("a reply goes to the thread's own Folder, anchored to its root", async () => {
     s.postMessage.mockResolvedValue({ ok: true })
@@ -141,9 +134,9 @@ describe('the card a comment sent from Ship carries (WBM-7, SPEC §13.6.2)', () 
 
   it('a comment naming one other issue sends its detailed card; naming only the issue it is on, none', async () => {
     s.postMessage.mockResolvedValue({ ok: true })
-    await startConversation({ folder: 'issue-folder', about: ISSUE.addr, withReference: true, body: see(LINKED) })
+    await startConversation({ folder: 'issue-folder', about: ISSUE.addr, body: see(LINKED) })
     expect(s.postMessage).toHaveBeenLastCalledWith(expect.objectContaining({ embeds: [{ value: LINKED, layout: 'detailed' }] }))
-    await startConversation({ folder: 'issue-folder', about: ISSUE.addr, withReference: true, body: see(ISSUE.addr) })
+    await startConversation({ folder: 'issue-folder', about: ISSUE.addr, body: see(ISSUE.addr) })
     expect(s.postMessage).toHaveBeenLastCalledWith(expect.objectContaining({ embeds: [] }))
   })
 

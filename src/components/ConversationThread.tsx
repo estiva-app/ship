@@ -62,9 +62,9 @@ export interface MessageData {
   /** Seconds. */
   at: number
   /**
-   * The body as it stands, minus the pointer at the object whose page this is —
-   * see `omitOwnReference`. Every other reference is still in here and is drawn
-   * as the object it names, not deleted.
+   * The body as it stands, every reference in it: a line that is only a link
+   * to the file the comment is on draws nothing (`MessageText`'s `ownFile`,
+   * ONE-11), and every other is drawn as the object it names.
    *
    * **This is the edited text where there is one** (CON-4). An edit changes
    * the body and its attachments (§7.2.1, amended 2026-09-23), and `threadFor`
