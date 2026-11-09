@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MUTED_D_TAG, serializeMutedBlob } from '@estiva-app/conversation'
 import type { TopicConversation } from '@estiva-app/interop'
@@ -26,7 +26,18 @@ vi.mock('@/api/store', () => ({
   projectFieldsNow: async () => undefined,
 }))
 // A `cipher:` content is its plaintext encrypted to you; anything else would not decrypt.
-vi.mock('@/api/nip44', () => ({ nip44: { decrypt: async (ciphertext: string) => (ciphertext.startsWith('cipher:') ? ciphertext.slice('cipher:'.length) : undefined) } }))
+// A test can hold every decrypt until it opens `decrypts`, as a busy nip44 does.
+let decrypts: Promise<void> | undefined
+let decrypting = 0
+vi.mock('@/api/nip44', () => ({
+  nip44: {
+    decrypt: async (ciphertext: string) => {
+      decrypting++
+      await decrypts
+      return ciphertext.startsWith('cipher:') ? ciphertext.slice('cipher:'.length) : undefined
+    },
+  },
+}))
 /** Your read state, one answer held across renders as the real hook holds it. */
 const landed = vi.hoisted(() => ({}))
 vi.mock('@/api/readStateSync', async (actual) => ({ ...(await actual<object>()), useLandedReadState: () => landed }))
@@ -117,6 +128,8 @@ beforeEach(() => {
   conversations.clear()
   realConversations = false
   down = false
+  decrypts = undefined
+  decrypting = 0
   resetTopicsForTests()
   resetFeedFactsForTests()
 })
@@ -249,6 +262,34 @@ describe("Ship's Topics", () => {
     await waitFor(() => expect(named()).toContain(address('t-a')))
     expect(named()).not.toContain(address('t-empty'))
     expect(named()).not.toContain(address('t-elsewhere'))
+  })
+
+  it('shows no new conversation until your mute list is in, and then none on a topic you muted', async () => {
+    realConversations = true
+    let open!: () => void
+    decrypts = new Promise<void>((resolve) => (open = resolve))
+    /** A conversation someone else started in a topic just now: new for you. */
+    const started = (d: string) => ({ ...event(1111, [['A', address(d)], ['K', '30840'], ['a', address(d)], ['k', '30840'], ['h', 'team']]), created_at: Math.floor(Date.now() / 1000) })
+    held.push(shipManifest(), topicManifest(), issueRoot('i-1'), mutes(address('t-hush')))
+    held.push(topic('t-in', 'Joined'), joined('t-in'), lists('t-in', 'i-1'), started('t-in'))
+    held.push(topic('t-hush', 'Muted'), joined('t-hush'), lists('t-hush', 'i-1'), started('t-hush'))
+    const conversationReads = () => asked.filter((f) => (f.kinds as number[] | undefined)?.includes(1111) && !f.authors && !f['#p'])
+    const { state } = ship([], ['i-1'])
+    render(<TopicsPage state={state} folders={[]} />)
+
+    // The topics are drawn while the mute list is still decrypting.
+    await waitFor(() => expect(titles()).toContain('Joined'))
+    await waitFor(() => expect(decrypting).toBeGreaterThan(0))
+    for (let turn = 0; turn < 20; turn++) await act(async () => {})
+    expect(conversationReads()).toEqual([])
+    expect(screen.queryByText(/new/)).toBeNull()
+
+    open()
+    await waitFor(() => expect(within(rows()[0]).getAllByText('1 new').length).toBeGreaterThan(0))
+    expect(titles()).toEqual(['Joined'])
+    fireEvent.click(screen.getByRole('tab', { name: /Other topics/ }))
+    expect(titles()).toEqual(['Muted'])
+    expect(within(rows()[0]).queryByText(/new/)).toBeNull()
   })
 
   it('reads the conversations of a topic once it is drawn, after the first ones were read', async () => {
