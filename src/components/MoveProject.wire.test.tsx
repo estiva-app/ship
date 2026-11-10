@@ -98,6 +98,21 @@ describe('Move to team…', () => {
     expect(say).toHaveBeenCalledWith('Moved to Target, but Gamma still lists it too. Try moving it again.', 'error')
   })
 
+  // TEA-9: a reason code Ship has no words for would refuse the same move again, so it never asks to move it again.
+  it('a second move refused with a reason code Ship does not know names the Folder that still lists it, and never asks to move it again', async () => {
+    wire.refuse = (index) => (index === 1 ? 'invalid: frozen: the team is archived' : undefined)
+    const say = await move([A, C], [[A, 'Alpha'], [C, 'Gamma'], [TARGET, 'Target']], 'Target')
+    expect(moves()).toEqual([['move', TARGET, A], ['move', TARGET, C]])
+    expect(say).toHaveBeenCalledWith('Moved to Target, but Gamma still lists it too.', 'error')
+  })
+
+  it('a move refused with a reason code Ship does not know says only that nothing was moved', async () => {
+    wire.refuse = () => 'invalid: frozen: the team is archived'
+    const say = await move([A], [[A, 'Alpha'], [TARGET, 'Target']], 'Target')
+    expect(moves()).toEqual([['move', TARGET, A]])
+    expect(say).toHaveBeenCalledWith('Nothing was moved.', 'error')
+  })
+
   it('a move refused because the Folders changed says so in Ship’s words, and reads the Folders again so Move can succeed', async () => {
     wire.refuse = () => 'invalid: the team a move leaves lists none of its files'
     const say = await move([A], [[A, 'Alpha'], [TARGET, 'Target']], 'Target')

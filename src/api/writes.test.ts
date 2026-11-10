@@ -359,17 +359,31 @@ describe('moving a project', () => {
     ['invalid: the team a move leaves lists none of its files', 'Nothing was moved: the teams changed since you opened this. Try again.'],
     ["invalid: a topic is listed by one team: take it off the other team's list first", 'Nothing was moved: the teams changed since you opened this. Try again.'],
     ['invalid: rate-limited', 'Nothing was moved. Try again.'],
-    // TEA-9: a refusal is read by its reason code; a code Ship does not know says only that nothing moved.
-    [
-      "invalid: not-home: a topic on no team's list goes only to its home or the Company team",
-      'Nothing was moved: it is in no team yet, so it can go only to the team it was started in, or to the Company team.',
-    ],
-    ['invalid: frozen: the team is frozen until Monday', 'Nothing was moved.'],
-    ['invalid: leaves-by-moving: a topic leaves a team only by a move', 'Nothing was moved.'],
   ])('the relay refusing the move with %j reads: %s', async (message, reason) => {
     vi.mocked(readFolderListing).mockResolvedValue(listing as never)
     const { sent } = relayAnswering(() => refuse(message))
     expect(await moveProject(PROJECT, [FROM], TO)).toEqual({ ok: false, reason, ...(/teams changed/.test(reason) ? { changed: true } : {}) })
+    expect(wire(sent)).toEqual([[1852, 'move', TO.id, FROM.id, [PROJECT.addr]]])
+  })
+
+  /*
+    TEA-9: a refusal carrying a reason code is said by the code, never by its
+    words; a code Ship has no words for (and `leaves-by-moving`, since Ship
+    never takes a live topic off a list) says only that nothing moved, and
+    never to try again, since the same move would be refused the same way.
+  */
+  it.each([
+    [
+      "invalid: not-home: a topic on no team's list goes only to its home or the Company team",
+      'Nothing was moved: it is in no team yet, so it can go only to the team it was started in, or to the Company team.',
+    ],
+    ['restricted: not-member: you are not a member of this team', 'Nothing was moved: you need to be a member of both teams to move this.'],
+    ['invalid: frozen: the team is archived', 'Nothing was moved.'],
+    ['invalid: leaves-by-moving: a topic leaves a team only by a move', 'Nothing was moved.'],
+  ])('a refusal with a reason code is said by the code; one Ship has no words for says only that nothing moved: %j reads %s', async (message, reason) => {
+    vi.mocked(readFolderListing).mockResolvedValue(listing as never)
+    const { sent } = relayAnswering(() => refuse(message))
+    expect(await moveProject(PROJECT, [FROM], TO)).toEqual({ ok: false, reason })
     expect(wire(sent)).toEqual([[1852, 'move', TO.id, FROM.id, [PROJECT.addr]]])
   })
 

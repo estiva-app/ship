@@ -336,7 +336,8 @@ export function deleteProject(project: Project): Promise<WriteResult> {
 
 /** What a move says when it stopped: nothing moved (a sentence, and `changed` when the Folders must be read again), or half moved. */
 export type MoveResult =
-  | { ok: true; stillIn?: { folder: string; why?: string } }
+  /** `retry: false`: refused with a reason code Ship has no words for, so it never says to try again (TEA-9). */
+  | { ok: true; stillIn?: { folder: string; why?: string; retry?: false } }
   | { ok: false; reason: string; changed?: true }
 
 /**
@@ -414,11 +415,12 @@ export async function moveProject(
               ? 'it is in no team yet, so it can go only to the team it was started in, or to the Company team.'
               : undefined)
     // A code Ship does not know (and `leaves-by-moving`: Ship never removes a live topic) says only that nothing moved, never "Try again".
-    if (moveRefused.nothingMoved && !why && moveRefused.why !== 'refused') return { ok: false, reason: 'Nothing was moved.' }
+    const unexplained = !why && moveRefused.why !== 'refused'
+    if (moveRefused.nothingMoved && unexplained) return { ok: false, reason: 'Nothing was moved.' }
     // A list changed since it was read: the caller reads the Folders again, so moving again can succeed.
     if (moveRefused.nothingMoved) return { ok: false, reason: nothing(why), ...(moveRefused.why === 'changed-meanwhile' ? { changed: true as const } : {}) }
     // The earlier moves arrived. Only the refused command's Folder was asked; the ones after it were never sent to.
-    return { ok: true, stillIn: { folder: moveRefused.notMovedFrom[0], ...(why ? { why } : {}) } }
+    return { ok: true, stillIn: { folder: moveRefused.notMovedFrom[0], ...(why ? { why } : {}), ...(unexplained ? { retry: false as const } : {}) } }
   } catch (error) {
     return refused(nothing(ownFailure({ threw: error })))
   }
