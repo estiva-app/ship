@@ -29,6 +29,7 @@ import {
   resolveForeignEvent,
   resolveForeignObject,
   resolveForeignRoots,
+  resolveForeignObjects,
   fileCandidates,
   folderOf,
   isArchived,
@@ -47,7 +48,7 @@ import {
 
 /** Chain-walking, from the runtime — one implementation, not one per consumer. */
 export { pickWidget } from '@estiva-app/interop'
-import { KIND_CHANGE, placeFilters, placeListing, type ReferenceCandidate } from '@estiva-app/conversation'
+import { KIND_CHANGE, placeFilters, placeListing, type Listed, type ReferenceCandidate } from '@estiva-app/conversation'
 import { relatedTo } from '@/lib/ownKinds'
 import { safeLink } from '@/lib/handoff'
 import { KIND } from '../nostr/kinds'
@@ -394,14 +395,20 @@ export async function readSidebarTopics(decrypt: (ciphertext: string) => Promise
 }
 
 /**
- * The Leaf documents a topic lists, as their roots and changes draw them: what
- * each is called now and where it opens (SHIPS-4). One read for all of them,
- * never their comments; one the reader cannot read is not returned.
+ * The Leaf documents a topic lists: what each is called now, where it opens,
+ * who changed it last and when, and the pages directly under it (SHIPS-4,
+ * TOPI-8). Where the relay has the list read, one read for all of them and
+ * their pages, by their fields' current changes and never their text; without
+ * it, each document's full read, as before. People are named by Ship's own
+ * directory, so none are looked up here. One the reader cannot read is not
+ * returned.
  */
 export async function readTopicDocuments(addresses: readonly string[]): Promise<ForeignObject[]> {
   if (addresses.length === 0) return []
-  const objects = await resolveForeignRoots(addresses, query, manifests, { archivedWith: true, ...(await listRead()) })
-  return objects.filter((object) => !object.unreachable)
+  const read = await listRead()
+  if (read.listRead) return resolveForeignRoots(addresses, query, manifests, { archivedWith: true, listRead: true, children: true })
+  const objects = await resolveForeignObjects(addresses, query, async () => ({}), manifests, { archivedWith: true })
+  return Object.values(objects).filter((object): object is ForeignObject => !!object && !object.unreachable)
 }
 
 const KIND_ROSTER = 39002
@@ -477,6 +484,23 @@ export async function readTopicMembers(topics: readonly ReadTopic[]): Promise<Ma
       return [topic.address, placeListing(place, { events: own, roster, listing }).length]
     }),
   )
+}
+
+/**
+ * Who one topic lists, for its page's members pill (TOPI-8): the same rule
+ * and read as Explore's count above, so the pill and Explore never disagree,
+ * and Peek's people list draws the same. Its own events come back too, for an
+ * Add to follow a leave. A failed read rejects.
+ * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-place-lists-who-chose-a-level-and-its-teams-members.md
+ */
+export async function readTopicPlace(topic: { address: string; folder: string }): Promise<{ listed: Listed[]; events: SignedEvent[] }> {
+  const place = { address: topic.address, team: topic.folder }
+  const filters = (placeFilters(place, signer.pubkey) as Record<string, unknown>[]).filter((filter) => !(filter.kinds as number[]).includes(KIND_APP_DATA))
+  const events: SignedEvent[] = await relay.queryAll(filters as never)
+  const roster = events.filter((event) => event.kind === KIND_ROSTER || ROSTER_COMMANDS.includes(event.kind))
+  const listing = events.filter((event) => event.kind === KIND_FOLDER_STATE || event.kind === KIND_FOLDER_COMMAND)
+  const own = events.filter((event) => !roster.includes(event) && !listing.includes(event))
+  return { listed: placeListing(place, { events: own, roster, listing }), events: own }
 }
 
 /**

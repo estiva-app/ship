@@ -1,0 +1,33 @@
+import { Meta } from '@storybook/addon-docs/blocks'
+
+<Meta title="Issues/EditedCaption" />
+
+# EditedCaption
+
+Who edited a row's file last and when, as "Katerina, 2h ago", in its own
+column on a topic's page. Hidden on a phone.
+
+**Seen in** *Pages*: a topic's page, on each issue and each Leaf document
+(TOPI-8).
+
+## When
+
+- **An issue row** (`TopicWorkRow`'s `edited`) and **a document row** on a
+  topic's page, with the label `editedLabel` builds: the first name and
+  Ship's `ago()`.
+
+## When not
+
+- **A project row**: `ProjectRow` shows the lead and progress, not the last edit.
+- **An issue's or a project's own page**: its History says who changed what.
+
+## How
+
+```tsx
+{edited && <EditedCaption edited={edited} />}
+```
+
+## What it owns
+
+- The column's width, so issues' and documents' captions line up.
+- Truncating a long name, and leaving it out on a phone.

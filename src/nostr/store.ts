@@ -31,7 +31,7 @@ import { findNaddrs, naddrToAddr, buildReaction, buildResolution, buildEdit, bui
 import { listFiles, openFile, writeChange, TEXT_FIELD, type WriteChangeResult } from '@estiva-app/interop'
 import { createLoadQuery, planArchiveFolder, planCreateFolder, planDeleteFolder, planListInTopic, planMoveFromFolders, planPlaceFile, planRemoveFromTopic, planRenameFolder, planUnlistFile, readMentionedIn, readMoveRefusal, type ListHolder, type FolderRef, type MovableFile, type MoveRefusal } from '@estiva-app/interop'
 import { foldFolder, type FolderState } from './fold'
-import { buildMembershipChange, buildMutedEvent, switchWrites, type Following, type Place, decorationsOf, foldAttachments, foldEdits, foldEmbeds, URGENT_TAG, type Decorations, type EditFold, type QueryFn } from '@estiva-app/conversation'
+import { buildMembershipChange, buildMutedEvent, buildPlaceAdd, switchWrites, type Following, type Place, decorationsOf, foldAttachments, foldEdits, foldEmbeds, URGENT_TAG, type Decorations, type EditFold, type QueryFn } from '@estiva-app/conversation'
 import { anchorIndex, type AnchorIndex } from './references'
 import { directoryFrom, type Directory } from './profiles'
 import { KIND } from './kinds'
@@ -1339,6 +1339,29 @@ export class Store {
       if (!result.ok) return result
     }
     return { ok: true, clearsMute: writes.clearsMute }
+  }
+
+  /**
+   * Leave a topic from its page's Members (TOPI-8): the public changes `switchWrites` gives for Not following, the
+   * ones Peek's switch signs for the same pick.
+   * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-persons-level-on-a-place-is-theirs-alone.md
+   */
+  async leavePlace(args: { place: Place; following: Following }): Promise<PublishResult> {
+    const writes = switchWrites(this.signer.pubkey, Date.now(), { place: args.place, folder: args.place.team, choice: 'not-following', following: args.following })
+    for (const change of writes.changes) {
+      const result = await this.publish(change)
+      if (!result.ok) return result
+    }
+    return { ok: true }
+  }
+
+  /**
+   * Add someone to a topic from its page's Members (TOPI-8; §11.8): a `member:<P>` = `true`, after their leave when
+   * they left. `events` are the topic's own, as `placeFilters` read them.
+   * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/anyone-may-add-a-person-to-a-file.md
+   */
+  addToPlace(args: { place: Place; person: string; events: readonly SignedEvent[] }): Promise<PublishResult> {
+    return this.publish(buildPlaceAdd(this.signer.pubkey, Date.now(), { place: args.place, folder: args.place.team, person: args.person, events: args.events }))
   }
 
   /** Write your whole mute list (`estiva:muted:v1`, §11.8 *Muting*), already encrypted to you: last write wins, so read it just before. */

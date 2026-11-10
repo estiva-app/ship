@@ -1,0 +1,42 @@
+import { Meta } from '@storybook/addon-docs/blocks'
+
+<Meta title="Projects/ProjectRow" />
+
+# ProjectRow
+
+One project as a row: its name opening its page, its team on the whole
+workspace's list, its status on the tabs that mix statuses, its lead's face and
+its progress. On a phone only the name and the count stay.
+
+**Seen in** *Pages*: the Projects page's table, and a topic's page, where its
+projects sit under the same tabs (TOPI-8).
+
+## When
+
+- **The Projects page** (`ProjectsView`): every project of the tab, with
+  `showFolder` on the whole workspace's list and `showStatus` on All and
+  Archived.
+- **A topic's page** (`TopicView`): the projects the topic lists, in the
+  topic's order, under All / Planned / Active / Completed; `showFolder` off (the
+  page names its team once), `showStatus` on All.
+
+## When not
+
+- **An issue or an archived row on a topic's page**: `TopicWorkRow`.
+- **A project card with its issues** (a Folder's or a Peek embed): the
+  manifest's card, drawn by the reading app.
+
+## How
+
+```tsx
+<ProjectRow project={project} showFolder={false} showStatus={tab === 'all'} />
+```
+
+`project` is a `ProjectRowData` from `projectTabs` (`src/lib/projects.ts`), so
+both pages count progress and name the lead the same way.
+
+## What it owns
+
+- The row's columns and their widths, which the tables' headings line up with.
+- The whole row opening the project (`Link` with `cover`), through `linkTo`.
+- A muted title and progress for an archived project.

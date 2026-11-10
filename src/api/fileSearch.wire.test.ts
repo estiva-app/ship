@@ -121,7 +121,8 @@ describe('a file read by its address: by the list read where the switch is on', 
     fields = { text: true }
     await readTopicDocuments([PROJECT])
     expect(asked.flat().some((f) => f.fields === 'newest')).toBe(true)
-    expect(asked.flat().some((f) => (f['#a'] as string[] | undefined)?.includes(PROJECT))).toBe(false)
+    // Its children are listed by `#a` too, but by the list read: no plain read of what names it.
+    expect(asked.flat().some((f) => f.fields !== 'newest' && (f['#a'] as string[] | undefined)?.includes(PROJECT))).toBe(false)
   })
 
   it("[ rows for recently read files are read the same way, and named by what they are called now", async () => {

@@ -303,7 +303,7 @@ function Page({ route, state, loading, directory, teams, folders, archives, say,
     case 'topics':
       return <TopicsPage folders={folders} folder={route.folder} say={say} />
     case 'topic':
-      return <TopicPage key={route.d} d={route.d} state={state} folders={folders} archives={archives} />
+      return <TopicPage key={route.d} d={route.d} state={state} folders={folders} archives={archives} directory={directory} say={say} refresh={refresh} />
     case 'projects':
       return <ProjectsPage key={route.folder} state={state} directory={directory} teams={teams} archives={archives} tab={route.tab ?? 'active'} folder={route.folder} say={say} refresh={refresh} />
     case 'issues':

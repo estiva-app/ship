@@ -173,6 +173,19 @@ export interface TopicWorkRow {
   progress?: { done: number; total: number }
   /** An issue's project, by title. */
   project?: string
+  /** An issue's last edit: who made its newest change, and when, in seconds (TOPI-8). */
+  edited?: { by: string; at: number }
+}
+
+/** Who made a file's newest change and when: its root's author until a field change is newer (TOPI-8). */
+export function lastEditOf(file: { author: string; createdAt: number; fields: Record<string, { by: string; at: number }> }): { by: string; at: number } {
+  let newest = { by: file.author, at: file.createdAt }
+  // Who is in it (`member:`, `follow:`) is not an edit to it: joining an issue does not make you its last editor.
+  for (const [name, field] of Object.entries(file.fields)) {
+    if (name.startsWith('member:') || name.startsWith('follow:')) continue
+    if (field.at > newest.at) newest = { by: field.by, at: field.at }
+  }
+  return newest
 }
 
 export interface TopicPageData {
@@ -194,7 +207,8 @@ export interface TopicPageData {
 /** Ship's projects and issues, with what their rows say. */
 export interface TopicPageWork {
   projects: readonly { addr: string; id: string; title: string; status: string; deleted?: unknown }[]
-  issues: readonly { addr: string; id: string; title: string; status: string; projectAddr?: string }[]
+  /** `author`, `createdAt` and `fields` give an issue row its last edit; the sidebar's fold leaves them out. */
+  issues: readonly { addr: string; id: string; title: string; status: string; projectAddr?: string; author?: string; createdAt?: number; fields?: Record<string, { by: string; at: number }> }[]
 }
 
 /**
@@ -239,6 +253,7 @@ export function topicPageOf(topic: ReadTopic, work: TopicPageWork, archives: Arc
           href: href({ name: 'issue', d: issue.id, slug: issue.title }),
           status: { value: issue.status, label: statusLabel(issue.status, ISSUE_STATUSES) },
           ...(parent ? { project: parent.title } : {}),
+          ...(issue.author && issue.createdAt !== undefined ? { edited: lastEditOf({ author: issue.author, createdAt: issue.createdAt, fields: issue.fields ?? {} }) } : {}),
         },
       })
     } else if (address.startsWith(`${DOCUMENT_KIND}:`)) documents.push(address)

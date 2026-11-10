@@ -14,7 +14,8 @@ import { isRelayBusy } from '../lib/relayBudget'
 import { SignerTokenExpired } from '../nostr/signer'
 import { projectFieldsAgain, projectFieldsNow, relay, signer, store } from './store'
 import { nip44 } from './nip44'
-import { mutedFilter, parseMutedBlob, serializeMutedBlob } from '@estiva-app/conversation'
+import { mutedFilter, parseMutedBlob, serializeMutedBlob, type Following } from '@estiva-app/conversation'
+import type { SignedEvent } from '@estiva-app/protocol'
 import type { ReadTopic } from '@estiva-app/interop'
 
 /**
@@ -125,6 +126,20 @@ export async function joinTopic(topic: ReadTopic): Promise<WriteResult | { ok: t
     console.warn('[topics] join:', error)
     return followed ? { ok: true, stillMuted: true } : refused('Try again.')
   }
+}
+
+/** Leave a topic from its page's Members (TOPI-8): Not following, as Peek's switch writes it. */
+export function leaveTopic(topic: { address: string; folder: string; following: Following }): Promise<WriteResult> {
+  return publish(() => store.leavePlace({ place: { address: topic.address, team: topic.folder }, following: topic.following }))
+}
+
+/**
+ * Add someone to a topic from its page's Members (TOPI-8): someone adding you puts you in it. `events` are the
+ * topic's own, from `readTopicPlace`, so an Add follows the person's leave.
+ * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-team-holds-three-kinds-of-place-and-add-puts-you-in-one.md
+ */
+export function addToTopic(topic: { address: string; folder: string }, person: string, events: readonly SignedEvent[]): Promise<WriteResult> {
+  return publish(() => store.addToPlace({ place: { address: topic.address, team: topic.folder }, person, events }))
 }
 
 /**

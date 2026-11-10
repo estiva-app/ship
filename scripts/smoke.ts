@@ -1216,12 +1216,22 @@ async function main() {
   const topicPage = page.locator('[data-surface="topic"]')
   check('a Peek topic link on Ship opens the topic’s page here (SHIPS-4)', await topicPage.isVisible())
   check('  …with the topic’s title', (await topicPage.innerText().catch(() => '')).includes('Who will extract the conversation package'))
-  const conversationInPeek = topicPage.getByRole('link', { name: /Conversation in Peek/ })
+  // Its ⋯ holds "Open in Peek" (TOPI-8), which opens a tab: the URL it opens is caught, not followed.
+  await page.evaluate(() => {
+    ;(window as unknown as { opened?: string }).opened = undefined
+    window.open = ((url?: string | URL) => {
+      ;(window as unknown as { opened?: string }).opened = String(url)
+      return null
+    }) as typeof window.open
+  })
+  await topicPage.getByRole('button', { name: 'More actions' }).click().catch(() => {})
+  await page.getByRole('menuitem', { name: 'Open in Peek' }).click().catch(() => {})
+  const opened = await page.evaluate(() => (window as unknown as { opened?: string }).opened)
   // The same path on Peek's host — only the host changes (Miky, 2026-10-01) — with the topic's current slug.
   check(
-    '  …and "Conversation in Peek" opens it in Peek',
-    (await conversationInPeek.getAttribute('href').catch(() => null)) === `https://peek.estiva.app/topic/who-will-extract-the-conversation-package-${HANDOFF_D}`,
-    (await conversationInPeek.getAttribute('href').catch(() => null)) ?? 'no link',
+    '  …and its ⋯ "Open in Peek" opens it in Peek',
+    opened === `https://peek.estiva.app/topic/who-will-extract-the-conversation-package-${HANDOFF_D}`,
+    opened ?? 'nothing opened',
   )
   await shot(page, '10b-topic')
 
