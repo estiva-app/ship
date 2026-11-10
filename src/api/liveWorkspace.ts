@@ -47,7 +47,6 @@ import {
 import type { RelayState } from '@estiva-app/protocol'
 import { ID_CONFIG, RELAY_URL } from '../config'
 import { currentToken } from '../auth/estivaId'
-import { READ_LIMIT_MS } from './clock'
 
 /**
  * The tab's one binding.
@@ -95,11 +94,12 @@ const DEBOUNCE_MS = 400
  * ten minutes slow writes a change dated ten minutes ago; a watch starting at
  * the read would never hear it, and with the socket live the poll stands down.
  * `readAt` is this computer's clock, which may itself run up to a minute fast
- * of the relay's and still read (`READ_LIMIT_MS`). So the watch starts both
+ * of the relay's and still read (`READ_LIMIT_MS` in `./clock`, 60 s; not
+ * imported, because a dozen tests mock that module). So the watch starts both
  * allowances before the read: the replay is the last sixteen minutes'
  * changes, which wake one re-read of their Folders at most.
  */
-const CLOCK_WINDOW_S = 15 * 60 + READ_LIMIT_MS / 1000
+const CLOCK_WINDOW_S = 15 * 60 + 60
 
 /**
  * The client, or `null` when this build cannot authenticate.
