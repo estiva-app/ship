@@ -53,6 +53,7 @@ import {
   type WorkspaceState,
 } from '@/api'
 import { useRelated, withoutTopics } from '@/api/useRelated'
+import { useHistoryFold } from '@/api/useFileChanges'
 import { useFileTopics } from '@/api/useFileTopics'
 import { useThreads } from '@/api/useThreads'
 import { editTargetOf, MEMBER_FIELD_PREFIX, refusalReason } from '@estiva-app/conversation'
@@ -648,6 +649,9 @@ export function ProjectPage({
      cases. */
   const merged = useMergedReadState()
   const judges = useFeedJudges(project ? { addr: project.addr, createdAt: project.createdAt } : undefined, channelContext(record))
+  // History, folded on every visit and read only while open (Miky, 2026-11-10): the open itself reads no older change.
+  const history = useHistoryFold(project?.addr)
+  const everyChange = history.changes
   const verdictAt = useMemo(() => {
     if (!judges.file) return () => undefined
     const aboutProject = new Set(conversations.filter((c) => project && (state.anchors[c.root.id] ?? []).includes(project.addr)).map((c) => c.id))
@@ -721,8 +725,13 @@ export function ProjectPage({
   const byFields = state.texts !== undefined
   const textPending = byFields && !state.texts!.includes(project.addr)
   const deleted = project.deleted
-  // Its History and "Edited" from every change to it, read with the page's facts: the load holds only the current ones.
-  const ownChanges = byFields ? withChangesOf(project.addr, state, judges.changes) : state
+  // Its History from every change to it once History is open; until then, and for "Edited", the load's current ones.
+  // A History read that failed (`null`) shows what the load holds rather than stay pending.
+  const ownChanges = byFields ? withChangesOf(project.addr, state, everyChange ?? undefined) : state
+  // Where the load already holds every change (no fields read), History needs no read of its own and stays open.
+  const historyFold = byFields
+    ? { open: history.open, onOpenChange: history.setOpen, pending: history.open && everyChange === undefined }
+    : undefined
 
   return (
     <>
@@ -768,6 +777,7 @@ export function ProjectPage({
             note="Your issues here still notify you."
             {...membershipActions({ kind: 'project', project }, project.title, directory.nameOf, say, async () => {
               await Promise.all([judges.reload(), refresh([project.contentFolder])])
+              history.again()
             })}
           />
         }
@@ -845,6 +855,7 @@ export function ProjectPage({
         activityTruncated={activity.truncated}
         // Its own changes, as an issue's, in the project's words (pages/history.ts).
         history={historyFor(project.addr, ownChanges, directory, PROJECT_STATUSES)}
+        historyFold={historyFold}
         /* A reply in Activity goes to the thread's own Folder, never this
            project's — CON-9. Refused when the thread's root carries no `h`,
            because filing somebody else's reply here is the wrong guess. */

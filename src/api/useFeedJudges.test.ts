@@ -59,6 +59,38 @@ describe("a file's members, read from public events", () => {
     expect(filters[3]).toMatchObject({ kinds: [30078], authors: [ME], '#d': [MUTED_D_TAG] })
   })
 
+  it('reads only the changes naming the people the app knows: the same members, since the same moment, and no text save (ALO-19)', async () => {
+    const X = '1'.repeat(64)
+    const Y = '2'.repeat(64)
+    const textSave = event(1851, ELSE, 1100, [['a', FILE], ['field', 'description'], ['value', ''], ['h', FOLDER]], 'x'.repeat(5000))
+    const relayHolds = [
+      textSave,
+      placement(1200, X),
+      placement(1300, Y), // X stays a member: a placement is a join, and nothing X signed takes it back
+      join(ELSE, 'true', X, 1400),
+      join(ELSE, 'true', Y, 1450), // a second add keeps the first one's since
+      join(X, 'false', ELSE, 1500), // somebody else's "false" is not X leaving
+      join(Y, 'false', Y, 1600),
+      comment(ME, 1700),
+    ]
+    // The relay's NIP-01 match, for the filters these reads send: kinds, authors, `#x` tags; any filter.
+    const matches = (e: SignedEvent, f: Record<string, unknown>) =>
+      Object.entries(f).every(([k, v]) => {
+        if (k === 'kinds') return (v as number[]).includes(e.kind)
+        if (k === 'authors') return (v as string[]).includes(e.pubkey)
+        if (k.startsWith('#')) return e.tags.some((t) => t[0] === k.slice(1) && (v as string[]).includes(t[1]))
+        return true
+      })
+    const relay = async (filters: Record<string, unknown>[]) => relayHolds.filter((e) => filters.some((f) => matches(e, f)))
+    const every = await readFeedFacts(relay, decrypt, file, ME)
+    const named = await readFeedFacts(relay, decrypt, { ...file, people: [X, Y, ELSE, OWNER] }, ME)
+    expect([...named.members].sort()).toEqual([...every.members].sort())
+    expect([...named.members.keys()].sort()).toEqual([ME, OWNER, X, ELSE].sort())
+    expect(named.members.get(ELSE)).toEqual({ member: true, since: 1400 })
+    expect(named.membership).toEqual(every.membership)
+    expect(named.events.map((e) => e.id)).not.toContain(textSave.id)
+  })
+
   it('makes you a member from a comment that carries only a lowercase a, and holds a repeated event once', async () => {
     const legacy = event(1111, ME, 1500, [['a', FILE]], 'hi')
     const { membership } = await facts([legacy, legacy])

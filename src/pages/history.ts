@@ -27,7 +27,7 @@ import { parseChanges, type Change as FoldChange } from '@/nostr/fold'
  */
 /**
  * `state` with the opened project's every change in its activity, from the
- * page's own read of them (`useFeedJudges`'s `changes`), where projects are
+ * page's own read of them once History is open (`useFileChanges`), where projects are
  * read by their fields (ALO-5) and the load holds only each field's current
  * change. Oldest first, in the fold's order (SPEC §6.3). Until that read has
  * come back, `state` as it is.

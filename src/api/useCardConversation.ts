@@ -34,7 +34,8 @@ function ask(address: string): Promise<Facts | undefined> {
   const flight = asking.get(address)
   if (flight) return flight
   // The file's root is not in hand: a creator counts as a member from the start, which a marker then bounds.
-  const next = readFeedFacts((filters) => relay.queryAll(filters), (c) => nip44.decrypt(c), { addr: address, createdAt: 0 }, signer.pubkey)
+  // Only the reader's own membership is asked, so the changes naming them are all the fold needs (ALO-19).
+  const next = readFeedFacts((filters) => relay.queryAll(filters), (c) => nip44.decrypt(c), { addr: address, createdAt: 0, people: [signer.pubkey] }, signer.pubkey)
     .then(({ events, membership, muted }) => {
       // An unreadable mute list keeps what was known; with nothing known the card shows no dot rather than light a muted file.
       const before = held.get(address)
