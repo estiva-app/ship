@@ -116,6 +116,8 @@ export function useWorkspace(opened?: Opened): Workspace {
   const first = useRef(opened)
   const [state, setState] = useState<WorkspaceState | null>(null)
   const [partial, setPartial] = useState(false)
+  /** When the read on screen began (ms): the live watch needs nothing older (fadc320c). */
+  const [readAt, setReadAt] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [clock, setClock] = useState<string | null>(null)
   const clockSaid = useRef(false)
@@ -142,11 +144,13 @@ export function useWorkspace(opened?: Opened): Workspace {
    */
   const start = useCallback((load: () => Promise<WorkspaceEvents>, whole: boolean): Promise<void> => {
     const ticket = ++latest.current
+    const startedAt = Date.now()
     const run = load()
       .then((next) => {
         if (!mounted.current || ticket !== latest.current) return
         events.current = next
         setState(foldWorkspace(next))
+        setReadAt(startedAt)
         setPartial(false)
         setError(null)
         // Set right: the skew a write would reuse is the wrong one now.
@@ -353,7 +357,7 @@ export function useWorkspace(opened?: Opened): Workspace {
   */
   // Not on the opened page's own read: a change there before the whole read
   // lands would re-read the whole workspace again, and that read brings it.
-  const { live } = useLiveWorkspace(partial ? [] : (state?.folders ?? []), reread)
+  const { live } = useLiveWorkspace(partial ? [] : (state?.folders ?? []), reread, readAt)
 
   // The interval stands down while the socket delivers; `visibilitychange` and
   // `focus` still fire, because a tab that was hidden has had no frames either.

@@ -82,6 +82,26 @@ const WORKSPACE_KINDS = [
 const DEBOUNCE_MS = 400
 
 /**
+ * How far before the read the watch starts (fadc320c).
+ *
+ * Without `since` the relay answers the REQ with its stored history first, up
+ * to its default limit: 10.66 MB as Miky on 10 Nov, every byte of it already in
+ * the read that produced `folders`, and each event waking a re-read besides.
+ *
+ * The relay matches `since` against live events too, and it accepts an event
+ * whose `created_at` is up to 15 minutes off its own clock
+ * (`BUZZ_MAX_TIMESTAMP_DRIFT_SECS`, default 900). A colleague whose clock runs
+ * ten minutes slow writes a change dated ten minutes ago; a watch starting at
+ * the read would never hear it, and with the socket live the poll stands down.
+ * `readAt` is this computer's clock, which may itself run up to a minute fast
+ * of the relay's and still read (`READ_LIMIT_MS` in `./clock`, 60 s; not
+ * imported, because a dozen tests mock that module). So the watch starts both
+ * allowances before the read: the replay is the last sixteen minutes'
+ * changes, which wake one re-read of their Folders at most.
+ */
+const CLOCK_WINDOW_S = 15 * 60 + 60
+
+/**
  * The client, or `null` when this build cannot authenticate.
  *
  * A relay `REQ` before auth is refused outright, so an anonymous build has
@@ -129,13 +149,25 @@ export interface LiveWorkspace {
  * first subscription can only open after a read has landed, and the set is
  * re-subscribed when it changes. Compared by value: an unchanged tick must not
  * tear down and rebuild 34 subscriptions, and a re-linked project must.
+ *
+ * `readAt` is when the read on screen began (ms). A subscription starts
+ * {@link CLOCK_WINDOW_S} before it; a new `readAt` alone does not resubscribe,
+ * because the open subscription is already live from an earlier point.
  */
-export function useLiveWorkspace(folders: string[], onChange: (changed: string[]) => void): LiveWorkspace {
+export function useLiveWorkspace(
+  folders: string[],
+  onChange: (changed: string[]) => void,
+  readAt?: number | null,
+): LiveWorkspace {
   const [relayState, setRelayState] = useState<RelayState | 'off'>('off')
   const latest = useRef(onChange)
   useEffect(() => {
     latest.current = onChange
   }, [onChange])
+  const readStart = useRef(readAt)
+  useEffect(() => {
+    readStart.current = readAt
+  }, [readAt])
 
   // The identity of the array changes on every read; its contents rarely do.
   const key = [...folders].sort().join(',')
@@ -153,6 +185,7 @@ export function useLiveWorkspace(folders: string[], onChange: (changed: string[]
     let timer: ReturnType<typeof setTimeout> | undefined
     // The Folders signalled since the last call — what the re-read is scoped to (PER-17).
     let changed = new Set<string>()
+    const from = readStart.current
     const watch = client.watchFolders(
       key.split(','),
       (folder) => {
@@ -167,7 +200,10 @@ export function useLiveWorkspace(folders: string[], onChange: (changed: string[]
           latest.current(folders)
         }, DEBOUNCE_MS)
       },
-      { kinds: WORKSPACE_KINDS },
+      {
+        kinds: WORKSPACE_KINDS,
+        ...(from != null ? { since: Math.floor(from / 1000) - CLOCK_WINDOW_S } : {}),
+      },
     )
 
     return () => {
