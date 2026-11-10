@@ -366,21 +366,30 @@ describe('moving a project', () => {
     expect(wire(sent)).toEqual([[1852, 'move', TO.id, FROM.id, [PROJECT.addr]]])
   })
 
-  /*
-    TEA-9: a refusal carrying a reason code is said by the code, never by its
-    words; a code Ship has no words for (and `leaves-by-moving`, since Ship
-    never takes a live topic off a list) says only that nothing moved, and
-    never to try again, since the same move would be refused the same way.
-  */
+  // TEA-9: a refusal carrying a reason code is said in Ship's words for the code, never by the relay's words after it.
   it.each([
     [
       "invalid: not-home: a topic on no team's list goes only to its home or the Company team",
       'Nothing was moved: it is in no team yet, so it can go only to the team it was started in, or to the Company team.',
     ],
     ['restricted: not-member: you are not a member of this team', 'Nothing was moved: you need to be a member of both teams to move this.'],
+  ])('a refusal with a reason code Ship knows is said in Ship’s words for the code: %j reads %s', async (message, reason) => {
+    vi.mocked(readFolderListing).mockResolvedValue(listing as never)
+    const { sent } = relayAnswering(() => refuse(message))
+    expect(await moveProject(PROJECT, [FROM], TO)).toEqual({ ok: false, reason })
+    expect(wire(sent)).toEqual([[1852, 'move', TO.id, FROM.id, [PROJECT.addr]]])
+  })
+
+  /*
+    TEA-9: a code Ship has no words for (and `leaves-by-moving`, since Ship
+    never takes a live topic off a list) says only that nothing moved, and
+    never to try again, since the same move would be refused the same way;
+    the words after the code (here "archived") are never read.
+  */
+  it.each([
     ['invalid: frozen: the team is archived', 'Nothing was moved.'],
     ['invalid: leaves-by-moving: a topic leaves a team only by a move', 'Nothing was moved.'],
-  ])('a refusal with a reason code is said by the code; one Ship has no words for says only that nothing moved: %j reads %s', async (message, reason) => {
+  ])('a refusal with a reason code Ship says nothing for says only that nothing moved, never to try again: %j reads %s', async (message, reason) => {
     vi.mocked(readFolderListing).mockResolvedValue(listing as never)
     const { sent } = relayAnswering(() => refuse(message))
     expect(await moveProject(PROJECT, [FROM], TO)).toEqual({ ok: false, reason })

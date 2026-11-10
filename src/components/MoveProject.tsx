@@ -1,4 +1,4 @@
-import { moveProject, type Project } from '@/api'
+import { moveProject, type MoveResult, type Project } from '@/api'
 import { reloadFolders } from '@/api/useFolders'
 import { MoveProjectDialog, type MoveProjectFolder } from '@/components/MoveProjectDialog'
 import { placedIn } from '@/lib/placement'
@@ -43,7 +43,7 @@ export function MoveProject({
       folders={folders}
       onClose={onClose}
       onMove={async (to) => {
-        let stillIn: { folder: string; why?: string; retry?: false } | undefined
+        let stillIn: Extract<MoveResult, { ok: true }>['stillIn']
         let changed = false
         const ok = await act(
           'Move',
