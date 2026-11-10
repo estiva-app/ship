@@ -1,4 +1,4 @@
-import { Relay, projectFieldsOf, type FetchLike } from '@estiva-app/protocol'
+import { Relay, projectFieldsOf, type FetchLike, type RelayFileReads } from '@estiva-app/protocol'
 import { isRateLimited, noteRateLimited } from '@/lib/relayBudget'
 import { estivaIdSigner, localSigner, type Signer } from '../nostr/signer'
 import { Store, type ProjectFields } from '../nostr/store'
@@ -84,19 +84,39 @@ const fetchReportingQuota: FetchLike = async (url, init) => {
 export const relay = new Relay(RELAY_URL, signer, { fetch: fetchReportingQuota })
 
 /** The switch (ALO-5): the relay's NIP-11 asked once, on the first read that needs it. */
+let fileReads: Promise<RelayFileReads> | undefined
 let projectFields: Promise<ProjectFields | undefined> | undefined
 const opted = optedIn()
+const fileReadsNow = (): Promise<RelayFileReads> => (fileReads ??= readFileReads(() => relay.info()))
 export const projectFieldsNow = (): Promise<ProjectFields | undefined> =>
-  (projectFields ??= readFileReads(() => relay.info()).then((reads) => projectFieldsOf(reads, opted)))
+  (projectFields ??= fileReadsNow().then((reads) => projectFieldsOf(reads, opted)))
+
+/**
+ * The types the relay keeps in order (NIP-11 `files.requires_prev`), for the
+ * shared packages' `inOrder`: a comment, a mention, a card, a listing, a block
+ * link or a `[` pick names a file of one by its id as well (ALO-8). Read
+ * whether or not this tab opted in, since the relay is what keeps them so —
+ * Peek's `inOrderTypes`.
+ *
+ * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-file-is-named-by-its-id-in-a-capital-and-small-tag.md
+ */
+export const inOrderTypes = (): Promise<readonly string[]> => fileReadsNow().then((reads) => reads.inOrder)
+
+/** `inOrder` as an option: absent while the relay keeps no type in order, so every write is as before. */
+export const inOrderOption = async (): Promise<{ inOrder?: readonly string[] }> => {
+  const inOrder = await inOrderTypes()
+  return inOrder.length > 0 ? { inOrder } : {}
+}
 
 /**
  * The relay refused a change for naming no `prev`: it has made the switch
  * since this tab read its NIP-11 (ALO-8). Read it again, so every later read
- * and write in this tab is switched too.
+ * and write in this tab is switched too, and names projects by their ids.
  */
 export const projectFieldsAgain = (): Promise<ProjectFields | undefined> => {
+  fileReads = undefined
   projectFields = undefined
   return projectFieldsNow()
 }
 
-export const store = new Store(relay, signer, relayClockSkew, projectFieldsNow)
+export const store = new Store(relay, signer, relayClockSkew, projectFieldsNow, inOrderTypes)

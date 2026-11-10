@@ -422,10 +422,15 @@ export function buildConversationMessage(
     linkTags?: readonly NostrTag[]
     /** The card the message asks for under it, one `embed` per file (SPEC §13.6.2) — `embedsToSend`. */
     embeds?: readonly Embed[]
+    /**
+     * The types the relay keeps in order (NIP-11 `files.requires_prev`): the
+     * file a comment is on, and a card's file, are named by their ids too (ALO-8).
+     */
+    inOrder?: readonly string[]
   },
 ): UnsignedEvent {
   assertFolderId(args.folder)
-  const embeds = embedTagsOf(args.embeds ?? [])
+  const embeds = embedTagsOf(args.embeds ?? [], args.inOrder)
 
   /*
     The tags the body earns (CON-25), the ones Peek appends: a `p` per person it
@@ -454,6 +459,7 @@ export function buildConversationMessage(
       body: args.body,
       comment: args.replyToComment,
       files: args.files,
+      inOrder: args.inOrder,
       tags: [...mentionTagsFor(args.body), ...earned({ address: args.replyToComment.anchor, event: args.replyToComment.id }), ...embeds],
     })
   }
@@ -464,6 +470,7 @@ export function buildConversationMessage(
       about: args.about,
       blockId: args.blockId,
       files: args.files,
+      inOrder: args.inOrder,
       tags: [...mentionTagsFor(args.body), ...earned({ address: args.about }), ...embeds],
     })
   }

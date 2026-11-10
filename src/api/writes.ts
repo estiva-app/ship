@@ -12,7 +12,7 @@ import { links } from './linkCards'
 import { linkResolverFor } from '../lib/linksNamingCards'
 import { isRelayBusy } from '../lib/relayBudget'
 import { SignerTokenExpired } from '../nostr/signer'
-import { projectFieldsAgain, projectFieldsNow, relay, signer, store } from './store'
+import { inOrderOption, projectFieldsAgain, projectFieldsNow, relay, signer, store } from './store'
 import { nip44 } from './nip44'
 import { mutedFilter, parseMutedBlob, serializeMutedBlob, type Following } from '@estiva-app/conversation'
 import type { SignedEvent } from '@estiva-app/protocol'
@@ -600,8 +600,9 @@ function cardToSend(body: string, here: string | undefined): Embed[] {
  * which are not read from here).
  * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/an-edit-says-what-the-message-links-now.md
  */
-function tagsEarnedBy(body: string, own: OwnPlace, edit = false): Promise<NostrTag[]> {
-  return links.tagsFor(toRenderTree(body, 'marker'), own, { edit })
+async function tagsEarnedBy(body: string, own: OwnPlace, edit = false): Promise<NostrTag[]> {
+  // A file of a type the relay keeps in order is named by its id too: an `o` beside its `a`, a `part` by its id (ALO-8).
+  return links.tagsFor(toRenderTree(body, 'marker'), own, { edit, ...(await inOrderOption()) })
 }
 
 /**
