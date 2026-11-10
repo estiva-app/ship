@@ -1,13 +1,27 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { FolderSummary } from '@estiva-app/interop'
-import type { FolderState } from '@/api'
-import { reloadTopics, rereadTopics, useTopicDocuments, useTopics, useYourTopics } from '@/api/topics'
+import type { FolderSummary, ForeignObject } from '@estiva-app/interop'
+import { me, type DirectoryView, type WorkspaceState } from '@/api'
+import { reloadTopics, rereadTopics, useTopicDocuments, useTopicPlace, useTopics, useYourTopics } from '@/api/topics'
+import { addToTopic, joinTopic, leaveTopic } from '@/api/writes'
+import { Members } from '@/components/Members'
+import { ThreadList } from '@/components/conversations/ThreadList'
 import type { Archives } from '@/lib/archive'
 import { safeLink } from '@/lib/handoff'
+import { projectTabs } from '@/lib/projects'
 import { useTabTitle } from '@/lib/tabTitle'
+import { ago } from '@/lib/time'
 import { isSiblingHost, topicHref } from '@/lib/topicLinks'
 import { topicOfD, topicPageOf } from '@/lib/topics'
-import { TopicView, type TopicDocument } from '@/views/TopicView'
+import { href } from '@/router'
+import { TopicView, type TopicDocument, type TopicPageView } from '@/views/TopicView'
+import { act, type Say } from './act'
+import { copyText, pickerPeople } from './ProjectPage'
+import { useTopicConversation } from './topicConversation'
+
+/** "Katerina, 2h ago": who edited a file last, by first name, and when (the prototype's rows, Miky 4 Nov). */
+export function editedLabel(name: string, at: number, now: number = Date.now()): string {
+  return `${name.split(' ')[0]}, ${ago(at, now)}`
+}
 
 /**
  * A topic's page in Ship (SHIPS-4): what it lists that Ship holds, from the
@@ -22,7 +36,24 @@ import { TopicView, type TopicDocument } from '@/views/TopicView'
  * nobody declares (SPEC §7.7 serving rule 4).
  * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-link-opens-in-the-app-you-are-in-when-it-has-a-page-made-for-that-kind.md
  */
-export function TopicPage({ d, state, folders, archives }: { d: string; state: FolderState; folders: FolderSummary[] | undefined; archives: Archives }) {
+export function TopicPage({
+  d,
+  state,
+  folders,
+  archives,
+  directory,
+  say,
+  refresh,
+}: {
+  d: string
+  state: WorkspaceState
+  folders: FolderSummary[] | undefined
+  archives: Archives
+  directory: DirectoryView
+  say: Say
+  /** Folders given: only they are re-read (PER-17). */
+  refresh: (folders?: string[]) => Promise<void>
+}) {
   const read = useTopics()
   const held = read === 'failed' ? undefined : read
   // Until every topic is read, one of yours draws from the sidebar's read of yours (ALO-17): its title, and
@@ -60,28 +91,60 @@ export function TopicPage({ d, state, folders, archives }: { d: string; state: F
 
   const documentsKey = page?.documents.join(' ') ?? ''
   const { documents: listed, retry: retryDocuments } = useTopicDocuments(documentsKey)
+  const { nameOf, personOf } = directory
   const documents = useMemo((): TopicDocument[] | 'loading' | 'failed' => {
     if (listed === undefined) return 'loading'
     if (listed === 'failed') return 'failed'
     if (!page) return []
     const order = new Map(page.documents.map((address, at) => [address, at]))
-    return listed
-      .flatMap((object): TopicDocument[] => {
-        // An archived document is left out, as Leaf's own lists leave it.
-        if (!object.address || object.archived) return []
-        const href = safeLink(object.openUrl)
-        return [{ address: object.address, title: object.slots.title?.value || 'Untitled document', ...(href ? { href } : {}) }]
-      })
-      .sort((a, b) => (order.get(a.address) ?? 0) - (order.get(b.address) ?? 0))
-  }, [listed, page])
+    // An archived document or page is left out, as Leaf's own lists leave it.
+    const documentOf = (object: ForeignObject): TopicDocument[] => {
+      if (!object.address || object.archived) return []
+      const href = safeLink(object.openUrl)
+      const children = (object.children ?? []).flatMap(documentOf)
+      return [
+        {
+          address: object.address,
+          title: object.slots.title?.value || 'Untitled document',
+          ...(href ? { href } : {}),
+          ...(object.changedBy && object.changedAt ? { edited: editedLabel(nameOf(object.changedBy), object.changedAt) } : {}),
+          ...(children.length ? { children } : {}),
+        },
+      ]
+    }
+    return listed.flatMap(documentOf).sort((a, b) => (order.get(a.address) ?? 0) - (order.get(b.address) ?? 0))
+  }, [listed, page, nameOf])
+
+  // Projects as the Projects page draws them, in the topic's order (Decided 6 Nov: the order inside each kind).
+  const view = useMemo((): TopicPageView | undefined => {
+    if (!page) return undefined
+    const live = page.live.filter((row) => row.kind === 'project').map((row) => row.address)
+    const order = new Map(live.map((address, at) => [address, at]))
+    const projects = projectTabs(
+      state.projects.filter((project) => order.has(project.addr)),
+      state.issues,
+      archives,
+      personOf,
+    ).all.sort((a, b) => (order.get(a.addr) ?? 0) - (order.get(b.addr) ?? 0))
+    const issues = page.live
+      .filter((row) => row.kind === 'issue')
+      .map((row) => ({ ...row, ...(row.edited ? { editedLabel: editedLabel(nameOf(row.edited.by), row.edited.at) } : {}) }))
+    const team = folders?.find((folder) => folder.id === page.folder)?.name
+    return { title: page.title, ...(page.summary ? { summary: page.summary } : {}), ...(team ? { team } : {}), archived: page.archived, projects, issues, archivedWork: page.archivedWork }
+  }, [page, state, archives, personOf, nameOf, folders])
+
+  const conversation = useTopicConversation(topic && !sendsOn ? { address: topic.address, folder: topic.folder, createdAt: topic.createdAt } : undefined, state, directory, say, refresh)
+  const { place, reload: reloadPlace } = useTopicPlace(topic && !sendsOn ? topic : undefined)
+  const members = useMemo(() => (place ? new Map(place.listed.map((listed) => [listed.pubkey, listed])) : undefined), [place])
+  const people = useMemo(() => pickerPeople(state, directory), [state, directory])
 
   useTabTitle(page && !sendsOn ? page.title : undefined)
 
   // A space draws nothing here while the browser goes on to Peek.
-  const shown = page
+  const shown = view
     ? sendsOn
       ? 'loading'
-      : page
+      : view
     : held && !topic && (!heldAtOpen.current || readAgain === 'landed')
       ? 'unavailable'
       : read === 'failed' || readAgain === 'failed'
@@ -91,8 +154,46 @@ export function TopicPage({ d, state, folders, archives }: { d: string; state: F
     <TopicView
       topic={shown}
       onRetryDocuments={retryDocuments}
-      folderName={page ? folders?.find((folder) => folder.id === page.folder)?.name : undefined}
       documents={documents}
+      topicsHref={href({ name: 'topics' })}
+      comments={conversation.comments}
+      conversation={
+        // An archived topic takes no message, as an archived file's comments do not (Decided 2026-10-17).
+        <ThreadList {...conversation.list} disabledReason={page?.archived ? 'This topic is archived.' : undefined} className="min-h-0 flex-1" />
+      }
+      members={
+        topic && (
+          <Members
+            key={topic.address}
+            members={members}
+            me={me}
+            people={people}
+            nameOf={nameOf}
+            personOf={personOf}
+            // Who made it: the pubkey in its address.
+            roles={[{ pubkey: topic.address.split(':')[1] ?? '', role: 'Author' }]}
+            readOnlyReason={page?.archived ? 'This topic is archived.' : undefined}
+            onSetMine={(member) =>
+              act(member ? 'Join' : 'Leave', () => (member ? joinTopic(topic) : leaveTopic(topic)), say, async () => {
+                await Promise.all([reloadPlace(), rereadTopics()])
+              }, (reason) => `Nothing changed: “${view?.title ?? 'this topic'}” could not be ${member ? 'joined' : 'left'}. ${reason}`)
+            }
+            onAdd={async (pubkeys) => {
+              for (const pubkey of pubkeys) {
+                const added = await act('Add member', () => addToTopic(topic, pubkey, place?.events ?? []), say, undefined, (reason) => `Nothing changed: ${nameOf(pubkey)} could not be added to “${view?.title ?? 'this topic'}”. ${reason}`)
+                if (!added) {
+                  await reloadPlace()
+                  return false
+                }
+              }
+              await reloadPlace()
+              return true
+            }}
+          />
+        )
+      }
+      onCopyLink={() => void copyText(new URL(topic ? topicHref(topic.address, view?.title ?? '') : location.pathname, window.location.origin).href, 'Link copied', 'Copy this link:', say)}
+      {...(page?.peekUrl ? { onOpenInPeek: () => void window.open(page.peekUrl, '_blank', 'noopener') } : {})}
       onRetry={() => {
         if (readAgain !== 'failed') return void reloadTopics()
         setReadAgain(undefined)

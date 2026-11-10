@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { createRetryingRead } from '@estiva-app/platform'
 import { activityTopics, addableTopics, readTopicActivity, type ReadTopic, type TopicsRead, type YourTopicsRead } from '@estiva-app/interop'
-import { readAllTopics, readSidebarTopics, readTopicDocuments, readTopicMembers, topicAsDrawn, type ForeignObject, type FolderSummary, type TopicOfFile } from './foreign'
+import { readAllTopics, readSidebarTopics, readTopicDocuments, readTopicMembers, readTopicPlace, topicAsDrawn, type ForeignObject, type FolderSummary, type TopicOfFile } from './foreign'
 import { knowSpaces, knowSpacesAmong } from '@/lib/topicLinks'
 import { foldersNow, heldFolders } from './useFolders'
 import { useLandedReadState } from './readStateSync'
@@ -175,6 +175,29 @@ export function useTopicDocuments(key: string): { documents: ForeignObject[] | '
   }, [key, attempt])
   const documents = answer?.key === key ? answer.value : undefined
   return { documents, retry: () => setAttempt((n) => n + 1) }
+}
+
+/**
+ * Who a topic lists, and its own events, for its page's members pill (TOPI-8): one read when the page opens and
+ * again after a Join, Leave or Add. `undefined` until it lands; a failed read keeps the pill out, as a file's does.
+ */
+export function useTopicPlace(topic: { address: string; folder: string } | undefined): { place: Awaited<ReturnType<typeof readTopicPlace>> | undefined; reload: () => Promise<void> } {
+  const [answer, setAnswer] = useState<{ key: string; value: Awaited<ReturnType<typeof readTopicPlace>> }>()
+  const key = topic ? `${topic.address} ${topic.folder}` : ''
+  const load = useCallback(async () => {
+    if (!topic) return
+    try {
+      const value = await readTopicPlace(topic)
+      setAnswer({ key, value })
+    } catch (error) {
+      console.warn('[topics] members:', error)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `key` is the topic
+  }, [key])
+  useEffect(() => {
+    void load()
+  }, [load])
+  return { place: answer?.key === key ? answer.value : undefined, reload: load }
 }
 
 /** Read every topic again; whether that read landed (a failed one keeps the topics already held). */

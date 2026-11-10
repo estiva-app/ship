@@ -531,7 +531,10 @@ describe("Ship's sidebar: where your five are read from (ALO-17)", () => {
     let release = () => {}
     everyTopicGate = new Promise((resolve) => (release = resolve))
     void ensureTopics()
-    render(<TopicPage d="t-2" state={work} folders={TEAMS} archives={archives} />)
+    const empty = { conversations: [], activity: [], anchors: {}, edits: {}, attachments: {}, urgent: {}, parts: {}, embeds: {} }
+    const workspace = { ...empty, ...work } as never
+    const directory = { directory: new Map(), nameOf: (k?: string) => (k ?? '').slice(0, 8), personOf: (k?: string) => ({ name: (k ?? '').slice(0, 8) }), profileOf: () => undefined } as never
+    render(<TopicPage d="t-2" state={workspace} folders={TEAMS} archives={archives} directory={directory} say={() => {}} refresh={async () => {}} />)
     await waitFor(() => expect(everyTopicReads()).toBe(1))
     await settle()
     expect(screen.getByRole('heading', { name: 'Topic 2' })).toBeTruthy()

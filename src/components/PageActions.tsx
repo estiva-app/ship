@@ -18,7 +18,13 @@ import { Menu, MenuItem, MenuSeparator, Toolbar, ToolbarButton } from '@estiva-a
  * buttons did. Copy link writes nothing, so it is never shut.
  */
 export interface PageActionsProps {
-  what: 'issue' | 'project'
+  /**
+   * A topic's page uses it too (TOPI-8): its button shows or hides the topic's conversation, and its ⋯ holds only
+   * Copy link and Open in Peek. Ship does not archive, move or delete a topic; Peek does (Miky, 6 Nov).
+   */
+  what: 'issue' | 'project' | 'topic'
+  /** A topic's ⋯: "Open in Peek", where its "Conversation in Peek" link was. Absent: no row. */
+  onOpenInPeek?: () => void
   /**
    * The comments column, shown or not, and the button that shows or hides it. Omitted: no button. `unread`: something
    * in them is new to the reader; while the column is hidden the button carries the kit's dot on its icon's corner, and
@@ -42,10 +48,10 @@ export interface PageActionsProps {
   lockedReason?: string
 }
 
-export function PageActions({ what, comments, overview, archive, onArchive, onDelete, onMove, onCopyLink, readOnlyReason, lockedReason }: PageActionsProps) {
+export function PageActions({ what, comments, overview, archive, onArchive, onDelete, onMove, onCopyLink, onOpenInPeek, readOnlyReason, lockedReason }: PageActionsProps) {
   // Under its Folder's archive, archiving a project again is an edit; an issue's own stays offered whatever is archived above it.
   const archiveShut = archive === 'with' && what === 'project' ? (readOnlyReason ?? lockedReason) : readOnlyReason
-  const commentsWord = comments?.shown ? 'Hide comments' : 'Show comments'
+  const commentsWord = what === 'topic' ? (comments?.shown ? 'Hide conversation' : 'Show conversation') : comments?.shown ? 'Hide comments' : 'Show comments'
   const overviewWord = overview?.shown ? 'Hide side panel' : 'Show side panel'
   return (
     // One strip: one Tab stop, arrows along it (the kit's Toolbar, no box of its own).
@@ -77,15 +83,24 @@ export function PageActions({ what, comments, overview, archive, onArchive, onDe
           </ToolbarButton>
         }
       >
-        {archive === 'none' && (
+        {what === 'topic' ? (
           <>
-            {onMove && <MenuItem label="Move to team…" onClick={onMove} disabledReason={readOnlyReason} />}
             <MenuItem label="Copy link" onClick={onCopyLink} />
-            <MenuSeparator />
+            {onOpenInPeek && <MenuItem label="Open in Peek" onClick={onOpenInPeek} />}
+          </>
+        ) : (
+          <>
+            {archive === 'none' && (
+              <>
+                {onMove && <MenuItem label="Move to team…" onClick={onMove} disabledReason={readOnlyReason} />}
+                <MenuItem label="Copy link" onClick={onCopyLink} />
+                <MenuSeparator />
+              </>
+            )}
+            <MenuItem label={`${archive === 'own' ? 'Unarchive' : 'Archive'} ${what}`} onClick={onArchive} disabledReason={archiveShut} />
+            <MenuItem label={`Delete ${what}`} destructive onClick={onDelete} disabledReason={readOnlyReason} />
           </>
         )}
-        <MenuItem label={`${archive === 'own' ? 'Unarchive' : 'Archive'} ${what}`} onClick={onArchive} disabledReason={archiveShut} />
-        <MenuItem label={`Delete ${what}`} destructive onClick={onDelete} disabledReason={readOnlyReason} />
       </Menu>
     </Toolbar>
   )
