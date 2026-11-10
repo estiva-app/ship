@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import type { Imeta, Quote } from '@estiva-app/protocol'
+import { blockRunTag, quoteTag, type Imeta, type Quote } from '@estiva-app/protocol'
 import { ownFileOf, refusalReason, withoutOwnFileLines } from '@estiva-app/conversation'
 import { ConversationCard, FieldLine, QuotedLine, ReplyCard, type ReactionRowProps, type RepliesRowProps } from '@estiva-app/ui'
 import { ago } from '@/lib/time'
@@ -9,7 +9,7 @@ import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
 import type { referenceCaptions, referenceSections } from '@/api/references'
 import { Attachments as FileAttachments } from '@/components/ui/Attachment'
 import { BlockAnchorNote } from '@/components/ui/BlockAnchorNote'
-import { PartCard } from '@/components/ui/PartCard'
+import { PartCard, QuotedPart } from '@/components/ui/PartCard'
 import type { MessageData } from '@/components/ConversationThread'
 import { useReopenHeld } from '@/auth/heldTyping'
 import { MessageText } from './MessageText'
@@ -47,11 +47,17 @@ function deleteNote(replies: number): ReactNode {
 const quoteWords = (quote: Quote) => (quote.end ? `${quote.start} … ${quote.end}` : quote.start)
 
 /**
- * What a comment is about, under its name: the anchored block, live, with the same card as a part (Decided
- * 2026-10-07), or the note when that block can no longer be shown; a comment written on a selection in Leaf, the
- * words it quotes. Nothing for a comment on the whole file.
+ * What a comment is about, under its name: a comment written on a selection in Leaf, the words it quotes, as Leaf
+ * shows them (ONE-12); the anchored block, live, with the same card as a part (Decided 2026-10-07, before comments
+ * quoted words), or the note when that block can no longer be shown. Nothing for a comment on the whole file.
  */
 function aboutOf(message: MessageData, nameOf?: (pubkey: string) => string): ReactNode {
+  // A comment on a selection is about its words, not the whole block: the words, as Leaf shows them (ONE-12).
+  if (message.anchorPart && message.quote) {
+    // Its anchor as written; a message the fold holds no event for carries the same two tags rebuilt.
+    const tags = message.event?.tags ?? [blockRunTag([message.anchorPart.block]), quoteTag(message.quote)]
+    return <QuotedPart address={message.anchorPart.address} block={message.anchorPart.block} words={quoteWords(message.quote)} tags={tags} nameOf={nameOf} />
+  }
   if (message.anchorPart) return <PartCard address={message.anchorPart.address} block={message.anchorPart.block} nameOf={nameOf} />
   if (message.anchor && message.anchor.state !== 'unanchored') return <BlockAnchorNote anchor={message.anchor} />
   if (message.quote) return <QuotedLine words={quoteWords(message.quote)} />
