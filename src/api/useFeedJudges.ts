@@ -6,8 +6,9 @@
  * is about, from public events, the way every app computes them:
  *
  * - membership is `membershipOf`'s fold over the file's root, its stream and
- *   its `kind:1851` changes — one request carrying two filters, `#a` for the
- *   changes and `#A` for the stream (a reply drops the lowercase `a`);
+ *   its `kind:1851` changes that name someone — one request carrying the
+ *   filters, `#a` + `#p` for the changes ({@link changesNamingFilter}) and
+ *   `#A` for the stream (a reply drops the lowercase `a`);
  * - the mute list (`estiva:muted:v1`, a private blob) rides in the same request
  *   as a third filter, and is decrypted only when it is a different event from
  *   the last one seen. Ship **reads** it so that what Peek muted stays quiet
@@ -56,6 +57,8 @@ export interface FeedFile {
   addr: string
   /** Unix seconds the file was created — its root's `created_at`, which Ship holds. */
   createdAt: number
+  /** Everyone the app knows (`peopleIn`): the changes naming them are the only ones read. Absent, every change is. */
+  people?: readonly string[]
 }
 
 const NO_MUTES: ReadonlySet<string> = new Set()
@@ -77,13 +80,29 @@ function rootOf(file: FeedFile): Pick<SignedEvent, 'id' | 'pubkey' | 'kind' | 'c
 }
 
 /**
+ * The file's changes the membership fold reads: only the ones naming someone.
+ * The fold takes a change for its `p` tags or a `member:<P>` field, and every
+ * one of those carries the person's `p` (§11.8), so `#p` with everyone the app
+ * knows returns the fold's whole input for them, and none of the text saves
+ * (on production 22 of 1,993 project changes name anyone; ALO-19). Opening a
+ * file reads no older change otherwise.
+ * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/opening-a-file-reads-its-current-text-not-its-history.md
+ *
+ * With no `people` (none known yet), every change, as before.
+ */
+export function changesNamingFilter(file: string, me: string, people?: readonly string[]): Record<string, unknown> {
+  if (!people?.length) return { kinds: [KIND.CHANGE], '#a': [file] }
+  return { kinds: [KIND.CHANGE], '#a': [file], '#p': [...new Set([me, ...people])].sort() }
+}
+
+/**
  * The relay filters one page's facts need, in one request. The stream is asked
  * for by `#A` (a reply drops the lowercase `a`) and by `#a`, because a comment
  * with no `A` anchors every `a` it has (`candidateFilesOf`).
  */
-export function feedFactsFilters(file: string, me: string): Record<string, unknown>[] {
+export function feedFactsFilters(file: string, me: string, people?: readonly string[]): Record<string, unknown>[] {
   return [
-    { kinds: [KIND.CHANGE], '#a': [file] },
+    changesNamingFilter(file, me, people),
     { kinds: [KIND.COMMENT], '#A': [file] },
     { kinds: [KIND.COMMENT], '#a': [file] },
     mutedFilter(me),
@@ -137,7 +156,7 @@ export async function readFeedFacts(
   onMembers?: (members: ReadonlyMap<string, Membership>) => void,
 ): Promise<{ membership: Membership; members: ReadonlyMap<string, Membership>; muted: ReadonlySet<string> | undefined; events: readonly SignedEvent[] }> {
   // The same comment can answer two of the filters; the fold counts events, so each is held once.
-  const events = [...new Map((await query(feedFactsFilters(file.addr, me))).map((e) => [e.id, e])).values()]
+  const events = [...new Map((await query(feedFactsFilters(file.addr, me, file.people))).map((e) => [e.id, e])).values()]
   const folded = [rootOf(file), ...events]
   const membership = membershipOf(file.addr, me, folded)
   // Everyone's, from the same events: the Members dialog's roster (SHI-31).
@@ -187,12 +206,6 @@ export interface FeedJudges {
    * `undefined` until the first read has come back.
    */
   members?: ReadonlyMap<string, Membership>
-  /**
-   * Every change to the file, from the same read: its History and "Edited"
-   * where projects are read by their fields (ALO-5), which the workspace's
-   * load no longer holds. `undefined` until it has come back.
-   */
-  changes?: readonly SignedEvent[]
   /** Read again now — after this page has joined, left or added somebody. */
   reload: () => Promise<void>
 }
@@ -206,9 +219,10 @@ export interface FeedJudges {
 export function useFeedJudges(file: FeedFile | undefined, channel: string | undefined): FeedJudges {
   const addr = file?.addr
   const createdAt = file?.createdAt
+  // By value: the page hands in a new array each render, and a new person is the only reason to read again.
+  const peopleKey = file?.people?.length ? [...new Set(file.people)].sort().join(',') : ''
   const [facts, setFacts] = useState<{ addr: string; membership: Membership; muted: ReadonlySet<string> }>()
   const [roster, setRoster] = useState<{ addr: string; members: ReadonlyMap<string, Membership> }>()
-  const [changes, setChanges] = useState<{ addr: string; events: readonly SignedEvent[] }>()
   /* The file the page is about now: a read for the one it just left must not replace the new one's facts. */
   const current = useRef(addr)
   useEffect(() => {
@@ -218,12 +232,12 @@ export function useFeedJudges(file: FeedFile | undefined, channel: string | unde
   const load = useCallback(async () => {
     if (addr === undefined || createdAt === undefined || !signedIn()) return
     try {
-      const read = await readFeedFacts((filters) => relay.queryAll(filters), (c) => nip44.decrypt(c), { addr, createdAt }, signer.pubkey, (members) => {
+      const people = peopleKey ? peopleKey.split(',') : undefined
+      const read = await readFeedFacts((filters) => relay.queryAll(filters), (c) => nip44.decrypt(c), { addr, createdAt, people }, signer.pubkey, (members) => {
         rosters.set(addr, members)
         if (current.current === addr) setRoster({ addr, members })
       })
       if (current.current !== addr) return
-      setChanges({ addr, events: read.events.filter((event) => event.kind === KIND.CHANGE) })
       const { muted } = read
       // An unreadable mute list keeps the mutes this file was last judged with, and with none yet the page holds back its verdict.
       setFacts((held) => {
@@ -234,7 +248,7 @@ export function useFeedJudges(file: FeedFile | undefined, channel: string | unde
     } catch (error) {
       console.warn('[unread] could not read membership:', error)
     }
-  }, [addr, createdAt])
+  }, [addr, createdAt, peopleKey])
 
   useEffect(() => {
     void load()
@@ -243,8 +257,7 @@ export function useFeedJudges(file: FeedFile | undefined, channel: string | unde
 
   return useMemo(() => {
     const members = roster && roster.addr === addr ? roster.members : addr === undefined ? undefined : rosters.get(addr)
-    const held = changes && changes.addr === addr ? changes.events : undefined
-    if (!facts || facts.addr !== addr) return { members, changes: held, reload: load }
+    if (!facts || facts.addr !== addr) return { members, reload: load }
     const me = signer.pubkey
     return {
       file: { stream: facts.addr, me, member: facts.membership.member, since: facts.membership.since, muted: facts.muted.has(facts.addr) },
@@ -252,8 +265,7 @@ export function useFeedJudges(file: FeedFile | undefined, channel: string | unde
         ? { stream: channel, me, member: false, muted: facts.muted.has(channel), floor: Number.MAX_SAFE_INTEGER }
         : undefined,
       members,
-      changes: held,
       reload: load,
     }
-  }, [facts, roster, changes, addr, channel, load])
+  }, [facts, roster, addr, channel, load])
 }

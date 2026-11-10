@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Panel, SectionHeader } from '@estiva-app/ui'
+import { CollapsibleSection, Panel, SectionHeader } from '@estiva-app/ui'
 import type { ActivityItem } from '@/components/Activity'
 import { History, type HistoryEntry } from '@/components/History'
 import { Related, hasRelated } from '@/components/Related'
@@ -15,6 +15,14 @@ export interface OverviewPanelProps {
   loading?: boolean
   /** Its own changes, in words. */
   history: HistoryEntry[]
+  /**
+   * History starts folded and its changes are read when it opens (ALO-19: a
+   * project's, whose opening reads no older change); folded again on every
+   * visit, so leaving it open never brings the read back unasked (Miky,
+   * 2026-11-10). `pending` while the read is on the way. Absent, History is
+   * drawn open, as an issue's still is.
+   */
+  historyFold?: { open: boolean; onOpenChange: (open: boolean) => void; pending: boolean }
   /** The topics that list it, with Add to topic (TOP-5): `FileTopicsOf`, which reads and writes them itself. */
   topics?: ReactNode
   /** Files placed under it from other apps (RFC 0.5 §10.7). Drawn only when there is something to say (`hasRelated`). */
@@ -30,7 +38,7 @@ export interface OverviewPanelProps {
  * draws them; then its "History"; then its "Topics", the rail's until the rail went (TOP-5); then "Related", what
  * was placed under it, when there is any. One scroll for all four, as Peek's (27 September).
  */
-export function OverviewPanel({ activity, activityTruncated, loading, history, topics, related, about, nameOf }: OverviewPanelProps) {
+export function OverviewPanel({ activity, activityTruncated, loading, history, historyFold, topics, related, about, nameOf }: OverviewPanelProps) {
   return (
     <Panel title="Overview" className="min-h-0 w-96 flex-1" bodyClassName="flex flex-col pb-4">
       {/* Peek's spacing: 16px above the heading, its own 8px inset brought to the cards' 16px edge, its count beside it. */}
@@ -38,10 +46,18 @@ export function OverviewPanel({ activity, activityTruncated, loading, history, t
       <div className="px-4 pb-4 pt-1">
         <MentionList items={activity} loading={loading} truncated={activityTruncated} about={about} nameOf={nameOf} />
       </div>
-      <SectionHeader title="History" hover="none" className="mx-2" />
-      <div className="px-4 pt-1">
-        <History entries={history} />
-      </div>
+      {historyFold ? (
+        <CollapsibleSection title="History" open={historyFold.open} onOpenChange={historyFold.onOpenChange} pending={historyFold.pending} className="mx-2" contentClassName="px-2 pt-1">
+          <History entries={history} />
+        </CollapsibleSection>
+      ) : (
+        <>
+          <SectionHeader title="History" hover="none" className="mx-2" />
+          <div className="px-4 pt-1">
+            <History entries={history} />
+          </div>
+        </>
+      )}
       {topics && (
         <>
           <SectionHeader title="Topics" hover="none" className="mx-2 mt-4" />

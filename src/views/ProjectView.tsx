@@ -18,7 +18,7 @@ import type { IssueRowData } from '@/components/IssueRow'
 import { IssuesTable, type IssuesTableRow } from '@/components/IssuesTable'
 import { ProjectFields, type ProjectFieldsProps } from '@/components/PageFields'
 import { PageActions, type PageActionsProps } from '@/components/PageActions'
-import { OverviewPanel } from '@/components/OverviewPanel'
+import { OverviewPanel, type OverviewPanelProps } from '@/components/OverviewPanel'
 import { LiveHeader, type LiveHeaderProps } from '@/components/editing/LiveHeader'
 import { ThreadList } from '@/components/conversations/ThreadList'
 import { useBlockComment } from '@/components/conversations/useBlockComment'
@@ -96,6 +96,8 @@ export interface ProjectViewProps {
   activityTruncated?: number
   /** Its own changes, in words: the Overview's History. */
   history: HistoryEntry[]
+  /** History folded until opened, and read then: `OverviewPanel`'s `historyFold`. */
+  historyFold?: OverviewPanelProps['historyFold']
   /** Status, assignee and progress, as a row between the summary and the description (ONE-6, step 4b). */
   fields: Omit<ProjectFieldsProps, 'readOnlyReason' | 'lockedReason'>
   /** The header's ⋯: Move to Folder…, Copy link, Archive or Unarchive, Delete. */
@@ -136,7 +138,7 @@ const TABS: { id: ProjectTab; label: string }[] = [
 ]
 
 /** One project's page, in tabs: Overview and Issues; its comments or its Overview beside it. */
-export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onView, issues, issueStatuses, hrefFor, related, topics, threads, conversationsLoading, mentionsLoading, unread, stillUnread, onThreadShown, onStartConversation, onReply, onCopyBlockLink, activity, activityTruncated, history, fields, menu, comments, overview, about, onReact, onResolve, onDeleteMessage, onEditMessage, readOnlyReason, lockedReason, commentsClosed, upload, archivedNotice, members, edited }: ProjectViewProps) {
+export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onView, issues, issueStatuses, hrefFor, related, topics, threads, conversationsLoading, mentionsLoading, unread, stillUnread, onThreadShown, onStartConversation, onReply, onCopyBlockLink, activity, activityTruncated, history, historyFold, fields, menu, comments, overview, about, onReact, onResolve, onDeleteMessage, onEditMessage, readOnlyReason, lockedReason, commentsClosed, upload, archivedNotice, members, edited }: ProjectViewProps) {
   // A block menu's Comment shows the column, with that block above its box (RIC-18).
   const comment = useBlockComment(header.description, header.descriptionFormat, () => comments.onShownChange(true), onStartConversation)
   return (
@@ -199,7 +201,7 @@ export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onVi
       {/* Its Overview, in the comments' place (ONE-6, step 4d): Activity, History, and what is placed under it ("Related"). */}
       {overview.shown && (
         <div className="flex shrink-0 flex-col border-l border-border-default" data-overview-column>
-          <OverviewPanel activity={activity} activityTruncated={activityTruncated} loading={mentionsLoading} history={history} topics={topics} related={related} about={about} nameOf={header.nameOf} />
+          <OverviewPanel activity={activity} activityTruncated={activityTruncated} loading={mentionsLoading} history={history} historyFold={historyFold} topics={topics} related={related} about={about} nameOf={header.nameOf} />
         </div>
       )}
       {/* Its comments, the kit's one column, 384px beside the page on both tabs, Issues too (Katerina, 2 November: A). */}
