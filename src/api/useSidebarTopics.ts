@@ -35,25 +35,27 @@ export function useSidebarTopics(work: TopicPageWork | undefined, archives: Arch
   // Your five wait for the mute list's first answer, so a muted topic is never drawn and then taken out.
   const fromPage = useMemo(() => (held && settled ? yourTopicsOf(held, muted) : undefined), [held, settled, muted])
   const addresses = useMemo(() => fromPage?.map((topic) => topic.address), [fromPage])
-  const order = useTopicActivity(held, addresses)
+  // Away from Topics only the activity the tab holds: no read, and none again on return to the tab.
+  const order = useTopicActivity(onTopics ? held : undefined, addresses)
 
   // Every other page: the lean read.
   const lean = useYourTopics(!onTopics)
   const leanRead = lean.read === 'failed' ? undefined : lean.read
 
+  // Each source the tab holds, read or not on this page: moving between pages keeps the five drawn
+  // from what is held until the page's own source lands (Miky, 6 Nov: the five stay put while you work).
   const topics = useMemo(() => {
     const drawn = work ?? { projects: [], issues: [] }
-    if (onTopics) {
-      if (read === 'failed' || order.failed) return 'failed' as const
-      if (!fromPage || !order.values) return 'loading' as const
-      return sidebarTopicsOf(fromPage, order.values, drawn, archives ?? NO_ARCHIVES)
-    }
-    if (lean.read === 'failed') return 'failed' as const
-    if (!leanRead) return 'loading' as const
-    return sidebarTopicsOf(leanRead.topics, leanRead.at, drawn, archives ?? NO_ARCHIVES)
+    const pageFive = fromPage && order.values ? sidebarTopicsOf(fromPage, order.values, drawn, archives ?? NO_ARCHIVES) : undefined
+    const leanFive = leanRead ? sidebarTopicsOf(leanRead.topics, leanRead.at, drawn, archives ?? NO_ARCHIVES) : undefined
+    const [own, other] = onTopics ? [pageFive, leanFive] : [leanFive, pageFive]
+    if (own) return own
+    const failed = onTopics ? read === 'failed' || order.failed : lean.read === 'failed'
+    if (failed) return 'failed' as const
+    return other ?? ('loading' as const)
   }, [onTopics, read, fromPage, order.values, order.failed, lean.read, leanRead, work, archives])
   // Only your topics can be open in the sidebar: the only ones it draws.
-  const yours = onTopics ? fromPage : leanRead?.topics
+  const yours = (onTopics ? fromPage : leanRead?.topics) ?? (onTopics ? leanRead?.topics : fromPage)
   const openTopic = route.name === 'topic' && yours ? topicOfD(yours, route.d)?.address : undefined
   return {
     topics,

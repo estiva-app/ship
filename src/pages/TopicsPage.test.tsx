@@ -23,9 +23,12 @@ const refuseKinds = new Set<number>()
 const asked: Record<string, unknown>[] = []
 /** While set, the mute list's read waits for it to settle: a slow mute list. */
 let muteGate: Promise<void> | undefined
+/** While set, the read of every topic waits for it to settle (its ask for your comments in each): a slow Topics read. */
+let everyTopicGate: Promise<void> | undefined
 const answer = async (filters: Record<string, unknown>[]) => {
   asked.push(...filters)
   if (muteGate && filters.some((f) => (f.kinds as number[] | undefined)?.includes(30078))) await muteGate
+  if (everyTopicGate && filters.some((f) => (f.kinds as number[] | undefined)?.join() === '1111' && (f.authors as string[] | undefined)?.includes(ME))) await everyTopicGate
   if (down) throw new Error('relay unreachable')
   return held.filter((e) => filters.some((f) => matches(f, e)))
 }
@@ -139,6 +142,7 @@ beforeEach(() => {
   asked.length = 0
   down = false
   muteGate = undefined
+  everyTopicGate = undefined
   say.mockReset()
   resetTopicsForTests()
   resetFeedFactsForTests()
@@ -417,6 +421,40 @@ describe("Ship's sidebar: where your five are read from (ALO-17)", () => {
     expect(linksIn(container)).toEqual(['Topic 3', 'Topic 6', 'Topic 5', 'Topic 4', 'Topic 2'])
     expect(rootReads()).toBe(1)
     expect(muteReads()).toBe(1)
+  })
+
+  it('moving Issues → Topics → Issues keeps your five drawn while Topics’ read is out, draws from it once it lands, and reads your topics no second time', async () => {
+    held.push(shipManifest(), mutes(address('t-hush')))
+    for (const n of [1, 2, 3, 4, 5, 6]) held.push(topic(`t-${n}`, `Topic ${n}`), joined(`t-${n}`))
+    held.push(topic('t-hush', 'T muted'), joined('t-hush'))
+    held.push(commented('t-3', KATERINA))
+    const { container, rerender } = render(<Sidebar state={ship([], [])} route={{ name: 'issues' }} />)
+    await waitFor(() => expect(linksIn(container)).toEqual(['Topic 3', 'Topic 6', 'Topic 5', 'Topic 4', 'Topic 2']))
+
+    // A topic joined since, which only Topics' read of every topic will see; that read is slow.
+    held.push(topic('t-7', 'Topic 7'), joined('t-7'))
+    let release = () => {}
+    everyTopicGate = new Promise((resolve) => (release = resolve))
+    void prefetchTopics()
+    render(page())
+    rerender(<Sidebar state={ship([], [])} route={{ name: 'topics' }} />)
+    await waitFor(() => expect(everyTopicReads()).toBeGreaterThan(0))
+    for (let turn = 0; turn < 10; turn++) await act(async () => {})
+    // Topics' read is still out: the same five stay drawn, not a loading list.
+    expect(linksIn(container)).toEqual(['Topic 3', 'Topic 6', 'Topic 5', 'Topic 4', 'Topic 2'])
+
+    // It lands, with its activity: the five are Topics' own.
+    release()
+    await waitFor(() => expect(linksIn(container)).toEqual(['Topic 7', 'Topic 3', 'Topic 6', 'Topic 5', 'Topic 4']))
+
+    // Back on Issues: five drawn at once, and the sidebar reads nothing: not your topics, not their activity.
+    for (let turn = 0; turn < 10; turn++) await act(async () => {})
+    const reads = asked.length
+    rerender(<Sidebar state={ship([], [])} route={{ name: 'issues' }} />)
+    expect(linksIn(container)).toHaveLength(5)
+    for (let turn = 0; turn < 10; turn++) await act(async () => {})
+    expect(linksIn(container)).toHaveLength(5)
+    expect(asked.length).toBe(reads)
   })
 
   it('on Issues, Try again after a failed read reads only your topics again, not every topic', async () => {

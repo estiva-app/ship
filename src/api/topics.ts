@@ -62,7 +62,7 @@ export function prefetchTopics(): Promise<void> {
  * answer at once, or the route's read on the way ({@link prefetchTopics}).
  * `failed` only once this open's read has failed: an error left by an earlier
  * read is not this one's. `on` false (the sidebar away from Topics) reads
- * nothing and answers `undefined`.
+ * nothing and answers what the tab holds, if anything.
  */
 export function useTopics(on = true): TopicsState {
   const snapshot = useSyncExternalStore(held.subscribe, held.snapshot)
@@ -75,7 +75,8 @@ export function useTopics(on = true): TopicsState {
       live = false
     }
   }, [on])
-  if (!on) return undefined
+  // Off, it reads nothing but still hands over what the tab holds.
+  if (!on) return snapshot.value
   return snapshot.value ?? (settled && snapshot.error !== undefined ? 'failed' : undefined)
 }
 
@@ -94,7 +95,7 @@ const readYours = () => {
   return readSidebarTopics((ciphertext) => nip44.decrypt(ciphertext))
 }
 
-/** The lean read of your topics, while `on`: `undefined` while the first one is out, `failed` when it did not land. */
+/** The lean read of your topics, while `on`: `undefined` while the first one is out, `failed` when it did not land. Off, what the tab holds, read nothing. */
 export function useYourTopics(on: boolean): { read: YourTopicsRead | 'failed' | undefined; retry: () => void } {
   const snapshot = useSyncExternalStore(yourRead.subscribe, yourRead.snapshot)
   const [settled, setSettled] = useState(false)
@@ -111,7 +112,8 @@ export function useYourTopics(on: boolean): { read: YourTopicsRead | 'failed' | 
       document.removeEventListener('visibilitychange', onReturn)
     }
   }, [on])
-  const read = !on ? undefined : (snapshot.value ?? (settled && snapshot.error !== undefined ? ('failed' as const) : undefined))
+  // Off, it reads nothing but still hands over what the tab holds.
+  const read = !on ? snapshot.value : (snapshot.value ?? (settled && snapshot.error !== undefined ? ('failed' as const) : undefined))
   return { read, retry: () => void yourRead.reload(readYours) }
 }
 
@@ -222,7 +224,8 @@ const mutes = (() => {
  * first read came back, in hand or not. One read for the tab, shared by every
  * page and the sidebar; asked again when your read state moves while the list
  * would not decrypt (a busy nip44), rather than never, and when you come back
- * to the tab and the topics are read again. `on` false reads nothing.
+ * to the tab and the topics are read again. `on` false reads nothing and
+ * answers what the tab holds.
  */
 export function useMuted(on = true): { muted: ReadonlySet<string> | undefined; settled: boolean } {
   const merged = useLandedReadState()
@@ -232,7 +235,7 @@ export function useMuted(on = true): { muted: ReadonlySet<string> | undefined; s
     if (!on || (now.muted && now.round >= round)) return
     mutes.read(round)
   }, [on, now.muted, now.round, round, merged])
-  return on ? { muted: now.muted, settled: now.settled } : { muted: undefined, settled: false }
+  return { muted: now.muted, settled: now.settled }
 }
 
 /** How long after a read coming back to the tab reads again: a quick look away and back reads nothing. */
