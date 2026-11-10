@@ -186,7 +186,11 @@ export function referenceCaptions(scope: MessageScope, nameOf?: (pubkey: string)
       const message = [...scope.here, ...parent].flatMap((thread) => [thread.root, ...thread.replies]).find((m) => m.id === id)
       return message ? { label: message.author.name ?? 'Someone', snippet: captionOf(message.body, nameOf) } : undefined
     }
-    const file = [...folderFiles, ...recentFiles].find((candidate) => candidate.uri.toLowerCase() === `nostr:${bare}`)
+    // A project picked once the relay keeps projects in order is its Ship link by id, not a `nostr:` reference (ALO-8).
+    const file = [...folderFiles, ...recentFiles].find((candidate) => {
+      const picked = candidate.uri.toLowerCase()
+      return picked === `nostr:${bare}` || picked === uri.toLowerCase()
+    })
     return file ? { label: file.title, snippet: '' } : undefined
   }
 }

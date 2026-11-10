@@ -27,12 +27,14 @@ vi.mock('./store', () => ({
   inOrderOption: async () => (wire.inOrder.length ? { inOrder: wire.inOrder } : {}),
   relay: {
     // Every `d` asked about is one issue by one author, as the relay would answer it.
-    query: async (filters: { '#d'?: string[] }[]) => (filters[0]['#d'] ?? []).map((d) => ({ kind: 30851, pubkey: PK, tags: [['d', d]], id: d, content: '', created_at: 1, sig: '' })),
+    // A `d` asked about as a project (ALO-8's id link) is one project by the same author.
+    query: async (filters: { '#d'?: string[]; kinds?: number[] }[]) =>
+      (filters[0]['#d'] ?? []).map((d) => ({ kind: filters[0].kinds?.includes(30851) || !filters[0].kinds ? 30851 : filters[0].kinds[0], pubkey: PK, tags: [['d', d]], id: d, content: '', created_at: 1, sig: '' })),
   },
 }))
 vi.mock('./handoff', () => ({
   declaredManifests: async () => [
-    { kind: 31990, pubkey: 'c'.repeat(64), id: 'm'.repeat(64), sig: '', created_at: 1, content: '{}', tags: [['web', 'https://ship.estiva.app/o/<bech32>', 'naddr'], ['urls', 'https://ship.estiva.app/issue/<slug>-<d>#block-<block>', '30851'], ['k', '30851']] },
+    { kind: 31990, pubkey: 'c'.repeat(64), id: 'm'.repeat(64), sig: '', created_at: 1, content: '{}', tags: [['web', 'https://ship.estiva.app/o/<bech32>', 'naddr'], ['urls', 'https://ship.estiva.app/issue/<slug>-<d>#block-<block>', '30851'], ['urls', 'https://ship.estiva.app/project/<slug>-<d>#block-<block>', '30850'], ['k', '30851'], ['k', '30850']] },
   ],
 }))
 vi.mock('./clock', () => ({ clockProblem: async () => null }))
@@ -101,6 +103,14 @@ describe('once the relay keeps projects in order, a comment from Ship names a pr
     const comment = wire.sent.at(-1)!
     expect(values(comment, 'a')).toEqual([ISSUE, `30850:${PK}:${d(7)}`, `30851:${PK}:${d(3)}`])
     expect(values(comment, 'o')).toEqual([d(7)])
+  })
+
+  it('a project picked from [ (its Ship link by id, no title) earns its a and o', async () => {
+    wire.inOrder = ['osnova.project']
+    await startConversation({ folder: FOLDER, about: ISSUE, body: `see https://ship.estiva.app/project/${d(6)}` })
+    const comment = wire.sent.at(-1)!
+    expect(values(comment, 'a')).toEqual([ISSUE, `30850:${PK}:${d(6)}`])
+    expect(values(comment, 'o')).toEqual([d(6)])
   })
 
   it('an edit keeps the o of a project its new words link', async () => {
