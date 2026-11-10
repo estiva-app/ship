@@ -106,6 +106,37 @@ describe('the subscription', () => {
   })
 })
 
+describe('where the subscription starts (fadc320c)', () => {
+  // 10 Nov 2026, 06:00:00 UTC, in ms: when the read on screen began.
+  const READ_AT = 1_794_290_400_000
+  const QUARTER_HOUR = 15 * 60
+
+  it('asks the relay for nothing older than the read, less the relay’s clock window', () => {
+    // Without `since` the relay answered with 10.66 MB of stored history as
+    // Miky, all of it already in the read. Fifteen minutes before the read is
+    // as far as a slow clock can date a change the relay still accepts.
+    renderHook(() => useLiveWorkspace([FOLDER_A], () => {}, READ_AT))
+    const [, , options] = watchFolders.mock.calls[0]
+    expect(options.since).toBe(READ_AT / 1000 - QUARTER_HOUR)
+  })
+
+  it('keeps the open subscription through a newer read, and starts a new one from the newest read', () => {
+    // A re-read lands every few seconds while people work; tearing the socket's
+    // REQ down for each would spend the relay's frame budget for nothing.
+    const later = READ_AT + 60_000
+    const { rerender } = renderHook(
+      ({ folders, readAt }: { folders: string[]; readAt: number }) => useLiveWorkspace(folders, () => {}, readAt),
+      { initialProps: { folders: [FOLDER_A], readAt: READ_AT } },
+    )
+    rerender({ folders: [FOLDER_A], readAt: later })
+    expect(watchFolders).toHaveBeenCalledTimes(1)
+    // A re-linked project adds a Folder: its subscription starts from the read that found it.
+    rerender({ folders: [FOLDER_A, FOLDER_B], readAt: later })
+    expect(watchFolders).toHaveBeenCalledTimes(2)
+    expect(watchFolders.mock.calls[1][2].since).toBe(later / 1000 - QUARTER_HOUR)
+  })
+})
+
 describe('a pushed event', () => {
   it('triggers one re-read, debounced, however many events arrive', () => {
     // One gesture in another app is often several events: a status change is a
