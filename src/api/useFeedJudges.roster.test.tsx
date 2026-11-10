@@ -16,6 +16,7 @@ vi.mock('./store', () => ({
 vi.mock('./nip44', () => ({ nip44: { decrypt: async () => undefined } }))
 vi.mock('../auth/estivaId', () => ({ signedIn: () => true }))
 vi.mock('@/lib/useRefresh', () => ({ useRefresh: () => {} }))
+vi.mock('./profileKeys', () => ({ profileKeys: async () => undefined }))
 
 const { useFeedJudges, resetFeedFactsForTests } = await import('./useFeedJudges')
 
@@ -26,6 +27,8 @@ const B = { addr: `30851:${OWNER_B}:project-b`, createdAt: 1000 }
 
 /** Answers the oldest read still waiting, with no events: the file's owner is its one member. */
 async function answer() {
+  // The read goes out once the profile keys are in (a tick later): wait for it.
+  await vi.waitFor(() => expect(pending.length).toBeGreaterThan(0))
   await act(async () => {
     pending.shift()?.answer([])
   })
@@ -55,7 +58,7 @@ describe("a file's members, remembered for this tab", () => {
 
     rerender({ file: A })
     // Before A's new read has answered: what the last one said.
-    expect(pending).toHaveLength(1)
+    await vi.waitFor(() => expect(pending).toHaveLength(1))
     expect([...(result.current.members?.keys() ?? [])]).toEqual([OWNER_A])
   })
 

@@ -53,7 +53,6 @@ import {
   type WorkspaceState,
 } from '@/api'
 import { useRelated, withoutTopics } from '@/api/useRelated'
-import { useRoster } from '@/api/useRoster'
 import { useFileChanges } from '@/api/useFileChanges'
 import { useFileTopics } from '@/api/useFileTopics'
 import { useThreads } from '@/api/useThreads'
@@ -649,15 +648,14 @@ export function ProjectPage({
      already dropped roots about any other file, so those are the only two
      cases. */
   const merged = useMergedReadState()
-  // Who is involved, from the changes naming everyone the app knows: never every change (ALO-19).
-  const roster = useRoster()
-  const known = useMemo(() => peopleIn(state, me, roster), [state, roster])
-  const judges = useFeedJudges(project ? { addr: project.addr, createdAt: project.createdAt, people: known } : undefined, channelContext(record))
+  const judges = useFeedJudges(project ? { addr: project.addr, createdAt: project.createdAt } : undefined, channelContext(record))
   // History, folded on every visit and read only while open (Miky, 2026-11-10): the open itself reads no older change.
   // Held as the project it was opened on, so moving to another project finds it folded.
   const [historyOpenOn, setHistoryOpenOn] = useState<string>()
   const historyOpen = project !== undefined && historyOpenOn === project.addr
-  const everyChange = useFileChanges(project?.addr, historyOpen)
+  // Bumped when this page joins, leaves or adds somebody, so an open History shows it.
+  const [historyAgain, setHistoryAgain] = useState(0)
+  const everyChange = useFileChanges(project?.addr, historyOpen, historyAgain)
   const verdictAt = useMemo(() => {
     if (!judges.file) return () => undefined
     const aboutProject = new Set(conversations.filter((c) => project && (state.anchors[c.root.id] ?? []).includes(project.addr)).map((c) => c.id))
@@ -732,7 +730,8 @@ export function ProjectPage({
   const textPending = byFields && !state.texts!.includes(project.addr)
   const deleted = project.deleted
   // Its History from every change to it once History is open; until then, and for "Edited", the load's current ones.
-  const ownChanges = byFields ? withChangesOf(project.addr, state, everyChange) : state
+  // A History read that failed (`null`) shows what the load holds rather than stay pending.
+  const ownChanges = byFields ? withChangesOf(project.addr, state, everyChange ?? undefined) : state
   // Where the load already holds every change (no fields read), History needs no read of its own and stays open.
   const historyFold = byFields
     ? { open: historyOpen, onOpenChange: (open: boolean) => setHistoryOpenOn(open ? project.addr : undefined), pending: historyOpen && everyChange === undefined }
@@ -782,6 +781,7 @@ export function ProjectPage({
             note="Your issues here still notify you."
             {...membershipActions({ kind: 'project', project }, project.title, directory.nameOf, say, async () => {
               await Promise.all([judges.reload(), refresh([project.contentFolder])])
+              setHistoryAgain((n) => n + 1)
             })}
           />
         }

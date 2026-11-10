@@ -11,15 +11,16 @@ export function everyChangeFilter(file: string): Record<string, unknown> {
 
 /**
  * Every change to `file`, read only while `open` (its History section is
- * open), and again each time it opens: opening the file itself reads no older
+ * open), again each time it opens, and again when `again` changes (the page
+ * joined, left or added somebody): opening the file itself reads no older
  * change (ALO-19), so a History nobody looks at costs nothing. `undefined`
- * while closed and until the read has come back; a failed read stays
- * `undefined` and is tried again on the next open.
+ * while closed and until the read has come back; `null` when it failed, so
+ * the section stops waiting and shows what the load holds.
  *
  * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/opening-a-file-reads-its-current-text-not-its-history.md
  */
-export function useFileChanges(file: string | undefined, open: boolean): readonly SignedEvent[] | undefined {
-  const [read, setRead] = useState<{ file: string; events: readonly SignedEvent[] }>()
+export function useFileChanges(file: string | undefined, open: boolean, again = 0): readonly SignedEvent[] | null | undefined {
+  const [read, setRead] = useState<{ file: string; events: readonly SignedEvent[] | null }>()
   useEffect(() => {
     if (!open || file === undefined || !signedIn()) return
     let live = true
@@ -28,12 +29,14 @@ export function useFileChanges(file: string | undefined, open: boolean): readonl
       .then((events) => {
         if (live) setRead({ file, events })
       })
-      .catch((error: unknown) => console.warn('[history] could not read the changes of', file, error))
+      .catch((error: unknown) => {
+        console.warn('[history] could not read the changes of', file, error)
+        if (live) setRead({ file, events: null })
+      })
     return () => {
       live = false
-      // Closed, or another file: the next open reads afresh.
-      setRead(undefined)
     }
-  }, [file, open])
+  }, [file, open, again])
+  // Closed, the held read is not shown; the next open reads afresh and shows the old rows only until it lands.
   return open && read !== undefined && read.file === file ? read.events : undefined
 }

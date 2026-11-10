@@ -34,4 +34,14 @@ describe("a project's History", () => {
     rerender({ open: true })
     await waitFor(() => expect(queryAll).toHaveBeenCalledTimes(2))
   })
+
+  it('stops waiting when the read fails, and reads again after the page joins, leaves or adds', async () => {
+    queryAll.mockClear()
+    queryAll.mockRejectedValueOnce(new Error('429'))
+    const { result, rerender } = renderHook(({ again }) => useFileChanges(FILE, true, again), { initialProps: { again: 0 } })
+    await waitFor(() => expect(result.current).toBeNull())
+    rerender({ again: 1 })
+    await waitFor(() => expect(queryAll).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(Array.isArray(result.current)).toBe(true))
+  })
 })

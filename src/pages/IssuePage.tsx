@@ -5,8 +5,7 @@ import { useCallback, useMemo, useState } from 'react'
 import { ArchiveDialog, ArchivedNotice } from '@estiva-app/ui'
 import { ARCHIVE_WORDS, archivedLine, archivedNoticeOf, lockedReason, ownArchive, type Archives } from '@/lib/archive'
 import { ISSUE_STATUSES, addMentioned, archiveIssue, commentsOn, deleteIssue, deleteMessage, editMessage, react, reply, setIssueField, unreact, startConversation, type DirectoryView, type FolderState, type WorkspaceState, threadContext, fileContext, useMergedReadState, useFeedJudges, unreadByThread } from '@/api'
-import { me, peopleIn, useMentionsElsewhere } from '@/api'
-import { useRoster } from '@/api/useRoster'
+import { me, useMentionsElsewhere } from '@/api'
 import { MEMBER_FIELD_PREFIX, memberOfField } from '@estiva-app/conversation'
 import { useRelated, withoutTopics } from '@/api/useRelated'
 import { useFileTopics } from '@/api/useFileTopics'
@@ -94,10 +93,7 @@ export function IssuePage({ state, directory, archives, d, say, refresh }: { sta
      package: you must be a member of the issue, and a muted issue lights only
      for a message that names you. */
   const merged = useMergedReadState()
-  // Who is involved, from the changes naming everyone the app knows, as a project's page (ALO-19).
-  const roster = useRoster()
-  const known = useMemo(() => peopleIn(state, me, roster), [state, roster])
-  const judges = useFeedJudges(issue ? { addr: issue.addr, createdAt: issue.createdAt, people: known } : undefined, undefined)
+  const judges = useFeedJudges(issue ? { addr: issue.addr, createdAt: issue.createdAt } : undefined, undefined)
   const verdictAt = useCallback(
     (frontier: Readonly<Record<string, number>>) => (judges.file ? unreadByThread(conversations, frontier, () => judges.file) : undefined),
     [conversations, judges],

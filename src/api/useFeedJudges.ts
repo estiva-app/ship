@@ -48,6 +48,7 @@ import { KIND } from '../nostr/kinds'
 import { signedIn } from '../auth/estivaId'
 import { nip44 } from './nip44'
 import { relay, signer } from './store'
+import { profileKeys } from './profileKeys'
 
 /** How often membership and mutes are re-read: the read state's cadence, since they move at the same speed. */
 const FEED_FACTS_REFRESH_MS = 30_000
@@ -57,7 +58,7 @@ export interface FeedFile {
   addr: string
   /** Unix seconds the file was created — its root's `created_at`, which Ship holds. */
   createdAt: number
-  /** Everyone the app knows (`peopleIn`): the changes naming them are the only ones read. Absent, every change is. */
+  /** The keys whose changes are read (`profileKeys`; the reader alone for a card). Absent or empty, every change is. */
   people?: readonly string[]
 }
 
@@ -81,14 +82,15 @@ function rootOf(file: FeedFile): Pick<SignedEvent, 'id' | 'pubkey' | 'kind' | 'c
 
 /**
  * The file's changes the membership fold reads: only the ones naming someone.
- * The fold takes a change for its `p` tags or a `member:<P>` field, and every
- * one of those carries the person's `p` (§11.8), so `#p` with everyone the app
- * knows returns the fold's whole input for them, and none of the text saves
- * (on production 22 of 1,993 project changes name anyone; ALO-19). Opening a
- * file reads no older change otherwise.
+ * The fold takes a change for its `p` tags or a `member:<P>` field, and a
+ * membership change MUST carry its person's `p` (§11.8; the relay refuses one
+ * without), so `#p` with everyone who has a profile returns the fold's whole
+ * input, and none of the text saves (on production 22 of 1,993 project
+ * changes name anyone; ALO-19). Opening a file reads no older change otherwise.
  * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/opening-a-file-reads-its-current-text-not-its-history.md
+ * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-membership-change-names-the-person-it-is-about.md
  *
- * With no `people` (none known yet), every change, as before.
+ * With no `people` (the profiles could not be read), every change, as before.
  */
 export function changesNamingFilter(file: string, me: string, people?: readonly string[]): Record<string, unknown> {
   if (!people?.length) return { kinds: [KIND.CHANGE], '#a': [file] }
@@ -219,8 +221,6 @@ export interface FeedJudges {
 export function useFeedJudges(file: FeedFile | undefined, channel: string | undefined): FeedJudges {
   const addr = file?.addr
   const createdAt = file?.createdAt
-  // By value: the page hands in a new array each render, and a new person is the only reason to read again.
-  const peopleKey = file?.people?.length ? [...new Set(file.people)].sort().join(',') : ''
   const [facts, setFacts] = useState<{ addr: string; membership: Membership; muted: ReadonlySet<string> }>()
   const [roster, setRoster] = useState<{ addr: string; members: ReadonlyMap<string, Membership> }>()
   /* The file the page is about now: a read for the one it just left must not replace the new one's facts. */
@@ -232,7 +232,8 @@ export function useFeedJudges(file: FeedFile | undefined, channel: string | unde
   const load = useCallback(async () => {
     if (addr === undefined || createdAt === undefined || !signedIn()) return
     try {
-      const people = peopleKey ? peopleKey.split(',') : undefined
+      // Everyone with a profile (ALO-19): the changes naming them are all the fold reads. Unknown, every change.
+      const people = await profileKeys()
       const read = await readFeedFacts((filters) => relay.queryAll(filters), (c) => nip44.decrypt(c), { addr, createdAt, people }, signer.pubkey, (members) => {
         rosters.set(addr, members)
         if (current.current === addr) setRoster({ addr, members })
@@ -248,7 +249,7 @@ export function useFeedJudges(file: FeedFile | undefined, channel: string | unde
     } catch (error) {
       console.warn('[unread] could not read membership:', error)
     }
-  }, [addr, createdAt, peopleKey])
+  }, [addr, createdAt])
 
   useEffect(() => {
     void load()
