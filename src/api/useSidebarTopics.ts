@@ -50,12 +50,13 @@ export function useSidebarTopics(work: TopicPageWork | undefined, archives: Arch
   const { topics, yours } = useMemo(() => {
     const drawn = work ?? { projects: [], issues: [] }
     const page = fromPage && order.values ? { at: Math.max(landedAt(held), landedAt(order.values)), topics: fromPage, order: order.values } : undefined
-    const yourRead = leanRead ? { at: landedAt(leanRead), topics: leanRead.topics, order: leanRead.at } : undefined
+    // The lean read brings your spaces too, for links to them: the sidebar never draws one.
+    const yourRead = leanRead ? { at: landedAt(leanRead), topics: leanRead.topics.filter((topic) => !topic.space), order: leanRead.at } : undefined
     const [own, other] = onTopics ? [page, yourRead] : [yourRead, page]
-    // The one that landed last; on a tie, this page's own.
+    // The one that landed last; on a tie, this page's own; failed only with no five held at all.
     const latest = own && other ? (other.at > own.at ? other : own) : own
     const failed = onTopics ? read === 'failed' || order.failed : lean.read === 'failed'
-    const source = latest ?? (failed ? undefined : other)
+    const source = latest ?? other
     return {
       topics: source ? sidebarTopicsOf(source.topics, source.order, drawn, archives ?? NO_ARCHIVES) : failed ? ('failed' as const) : ('loading' as const),
       // Only your topics can be open in the sidebar: the only ones it draws.

@@ -386,10 +386,11 @@ export async function readAllTopics(): Promise<TopicsRead> {
  * the sidebar draws its five from on every page but Topics and a topic's. One
  * request a call, never paged by `queryAll`, which would ask each filter for a
  * thousand events and keep interop's reads from ending on a short page.
- * `decrypt` opens your mute list.
+ * `decrypt` opens your mute list. Your spaces come with it, marked, so a link
+ * to one goes to Peek on every page; the sidebar leaves them out itself.
  */
 export async function readSidebarTopics(decrypt: (ciphertext: string) => Promise<string | undefined>): Promise<YourTopicsRead> {
-  return readYourTopics(query, signer.pubkey, { cache: manifests, decrypt, ...(await listRead()) })
+  return readYourTopics(query, signer.pubkey, { cache: manifests, decrypt, spaces: true, ...(await listRead()) })
 }
 
 /**

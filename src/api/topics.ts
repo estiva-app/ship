@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { createRetryingRead } from '@estiva-app/platform'
 import { activityTopics, addableTopics, readTopicActivity, type ReadTopic, type TopicsRead, type YourTopicsRead } from '@estiva-app/interop'
 import { readAllTopics, readSidebarTopics, readTopicDocuments, readTopicMembers, topicAsDrawn, type ForeignObject, type FolderSummary, type TopicOfFile } from './foreign'
-import { knowSpaces } from '@/lib/topicLinks'
+import { knowSpaces, knowSpacesAmong } from '@/lib/topicLinks'
 import { foldersNow, heldFolders } from './useFolders'
 import { useLandedReadState } from './readStateSync'
 import { readMuted } from './useFeedJudges'
@@ -79,6 +79,12 @@ export function prefetchTopics(): Promise<void> {
 export function useTopics(on = true): TopicsState {
   const snapshot = useSyncExternalStore(held.subscribe, held.snapshot)
   const [settled, setSettled] = useState(false)
+  // Turned on again, a read starts: an error an earlier one left is not this one's.
+  const [wasOn, setWasOn] = useState(on)
+  if (wasOn !== on) {
+    setWasOn(on)
+    if (on) setSettled(false)
+  }
   useEffect(() => {
     if (!on) return
     let live = true
@@ -103,15 +109,26 @@ const yourRead = createRetryingRead<YourTopicsRead>({ retryable: () => false })
 yourRead.subscribe(() => stampLanding(yourRead.snapshot().value))
 /** When the lean read was last asked for, so a quick look away and back reads nothing. */
 let yoursReadAt = 0
-const readYours = () => {
+const readYours = async () => {
   yoursReadAt = Date.now()
-  return readSidebarTopics((ciphertext) => nip44.decrypt(ciphertext))
+  const asked = mutes.ticket()
+  const read = await readSidebarTopics((ciphertext) => nip44.decrypt(ciphertext))
+  // Which of yours are spaces, for every link to one; and the mute list it opened, for the tab's one list.
+  knowSpacesAmong(read.topics)
+  if (read.muted) mutes.give(read.muted, asked)
+  return read
 }
 
 /** The lean read of your topics, while `on`: `undefined` while the first one is out, `failed` when it did not land. Off, what the tab holds, read nothing. */
 export function useYourTopics(on: boolean): { read: YourTopicsRead | 'failed' | undefined; retry: () => void } {
   const snapshot = useSyncExternalStore(yourRead.subscribe, yourRead.snapshot)
   const [settled, setSettled] = useState(false)
+  // Turned on again, a read starts: an error an earlier one left is not this one's.
+  const [wasOn, setWasOn] = useState(on)
+  if (wasOn !== on) {
+    setWasOn(on)
+    if (on) setSettled(false)
+  }
   useEffect(() => {
     if (!on) return
     let live = true
@@ -183,13 +200,18 @@ export function reloadTopics(): Promise<void> {
  * Topics and the sidebar beside it read it once between them. `round` moves
  * when you come back to the tab and the topics are read again
  * ({@link useTopicsOnReturn}), so a topic muted or unmuted elsewhere moves then.
+ * The lean read of your topics opens the same list and hands it over
+ * ({@link give}), so moving from Issues to Topics reads it no second time.
+ * Every answer carries the ticket taken when its read was asked, and only a
+ * newer one replaces the list held: a slow, older answer landing last never wins.
  */
 const mutes = (() => {
-  let now: { muted?: ReadonlySet<string>; settled: boolean; round: number } = { settled: false, round: -1 }
+  let now: { muted?: ReadonlySet<string>; settled: boolean; round: number; ticket: number } = { settled: false, round: -1, ticket: 0 }
   let round = 0
   let reading: { round: number } | undefined
   /** A read in flight across a reset writes nothing. */
   let epoch = 0
+  let tickets = 0
   const listeners = new Set<() => void>()
   const tell = () => {
     for (const listener of listeners) listener()
@@ -207,6 +229,7 @@ const mutes = (() => {
       const mine = { round: at }
       reading = mine
       const from = epoch
+      const ticket = ++tickets
       const land = (next: (was: typeof now) => typeof now) => {
         if (from !== epoch) return
         if (reading === mine) reading = undefined
@@ -214,9 +237,17 @@ const mutes = (() => {
         tell()
       }
       void readMuted((filters) => relay.query(filters as never), (ciphertext) => nip44.decrypt(ciphertext), signer.pubkey).then(
-        (keys) => land((was) => (keys ? { muted: keys, settled: true, round: at } : { ...was, settled: true })),
+        (keys) => land((was) => (keys && ticket > was.ticket ? { muted: keys, settled: true, round: at, ticket } : { ...was, settled: true })),
         () => land((was) => ({ ...was, settled: true })),
       )
+    },
+    /** A ticket for a read of the list made elsewhere, taken as it is asked. */
+    ticket: () => ({ ticket: ++tickets, epoch, round }),
+    /** The list another read opened, held for the round it was asked in unless a newer answer is. */
+    give(keys: ReadonlySet<string>, asked: { ticket: number; epoch: number; round: number }) {
+      if (asked.epoch !== epoch || asked.ticket <= now.ticket) return
+      now = { muted: keys, settled: true, round: asked.round, ticket: asked.ticket }
+      tell()
     },
     again() {
       round += 1
@@ -224,8 +255,9 @@ const mutes = (() => {
     },
     reset() {
       epoch += 1
-      now = { settled: false, round: -1 }
+      now = { settled: false, round: -1, ticket: 0 }
       round = 0
+      tickets = 0
       reading = undefined
     },
   }
