@@ -5,6 +5,11 @@ import type { TopicWorkRow as Row } from '@/lib/topics'
 import { StatusLabel } from '@/components/ui/StatusLabel'
 import { linkTo } from '@/router'
 
+/** Who edited a row's file last and when ("Katerina, 2h ago"), in its column on a topic's page; hidden on a phone. */
+export function EditedCaption({ edited }: { edited: string }) {
+  return <span className="hidden w-32 shrink-0 truncate text-right text-caption text-text-muted sm:inline">{edited}</span>
+}
+
 /**
  * A project or an issue on a topic's page (SHIPS-4), as the approved story
  * `TopicPage` draws it: a project with its issues done of all beside a bar, an
@@ -14,11 +19,6 @@ import { linkTo } from '@/router'
  * drawn as the Projects page draws them, so only issues and archived rows use
  * this one.
  */
-/** Who edited a row's file last and when ("Katerina, 2h ago"), in its column on a topic's page; hidden on a phone. */
-export function EditedCaption({ edited }: { edited: string }) {
-  return <span className="hidden w-32 shrink-0 truncate text-right text-caption text-text-muted sm:inline">{edited}</span>
-}
-
 export function TopicWorkRow({ row, archived = false, edited }: { row: Row; archived?: boolean; edited?: string }) {
   return (
     <div data-topic-work={row.address} className="relative flex h-9 min-w-0 items-center gap-3 rounded-md px-3 transition-colors hover:bg-bg-hover">
