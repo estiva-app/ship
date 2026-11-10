@@ -410,7 +410,11 @@ export async function moveProject(
           ? 'you need to be a member of both teams to move this.'
           : moveRefused.why === 'changed-meanwhile'
             ? 'the teams changed since you opened this. Try again.'
-            : undefined)
+            : moveRefused.why === 'not-home'
+              ? 'it is in no team yet, so it can go only to the team it was started in, or to the Company team.'
+              : undefined)
+    // A code Ship does not know (and `leaves-by-moving`: Ship never removes a live topic) says only that nothing moved, never "Try again".
+    if (moveRefused.nothingMoved && !why && moveRefused.why !== 'refused') return { ok: false, reason: 'Nothing was moved.' }
     // A list changed since it was read: the caller reads the Folders again, so moving again can succeed.
     if (moveRefused.nothingMoved) return { ok: false, reason: nothing(why), ...(moveRefused.why === 'changed-meanwhile' ? { changed: true as const } : {}) }
     // The earlier moves arrived. Only the refused command's Folder was asked; the ones after it were never sent to.
