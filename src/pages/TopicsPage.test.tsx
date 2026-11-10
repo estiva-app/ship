@@ -60,6 +60,7 @@ import { foldersNow } from '@/api/useFolders'
 import { resetFeedFactsForTests } from '@/api/useFeedJudges'
 import { buildManifest } from '@/nostr/manifest'
 import type { Archives } from '@/lib/archive'
+import type { Route } from '@/router'
 
 interface TestEvent {
   id: string
@@ -356,10 +357,10 @@ describe("Ship's Topics (Explore topics)", () => {
   })
 })
 
-/** The sidebar as the app wires it: the same reads, your five, each folding to its work. */
-function Sidebar({ state, topicD }: { state: FolderState; topicD?: string }) {
+/** The sidebar as the app wires it: the same reads, your five, each folding to its work; on Issues unless another route is named. */
+function Sidebar({ state, route = { name: 'issues' } }: { state: FolderState; route?: Route }) {
   const archives: Archives = { ofIssue: () => undefined, ofProject: () => undefined }
-  const topics = useSidebarTopics({ projects: state.projects, issues: state.issues }, archives, topicD)
+  const topics = useSidebarTopics({ projects: state.projects, issues: state.issues }, archives, route)
   return <ShipSidebar openIssues={0} activeProjects={0} hrefFor={(entry) => `/${entry}`} {...topics} />
 }
 const sidebarTopics = () =>
@@ -367,6 +368,71 @@ const sidebarTopics = () =>
     .getAllByRole('link')
     .map((a) => a.textContent)
     .filter((text) => text?.startsWith('T'))
+
+/**
+ * The read of every topic asks for your comments in each one (your part in every
+ * topic); the sidebar's lean read never does (ALO-17).
+ */
+const everyTopicReads = () => asked.filter((f) => (f.kinds as number[] | undefined)?.join() === '1111' && (f.authors as string[] | undefined)?.includes(ME)).length
+/** Reads of every topic's root: one per read of the topics, lean or full. */
+const rootReads = () => asked.filter((f) => (f.kinds as number[] | undefined)?.join() === '30840' && !f['#d'] && !f.authors).length
+const muteReads = () => asked.filter((f) => (f.kinds as number[] | undefined)?.includes(30078)).length
+const linksIn = (box: HTMLElement) =>
+  within(box)
+    .queryAllByRole('link')
+    .map((a) => a.textContent)
+    .filter((text) => text?.startsWith('T'))
+
+describe("Ship's sidebar: where your five are read from (ALO-17)", () => {
+  it('on Issues draws your five newest in order from a read of only your topics, and never reads every topic', async () => {
+    held.push(shipManifest(), mutes(address('t-hush')))
+    for (const n of [1, 2, 3, 4, 5, 6]) held.push(topic(`t-${n}`, `Topic ${n}`), joined(`t-${n}`))
+    held.push(topic('t-hush', 'T muted'), joined('t-hush'), topic('t-old', 'T archived'), joined('t-old'), archiving('t-old'), topic('t-not', 'T not mine'))
+    held.push(commented('t-3', KATERINA))
+    render(<Sidebar state={ship([], [])} route={{ name: 'issues' }} />)
+
+    await waitFor(() => expect(sidebarTopics()).toEqual(['Topic 3', 'Topic 6', 'Topic 5', 'Topic 4', 'Topic 2']))
+    expect(everyTopicReads()).toBe(0)
+    expect(rootReads()).toBe(1)
+  })
+
+  it('on Topics draws the same five from the page’s own read: no read of its own, one mute list between them, and none again on a topic’s page', async () => {
+    held.push(shipManifest(), mutes(address('t-hush')))
+    for (const n of [1, 2, 3, 4, 5, 6]) held.push(topic(`t-${n}`, `Topic ${n}`), joined(`t-${n}`))
+    held.push(topic('t-hush', 'T muted'), joined('t-hush'), topic('t-old', 'T archived'), joined('t-old'), archiving('t-old'), topic('t-not', 'T not mine'))
+    held.push(commented('t-3', KATERINA))
+    // As the app opens Topics: the route's read, then the page and the sidebar beside it.
+    void prefetchTopics()
+    render(page())
+    const { container, rerender } = render(<Sidebar state={ship([], [])} route={{ name: 'topics' }} />)
+
+    await waitFor(() => expect(linksIn(container)).toEqual(['Topic 3', 'Topic 6', 'Topic 5', 'Topic 4', 'Topic 2']))
+    for (let turn = 0; turn < 10; turn++) await act(async () => {})
+    expect(rootReads()).toBe(1)
+    expect(muteReads()).toBe(1)
+
+    // On to a topic's page: the sidebar reads nothing again.
+    rerender(<Sidebar state={ship([], [])} route={{ name: 'topic', d: 't-3' }} />)
+    for (let turn = 0; turn < 10; turn++) await act(async () => {})
+    expect(linksIn(container)).toEqual(['Topic 3', 'Topic 6', 'Topic 5', 'Topic 4', 'Topic 2'])
+    expect(rootReads()).toBe(1)
+    expect(muteReads()).toBe(1)
+  })
+
+  it('on Issues, Try again after a failed read reads only your topics again, not every topic', async () => {
+    down = true
+    held.push(shipManifest(), topic('t-1', 'Topic 1'), joined('t-1'), topic('t-2', 'Topic 2'))
+    render(<Sidebar state={ship([], [])} route={{ name: 'issues' }} />)
+    await waitFor(() => expect(screen.getByText('Didn’t load.')).toBeTruthy())
+    const failed = rootReads()
+
+    down = false
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    await waitFor(() => expect(sidebarTopics()).toEqual(['Topic 1']))
+    expect(rootReads()).toBe(failed + 1)
+    expect(everyTopicReads()).toBe(0)
+  })
+})
 
 describe("Ship's sidebar: your five newest topics", () => {
   it('shows your five newest topics, newest first, then Explore topics; never an archived, muted or other topic', async () => {
@@ -404,7 +470,7 @@ describe("Ship's sidebar: your five newest topics", () => {
     await waitFor(() => expect(sidebarTopics()).toEqual(['Topic 1']))
     expect(screen.queryByRole('link', { name: 'p-1' })).toBeNull()
 
-    rerender(<Sidebar state={ship(['p-1'], [])} topicD="t-1" />)
+    rerender(<Sidebar state={ship(['p-1'], [])} route={{ name: 'topic', d: 't-1' }} />)
     await waitFor(() => expect(screen.getByRole('link', { name: 'p-1' })).toBeTruthy())
   })
 

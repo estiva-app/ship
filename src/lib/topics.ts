@@ -124,22 +124,31 @@ export const TOPICS_SHOWN = 5
  * same "yours" as the Your topics tab, each with what its page lists that is
  * not archived, projects then issues, each in the order the topic lists them
  * ({@link topicPageOf}): the topic's one arranged order (TOPI-5).
+ *
+ * `topics` are your topics, already judged (ALO-17): interop's lean read on
+ * most pages, {@link yourTopicsOf} the Topics page's read on Topics and a
+ * topic's page; `at` orders them, newest first.
  */
-export function sidebarTopicsOf(read: TopicsRead, at: ReadonlyMap<string, number>, work: TopicPageWork, archives: Archives, muted?: ReadonlySet<string>): SidebarTopic[] {
+export function sidebarTopicsOf(topics: readonly ReadTopic[], at: ReadonlyMap<string, number>, work: TopicPageWork, archives: Archives): SidebarTopic[] {
   const newest = byActivity(at)
-  const byAddress = new Map(read.topics.map((topic) => [topic.address, topic]))
-  return yourTopics(read, muted)
-    .sort(newest)
+  return [...topics]
+    .sort((a, b) => newest(a.address, b.address))
     .slice(0, TOPICS_SHOWN)
-    .map((address) => {
-      const page = topicPageOf(byAddress.get(address)!, work, archives)
+    .map((topic) => {
+      const page = topicPageOf(topic, work, archives)
       return {
-        id: address,
+        id: topic.address,
         title: page.title,
-        href: topicHref(address, page.title),
+        href: topicHref(topic.address, page.title),
         work: page.live.map((row) => ({ id: row.address, kind: row.kind, title: row.title, href: row.href })),
       }
     })
+}
+
+/** Your topics in a read of every topic, by {@link yourTopics}: what the sidebar draws on Topics and a topic's page. */
+export function yourTopicsOf(read: TopicsRead, muted?: ReadonlySet<string>): ReadTopic[] {
+  const yours = new Set(yourTopics(read, muted))
+  return read.topics.filter((topic) => yours.has(topic.address))
 }
 
 /** A Leaf document's kind: what a topic's Documents lists (interop's `LISTED_FILE_KINDS`). */
@@ -147,9 +156,9 @@ export const DOCUMENT_KIND = 30842
 
 const dOf = (address: string) => address.split(':')[2] ?? ''
 
-/** The topic a `d` names in the read: none when no topic holds it, or two do (§13.1, as the hand-off reads it). */
-export function topicOfD(read: TopicsRead, d: string): ReadTopic | undefined {
-  const held = read.topics.filter((topic) => dOf(topic.address) === d)
+/** The topic a `d` names among these: none when no topic holds it, or two do (§13.1, as the hand-off reads it). */
+export function topicOfD(topics: readonly ReadTopic[], d: string): ReadTopic | undefined {
+  const held = topics.filter((topic) => dOf(topic.address) === d)
   return held.length === 1 ? held[0] : undefined
 }
 

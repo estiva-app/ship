@@ -25,7 +25,7 @@ import { TopicView, type TopicDocument } from '@/views/TopicView'
 export function TopicPage({ d, state, folders, archives }: { d: string; state: FolderState; folders: FolderSummary[] | undefined; archives: Archives }) {
   const read = useTopics()
   const held = read === 'failed' ? undefined : read
-  const topic = held ? topicOfD(held, d) : undefined
+  const topic = held ? topicOfD(held.topics, d) : undefined
 
   // A read this open made already has every topic the reader can read; only an older one is read again.
   const heldAtOpen = useRef(read !== undefined && read !== 'failed')
