@@ -435,7 +435,18 @@ export class Store {
     private readonly clockSkewMs: () => Promise<number | null> = () => Promise.resolve(null),
     /** Whether projects are read by their fields and written in order (`api/fileReads.ts`); off when it answers nothing. */
     readonly projectFields: () => Promise<ProjectFields | undefined> = () => Promise.resolve(undefined),
+    /**
+     * The types the relay keeps in order (`api/store.ts` `inOrderTypes`): a
+     * comment, card or listing names a file of one by its id too (ALO-8).
+     */
+    readonly inOrderTypes: () => Promise<readonly string[]> = () => Promise.resolve([]),
   ) {}
+
+  /** `inOrder` for the shared builders, absent while the relay keeps no type in order. */
+  private async inOrderOption(): Promise<{ inOrder?: readonly string[] }> {
+    const inOrder = await this.inOrderTypes()
+    return inOrder.length > 0 ? { inOrder } : {}
+  }
 
   /** Projects opened on this page: each whole load reads its current text too, which a list never carries (§6.13). */
   private readonly openedProjects = new Set<string>()
@@ -686,7 +697,7 @@ export class Store {
     )
     if (!result.ok) return { result, addr, id, folder }
 
-    const { result: placed } = await this.publishInOrder(planPlaceFile(this.signer.pubkey, Date.now(), { folder, address: addr, hasState: args.team.hasState }))
+    const { result: placed } = await this.publishInOrder(planPlaceFile(this.signer.pubkey, Date.now(), { folder, address: addr, hasState: args.team.hasState, ...(await this.inOrderOption()) }))
     return { result, placed, addr, id, folder }
   }
 
@@ -738,6 +749,7 @@ export class Store {
       from: args.from,
       to: args.to,
       listings: args.listings ?? new Map(),
+      ...(await this.inOrderOption()),
     })
     if (!plan.ok) return { refused: plan.reason }
     for (const [index, event] of plan.events.entries()) {
@@ -873,8 +885,9 @@ export class Store {
     if (!result.ok) return { result }
 
     let unlisted: PublishResult | undefined
+    const inOrder = await this.inOrderOption()
     for (const listing of args.folders) {
-      for (const command of planUnlistFile(this.signer.pubkey, Date.now(), { folder: listing.folder, address: args.project, hasState: listing.hasState })) {
+      for (const command of planUnlistFile(this.signer.pubkey, Date.now(), { folder: listing.folder, address: args.project, hasState: listing.hasState, ...inOrder })) {
         const answer = await this.publish(command)
         if (!unlisted || unlisted.ok) unlisted = answer
       }
@@ -971,7 +984,7 @@ export class Store {
    * No client can evaluate that, so nothing here gates on authorship; the
    * control is offered and a refusal is reported, exactly as for deletion.
    */
-  editMessage(args: {
+  async editMessage(args: {
     folder: string
     messageEventId: string
     body: string
@@ -998,8 +1011,10 @@ export class Store {
       body: args.body,
       embeds: args.embeds,
       mediaTags: args.files?.map(imetaTag),
+      ...(await this.inOrderOption()),
     })
-    const linkTags = (args.linkTags ?? []).filter((t) => t[0] === 'a' || t[0] === 'q').map((t) => [...t])
+    // A file the body names by its id as well keeps its `o` beside its `a` (ALO-8).
+    const linkTags = (args.linkTags ?? []).filter((t) => t[0] === 'a' || t[0] === 'o' || t[0] === 'q').map((t) => [...t])
     return this.publish({ ...edit, tags: [...edit.tags, ...linkTags] })
   }
 
@@ -1031,7 +1046,7 @@ export class Store {
    * as the issue's widget above the message, so a comment arriving in the topic
    * says what it is about instead of being a bare line of text.
    */
-  postMessage(args: {
+  async postMessage(args: {
     folder: string
     body: string
     replyTo?: ThreadRef
@@ -1061,6 +1076,7 @@ export class Store {
         urgent: args.urgent,
         linkTags: args.linkTags,
         embeds: args.embeds,
+        ...(await this.inOrderOption()),
       }),
     )
   }

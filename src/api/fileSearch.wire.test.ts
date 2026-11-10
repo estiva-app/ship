@@ -77,7 +77,10 @@ vi.mock('./store', () => ({
   },
   signer: { pubkey: 'c'.repeat(64) },
   projectFieldsNow: async () => fields,
+  inOrderOption: async () => (inOrder.length ? { inOrder } : {}),
 }))
+/** The types the relay says it keeps in order (NIP-11 `files.requires_prev`). */
+let inOrder: string[] = []
 
 const { fileCandidatesOf, readTopicDocuments, searchFiles } = await import('./foreign')
 const { buildManifest } = await import('../nostr/manifest')
@@ -91,6 +94,7 @@ const PROJECT = `30850:${OWNER}:p1`
 beforeEach(() => {
   held.length = 0
   asked.length = 0
+  inOrder = []
   const unsigned = buildManifest(OWNER, Date.now())
   held.push(event(unsigned.kind, unsigned.tags, unsigned.content), project('p1', 'Launch plan', 'First block.\nThird block mentions quoxalbit'))
 })
@@ -113,6 +117,34 @@ describe("[ finds a project by a word of its text, where the relay finds project
     fields = undefined
     expect((await searchFiles('laun')).map((row) => row.id)).toEqual([PROJECT])
     expect(asked.flat().some((f) => f.fields !== undefined)).toBe(false)
+  })
+})
+
+// ALO-8 (decided 2026-11-06): from the switch a project picked from `[` is saved as its id link, as in Leaf and Peek.
+describe('[ saves a picked project as its id link once the relay keeps projects in order', () => {
+  const ID = '5f0c1f2e-3a4b-4c5d-8e6f-7a8b9c0d1e2f'
+  const KEPT = `30850:${OWNER}:${ID}`
+
+  beforeEach(() => {
+    held.push(project(ID, 'Quarterly plan', 'Body.'))
+    fields = { text: true, search: true }
+  })
+
+  it('a recently read project is offered as its Ship link by id, not a nostr: reference', async () => {
+    inOrder = ['osnova.project']
+    const rows = await fileCandidatesOf({ addresses: [KEPT], at: new Map() }, 2)
+    expect(rows.map((row) => row.uri)).toEqual([`https://ship.estiva.app/project/${ID}`])
+  })
+
+  it('a project found by typing is offered the same way', async () => {
+    inOrder = ['osnova.project']
+    const rows = await searchFiles('quarter')
+    expect(rows.map((row) => row.uri)).toEqual([`https://ship.estiva.app/project/${ID}`])
+  })
+
+  it('before the relay keeps projects in order, the same pick is a nostr: reference, as before', async () => {
+    const rows = await fileCandidatesOf({ addresses: [KEPT], at: new Map() }, 2)
+    expect(rows.map((row) => row.uri.startsWith('nostr:naddr1'))).toEqual([true])
   })
 })
 

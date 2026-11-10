@@ -21,6 +21,7 @@ vi.mock('@/api/store', () => ({
   },
   relay: { query: async () => [] },
   signer: { pubkey: 'b'.repeat(64) },
+  inOrderOption: async () => ({}),
 }))
 vi.mock('@/api/handoff', () => ({ declaredManifests: async () => [] }))
 vi.mock('@/api/clock', () => ({ clockProblem: async () => null }))

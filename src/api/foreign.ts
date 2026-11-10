@@ -52,7 +52,7 @@ import { KIND_CHANGE, placeFilters, placeListing, type Listed, type ReferenceCan
 import { relatedTo } from '@/lib/ownKinds'
 import { safeLink } from '@/lib/handoff'
 import { KIND } from '../nostr/kinds'
-import { projectFieldsNow, relay, signer } from './store'
+import { inOrderOption, projectFieldsNow, relay, signer } from './store'
 
 export type { ForeignObject, ResolvedSlot, FolderContents, FolderSummary } from '@estiva-app/interop'
 
@@ -327,7 +327,7 @@ export async function readFolderListing(id: string, read: QueryFn = loadQuery())
 export async function searchFiles(text: string): Promise<ReferenceCandidate[]> {
   const fields = await projectFieldsNow()
   const byFields = fields?.search ? { kinds: [KIND.PROJECT], query: (filters: Record<string, unknown>[]) => relay.queryWithMatches(filters as never) } : undefined
-  return searchFileReferences(text, query, { cache: manifests, ...(fields ? { listRead: true } : {}), ...(byFields ? { byFields } : {}) })
+  return searchFileReferences(text, query, { cache: manifests, ...(fields ? { listRead: true } : {}), ...(byFields ? { byFields } : {}), ...(await inOrderOption()) })
 }
 
 /** A topic as the Topics line draws it and a list entry names it (TOP-5). */
@@ -513,10 +513,11 @@ export async function fileCandidatesOf(
   files: readonly ForeignObject[] | { addresses: readonly string[]; at: ReadonlyMap<string, number> },
   tier: number,
 ): Promise<ReferenceCandidate[]> {
-  const read = await listRead()
-  if (!('addresses' in files)) return fileCandidates(files, tier, query, { cache: manifests, ...read })
+  // A project the relay keeps in order is picked as its id link (ALO-8, SPEC §13.1): interop's `pickedFileUri`.
+  const [read, inOrder] = await Promise.all([listRead(), inOrderOption()])
+  if (!('addresses' in files)) return fileCandidates(files, tier, query, { cache: manifests, ...read, ...inOrder })
   const objects = await resolveForeignRoots(files.addresses, query, manifests, read)
-  return fileCandidates(objects, tier, query, { cache: manifests, at: files.at, ...read })
+  return fileCandidates(objects, tier, query, { cache: manifests, at: files.at, ...read, ...inOrder })
 }
 
 /** The foreign files placed under one of Ship's objects, with their conversation counts. */
