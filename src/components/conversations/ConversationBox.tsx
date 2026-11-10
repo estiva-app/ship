@@ -6,7 +6,7 @@ import { referenceOfLink, type EditorDocument, type Embed, type Imeta } from '@e
 import { Kbd } from '@estiva-app/ui'
 import { CommentBox, commentBoxRows, LinkChips, type BoxFile, type BoxSentUnder, type BoxUnder, type ReferenceViewProps, type SendAnswer, type UploadAnswer } from '@estiva-app/ui/editor'
 import type { ForeignObject } from '@/api/foreign'
-import { askLinkValues, knownBlockOf, knownLinkValue, linksChanged } from '@/api/linkCards'
+import { askLinkValues, knownBlockOf, knownLinkValue, linksChanged, useAskLinks } from '@/api/linkCards'
 import { subscribeReferences, type ReferenceSection } from '@/api/references'
 import { uploadAttachment } from '@/api/blobs'
 import { useForeignObjects } from '@/api/useForeignObjects'
@@ -270,11 +270,16 @@ const BoxReferences = createContext<BoxReferenceContext>({})
  */
 function BoxReference({ uri, href }: ReferenceViewProps) {
   const { resolved, nameOf } = useContext(BoxReferences)
-  const known = resolved?.[uri]
-  const [asked] = useForeignObjects(known === undefined ? [uri] : []) ?? []
+  // A project picked from `[` once the relay keeps projects in order is its app link by id (ALO-8): asked for
+  // like a pasted link, then drawn by the `nostr:` reference it names.
+  const link = /^https?:\/\//i.test(uri)
+  useAskLinks(link ? [uri] : [])
+  const reference = link ? referenceOfLink(uri, knownLinkValue) : uri
+  const known = reference ? resolved?.[reference] : undefined
+  const [asked] = useForeignObjects(reference && known === undefined ? [reference] : []) ?? []
   const object = known ?? asked
   // The kit keeps a click in the draft; a URL whose file cannot be shown stays the URL it was written as (WBM-11).
-  return <MessageChip uri={uri} object={object} nameOf={nameOf} preview={false} opensAt={href} />
+  return <MessageChip uri={reference ?? uri} object={object} nameOf={nameOf} preview={false} opensAt={href ?? (link ? uri : undefined)} />
 }
 
 /** Loaded on first use (see ThreadList): the editor is its own chunk. */
