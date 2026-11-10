@@ -23,14 +23,25 @@ const refuseKinds = new Set<number>()
 const asked: Record<string, unknown>[] = []
 /** While set, the mute list's read waits for it to settle: a slow mute list. */
 let muteGate: Promise<void> | undefined
-const answer = async (filters: Record<string, unknown>[]) => {
+/**
+ * Every ask Ship paged (`queryAll`), one entry per call. Only the read of every
+ * topic pages (`readAllTopics`); the lean read of yours never does (`readSidebarTopics`).
+ */
+const paged: Record<string, unknown>[][] = []
+/** While set, every paged ask waits for it to settle: a slow read of every topic. */
+let everyTopicGate: Promise<void> | undefined
+/** Paged asks fail: the read of every topic does not land, the lean read does. */
+let pagedDown = false
+const answer = async (filters: Record<string, unknown>[], { paging = false } = {}) => {
   asked.push(...filters)
+  if (paging) paged.push(filters)
   if (muteGate && filters.some((f) => (f.kinds as number[] | undefined)?.includes(30078))) await muteGate
-  if (down) throw new Error('relay unreachable')
+  if (paging && everyTopicGate) await everyTopicGate
+  if (down || (paging && pagedDown)) throw new Error('relay unreachable')
   return held.filter((e) => filters.some((f) => matches(f, e)))
 }
 vi.mock('@/api/store', () => ({
-  relay: { query: (filters: Record<string, unknown>[]) => answer(filters), queryAll: (filters: Record<string, unknown>[]) => answer(filters) },
+  relay: { query: (filters: Record<string, unknown>[]) => answer(filters), queryAll: (filters: Record<string, unknown>[]) => answer(filters, { paging: true }) },
   signer: { pubkey: 'c'.repeat(64) },
   projectFieldsNow: async () => undefined,
   store: {
@@ -53,13 +64,16 @@ vi.mock('@/api/readStateSync', async (actual) => ({ ...(await actual<object>()),
 import { Store } from '@/nostr/store'
 import type { Relay, UnsignedEvent } from '@estiva-app/protocol'
 import { TopicsPage } from './TopicsPage'
-import { prefetchTopics, resetTopicsForTests, topicChoicesNow } from '@/api/topics'
+import { ensureTopics, prefetchTopics, resetTopicsForTests, topicChoicesNow } from '@/api/topics'
+import { TopicPage } from './TopicPage'
+import { FileTopics } from '@/components/FileTopics'
 import { useSidebarTopics } from '@/api/useSidebarTopics'
 import { ShipSidebar } from '@/components/ShipSidebar'
 import { foldersNow } from '@/api/useFolders'
 import { resetFeedFactsForTests } from '@/api/useFeedJudges'
 import { buildManifest } from '@/nostr/manifest'
 import type { Archives } from '@/lib/archive'
+import type { Route } from '@/router'
 
 interface TestEvent {
   id: string
@@ -138,6 +152,9 @@ beforeEach(() => {
   asked.length = 0
   down = false
   muteGate = undefined
+  everyTopicGate = undefined
+  paged.length = 0
+  pagedDown = false
   say.mockReset()
   resetTopicsForTests()
   resetFeedFactsForTests()
@@ -356,10 +373,10 @@ describe("Ship's Topics (Explore topics)", () => {
   })
 })
 
-/** The sidebar as the app wires it: the same reads, your five, each folding to its work. */
-function Sidebar({ state, topicD }: { state: FolderState; topicD?: string }) {
+/** The sidebar as the app wires it: the same reads, your five, each folding to its work; on Issues unless another route is named. */
+function Sidebar({ state, route = { name: 'issues' } }: { state: FolderState; route?: Route }) {
   const archives: Archives = { ofIssue: () => undefined, ofProject: () => undefined }
-  const topics = useSidebarTopics({ projects: state.projects, issues: state.issues }, archives, topicD)
+  const topics = useSidebarTopics({ projects: state.projects, issues: state.issues }, archives, route)
   return <ShipSidebar openIssues={0} activeProjects={0} hrefFor={(entry) => `/${entry}`} {...topics} />
 }
 const sidebarTopics = () =>
@@ -367,6 +384,175 @@ const sidebarTopics = () =>
     .getAllByRole('link')
     .map((a) => a.textContent)
     .filter((text) => text?.startsWith('T'))
+
+/** Reads of every topic: the paged asks for topic roots, which only `readAllTopics` makes (ALO-17). */
+const everyTopicReads = () => paged.filter((filters) => filters.some((f) => (f.kinds as number[] | undefined)?.includes(30840))).length
+/**
+ * Lets every answer the fake relay owes land. No timer runs in these reads (the
+ * relay answers on a promise), so there is no clock to advance: each empty turn
+ * lets one more promise in the chain settle, and nothing waits on real time.
+ */
+const settle = async () => {
+  for (let turn = 0; turn < 10; turn++) await act(async () => {})
+}
+/** Reads of every topic's root: one per read of the topics, lean or full. */
+const rootReads = () => asked.filter((f) => (f.kinds as number[] | undefined)?.join() === '30840' && !f['#d'] && !f.authors).length
+const muteReads = () => asked.filter((f) => (f.kinds as number[] | undefined)?.includes(30078)).length
+const linksIn = (box: HTMLElement) =>
+  within(box)
+    .queryAllByRole('link')
+    .map((a) => a.textContent)
+    .filter((text) => text?.startsWith('T'))
+
+describe("Ship's sidebar: where your five are read from (ALO-17)", () => {
+  it('on Issues draws your five newest in order from a read of only your topics, and never reads every topic', async () => {
+    held.push(shipManifest(), mutes(address('t-hush')))
+    for (const n of [1, 2, 3, 4, 5, 6]) held.push(topic(`t-${n}`, `Topic ${n}`), joined(`t-${n}`))
+    held.push(topic('t-hush', 'T muted'), joined('t-hush'), topic('t-old', 'T archived'), joined('t-old'), archiving('t-old'), topic('t-not', 'T not mine'))
+    held.push(commented('t-3', KATERINA))
+    render(<Sidebar state={ship([], [])} route={{ name: 'issues' }} />)
+
+    await waitFor(() => expect(sidebarTopics()).toEqual(['Topic 3', 'Topic 6', 'Topic 5', 'Topic 4', 'Topic 2']))
+    expect(everyTopicReads()).toBe(0)
+    expect(rootReads()).toBe(1)
+  })
+
+  it('on Topics draws the same five from the page’s own read: no read of its own, one mute list between them, and none again on a topic’s page', async () => {
+    held.push(shipManifest(), mutes(address('t-hush')))
+    for (const n of [1, 2, 3, 4, 5, 6]) held.push(topic(`t-${n}`, `Topic ${n}`), joined(`t-${n}`))
+    held.push(topic('t-hush', 'T muted'), joined('t-hush'), topic('t-old', 'T archived'), joined('t-old'), archiving('t-old'), topic('t-not', 'T not mine'))
+    held.push(commented('t-3', KATERINA))
+    // As the app opens Topics: the route's read, then the page and the sidebar beside it.
+    void prefetchTopics()
+    render(page())
+    const { container, rerender } = render(<Sidebar state={ship([], [])} route={{ name: 'topics' }} />)
+
+    await waitFor(() => expect(linksIn(container)).toEqual(['Topic 3', 'Topic 6', 'Topic 5', 'Topic 4', 'Topic 2']))
+    await settle()
+    expect(rootReads()).toBe(1)
+    expect(muteReads()).toBe(1)
+
+    // On to a topic's page: the sidebar reads nothing again.
+    rerender(<Sidebar state={ship([], [])} route={{ name: 'topic', d: 't-3' }} />)
+    await settle()
+    expect(linksIn(container)).toEqual(['Topic 3', 'Topic 6', 'Topic 5', 'Topic 4', 'Topic 2'])
+    expect(rootReads()).toBe(1)
+    expect(muteReads()).toBe(1)
+  })
+
+  it('moving Issues → Topics → Issues keeps your five drawn while Topics’ read is out, draws from it once it lands, keeps its five back on Issues, and reads nothing more', async () => {
+    held.push(shipManifest(), mutes(address('t-hush')))
+    for (const n of [1, 2, 3, 4, 5, 6]) held.push(topic(`t-${n}`, `Topic ${n}`), joined(`t-${n}`))
+    held.push(topic('t-hush', 'T muted'), joined('t-hush'))
+    held.push(commented('t-3', KATERINA))
+    const { container, rerender } = render(<Sidebar state={ship([], [])} route={{ name: 'issues' }} />)
+    await waitFor(() => expect(linksIn(container)).toEqual(['Topic 3', 'Topic 6', 'Topic 5', 'Topic 4', 'Topic 2']))
+
+    // A topic joined since, which only Topics' read of every topic will see; that read is slow.
+    held.push(topic('t-7', 'Topic 7'), joined('t-7'))
+    let release = () => {}
+    everyTopicGate = new Promise((resolve) => (release = resolve))
+    void prefetchTopics()
+    render(page())
+    rerender(<Sidebar state={ship([], [])} route={{ name: 'topics' }} />)
+    await waitFor(() => expect(everyTopicReads()).toBeGreaterThan(0))
+    await settle()
+    // Topics' read is still out: the same five stay drawn, not a loading list.
+    expect(linksIn(container)).toEqual(['Topic 3', 'Topic 6', 'Topic 5', 'Topic 4', 'Topic 2'])
+
+    // It lands, with its activity: the five are Topics' own.
+    release()
+    await waitFor(() => expect(linksIn(container)).toEqual(['Topic 7', 'Topic 3', 'Topic 6', 'Topic 5', 'Topic 4']))
+
+    // Back on Issues: the same five, Topics' read being the latest, never the older five; and the sidebar reads nothing.
+    await settle()
+    const reads = asked.length
+    rerender(<Sidebar state={ship([], [])} route={{ name: 'issues' }} />)
+    expect(linksIn(container)).toEqual(['Topic 7', 'Topic 3', 'Topic 6', 'Topic 5', 'Topic 4'])
+    await settle()
+    expect(linksIn(container)).toEqual(['Topic 7', 'Topic 3', 'Topic 6', 'Topic 5', 'Topic 4'])
+    expect(asked.length).toBe(reads)
+  })
+
+  it('on Issues, a link to a space you are in goes to Peek from the first read of your topics, and the sidebar never draws the space', async () => {
+    held.push(shipManifest(), topic('t-1', 'Topic 1'), joined('t-1'), topic('t-sp', 'T space'), joined('t-sp'), spaceMark('t-sp'))
+    const { container } = render(<Sidebar state={ship([], [])} route={{ name: 'issues' }} />)
+    await waitFor(() => expect(rootReads()).toBe(1))
+    await settle()
+    expect(linksIn(container)).toEqual(['Topic 1'])
+
+    // The issue's topics land after the sidebar's read: its chip for the space opens Peek, not Ship's page.
+    const space = { address: address('t-sp'), folder: TEAM, title: 'T space', openUrl: 'https://peek.estiva.app/topic/t-sp', archived: false }
+    render(<FileTopics topics={[space]} busy={new Set()} onChange={vi.fn()} readChoices={vi.fn()} />)
+    expect(screen.getByRole('link', { name: /T space/ }).getAttribute('href')).toBe('https://peek.estiva.app/topic/t-sp')
+    expect(everyTopicReads()).toBe(0)
+  })
+
+  it('Issues → Topics reads your mute list once: Topics takes the list the read of your topics opened, and leaves the same topic out', async () => {
+    held.push(shipManifest(), mutes(address('t-hush')))
+    for (const n of [1, 2, 3]) held.push(topic(`t-${n}`, `Topic ${n}`), joined(`t-${n}`))
+    held.push(topic('t-hush', 'T muted'), joined('t-hush'))
+    const { container, rerender } = render(<Sidebar state={ship([], [])} route={{ name: 'issues' }} />)
+    await waitFor(() => expect(linksIn(container)).toEqual(['Topic 3', 'Topic 2', 'Topic 1']))
+    expect(muteReads()).toBe(1)
+
+    void prefetchTopics()
+    render(page())
+    rerender(<Sidebar state={ship([], [])} route={{ name: 'topics' }} />)
+    await waitFor(() => expect(titles()).toContain('Topic 3'))
+    await settle()
+    expect(titles()).not.toContain('T muted')
+    expect(linksIn(container)).toEqual(['Topic 3', 'Topic 2', 'Topic 1'])
+    expect(muteReads()).toBe(1)
+  })
+
+  it('on Topics, when the read of every topic fails, your five from the read of yours stay drawn rather than “Didn’t load.”', async () => {
+    held.push(shipManifest(), topic('t-1', 'Topic 1'), joined('t-1'), topic('t-2', 'Topic 2'), joined('t-2'))
+    const { container, rerender } = render(<Sidebar state={ship([], [])} route={{ name: 'issues' }} />)
+    await waitFor(() => expect(linksIn(container)).toEqual(['Topic 2', 'Topic 1']))
+
+    pagedDown = true
+    void prefetchTopics().catch(() => {})
+    rerender(<Sidebar state={ship([], [])} route={{ name: 'topics' }} />)
+    await waitFor(() => expect(everyTopicReads()).toBeGreaterThan(0))
+    await settle()
+    expect(screen.queryByText('Didn’t load.')).toBeNull()
+    expect(linksIn(container)).toEqual(['Topic 2', 'Topic 1'])
+  })
+
+  it('from Issues, a topic opened from the sidebar draws its page, with the work it lists, before every topic is read', async () => {
+    held.push(shipManifest(), issueRoot('i-1'), topic('t-1', 'Topic 1'), joined('t-1'), topic('t-2', 'Topic 2'), joined('t-2'), lists('t-2', 'i-1'))
+    const work = ship([], ['i-1'])
+    const archives: Archives = { ofIssue: () => undefined, ofProject: () => undefined }
+    const { container } = render(<Sidebar state={work} route={{ name: 'issues' }} />)
+    await waitFor(() => expect(linksIn(container)).toEqual(['Topic 2', 'Topic 1']))
+
+    // The click: the topic route reads every topic (slow here) and the page mounts.
+    let release = () => {}
+    everyTopicGate = new Promise((resolve) => (release = resolve))
+    void ensureTopics()
+    render(<TopicPage d="t-2" state={work} folders={TEAMS} archives={archives} />)
+    await waitFor(() => expect(everyTopicReads()).toBe(1))
+    await settle()
+    expect(screen.getByRole('heading', { name: 'Topic 2' })).toBeTruthy()
+    expect(screen.getByRole('link', { name: /i-1/ })).toBeTruthy()
+    release()
+  })
+
+  it('on Issues, Try again after a failed read reads only your topics again, not every topic', async () => {
+    down = true
+    held.push(shipManifest(), topic('t-1', 'Topic 1'), joined('t-1'), topic('t-2', 'Topic 2'))
+    render(<Sidebar state={ship([], [])} route={{ name: 'issues' }} />)
+    await waitFor(() => expect(screen.getByText('Didn’t load.')).toBeTruthy())
+    const failed = rootReads()
+
+    down = false
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    await waitFor(() => expect(sidebarTopics()).toEqual(['Topic 1']))
+    expect(rootReads()).toBe(failed + 1)
+    expect(everyTopicReads()).toBe(0)
+  })
+})
 
 describe("Ship's sidebar: your five newest topics", () => {
   it('shows your five newest topics, newest first, then Explore topics; never an archived, muted or other topic', async () => {
@@ -391,7 +577,7 @@ describe("Ship's sidebar: your five newest topics", () => {
 
     // The topics are read; the mute list is not back yet: no topic is drawn.
     await waitFor(() => expect(asked.some((f) => (f.kinds as number[] | undefined)?.includes(30840))).toBe(true))
-    for (let turn = 0; turn < 10; turn++) await act(async () => {})
+    await settle()
     expect(sidebarTopics()).toEqual([])
 
     release()
@@ -404,7 +590,7 @@ describe("Ship's sidebar: your five newest topics", () => {
     await waitFor(() => expect(sidebarTopics()).toEqual(['Topic 1']))
     expect(screen.queryByRole('link', { name: 'p-1' })).toBeNull()
 
-    rerender(<Sidebar state={ship(['p-1'], [])} topicD="t-1" />)
+    rerender(<Sidebar state={ship(['p-1'], [])} route={{ name: 'topic', d: 't-1' }} />)
     await waitFor(() => expect(screen.getByRole('link', { name: 'p-1' })).toBeTruthy())
   })
 
@@ -426,13 +612,13 @@ describe("Ship's sidebar: your five newest topics", () => {
 
     // QA-2 writes in Topic 1 while you are working: nothing moves.
     held.push({ ...commented('t-1', KATERINA), created_at: NOW() })
-    for (let turn = 0; turn < 10; turn++) await act(async () => {})
+    await settle()
     expect(sidebarTopics()).toEqual(['Topic 2', 'Topic 1'])
 
     // A quick look away and back, 30 seconds: still nothing moves.
     vi.setSystemTime(Date.now() + 30_000)
     await act(async () => document.dispatchEvent(new Event('visibilitychange')))
-    for (let turn = 0; turn < 10; turn++) await act(async () => {})
+    await settle()
     expect(sidebarTopics()).toEqual(['Topic 2', 'Topic 1'])
 
     // You come back to the tab two minutes after the read: Topic 1 is on top.

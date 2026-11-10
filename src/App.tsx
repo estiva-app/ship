@@ -75,7 +75,7 @@ function Shell() {
   const archives = useMemo(() => (state ? archivesOf(state, folders ?? []) : undefined), [state, folders])
   // Your five newest topics (TOPI-9), each folding to the work it lists once the workspace is read.
   const topicWork = useMemo(() => (state && !partial ? { projects: state.projects, issues: state.issues } : undefined), [state, partial])
-  const sidebarTopics = useSidebarTopics(topicWork, archives, route.name === 'topic' ? route.d : undefined)
+  const sidebarTopics = useSidebarTopics(topicWork, archives, route)
   useTabTitle(pageTitleOf(route, state))
   const { showToast } = useToast()
   const { banner, say, clear } = useBanner(showToast)

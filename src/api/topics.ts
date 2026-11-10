@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { createRetryingRead } from '@estiva-app/platform'
-import { activityTopics, addableTopics, readTopicActivity, type ReadTopic, type TopicsRead } from '@estiva-app/interop'
-import { readAllTopics, readTopicDocuments, readTopicMembers, topicAsDrawn, type ForeignObject, type FolderSummary, type TopicOfFile } from './foreign'
-import { knowSpaces } from '@/lib/topicLinks'
+import { activityTopics, addableTopics, readTopicActivity, type ReadTopic, type TopicsRead, type YourTopicsRead } from '@estiva-app/interop'
+import { readAllTopics, readSidebarTopics, readTopicDocuments, readTopicMembers, topicAsDrawn, type ForeignObject, type FolderSummary, type TopicOfFile } from './foreign'
+import { knowSpaces, knowSpacesAmong } from '@/lib/topicLinks'
 import { foldersNow, heldFolders } from './useFolders'
 import { useLandedReadState } from './readStateSync'
 import { readMuted } from './useFeedJudges'
@@ -18,9 +18,21 @@ import { relay, signer } from './store'
  */
 const held = createRetryingRead<TopicsRead>({ retryable: () => false })
 
+/** The order this tab's reads landed in, by the answer each gave (ALO-17): the sidebar draws its five from the latest. */
+const landings = new WeakMap<object, number>()
+let landingsSoFar = 0
+function stampLanding(value: object | undefined): void {
+  if (value && !landings.has(value)) landings.set(value, ++landingsSoFar)
+}
+/** When an answer landed, in this tab's order of landings; 0 for none. */
+export function landedAt(value: object | undefined): number {
+  return (value && landings.get(value)) || 0
+}
+
 // A link to a space opens Peek, not the topic's page (SHIPS-4): each read says which topics are spaces.
 held.subscribe(() => {
   const read = held.snapshot().value
+  stampLanding(read)
   if (read) knowSpaces(read)
 })
 
@@ -35,8 +47,11 @@ async function topicsFresh(): Promise<TopicsRead> {
 /** Test seam: forget the held topics and choices. */
 export function resetTopicsForTests(): void {
   held.clear()
+  yourRead.clear()
+  yoursReadAt = 0
   activity.reset()
   members.reset()
+  mutes.reset()
   choices = undefined
   knowSpaces({ topics: [] } as unknown as TopicsRead)
 }
@@ -58,19 +73,78 @@ export function prefetchTopics(): Promise<void> {
  * Every topic the reader can read, for the Topics page (SHIPS-3): the held
  * answer at once, or the route's read on the way ({@link prefetchTopics}).
  * `failed` only once this open's read has failed: an error left by an earlier
- * read is not this one's.
+ * read is not this one's. `on` false (the sidebar away from Topics) reads
+ * nothing and answers what the tab holds, if anything.
  */
-export function useTopics(): TopicsState {
+export function useTopics(on = true): TopicsState {
   const snapshot = useSyncExternalStore(held.subscribe, held.snapshot)
   const [settled, setSettled] = useState(false)
+  // Turned on again, a read starts: an error an earlier one left is not this one's.
+  const [wasOn, setWasOn] = useState(on)
+  if (wasOn !== on) {
+    setWasOn(on)
+    if (on) setSettled(false)
+  }
   useEffect(() => {
+    if (!on) return
     let live = true
     void held.ensure(readAllTopics).finally(() => live && setSettled(true))
     return () => {
       live = false
     }
-  }, [])
+  }, [on])
+  // Off, it reads nothing but still hands over what the tab holds.
+  if (!on) return snapshot.value
   return snapshot.value ?? (settled && snapshot.error !== undefined ? 'failed' : undefined)
+}
+
+/**
+ * Only your topics, newest first (ALO-17): interop's lean read, held per tab,
+ * what the sidebar draws on every page but Topics and a topic's. Read when the
+ * first such page opens, and again when you come back to the tab
+ * {@link REREAD_AFTER_MS} after the last read, never live, as the five have
+ * always moved (Miky, 6 Nov). Not retried on its own: Try again reads.
+ */
+const yourRead = createRetryingRead<YourTopicsRead>({ retryable: () => false })
+yourRead.subscribe(() => stampLanding(yourRead.snapshot().value))
+/** When the lean read was last asked for, so a quick look away and back reads nothing. */
+let yoursReadAt = 0
+const readYours = async () => {
+  yoursReadAt = Date.now()
+  const asked = mutes.ticket()
+  const read = await readSidebarTopics((ciphertext) => nip44.decrypt(ciphertext))
+  // Which of yours are spaces, for every link to one; and the mute list it opened, for the tab's one list.
+  knowSpacesAmong(read.topics)
+  if (read.muted) mutes.give(read.muted, asked)
+  return read
+}
+
+/** The lean read of your topics, while `on`: `undefined` while the first one is out, `failed` when it did not land. Off, what the tab holds, read nothing. */
+export function useYourTopics(on: boolean): { read: YourTopicsRead | 'failed' | undefined; retry: () => void } {
+  const snapshot = useSyncExternalStore(yourRead.subscribe, yourRead.snapshot)
+  const [settled, setSettled] = useState(false)
+  // Turned on again, a read starts: an error an earlier one left is not this one's.
+  const [wasOn, setWasOn] = useState(on)
+  if (wasOn !== on) {
+    setWasOn(on)
+    if (on) setSettled(false)
+  }
+  useEffect(() => {
+    if (!on) return
+    let live = true
+    void yourRead.ensure(readYours).finally(() => live && setSettled(true))
+    const onReturn = () => {
+      if (document.visibilityState === 'visible' && Date.now() - yoursReadAt > REREAD_AFTER_MS) void yourRead.reload(readYours)
+    }
+    document.addEventListener('visibilitychange', onReturn)
+    return () => {
+      live = false
+      document.removeEventListener('visibilitychange', onReturn)
+    }
+  }, [on])
+  // Off, it reads nothing but still hands over what the tab holds.
+  const read = !on ? snapshot.value : (snapshot.value ?? (settled && snapshot.error !== undefined ? ('failed' as const) : undefined))
+  return { read, retry: () => void yourRead.reload(readYours) }
 }
 
 /**
@@ -122,27 +196,91 @@ export function reloadTopics(): Promise<void> {
 }
 
 /**
+ * Your mute list, held per tab and shared by every hook that asks (ALO-17):
+ * Topics and the sidebar beside it read it once between them. `round` moves
+ * when you come back to the tab and the topics are read again
+ * ({@link useTopicsOnReturn}), so a topic muted or unmuted elsewhere moves then.
+ * The lean read of your topics opens the same list and hands it over
+ * ({@link give}), so moving from Issues to Topics reads it no second time.
+ * Every answer carries the ticket taken when its read was asked, and only a
+ * newer one replaces the list held: a slow, older answer landing last never wins.
+ */
+const mutes = (() => {
+  let now: { muted?: ReadonlySet<string>; settled: boolean; round: number; ticket: number } = { settled: false, round: -1, ticket: 0 }
+  let round = 0
+  let reading: { round: number } | undefined
+  /** A read in flight across a reset writes nothing. */
+  let epoch = 0
+  let tickets = 0
+  const listeners = new Set<() => void>()
+  const tell = () => {
+    for (const listener of listeners) listener()
+  }
+  return {
+    subscribe(listener: () => void) {
+      listeners.add(listener)
+      return () => void listeners.delete(listener)
+    },
+    snapshot: () => now,
+    round: () => round,
+    /** Read the list, unless a read for this round is on the way. */
+    read(at: number) {
+      if (reading && reading.round >= at) return
+      const mine = { round: at }
+      reading = mine
+      const from = epoch
+      const ticket = ++tickets
+      const land = (next: (was: typeof now) => typeof now) => {
+        if (from !== epoch) return
+        if (reading === mine) reading = undefined
+        now = next(now)
+        tell()
+      }
+      void readMuted((filters) => relay.query(filters as never), (ciphertext) => nip44.decrypt(ciphertext), signer.pubkey).then(
+        (keys) => land((was) => (keys && ticket > was.ticket ? { muted: keys, settled: true, round: at, ticket } : { ...was, settled: true })),
+        () => land((was) => ({ ...was, settled: true })),
+      )
+    },
+    /** A ticket for a read of the list made elsewhere, taken as it is asked. */
+    ticket: () => ({ ticket: ++tickets, epoch, round }),
+    /** The list another read opened, held for the round it was asked in unless a newer answer is. */
+    give(keys: ReadonlySet<string>, asked: { ticket: number; epoch: number; round: number }) {
+      if (asked.epoch !== epoch || asked.ticket <= now.ticket) return
+      now = { muted: keys, settled: true, round: asked.round, ticket: asked.ticket }
+      tell()
+    },
+    again() {
+      round += 1
+      tell()
+    },
+    reset() {
+      epoch += 1
+      now = { settled: false, round: -1, ticket: 0 }
+      round = 0
+      tickets = 0
+      reading = undefined
+    },
+  }
+})()
+
+/**
  * The files and channels you muted (`estiva:muted:v1`, encrypted to you):
  * `muted` is `undefined` until the list is in hand, and `settled` once the
- * first read came back, in hand or not. Asked again when your read state
- * moves while the list would not decrypt (a busy nip44), rather than never,
- * and each time `again` changes: the sidebar passes its topics read, so a
- * topic muted or unmuted elsewhere moves when you come back to the tab.
+ * first read came back, in hand or not. One read for the tab, shared by every
+ * page and the sidebar; asked again when your read state moves while the list
+ * would not decrypt (a busy nip44), rather than never, and when you come back
+ * to the tab and the topics are read again. `on` false reads nothing and
+ * answers what the tab holds.
  */
-export function useMuted(again?: unknown): { muted: ReadonlySet<string> | undefined; settled: boolean } {
+export function useMuted(on = true): { muted: ReadonlySet<string> | undefined; settled: boolean } {
   const merged = useLandedReadState()
-  const [read, setRead] = useState<{ muted?: ReadonlySet<string>; settled: boolean; for?: unknown }>({ settled: false })
+  const now = useSyncExternalStore(mutes.subscribe, mutes.snapshot)
+  const round = useSyncExternalStore(mutes.subscribe, mutes.round)
   useEffect(() => {
-    if (read.muted && Object.is(read.for, again)) return
-    let live = true
-    void readMuted((filters) => relay.query(filters as never), (ciphertext) => nip44.decrypt(ciphertext), signer.pubkey)
-      .then((keys) => live && setRead((now) => (keys ? { muted: keys, settled: true, for: again } : { ...now, settled: true })))
-      .catch(() => live && setRead((now) => ({ ...now, settled: true })))
-    return () => {
-      live = false
-    }
-  }, [read.muted, read.for, again, merged])
-  return { muted: read.muted, settled: read.settled }
+    if (!on || (now.muted && now.round >= round)) return
+    mutes.read(round)
+  }, [on, now.muted, now.round, round, merged])
+  return { muted: now.muted, settled: now.settled }
 }
 
 /** How long after a read coming back to the tab reads again: a quick look away and back reads nothing. */
@@ -182,6 +320,7 @@ function perTopicRead<T>(read: (topics: ReadTopic[]) => Promise<ReadonlyMap<stri
       .then(
         (next) => {
           values = new Map([...values, ...next])
+          stampLanding(values)
           failed.delete(key)
           for (const address of next.keys()) readAt.set(address, Date.now())
         },
@@ -273,19 +412,23 @@ export const useTopicMembers = members.useRead
 /**
  * Read the topics again when you come back to the tab (TOPI-9), at most once
  * a {@link REREAD_AFTER_MS}: a topic joined in Peek, or started since, enters
- * the sidebar's five then, never while you work.
+ * the sidebar's five then, never while you work; your mute list with them.
+ * Only while `on`: on Topics and a topic's page, where the sidebar draws from
+ * every topic's read.
  */
-export function useTopicsOnReturn(): void {
+export function useTopicsOnReturn(on = true): void {
   useEffect(() => {
+    if (!on) return
     let last = Date.now()
     const onReturn = () => {
       if (document.visibilityState !== 'visible' || Date.now() - last <= REREAD_AFTER_MS) return
       last = Date.now()
       void rereadTopics()
+      mutes.again()
     }
     document.addEventListener('visibilitychange', onReturn)
     return () => document.removeEventListener('visibilitychange', onReturn)
-  }, [])
+  }, [on])
 }
 
 /** Add to topic's choices: the topics you are a member of, then the rest. */

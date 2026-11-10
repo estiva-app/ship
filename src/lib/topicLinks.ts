@@ -1,4 +1,4 @@
-import { KIND_BARE_FILE, objectRef, type TopicsRead } from '@estiva-app/interop'
+import { KIND_BARE_FILE, objectRef, type ReadTopic, type TopicsRead } from '@estiva-app/interop'
 import { href } from '@/router'
 import { safeLink } from './handoff'
 
@@ -47,9 +47,22 @@ export function isSiblingHost(url: string, here: string): boolean {
 /** The spaces the last topics read named. */
 let spaces: ReadonlySet<string> = new Set()
 
-/** Called as each topics read lands. */
+/** Called as each read of every topic lands. */
 export function knowSpaces(read: TopicsRead): void {
   spaces = new Set(read.topics.filter((topic) => topic.space).map((topic) => topic.address))
+}
+
+/**
+ * Called as a read of only your topics lands (ALO-17): it says, for each of
+ * yours, whether it is a space; what it says nothing of stays as known.
+ */
+export function knowSpacesAmong(topics: readonly Pick<ReadTopic, 'address' | 'space'>[]): void {
+  const next = new Set(spaces)
+  for (const topic of topics) {
+    if (topic.space) next.add(topic.address)
+    else next.delete(topic.address)
+  }
+  spaces = next
 }
 
 /**

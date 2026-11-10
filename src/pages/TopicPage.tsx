@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FolderSummary } from '@estiva-app/interop'
 import type { FolderState } from '@/api'
-import { reloadTopics, rereadTopics, useTopicDocuments, useTopics } from '@/api/topics'
+import { reloadTopics, rereadTopics, useTopicDocuments, useTopics, useYourTopics } from '@/api/topics'
 import type { Archives } from '@/lib/archive'
 import { safeLink } from '@/lib/handoff'
 import { useTabTitle } from '@/lib/tabTitle'
@@ -25,7 +25,11 @@ import { TopicView, type TopicDocument } from '@/views/TopicView'
 export function TopicPage({ d, state, folders, archives }: { d: string; state: FolderState; folders: FolderSummary[] | undefined; archives: Archives }) {
   const read = useTopics()
   const held = read === 'failed' ? undefined : read
-  const topic = held ? topicOfD(held, d) : undefined
+  // Until every topic is read, one of yours draws from the sidebar's read of yours (ALO-17): its title, and
+  // what Ship holds of it at once, then Peek's link when every topic lands. A space waits, to go on to Peek.
+  const yours = useYourTopics(false).read
+  const fromYours = !held && yours && yours !== 'failed' ? topicOfD(yours.topics, d) : undefined
+  const topic = held ? topicOfD(held.topics, d) : fromYours && !fromYours.space ? fromYours : undefined
 
   // A read this open made already has every topic the reader can read; only an older one is read again.
   const heldAtOpen = useRef(read !== undefined && read !== 'failed')

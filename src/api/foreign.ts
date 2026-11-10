@@ -34,9 +34,11 @@ import {
   isArchived,
   searchFileReferences,
   readTopics,
+  readYourTopics,
   topicsOfFile,
   type ReadTopic,
   type TopicsRead,
+  type YourTopicsRead,
   type FolderContents,
   type FolderSummary,
   type ForeignObject,
@@ -374,7 +376,21 @@ export async function readFileTopics(file: string): Promise<TopicOfFile[]> {
  * change on the topic, and reading them all would grow with each (TOPI-5).
  */
 export async function readAllTopics(): Promise<TopicsRead> {
-  return readTopics((filters) => relay.queryAll(filters as never), signer.pubkey, { cache: manifests, ...(await listRead()) })
+  const lists = await listRead()
+  // The parents walked to see whether a topic is archived with one are read by the same list read (ALO-17).
+  return readTopics((filters) => relay.queryAll(filters as never), signer.pubkey, { cache: manifests, ...lists, ...(lists.listRead ? { parentsListRead: true } : {}) })
+}
+
+/**
+ * Only your topics, newest activity first (ALO-17): interop's lean read, what
+ * the sidebar draws its five from on every page but Topics and a topic's. One
+ * request a call, never paged by `queryAll`, which would ask each filter for a
+ * thousand events and keep interop's reads from ending on a short page.
+ * `decrypt` opens your mute list. Your spaces come with it, marked, so a link
+ * to one goes to Peek on every page; the sidebar leaves them out itself.
+ */
+export async function readSidebarTopics(decrypt: (ciphertext: string) => Promise<string | undefined>): Promise<YourTopicsRead> {
+  return readYourTopics(query, signer.pubkey, { cache: manifests, decrypt, spaces: true, ...(await listRead()) })
 }
 
 /**
