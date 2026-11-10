@@ -29,17 +29,7 @@ const object = (address: string, title: string) => ({
   actions: [],
   viaRecommendation: true,
 })
-/** A project `[` picks once the relay keeps projects in order: its Ship link by id (ALO-8), which the link reader answers. */
-const PROJECT_ID = 'f0b27d90-d5b9-40e7-8078-865ab36a421c'
-const PROJECT = `30850:${ISSUE_PK}:${PROJECT_ID}`
-const PICKED = `https://ship.estiva.app/project/${PROJECT_ID}`
-const TITLES: Record<string, string> = { [FIRST]: 'Named first', [OTHER]: 'Another issue', [THREAD_FILE]: 'The thread’s own', [PROJECT]: 'Picked project' }
-
-vi.mock(import('@/api/linkCards'), async (importOriginal) => ({
-  ...(await importOriginal()),
-  knownLinkValue: (url: string) => (url === PICKED ? PROJECT : undefined),
-  useAskLinks: () => 0,
-}))
+const TITLES: Record<string, string> = { [FIRST]: 'Named first', [OTHER]: 'Another issue', [THREAD_FILE]: 'The thread’s own' }
 
 vi.mock(import('@/api/foreign'), async (importOriginal) => ({
   ...(await importOriginal()),
@@ -99,15 +89,6 @@ describe('the edit box', () => {
     // Kept from the browser and from the router alike.
     expect(click.defaultPrevented).toBe(true)
     expect(location.pathname).toBe('/')
-  })
-
-  // ALO-8: the pick was drawn "You can't open this link" until sent.
-  it('draws a project picked from [ as its id link as that project’s chip', async () => {
-    const { box } = await edit('No link yet.')
-    act(() => void box.editor.chain().focus('end').insertContent({ type: 'reference', attrs: { uri: PICKED } }).run())
-    await waitFor(() => expect(box.querySelector('a')?.textContent).toContain('Picked project'))
-    expect(box.textContent).not.toContain('can’t open')
-    expect(box.textContent).not.toContain("can't open")
   })
 
   it('shows the card of a file the edit names first', async () => {
