@@ -18,9 +18,21 @@ import { relay, signer } from './store'
  */
 const held = createRetryingRead<TopicsRead>({ retryable: () => false })
 
+/** The order this tab's reads landed in, by the answer each gave (ALO-17): the sidebar draws its five from the latest. */
+const landings = new WeakMap<object, number>()
+let landingsSoFar = 0
+function stampLanding(value: object | undefined): void {
+  if (value && !landings.has(value)) landings.set(value, ++landingsSoFar)
+}
+/** When an answer landed, in this tab's order of landings; 0 for none. */
+export function landedAt(value: object | undefined): number {
+  return (value && landings.get(value)) || 0
+}
+
 // A link to a space opens Peek, not the topic's page (SHIPS-4): each read says which topics are spaces.
 held.subscribe(() => {
   const read = held.snapshot().value
+  stampLanding(read)
   if (read) knowSpaces(read)
 })
 
@@ -88,6 +100,7 @@ export function useTopics(on = true): TopicsState {
  * always moved (Miky, 6 Nov). Not retried on its own: Try again reads.
  */
 const yourRead = createRetryingRead<YourTopicsRead>({ retryable: () => false })
+yourRead.subscribe(() => stampLanding(yourRead.snapshot().value))
 /** When the lean read was last asked for, so a quick look away and back reads nothing. */
 let yoursReadAt = 0
 const readYours = () => {
@@ -275,6 +288,7 @@ function perTopicRead<T>(read: (topics: ReadTopic[]) => Promise<ReadonlyMap<stri
       .then(
         (next) => {
           values = new Map([...values, ...next])
+          stampLanding(values)
           failed.delete(key)
           for (const address of next.keys()) readAt.set(address, Date.now())
         },

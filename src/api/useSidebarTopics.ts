@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import type { Archives } from '@/lib/archive'
 import { sidebarTopicsOf, topicOfD, yourTopicsOf, type SidebarTopic, type TopicPageWork } from '@/lib/topics'
 import type { Route } from '@/router'
-import { reloadTopics, useMuted, useTopicActivity, useTopics, useTopicsOnReturn, useYourTopics } from './topics'
+import { landedAt, reloadTopics, useMuted, useTopicActivity, useTopics, useTopicsOnReturn, useYourTopics } from './topics'
 
 /** The sidebar's topics, and where the route is among them. */
 export interface SidebarTopics {
@@ -22,7 +22,9 @@ export interface SidebarTopics {
  * page, which read every topic anyway, from that read, the page's activity
  * and the one mute list the tab holds: the sidebar reads nothing of its own
  * there. Everywhere else, from interop's lean read of only your topics, one
- * per tab: no read of every topic for five names.
+ * per tab: no read of every topic for five names. Whichever of the two the
+ * tab holds and landed last is drawn, on any page, so moving between pages
+ * never steps back to an older five and never blanks them.
  */
 export function useSidebarTopics(work: TopicPageWork | undefined, archives: Archives | undefined, route: Route): SidebarTopics {
   const onTopics = route.name === 'topics' || route.name === 'topic'
@@ -42,20 +44,24 @@ export function useSidebarTopics(work: TopicPageWork | undefined, archives: Arch
   const lean = useYourTopics(!onTopics)
   const leanRead = lean.read === 'failed' ? undefined : lean.read
 
-  // Each source the tab holds, read or not on this page: moving between pages keeps the five drawn
-  // from what is held until the page's own source lands (Miky, 6 Nov: the five stay put while you work).
-  const topics = useMemo(() => {
+  // Each source the tab holds, read or not on this page, and the one that landed last: moving between
+  // pages never steps back to an older five, nor blanks them until the page's own source lands
+  // (Miky, 6 Nov: the five stay put while you work).
+  const { topics, yours } = useMemo(() => {
     const drawn = work ?? { projects: [], issues: [] }
-    const pageFive = fromPage && order.values ? sidebarTopicsOf(fromPage, order.values, drawn, archives ?? NO_ARCHIVES) : undefined
-    const leanFive = leanRead ? sidebarTopicsOf(leanRead.topics, leanRead.at, drawn, archives ?? NO_ARCHIVES) : undefined
-    const [own, other] = onTopics ? [pageFive, leanFive] : [leanFive, pageFive]
-    if (own) return own
+    const page = fromPage && order.values ? { at: Math.max(landedAt(held), landedAt(order.values)), topics: fromPage, order: order.values } : undefined
+    const yourRead = leanRead ? { at: landedAt(leanRead), topics: leanRead.topics, order: leanRead.at } : undefined
+    const [own, other] = onTopics ? [page, yourRead] : [yourRead, page]
+    // The one that landed last; on a tie, this page's own.
+    const latest = own && other ? (other.at > own.at ? other : own) : own
     const failed = onTopics ? read === 'failed' || order.failed : lean.read === 'failed'
-    if (failed) return 'failed' as const
-    return other ?? ('loading' as const)
-  }, [onTopics, read, fromPage, order.values, order.failed, lean.read, leanRead, work, archives])
-  // Only your topics can be open in the sidebar: the only ones it draws.
-  const yours = (onTopics ? fromPage : leanRead?.topics) ?? (onTopics ? leanRead?.topics : fromPage)
+    const source = latest ?? (failed ? undefined : other)
+    return {
+      topics: source ? sidebarTopicsOf(source.topics, source.order, drawn, archives ?? NO_ARCHIVES) : failed ? ('failed' as const) : ('loading' as const),
+      // Only your topics can be open in the sidebar: the only ones it draws.
+      yours: source?.topics,
+    }
+  }, [onTopics, read, held, fromPage, order.values, order.failed, lean.read, leanRead, work, archives])
   const openTopic = route.name === 'topic' && yours ? topicOfD(yours, route.d)?.address : undefined
   return {
     topics,

@@ -423,7 +423,7 @@ describe("Ship's sidebar: where your five are read from (ALO-17)", () => {
     expect(muteReads()).toBe(1)
   })
 
-  it('moving Issues → Topics → Issues keeps your five drawn while Topics’ read is out, draws from it once it lands, and reads your topics no second time', async () => {
+  it('moving Issues → Topics → Issues keeps your five drawn while Topics’ read is out, draws from it once it lands, keeps its five back on Issues, and reads nothing more', async () => {
     held.push(shipManifest(), mutes(address('t-hush')))
     for (const n of [1, 2, 3, 4, 5, 6]) held.push(topic(`t-${n}`, `Topic ${n}`), joined(`t-${n}`))
     held.push(topic('t-hush', 'T muted'), joined('t-hush'))
@@ -447,13 +447,13 @@ describe("Ship's sidebar: where your five are read from (ALO-17)", () => {
     release()
     await waitFor(() => expect(linksIn(container)).toEqual(['Topic 7', 'Topic 3', 'Topic 6', 'Topic 5', 'Topic 4']))
 
-    // Back on Issues: five drawn at once, and the sidebar reads nothing: not your topics, not their activity.
+    // Back on Issues: the same five, Topics' read being the latest, never the older five; and the sidebar reads nothing.
     for (let turn = 0; turn < 10; turn++) await act(async () => {})
     const reads = asked.length
     rerender(<Sidebar state={ship([], [])} route={{ name: 'issues' }} />)
-    expect(linksIn(container)).toHaveLength(5)
+    expect(linksIn(container)).toEqual(['Topic 7', 'Topic 3', 'Topic 6', 'Topic 5', 'Topic 4'])
     for (let turn = 0; turn < 10; turn++) await act(async () => {})
-    expect(linksIn(container)).toHaveLength(5)
+    expect(linksIn(container)).toEqual(['Topic 7', 'Topic 3', 'Topic 6', 'Topic 5', 'Topic 4'])
     expect(asked.length).toBe(reads)
   })
 
