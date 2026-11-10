@@ -80,11 +80,11 @@ type EditorBox = HTMLElement & { editor: Editor }
 /** What `[` puts in the box for a pick: a reference node holding the row's uri, at the caret. */
 const pick = (box: EditorBox, uri: string) => act(() => void box.editor.chain().focus('end').insertContent({ type: 'reference', attrs: { uri } }).run())
 
-/** Until the chip is drawn and no longer loading; what it then says is asserted after. */
+/** Until the chip is drawn, whatever it says, and no longer loading; what it says is asserted after. */
 const settled = (box: EditorBox) =>
   waitFor(() => {
     expect(box.querySelector('[aria-busy="true"]')).toBeNull()
-    expect(box.querySelector('a')).not.toBeNull()
+    expect(box.textContent).not.toBe('No link yet.')
   })
 
 const commentBox = async () => {
