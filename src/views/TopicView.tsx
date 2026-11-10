@@ -95,7 +95,7 @@ export function TopicView({ topic, documents, onRetry, onRetryDocuments, topicsH
           actions={loaded && <PageActions what="topic" comments={comments} archive="none" onArchive={() => {}} onDelete={() => {}} onCopyLink={onCopyLink} onOpenInPeek={onOpenInPeek} />}
         />
         {topic === 'failed' ? (
-          <EmptyState icon={<IconTarget size={16} stroke={1.5} />} scope="page" message="Topics didn’t load." action={{ label: 'Try again', onClick: onRetry }} />
+          <EmptyState icon={<IconTarget size={16} stroke={1.5} />} scope="page" message="This topic didn’t load." action={{ label: 'Try again', onClick: onRetry }} />
         ) : (
           <ScrollArea className="min-h-0 min-w-0 flex-1" contentClassName="flex flex-col gap-5 px-6 py-5">
             {topic === 'loading' ? (

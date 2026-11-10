@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FolderSummary, ForeignObject } from '@estiva-app/interop'
+import { archivedLine } from '@estiva-app/ui'
 import { me, type DirectoryView, type WorkspaceState } from '@/api'
 import { reloadTopics, rereadTopics, useTopicDocuments, useTopicPlace, useTopics, useYourTopics } from '@/api/topics'
 import { addToTopic, joinTopic, leaveTopic } from '@/api/writes'
@@ -159,7 +160,8 @@ export function TopicPage({
       comments={conversation.comments}
       conversation={
         // An archived topic takes no message, as an archived file's comments do not (Decided 2026-10-17).
-        <ThreadList {...conversation.list} disabledReason={page?.archived ? 'This topic is archived.' : undefined} className="min-h-0 flex-1" />
+        // Said as the approved story says it: where to bring it back.
+        <ThreadList {...conversation.list} disabledReason={page?.archived ? archivedLine({}, undefined, { in: 'Peek', to: 'reply' }) : undefined} className="min-h-0 flex-1" />
       }
       members={
         topic && (
@@ -172,7 +174,7 @@ export function TopicPage({
             personOf={personOf}
             // Who made it: the pubkey in its address.
             roles={[{ pubkey: topic.address.split(':')[1] ?? '', role: 'Author' }]}
-            readOnlyReason={page?.archived ? 'This topic is archived.' : undefined}
+            readOnlyReason={page?.archived ? 'Archived. Unarchive it in Peek to join.' : undefined}
             onSetMine={(member) =>
               act(member ? 'Join' : 'Leave', () => (member ? joinTopic(topic) : leaveTopic(topic)), say, async () => {
                 await Promise.all([reloadPlace(), rereadTopics()])
