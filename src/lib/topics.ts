@@ -123,7 +123,7 @@ export const TOPICS_SHOWN = 5
  * The sidebar's topics (TOPI-9): your five newest, by the same rule and the
  * same "yours" as the Your topics tab, each with what its page lists that is
  * not archived, projects then issues, each in the order the topic lists them
- * ({@link topicPageOf}) — the topic's arranged order once arranging ships.
+ * ({@link topicPageOf}): the topic's one arranged order (TOPI-5).
  */
 export function sidebarTopicsOf(read: TopicsRead, at: ReadonlyMap<string, number>, work: TopicPageWork, archives: Archives, muted?: ReadonlySet<string>): SidebarTopic[] {
   const newest = byActivity(at)

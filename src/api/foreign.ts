@@ -369,10 +369,12 @@ export async function readFileTopics(file: string): Promise<TopicOfFile[]> {
 /**
  * Every topic the reader can read, with its list, its archive and whether it
  * is theirs (SHIPS-2): interop's one read, which Add to topic and the Topics
- * page draw from. Paged, as a read of every topic must be.
+ * page draw from. Paged, as a read of every topic must be. Each list by the
+ * list read where the relay offers it: every move or look someone sets is a
+ * change on the topic, and reading them all would grow with each (TOPI-5).
  */
-export function readAllTopics(): Promise<TopicsRead> {
-  return readTopics((filters) => relay.queryAll(filters as never), signer.pubkey, { cache: manifests })
+export async function readAllTopics(): Promise<TopicsRead> {
+  return readTopics((filters) => relay.queryAll(filters as never), signer.pubkey, { cache: manifests, ...(await listRead()) })
 }
 
 /**
