@@ -176,9 +176,21 @@ export function TopicPage({
             roles={[{ pubkey: topic.address.split(':')[1] ?? '', role: 'Author' }]}
             readOnlyReason={page?.archived ? 'Archived. Unarchive it in Peek to join.' : undefined}
             onSetMine={(member) =>
-              act(member ? 'Join' : 'Leave', () => (member ? joinTopic(topic) : leaveTopic(topic)), say, async () => {
-                await Promise.all([reloadPlace(), rereadTopics()])
-              }, (reason) => `Nothing changed: “${view?.title ?? 'this topic'}” could not be ${member ? 'joined' : 'left'}. ${reason}`)
+              act(
+                member ? 'Join' : 'Leave',
+                async () => {
+                  if (!member) return leaveTopic(topic)
+                  const joined = await joinTopic(topic)
+                  // Said as Topics says it (TopicsPage): joined, but a mute you kept stays.
+                  if ('stillMuted' in joined) say(`Joined “${view?.title ?? 'this topic'}”, but it is still muted. Join again to unmute it.`, 'error')
+                  return joined.ok ? { ok: true as const } : joined
+                },
+                say,
+                async () => {
+                  await Promise.all([reloadPlace(), rereadTopics()])
+                },
+                (reason) => `Nothing changed: “${view?.title ?? 'this topic'}” could not be ${member ? 'joined' : 'left'}. ${reason}`,
+              )
             }
             onAdd={async (pubkeys) => {
               for (const pubkey of pubkeys) {

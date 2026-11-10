@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { FolderState } from '@/api'
 
 /*
@@ -104,6 +104,12 @@ function Page(props: { d: string; state: FolderState; folders: never[] | { id: s
 }
 const page = () => document.querySelector('[data-surface="topic"]') as HTMLElement
 const workRows = () => [...page().querySelectorAll('[data-topic-work]')].map((row) => row.textContent)
+
+// A failed test leaves no fake clock or spy behind it.
+afterEach(() => {
+  vi.useRealTimers()
+  vi.restoreAllMocks()
+})
 
 beforeEach(() => {
   held.length = 0
@@ -213,7 +219,15 @@ describe("A topic's page in Ship", () => {
     held.push(issueRoot('i1'), topic(D, 'Widgets'), lists(D, 'i1'), lists(D, 'spec'))
     const { state, archives } = ship([], [{ d: 'i1', status: 'todo' }])
     const issue = (state as unknown as { issues: Record<string, unknown>[] }).issues[0]!
-    Object.assign(issue, { author: OWNER, createdAt: 1_700_000_000, fields: { status: { value: 'todo', by: KATERINA, at: 1_700_000_000 + 2 * 3600 } } })
+    // Katerina set its status 2h in; someone joining it after that is not an edit, so the row still says Katerina.
+    Object.assign(issue, {
+      author: OWNER,
+      createdAt: 1_700_000_000,
+      fields: {
+        status: { value: 'todo', by: KATERINA, at: 1_700_000_000 + 2 * 3600 },
+        [`member:${'d'.repeat(64)}`]: { value: 'true', by: 'd'.repeat(64), at: 1_700_000_000 + 2.5 * 3600 },
+      },
+    })
     render(<Page d={D} state={state} folders={[]} archives={archives} />)
 
     await waitFor(() => expect(page().querySelector('[data-topic-work]')).not.toBeNull())

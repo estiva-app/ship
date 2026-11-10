@@ -180,7 +180,11 @@ export interface TopicWorkRow {
 /** Who made a file's newest change and when: its root's author until a field change is newer (TOPI-8). */
 export function lastEditOf(file: { author: string; createdAt: number; fields: Record<string, { by: string; at: number }> }): { by: string; at: number } {
   let newest = { by: file.author, at: file.createdAt }
-  for (const field of Object.values(file.fields)) if (field.at > newest.at) newest = { by: field.by, at: field.at }
+  // Who is in it (`member:`, `follow:`) is not an edit to it: joining an issue does not make you its last editor.
+  for (const [name, field] of Object.entries(file.fields)) {
+    if (name.startsWith('member:') || name.startsWith('follow:')) continue
+    if (field.at > newest.at) newest = { by: field.by, at: field.at }
+  }
   return newest
 }
 
