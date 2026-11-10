@@ -1,5 +1,5 @@
-import { serializeBlockDocument } from '@estiva-app/protocol'
-import { PartCard as KitPartCard, thingKindOf } from '@estiva-app/ui'
+import { KIND, resolveCommentAnchor, serializeBlockDocument } from '@estiva-app/protocol'
+import { PartCard as KitPartCard, QuotedLine, thingKindOf } from '@estiva-app/ui'
 import { usePart, type PartView } from '@/api/part'
 import { linkedOf } from '@/lib/linked'
 import { ShipRichText } from './ShipRichText'
@@ -17,6 +17,30 @@ const CUT_AT = 160
  */
 export function PartCard({ address, block, nameOf }: { address: string; block: string; nameOf?: (pubkey: string) => string }) {
   return <PartCardView view={usePart({ address, block })} address={address} block={block} nameOf={nameOf} />
+}
+
+/**
+ * The words a comment written on a selection quotes (LEAF-7), as Leaf draws them: the kit's `QuotedLine`, in the
+ * page's highlight while they are still in the file, "Changed since" once they are not, struck through once their
+ * blocks are gone (SPEC §13.6). The words open the file at that spot (Miky, 10 Nov, ONE-12). Read on the same poll
+ * the block's card would make, and resolved against the file the read hands back, so it costs no read of its own.
+ * Until the file is read, or when it cannot be, the words show on the grey with no claim about them.
+ *
+ * @registry namesake: reads the part from the relay and draws the kit's QuotedLine, as Peek's comment card does.
+ */
+export function QuotedPart({ address, block, words, tags }: { address: string; block: string; words: string; tags: string[][] }) {
+  const view = usePart({ address, block })
+  const read = view.state === 'resolved' || view.state === 'detached' || view.state === 'unaddressable' ? view : undefined
+  const body = read?.object.slots.body
+  const anchor = body ? resolveCommentAnchor({ kind: KIND.COMMENT, tags }, body.value, body.format === 'blocks' ? 'blocks' : 'marker').state : undefined
+  const state = anchor === 'resolved' ? 'here' : anchor === 'reworded' ? 'reworded' : anchor === 'detached' ? 'gone' : undefined
+  // Words whose blocks are gone lead nowhere: their spot is not in the file any more.
+  const place = state === 'gone' ? undefined : placeOf(read?.link)
+  return (
+    <div data-part="quote" data-part-address={address} data-part-block={block}>
+      {state ? <QuotedLine words={words} state={state} href={place?.href} external={place ? !place.here : undefined} /> : <QuotedLine label={words} />}
+    </div>
+  )
 }
 
 /** Where a part's link opens: a path of Ship's own, so it opens in place, or another app's https address. */
