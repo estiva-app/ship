@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { SignedEvent } from '@estiva-app/protocol'
 import { KIND } from '../nostr/kinds'
 import { signedIn } from '../auth/estivaId'
@@ -39,4 +39,25 @@ export function useFileChanges(file: string | undefined, open: boolean, again = 
   }, [file, open, again])
   // Closed, the held read is not shown; the next open reads afresh and shows the old rows only until it lands.
   return open && read !== undefined && read.file === file ? read.events : undefined
+}
+
+/**
+ * A file page's History section: folded on every visit and read only while
+ * open (Miky, 2026-11-10). Held as the file it was opened on, so moving to
+ * another file finds it folded and reads nothing. `again()` re-reads an open
+ * History after the page joined, left or added somebody.
+ */
+export function useHistoryFold(file: string | undefined): {
+  open: boolean
+  setOpen: (open: boolean) => void
+  again: () => void
+  changes: readonly SignedEvent[] | null | undefined
+} {
+  const [openOn, setOpenOn] = useState<string>()
+  const [count, setCount] = useState(0)
+  const open = file !== undefined && openOn === file
+  const changes = useFileChanges(file, open, count)
+  const setOpen = useCallback((next: boolean) => setOpenOn(next ? file : undefined), [file])
+  const again = useCallback(() => setCount((n) => n + 1), [])
+  return { open, setOpen, again, changes }
 }

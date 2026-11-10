@@ -44,6 +44,13 @@ describe('who is in a project, as the page asks the relay (ALO-19)', () => {
     expect(query).toHaveBeenCalledTimes(1)
   })
 
+  it('names the reader too when they have no profile yet, so their own join is read', async () => {
+    query.mockResolvedValueOnce([profile(KAT)])
+    renderHook(() => useFeedJudges({ addr: FILE, createdAt: 1000 }, undefined))
+    await vi.waitFor(() => expect(queryAll).toHaveBeenCalledTimes(1))
+    expect(changeFilters()).toEqual([{ kinds: [1851], '#a': [FILE], '#p': [ME, KAT].sort() }])
+  })
+
   it('reads every change when the profiles cannot be read, rather than miss somebody', async () => {
     query.mockRejectedValueOnce(new Error('429'))
     renderHook(() => useFeedJudges({ addr: FILE, createdAt: 1000 }, undefined))

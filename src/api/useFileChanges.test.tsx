@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { renderHook, waitFor } from '@testing-library/react'
+import { act, renderHook, waitFor } from '@testing-library/react'
 import type { SignedEvent } from '@estiva-app/protocol'
 
 /*
@@ -12,7 +12,7 @@ const queryAll = vi.fn(async (_filters: Record<string, unknown>[]): Promise<Sign
 vi.mock('./store', () => ({ relay: { queryAll: (filters: Record<string, unknown>[]) => queryAll(filters) } }))
 vi.mock('../auth/estivaId', () => ({ signedIn: () => true }))
 
-const { useFileChanges } = await import('./useFileChanges')
+const { useFileChanges, useHistoryFold } = await import('./useFileChanges')
 
 const FILE = `30850:${'e'.repeat(64)}:6bd072cb-6c30-4883-abb5-faf880d0c444`
 const askedForEveryChange = () => queryAll.mock.calls.some(([filters]) => filters.some((f) => (f.kinds as number[]).includes(1851) && !('#p' in f)))
@@ -43,5 +43,18 @@ describe("a project's History", () => {
     rerender({ again: 1 })
     await waitFor(() => expect(queryAll).toHaveBeenCalledTimes(2))
     await waitFor(() => expect(Array.isArray(result.current)).toBe(true))
+  })
+
+  it('opened on one project is folded on the next, and reads none of its changes', async () => {
+    const OTHER = `30850:${'e'.repeat(64)}:0e5cbbbb-1f0e-4d2b-9a43-0d6c1a6f3d11`
+    queryAll.mockReset()
+    queryAll.mockResolvedValue([])
+    const { result, rerender } = renderHook(({ file }) => useHistoryFold(file), { initialProps: { file: FILE } })
+    act(() => result.current.setOpen(true))
+    await waitFor(() => expect(queryAll).toHaveBeenCalledWith([{ kinds: [1851], '#a': [FILE] }]))
+
+    rerender({ file: OTHER })
+    expect(result.current.open).toBe(false)
+    expect(queryAll).not.toHaveBeenCalledWith([{ kinds: [1851], '#a': [OTHER] }])
   })
 })
