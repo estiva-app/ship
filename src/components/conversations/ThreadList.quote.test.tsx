@@ -91,8 +91,8 @@ describe('a comment on a few words of an issue', () => {
     const c = show({ state: 'detached', object: objectWith('Another paragraph entirely.', ['p2']), link: HERE })
     expect(c.querySelector('[data-quoted]')?.getAttribute('data-quoted')).toBe('gone')
     expect(c.textContent).toContain('Deleted from the page')
-    // Their spot is gone from the file: no link to it.
-    expect(c.querySelector('[data-quoted] a')).toBeNull()
+    // Their spot is gone from the file: the words open the issue itself, never a spot that is not there.
+    expect(c.querySelector('[data-quoted] a')?.getAttribute('href')).toBe(`/issue/plan-the-launch-${D}`)
   })
 
   it('shows the words with no claim about them until the issue is read', () => {
@@ -100,5 +100,20 @@ describe('a comment on a few words of an issue', () => {
     expect(c.querySelector('[data-quoted]')?.getAttribute('data-quoted')).toBe('part')
     expect(c.textContent).toContain('brass fitting')
     expect(c.textContent).not.toContain('Changed since')
+  })
+
+  // As the paragraph card said before (SPEC §13.6.1): a reader can tell the issue is gone, or not theirs to open.
+  it('says the issue was deleted, or that the reader cannot open it, as the paragraph card did', () => {
+    expect(show({ state: 'deleted' }).querySelector('[data-part="deleted"]')?.textContent).toBe('A part of this issue deleted')
+    expect(show({ state: 'unreadable' }).querySelector('[data-part="unreadable"]')?.textContent).toBe("You can't open this issue")
+  })
+
+  it('opens the issue itself, not a missing spot, once the block it opened at is gone and the words are not', () => {
+    // A quote across p1..p2: p1 deleted, p2 still holds "brass fitting".
+    const across = { ...event, tags: [['A', ADDRESS], blockRunTag(['p1', 'p2']), quoteTag({ start: 'brass fitting' })] } as SignedEvent
+    views.set(ADDRESS, { state: 'detached', object: objectWith(PARAGRAPH, ['p2']), link: HERE })
+    const t: ThreadData = { ...thread, root: { ...thread.root, event: across } }
+    const c = render(<ThreadList threads={[t]} onStart={async () => true} onReply={async () => true} />).container
+    expect(c.querySelector('[data-quoted] a')?.getAttribute('href')).toBe(`/issue/plan-the-launch-${D}`)
   })
 })

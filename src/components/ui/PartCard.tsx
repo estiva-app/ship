@@ -1,6 +1,8 @@
+import { useMemo } from 'react'
 import { KIND, resolveCommentAnchor, serializeBlockDocument } from '@estiva-app/protocol'
 import { PartCard as KitPartCard, QuotedLine, thingKindOf } from '@estiva-app/ui'
 import { usePart, type PartView } from '@/api/part'
+import type { ForeignObject } from '@/api/foreign'
 import { linkedOf } from '@/lib/linked'
 import { ShipRichText } from './ShipRichText'
 
@@ -24,23 +26,43 @@ export function PartCard({ address, block, nameOf }: { address: string; block: s
  * page's highlight while they are still in the file, "Changed since" once they are not, struck through once their
  * blocks are gone (SPEC §13.6). The words open the file at that spot (Miky, 10 Nov, ONE-12). Read on the same poll
  * the block's card would make, and resolved against the file the read hands back, so it costs no read of its own.
- * Until the file is read, or when it cannot be, the words show on the grey with no claim about them.
+ * Until the file is read, the words show on the grey with no claim about them. A file deleted, not the reader's to
+ * see, or with no parts says so in the part card's words, as before.
  *
  * @registry namesake: reads the part from the relay and draws the kit's QuotedLine, as Peek's comment card does.
  */
-export function QuotedPart({ address, block, words, tags }: { address: string; block: string; words: string; tags: string[][] }) {
+export function QuotedPart({ address, block, words, tags, nameOf }: { address: string; block: string; words: string; tags: string[][]; nameOf?: (pubkey: string) => string }) {
   const view = usePart({ address, block })
   const read = view.state === 'resolved' || view.state === 'detached' || view.state === 'unaddressable' ? view : undefined
   const body = read?.object.slots.body
-  const anchor = body ? resolveCommentAnchor({ kind: KIND.COMMENT, tags }, body.value, body.format === 'blocks' ? 'blocks' : 'marker').state : undefined
+  const tagsKey = JSON.stringify(tags)
+  const anchor = useMemo(
+    () => (body ? resolveCommentAnchor({ kind: KIND.COMMENT, tags: JSON.parse(tagsKey) as string[][] }, body.value, body.format === 'blocks' ? 'blocks' : 'marker').state : undefined),
+    [body, tagsKey],
+  )
   const state = anchor === 'resolved' ? 'here' : anchor === 'reworded' ? 'reworded' : anchor === 'detached' ? 'gone' : undefined
-  // Words whose blocks are gone lead nowhere: their spot is not in the file any more.
-  const place = state === 'gone' ? undefined : placeOf(read?.link)
+  if (view.state === 'loading') {
+    return (
+      <div data-quoted-part="loading" data-part-address={address}>
+        <QuotedLine label={words} />
+      </div>
+    )
+  }
+  if (!read || !state) return <PartCardView view={view} address={address} block={block} nameOf={nameOf} />
+  // The words' spot while the block it opens at stands; the file itself once it is gone, never a spot that is not there.
+  const place = view.state === 'resolved' && state !== 'gone' ? placeOf(view.link) : fileLinkOf(read.object)
   return (
-    <div data-part="quote" data-part-address={address} data-part-block={block}>
-      {state ? <QuotedLine words={words} state={state} href={place?.href} external={place ? !place.here : undefined} /> : <QuotedLine label={words} />}
+    <div data-quoted-part={state} data-part-address={address} data-part-block={block}>
+      <QuotedLine words={words} state={state} href={place?.href} external={place ? !place.here : undefined} />
     </div>
   )
+}
+
+/** Where a file itself opens: a path of Ship's own in place, another app's https address in a new tab. */
+function fileLinkOf(object: ForeignObject): { href: string; here: boolean } | undefined {
+  const { href } = linkedOf(object)
+  if (!href) return undefined
+  return href.startsWith('/') ? { href, here: true } : placeOf(href)
 }
 
 /** Where a part's link opens: a path of Ship's own, so it opens in place, or another app's https address. */
