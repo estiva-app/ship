@@ -87,6 +87,7 @@ export {
   workFolder,
   type CardEdit,
   type CreateResult,
+  type MoveResult,
   type WriteResult,
 } from './writes'
 export { clockProblem } from './clock'

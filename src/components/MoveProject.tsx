@@ -1,4 +1,4 @@
-import { moveProject, type Project } from '@/api'
+import { moveProject, type MoveResult, type Project } from '@/api'
 import { reloadFolders } from '@/api/useFolders'
 import { MoveProjectDialog, type MoveProjectFolder } from '@/components/MoveProjectDialog'
 import { placedIn } from '@/lib/placement'
@@ -43,7 +43,7 @@ export function MoveProject({
       folders={folders}
       onClose={onClose}
       onMove={async (to) => {
-        let stillIn: { folder: string; why?: string } | undefined
+        let stillIn: Extract<MoveResult, { ok: true }>['stillIn']
         let changed = false
         const ok = await act(
           'Move',
@@ -65,7 +65,7 @@ export function MoveProject({
         }
         if (stillIn) {
           // Only the Folder whose move was refused is named; any after it were never asked.
-          say(`Moved to ${to.name}, but ${nameOf(stillIn.folder)} still lists it too${stillIn.why ? `: ${stillIn.why}` : '. Try moving it again.'}`, 'error')
+          say(`Moved to ${to.name}, but ${nameOf(stillIn.folder)} still lists it too${stillIn.why ? `: ${stillIn.why}` : stillIn.retry === false ? '.' : '. Try moving it again.'}`, 'error')
           return false
         }
         say(`Moved to ${to.name}`)
