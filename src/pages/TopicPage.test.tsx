@@ -137,6 +137,21 @@ describe("A topic's page in Ship", () => {
     expect(location.pathname).toBe(`/topic/widgets-${D}`)
   })
 
+  it('keeps the topic’s one order within each kind: the projects as placed, then the issues as placed (TOPI-5)', async () => {
+    held.push(manifest('ship', 'ship.estiva.app', ['30850', '30851']), manifest('peek', 'peek.estiva.app', ['30840']))
+    held.push(projectRoot('p1'), projectRoot('p2'), issueRoot('i1'), issueRoot('i2'))
+    held.push(topic(D, 'Widgets'), lists(D, 'p1'), lists(D, 'i1'), lists(D, 'p2'), lists(D, 'i2'))
+    // Somebody dragged the second issue to the top, then the second project above the first.
+    const place = (file: string, key: string) => event(1851, [['a', address(D)], ['O', D], ['field', `order:${file}`], ['value', key], ['h', 'team'], ['ts', String(Date.now())], ['o', file]])
+    held.push(place('i2', 'a'), place('p2', 'b'), place('p1', 'c'), place('i1', 'd'))
+    const { state, archives } = ship([{ d: 'p1', status: 'todo' }, { d: 'p2', status: 'todo' }], [{ d: 'i1', status: 'todo' }, { d: 'i2', status: 'todo' }])
+    render(<TopicPage d={D} state={state} folders={[{ id: 'team', name: 'HQ' } as never]} archives={archives} />)
+
+    await waitFor(() => expect(page().querySelector('[data-topic-loaded]')).not.toBeNull())
+    const titles = [...page().querySelectorAll<HTMLElement>('[data-topic-work]')].map((row) => within(row).getAllByRole('link')[0]!.textContent)
+    expect(titles).toEqual(['Project p2', 'Project p1', 'Issue i2', 'Issue i1'])
+  })
+
   it('says "No projects or issues." for a topic listing none, with no Archived link', async () => {
     held.push(manifest('peek', 'peek.estiva.app', ['30840']), topic(D, 'Empty'))
     const { state, archives } = ship([], [])
