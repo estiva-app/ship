@@ -6,7 +6,7 @@ import { referenceOfLink, type EditorDocument, type Embed, type Imeta } from '@e
 import { Kbd } from '@estiva-app/ui'
 import { CommentBox, commentBoxRows, LinkChips, type BoxFile, type BoxSentUnder, type BoxUnder, type ReferenceViewProps, type SendAnswer, type UploadAnswer } from '@estiva-app/ui/editor'
 import type { ForeignObject } from '@/api/foreign'
-import { askLinkValues, isAppLink, knownBlockOf, knownLinkValue, linksChanged, useLinkNames } from '@/api/linkCards'
+import { askLinkValues, isWebLink, knownBlockOf, knownLinkValue, linksChanged, useLinkNames } from '@/api/linkCards'
 import { subscribeReferences, type ReferenceSection } from '@/api/references'
 import { uploadAttachment } from '@/api/blobs'
 import { useForeignObjects } from '@/api/useForeignObjects'
@@ -269,7 +269,7 @@ const BoxReferences = createContext<BoxReferenceContext>({})
  * is the directory's chip.
  */
 function BoxReference(props: ReferenceViewProps) {
-  return isAppLink(props.uri) ? <BoxLinkReference {...props} /> : <BoxObjectReference {...props} />
+  return isWebLink(props.uri) ? <BoxLinkReference {...props} /> : <BoxObjectReference {...props} />
 }
 
 function BoxObjectReference({ uri, href }: ReferenceViewProps) {

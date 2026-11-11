@@ -4,7 +4,7 @@ import { imetaFromAttrs, linksAsReferences, referenceOfLink, toRenderTree, urlRu
 import { RichText } from '@estiva-app/ui'
 import type { AttachmentViewProps, ReferenceViewProps } from '@estiva-app/ui/editor'
 import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
-import { isAppLink, useLinkNames } from '@/api/linkCards'
+import { isWebLink, useLinkNames } from '@/api/linkCards'
 import { byReference, useForeignObjects } from '@/api/useForeignObjects'
 import { Attachment } from '@/components/ui/Attachment'
 import { MessageCard, MessageChip, MessageRow } from '@/components/ui/MessageLinks'
@@ -74,7 +74,7 @@ export function DescriptionLinks({ editor, resolved, nameOf, readOnly, children 
   const uris = key ? key.split('\n') : []
   // A file `[` picked once the relay keeps its type in order is its app link by id (ALO-8): read by what it names.
   const named = useLinkNames(uris)
-  const references = uris.map((uri) => (isAppLink(uri) ? named.get(uri) : uri)).filter((uri): uri is string => !!uri)
+  const references = uris.map((uri) => (isWebLink(uri) ? named.get(uri) : uri)).filter((uri): uri is string => !!uri)
   const missing = [...new Set(references)].filter((uri) => !(uri in resolved))
   const own = byReference(missing, useForeignObjects(missing))
   const all = missing.length ? { ...own, ...resolved } : resolved
@@ -94,7 +94,7 @@ export function DescriptionLink({ uri: written, href: writtenAt, place = 'chip',
   const { resolved, named, nameOf } = useContext(Links)
   if (/^nostr:npub1/i.test(written)) return <Reference uri={written} nameOf={nameOf} />
   // An app link (a `[` pick, ALO-8) is drawn as the file it names, opening at the link; one naming nothing is the URL.
-  const link = isAppLink(written)
+  const link = isWebLink(written)
   const reference = link ? named?.get(written) : written
   const uri = reference ?? written
   const href = writtenAt ?? (link ? written : undefined)

@@ -7,7 +7,8 @@
  * a link the reader names nothing for is the URL as written, not a chip loading
  * for ever. The link reader is real: only the manifests and the relay's answer
  * are stubbed, so the box has to ask for the link and draw again when the answer
- * comes back.
+ * comes back. What a `nostr:` reference draws as (`resolveForeign`) is stubbed:
+ * `foreign.test.ts` covers it.
  */
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
