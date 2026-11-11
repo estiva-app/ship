@@ -13,6 +13,7 @@
  */
 import { useEffect, useSyncExternalStore } from 'react'
 import { linkReader } from '@estiva-app/interop'
+import { referenceOfLink } from '@estiva-app/protocol'
 import { writtenLinkOf, type ReferenceLink } from '@/lib/referenceLink'
 import { declaredManifests } from './handoff'
 import { relay } from './store'
@@ -82,6 +83,30 @@ export function useAskLinks(urls: readonly string[]): number {
     }
   }, [key, version])
   return version
+}
+
+/** Whether a reference's uri is a web link (`useLinkNames` reads what it names) rather than a `nostr:` reference. */
+export const isWebLink = (uri: string): boolean => /^https?:\/\//i.test(uri)
+
+/**
+ * What each reference written as an app link names, for a box being written in:
+ * a file `[` picks once the relay keeps its type in order is its link by id
+ * (ALO-8, interop's `pickedFileUri`), where it used to be a `nostr:` reference.
+ * Asks like a pasted link and draws again as answers come back. By link: the
+ * `nostr:` reference once the reader has answered, null when it answered
+ * nothing (the chip then stops loading); a link still asked about is absent.
+ * Any other uri is left out.
+ */
+export function useLinkNames(uris: readonly string[]): ReadonlyMap<string, string | null> {
+  const asked = uris.filter(isWebLink)
+  useAskLinks(asked)
+  const out = new Map<string, string | null>()
+  for (const url of asked) {
+    const reference = referenceOfLink(url, links.known)
+    if (reference) out.set(url, reference)
+    else if (links.answered(url)) out.set(url, null)
+  }
+  return out
 }
 
 /**

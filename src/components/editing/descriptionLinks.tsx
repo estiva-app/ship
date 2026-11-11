@@ -4,6 +4,7 @@ import { imetaFromAttrs, linksAsReferences, referenceOfLink, toRenderTree, urlRu
 import { RichText } from '@estiva-app/ui'
 import type { AttachmentViewProps, ReferenceViewProps } from '@estiva-app/ui/editor'
 import type { ForeignObject as ForeignObjectData } from '@/api/foreign'
+import { isWebLink, useLinkNames } from '@/api/linkCards'
 import { byReference, useForeignObjects } from '@/api/useForeignObjects'
 import { Attachment } from '@/components/ui/Attachment'
 import { MessageCard, MessageChip, MessageRow } from '@/components/ui/MessageLinks'
@@ -43,6 +44,8 @@ export function linksInBlocks(blocks: readonly RenderBlock[]): string[] {
 
 interface DescriptionLinksValue {
   resolved: Resolved
+  /** What each app link the editor holds names (`useLinkNames`): absent while asked, null for nothing. */
+  named?: ReadonlyMap<string, string | null>
   nameOf?: (pubkey: string) => string
   /** Only read: its files open, and a card's values are words, since this reader cannot act here. */
   readOnly: boolean
@@ -68,10 +71,14 @@ export function DescriptionLinks({ editor, resolved, nameOf, readOnly, children 
       return [...uris].join('\n')
     },
   })
-  const missing = (key ? key.split('\n') : []).filter((uri) => !(uri in resolved))
+  const uris = key ? key.split('\n') : []
+  // A file `[` picked once the relay keeps its type in order is its app link by id (ALO-8): read by what it names.
+  const named = useLinkNames(uris)
+  const references = uris.map((uri) => (isWebLink(uri) ? named.get(uri) : uri)).filter((uri): uri is string => !!uri)
+  const missing = [...new Set(references)].filter((uri) => !(uri in resolved))
   const own = byReference(missing, useForeignObjects(missing))
   const all = missing.length ? { ...own, ...resolved } : resolved
-  return <Links.Provider value={{ resolved: all, nameOf, readOnly }}>{children}</Links.Provider>
+  return <Links.Provider value={{ resolved: all, named, nameOf, readOnly }}>{children}</Links.Provider>
 }
 
 /**
@@ -83,10 +90,15 @@ export function DescriptionLinks({ editor, resolved, nameOf, readOnly, children 
  * file cannot be shown stays the URL it was written as (WBM-11), the kit's way.
  * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/every-app-edits-a-document-with-one-shared-editor.md
  */
-export function DescriptionLink({ uri, href, place = 'chip', editing = false }: ReferenceViewProps) {
-  const { resolved, nameOf } = useContext(Links)
-  if (/^nostr:npub1/i.test(uri)) return <Reference uri={uri} nameOf={nameOf} />
-  const object = resolved[uri]
+export function DescriptionLink({ uri: written, href: writtenAt, place = 'chip', editing = false }: ReferenceViewProps) {
+  const { resolved, named, nameOf } = useContext(Links)
+  if (/^nostr:npub1/i.test(written)) return <Reference uri={written} nameOf={nameOf} />
+  // An app link (a `[` pick, ALO-8) is drawn as the file it names, opening at the link; one naming nothing is the URL.
+  const link = isWebLink(written)
+  const reference = link ? named?.get(written) : written
+  const uri = reference ?? written
+  const href = writtenAt ?? (link ? written : undefined)
+  const object = reference === null ? null : reference === undefined ? undefined : resolved[reference]
   if (place === 'card') return <DescriptionCard uri={uri} object={object} href={href} />
   if (place === 'row') return <MessageRow uri={uri} object={object} opensAt={href} />
   return <MessageChip uri={uri} object={object} nameOf={nameOf} preview={!editing} opensAt={href} />

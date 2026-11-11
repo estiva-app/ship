@@ -6,7 +6,7 @@ import { referenceOfLink, type EditorDocument, type Embed, type Imeta } from '@e
 import { Kbd } from '@estiva-app/ui'
 import { CommentBox, commentBoxRows, LinkChips, type BoxFile, type BoxSentUnder, type BoxUnder, type ReferenceViewProps, type SendAnswer, type UploadAnswer } from '@estiva-app/ui/editor'
 import type { ForeignObject } from '@/api/foreign'
-import { askLinkValues, knownBlockOf, knownLinkValue, linksChanged } from '@/api/linkCards'
+import { askLinkValues, isWebLink, knownBlockOf, knownLinkValue, linksChanged, useLinkNames } from '@/api/linkCards'
 import { subscribeReferences, type ReferenceSection } from '@/api/references'
 import { uploadAttachment } from '@/api/blobs'
 import { useForeignObjects } from '@/api/useForeignObjects'
@@ -268,13 +268,30 @@ const BoxReferences = createContext<BoxReferenceContext>({})
  * SHI-49). While written it follows no click and shows no hover card. A person
  * is the directory's chip.
  */
-function BoxReference({ uri, href }: ReferenceViewProps) {
+function BoxReference(props: ReferenceViewProps) {
+  return isWebLink(props.uri) ? <BoxLinkReference {...props} /> : <BoxObjectReference {...props} />
+}
+
+function BoxObjectReference({ uri, href }: ReferenceViewProps) {
   const { resolved, nameOf } = useContext(BoxReferences)
   const known = resolved?.[uri]
   const [asked] = useForeignObjects(known === undefined ? [uri] : []) ?? []
-  const object = known ?? asked
   // The kit keeps a click in the draft; a URL whose file cannot be shown stays the URL it was written as (WBM-11).
-  return <MessageChip uri={uri} object={object} nameOf={nameOf} preview={false} opensAt={href} />
+  return <MessageChip uri={uri} object={known ?? asked} nameOf={nameOf} preview={false} opensAt={href} />
+}
+
+/**
+ * A file `[` picked once the relay keeps its type in order: its app link by id (ALO-8), drawn by the `nostr:`
+ * reference the link reader answers for it, and opening at the link. A link the reader names nothing for is the
+ * URL as written, not a chip loading for ever.
+ */
+function BoxLinkReference({ uri, href }: ReferenceViewProps) {
+  const { resolved, nameOf } = useContext(BoxReferences)
+  const reference = useLinkNames([uri]).get(uri)
+  const known = reference ? resolved?.[reference] : undefined
+  const [asked] = useForeignObjects(reference && known === undefined ? [reference] : []) ?? []
+  const object = reference === null ? null : (known ?? asked)
+  return <MessageChip uri={reference ?? uri} object={object} nameOf={nameOf} preview={false} opensAt={href ?? uri} />
 }
 
 /** Loaded on first use (see ThreadList): the editor is its own chunk. */
