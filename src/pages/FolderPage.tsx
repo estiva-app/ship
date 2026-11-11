@@ -91,7 +91,7 @@ export function FolderPage({ id, folders, nameOf = (pubkey) => `${pubkey.slice(0
     Folder lists, and what stays visible elsewhere — made when the person asks,
     not on every page load.
   */
-  // Only the Folder's owners and admins: the relay refuses their rename (9002) from anybody else, and every reader ignores their archive (SPEC §3.2).
+  // Only the Folder's owners and admins, and on a team nobody owns the workspace's owners and admins (interop's `admins`, TEA-10): the relay refuses a rename (9002) from anybody else, and every reader ignores their archive (SPEC §3.2, §3.3).
   const isFolderAdmin = !!contents?.admins?.includes(me)
   const canArchive = !!contents?.channel && isFolderAdmin
   const reread = useCallback(async () => {
