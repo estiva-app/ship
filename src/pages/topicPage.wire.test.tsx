@@ -274,7 +274,8 @@ describe('A reaction from the topic page names whose message it is on (ACT-6)', 
 
   // Each test is a new session: the relay's key not read yet, and the relay, which signs every team record, holding one.
   beforeEach(() => {
-    store.resetRelayKeyForTests()
+    // Optional so the same tests run on the code before ACT-6, which kept no key (/land's old-code check).
+    store.resetRelayKeyForTests?.()
     teamRecords.held = [{ id: '7'.repeat(64), kind: 39000, pubkey: RELAY, sig: '0'.repeat(128), tags: [['d', TEAM]], content: '' }]
   })
 
