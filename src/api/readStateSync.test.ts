@@ -219,12 +219,54 @@ describe('what the screen judges against only moves forward (SHI-38)', () => {
     const first = renderHook(() => useMergedReadState())
     await waitFor(() => expect(first.result.current[OURS]).toBe(1000))
     first.unmount()
+    // A page opened past the shared window asks the relay again.
+    const { READ_STATE_SHARED_MS } = await import('./readStateSync')
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(Date.now() + READ_STATE_SHARED_MS)
 
     // Our slot would not decrypt this time (a 429 on /nip44/decrypt): the merge lacks it.
     fetchReadState.mockResolvedValue({ reachable: true, merged: { [THEIRS]: 6000 }, own: undefined, ownUndecryptable: true })
     const second = renderHook(() => useMergedReadState())
     await waitFor(() => expect(second.result.current[THEIRS]).toBe(6000))
     expect(second.result.current[OURS]).toBe(1000)
+    vi.useRealTimers()
+  })
+})
+
+// 1649c95c, 13 Nov: opening a topic in Ship read Miky's read state four times
+// (0.88 MB) — its conversation, each card's, the sidebar's dots, each its own.
+describe('a page reads its read state once, whoever on it asks', () => {
+  beforeEach(fresh)
+  afterEach(() => vi.useRealTimers())
+
+  it('asks the relay once for every hook a page mounts, at once or a few seconds apart', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    const { useMergedReadState, READ_STATE_SHARED_MS } = await import('./readStateSync')
+    fetchReadState.mockResolvedValue({ reachable: true, merged: { [THEIRS]: 5000 }, own: undefined })
+    const conversation = renderHook(() => useMergedReadState())
+    const card = renderHook(() => useMergedReadState())
+    await waitFor(() => expect(card.result.current[THEIRS]).toBe(5000))
+    vi.setSystemTime(Date.now() + READ_STATE_SHARED_MS - 1000)
+    const sidebar = renderHook(() => useMergedReadState())
+    await waitFor(() => expect(sidebar.result.current[THEIRS]).toBe(5000))
+    expect(conversation.result.current[THEIRS]).toBe(5000)
+    expect(fetchReadState).toHaveBeenCalledTimes(1)
+  })
+
+  it('asks again after a fetch missing a slot, so the retry is not answered from it', async () => {
+    const { useMergedReadState } = await import('./readStateSync')
+    decryptUnlessRefused.mockRejectedValueOnce(new Error('429'))
+    fetchReadState.mockImplementationOnce(async (...args: unknown[]) => {
+      // The package's decrypt refused one slot, as a 429 does.
+      await (args[2] as { decrypt: (c: string) => Promise<string> }).decrypt('enc:x').catch(() => {})
+      return { reachable: true, merged: { [THEIRS]: 5000 }, own: undefined }
+    })
+    fetchReadState.mockResolvedValue({ reachable: true, merged: { [THEIRS]: 6000 }, own: undefined })
+    const first = renderHook(() => useMergedReadState())
+    await waitFor(() => expect(first.result.current[THEIRS]).toBe(5000))
+    const second = renderHook(() => useMergedReadState())
+    await waitFor(() => expect(second.result.current[THEIRS]).toBe(6000))
+    expect(fetchReadState).toHaveBeenCalledTimes(2)
   })
 })
 

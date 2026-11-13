@@ -54,6 +54,9 @@ export const READ_STATE_REFRESH_MS = 30_000
 /** How soon a tab with no whole frontier yet asks again after a refused decrypt: long enough for `/nip44/*`'s per-minute quota to give some back. */
 export const INCOMPLETE_RETRY_MS = 10_000
 
+/** How long one whole fetch answers every hook that asks after it: half the cadence, so each still re-reads every 30 s. */
+export const READ_STATE_SHARED_MS = READ_STATE_REFRESH_MS / 2
+
 /** The relay, as the package's reads take it. */
 const query: QueryFn = (filters) => relay.query(filters as never)
 
@@ -162,6 +165,34 @@ async function loadReadState(): Promise<FetchedReadState & { complete: boolean }
   return { ...state, complete }
 }
 
+/** The fetch in flight, which every mounted hook joins. */
+let pending: Promise<FetchedReadState & { complete: boolean }> | undefined
+/** The last whole fetch and when it landed, which a hook mounting soon after takes instead of asking again. */
+let lastWhole: { at: number; state: FetchedReadState & { complete: boolean } } | undefined
+
+/**
+ * {@link loadReadState}, once for the whole tab (1649c95c): a page draws read
+ * state in several places — its conversation, each card's, the sidebar's dots —
+ * and each mounted hook asked the relay itself, four reads of the same `30078`s
+ * on opening a topic in Ship. A hook asking while a fetch runs joins it, and one
+ * asking within {@link READ_STATE_SHARED_MS} of a whole fetch takes that one. A
+ * fetch missing a slot is not kept, so the retry after a refused decrypt still asks.
+ */
+function sharedReadState(): Promise<FetchedReadState & { complete: boolean }> {
+  if (pending) return pending
+  if (lastWhole && Date.now() - lastWhole.at < READ_STATE_SHARED_MS) return Promise.resolve(lastWhole.state)
+  const run = loadReadState()
+    .then((state) => {
+      if (state.reachable && state.complete) lastWhole = { at: Date.now(), state }
+      return state
+    })
+    .finally(() => {
+      if (pending === run) pending = undefined
+    })
+  pending = run
+  return run
+}
+
 /** Publish anything pending now. */
 export function flushReadState(): Promise<void> {
   return queue.flush()
@@ -188,6 +219,8 @@ export function resetReadStateForTests(): void {
   shown = {}
   fetched = undefined
   marked = {}
+  pending = undefined
+  lastWhole = undefined
 }
 
 /** Flush before the tab goes away — `visibilitychange` is the one mobile fires. */
@@ -228,7 +261,7 @@ export function useMergedReadState(): Record<string, number> {
   const load = useCallback(async () => {
     if (!signedIn()) return
     try {
-      const state = await loadReadState()
+      const state = await sharedReadState()
       // Unreachable is not empty — keep the last good frontier rather than
       // blanking every divider because one fetch failed. A reachable fetch
       // only raises it: one missing a slot it could not decrypt is not
