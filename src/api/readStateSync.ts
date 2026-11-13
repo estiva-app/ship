@@ -1,10 +1,13 @@
 /**
- * Marking things read, and getting it onto the relay (CRO-8).
+ * Marking things read, and getting it onto the relay (CRO-8), and the merged
+ * frontier the screen judges against.
  *
- * One queue for the tab, because NIP-RS is one blob per **installation**. A
- * per-component queue would hold a partial context map each, and since the blob
- * is a replaceable snapshot they would take turns overwriting one another's
- * contexts — the whole-blob rule broken by construction rather than by a bug.
+ * The write half is `@estiva-app/conversation`'s `createReadStateQueue`
+ * (TOPIC-3), the one Leaf uses too: one queue for the tab, because NIP-RS is
+ * one blob per **installation**; the whole blob on every publish, read back
+ * from our own slot before each one; debounced on marks, never on the poll.
+ * What stays here is Ship's own: where its slot is kept, what it is called,
+ * which session may write, and the read half below.
  *
  * ## Debounced on read events, never on the poll
  *
@@ -13,14 +16,6 @@
  * budget of 120 operations per minute — and it would say nothing new, because a
  * refresh is not somebody reading anything. So `markRead` is called from the
  * pages, on the object being looked at, and the publish is debounced behind it.
- *
- * ## Whole blob, always
- *
- * The coordinate is replaced, not patched, so every publish carries the complete
- * map. That is why this hydrates from the relay before its first write: a
- * partial blob does not fail, it silently drops every context it omitted, and
- * because the cross-slot merge is grow-only the loss stays invisible until this
- * is the last slot standing.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRefresh } from '@/lib/useRefresh'
@@ -28,28 +23,18 @@ import { relay, signer } from './store'
 import { nip44, nip44UnlessRefused } from './nip44'
 import { signedIn } from '../auth/estivaId'
 import {
+  READ_DWELL_MS,
   READ_STATE_HORIZON_DAYS,
-  REPLY_FLOOR_CONTEXT,
-  advanceContexts as advance,
+  READ_STATE_PUBLISH_DEBOUNCE_MS,
+  createReadStateQueue,
   createSlotCache,
   fetchReadState,
-  loadSlotIdentity as loadSlot,
-  publishReadState,
   readStateDTag,
-  rotateSlotId,
-  toContextSeconds,
   type FetchedReadState,
   type Nip44,
   type QueryFn,
-  type SlotIdentity,
+  type ReadStateAttempt,
 } from '@estiva-app/conversation'
-
-/*
-  NIP-RS itself — the context grammar, the blob, the byte cap, the merge, the
-  slot's identity, the fetch and the publish — is `@estiva-app/conversation`'s
-  (CON-19), so Ship and Peek write the same blob by construction. What stays
-  here is Ship's own: where its slot is kept, what it is called, and the queue.
-*/
 
 /** Ship's slot, kept apart from anything else this app stores. Changing it gives every Ship user a fresh slot. */
 export const SLOT_STORAGE_KEY = 'ship.readstate.slot'
@@ -57,69 +42,11 @@ export const SLOT_STORAGE_KEY = 'ship.readstate.slot'
 /** Names Ship in a new `client_id`: `ship-1a2b3c4d`. Existing slots keep the one they have. */
 const CLIENT_PREFIX = 'ship'
 
-const random = (n: number): Uint8Array => crypto.getRandomValues(new Uint8Array(n))
-
-function safeStorage(): Storage | undefined {
-  try {
-    return typeof localStorage === 'undefined' ? undefined : localStorage
-  } catch {
-    return undefined
-  }
-}
-
-/** This installation's slot, minted once and reused. `localStorage`, never `sessionStorage`: a slot that dies with the tab piles up slots. */
-export function loadSlotIdentity(storage: Storage | undefined = safeStorage()): SlotIdentity {
-  return loadSlot({ storage, storageKey: SLOT_STORAGE_KEY, clientPrefix: CLIENT_PREFIX, random })
-}
-
-/** The relay, as the package's reads take it. */
-const query: QueryFn = (filters) => relay.query(filters as never)
-
-/**
- * What every slot last decrypted to, for the life of the tab: a refresh
- * decrypts only the slots that changed, and a slot refused with a 429 keeps
- * its last markers (Peek 23130326). Resets on a new pubkey.
- */
-let slotCache = createSlotCache()
-
-/**
- * Everything the relay holds of the person's read state, merged.
- *
- * `complete` is false when a decrypt was refused (a 429 above all): the package
- * then asks nothing more that round, and a slot this tab has not decrypted
- * before is missing from `merged` altogether — on a cold tab, most of them
- * (99557309, 7 Oct: four probes in a minute, five dividers).
- */
-async function loadReadState(): Promise<FetchedReadState & { complete: boolean }> {
-  let complete = true
-  const decrypt: Pick<Nip44, 'decrypt'> = {
-    decrypt: (ciphertext) =>
-      nip44UnlessRefused.decrypt(ciphertext).catch((error: unknown) => {
-        complete = false
-        throw error
-      }),
-  }
-  const state = await fetchReadState(query, signer.pubkey, decrypt, currentIdentity(), Date.now(), READ_STATE_HORIZON_DAYS, slotCache)
-  return { ...state, complete }
-}
-
-/** Apply markers, taking the later of each, and cap to the byte ceiling. What the cap evicted is reported. */
-function advanceContexts(current: Record<string, number>, updates: Record<string, number>): Record<string, number> {
-  const { contexts, evicted } = advance(current, updates)
-  if (evicted.length > 0) console.warn(`[read-state] over the byte cap; ${evicted.length} oldest markers dropped`)
-  return contexts
-}
-
 /** Long enough to batch opening a few issues, short enough to survive a tab close. */
-export const PUBLISH_DEBOUNCE_MS = 3000
+export const PUBLISH_DEBOUNCE_MS = READ_STATE_PUBLISH_DEBOUNCE_MS
 
-/**
- * How long an object must be on screen before it counts as read.
- *
- * Without a dwell, arrowing through an issue list would burn every issue's
- * unread state on the way past. Peek uses the same idea for the same reason.
- */
-export const READ_DWELL_MS = 1500
+/** How long an object must be on screen before it counts as read: arrowing through an issue list burns nothing. */
+export { READ_DWELL_MS }
 
 /** How often the merged frontier is re-read. Deliberately not the 5s poll. */
 export const READ_STATE_REFRESH_MS = 30_000
@@ -127,22 +54,11 @@ export const READ_STATE_REFRESH_MS = 30_000
 /** How soon a tab with no whole frontier yet asks again after a refused decrypt: long enough for `/nip44/*`'s per-minute quota to give some back. */
 export const INCOMPLETE_RETRY_MS = 10_000
 
-let identity: SlotIdentity | undefined
-/** Everything this slot knows: hydrated from the relay, plus what was recorded. */
-let known: Record<string, number> = {}
-/** Recorded but not yet in an accepted publish. */
-let pending: Record<string, number> = {}
-/** What the relay is believed to hold, so an unchanged blob is not republished. */
-let published: Record<string, number> | undefined
-let hydrated = false
-let hydrating: Promise<void> | undefined
-let timer: ReturnType<typeof setTimeout> | undefined
-/** Grows while a flush keeps failing, so a long outage is not a busy loop. */
-let retryMs = 0
-let inFlight: Promise<void> = Promise.resolve()
+/** The relay, as the package's reads take it. */
+const query: QueryFn = (filters) => relay.query(filters as never)
 
 /** What the last flush attempt did, for the diagnostic below. */
-let lastAttempt: { at: number; outcome: string; detail?: string; contexts?: number } | undefined
+let lastAttempt: { at: number; outcome: ReadStateAttempt; detail?: string; contexts?: number } | undefined
 /** The last merged frontier this tab fetched, so the diagnostic need not re-fetch. */
 let lastMerged: Record<string, number> = {}
 /**
@@ -180,178 +96,75 @@ function show(from: Readonly<Record<string, number>>): void {
   for (const listener of shownListeners) listener()
 }
 
-function noteAttempt(outcome: string, detail?: string, contexts?: number): void {
-  lastAttempt = { at: Date.now(), outcome, ...(detail ? { detail } : {}), ...(contexts !== undefined ? { contexts } : {}) }
-}
+/**
+ * The tab's one queue. Its own slot is read back with a decrypt that
+ * **throws** whenever it does not decrypt: `nip44.decrypt` answers `undefined`
+ * on a 429, which the queue would take for a slot that will never decrypt, and
+ * it would move to a new slot on every rate limit.
+ */
+const queue = createReadStateQueue({
+  storage: () => (typeof localStorage === 'undefined' ? undefined : localStorage),
+  storageKey: SLOT_STORAGE_KEY,
+  clientPrefix: CLIENT_PREFIX,
+  random: (n) => crypto.getRandomValues(new Uint8Array(n)),
+  // The page's signer is one person for its life; an access token renewing mid-session only holds the write back.
+  pubkey: () => signer.pubkey,
+  canWrite: signedIn,
+  query,
+  nip44: {
+    encrypt: (plaintext) => nip44.encrypt(plaintext),
+    // Not even a "will never decrypt" answer moves Ship off its slot: `nip44UnlessRefused` gives one for any status
+    // it does not know (a 400 or 404 while Estiva ID deploys), and a new slot would orphan everything read here.
+    // Ship holds the publish instead, as it always has; another installation's blob still takes a new slot.
+    decrypt: async (ciphertext) => {
+      const plaintext = await nip44UnlessRefused.decrypt(ciphertext)
+      if (plaintext === undefined) throw new Error('our read-state slot would not decrypt')
+      return plaintext
+    },
+  },
+  sign: (event) => signer.sign(event),
+  publish: (event) => relay.publish(event),
+  // On this screen at once, not after the publish and the next re-read.
+  onMarked: (contexts) => {
+    marked = laterOf(marked, contexts)
+    show(contexts)
+  },
+  onAttempt: (outcome, detail, contexts) => {
+    lastAttempt = { at: Date.now(), outcome, ...(detail ? { detail } : {}), ...(contexts !== undefined ? { contexts } : {}) }
+  },
+})
 
-function currentIdentity(): SlotIdentity {
-  if (!identity) identity = loadSlotIdentity()
-  return identity
-}
+/**
+ * What every slot last decrypted to, for the life of the tab: a refresh
+ * decrypts only the slots that changed, and a slot refused with a 429 keeps
+ * its last markers (Peek 23130326). Resets on a new pubkey.
+ */
+let slotCache = createSlotCache()
 
-const sameContexts = (a: Record<string, number>, b: Record<string, number>): boolean => {
-  const keys = Object.keys(a)
-  return keys.length === Object.keys(b).length && keys.every((k) => a[k] === b[k])
-}
-
-async function hydrate(): Promise<void> {
-  if (hydrated) return
-  if (!hydrating) {
-    hydrating = (async () => {
-      const state = await loadReadState()
-      /*
-       * Unreachable is not empty. Staying unhydrated means the next attempt
-       * tries again; treating it as empty would publish a blob that drops every
-       * context recorded before this session. An empty *coordinate*, by
-       * contrast, is the ordinary first run and hydrates to nothing — the
-       * distinction Peek had to ship a fix for.
-       */
-      if (!state.reachable) return
-      /*
-       * Our slot is there and unreadable — almost always a `429` from
-       * `/nip44/decrypt`. Publishing now would replace it with only what this
-       * session recorded and drop the rest, permanently. Stay unhydrated and
-       * try again; a transient rate limit must not cost read state.
-       */
-      if (state.ownUndecryptable) {
-        console.warn('[read-state] own slot could not be decrypted; not publishing over it')
-        return
-      }
-      /*
-       * Our coordinate holds another installation's blob (a copied profile, a
-       * restored storage). Writing to it would overwrite theirs on every write,
-       * so take a new slot id under the same `client_id` and start it empty.
-       */
-      if (state.coordinateConflicted) {
-        identity = rotateSlotId(currentIdentity(), { storage: safeStorage(), storageKey: SLOT_STORAGE_KEY, random })
-      }
-      /*
-       * Seeded from **our own slot**, not from the merge.
-       *
-       * Seeding from the merge looked harmless — the rule is a maximum, so
-       * carrying another installation's contexts loses nothing — and the
-       * cross-app verification showed what it actually costs: Ship's slot came
-       * back holding 53 contexts against Peek's 47, having absorbed Peek's and
-       * republished them as its own. Every slot converges to the union.
-       *
-       * Nothing is *wrong* with that, and two things about it are bad. Each
-       * slot becomes O(everything the person has read) rather than O(what this
-       * app read), so all of them approach the reference client's 32,768-byte
-       * plaintext limit together instead of one at a time. And `client_id`
-       * stops meaning "the app that read this", which is the only signal there
-       * is about where a marker came from.
-       *
-       * A slot is this installation's account of what *it* read. The union is
-       * what the merge is for, and it is computed at read time.
-       */
-      // The tab's own reply floor goes in as `current`: `advanceContexts` refuses one among the updates (CON-34).
-      const own = state.own?.contexts ?? {}
-      const { [REPLY_FLOOR_CONTEXT]: floor, ...recorded } = known
-      const held = floor === undefined ? own : { ...own, [REPLY_FLOOR_CONTEXT]: Math.max(floor, own[REPLY_FLOOR_CONTEXT] ?? 0) }
-      known = advanceContexts(held, recorded)
-      published = state.own?.contexts ?? {}
-      hydrated = true
-    })().finally(() => {
-      hydrating = undefined
-    })
+/**
+ * Everything the relay holds of the person's read state, merged.
+ *
+ * `complete` is false when a decrypt was refused (a 429 above all): the package
+ * then asks nothing more that round, and a slot this tab has not decrypted
+ * before is missing from `merged` altogether — on a cold tab, most of them
+ * (99557309, 7 Oct: four probes in a minute, five dividers).
+ */
+async function loadReadState(): Promise<FetchedReadState & { complete: boolean }> {
+  let complete = true
+  const decrypt: Pick<Nip44, 'decrypt'> = {
+    decrypt: (ciphertext) =>
+      nip44UnlessRefused.decrypt(ciphertext).catch((error: unknown) => {
+        complete = false
+        throw error
+      }),
   }
-  await hydrating
+  const state = await fetchReadState(query, signer.pubkey, decrypt, queue.identity(), Date.now(), READ_STATE_HORIZON_DAYS, slotCache)
+  return { ...state, complete }
 }
 
 /** Publish anything pending now. */
-/**
- * Try again later, because markers are still pending.
- *
- * Every early return below leaves `pending` populated, and the debounce timer
- * has already fired and been cleared — so without this the markers sit stranded
- * until the next `record` or the tab is hidden. Observed twice: once behind a
- * `/nip44` rate limit and once behind an access token expiring mid-session, and
- * both times reading an issue simply never reached the relay.
- *
- * Backs off so a long outage is not a busy loop, and resets on success.
- */
-function retryLater(): void {
-  if (timer !== undefined) return
-  retryMs = retryMs === 0 ? PUBLISH_DEBOUNCE_MS : Math.min(retryMs * 2, 60_000)
-  timer = setTimeout(() => {
-    timer = undefined
-    void flushReadState()
-  }, retryMs)
-}
-
 export function flushReadState(): Promise<void> {
-  if (timer !== undefined) {
-    clearTimeout(timer)
-    timer = undefined
-  }
-  inFlight = inFlight.then(async () => {
-    if (Object.keys(pending).length === 0) return noteAttempt('nothing-pending')
-    // No usable token — an access token expiring mid-session is ordinary, and
-    // the signer renews itself. Keep the markers and come back.
-    if (!signedIn()) {
-      noteAttempt('no-session', 'retrying')
-      return retryLater()
-    }
-    await hydrate()
-    // Unreachable, or our own slot is there and unreadable. Both mean we must
-    // not publish; neither means the markers should be abandoned.
-    if (!hydrated) {
-      noteAttempt('not-hydrated', 'relay unreachable, or our slot would not decrypt; retrying')
-      return retryLater()
-    }
-    const sending = pending
-    const contexts = { ...known }
-    pending = {}
-    // Hydration can supersede everything pending — a marker older than the
-    // relay's own is not a change, and republishing an identical blob costs
-    // three round trips to say nothing.
-    if (published && sameContexts(published, contexts)) return noteAttempt('unchanged')
-    try {
-      const result = await publishReadState(
-        { sign: (event) => signer.sign(event), publish: (event) => relay.publish(event), nip44 },
-        signer.pubkey,
-        currentIdentity(),
-        contexts,
-        Date.now(),
-      )
-      if (result.ok) {
-        published = contexts
-        retryMs = 0
-        noteAttempt('published', undefined, Object.keys(contexts).length)
-      } else {
-        console.warn('[read-state] publish rejected:', result.reason)
-        noteAttempt('rejected', result.reason)
-        pending = advanceContexts(pending, sending)
-        retryLater()
-      }
-    } catch (error) {
-      console.warn('[read-state] publish failed:', error)
-      noteAttempt('failed', error instanceof Error ? error.message : String(error))
-      pending = advanceContexts(pending, sending)
-      retryLater()
-    }
-  })
-  return inFlight
-}
-
-function record(context: string | undefined, atMs: number): void {
-  if (!context) return
-  const seconds = toContextSeconds(atMs)
-  const advanced = advanceContexts(known, { [context]: seconds })
-  // `advanceContexts` drops what it will not publish, so an unchanged map means
-  // the marker was invalid or not newer. Scheduling anyway would republish an
-  // identical blob.
-  if (advanced[context] === known[context]) return
-  known = advanced
-  marked = laterOf(marked, { [context]: seconds })
-  // On this screen at once, not after the publish and the next re-read.
-  show({ [context]: seconds })
-  pending = advanceContexts(pending, { [context]: seconds })
-  if (timer !== undefined) clearTimeout(timer)
-  timer = setTimeout(() => {
-    timer = undefined
-    void flushReadState()
-  }, PUBLISH_DEBOUNCE_MS)
+  return queue.flush()
 }
 
 /**
@@ -362,37 +175,24 @@ function record(context: string | undefined, atMs: number): void {
  * a container belongs — which is the mistake that would mark a whole project
  * read (SPEC §11.2).
  */
-export function markRead(contexts: (string | undefined)[], atMs: number = Date.now()): void {
-  for (const context of contexts) record(context, atMs)
+export function markRead(contexts: readonly (string | undefined)[], atMs: number = Date.now()): void {
+  queue.markRead(contexts, atMs)
 }
 
 /** Test seam: drop the tab's state so a suite can start clean. */
 export function resetReadStateForTests(): void {
-  if (timer !== undefined) clearTimeout(timer)
-  timer = undefined
-  identity = undefined
+  queue.reset()
   slotCache = createSlotCache()
-  known = {}
-  pending = {}
-  published = undefined
-  hydrated = false
-  retryMs = 0
   lastAttempt = undefined
   lastMerged = {}
   shown = {}
   fetched = undefined
   marked = {}
-  hydrating = undefined
-  inFlight = Promise.resolve()
 }
 
 /** Flush before the tab goes away — `visibilitychange` is the one mobile fires. */
 export function installReadStateFlush(): () => void {
-  const onHidden = () => {
-    if (document.visibilityState === 'hidden') void flushReadState()
-  }
-  document.addEventListener('visibilitychange', onHidden)
-  return () => document.removeEventListener('visibilitychange', onHidden)
+  return queue.installFlushOnHide(document)
 }
 
 /**
@@ -568,13 +368,14 @@ export interface ReadStateDiagnostic {
 }
 
 function snapshot(): ReadStateDiagnostic {
-  const id = currentIdentity()
+  const id = queue.identity()
+  const { known, pending, published, hydrated, retryMs } = queue.state()
   return {
     slot: readStateDTag(id.slotId),
     clientId: id.clientId,
-    known: { ...known },
-    pending: { ...pending },
-    published: published ? { ...published } : undefined,
+    known,
+    pending,
+    published,
     hydrated,
     retryInS: Math.round(retryMs / 1000),
     lastAttempt,

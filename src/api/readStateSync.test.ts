@@ -3,27 +3,51 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import type { FetchedReadState } from '@estiva-app/conversation'
 
-/**
- * A slot is this installation's account of what *it* read.
- *
- * Found by the CRO-8 cross-app verification rather than by review: Ship's slot
- * came back holding 53 contexts against Peek's 47, because it hydrated from the
- * merge and republished everything Peek had read as its own. The max rule makes
- * that lossless, which is exactly why nothing failed and why it needed looking
- * at the numbers to notice.
+/*
+ * Ship's read state through the package's one queue (TOPIC-3). The queue's own
+ * contract — the whole blob, the read-back before every write, a new slot over
+ * another installation's blob, the reply floor — is the package's
+ * `readStateQueue.test.ts`. What is Ship's own is tested here, at the wire: the
+ * 30078 that reaches a fake relay, in the slot Ship already had.
  */
-const fetchReadState = vi.fn<() => Promise<Pick<FetchedReadState, 'reachable' | 'merged'> & Partial<FetchedReadState>>>()
-/** Typed loosely on purpose: the assertion is about argument 4, the blob. */
-const publishReadState = vi.fn<(...args: unknown[]) => Promise<{ ok: boolean }>>(async () => ({ ok: true }))
 
-const decryptUnlessRefused = vi.fn<(ciphertext: string) => Promise<string | undefined>>(async () => undefined)
+/** A relay holding 30078s by coordinate, as the real one does. */
+const wire = vi.hoisted(() => {
+  const events = new Map<string, { kind: number; pubkey: string; created_at: number; tags: string[][]; content: string }>()
+  const dOf = (e: { tags: string[][] }) => e.tags.find((t) => t[0] === 'd')?.[1] ?? ''
+  return {
+    events,
+    publishes: 0,
+    dOf,
+    /** The blob at a `d` tag, decrypted the way the fake NIP-44 below encrypts. */
+    blob(d: string) {
+      const e = events.get(d)
+      return e ? (JSON.parse(e.content.slice(4)) as { client_id: string; contexts: Record<string, number> }) : undefined
+    },
+  }
+})
+
+/** The merged frontier the read half is handed: the screen's tests set it. */
+const fetchReadState = vi.fn<() => Promise<Pick<FetchedReadState, 'reachable' | 'merged'> & Partial<FetchedReadState>>>()
+
+/** Our own slot read back. A 429 throws here, as `nip44UnlessRefused` does. */
+const decryptUnlessRefused = vi.fn(async (ciphertext: string): Promise<string | undefined> => (ciphertext.startsWith('enc:') ? ciphertext.slice(4) : undefined))
 
 vi.mock('./store', () => ({
-  relay: {},
-  signer: { pubkey: 'me', sign: async (e: unknown) => e },
+  relay: {
+    query: async (filters: { authors: string[]; '#d': string[] }[]) =>
+      [...wire.events.values()].filter((e) => filters[0].authors.includes(e.pubkey) && filters[0]['#d'].includes(wire.dOf(e))),
+    publish: async (event: { tags: string[][]; kind: number; pubkey: string; created_at: number; content: string }) => {
+      wire.publishes++
+      wire.events.set(wire.dOf(event), event)
+      return { ok: true }
+    },
+  },
+  signer: { pubkey: 'me', sign: async (e: object) => ({ ...e, id: '0'.repeat(64), sig: '' }) },
 }))
 vi.mock('./nip44', () => ({
-  nip44: { encrypt: async (p: string) => p, decrypt: async () => undefined },
+  // The plain decrypt answers `undefined` on a 429: the queue must never be handed it.
+  nip44: { encrypt: async (p: string) => `enc:${p}`, decrypt: async () => undefined },
   nip44UnlessRefused: { decrypt: (ciphertext: string) => decryptUnlessRefused(ciphertext) },
 }))
 const signedIn = vi.fn(() => true)
@@ -31,180 +55,113 @@ vi.mock('../auth/estivaId', () => ({ signedIn: () => signedIn() }))
 vi.mock('@estiva-app/conversation', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@estiva-app/conversation')>()),
   fetchReadState: (...a: unknown[]) => fetchReadState(...(a as [])),
-  publishReadState: (...a: unknown[]) => publishReadState(...(a as [])),
 }))
 
 const OURS = 'b7c1e0a4-2f3d-4a86-9c15-8d0e6f2a4b91'
 const THEIRS = 'c8d2f1b5-3a4e-4b97-8d26-9e1f7a3b5c02'
 const NEW = 'd9e3a2c6-4b5f-4ca8-9e37-af2068c4d613'
+const SLOT = 'a'.repeat(32)
+const OUR_D = `read-state:${SLOT}`
 
-describe('the slot holds what THIS installation read', () => {
-  beforeEach(async () => {
-    vi.clearAllMocks()
-    const { resetReadStateForTests } = await import('./readStateSync')
-    resetReadStateForTests()
-  })
+async function fresh() {
+  vi.clearAllMocks()
+  wire.events.clear()
+  wire.publishes = 0
+  localStorage.clear()
+  localStorage.setItem('ship.readstate.slot', JSON.stringify({ slotId: SLOT, clientId: 'ship-1a2b3c4d' }))
+  signedIn.mockReturnValue(true)
+  const { resetReadStateForTests } = await import('./readStateSync')
+  resetReadStateForTests()
+}
 
-  it("does not absorb another installation's contexts into our slot", async () => {
+function put(d: string, clientId: string, contexts: Record<string, number>) {
+  wire.events.set(d, { kind: 30078, pubkey: 'me', created_at: 1, tags: [['d', d]], content: `enc:${JSON.stringify({ v: 1, client_id: clientId, contexts })}` })
+}
+
+describe("Ship writes the slot it already had (CON-19), and only what it read", () => {
+  beforeEach(fresh)
+
+  it('publishes into ship.readstate.slot, under its client id, keeping what that slot held', async () => {
     const { markRead, flushReadState } = await import('./readStateSync')
-    fetchReadState.mockResolvedValue({
-      reachable: true,
-      // The merge holds both; our own slot holds only ours.
-      merged: { [OURS]: 1000, [THEIRS]: 5000 },
-      own: { v: 1, client_id: 'ship-a', contexts: { [OURS]: 1000 } },
-    })
+    put(OUR_D, 'ship-1a2b3c4d', { [OURS]: 1000 })
 
     markRead([NEW], 2_000_000)
     await flushReadState()
 
-    expect(publishReadState).toHaveBeenCalledTimes(1)
-    const contexts = publishReadState.mock.calls[0][3] as unknown as Record<string, number>
-    expect(contexts[OURS]).toBe(1000)
-    expect(contexts[NEW]).toBe(2000)
-    // The whole point: Peek's marker stays in Peek's slot. It is still in the
-    // merge, so nothing is lost — it is simply not ours to republish.
-    expect(contexts).not.toHaveProperty(THEIRS)
+    expect(wire.blob(OUR_D)).toEqual({ v: 1, client_id: 'ship-1a2b3c4d', contexts: { [OURS]: 1000, [NEW]: 2000 } })
   })
 
-  it('still publishes the whole of OUR slot, not a delta', async () => {
+  it('mints a new slot as ship-<8 hex> under the same key when it has none, and publishes there', async () => {
     const { markRead, flushReadState } = await import('./readStateSync')
-    fetchReadState.mockResolvedValue({
-      reachable: true,
-      merged: { [OURS]: 1000 },
-      own: { v: 1, client_id: 'ship-a', contexts: { [OURS]: 1000 } },
-    })
+    localStorage.clear()
 
     markRead([NEW], 2_000_000)
     await flushReadState()
 
-    const contexts = publishReadState.mock.calls[0][3] as unknown as Record<string, number>
-    // A replaceable coordinate: omitting the old marker would drop it.
-    expect(Object.keys(contexts).sort()).toEqual([NEW, OURS].sort())
-  })
-
-  it('refuses to publish while the relay could not be asked', async () => {
-    const { markRead, flushReadState } = await import('./readStateSync')
-    fetchReadState.mockResolvedValue({ reachable: false, merged: {} })
-
-    markRead([NEW], 2_000_000)
-    await flushReadState()
-
-    expect(publishReadState).not.toHaveBeenCalled()
+    const stored = JSON.parse(localStorage.getItem('ship.readstate.slot') ?? '{}') as { slotId: string; clientId: string }
+    expect(stored.clientId).toMatch(/^ship-[0-9a-f]{8}$/)
+    expect(wire.blob(`read-state:${stored.slotId}`)?.client_id).toBe(stored.clientId)
   })
 })
 
-describe('an unreadable own slot blocks the publish', () => {
-  beforeEach(async () => {
-    vi.clearAllMocks()
-    const { resetReadStateForTests } = await import('./readStateSync')
-    resetReadStateForTests()
+describe('a marker is never stranded, and never written over a slot it could not read', () => {
+  beforeEach(fresh)
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.restoreAllMocks()
   })
 
-  /**
-   * The loss this prevents: our slot is on the relay, `/nip44/decrypt` 429s, and
-   * publishing would replace it with only this session's markers. Permanently —
-   * the merge is a maximum, but a context that is gone from every slot is gone.
-   */
-  it('refuses to publish when our own slot is present but undecryptable', async () => {
-    const { markRead, flushReadState } = await import('./readStateSync')
-    fetchReadState.mockResolvedValue({
-      reachable: true,
-      merged: { [OURS]: 1000 },
-      own: undefined,
-      ownUndecryptable: true,
-    })
-
-    markRead([NEW], 2_000_000)
-    await flushReadState()
-
-    expect(publishReadState).not.toHaveBeenCalled()
-  })
-
-  it('still publishes on a genuinely empty coordinate', async () => {
-    const { markRead, flushReadState } = await import('./readStateSync')
-    fetchReadState.mockResolvedValue({
-      reachable: true,
-      merged: {},
-      own: undefined,
-      ownUndecryptable: false,
-    })
-
-    markRead([NEW], 2_000_000)
-    await flushReadState()
-
-    expect(publishReadState).toHaveBeenCalledTimes(1)
-  })
-})
-
-describe('a marker is never stranded by a transient failure', () => {
-  beforeEach(async () => {
-    vi.clearAllMocks()
+  it('holds the publish while our slot answers 429, keeps the slot, and publishes once it decrypts', async () => {
     vi.useFakeTimers()
-    const { resetReadStateForTests } = await import('./readStateSync')
-    resetReadStateForTests()
-  })
-  afterEach(() => vi.useRealTimers())
-
-  /**
-   * An access token expiring mid-session is ordinary — the signer renews itself.
-   * Before this, the flush returned, the debounce timer had already fired, and
-   * the marker sat in `pending` until the next read or a tab switch. Observed
-   * live: reading an issue in Ship simply never reached the relay.
-   */
-  it('retries after the session is unusable, and publishes once it is back', async () => {
     const { markRead, flushReadState } = await import('./readStateSync')
-    fetchReadState.mockResolvedValue({ reachable: true, merged: {}, own: undefined })
-    signedIn.mockReturnValue(false)
+    put(OUR_D, 'ship-1a2b3c4d', { [OURS]: 1000 })
+    decryptUnlessRefused.mockRejectedValueOnce(new Error('POST /nip44/decrypt failed: 429'))
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
 
     markRead([NEW], 2_000_000)
     await flushReadState()
-    expect(publishReadState).not.toHaveBeenCalled()
+    expect(wire.publishes).toBe(0)
+    // Not a new slot: a 429 is not a slot that will never decrypt.
+    expect(JSON.parse(localStorage.getItem('ship.readstate.slot') ?? '{}').slotId).toBe(SLOT)
 
-    signedIn.mockReturnValue(true)
-    await vi.advanceTimersByTimeAsync(5_000)
-    expect(publishReadState).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(3000)
+    expect(wire.blob(OUR_D)?.contexts).toEqual({ [OURS]: 1000, [NEW]: 2000 })
   })
 
-  it('retries when our own slot could not be decrypted', async () => {
+  // A status `nip44UnlessRefused` does not know (a 400 or 404 while Estiva ID deploys) answers "will never decrypt".
+  it('keeps its slot when it answers "will never decrypt", rather than leaving what it held behind', async () => {
+    vi.useFakeTimers()
     const { markRead, flushReadState } = await import('./readStateSync')
-    signedIn.mockReturnValue(true)
-    fetchReadState.mockResolvedValue({
-      reachable: true, merged: {}, own: undefined, ownUndecryptable: true,
-    })
+    put(OUR_D, 'ship-1a2b3c4d', { [OURS]: 1000 })
+    decryptUnlessRefused.mockResolvedValueOnce(undefined)
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
 
     markRead([NEW], 2_000_000)
     await flushReadState()
-    expect(publishReadState).not.toHaveBeenCalled()
+    expect(wire.publishes).toBe(0)
+    expect(JSON.parse(localStorage.getItem('ship.readstate.slot') ?? '{}').slotId).toBe(SLOT)
 
-    fetchReadState.mockResolvedValue({ reachable: true, merged: {}, own: undefined })
-    await vi.advanceTimersByTimeAsync(5_000)
-    expect(publishReadState).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(3000)
+    expect(wire.blob(OUR_D)?.contexts).toEqual({ [OURS]: 1000, [NEW]: 2000 })
   })
 
-  it('backs off rather than busy-looping while it keeps failing', async () => {
+  it('waits while the session is renewing, and publishes once it is back', async () => {
+    vi.useFakeTimers()
     const { markRead, flushReadState } = await import('./readStateSync')
     signedIn.mockReturnValue(false)
+
     markRead([NEW], 2_000_000)
     await flushReadState()
+    expect(wire.publishes).toBe(0)
 
-    // First retry at the debounce interval, the next at twice that — so a long
-    // outage costs a handful of checks rather than one every three seconds.
-    await vi.advanceTimersByTimeAsync(3_100)
-    const afterFirst = signedIn.mock.calls.length
-    await vi.advanceTimersByTimeAsync(3_100)
-    expect(signedIn.mock.calls.length).toBe(afterFirst)
-    await vi.advanceTimersByTimeAsync(3_100)
-    expect(signedIn.mock.calls.length).toBeGreaterThan(afterFirst)
+    signedIn.mockReturnValue(true)
+    await vi.advanceTimersByTimeAsync(3000)
+    expect(wire.blob(OUR_D)?.contexts).toEqual({ [NEW]: 2000 })
   })
 })
 
 describe('the diagnostic reports why a publish did not happen', () => {
-  beforeEach(async () => {
-    vi.clearAllMocks()
-    const { resetReadStateForTests } = await import('./readStateSync')
-    resetReadStateForTests()
-    signedIn.mockReturnValue(true)
-  })
+  beforeEach(fresh)
 
   const diag = () => (window as unknown as { __readState: () => Record<string, unknown> }).__readState()
 
@@ -230,7 +187,6 @@ describe('the diagnostic reports why a publish did not happen', () => {
   it('reports a successful publish, with pending emptied', async () => {
     const { installReadStateDiagnostic, markRead, flushReadState } = await import('./readStateSync')
     installReadStateDiagnostic()
-    fetchReadState.mockResolvedValue({ reachable: true, merged: {}, own: undefined })
 
     markRead([NEW], 2_000_000)
     await flushReadState()
@@ -239,99 +195,12 @@ describe('the diagnostic reports why a publish did not happen', () => {
     expect((d.lastAttempt as { outcome: string }).outcome).toBe('published')
     expect(d.pending).toEqual({})
   })
-
-  it('distinguishes an undecryptable own slot from an empty one', async () => {
-    const { installReadStateDiagnostic, markRead, flushReadState } = await import('./readStateSync')
-    installReadStateDiagnostic()
-    fetchReadState.mockResolvedValue({
-      reachable: true, merged: {}, own: undefined, ownUndecryptable: true,
-    })
-
-    markRead([NEW], 2_000_000)
-    await flushReadState()
-
-    expect((diag().lastAttempt as { outcome: string }).outcome).toBe('not-hydrated')
-  })
-})
-
-describe("Ship's slot is the one it already had (CON-19)", () => {
-  const SLOT = 'a'.repeat(32)
-
-  beforeEach(async () => {
-    vi.clearAllMocks()
-    localStorage.clear()
-    const { resetReadStateForTests } = await import('./readStateSync')
-    resetReadStateForTests()
-    signedIn.mockReturnValue(true)
-  })
-
-  it('keeps a slot stored under ship.readstate.slot, client id and all', async () => {
-    const { loadSlotIdentity } = await import('./readStateSync')
-    localStorage.setItem('ship.readstate.slot', JSON.stringify({ slotId: SLOT, clientId: 'ship-1a2b3c4d' }))
-    expect(loadSlotIdentity()).toEqual({ slotId: SLOT, clientId: 'ship-1a2b3c4d' })
-  })
-
-  it('mints a new one as ship-<8 hex> under the same key, and reuses it', async () => {
-    const { loadSlotIdentity } = await import('./readStateSync')
-    const first = loadSlotIdentity()
-    expect(first.slotId).toMatch(/^[0-9a-f]{32}$/)
-    expect(first.clientId).toMatch(/^ship-[0-9a-f]{8}$/)
-    expect(JSON.parse(localStorage.getItem('ship.readstate.slot') ?? '{}')).toEqual(first)
-    expect(loadSlotIdentity()).toEqual(first)
-  })
-
-  it("takes a new slot id rather than overwrite another installation's blob", async () => {
-    const { markRead, flushReadState } = await import('./readStateSync')
-    localStorage.setItem('ship.readstate.slot', JSON.stringify({ slotId: SLOT, clientId: 'ship-1a2b3c4d' }))
-    fetchReadState.mockResolvedValue({ reachable: true, merged: { [OURS]: 1000 }, own: undefined, ownUndecryptable: false, coordinateConflicted: true })
-
-    markRead([NEW], 2_000_000)
-    await flushReadState()
-
-    expect(publishReadState).toHaveBeenCalledTimes(1)
-    const identity = publishReadState.mock.calls[0][2] as { slotId: string; clientId: string }
-    expect(identity.slotId).not.toBe(SLOT)
-    expect(identity.clientId).toBe('ship-1a2b3c4d')
-    expect(JSON.parse(localStorage.getItem('ship.readstate.slot') ?? '{}').slotId).toBe(identity.slotId)
-  })
-})
-
-describe('the reply floor survives hydration (CON-34)', () => {
-  beforeEach(async () => {
-    vi.clearAllMocks()
-    const { resetReadStateForTests } = await import('./readStateSync')
-    resetReadStateForTests()
-  })
-
-  // `advanceContexts` refuses a floor among its updates, and hydration hands it
-  // what this tab recorded as updates: a floor the cap raised before the first
-  // publish was dropped there, and every reply under it lit up again.
-  it('keeps a floor the cap raised before the first publish', async () => {
-    const { markRead, flushReadState } = await import('./readStateSync')
-    const { MAX_CONTEXTS_BYTES, REPLY_FLOOR_CONTEXT, threadContext } = await import('@estiva-app/conversation')
-    fetchReadState.mockResolvedValue({ reachable: true, merged: {}, own: { v: 1, client_id: 'ship-a', contexts: { [OURS]: 1000 } } })
-
-    vi.spyOn(console, 'warn').mockImplementation(() => {})
-    // A `thread:` entry costs 85 bytes, so this is a few dozen past the budget.
-    const threads = Array.from({ length: Math.ceil(MAX_CONTEXTS_BYTES / 80) }, (_, i) => threadContext(i.toString(16).padStart(64, '0')))
-    threads.forEach((context, i) => markRead([context], 1_700_000_000_000 + i * 1000))
-    await flushReadState()
-
-    const contexts = publishReadState.mock.calls[0][3] as unknown as Record<string, number>
-    expect(contexts[REPLY_FLOOR_CONTEXT]).toBeGreaterThan(1000)
-    expect(contexts[OURS]).toBe(1000)
-    // Filling a 64 KB budget one marker at a time caps on every one: about a second alone, more under a full run.
-  }, 20_000)
 })
 
 // Katerina, 2026-10-05: "new replies won't leave after reading". On production the
 // count stayed 28 s with the thread open, then a re-read relit the divider.
 describe('what the screen judges against only moves forward (SHI-38)', () => {
-  beforeEach(async () => {
-    vi.clearAllMocks()
-    const { resetReadStateForTests } = await import('./readStateSync')
-    resetReadStateForTests()
-  })
+  beforeEach(fresh)
 
   it('shows a mark at once, before any publish or re-read', async () => {
     const { markRead, useMergedReadState } = await import('./readStateSync')
@@ -341,7 +210,7 @@ describe('what the screen judges against only moves forward (SHI-38)', () => {
 
     act(() => markRead([NEW], 7_000_000))
     expect(result.current[NEW]).toBe(7000)
-    expect(publishReadState).not.toHaveBeenCalled()
+    expect(wire.publishes).toBe(0)
   })
 
   it('keeps a marker that a later fetch is missing', async () => {
