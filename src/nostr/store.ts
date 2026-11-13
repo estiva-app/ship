@@ -27,7 +27,7 @@ import {
   projectAddr,
   type CommentRef,
 } from './events'
-import { findNaddrs, naddrToAddr, buildReaction, buildResolution, buildEdit, buildDeletion as buildEventDeletion, imetaTag } from '@estiva-app/protocol'
+import { findNaddrs, naddrToAddr, buildReaction, buildResolution, buildEdit, buildDeletion as buildEventDeletion, imetaTag, needsRelayKey, RELAY_KEY_FILTER, type Authored } from '@estiva-app/protocol'
 import { listFiles, openFile, writeChange, TEXT_FIELD, type WriteChangeResult } from '@estiva-app/interop'
 import { createLoadQuery, planArchiveFolder, planCreateFolder, planDeleteFolder, planListInTopic, planMoveFromFolders, planPlaceFile, planRemoveFromTopic, planRenameFolder, planUnlistFile, readMentionedIn, readMoveRefusal, type ListHolder, type FolderRef, type MovableFile, type MoveRefusal } from '@estiva-app/interop'
 import { foldFolder, type FolderState } from './fold'
@@ -1140,14 +1140,43 @@ export class Store {
    * emits none, because the relay derives the channel from the target's `e` tag
    * and ignores a client-supplied one. Adding it would change the event id for
    * no benefit.
+   *
+   * Its `p` names whose message it is (ACT-6): the target's effective author,
+   * worked out the one way every app does (`effectiveAuthor`). A message the
+   * relay signed for someone names that person, so the relay's key is read, once
+   * per session, and only for a target that could be relay-signed
+   * (`needsRelayKey`): reacting to an ordinary message costs no read.
+   * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-reaction-names-whose-message-it-reacts-to.md
    */
-  react(args: { targetEventId: string; emoji: string }): Promise<PublishResult> {
+  async react(args: { target: Authored & { id: string }; emoji: string }): Promise<PublishResult> {
+    const relayKey = needsRelayKey(args.target) ? await this.relayKey() : undefined
     return this.publish(
       buildReaction(this.signer.pubkey, Date.now(), {
-        targetEventId: args.targetEventId,
+        target: args.target,
         emoji: args.emoji,
+        ...(relayKey ? { relayKey } : {}),
       }),
     )
+  }
+
+  /**
+   * The relay's own key, the signer of any team record, read once per session.
+   * A failed read, or one that found no team record, is tried again next time.
+   */
+  private relayKeyRead?: Promise<string | undefined>
+  private relayKey(): Promise<string | undefined> {
+    this.relayKeyRead ??= (this.relay.query([RELAY_KEY_FILTER] as never) as Promise<SignedEvent[]>).then(
+      (events) => {
+        const key = events[0]?.pubkey
+        if (!key) this.relayKeyRead = undefined
+        return key
+      },
+      (error: unknown) => {
+        this.relayKeyRead = undefined
+        throw error
+      },
+    )
+    return this.relayKeyRead
   }
 
   /**

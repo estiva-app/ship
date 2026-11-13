@@ -3,11 +3,9 @@ import {
   deleteMessage,
   editMessage,
   fileContext,
-  react,
   reply,
   startConversation,
   threadContext,
-  unreact,
   unreadByThread,
   useFeedJudges,
   useMergedReadState,
@@ -20,7 +18,7 @@ import { ownConversations } from '@/lib/ownConversation'
 import { newestDrawn, useMarkRead, useShownThreads } from '@/lib/useMarkRead'
 import { useNewSince } from '@/lib/useNewSince'
 import { answerOf, deleteAnswer, type Say } from './act'
-import { cardEditOf, folderOfMessage, refreshAfter, resolveAnswer, threadFor } from './ProjectPage'
+import { cardEditOf, folderOfMessage, reactTo, refreshAfter, resolveAnswer, threadFor } from './ProjectPage'
 import { useSideColumn } from './sideColumn'
 
 /**
@@ -80,7 +78,7 @@ export function useTopicConversation(
         if (!conversation || !topic) return Promise.resolve('That conversation is no longer on this page.')
         return answerOf(() => reply(conversation, topic.folder, body, files, picks?.urgent, picks?.embeds), () => refresh([conversation.root.folder || topic.folder]))
       },
-      onReact: (messageId, emoji, mine) => answerOf(() => (mine ? unreact(mine) : react(messageId, emoji))),
+      onReact: (messageId, emoji, mine) => reactTo(state, messageId, emoji, mine),
       onResolve: (threadId, resolved, note) => resolveAnswer(state, threadId, resolved, note, say),
       onDeleteMessage: (messageId) => {
         const folder = folderOfMessage(state, messageId)

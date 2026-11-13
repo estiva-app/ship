@@ -189,6 +189,32 @@ export function folderOfMessage(state: FolderState, messageId: string): string |
 }
 
 /**
+ * Add or take back a reaction on a message on this page — CON-2, ACT-6.
+ *
+ * `mine` is the viewer's own reaction, when they have one: taking it back
+ * targets that reaction, never the message. A new one names whose message it is
+ * on (its `p`), read from the message's own event as the page holds it; a
+ * message the page no longer holds is refused rather than sent naming nobody.
+ * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-reaction-names-whose-message-it-reacts-to.md
+ */
+export function reactTo(state: FolderState, messageId: string, emoji: string, mine: string | undefined): Promise<true | string> {
+  if (mine) return answerOf(() => unreact(mine))
+  const target = heldEventOf(state, messageId)
+  if (!target) return Promise.resolve('That message is no longer on this page.')
+  return answerOf(() => react(target, emoji))
+}
+
+/** The event a message on this page was read from, when the page holds it. */
+function heldEventOf(state: FolderState, messageId: string) {
+  for (const conversation of state.conversations) {
+    for (const message of [conversation.root, ...conversation.replies]) {
+      if (message.id === messageId) return eventOf(message)
+    }
+  }
+  return undefined
+}
+
+/**
  * Resolve or reopen a thread on this page (ONE-8), filed in its comment's own Folder (SPEC §6.4). A resolve's refusal
  * goes back to its dialog; a reopen has none, so the page says it.
  */
@@ -873,9 +899,7 @@ export function ProjectPage({
           workspace re-read would spend 38 bridge requests to learn nothing.
           The reaction surface re-reads its own query instead — one request.
         */
-        onReact={(messageId, emoji, mine) =>
-          answerOf(() => (mine ? unreact(mine) : react(messageId, emoji)))
-        }
+        onReact={(messageId, emoji, mine) => reactTo(acting, messageId, emoji, mine)}
         // A resolve is a kind:9101, re-read with the reactions, so no workspace re-read either (ONE-8).
         onResolve={(threadId, resolved, note) => resolveAnswer(acting, threadId, resolved, note, say)}
         /*
