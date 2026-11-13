@@ -9,7 +9,7 @@
  * build has no Estiva ID session); `encrypt` hands the plaintext back so the 30078 on the wire can be read, and
  * `readStateSync.test.ts` covers the blob's own contract.
  */
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorkspaceState } from '@/api'
@@ -20,7 +20,7 @@ type Signed = { id: string; kind: number; pubkey: string; sig: string; tags: str
 const { published, teamRecords } = vi.hoisted(() => {
   const published: Signed[] = []
   /** What the relay answers a read of team records (`kind:39000`) with, and how many times it was asked. */
-  const teamRecords = { held: [] as Signed[], reads: 0 }
+  const teamRecords = { held: [] as Signed[], reads: 0, fail: false }
   globalThis.fetch = (async (url: RequestInfo | URL, init?: RequestInit) => {
     const path = new URL(String(url)).pathname
     if (init?.method === 'POST' && path.endsWith('/events')) {
@@ -31,6 +31,7 @@ const { published, teamRecords } = vi.hoisted(() => {
     if (init?.method === 'POST' && path.endsWith('/query')) {
       if (!String(init.body).includes('39000')) return new Response('[]', { status: 200 })
       teamRecords.reads++
+      if (teamRecords.fail) return new Response(JSON.stringify({ error: 'internal error' }), { status: 500 })
       return new Response(JSON.stringify(teamRecords.held), { status: 200 })
     }
     return new Response('{}', { status: 404 })
@@ -106,6 +107,7 @@ beforeEach(() => {
   published.length = 0
   teamRecords.held = []
   teamRecords.reads = 0
+  teamRecords.fail = false
   vi.mocked(signedIn).mockReturnValue(false)
   viewer.following = NOT_IN
   vi.mocked(readTopicPlace).mockImplementation(() => Promise.resolve({ listed: [{ pubkey: AUTHOR, level: 'all', ways: [] }], events: [] }) as ReturnType<typeof readTopicPlace>)
@@ -258,6 +260,23 @@ describe('A reaction from the topic page names whose message it is on (ACT-6)', 
     await waitFor(() => expect(published.some((event) => event.kind === 7)).toBe(true))
     return published.find((event) => event.kind === 7)!
   }
+
+  // First in this block on purpose: the relay's key is kept for the session once read, and this test is about not having it.
+  it("when the relay's key cannot be read, it still goes out naming the message's signer, and the next one reads the key again", async () => {
+    teamRecords.fail = true
+    vi.mocked(useWorkspace).mockReturnValue(workspace(holding(message(KATERINA, [['p', RAVI]]))))
+    const first = await reactWithThumbsUp()
+    expect(teamRecords.reads).toBe(1)
+    expect(first.tags).toEqual([['e', MESSAGE], ['p', KATERINA]])
+
+    teamRecords.fail = false
+    // The same session, the page opened again.
+    cleanup()
+    await pickThumbsUp()
+    await waitFor(() => expect(published.filter((event) => event.kind === 7)).toHaveLength(2))
+    expect(teamRecords.reads).toBe(2)
+    expect(published.filter((event) => event.kind === 7)[1]!.tags).toEqual([['e', MESSAGE], ['p', KATERINA]])
+  })
 
   it('on a message whose event the page does not hold, it is refused, and no reaction naming nobody is sent', async () => {
     // `said` is built by hand, as no workspace read would: there is no event to read its author from.

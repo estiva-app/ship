@@ -1161,21 +1161,19 @@ export class Store {
 
   /**
    * The relay's own key, the signer of any team record, read once per session.
-   * A failed read, or one that found no team record, is tried again next time.
+   * A failed read, or one that found no team record, answers `undefined`, so
+   * the reaction names the message's signer (right for every message a person
+   * signed), and is tried again on the next reaction.
    */
   private relayKeyRead?: Promise<string | undefined>
   private relayKey(): Promise<string | undefined> {
     this.relayKeyRead ??= (this.relay.query([RELAY_KEY_FILTER] as never) as Promise<SignedEvent[]>).then(
-      (events) => {
-        const key = events[0]?.pubkey
-        if (!key) this.relayKeyRead = undefined
-        return key
-      },
-      (error: unknown) => {
-        this.relayKeyRead = undefined
-        throw error
-      },
-    )
+      (events) => events[0]?.pubkey,
+      () => undefined,
+    ).then((key) => {
+      if (!key) this.relayKeyRead = undefined
+      return key
+    })
     return this.relayKeyRead
   }
 
