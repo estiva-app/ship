@@ -4,7 +4,7 @@ import { addrToNaddr } from '@estiva-app/protocol'
 const query = vi.fn()
 const resolveForeign = vi.fn()
 vi.mock('./store', () => ({ relay: { query: (filters: unknown) => query(filters) } }))
-vi.mock('./foreign', () => ({ resolveForeign: (reference: string) => resolveForeign(reference) }))
+vi.mock('./foreign', () => ({ resolveForeign: (reference: string, options?: unknown) => resolveForeign(reference, options) }))
 
 const { resolveHandoff } = await import('./handoff')
 
@@ -47,7 +47,8 @@ describe('resolveHandoff', () => {
     resolveForeign.mockResolvedValue({ ref: 'r', appName: 'Leaf', openUrl })
     const handoff = await resolveHandoff('document', `plan-${D}`)
     expect(query).toHaveBeenLastCalledWith([{ kinds: [30842], '#d': [D], limit: 2 }])
-    expect(resolveForeign).toHaveBeenCalledWith(`30842:${PK}:${D}`)
+    // In full: the link's page draws a deleted file, which a card's read leaves out (ALO-23).
+    expect(resolveForeign).toHaveBeenCalledWith(`30842:${PK}:${D}`, { full: true })
     // Named by the manifest whose `web` template built the projection's link,
     // and the link is the same path on that app's host, which serves it.
     expect(handoff).toEqual({ state: 'found', object: expect.objectContaining({ appName: 'Leaf' }), app: 'Leaf', openUrl: `https://leaf.estiva.app/document/plan-${D}` })

@@ -99,7 +99,8 @@ describe('resolveForeign — a widget that refreshes must not re-discover the ap
     expect(discovery).toBeGreaterThan(1)
 
     query.mockClear()
-    const again = await resolveForeign(ADDRESS)
+    // The next tick: `fresh`, as a tick past the answer cards share (ALO-23).
+    const again = await resolveForeign(ADDRESS, { fresh: true })
 
     expect(again?.slots.title?.value).toBe('A project')
     expect(query).toHaveBeenCalledTimes(1)
@@ -110,7 +111,7 @@ describe('resolveForeign — a widget that refreshes must not re-discover the ap
     // The title changes at the relay between ticks — a rename in the other app.
     world[1] = event({ kind: KIND, tags: [['d', 'p1'], ['title', 'Renamed elsewhere']] })
 
-    const after = await resolveForeign(ADDRESS)
+    const after = await resolveForeign(ADDRESS, { fresh: true })
 
     expect(after?.slots.title?.value).toBe('Renamed elsewhere')
     world[1] = object
@@ -130,13 +131,14 @@ describe('resolveForeign — who the people are is remembered too (SHA-16)', () 
       asserted on: the cache is at module scope, so an earlier test in this file
       may already have warmed it — which is exactly the sharing it is there for.
     */
-    const found = await resolveForeign(ADDRESS)
+    // Each a tick of its own (`fresh`), past the answer cards share (ALO-23).
+    const found = await resolveForeign(ADDRESS, { fresh: true })
     // Without this the test is vacuous: nothing looks anybody up unless a slot
     // is declared `as: 'pubkey'`, and then a missing cache would also ask zero.
     expect(found?.slots.meta?.isPubkey).toBe(true)
 
     query.mockClear()
-    await resolveForeign(ADDRESS)
+    await resolveForeign(ADDRESS, { fresh: true })
 
     const profileAsks = query.mock.calls.filter((call) =>
       (call[0] as { kinds?: number[] }[]).some((f) => f.kinds?.includes(0)),
