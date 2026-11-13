@@ -51,6 +51,7 @@ export { pickWidget } from '@estiva-app/interop'
 import { KIND_CHANGE, placeFilters, placeListing, type Listed, type ReferenceCandidate } from '@estiva-app/conversation'
 import { relatedTo } from '@/lib/ownKinds'
 import { safeLink } from '@/lib/handoff'
+import { REFRESH_MS } from '@/lib/useRefresh'
 import { KIND } from '../nostr/kinds'
 import { inOrderOption, projectFieldsNow, relay, signer } from './store'
 
@@ -176,9 +177,25 @@ export interface ResolveOptions {
    * read, so only `useFolderFiles` asks, never the refresh tick; a chip never.
    */
   folderFiles?: boolean
+  /**
+   * The file's every change and comments, as interop's full read gives them: a page's text for a part of it
+   * (`part.ts`), which a card never draws. Otherwise a file is read as a card draws it (ALO-23, below).
+   */
+  full?: boolean
+  /** A card's read that no other component's answer stands in for: the file again, after a change made from it. */
+  fresh?: boolean
 }
 
-export function resolveForeign(reference: string, { folderFiles }: ResolveOptions = {}): Promise<ForeignObject | null> {
+/**
+ * What a reference draws as: a message, or a file as a chip, row or card draws it. A file is read as it is now and
+ * once for every component drawing it (`resolveCard`), unless `full` or `folderFiles` asks for more.
+ */
+export function resolveForeign(reference: string, { folderFiles, full, fresh }: ResolveOptions = {}): Promise<ForeignObject | null> {
+  if (full || folderFiles) return readFull(reference, { folderFiles })
+  return resolveCard(reference, { fresh })
+}
+
+function readFull(reference: string, { folderFiles }: Pick<ResolveOptions, 'folderFiles'> = {}): Promise<ForeignObject | null> {
   /*
     A message mentioned from Peek arrives as `nostr:nevent…` (RIC-11), and
     everything went to `resolveForeignObject`, which decodes an `naddr` or an
@@ -193,6 +210,108 @@ export function resolveForeign(reference: string, { folderFiles }: ResolveOption
   // runtime's signature; naming them here would be inventing an adapter the
   // seam does not need.
   return resolveForeignObject(reference, query, profiles.viaRelay(query), 0, manifests, folderFiles ? { folderFiles } : undefined)
+}
+
+/**
+ * How long one card read answers every component drawing the same reference (ALO-23): half a refresh, so components
+ * whose ticks fall close together share one read, and a card is never more than a tick and a half behind the relay.
+ */
+const CARD_SHARE_MS = REFRESH_MS / 2
+
+const cardAnswers = new Map<string, { at: number; answer: Promise<ForeignObject | null> }>()
+/** The references asked in this moment, and their one read. */
+let cardBatch: { references: Set<string>; read: Promise<Map<string, ForeignObject | null>> } | undefined
+
+/**
+ * What a card, a row or a chip draws for a reference: the file as it is now, read once for every component drawing it
+ * (ALO-23).
+ *
+ * The full read gives a file's every change (up to 500) and its comments, and each component asked on its own, so a
+ * topic's page read one project's 1.8 MB three or four times over. A card draws none of that: it draws the file's
+ * current fields, and a project's issues with theirs (`linkedFrom` in the kit). So the references asked in the same
+ * moment are read together, through the list read (SPEC §6.13) where the relay has it, as `readTopicDocuments` does,
+ * and the answer is shared for `CARD_SHARE_MS`. The people the files name are then looked up once, from the same
+ * profiles cache, because the list read names nobody. A message (an event reference) keeps its own read.
+ *
+ * A read that fails rejects every reference it carried, and is not kept, so the next tick asks again.
+ */
+function resolveCard(reference: string, { fresh }: Pick<ResolveOptions, 'fresh'> = {}): Promise<ForeignObject | null> {
+  const held = cardAnswers.get(reference)
+  if (!fresh && held && Date.now() - held.at < CARD_SHARE_MS) return held.answer
+  const answer = isEventReference(reference) ? readFull(reference) : inCardBatch(reference)
+  cardAnswers.set(reference, { at: Date.now(), answer })
+  answer.catch(() => {
+    if (cardAnswers.get(reference)?.answer === answer) cardAnswers.delete(reference)
+  })
+  return answer
+}
+
+/** `reference` in the read the components asking in this same moment send together. */
+function inCardBatch(reference: string): Promise<ForeignObject | null> {
+  if (!cardBatch) {
+    const references = new Set<string>()
+    // A macrotask, so every component a render mounts or a tick refreshes has asked before the read goes.
+    const read = new Promise<void>((go) => setTimeout(go, 0)).then(() => {
+      cardBatch = undefined
+      return readCards([...references])
+    })
+    cardBatch = { references, read }
+  }
+  cardBatch.references.add(reference)
+  return cardBatch.read.then((answers) => answers.get(reference) ?? null)
+}
+
+function addressOfReference(reference: string): string | undefined {
+  try {
+    // A bare `naddr1…` parses only as a NIP-27 reference.
+    return pointerToAddress(referenceToPointer(/^(nostr:|\d+:)/.test(reference) ? reference : `nostr:${reference}`))
+  } catch {
+    return undefined
+  }
+}
+
+/** Every key a file draws as a person, as interop's full read names them: its person fields, controls and deleter. */
+function pubkeysOf(object: ForeignObject): string[] {
+  const keys: string[] = []
+  for (const slot of [...Object.values(object.slots), ...object.meta]) if (slot.isPubkey && slot.value) keys.push(slot.value)
+  for (const action of object.actions) if (action.control === 'pubkey' && action.current) keys.push(action.current)
+  if (object.deleted) keys.push(object.deleted.by)
+  return keys
+}
+
+async function readCards(references: readonly string[]): Promise<Map<string, ForeignObject | null>> {
+  const read = await listRead()
+  const addressed = references.flatMap((reference) => {
+    const address = addressOfReference(reference)
+    return address ? [[reference, address] as const] : []
+  })
+  const answers = new Map<string, ForeignObject | null>()
+  // Without the list read, or for a reference that names no address, each its full read, as before.
+  const alone = read.listRead ? references.filter((reference) => !addressed.some(([r]) => r === reference)) : references
+  const [objects, ...each] = await Promise.all([
+    read.listRead && addressed.length
+      ? resolveForeignRoots(
+          addressed.map(([, address]) => address),
+          query,
+          manifests,
+          { listRead: true, children: true },
+        )
+      : Promise.resolve([]),
+    ...alone.map((reference) => readFull(reference)),
+  ])
+  alone.forEach((reference, i) => answers.set(reference, each[i]))
+  if (!objects.length) {
+    if (read.listRead) for (const [reference] of addressed) answers.set(reference, null)
+    return answers
+  }
+  const keys = [...new Set(objects.flatMap((object) => [object, ...(object.children ?? [])].flatMap(pubkeysOf)))]
+  const people = keys.length ? await profiles.viaRelay(query)(keys) : {}
+  const byAddress = new Map(
+    objects.map((object) => [object.address, { ...object, people, ...(object.children ? { children: object.children.map((child) => ({ ...child, people })) } : {}) }]),
+  )
+  // A file the list read leaves out (deleted, or not readable here) is no answer, as the full read's `null`.
+  for (const [reference, address] of addressed) answers.set(reference, byAddress.get(address) ?? null)
+  return answers
 }
 
 /**

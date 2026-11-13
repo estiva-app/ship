@@ -177,7 +177,8 @@ export function MessageCard({
           return
         }
         // Then what the relay now holds.
-        const fresh = await resolveForeign(uri)
+        // Fresh: what another card read a moment ago is from before this change.
+        const fresh = await resolveForeign(uri, { fresh: true })
         setAfter({ given, object: fresh })
       } catch (e) {
         setError((e as Error).message)

@@ -94,7 +94,8 @@ export function openLinkOf(blockLink: string | undefined, openUrl: string | unde
 
 /** Read one part once, as the signed-in viewer. */
 export async function readPart(pointer: PartPointer): Promise<PartView> {
-  const object = await resolveForeign(pointer.address)
+  // In full: a part is a run of the page's text, which a card's read leaves out (ALO-23).
+  const object = await resolveForeign(pointer.address, { full: true })
   // `unreachable` is interop's stand-in for an address the read could not see
   // (it carries the noun from the manifest and nothing else): the same empty read.
   if (!object || object.unreachable) {
