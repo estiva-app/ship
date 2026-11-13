@@ -54,8 +54,9 @@
  * here — this file knows only Ship's own.
  *
  * A page that is not a file lives under `/app/`, so a word some app declares
- * tomorrow can never land on it. The Folder page is the one Ship has; it was
- * `/folder/<id>` until PRO-22, and that path still opens it and is rewritten
+ * tomorrow can never land on it. The team page is the one Ship has, at
+ * `/app/teams/<id>`; it was `/folder/<id>` until PRO-22 and `/app/folder/<id>`
+ * until its links said teams, and those paths still open it and are rewritten
  * once (`movedRedirect`), the way an old hash link is.
  */
 import { useEffect, useState } from 'react'
@@ -142,9 +143,9 @@ const DEFAULT_PROJECT_VIEW: ProjectView = 'table'
 export function href(route: Route): string {
   switch (route.name) {
     case 'issues':
-      return route.folder ? `/app/folder/${route.folder}/issues` : '/issues'
+      return route.folder ? `/app/teams/${route.folder}/issues` : '/issues'
     case 'projects': {
-      const base = route.folder ? `/app/folder/${route.folder}/projects` : '/projects'
+      const base = route.folder ? `/app/teams/${route.folder}/projects` : '/projects'
       return route.tab && route.tab !== 'active' ? `${base}?tab=${route.tab}` : base
     }
     case 'project': {
@@ -160,9 +161,9 @@ export function href(route: Route): string {
     case 'issue':
       return `/issue/${objectRef(route.d, route.slug)}`
     case 'folder':
-      return `/app/folder/${route.id}`
+      return `/app/teams/${route.id}`
     case 'topics':
-      return route.folder ? `/app/folder/${route.folder}/topics` : '/topics'
+      return route.folder ? `/app/teams/${route.folder}/topics` : '/topics'
     case 'topic':
       return `/topic/${objectRef(route.d, route.slug)}`
     case 'inbound':
@@ -227,8 +228,9 @@ export function parse(location: string): Route {
     if (d && !new URLSearchParams(query ?? '').has('thread')) return { name: 'topic', d }
     if (d) return { name: 'elsewhere', word: parts[0], ref: parts[1], query }
   }
-  // A Folder's Topics, Projects and Issues (SHIPS-5), under the Folder page's path, or the path it had before PRO-22.
-  const folderAt = parts[0] === 'app' && parts[1] === 'folder' ? 2 : parts[0] === 'folder' ? 1 : -1
+  // A team's Topics, Projects and Issues (SHIPS-5), under the team page's path, or a path it had before:
+  // `/app/folder/<id>` until its links said teams, `/folder/<id>` before PRO-22.
+  const folderAt = parts[0] === 'app' && (parts[1] === 'teams' || parts[1] === 'folder') ? 2 : parts[0] === 'folder' ? 1 : -1
   const folder = folderAt !== -1 ? parts[folderAt] : undefined
   if (folder && parts[folderAt + 1] === 'topics') return { name: 'topics', folder }
   if (folder && parts[folderAt + 1] === 'projects') {
@@ -236,13 +238,8 @@ export function parse(location: string): Route {
     return tab ? { name: 'projects', tab, folder } : { name: 'projects', folder }
   }
   if (folder && parts[folderAt + 1] === 'issues') return { name: 'issues', folder }
-  if (parts[0] === 'app' && parts[1] === 'folder' && parts[2]) {
-    return { name: 'folder', id: parts[2] }
-  }
-  // Where the Folder page was until PRO-22; `movedRedirect` corrects the bar.
-  if (parts[0] === 'folder' && parts[1]) {
-    return { name: 'folder', id: parts[1] }
-  }
+  // The team page; its older paths still open it, and `movedRedirect` corrects the bar.
+  if (folder) return { name: 'folder', id: folder }
   if (parts.length === 2 && !OWN_SEGMENTS.has(parts[0])) {
     return query ? { name: 'elsewhere', word: parts[0], ref: parts[1], query } : { name: 'elsewhere', word: parts[0], ref: parts[1] }
   }
@@ -272,16 +269,21 @@ export function hashRedirect(location: string): string | null {
 }
 
 /**
- * The path a page that moved under `/app/` (PRO-22) should become, or null.
+ * The path a team's page at an older address should become, or null.
  *
- * Only the Folder page moved. Its old path is in browser histories and in the
- * sidebar links of every tab opened before the deploy, so it still opens the
- * page, and this rewrites the bar once so the address copied next is the new one.
+ * The team page and its Topics, Projects and Issues were `/folder/<id>…` until
+ * PRO-22 and `/app/folder/<id>…` until their links said teams. Those paths are
+ * in messages and descriptions on the relay and in browser histories, so they
+ * are kept for good: they still open the same view, and this rewrites the bar
+ * once so the address copied next is the teams one. A block link's `#…` stays.
+ * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-teams-link-says-teams-and-an-old-folder-link-still-opens-it.md
  */
 export function movedRedirect(location: string): string | null {
-  const path = location.replace(/^[a-z]+:\/\/[^/]+/i, '').split(/[?#]/)[0]
-  if (!/^\/folder\/[^/]+\/?$/.test(path)) return null
-  return href(parse(path))
+  const local = location.replace(/^[a-z]+:\/\/[^/]+/i, '')
+  const [beforeHash, hash] = local.includes('#') ? [local.slice(0, local.indexOf('#')), local.slice(local.indexOf('#'))] : [local, '']
+  const path = beforeHash.split('?')[0]
+  if (!/^\/(app\/)?folder\/[^/]+(\/(topics|projects|issues))?\/?$/.test(path)) return null
+  return href(parse(beforeHash)) + hash
 }
 
 /** Navigate, adding a history entry. */

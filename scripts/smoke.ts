@@ -1161,7 +1161,7 @@ async function main() {
     ],
   })
 
-  await page.goto(`http://localhost:${PORT}/app/folder/${FOLDER_ID}`)
+  await page.goto(`http://localhost:${PORT}/app/teams/${FOLDER_ID}`)
   await page.waitForSelector(`[data-folder="${FOLDER_ID}"]`)
   const folderView = page.locator(`[data-folder="${FOLDER_ID}"]`)
   check('the Folder resolves from its relay-maintained state', (await folderView.getAttribute('data-source')) === 'state')
@@ -1189,7 +1189,11 @@ async function main() {
   // The Folder page's old path still opens it, and the bar moves to /app/ (PRO-22).
   await page.goto(`http://localhost:${PORT}/folder/${FOLDER_ID}`)
   await page.waitForSelector(`[data-folder="${FOLDER_ID}"]`)
-  check('the old Folder path opens the page and moves under /app/', new URL(page.url()).pathname === `/app/folder/${FOLDER_ID}`, page.url())
+  check('the old Folder path opens the page and moves under /app/', new URL(page.url()).pathname === `/app/teams/${FOLDER_ID}`, page.url())
+  // …and so does the path it had until team links said teams.
+  await page.goto(`http://localhost:${PORT}/app/folder/${FOLDER_ID}`)
+  await page.waitForSelector(`[data-folder="${FOLDER_ID}"]`)
+  check('the /app/folder path opens the team page at /app/teams', new URL(page.url()).pathname === `/app/teams/${FOLDER_ID}`, page.url())
 
   // ── A topic on Ship's host: its page here; one message in it: the hand-off ─
   // RFC 0.5 §7.7: a Peek topic's path with Ship's host in front names the same
@@ -1299,7 +1303,7 @@ async function main() {
       '9007 - Smoke folder true | 1852 add undefined true',
     createWrites.map((e) => `${e.kind} ${tagValue(e, 'op') ?? '-'} ${tagValue(e, 'name')}`).join(' | ') || 'nothing published',
   )
-  check('  …and opens the new Folder', !!newFolderId && page.url().endsWith(`/folder/${newFolderId}`), page.url())
+  check('  …and opens the new Folder', !!newFolderId && page.url().endsWith(`/teams/${newFolderId}`), page.url())
 
   // The stub does not derive a channel or state from commands; write them as the relay would have.
   seed({ kind: 39000, tags: [['d', newFolderId], ['name', 'Smoke folder']] })

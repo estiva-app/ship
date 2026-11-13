@@ -11,7 +11,7 @@ const noop = () => {}
 const KEY = 'a8a7d739'.repeat(8)
 
 describe('ShipSidebar', () => {
-  const hrefFor = (entry: SidebarEntry, folder?: string) => (folder ? `/app/folder/${folder}/${entry}` : `/${entry}`)
+  const hrefFor = (entry: SidebarEntry, folder?: string) => (folder ? `/app/teams/${folder}/${entry}` : `/${entry}`)
   const teams = [
     { id: 'peek', name: 'Peek' },
     { id: 'hq', name: 'Estiva HQ' },
@@ -80,9 +80,9 @@ describe('ShipSidebar', () => {
     ])
     await userEvent.click(screen.getByRole('button', { name: 'Estiva HQ' }))
     expect(rowsOf(container, 'hq').map((a) => [a.textContent, a.getAttribute('href')])).toEqual([
-      ['Topics', '/app/folder/hq/topics'],
-      ['Projects', '/app/folder/hq/projects'],
-      ['Issues', '/app/folder/hq/issues'],
+      ['Topics', '/app/teams/hq/topics'],
+      ['Projects', '/app/teams/hq/projects'],
+      ['Issues', '/app/teams/hq/issues'],
     ])
     expect(screen.queryByRole('button', { name: 'Not in a Folder' })).not.toBeInTheDocument()
   })
@@ -93,7 +93,7 @@ describe('ShipSidebar', () => {
     expect(screen.getByRole('button', { name: 'Peek' })).toHaveAttribute('aria-expanded', 'true')
     expect(screen.getByRole('button', { name: 'Estiva HQ' })).toHaveAttribute('aria-expanded', 'false')
     const marked = [...container.querySelectorAll('a[aria-current="page"]')].map((a) => a.getAttribute('href'))
-    expect(marked).toEqual(['/app/folder/peek/projects'])
+    expect(marked).toEqual(['/app/teams/peek/projects'])
   })
 
   it("on an issue in no team, the top Issues is marked and no fold opens", () => {

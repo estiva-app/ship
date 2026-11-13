@@ -89,17 +89,17 @@ describe('parse, at the edges', () => {
 
   it("serves a Folder's Projects and Issues under its Folder, as its Topics (SHIPS-5)", () => {
     const UUID5 = 'b59fbb9c-0cd4-43c1-9f5b-3b5704072e6f'
-    expect(href({ name: 'projects', folder: UUID5 })).toBe(`/app/folder/${UUID5}/projects`)
-    expect(href({ name: 'projects', tab: 'completed', folder: UUID5 })).toBe(`/app/folder/${UUID5}/projects?tab=completed`)
-    expect(href({ name: 'issues', folder: UUID5 })).toBe(`/app/folder/${UUID5}/issues`)
-    expect(parse(`/app/folder/${UUID5}/projects?tab=completed`)).toEqual({ name: 'projects', tab: 'completed', folder: UUID5 })
-    expect(parse(`/app/folder/${UUID5}/issues`)).toEqual({ name: 'issues', folder: UUID5 })
+    expect(href({ name: 'projects', folder: UUID5 })).toBe(`/app/teams/${UUID5}/projects`)
+    expect(href({ name: 'projects', tab: 'completed', folder: UUID5 })).toBe(`/app/teams/${UUID5}/projects?tab=completed`)
+    expect(href({ name: 'issues', folder: UUID5 })).toBe(`/app/teams/${UUID5}/issues`)
+    expect(parse(`/app/teams/${UUID5}/projects?tab=completed`)).toEqual({ name: 'projects', tab: 'completed', folder: UUID5 })
+    expect(parse(`/app/teams/${UUID5}/issues`)).toEqual({ name: 'issues', folder: UUID5 })
   })
 
   it('a Projects link from before the tabs still opens Archived, on the whole list and in a Folder (SHIPS-7)', () => {
     const UUID5 = 'b59fbb9c-0cd4-43c1-9f5b-3b5704072e6f'
     expect(parse('/projects?archived')).toEqual({ name: 'projects', tab: 'archived' })
-    expect(parse(`/app/folder/${UUID5}/projects?archived`)).toEqual({ name: 'projects', tab: 'archived', folder: UUID5 })
+    expect(parse(`/app/teams/${UUID5}/projects?archived`)).toEqual({ name: 'projects', tab: 'archived', folder: UUID5 })
     expect(parse('/projects?tab=nonsense')).toEqual({ name: 'projects' })
   })
 
@@ -201,23 +201,33 @@ describe('the §7.7 root', () => {
 
   it('serves Topics at /topics and a Folder’s Topics under its Folder, at the old Folder path too (SHIPS-3)', () => {
     expect(href({ name: 'topics' })).toBe('/topics')
-    expect(href({ name: 'topics', folder: UUID })).toBe(`/app/folder/${UUID}/topics`)
+    expect(href({ name: 'topics', folder: UUID })).toBe(`/app/teams/${UUID}/topics`)
     expect(parse(`/folder/${UUID}/topics`)).toEqual({ name: 'topics', folder: UUID })
     // Not another app's word: `/topics/<x>` is no hand-off.
     expect(parse(`/topics/${UUID}`)).toEqual({ name: 'topics' })
-    expect(movedRedirect(`/folder/${UUID}/topics`)).toBe(null)
+  })
+
+  it('opens a team’s page and views from its old folder links, and rewrites the bar to the teams address once', () => {
+    expect(parse(`/app/folder/${UUID}`)).toEqual({ name: 'folder', id: UUID })
+    expect(parse(`/app/folder/${UUID}/issues`)).toEqual({ name: 'issues', folder: UUID })
+    expect(movedRedirect(`/app/folder/${UUID}`)).toBe(`/app/teams/${UUID}`)
+    expect(movedRedirect(`/app/folder/${UUID}/issues`)).toBe(`/app/teams/${UUID}/issues`)
+    expect(movedRedirect(`/app/folder/${UUID}/projects?tab=completed`)).toBe(`/app/teams/${UUID}/projects?tab=completed`)
+    expect(movedRedirect(`https://ship.estiva.app/app/folder/${UUID}/topics#block-x`)).toBe(`/app/teams/${UUID}/topics#block-x`)
+    expect(movedRedirect(`/folder/${UUID}/topics`)).toBe(`/app/teams/${UUID}/topics`)
+    expect(movedRedirect(`/app/teams/${UUID}/issues`)).toBe(null)
   })
 
   it('serves the Folder page under /app/', () => {
-    expect(href({ name: 'folder', id: UUID })).toBe(`/app/folder/${UUID}`)
-    expect(parse(`/app/folder/${UUID}`)).toEqual({ name: 'folder', id: UUID })
+    expect(href({ name: 'folder', id: UUID })).toBe(`/app/teams/${UUID}`)
+    expect(parse(`/app/teams/${UUID}`)).toEqual({ name: 'folder', id: UUID })
   })
 
   it('still opens the Folder page at its old path, and rewrites the bar once', () => {
     expect(parse(`/folder/${UUID}`)).toEqual({ name: 'folder', id: UUID })
-    expect(movedRedirect(`/folder/${UUID}`)).toBe(`/app/folder/${UUID}`)
-    expect(movedRedirect(`https://ship.estiva.app/folder/${UUID}`)).toBe(`/app/folder/${UUID}`)
-    expect(movedRedirect(`/app/folder/${UUID}`)).toBe(null)
+    expect(movedRedirect(`/folder/${UUID}`)).toBe(`/app/teams/${UUID}`)
+    expect(movedRedirect(`https://ship.estiva.app/folder/${UUID}`)).toBe(`/app/teams/${UUID}`)
+    expect(movedRedirect(`/app/teams/${UUID}`)).toBe(null)
     expect(movedRedirect(`/issue/x-${UUID}`)).toBe(null)
   })
 
@@ -225,6 +235,6 @@ describe('the §7.7 root', () => {
     goTo(`/folder/${UUID}`)
     const { result } = renderHook(() => useRoute())
     expect(result.current).toEqual({ name: 'folder', id: UUID })
-    expect(location.pathname).toBe(`/app/folder/${UUID}`)
+    expect(location.pathname).toBe(`/app/teams/${UUID}`)
   })
 })

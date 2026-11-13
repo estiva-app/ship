@@ -34,7 +34,7 @@ const meta = {
   args: {
     openIssues: 18,
     activeProjects: 5,
-    hrefFor: (entry, folder) => (folder ? `#/app/folder/${folder}/${entry}` : `#/${entry}`),
+    hrefFor: (entry, folder) => (folder ? `#/app/teams/${folder}/${entry}` : `#/${entry}`),
     folders: FOLDERS,
     onOpenFolder: () => {},
     onNewFolder: () => {},
