@@ -74,7 +74,8 @@ export async function resolveHandoff(word: string, ref: string, query?: string):
   if (lookup.by === 'd' && event.kind === KIND_BARE_FILE && !new URLSearchParams(query ?? '').has('thread')) {
     return { state: 'own', kind: event.kind, d: lookup.identifier }
   }
-  const object = await resolveForeign(lookup.by === 'd' ? `${event.kind}:${event.pubkey}:${lookup.identifier}` : event.id)
+  // In full, not as a card: the page an outside link opens draws a deleted file too, which the card's read leaves out (ALO-23).
+  const object = await resolveForeign(lookup.by === 'd' ? `${event.kind}:${event.pubkey}:${lookup.identifier}` : event.id, { full: true })
   if (!object) return { state: 'unclaimed' }
   const projected = safeLink(object.openUrl)
   const owner = projected ? manifestOfLink(projected, all) : undefined

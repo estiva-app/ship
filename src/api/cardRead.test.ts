@@ -120,23 +120,43 @@ describe('resolveForeign — a card reads its file as it is now, once for every 
     expect(changeReads()).toEqual([])
   })
 
-  it('answers a second component from the same read while it is fresh, and reads again on the next tick', async () => {
-    await ask(FIRST)
-    await vi.advanceTimersByTimeAsync(REFRESH_MS / 4)
+  it('reads the relay again once a read has landed, so an edit from another app shows on the next ask', async () => {
     await ask(FIRST)
     expect(fileFilters()).toHaveLength(1)
 
-    // An edit made in another app since then reaches the card on the next tick.
+    // An edit made in another app, then a return to the tab a moment later: no answer from before it stands in.
     const title = world[1].tags.find((t) => t[0] === 'title')!
     title[1] = 'Renamed in Peek'
     try {
-      await vi.advanceTimersByTimeAsync(REFRESH_MS)
+      await vi.advanceTimersByTimeAsync(1000)
       const [fresh] = await ask(FIRST)
       expect(fresh?.slots.title?.value).toBe('Renamed in Peek')
       expect(fileFilters()).toHaveLength(2)
     } finally {
       title[1] = 'The first project'
     }
+  })
+
+  it('asks each file on its own when the shared list read is turned away, so only the bad one fails', async () => {
+    query.mockImplementation(async (filters: Record<string, unknown>[]) => {
+      if (filters.some((f) => f.fields === 'newest' && (f['#d'] as string[]).includes('p1'))) throw new Error('400')
+      return answer(filters)
+    })
+    const answers = [FIRST, SECOND].map((reference) => resolveForeign(reference).then((o) => o?.slots.title?.value, () => 'failed'))
+    await vi.advanceTimersByTimeAsync(0)
+    expect(await Promise.all(answers)).toEqual(['failed', 'The second project'])
+  })
+
+  it('fails a card whose own read fails alone, never the cards read beside it', async () => {
+    // Without the list read each file is read on its own, and the relay turns one of them away.
+    switched.mockResolvedValue(undefined)
+    query.mockImplementation(async (filters: Record<string, unknown>[]) => {
+      if (filters.some((f) => (f['#d'] as string[] | undefined)?.includes('p1'))) throw new Error('429')
+      return answer(filters)
+    })
+    const answers = [FIRST, SECOND].map((reference) => resolveForeign(reference).then((o) => o?.slots.title?.value, () => 'failed'))
+    await vi.advanceTimersByTimeAsync(0)
+    expect(await Promise.all(answers)).toEqual(['failed', 'The second project'])
   })
 
   it('answers nothing for a file the list read leaves out, as the full read did', async () => {

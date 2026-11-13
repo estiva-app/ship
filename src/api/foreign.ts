@@ -51,7 +51,6 @@ export { pickWidget } from '@estiva-app/interop'
 import { KIND_CHANGE, placeFilters, placeListing, type Listed, type ReferenceCandidate } from '@estiva-app/conversation'
 import { relatedTo } from '@/lib/ownKinds'
 import { safeLink } from '@/lib/handoff'
-import { REFRESH_MS } from '@/lib/useRefresh'
 import { KIND } from '../nostr/kinds'
 import { inOrderOption, projectFieldsNow, relay, signer } from './store'
 
@@ -213,14 +212,13 @@ function readFull(reference: string, { folderFiles }: Pick<ResolveOptions, 'fold
 }
 
 /**
- * How long one card read answers every component drawing the same reference (ALO-23): half a refresh, so components
- * whose ticks fall close together share one read, and a card is never more than a tick and a half behind the relay.
+ * The card reads in flight, by reference (ALO-23). Only while in flight: every component's refresh comes from one
+ * scheduler (`useRefresh`), so they ask in the same moment and share the read that way, and an ask once it has landed
+ * (a return to the tab, a page opened) reads the relay again.
  */
-const CARD_SHARE_MS = REFRESH_MS / 2
-
-const cardAnswers = new Map<string, { at: number; answer: Promise<ForeignObject | null> }>()
+const cardAnswers = new Map<string, Promise<ForeignObject | null>>()
 /** The references asked in this moment, and their one read. */
-let cardBatch: { references: Set<string>; read: Promise<Map<string, ForeignObject | null>> } | undefined
+let cardBatch: { references: Set<string>; read: Promise<Map<string, Promise<ForeignObject | null>>> } | undefined
 
 /**
  * What a card, a row or a chip draws for a reference: the file as it is now, read once for every component drawing it
@@ -230,19 +228,18 @@ let cardBatch: { references: Set<string>; read: Promise<Map<string, ForeignObjec
  * topic's page read one project's 1.8 MB three or four times over. A card draws none of that: it draws the file's
  * current fields, and a project's issues with theirs (`linkedFrom` in the kit). So the references asked in the same
  * moment are read together, through the list read (SPEC §6.13) where the relay has it, as `readTopicDocuments` does,
- * and the answer is shared for `CARD_SHARE_MS`. The people the files name are then looked up once, from the same
- * profiles cache, because the list read names nobody. A message (an event reference) keeps its own read.
- *
- * A read that fails rejects every reference it carried, and is not kept, so the next tick asks again.
+ * and one in flight answers every component asking for it. The people the files name are then looked up once, from
+ * the same profiles cache, because the list read names nobody. A message (an event reference) keeps its own read.
  */
 function resolveCard(reference: string, { fresh }: Pick<ResolveOptions, 'fresh'> = {}): Promise<ForeignObject | null> {
   const held = cardAnswers.get(reference)
-  if (!fresh && held && Date.now() - held.at < CARD_SHARE_MS) return held.answer
+  if (!fresh && held) return held
   const answer = isEventReference(reference) ? readFull(reference) : inCardBatch(reference)
-  cardAnswers.set(reference, { at: Date.now(), answer })
-  answer.catch(() => {
-    if (cardAnswers.get(reference)?.answer === answer) cardAnswers.delete(reference)
-  })
+  cardAnswers.set(reference, answer)
+  const landed = () => {
+    if (cardAnswers.get(reference) === answer) cardAnswers.delete(reference)
+  }
+  answer.then(landed, landed)
   return answer
 }
 
@@ -279,39 +276,41 @@ function pubkeysOf(object: ForeignObject): string[] {
   return keys
 }
 
-async function readCards(references: readonly string[]): Promise<Map<string, ForeignObject | null>> {
-  const read = await listRead()
-  const addressed = references.flatMap((reference) => {
-    const address = addressOfReference(reference)
-    return address ? [[reference, address] as const] : []
-  })
-  const answers = new Map<string, ForeignObject | null>()
+/**
+ * Each reference's answer, settled on its own: one that cannot be read (a person's `npub`, a broken address) fails
+ * alone, as it did when every component read for itself, and never the cards read beside it.
+ */
+async function readCards(references: readonly string[]): Promise<Map<string, Promise<ForeignObject | null>>> {
+  const answers = new Map<string, Promise<ForeignObject | null>>()
+  const read = await listRead().catch(() => ({}) as { listRead?: true })
+  const addressed = read.listRead
+    ? references.flatMap((reference) => {
+        const address = addressOfReference(reference)
+        return address ? [[reference, address] as const] : []
+      })
+    : []
   // Without the list read, or for a reference that names no address, each its full read, as before.
-  const alone = read.listRead ? references.filter((reference) => !addressed.some(([r]) => r === reference)) : references
-  const [objects, ...each] = await Promise.all([
-    read.listRead && addressed.length
-      ? resolveForeignRoots(
-          addressed.map(([, address]) => address),
-          query,
-          manifests,
-          { listRead: true, children: true },
-        )
-      : Promise.resolve([]),
-    ...alone.map((reference) => readFull(reference)),
-  ])
-  alone.forEach((reference, i) => answers.set(reference, each[i]))
-  if (!objects.length) {
-    if (read.listRead) for (const [reference] of addressed) answers.set(reference, null)
-    return answers
+  for (const reference of references) if (!addressed.some(([r]) => r === reference)) answers.set(reference, readFull(reference))
+  if (!addressed.length) return answers
+  const listed = readListed(addressed.map(([, address]) => address))
+  // A file the list read leaves out (deleted, or not readable here) is no answer, as the full read's `null`.
+  const own = (address: string) => (byAddress: Map<string | undefined, ForeignObject>) => byAddress.get(address) ?? null
+  for (const [reference, address] of addressed) {
+    // When the one read fails, each file is asked on its own, so one the relay turns away fails alone.
+    const alone = (failed: unknown) => (addressed.length > 1 ? readListed([address]).then(own(address)) : Promise.reject(failed))
+    answers.set(reference, listed.then(own(address), alone))
   }
+  return answers
+}
+
+/** Files by the list read, with the people they name; a failed people read leaves names to the next tick. */
+async function readListed(addresses: readonly string[]): Promise<Map<string | undefined, ForeignObject>> {
+  const objects = await resolveForeignRoots(addresses, query, manifests, { listRead: true, children: true })
   const keys = [...new Set(objects.flatMap((object) => [object, ...(object.children ?? [])].flatMap(pubkeysOf)))]
-  const people = keys.length ? await profiles.viaRelay(query)(keys) : {}
-  const byAddress = new Map(
+  const people = keys.length ? await profiles.viaRelay(query)(keys).catch(() => ({})) : {}
+  return new Map(
     objects.map((object) => [object.address, { ...object, people, ...(object.children ? { children: object.children.map((child) => ({ ...child, people })) } : {}) }]),
   )
-  // A file the list read leaves out (deleted, or not readable here) is no answer, as the full read's `null`.
-  for (const [reference, address] of addressed) answers.set(reference, byAddress.get(address) ?? null)
-  return answers
 }
 
 /**
