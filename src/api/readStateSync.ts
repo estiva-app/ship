@@ -97,10 +97,10 @@ function show(from: Readonly<Record<string, number>>): void {
 }
 
 /**
- * The tab's one queue. Its own slot is read back with the decrypt that
- * **throws** on a refusal that may pass (a 429 above all): `nip44.decrypt`
- * answers `undefined` there, which the queue would take for a slot that will
- * never decrypt, and it would move to a new slot on every rate limit.
+ * The tab's one queue. Its own slot is read back with a decrypt that
+ * **throws** whenever it does not decrypt: `nip44.decrypt` answers `undefined`
+ * on a 429, which the queue would take for a slot that will never decrypt, and
+ * it would move to a new slot on every rate limit.
  */
 const queue = createReadStateQueue({
   storage: () => (typeof localStorage === 'undefined' ? undefined : localStorage),
@@ -111,7 +111,17 @@ const queue = createReadStateQueue({
   pubkey: () => signer.pubkey,
   canWrite: signedIn,
   query,
-  nip44: { encrypt: (plaintext) => nip44.encrypt(plaintext), decrypt: (ciphertext) => nip44UnlessRefused.decrypt(ciphertext) },
+  nip44: {
+    encrypt: (plaintext) => nip44.encrypt(plaintext),
+    // Not even a "will never decrypt" answer moves Ship off its slot: `nip44UnlessRefused` gives one for any status
+    // it does not know (a 400 or 404 while Estiva ID deploys), and a new slot would orphan everything read here.
+    // Ship holds the publish instead, as it always has; another installation's blob still takes a new slot.
+    decrypt: async (ciphertext) => {
+      const plaintext = await nip44UnlessRefused.decrypt(ciphertext)
+      if (plaintext === undefined) throw new Error('our read-state slot would not decrypt')
+      return plaintext
+    },
+  },
   sign: (event) => signer.sign(event),
   publish: (event) => relay.publish(event),
   // On this screen at once, not after the publish and the next re-read.

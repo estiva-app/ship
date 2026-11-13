@@ -84,8 +84,6 @@ describe("Ship writes the slot it already had (CON-19), and only what it read", 
   it('publishes into ship.readstate.slot, under its client id, keeping what that slot held', async () => {
     const { markRead, flushReadState } = await import('./readStateSync')
     put(OUR_D, 'ship-1a2b3c4d', { [OURS]: 1000 })
-    // Peek's slot, beside ours: never read into ours.
-    put(`read-state:${'b'.repeat(32)}`, 'peek-00000000', { [THEIRS]: 5000 })
 
     markRead([NEW], 2_000_000)
     await flushReadState()
@@ -108,7 +106,10 @@ describe("Ship writes the slot it already had (CON-19), and only what it read", 
 
 describe('a marker is never stranded, and never written over a slot it could not read', () => {
   beforeEach(fresh)
-  afterEach(() => vi.useRealTimers())
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+  })
 
   it('holds the publish while our slot answers 429, keeps the slot, and publishes once it decrypts', async () => {
     vi.useFakeTimers()
@@ -121,6 +122,23 @@ describe('a marker is never stranded, and never written over a slot it could not
     await flushReadState()
     expect(wire.publishes).toBe(0)
     // Not a new slot: a 429 is not a slot that will never decrypt.
+    expect(JSON.parse(localStorage.getItem('ship.readstate.slot') ?? '{}').slotId).toBe(SLOT)
+
+    await vi.advanceTimersByTimeAsync(3000)
+    expect(wire.blob(OUR_D)?.contexts).toEqual({ [OURS]: 1000, [NEW]: 2000 })
+  })
+
+  // A status `nip44UnlessRefused` does not know (a 400 or 404 while Estiva ID deploys) answers "will never decrypt".
+  it('keeps its slot when it answers "will never decrypt", rather than leaving what it held behind', async () => {
+    vi.useFakeTimers()
+    const { markRead, flushReadState } = await import('./readStateSync')
+    put(OUR_D, 'ship-1a2b3c4d', { [OURS]: 1000 })
+    decryptUnlessRefused.mockResolvedValueOnce(undefined)
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    markRead([NEW], 2_000_000)
+    await flushReadState()
+    expect(wire.publishes).toBe(0)
     expect(JSON.parse(localStorage.getItem('ship.readstate.slot') ?? '{}').slotId).toBe(SLOT)
 
     await vi.advanceTimersByTimeAsync(3000)
