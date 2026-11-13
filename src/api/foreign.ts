@@ -67,10 +67,9 @@ export type { ForeignObject, ResolvedSlot, FolderContents, FolderSummary } from 
  * Each event once: the relay answers every filter on its own, so a file two filters match comes back twice — an
  * issue asked by its own card and as its project's (ALO-23) — and the project's card would list it twice.
  */
-const query = async (filters: Record<string, unknown>[]): Promise<SignedEvent[]> => {
-  const seen = new Set<string>()
-  return (await relay.query(filters as never)).filter((event) => !seen.has(event.id) && !!seen.add(event.id))
-}
+const query = async (filters: Record<string, unknown>[]): Promise<SignedEvent[]> => [
+  ...new Map((await relay.query(filters as never)).map((event) => [event.id, event])).values(),
+]
 
 /**
  * One load of Folder reads (APP-2): a Folder listing and the Folders' contents
