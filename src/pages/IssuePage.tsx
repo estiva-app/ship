@@ -4,7 +4,7 @@ import { useNewSince } from '@/lib/useNewSince'
 import { useCallback, useMemo, useState } from 'react'
 import { ArchiveDialog, ArchivedNotice } from '@estiva-app/ui'
 import { ARCHIVE_WORDS, archivedLine, archivedNoticeOf, lockedReason, ownArchive, type Archives } from '@/lib/archive'
-import { ISSUE_STATUSES, addMentioned, archiveIssue, commentsOn, deleteIssue, deleteMessage, editMessage, react, reply, setIssueField, unreact, startConversation, type DirectoryView, type FolderState, type WorkspaceState, threadContext, fileContext, useMergedReadState, useFeedJudges, unreadByThread } from '@/api'
+import { ISSUE_STATUSES, addMentioned, archiveIssue, commentsOn, deleteIssue, deleteMessage, editMessage, reply, setIssueField, startConversation, type DirectoryView, type FolderState, type WorkspaceState, threadContext, fileContext, useMergedReadState, useFeedJudges, unreadByThread } from '@/api'
 import { me, useMentionsElsewhere } from '@/api'
 import { MEMBER_FIELD_PREFIX, memberOfField } from '@estiva-app/conversation'
 import { useRelated, withoutTopics } from '@/api/useRelated'
@@ -20,7 +20,7 @@ import { act, actInField, answerOf, deleteAnswer, sayOnceLeft, type Say } from '
 import { editedFor, historyFor } from './history'
 import { useSideColumn } from './sideColumn'
 import { FileTopicsOf } from '@/components/FileTopicsOf'
-import { activityFor, cardEditOf, copyText, folderOfMessage, pickerPeople, refreshAfter, resolveAnswer, threadFor, useMentionLinks, withElsewhere } from './ProjectPage'
+import { activityFor, cardEditOf, copyText, folderOfMessage, pickerPeople, reactTo, refreshAfter, resolveAnswer, threadFor, useMentionLinks, withElsewhere } from './ProjectPage'
 import { useReferencePage } from '@/api/references'
 
 /**
@@ -235,9 +235,7 @@ export function IssuePage({ state, directory, archives, d, say, refresh }: { sta
           workspace re-read would spend 38 bridge requests to learn nothing.
           The reaction surface re-reads its own query instead — one request.
         */
-        onReact={(messageId, emoji, mine) =>
-          answerOf(() => (mine ? unreact(mine) : react(messageId, emoji)))
-        }
+        onReact={(messageId, emoji, mine) => reactTo(acting, messageId, emoji, mine)}
         // A resolve is a kind:9101, re-read with the reactions, so no workspace re-read either (ONE-8).
         onResolve={(threadId, resolved, note) => resolveAnswer(acting, threadId, resolved, note, say)}
         /*

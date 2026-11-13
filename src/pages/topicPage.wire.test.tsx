@@ -9,7 +9,7 @@
  * build has no Estiva ID session); `encrypt` hands the plaintext back so the 30078 on the wire can be read, and
  * `readStateSync.test.ts` covers the blob's own contract.
  */
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorkspaceState } from '@/api'
@@ -17,8 +17,10 @@ import { stubLayout } from '@/test/inlineText'
 
 type Signed = { id: string; kind: number; pubkey: string; sig: string; tags: string[][]; content: string }
 
-const { published } = vi.hoisted(() => {
+const { published, teamRecords } = vi.hoisted(() => {
   const published: Signed[] = []
+  /** What the relay answers a read of team records (`kind:39000`) with, and how many times it was asked. */
+  const teamRecords = { held: [] as Signed[], reads: 0, fail: false }
   globalThis.fetch = (async (url: RequestInfo | URL, init?: RequestInit) => {
     const path = new URL(String(url)).pathname
     if (init?.method === 'POST' && path.endsWith('/events')) {
@@ -26,10 +28,17 @@ const { published } = vi.hoisted(() => {
       published.push(event)
       return new Response(JSON.stringify({ accepted: true, event_id: event.id }), { status: 200 })
     }
-    if (init?.method === 'POST' && path.endsWith('/query')) return new Response('[]', { status: 200 })
+    if (init?.method === 'POST' && path.endsWith('/query')) {
+      // `POST /query` takes a bare array of filters: only one asking for kind 39000 is a read of team records.
+      const filters = JSON.parse(String(init.body)) as { kinds?: number[] }[]
+      if (!filters.some((filter) => filter.kinds?.includes(39000))) return new Response('[]', { status: 200 })
+      teamRecords.reads++
+      if (teamRecords.fail) return new Response(JSON.stringify({ error: 'internal error' }), { status: 500 })
+      return new Response(JSON.stringify(teamRecords.held), { status: 200 })
+    }
     return new Response('{}', { status: 404 })
   }) as typeof fetch
-  return { published }
+  return { published, teamRecords }
 })
 const NOT_IN = { kind: 'topic', in: false }
 const viewer = vi.hoisted(() => ({ following: { kind: 'topic', in: false } as Record<string, unknown> }))
@@ -83,6 +92,9 @@ import { fileContext, me, READ_DWELL_MS, useDirectory, useWorkspace } from '@/ap
 import { readTopicPlace } from '@/api/foreign'
 import { PUBLISH_DEBOUNCE_MS, resetReadStateForTests } from '@/api/readStateSync'
 import { signedIn } from '@/auth/estivaId'
+import { foldFolder } from '@/nostr/fold'
+import { foldEdits } from '@estiva-app/conversation'
+import { store } from '@/api/store'
 import App from '@/App'
 
 const STATE = { projects: [], issues: [], activity: [], conversations: [], anchors: {}, edits: {}, attachments: {}, urgent: {}, parts: {}, embeds: {}, folders: [], events: [], threadsAt: { [TEAM]: 1 }, mentionsOf: [TOPIC] } as unknown as WorkspaceState
@@ -97,6 +109,9 @@ const topicMarks = () => published.filter((event) => event.kind === 30078 && eve
 
 beforeEach(() => {
   published.length = 0
+  teamRecords.held = []
+  teamRecords.reads = 0
+  teamRecords.fail = false
   vi.mocked(signedIn).mockReturnValue(false)
   viewer.following = NOT_IN
   vi.mocked(readTopicPlace).mockImplementation(() => Promise.resolve({ listed: [{ pubkey: AUTHOR, level: 'all', ways: [] }], events: [] }) as ReturnType<typeof readTopicPlace>)
@@ -208,5 +223,137 @@ describe("A topic's page at the wire (TOPI-8)", () => {
     expect(tag(add, 'value')).toBe('true')
     expect(tag(add, 'a')).toBe(TOPIC)
     expect(tag(add, 'h')).toBe(TEAM)
+  })
+})
+
+/*
+  A 👍 names whose message it is on (ACT-6): the `kind:7` Ship signs carries the message's `e` and its author's `p`,
+  so the next step can show that person the reaction. The message is folded from its event, as a workspace read
+  folds it, because the author is read from the event the page holds.
+  why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-reaction-names-whose-message-it-reacts-to.md
+*/
+describe('A reaction from the topic page names whose message it is on (ACT-6)', () => {
+  const RAVI = 'a'.repeat(64)
+  const RELAY = '9'.repeat(64)
+  const MESSAGE = '8'.repeat(64)
+  const REPLY = '6'.repeat(64)
+  const AGENT = 'c'.repeat(64)
+  const OWNER = 'e'.repeat(64)
+  const message =(pubkey: string, tags: string[][]): Signed & { created_at: number } => ({
+    id: MESSAGE,
+    kind: 1111,
+    pubkey,
+    created_at: SAID_AT,
+    content: 'Shipping Friday?',
+    sig: '0'.repeat(128),
+    tags: [['A', TOPIC], ['K', '30840'], ['h', TEAM], ...tags],
+  })
+  /** The workspace holding one conversation about the topic: its events (message, replies, edits), folded as a read folds them. */
+  const holding = (...events: (Signed & { created_at: number })[]) => {
+    const folded = foldFolder(events as never)
+    return { ...STATE, conversations: folded.conversations, edits: foldEdits(events as never), anchors: { [MESSAGE]: [TOPIC] }, events } as unknown as WorkspaceState
+  }
+  /** Picks 👍 on the message reading `text`; on a reply, `replyId` says which card. */
+  async function pickThumbsUp(text = 'Shipping Friday?', replyId?: string) {
+    await open()
+    const user = userEvent.setup()
+    const column = document.querySelector('[data-comments-column]') as HTMLElement
+    // A reply is drawn once its thread is opened.
+    if (replyId) await user.click(await within(column).findByText(/1 reply/))
+    await screen.findByText(text)
+    const card = replyId ? (document.querySelector(`[data-reply-id="${replyId}"]`) as HTMLElement) : column
+    ;(replyId ? [card] : column.querySelectorAll('[data-comment-body], [data-reply-id]')).forEach((each) => fireEvent.mouseEnter(each))
+    await user.click(within(card).getByRole('button', { name: 'React' }))
+    await user.click(await screen.findByRole('button', { name: 'Makes sense' }))
+  }
+  async function reactWithThumbsUp(text?: string, replyId?: string) {
+    await pickThumbsUp(text, replyId)
+    await waitFor(() => expect(published.some((event) => event.kind === 7)).toBe(true))
+    return published.find((event) => event.kind === 7)!
+  }
+
+  // Each test is a new session: the relay's key not read yet, and the relay, which signs every team record, holding one.
+  beforeEach(() => {
+    // Optional so the same tests run on the code before ACT-6, which kept no key (/land's old-code check).
+    store.resetRelayKeyForTests?.()
+    teamRecords.held = [{ id: '7'.repeat(64), kind: 39000, pubkey: RELAY, sig: '0'.repeat(128), tags: [['d', TEAM]], content: '' }]
+  })
+
+  it("when the relay's key cannot be read, it still goes out naming the message's signer, and the next one reads the key again", async () => {
+    teamRecords.fail = true
+    vi.mocked(useWorkspace).mockReturnValue(workspace(holding(message(KATERINA, [['p', RAVI]]))))
+    const first = await reactWithThumbsUp()
+    expect(teamRecords.reads).toBe(1)
+    expect(first.tags).toEqual([['e', MESSAGE], ['p', KATERINA]])
+
+    teamRecords.fail = false
+    // The same session, the page opened again.
+    cleanup()
+    await pickThumbsUp()
+    await waitFor(() => expect(published.filter((event) => event.kind === 7)).toHaveLength(2))
+    expect(teamRecords.reads).toBe(2)
+    expect(published.filter((event) => event.kind === 7)[1]!.tags).toEqual([['e', MESSAGE], ['p', KATERINA]])
+  })
+
+  it('on a message whose event the page does not hold, it is refused, and no reaction naming nobody is sent', async () => {
+    // `said` is built by hand, as no workspace read would: there is no event to read its author from.
+    vi.mocked(useWorkspace).mockReturnValue(workspace(WITH_CONVERSATION))
+    await pickThumbsUp()
+    // Settled either way: a reaction went out, or the refusal is on screen.
+    await waitFor(() => expect(published.some((event) => event.kind === 7) || screen.queryByText(/^Not reacted/) !== null).toBe(true))
+    expect(published.filter((event) => event.kind === 7)).toEqual([])
+    expect(screen.getByText(/^Not reacted/)).toBeInTheDocument()
+  })
+
+  it("on Katerina's message, it carries the message and names Katerina, and reads nothing more to do it", async () => {
+    vi.mocked(useWorkspace).mockReturnValue(workspace(holding(message(KATERINA, []))))
+    const reaction = await reactWithThumbsUp()
+    expect(reaction.pubkey).toBe(me)
+    expect(reaction.content).toBe('👍')
+    expect(reaction.tags).toEqual([['e', MESSAGE], ['p', KATERINA]])
+    expect(teamRecords.reads).toBe(0)
+  })
+
+  it("on Katerina's message that mentions Ravi, it still names Katerina, not Ravi", async () => {
+    vi.mocked(useWorkspace).mockReturnValue(workspace(holding(message(KATERINA, [['p', RAVI]]))))
+    const reaction = await reactWithThumbsUp()
+    expect(reaction.tags).toEqual([['e', MESSAGE], ['p', KATERINA]])
+  })
+
+  it("on a reply, it names the reply's author, not the conversation's", async () => {
+    const reply: Signed & { created_at: number } = {
+      id: REPLY,
+      kind: 1111,
+      pubkey: KATERINA,
+      created_at: SAID_AT + 60,
+      content: 'Yes, Friday.',
+      sig: '0'.repeat(128),
+      // NIP-22: a reply keeps the topic as its root and names the comment it answers by `e`, its author by `p`.
+      tags: [['A', TOPIC], ['K', '30840'], ['e', MESSAGE], ['k', '1111'], ['p', AUTHOR], ['h', TEAM]],
+    }
+    vi.mocked(useWorkspace).mockReturnValue(workspace(holding(message(AUTHOR, []), reply)))
+    const reaction = await reactWithThumbsUp('Yes, Friday.', REPLY)
+    expect(reaction.tags).toEqual([['e', REPLY], ['p', KATERINA]])
+  })
+
+  it("on an agent's message its owner edited, it names the agent, whose message it still is", async () => {
+    const edit: Signed & { created_at: number } = {
+      id: '5'.repeat(64),
+      kind: 40003,
+      pubkey: OWNER,
+      created_at: SAID_AT + 60,
+      content: 'Shipping Monday?',
+      sig: '0'.repeat(128),
+      tags: [['h', TEAM], ['e', MESSAGE]],
+    }
+    vi.mocked(useWorkspace).mockReturnValue(workspace(holding(message(AGENT, []), edit)))
+    const reaction = await reactWithThumbsUp('Shipping Monday?')
+    expect(reaction.tags).toEqual([['e', MESSAGE], ['p', AGENT]])
+  })
+
+  it('on a message the relay signed for Ravi, it names Ravi, read through the relay’s own key', async () => {
+    vi.mocked(useWorkspace).mockReturnValue(workspace(holding(message(RELAY, [['actor', RAVI]]))))
+    const reaction = await reactWithThumbsUp()
+    expect(reaction.tags).toEqual([['e', MESSAGE], ['p', RAVI]])
   })
 })

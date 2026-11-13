@@ -772,9 +772,14 @@ let settling = false
  * the target's `e` tag and ignores a client-supplied `h`. That makes this the
  * one write in this file that does not have to know which Folder it is in — and
  * the reason `postMessage` and the change events all do.
+ *
+ * `target` is the message's own event, as read: its `p` names whose message it
+ * is (ACT-6), so a caller that does not hold the event refuses rather than
+ * sending a reaction that names nobody (`reactTo` on the pages).
+ * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-reaction-names-whose-message-it-reacts-to.md
  */
-export function react(targetEventId: string, emoji: string): Promise<WriteResult> {
-  return publish(() => store.react({ targetEventId, emoji }))
+export function react(target: Pick<SignedEvent, 'id' | 'pubkey' | 'tags'>, emoji: string): Promise<WriteResult> {
+  return publish(() => store.react({ target: { id: target.id, pubkey: target.pubkey, tags: target.tags }, emoji }))
 }
 
 /**
