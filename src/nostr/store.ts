@@ -1177,6 +1177,11 @@ export class Store {
     return this.relayKeyRead
   }
 
+  /** Each test starts a session that has not read the relay's key yet. */
+  resetRelayKeyForTests(): void {
+    this.relayKeyRead = undefined
+  }
+
   /**
    * Resolve or reopen a thread (SPEC §6.4, ONE-8): a `kind:9101` about its
    * top-level comment, the same assertion Peek and Leaf write. `folder` is the
