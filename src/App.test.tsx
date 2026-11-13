@@ -140,7 +140,7 @@ describe('sidebarProps — the old app\'s counting rules', () => {
     expect(sidebarProps(STATE, { name: 'issue', d: D('11') }, teams).current).toEqual({ entry: 'issues', folder: 'f' })
     expect(sidebarProps(STATE, { name: 'issue', d: D('14') }, teams).current).toEqual({ entry: 'issues', folder: undefined })
     expect(sidebarProps(STATE, { name: 'project', d: LIVE, view: 'table' }).current).toEqual({ entry: 'projects', folder: undefined })
-    expect(sidebarProps(STATE, { name: 'issues', folder: 'f' }, teams).hrefFor('projects', 'f')).toBe('/app/folder/f/projects')
+    expect(sidebarProps(STATE, { name: 'issues', folder: 'f' }, teams).hrefFor('projects', 'f')).toBe('/app/teams/f/projects')
   })
 })
 
@@ -317,7 +317,7 @@ describe('Projects page — cards from the fold', () => {
   // SHIPS-5: the readFolders mock's team "Ship" lists Live; Mine's own Folder is no team, so it is in no team's Projects.
   it("lists only a Folder's projects on its Projects, and Add project there starts on that Folder", async () => {
     vi.mocked(createProject).mockResolvedValue({ ok: true, addr: '30850:x:new' })
-    goTo('/app/folder/3167adea-877f-43c4-96fb-517a2b2d5d24/projects?tab=planned')
+    goTo('/app/teams/3167adea-877f-43c4-96fb-517a2b2d5d24/projects?tab=planned')
     render(<App />)
     const main = within(screen.getByRole('main'))
     expect(await main.findByRole('heading', { name: 'Ship · Projects' })).toBeInTheDocument()
@@ -365,7 +365,7 @@ describe('Issues page — rows from the fold', () => {
 
   // SHIPS-5: team "Ship" lists Live, so its Issues are Live's two; X-4 is in no project, so in no team's Issues.
   it("lists only the issues of a Folder's projects on its Issues, and Add issue there offers only those projects", async () => {
-    goTo('/app/folder/3167adea-877f-43c4-96fb-517a2b2d5d24/issues')
+    goTo('/app/teams/3167adea-877f-43c4-96fb-517a2b2d5d24/issues')
     render(<App />)
     const main = within(screen.getByRole('main'))
     expect(await main.findByRole('heading', { name: 'Ship · Issues' })).toBeInTheDocument()
@@ -759,7 +759,7 @@ describe('before the first read lands', () => {
     relay is busy.
   */
   it('draws a Folder page without waiting for the workspace', () => {
-    goTo(`/app/folder/${D('90')}`)
+    goTo(`/app/teams/${D('90')}`)
     vi.mocked(useWorkspace).mockReturnValue({ state: null, partial: false, error: null, clock: null, loading: true, busy: false, refresh, wantThreads: () => {}, live: false })
     const { container, unmount } = render(<App />)
     expect(container.querySelector('[data-loading="workspace"]')).toBeNull()

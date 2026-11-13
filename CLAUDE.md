@@ -12,8 +12,10 @@ and two `TES-1`. The address is the identity; the ref is decoration. Use the
 
 **Say team to people; tool names and flags still say folder.** Every word a
 person reads (labels, dialogs, notices, the manifest's action descriptions)
-says team: "Teams" as a heading, "team" in a sentence. Code names, routes
-(`/app/folder/…`), kinds and the `folder:` link prefix keep folder (TEA-8).
+says team: "Teams" as a heading, "team" in a sentence, and so does a team's
+address, `/app/teams/<id>…`, whose old `/app/folder/…` and `/folder/…` paths
+redirect for good (record a-teams-link-says-teams-and-an-old-folder-link-still-opens-it).
+Code names, kinds and the `folder:` link prefix keep folder (TEA-8).
 
 **The UI Guardrails project:** where it stands is `docs/GATES.md` §0 in the `estiva-ui` checkout beside this repository.
 `npm run gates:status` here shows Ship's part of it, read from the code.
