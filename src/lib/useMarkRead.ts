@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import { markRead, READ_DWELL_MS } from '@/api'
+import { dwellContexts, dwellKey, watchDwell } from '@estiva-app/conversation'
+import { markRead } from '@/api'
 
 /**
  * Mark what is on screen read, once it has been on screen for a moment (CRO-8).
@@ -21,35 +22,12 @@ import { markRead, READ_DWELL_MS } from '@/api'
  * stayed new until the page was opened again.
  */
 export function useMarkRead(contexts: (string | undefined)[], newestAt?: number): void {
-  // Joined so the effect re-runs when the *set* changes rather than on every
-  // render — a new array literal each render would restart the dwell forever
-  // and nothing would ever be marked read.
-  const key = contexts.filter(Boolean).sort().join('|')
-  useEffect(() => {
-    if (key.length === 0) return
-    let t: ReturnType<typeof setTimeout> | undefined
-    // Up to the newest message drawn, never past the clock — as Peek's
-    // `useDwell`: the relay may hold one the 5 s poll has not drawn yet, and a
-    // marker is grow-only. A message ahead of the clock is read once the clock
-    // gets there, if still on screen. Without a `newestAt`, the clock, as before.
-    const fire = () => {
-      const now = Math.floor(Date.now() / 1000)
-      markRead(key.split('|'), newestAt === undefined ? Date.now() : Math.min(newestAt, now) * 1000)
-      if (newestAt !== undefined && newestAt > now) t = setTimeout(fire, (newestAt - now) * 1000)
-    }
-    // A page in a background tab is not being read: arm only while it is shown,
-    // and again when it comes back (Peek's `useDwell`).
-    const arm = () => {
-      clearTimeout(t)
-      if (!document.hidden) t = setTimeout(fire, READ_DWELL_MS)
-    }
-    arm()
-    document.addEventListener('visibilitychange', arm)
-    return () => {
-      clearTimeout(t)
-      document.removeEventListener('visibilitychange', arm)
-    }
-  }, [key, newestAt])
+  // The set, not the array: a new array literal each render would restart the
+  // dwell forever and nothing would ever be marked read.
+  const key = dwellKey(contexts)
+  // Up to the newest message drawn, never past the clock, and only while the
+  // page is shown: the package's `watchDwell`, which Leaf's column uses too.
+  useEffect(() => watchDwell(dwellContexts(key), newestAt === undefined ? undefined : newestAt * 1000, markRead, document), [key, newestAt])
 }
 
 /** The newest root of a feed, and the newest reply of the threads in `open` — what each `useMarkRead` of a page re-arms on. */
