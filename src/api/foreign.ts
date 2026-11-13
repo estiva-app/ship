@@ -63,9 +63,13 @@ export type { ForeignObject, ResolvedSlot, FolderContents, FolderSummary } from 
  * is handed everything. Ship's relay is authenticated the same way the rest of
  * the app's reads are, so a reference to a Folder the viewer cannot see comes
  * back `unreachable` rather than throwing.
+ *
+ * Each event once: the relay answers every filter on its own, so a file two filters match comes back twice — an
+ * issue asked by its own card and as its project's (ALO-23) — and the project's card would list it twice.
  */
-const query = (filters: Record<string, unknown>[]): Promise<SignedEvent[]> =>
-  relay.query(filters as never)
+const query = async (filters: Record<string, unknown>[]): Promise<SignedEvent[]> => [
+  ...new Map((await relay.query(filters as never)).map((event) => [event.id, event])).values(),
+]
 
 /**
  * One load of Folder reads (APP-2): a Folder listing and the Folders' contents

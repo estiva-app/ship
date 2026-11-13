@@ -176,6 +176,34 @@ describe('resolveForeign — a card reads its file as it is now, once for every 
     expect(read?.slots.title?.value).toBe('The first project')
   })
 
+  it("lists each of a project's issues once when one of them is asked in the same moment", async () => {
+    // A project whose app lists its issues under it, recommended by its author, beside the world's own app.
+    const OWNER = 'c'.repeat(64)
+    const PROJECT = `30850:${OWNER}:q1`
+    const projections = {
+      30850: { widget: 'card', slots: { title: { tag: 'title' }, list: { children: { kind: 30851, via: 'a', limit: 50 } } } },
+      30851: { widget: 'card', slots: { title: { tag: 'title' } } },
+    }
+    const recommend = (kind: number) => event({ kind: 31989, pubkey: OWNER, tags: [['d', String(kind)], ['a', `31990:${OWNER}:tracker`]] })
+    const files = [
+      event({ kind: 31990, pubkey: OWNER, tags: [['d', 'tracker'], ['k', '30850'], ['k', '30851']], content: JSON.stringify({ name: 'Tracker', projections }) }),
+      recommend(30850),
+      recommend(30851),
+      event({ kind: 30850, pubkey: OWNER, tags: [['d', 'q1'], ['title', 'A project']] }),
+      event({ kind: 30851, pubkey: OWNER, tags: [['d', 'i1'], ['title', 'An issue'], ['a', PROJECT]] }),
+      event({ kind: 30851, pubkey: OWNER, tags: [['d', 'i2'], ['title', 'Another issue'], ['a', PROJECT]] }),
+    ]
+    world.push(...files)
+    // The relay answers each filter on its own: an issue asked by its own card and as the project's comes back twice.
+    query.mockImplementation(async (filters: Record<string, unknown>[]) => (await Promise.all(filters.map((f) => answer([f])))).flat())
+    try {
+      const [project] = await ask(PROJECT, `30851:${OWNER}:i1`)
+      expect(project?.children?.map((child) => child.slots.title?.value).sort()).toEqual(['An issue', 'Another issue'])
+    } finally {
+      world.splice(world.length - files.length, files.length)
+    }
+  })
+
   it('reads each file in full where the relay has no list read yet', async () => {
     switched.mockResolvedValue(undefined)
     const [a] = await ask(FIRST)
