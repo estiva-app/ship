@@ -253,6 +253,17 @@ describe('a page reads its read state once, whoever on it asks', () => {
     expect(fetchReadState).toHaveBeenCalledTimes(1)
   })
 
+  // Product review of ship#409: read a reply in Peek, come back to Ship within seconds — its dot must clear as you do.
+  it('asks the relay again when the window is focused, however soon after the last fetch', async () => {
+    const { useMergedReadState } = await import('./readStateSync')
+    fetchReadState.mockResolvedValueOnce({ reachable: true, merged: { [THEIRS]: 5000 }, own: undefined })
+    fetchReadState.mockResolvedValue({ reachable: true, merged: { [THEIRS]: 9000 }, own: undefined })
+    const page = renderHook(() => useMergedReadState())
+    await waitFor(() => expect(page.result.current[THEIRS]).toBe(5000))
+    act(() => void window.dispatchEvent(new Event('focus')))
+    await waitFor(() => expect(page.result.current[THEIRS]).toBe(9000))
+  })
+
   it('asks again after a fetch missing a slot, so the retry is not answered from it', async () => {
     const { useMergedReadState } = await import('./readStateSync')
     decryptUnlessRefused.mockRejectedValueOnce(new Error('429'))

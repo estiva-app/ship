@@ -175,12 +175,14 @@ let lastWhole: { at: number; state: FetchedReadState & { complete: boolean } } |
  * state in several places — its conversation, each card's, the sidebar's dots —
  * and each mounted hook asked the relay itself, four reads of the same `30078`s
  * on opening a topic in Ship. A hook asking while a fetch runs joins it, and one
- * asking within {@link READ_STATE_SHARED_MS} of a whole fetch takes that one. A
- * fetch missing a slot is not kept, so the retry after a refused decrypt still asks.
+ * `opening` within {@link READ_STATE_SHARED_MS} of a whole fetch takes that one.
+ * A refresh — the window focused, the tab shown again, the cadence — always asks
+ * the relay, so what you read in Peek a moment ago is read here as you come back.
+ * A fetch missing a slot is not kept, so the retry after a refused decrypt still asks.
  */
-function sharedReadState(): Promise<FetchedReadState & { complete: boolean }> {
+function sharedReadState(opening: boolean): Promise<FetchedReadState & { complete: boolean }> {
   if (pending) return pending
-  if (lastWhole && Date.now() - lastWhole.at < READ_STATE_SHARED_MS) return Promise.resolve(lastWhole.state)
+  if (opening && lastWhole && Date.now() - lastWhole.at < READ_STATE_SHARED_MS) return Promise.resolve(lastWhole.state)
   const run = loadReadState()
     .then((state) => {
       if (state.reachable && state.complete) lastWhole = { at: Date.now(), state }
@@ -258,10 +260,11 @@ export function useMergedReadState(): Record<string, number> {
 
   const retry = useRef<ReturnType<typeof setTimeout>>(undefined)
   const mounted = useRef(false)
-  const load = useCallback(async () => {
+  // `opening` only from the mount below: `useRefresh` and the retry call it bare, and a refresh asks the relay.
+  const load = useCallback(async (opening = false) => {
     if (!signedIn()) return
     try {
-      const state = await sharedReadState()
+      const state = await sharedReadState(opening)
       // Unreachable is not empty — keep the last good frontier rather than
       // blanking every divider because one fetch failed. A reachable fetch
       // only raises it: one missing a slot it could not decrypt is not
@@ -291,7 +294,7 @@ export function useMergedReadState(): Record<string, number> {
 
   useEffect(() => {
     mounted.current = true
-    void load()
+    void load(true)
     return () => {
       mounted.current = false
       clearTimeout(retry.current)
