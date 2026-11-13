@@ -239,7 +239,7 @@ export function parse(location: string): Route {
   }
   if (folder && parts[folderAt + 1] === 'issues') return { name: 'issues', folder }
   // The team page; its older paths still open it, and `movedRedirect` corrects the bar.
-  if (folder && parts.length === folderAt + 1) return { name: 'folder', id: folder }
+  if (folder) return { name: 'folder', id: folder }
   if (parts.length === 2 && !OWN_SEGMENTS.has(parts[0])) {
     return query ? { name: 'elsewhere', word: parts[0], ref: parts[1], query } : { name: 'elsewhere', word: parts[0], ref: parts[1] }
   }
