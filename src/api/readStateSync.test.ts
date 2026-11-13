@@ -201,6 +201,7 @@ describe('the diagnostic reports why a publish did not happen', () => {
 // count stayed 28 s with the thread open, then a re-read relit the divider.
 describe('what the screen judges against only moves forward (SHI-38)', () => {
   beforeEach(fresh)
+  afterEach(() => vi.useRealTimers())
 
   it('shows a mark at once, before any publish or re-read', async () => {
     const { markRead, useMergedReadState } = await import('./readStateSync')
@@ -229,7 +230,6 @@ describe('what the screen judges against only moves forward (SHI-38)', () => {
     const second = renderHook(() => useMergedReadState())
     await waitFor(() => expect(second.result.current[THEIRS]).toBe(6000))
     expect(second.result.current[OURS]).toBe(1000)
-    vi.useRealTimers()
   })
 })
 
