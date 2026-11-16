@@ -8,7 +8,7 @@
  */
 import { useState } from 'react'
 import { IconAlertSquareRoundedFilled, IconAntennaBars3, IconAntennaBars4, IconAntennaBars5, IconSparkles, IconTrendingDown, IconTrendingUp } from '@tabler/icons-react'
-import { AvatarGroup, Button, Card, Link, MetaText, Person, SectionHeader, WithTooltip } from '@estiva-app/ui'
+import { AvatarGroup, Button, Card, Link, MetaText, Person, SectionHeader, Select, WithTooltip } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
 import { ScrollArea } from '@/components/ui/ScrollArea'
 import { AcceptReject, ENDED, ItemTag, LIVE, StatusOf, acceptedStatus } from './ItemParts'
@@ -335,6 +335,7 @@ function BlockerRow({ item, me, onOpen, selected }: { item: Item; me: string; on
 /** An open question as a box: its options at a glance, and the talk about them, so a team can start deciding. */
 function QuestionBox({ item, me, onOpen, selected }: { item: Item; me: string; onOpen?: () => void; selected?: boolean }) {
   const [status, setStatus] = useState<Status>(item.status)
+  const [step, setStep] = useState<QuestionStep>(item.step ?? 'raised')
   const letters = 'ABCDEF'
   return (
     <Card fill="surface" hover="hairline" selected={selected} className="relative flex flex-col gap-3 p-4">
@@ -351,13 +352,17 @@ function QuestionBox({ item, me, onOpen, selected }: { item: Item; me: string; o
             <NewDot on={item.isNew} />
           </span>
         </span>
-        {status === 'proposed' && (
-          <span className="relative shrink-0">
+        {/* Proposed: Accept and ✕; once accepted, where it is, as one status picker (Miky, 16 Nov: no row of steps). */}
+        <span className="relative shrink-0">
+          {status === 'proposed' ? (
             <Answer item={item} me={me} status={status} onStatus={setStatus} />
-          </span>
-        )}
+          ) : (
+            <span className="block w-32">
+              <Select size="small" ariaLabel="Where this question is" value={step} onChange={(v) => setStep(v as QuestionStep)} options={STEPS} />
+            </span>
+          )}
+        </span>
       </div>
-      <QuestionSteps step={item.step ?? 'raised'} />
       {item.options ? (
         <ol className="flex flex-col gap-2" aria-label="Options">
           {item.options.map((o, n) => (
@@ -391,8 +396,8 @@ function QuestionBox({ item, me, onOpen, selected }: { item: Item; me: string; o
       <div className="mt-auto flex flex-col gap-2 border-t border-border-subtle pt-3">
         {/* What it needs now, from whom: the box's one call to act. */}
         <div className="relative flex items-center justify-between gap-3 text-body-2">
-          <span className="font-medium text-text-primary">{needs(item, me)}</span>
-          {item.step === 'decide' && item.decider?.key === me && (
+          <span className="font-medium text-text-primary">{needs({ ...item, step }, me)}</span>
+          {step === 'decide' && item.decider?.key === me && (
             <Button variant="primary" size="small" onClick={() => undefined}>
               Decide
             </Button>
@@ -414,27 +419,13 @@ function QuestionBox({ item, me, onOpen, selected }: { item: Item; me: string; o
   )
 }
 
-const STEPS: { id: QuestionStep; label: string }[] = [
-  { id: 'raised', label: 'Raised' },
-  { id: 'options', label: 'Options' },
-  { id: 'review', label: 'Review' },
-  { id: 'decide', label: 'Decide' },
+/** Where a question is (Miky, 16 Nov): raised, its options researched, in review, ready to decide. Decided leaves the box for the Journal. */
+const STEPS: { value: QuestionStep; label: string }[] = [
+  { value: 'raised', label: 'Raised' },
+  { value: 'options', label: 'Options ready' },
+  { value: 'review', label: 'In review' },
+  { value: 'decide', label: 'Ready to decide' },
 ]
-
-/** Where a question is (Miky, 16 Nov): raised, its options researched, in review, ready to decide. Done leaves the box for the Journal. */
-function QuestionSteps({ step }: { step: QuestionStep }) {
-  const at = STEPS.findIndex((s) => s.id === step)
-  return (
-    <ol className="flex items-center gap-1.5 text-caption" aria-label="Where this question is">
-      {STEPS.map((s, n) => (
-        <li key={s.id} aria-current={n === at ? 'step' : undefined} className={cn('flex items-center gap-1.5', n === at ? 'font-medium text-accent-primary' : n < at ? 'text-text-secondary' : 'text-text-muted')}>
-          {n > 0 && <span className={cn('h-px w-4', n <= at ? 'bg-text-secondary' : 'bg-border-strong')} />}
-          {s.label}
-        </li>
-      ))}
-    </ol>
-  )
-}
 
 /** The next step in words, naming who it waits on. */
 const needs = (item: Item, me: string) => {
