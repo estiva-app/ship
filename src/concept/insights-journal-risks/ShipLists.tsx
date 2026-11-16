@@ -8,7 +8,7 @@
  */
 import { useState } from 'react'
 import { IconAlertSquareRoundedFilled, IconAntennaBars3, IconAntennaBars4, IconAntennaBars5, IconSparkles, IconTrendingDown, IconTrendingUp } from '@tabler/icons-react'
-import { AvatarGroup, Button, Card, Link, MetaText, Person, SectionHeader, Select, WithTooltip } from '@estiva-app/ui'
+import { AvatarGroup, Button, Card, Link, MetaText, Person, SectionHeader, WithTooltip } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
 import { ScrollArea } from '@/components/ui/ScrollArea'
 import { AcceptReject, ENDED, ItemTag, LIVE, StatusOf, acceptedStatus } from './ItemParts'
@@ -335,7 +335,6 @@ function BlockerRow({ item, me, onOpen, selected }: { item: Item; me: string; on
 /** An open question as a box: its options at a glance, and the talk about them, so a team can start deciding. */
 function QuestionBox({ item, me, onOpen, selected }: { item: Item; me: string; onOpen?: () => void; selected?: boolean }) {
   const [status, setStatus] = useState<Status>(item.status)
-  const [step, setStep] = useState<QuestionStep>(item.step ?? 'raised')
   const letters = 'ABCDEF'
   return (
     <Card fill="surface" hover="hairline" selected={selected} className="relative flex flex-col gap-3 p-4">
@@ -352,16 +351,11 @@ function QuestionBox({ item, me, onOpen, selected }: { item: Item; me: string; o
             <NewDot on={item.isNew} />
           </span>
         </span>
-        {/* Proposed: Accept and ✕; once accepted, where it is, as one status picker (Miky, 16 Nov: no row of steps). */}
-        <span className="relative shrink-0">
-          {status === 'proposed' ? (
+        {status === 'proposed' && (
+          <span className="relative shrink-0">
             <Answer item={item} me={me} status={status} onStatus={setStatus} />
-          ) : (
-            <span className="block w-32">
-              <Select size="small" ariaLabel="Where this question is" value={step} onChange={(v) => setStep(v as QuestionStep)} options={STEPS} />
-            </span>
-          )}
-        </span>
+          </span>
+        )}
       </div>
       {item.options ? (
         <ol className="flex flex-col gap-2" aria-label="Options">
@@ -396,8 +390,8 @@ function QuestionBox({ item, me, onOpen, selected }: { item: Item; me: string; o
       <div className="mt-auto flex flex-col gap-2 border-t border-border-subtle pt-3">
         {/* What it needs now, from whom: the box's one call to act. */}
         <div className="relative flex items-center justify-between gap-3 text-body-2">
-          <span className="font-medium text-text-primary">{needs({ ...item, step }, me)}</span>
-          {step === 'decide' && item.decider?.key === me && (
+          <span className="font-medium text-text-primary">{needs(item, me)}</span>
+          {item.step === 'decide' && item.decider?.key === me && (
             <Button variant="primary" size="small" onClick={() => undefined}>
               Decide
             </Button>
@@ -419,15 +413,8 @@ function QuestionBox({ item, me, onOpen, selected }: { item: Item; me: string; o
   )
 }
 
-/** Where a question is (Miky, 16 Nov): raised, its options researched, in review, ready to decide. Decided leaves the box for the Journal. */
-const STEPS: { value: QuestionStep; label: string }[] = [
-  { value: 'raised', label: 'Raised' },
-  { value: 'options', label: 'Options ready' },
-  { value: 'review', label: 'In review' },
-  { value: 'decide', label: 'Ready to decide' },
-]
 
-/** The next step in words, naming who it waits on. */
+/** The question's phase in words, in the box's footer (Miky, 16 Nov: the footer says where it is, no row of steps): raised, options ready, in review, ready to decide. */
 const needs = (item: Item, me: string) => {
   const who = (p?: { key: string; name: string }) => (p ? (p.key === me ? 'you' : p.name) : 'someone')
   switch (item.step ?? 'raised') {
