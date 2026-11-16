@@ -16,7 +16,7 @@ import { StatusLabel } from '@/components/ui/StatusLabel'
 import { statusOption, wordIcon, type Status } from './MarkAs'
 
 /** A severity's colour: the kind and the severity share it. */
-import { SEVERITIES, type Item, type Severity, type Visual } from './fixtures'
+import { SEVERITIES, type Item, type QuestionStep, type Severity, type Visual } from './fixtures'
 
 /** New first, then newest first: what waits for you leads either view. */
 const newFirst = (items: Item[]) => [...items].sort((a, b) => Number(!!b.isNew) - Number(!!a.isNew) || b.day.localeCompare(a.day))
@@ -357,18 +357,26 @@ function QuestionBox({ item, me, onOpen, selected }: { item: Item; me: string; o
           </span>
         )}
       </div>
+      <QuestionSteps step={item.step ?? 'raised'} />
       {item.options ? (
         <ol className="flex flex-col gap-2" aria-label="Options">
           {item.options.map((o, n) => (
             <li key={o.label} className="flex gap-2 text-body-2">
               <span className="w-4 shrink-0 font-medium text-text-muted">{letters[n]}</span>
-              <span className="flex min-w-0 flex-col">
+              <span className="flex min-w-0 flex-1 flex-col">
                 <span className="flex items-center gap-2 font-medium">
                   {o.label}
                   {o.lean && <span className="text-caption text-accent-primary">Leaning</span>}
+                  {o.addedBy && <span className="text-caption font-normal text-text-muted">added by {o.addedBy.name}</span>}
                 </span>
                 <span className="line-clamp-2 text-text-secondary">{o.gist}</span>
               </span>
+              {/* In review: who favours this option. */}
+              {o.favouredBy && o.favouredBy.length > 0 && (
+                <span className="mt-0.5 shrink-0">
+                  <AvatarGroup members={o.favouredBy.map((p) => ({ name: p.name, bot: p.bot }))} size={16} />
+                </span>
+              )}
             </li>
           ))}
         </ol>
@@ -380,19 +388,67 @@ function QuestionBox({ item, me, onOpen, selected }: { item: Item; me: string; o
           </Button>
         </div>
       )}
-      <div className="mt-auto flex items-center justify-between gap-3 text-caption text-text-muted">
-        {item.discussion ? (
-          <span className="flex items-center gap-2">
-            <AvatarGroup members={item.discussion.people.map((p) => ({ name: p.name, bot: p.bot }))} size={18} />
-            {item.discussion.replies} replies · last {item.discussion.last}
-          </span>
-        ) : (
-          <span>No discussion yet</span>
-        )}
-        {item.optionsBy && <span>Options by {item.optionsBy.name}</span>}
+      <div className="mt-auto flex flex-col gap-2 border-t border-border-subtle pt-3">
+        {/* What it needs now, from whom: the box's one call to act. */}
+        <div className="relative flex items-center justify-between gap-3 text-body-2">
+          <span className="font-medium text-text-primary">{needs(item, me)}</span>
+          {item.step === 'decide' && item.decider?.key === me && (
+            <Button variant="primary" size="small" onClick={() => undefined}>
+              Decide
+            </Button>
+          )}
+        </div>
+        <div className="flex items-center justify-between gap-3 text-caption text-text-muted">
+          {item.discussion ? (
+            <span className="flex items-center gap-2">
+              <AvatarGroup members={item.discussion.people.map((p) => ({ name: p.name, bot: p.bot }))} size={18} />
+              {item.discussion.replies} replies · last {item.discussion.last}
+            </span>
+          ) : (
+            <span>No discussion yet</span>
+          )}
+          {item.optionsBy && <span>Options by {item.optionsBy.name}</span>}
+        </div>
       </div>
     </Card>
   )
+}
+
+const STEPS: { id: QuestionStep; label: string }[] = [
+  { id: 'raised', label: 'Raised' },
+  { id: 'options', label: 'Options' },
+  { id: 'review', label: 'Review' },
+  { id: 'decide', label: 'Decide' },
+]
+
+/** Where a question is (Miky, 16 Nov): raised, its options researched, in review, ready to decide. Done leaves the box for the Journal. */
+function QuestionSteps({ step }: { step: QuestionStep }) {
+  const at = STEPS.findIndex((s) => s.id === step)
+  return (
+    <ol className="flex items-center gap-1.5 text-caption" aria-label="Where this question is">
+      {STEPS.map((s, n) => (
+        <li key={s.id} aria-current={n === at ? 'step' : undefined} className={cn('flex items-center gap-1.5', n === at ? 'font-medium text-accent-primary' : n < at ? 'text-text-secondary' : 'text-text-muted')}>
+          {n > 0 && <span className={cn('h-px w-4', n <= at ? 'bg-text-secondary' : 'bg-border-strong')} />}
+          {s.label}
+        </li>
+      ))}
+    </ol>
+  )
+}
+
+/** The next step in words, naming who it waits on. */
+const needs = (item: Item, me: string) => {
+  const who = (p?: { key: string; name: string }) => (p ? (p.key === me ? 'you' : p.name) : 'someone')
+  switch (item.step ?? 'raised') {
+    case 'raised':
+      return 'Needs its options researched'
+    case 'options':
+      return 'Options ready: needs your review'
+    case 'review':
+      return `In review · ${who(item.decider)} decide${who(item.decider) === 'you' ? '' : 's'} when it settles`
+    case 'decide':
+      return `Ready for ${who(item.decider)} to decide`
+  }
 }
 
 /**
