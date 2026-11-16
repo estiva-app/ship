@@ -1877,20 +1877,21 @@ export class Store {
     const threadsAt = { ...previous.threadsAt }
     const liveAt = { ...previous.liveAt }
     // A live Folder's new conversation, from when it was last asked (ALO-27): its whole conversation is never read here.
-    const live = [...scope].filter((folder) => threadsAt[folder] === undefined && liveAt[folder] !== undefined)
+    const live = new Set([...scope].filter((folder) => threadsAt[folder] === undefined && liveAt[folder] !== undefined))
     const kept = previous.events.filter((event) => {
       const folder = folderOfEvent(event)
-      if (folder && live.includes(folder) && THREAD_KINDS.includes(event.kind)) return true
+      if (folder && live.has(folder) && THREAD_KINDS.includes(event.kind)) return true
       return !folder || !scope.has(folder) || since[folder] !== undefined
     })
     // A Folder's conversation only where it is held (APP-5): one a screen has not asked for stays unread.
     const kinds = (folder: string) => [...(threadsAt[folder] === undefined ? FOLDER_KINDS_BUT_THREADS : FOLDER_KINDS), KIND.DELETION]
-    const liveSince = live.map((folder) => ({ kinds: [...THREAD_KINDS], '#h': [folder], since: sinceOf(liveAt[folder]!) }))
+    const liveSince = [...live].map((folder) => ({ kinds: [...THREAD_KINDS], '#h': [folder], since: sinceOf(liveAt[folder]!) }))
     const at = Date.now()
     const fresh = await this.readFolderEvents([...scope], readAt, since, this.queryAll, kinds, undefined, liveSince)
     for (const folder of live) liveAt[folder] = at
     for (const event of fresh) if (event.kind === KIND.DELETION) this.deleted.note(event)
-    const lost = await this.lostFolders(this.deleted.drop(kept), Object.keys(since), foldersOf(fresh))
+    // A live Folder keeps its held conversation through a whole re-read, so it is checked for lost access as well.
+    const lost = await this.lostFolders(this.deleted.drop(kept), [...new Set([...Object.keys(since), ...live])], foldersOf(fresh))
     if (lost.size) {
       // Read whole, as a Folder never read: what this reader may still see, and nothing if it may see nothing.
       for (const folder of lost) delete readAt[folder]
@@ -2037,7 +2038,10 @@ export class Store {
     read: QueryFn = this.queryAll,
     kinds: KindsOf = FOLDER_KINDS,
     threadsAt?: Record<string, number>,
-    /** Filters sent in the same request, whose answers note nothing: a live Folder's new conversation (ALO-27). */
+    /**
+     * Filters sent in the same request: a live Folder's new conversation (ALO-27). They mark nothing as held; an
+     * answer from one of `folders` stamps its `readAt` as any answer does, which is right, since it was asked too.
+     */
     alongside: readonly Record<string, unknown>[] = [],
   ): Promise<SignedEvent[]> {
     for (const folder of folders) assertFolderId(folder)

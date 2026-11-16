@@ -63,13 +63,16 @@ function matches(event: SignedEvent, filter: Record<string, unknown>): boolean {
     if (values && !event.tags.some((t) => t[0] === name && values.includes(t[1]!))) return false
   }
   if (typeof filter.since === 'number' && event.created_at < filter.since) return false
+  if (Array.isArray(filter.ids) && !filter.ids.includes(event.id)) return false
   return true
 }
 
+/** While set, the relay gives this reader nothing from the team, as it does once someone is removed from it. */
+let removed = false
 const relay = {
   async queryAll(filters: Record<string, unknown>[]) {
     asked.push(filters)
-    return held.filter((event) => filters.some((filter) => matches(event, filter)))
+    return held.filter((event) => !(removed && event.tags.some((t) => t[0] === 'h' && t[1] === TEAM)) && filters.some((filter) => matches(event, filter)))
   },
 } as unknown as Relay
 
@@ -112,6 +115,14 @@ check("in the same request as the team's own re-read", asked.length === 1, Strin
 check("what the topic held is kept", own.every((event) => has(reloaded, event)))
 check('and it still holds it, live', !!reloaded.ownOf?.includes(TOPIC) && (reloaded.liveAt?.[TEAM] ?? 0) >= (opened.liveAt?.[TEAM] ?? 0))
 check('the topic draws the new reply', conversationsAbout(foldWorkspace(reloaded).conversations, TOPIC).find((c) => c.id === comment.id)?.replies.length === 2)
+
+// Removed from the team before its first re-read (nothing read it by `#h` yet): that re-read drops the topic's
+// conversation, as it drops a Folder's whole one.
+// why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/someone-you-remove-loses-access-at-once.md
+removed = true
+const gone = await store.reloadFolders(opened, [TEAM])
+removed = false
+check("removed from the team, the topic's conversation is gone on the next re-read", opened.readAt[TEAM] === undefined && own.every((event) => !has(gone, event)))
 
 // The team's own page draws its whole conversation: that screen still reads it.
 asked = []
