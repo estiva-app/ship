@@ -10,13 +10,14 @@ import { ScrollArea } from '@/components/ui/ScrollArea'
 import { STATUSES, TYPE_META, type Status } from './MarkAs'
 import { SourceAsMarked } from './ItemParts'
 import { CommentsColumn, type StoryComment } from './CommentsColumn'
-import { CATEGORIES, KATERINA, PEOPLE, TEAM, type Item } from './fixtures'
+import { CATEGORIES, SEVERITIES, KATERINA, PEOPLE, TEAM, type Item } from './fixtures'
 
-/** An item's fields: its status picker with its type's words, Decided by on a Journal entry, an Insight's category. */
+/** An item's fields: its status picker with its type's words, Decided by on a Journal entry, an Insight's category, a Risk's severity. */
 export function ItemFields({ item, me = 'miky' }: { item: Item; me?: string }) {
   const [status, setStatus] = useState<Status>(item.status)
   const [decider, setDecider] = useState(item.decidedBy?.key)
   const [category, setCategory] = useState<string>(item.category ?? '')
+  const [severity, setSeverity] = useState<string>(item.severity ?? '')
   const people = PEOPLE.map((p) => ({ value: p.key, label: p.name }))
   const waitingOn = status === 'proposed' && item.decidedBy && item.decidedBy.key !== me ? item.decidedBy.name : undefined
   return (
@@ -28,6 +29,9 @@ export function ItemFields({ item, me = 'miky' }: { item: Item; me?: string }) {
         />
         {item.type === 'insight' && (
           <Select size="small" ariaLabel="Category" placeholder="Category" value={category} onChange={setCategory} options={CATEGORIES.map((c) => ({ value: c, label: c }))} />
+        )}
+        {item.type === 'risk' && (
+          <Select size="small" ariaLabel="Severity" placeholder="Severity" value={severity} onChange={setSeverity} options={SEVERITIES.map((s) => ({ value: s, label: s }))} />
         )}
       </div>
       <MetaText tone="muted">

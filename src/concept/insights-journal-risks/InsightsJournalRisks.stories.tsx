@@ -53,8 +53,10 @@ export const ProjectJournalEntryOpen: Story = { render: () => <Shell><ProjectPag
 export const ProjectOverviewMarkOpen: Story = { render: () => <Shell><ProjectPage start="overview" open="i1" /></Shell> }
 /** Journal, seen by Katerina: the Decision in her name shows Accept / ✕ to her. */
 export const ProjectJournalAsKaterina: Story = { render: () => <Shell><ProjectPage start="journal" me="katerina" /></Shell> }
-/** Risks: a table as Issues are (Kind · Title · Status · Raised by · About · When), filtered by Open, Proposed, Resolved and rejected. */
+/** Risks: a table as Issues are, two lines a row (Kind · Title and summary · Severity · Status · Raised by · About · When), most recent first; filtered by Open, Proposed, Resolved and rejected. */
 export const ProjectRisks: Story = { render: () => <Shell><ProjectPage start="risks" /></Shell> }
+/** Risks, most severe first: Critical and High lead, what ended goes last. */
+export const ProjectRisksMostSevere: Story = { render: () => <Shell><ProjectPage start="risks" order="severe" /></Shell> }
 /** A list loading. */
 export const ProjectInsightsLoading: Story = { render: () => <Shell><ProjectPage start="insights" listState="loading" /></Shell> }
 /** A list that failed to load. */
