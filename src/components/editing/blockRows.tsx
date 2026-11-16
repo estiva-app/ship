@@ -1,5 +1,13 @@
+import { createContext, useContext, type ReactNode } from 'react'
 import { IconLink, IconMessage } from '@tabler/icons-react'
 import { MenuItem, type HandleBlock } from '@estiva-app/ui'
+
+/** CONCEPT ONLY (concept/insights-journal-risks): a story adds its own rows to a block's menu — Mark as… — without copying the editor. Never merged. */
+export const ConceptBlockRows = createContext<((blockId: string) => ReactNode) | null>(null)
+function ConceptRows({ id }: { id: string }) {
+  const rows = useContext(ConceptBlockRows)
+  return rows ? <>{rows(id)}</> : null
+}
 
 /**
  * A link to one block of a description (RIC-18): the page's Overview, with
@@ -40,6 +48,7 @@ export function blockRows(onComment?: (blockId: string) => void, onCopyLink?: (l
       <>
         <MenuItem label="Copy link" leading={<IconLink size={16} stroke={1.5} className="text-text-secondary" />} onClick={() => copy(blockLink(id))} />
         {onComment && <MenuItem label="Comment" leading={<IconMessage size={16} stroke={1.5} className="text-text-secondary" />} onClick={() => onComment(id)} />}
+        <ConceptRows id={id} />
       </>
     )
   }
