@@ -41,7 +41,7 @@ export const ProjectOverview: Story = { render: () => <Shell><ProjectPage start=
 export const ProjectOverviewWithSidePanel: Story = { render: () => <Shell><ProjectPage start="overview" side="overview" /></Shell> }
 /** Issues: today's table, unchanged. */
 export const ProjectIssues: Story = { render: () => <Shell><ProjectPage start="issues" /></Shell> }
-/** Insights: one timeline, newest first, each entry read as a message (name, category, when, where); new ones above the New line, Accept / ✕ on them. */
+/** Insights: a grid of boxes, filtered by category; new ones first with a dot, Accept / ✕ on them. */
 export const ProjectInsights: Story = { render: () => <Shell><ProjectPage start="insights" /></Shell> }
 /** An Insight opened beside the list, as Peek opens a thread: the list stays in view. */
 export const ProjectInsightOpen: Story = { render: () => <Shell><ProjectPage start="insights" open="i3" /></Shell> }
@@ -53,7 +53,7 @@ export const ProjectJournalEntryOpen: Story = { render: () => <Shell><ProjectPag
 export const ProjectOverviewMarkOpen: Story = { render: () => <Shell><ProjectPage start="overview" open="i1" /></Shell> }
 /** Journal, seen by Katerina: the Decision in her name shows Accept / ✕ to her. */
 export const ProjectJournalAsKaterina: Story = { render: () => <Shell><ProjectPage start="journal" me="katerina" /></Shell> }
-/** Risks: the same timeline, filtered by Open, Proposed, Resolved and rejected. */
+/** Risks: a table as Issues are (Kind · Title · Status · Raised by · About · When), filtered by Open, Proposed, Resolved and rejected. */
 export const ProjectRisks: Story = { render: () => <Shell><ProjectPage start="risks" /></Shell> }
 /** A list loading. */
 export const ProjectInsightsLoading: Story = { render: () => <Shell><ProjectPage start="insights" listState="loading" /></Shell> }

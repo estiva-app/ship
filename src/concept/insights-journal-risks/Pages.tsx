@@ -25,6 +25,7 @@ import { ACTIVITY, PEOPLE as SHIP_PEOPLE, PROJECT_STATUSES } from '@/fixtures/pr
 import { MarkAsRows, MarkedNotice, STATUSES, TYPE_META, TYPE_OF, blockLineCss, markedBlockAt, type ItemType, type MarkWord, type Status } from './MarkAs'
 import { FilterRow, ItemTimeline, ListStateView, SourceAsMarked, filterItems, type ListState } from './ItemParts'
 import { ItemFields, ItemPanel, commentsOn } from './ItemPanel'
+import { InsightGrid, RiskTable } from './ShipLists'
 import { CommentsColumn, type StoryComment } from './CommentsColumn'
 import { ITEMS, KATERINA, MIKY, PEOPLE, PROJECT, TEAM, byType, type Item } from './fixtures'
 
@@ -91,15 +92,21 @@ function WhatsNew({ onTab }: { onTab: (t: ConceptTab) => void }) {
   )
 }
 
-/** Insights, Journal or Risks: the filter row, then the one timeline, newest first, the new ones above the New line. */
+/**
+ * Insights, Journal or Risks: the filter row, then each list's own view (Miky, 16 Nov): Insights a grid of boxes,
+ * Journal the timeline in the reading column, Risks a table as wide as Issues'.
+ */
 function ItemsTab({ type, state, onOpen, openId, me }: { type: ItemType; state: ListState; onOpen: (i: Item) => void; openId?: string; me?: string }) {
   const items = byType(type)
   const [filter, setFilter] = useState('all')
+  const shown = filterItems(items, filter)
   return (
-    <div className="mx-auto flex w-full max-w-[768px] flex-col gap-3">
+    <div className={`flex w-full flex-col gap-3 ${type === 'journal' ? 'mx-auto max-w-[768px]' : ''}`}>
       <ListStateView state={state} type={type}>
         <FilterRow type={type} value={filter} onChange={setFilter} items={items} />
-        <ItemTimeline items={filterItems(items, filter)} onOpen={onOpen} openId={openId} me={me} label={TYPE_META[type].tab} />
+        {type === 'insight' && <InsightGrid items={shown} onOpen={onOpen} openId={openId} me={me} />}
+        {type === 'journal' && <ItemTimeline items={shown} onOpen={onOpen} openId={openId} me={me} label="Journal" />}
+        {type === 'risk' && <RiskTable items={shown} onOpen={onOpen} openId={openId} me={me} />}
       </ListStateView>
     </div>
   )
