@@ -25,9 +25,9 @@ import { ACTIVITY, PEOPLE as SHIP_PEOPLE, PROJECT_STATUSES } from '@/fixtures/pr
 import { MarkAsRows, MarkedNotice, STATUSES, TYPE_META, TYPE_OF, blockLineCss, markedBlockAt, type ItemType, type MarkWord, type Status } from './MarkAs'
 import { FilterRow, ItemTimeline, ListStateView, SourceAsMarked, filterItems, type ListState } from './ItemParts'
 import { ItemFields, ItemPanel, commentsOn } from './ItemPanel'
-import { InsightGrid, RISK_ORDERS, RiskTable, type RiskOrder } from './ShipLists'
+import { InsightGrid, RiskDashboard } from './ShipLists'
 import { CommentsColumn, type StoryComment } from './CommentsColumn'
-import { ITEMS, KATERINA, MIKY, PEOPLE, PROJECT, TEAM, byType, type Item } from './fixtures'
+import { HAND_TYPED, ITEMS, KATERINA, MIKY, PEOPLE, PROJECT, TEAM, byType, type Item } from './fixtures'
 
 const noop = () => {}
 export type ConceptTab = 'overview' | 'issues' | 'insights' | 'journal' | 'risks'
@@ -96,29 +96,25 @@ function WhatsNew({ onTab }: { onTab: (t: ConceptTab) => void }) {
  * Insights, Journal or Risks: the filter row, then each list's own view (Miky, 16 Nov): Insights a grid of boxes,
  * Journal the timeline in the reading column, Risks a table as wide as Issues'.
  */
-function ItemsTab({ type, state, onOpen, openId, me, order: order0 = 'recent' }: { type: ItemType; state: ListState; onOpen: (i: Item) => void; openId?: string; me?: string; order?: RiskOrder }) {
+function ItemsTab({ type, state, onOpen, openId, me }: { type: ItemType; state: ListState; onOpen: (i: Item) => void; openId?: string; me?: string }) {
   const items = byType(type)
   const [filter, setFilter] = useState('all')
-  const [order, setOrder] = useState<RiskOrder>(order0)
   const shown = filterItems(items, filter)
   return (
     <div className={`flex w-full flex-col gap-3 ${type === 'journal' ? 'mx-auto max-w-[768px]' : ''}`}>
       <ListStateView state={state} type={type}>
-        <div className="flex items-center justify-between gap-3">
-          <FilterRow type={type} value={filter} onChange={setFilter} items={items} />
-          {/* Risks: most recent or most severe first (Miky, 16 Nov). */}
-          {type === 'risk' && <span className="w-40 shrink-0"><Select size="small" ariaLabel="Order" value={order} onChange={(v) => setOrder(v as RiskOrder)} options={RISK_ORDERS} /></span>}
-        </div>
+        {/* Risks are a dashboard of three sections, so no filter row (Miky, 16 Nov). */}
+        {type !== 'risk' && <FilterRow type={type} value={filter} onChange={setFilter} items={items} />}
         {type === 'insight' && <InsightGrid items={shown} onOpen={onOpen} openId={openId} me={me} />}
         {type === 'journal' && <ItemTimeline items={shown} onOpen={onOpen} openId={openId} me={me} label="Journal" />}
-        {type === 'risk' && <RiskTable items={shown} order={order} onOpen={onOpen} openId={openId} me={me} />}
+        {type === 'risk' && <RiskDashboard items={[...items, HAND_TYPED]} onOpen={onOpen} openId={openId} me={me} />}
       </ListStateView>
     </div>
   )
 }
 
 /** The project page: today's header and tab row, three more tabs; an item opens beside its list. */
-export function ProjectPage({ start = 'overview', listState = 'ready', me = 'miky', open: open0, side: side0 = 'none', order }: { start?: ConceptTab; listState?: ListState; me?: string; open?: string; side?: 'comments' | 'overview' | 'none'; order?: RiskOrder }) {
+export function ProjectPage({ start = 'overview', listState = 'ready', me = 'miky', open: open0, side: side0 = 'none' }: { start?: ConceptTab; listState?: ListState; me?: string; open?: string; side?: 'comments' | 'overview' | 'none' }) {
   const [tab, setTab] = useState<ConceptTab>(start)
   const [open, setOpen] = useState<Item | undefined>(ITEMS.find((i) => i.id === open0))
   const onOpenItem = (i: Item) => setOpen((o) => (o?.id === i.id ? undefined : i))
@@ -165,7 +161,7 @@ export function ProjectPage({ start = 'overview', listState = 'ready', me = 'mik
           {tab === 'issues' && <IssuesTable issues={ISSUES} statuses={ISSUE_STATUSES} hrefFor={hrefFor} />}
           {tab === 'insights' && <ItemsTab type="insight" state={listState} onOpen={onOpenItem} openId={open?.id} me={me} />}
           {tab === 'journal' && <ItemsTab type="journal" state={listState} onOpen={onOpenItem} openId={open?.id} me={me} />}
-          {tab === 'risks' && <ItemsTab type="risk" state={listState} onOpen={onOpenItem} openId={open?.id} me={me} order={order} />}
+          {tab === 'risks' && <ItemsTab type="risk" state={listState} onOpen={onOpenItem} openId={open?.id} me={me} />}
         </ScrollArea>
       </div>
       {open && (tab === 'overview' || open.type === TAB_TYPE[tab]) && <ItemPanel item={open} me={me} onClose={() => setOpen(undefined)} />}

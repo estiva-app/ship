@@ -7,8 +7,8 @@
  *   most severe first (Miky, 16 Nov).
  */
 import { useState } from 'react'
-import { IconAlertSquareRoundedFilled, IconAntennaBars3, IconAntennaBars4, IconAntennaBars5, IconTrendingDown, IconTrendingUp } from '@tabler/icons-react'
-import { Card, Link, MetaText, Person, SectionHeader, WithTooltip } from '@estiva-app/ui'
+import { IconAlertSquareRoundedFilled, IconAntennaBars3, IconAntennaBars4, IconAntennaBars5, IconSparkles, IconTrendingDown, IconTrendingUp } from '@tabler/icons-react'
+import { AvatarGroup, Button, Card, Link, MetaText, Person, SectionHeader, WithTooltip } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
 import { ScrollArea } from '@/components/ui/ScrollArea'
 import { AcceptReject, ENDED, ItemTag, LIVE, StatusOf, acceptedStatus } from './ItemParts'
@@ -185,7 +185,7 @@ const TH = 'h-9 px-3 text-left text-menu font-medium uppercase tracking-widest t
 const TD = 'h-10 px-3 text-body-2'
 
 /** One risk as a row: Severity · Kind (Concern, Question or Blocker) · Title over its summary · Raised by · When · Status. */
-function RiskRow({ item, me, onOpen, selected }: { item: Item; me: string; onOpen?: () => void; selected?: boolean }) {
+function RiskRow({ item, me, onOpen, selected, kind = true }: { item: Item; me: string; onOpen?: () => void; selected?: boolean; kind?: boolean }) {
   const [status, setStatus] = useState<Status>(item.status)
   const author = item.source?.author ?? item.markedBy
   return (
@@ -198,12 +198,14 @@ function RiskRow({ item, me, onOpen, selected }: { item: Item; me: string; onOpe
         </span>
         <SeverityMark severity={item.severity} />
       </td>
-      <td className={cn(TD, 'text-text-secondary')}>
-        <span className="flex items-center gap-1.5">
-          {wordIcon(item.word, 16)}
-          {item.word}
-        </span>
-      </td>
+      {kind && (
+        <td className={cn(TD, 'text-text-secondary')}>
+          <span className="flex items-center gap-1.5">
+            {wordIcon(item.word, 16)}
+            {item.word}
+          </span>
+        </td>
+      )}
       {/* Two lines, as Linear's table has them (Miky, 16 Nov): the title, and the summary under it in full width. */}
       <td className="px-3 py-2 text-body-2">
         <span className="block font-medium"><Link href="#" variant="quiet" truncate cover className="block" onClick={(e) => (e.preventDefault(), onOpen?.())}>
@@ -264,7 +266,7 @@ export function SeverityMark({ severity }: { severity?: Severity }) {
 }
 
 /** Risks as a table, as Issues are: it scrolls sideways inside its own box rather than widen the page. */
-export function RiskTable({ items, order = 'recent', onOpen, openId, me = 'miky' }: { items: Item[]; order?: RiskOrder; onOpen?: (item: Item) => void; openId?: string; me?: string }) {
+export function RiskTable({ items, order = 'recent', onOpen, openId, me = 'miky', kind = true }: { items: Item[]; order?: RiskOrder; onOpen?: (item: Item) => void; openId?: string; me?: string; kind?: boolean }) {
   return (
     <Card clip fill="none">
       <ScrollArea orientation="horizontal">
@@ -272,7 +274,7 @@ export function RiskTable({ items, order = 'recent', onOpen, openId, me = 'miky'
           <thead className="bg-bg-surface">
             <tr className="border-b border-border-default">
               <th className={cn(TH, 'w-24')}>Severity</th>
-              <th className={cn(TH, 'w-32')}>Kind</th>
+              {kind && <th className={cn(TH, 'w-32')}>Kind</th>}
               <th className={TH}>Title</th>
               <th className={cn(TH, 'w-32')}>Raised by</th>
               <th className={cn(TH, 'w-20')}>When</th>
@@ -281,11 +283,153 @@ export function RiskTable({ items, order = 'recent', onOpen, openId, me = 'miky'
           </thead>
           <tbody>
             {ordered(items, order).map((item) => (
-              <RiskRow key={item.id} item={item} me={me} selected={item.id === openId} onOpen={() => onOpen?.(item)} />
+              <RiskRow key={item.id} item={item} me={me} kind={kind} selected={item.id === openId} onOpen={() => onOpen?.(item)} />
             ))}
           </tbody>
         </table>
       </ScrollArea>
     </Card>
+  )
+}
+
+/** How long a blocker has been waiting, counted to the prototype's today. */
+const waited = (day: string) => {
+  const n = Math.round((Date.parse('2026-11-16') - Date.parse(day)) / 864e5)
+  return n <= 0 ? 'today' : n === 1 ? '1 day' : `${n} days`
+}
+
+/** A blocker: what stops, who has to act, for how long. Proposed ones ask for Accept first. */
+function BlockerRow({ item, me, onOpen, selected }: { item: Item; me: string; onOpen?: () => void; selected?: boolean }) {
+  const [status, setStatus] = useState<Status>(item.status)
+  return (
+    <li className={cn('relative flex items-start gap-3 border-b border-border-subtle px-4 py-3 last:border-b-0 hover:bg-bg-hover', selected && 'bg-bg-selected')}>
+      <span className="mt-0.5 flex text-error-default">{wordIcon('Blocker', 18)}</span>
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="flex items-center gap-2 font-medium">
+          <NewDot on={item.isNew} />
+          <Link href="#" variant="quiet" truncate cover onClick={(e) => (e.preventDefault(), onOpen?.())}>
+            {item.title}
+          </Link>
+        </span>
+        {item.summary && <span className="text-body-2 text-text-secondary">{item.summary}</span>}
+        {item.blocks && <MetaText>Stops: {item.blocks}</MetaText>}
+      </div>
+      <div className="relative flex shrink-0 items-center gap-2 text-body-2">
+        {status === 'proposed' ? (
+          <Answer item={item} me={me} status={status} onStatus={setStatus} />
+        ) : (
+          item.waitingOn && (
+            <>
+              <span className="text-text-muted">Waiting on</span>
+              <Person name={item.waitingOn.name} size={16} />
+              <span className="tabular-nums text-text-muted">· {waited(item.day)}</span>
+            </>
+          )
+        )}
+      </div>
+    </li>
+  )
+}
+
+/** An open question as a box: its options at a glance, and the talk about them, so a team can start deciding. */
+function QuestionBox({ item, me, onOpen, selected }: { item: Item; me: string; onOpen?: () => void; selected?: boolean }) {
+  const [status, setStatus] = useState<Status>(item.status)
+  const letters = 'ABCDEF'
+  return (
+    <Card fill="surface" hover="hairline" selected={selected} className="relative flex flex-col gap-3 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <span className="flex min-w-0 items-start gap-2 font-medium">
+          {item.isNew && <span className="mt-2 flex"><NewDot on /></span>}
+          <Link href="#" variant="quiet" cover onClick={(e) => (e.preventDefault(), onOpen?.())}>
+            {item.title}
+          </Link>
+        </span>
+        {status === 'proposed' && (
+          <span className="relative shrink-0">
+            <Answer item={item} me={me} status={status} onStatus={setStatus} />
+          </span>
+        )}
+      </div>
+      {item.options ? (
+        <ol className="flex flex-col gap-2" aria-label="Options">
+          {item.options.map((o, n) => (
+            <li key={o.label} className="flex gap-2 text-body-2">
+              <span className="w-4 shrink-0 font-medium text-text-muted">{letters[n]}</span>
+              <span className="flex min-w-0 flex-col">
+                <span className="flex items-center gap-2 font-medium">
+                  {o.label}
+                  {o.lean && <span className="text-caption text-accent-primary">Leaning</span>}
+                </span>
+                <span className="line-clamp-2 text-text-secondary">{o.gist}</span>
+              </span>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <div className="relative flex items-center justify-between gap-3 rounded-md bg-bg-inset px-3 py-2 text-body-2">
+          <span className="text-text-secondary">No options yet.</span>
+          <Button variant="outlined" size="small" leadingIcon={<IconSparkles size={14} stroke={1.5} />} onClick={() => undefined}>
+            Research options
+          </Button>
+        </div>
+      )}
+      <div className="mt-auto flex items-center justify-between gap-3 text-caption text-text-muted">
+        {item.discussion ? (
+          <span className="flex items-center gap-2">
+            <AvatarGroup members={item.discussion.people.map((p) => ({ name: p.name, bot: p.bot }))} size={18} />
+            {item.discussion.replies} replies · last {item.discussion.last}
+          </span>
+        ) : (
+          <span>No discussion yet</span>
+        )}
+        {item.optionsBy && <span>Options by {item.optionsBy.name}</span>}
+      </div>
+    </Card>
+  )
+}
+
+/**
+ * Risks as a dashboard, not one table (Miky, 16 Nov): what someone must act on now, what is still to be decided, and
+ * what to keep an eye on. Each shows only while it holds something; what ended is one line at the bottom.
+ */
+export function RiskDashboard({ items, onOpen, openId, me = 'miky' }: { items: Item[]; onOpen?: (item: Item) => void; openId?: string; me?: string }) {
+  const live = items.filter((i) => !ENDED.includes(i.status))
+  const blockers = newFirst(live.filter((i) => i.word === 'Blocker'))
+  const questions = newFirst(live.filter((i) => i.word === 'Question'))
+  const concerns = live.filter((i) => i.word === 'Concern')
+  const ended = items.length - live.length
+  const open = (item: Item) => () => onOpen?.(item)
+  return (
+    <div className="flex flex-col gap-8">
+      {blockers.length > 0 && (
+        <section className="flex flex-col gap-3">
+          <SectionHeader title="Blockers" count={blockers.length} />
+          <Card fill="none" clip>
+            <ul aria-label="Blockers">
+              {blockers.map((item) => (
+                <BlockerRow key={item.id} item={item} me={me} selected={item.id === openId} onOpen={open(item)} />
+              ))}
+            </ul>
+          </Card>
+        </section>
+      )}
+      {questions.length > 0 && (
+        <section className="flex flex-col gap-3">
+          <SectionHeader title="Open questions" count={questions.length} />
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-3" aria-label="Open questions">
+            {questions.map((item) => (
+              <QuestionBox key={item.id} item={item} me={me} selected={item.id === openId} onOpen={open(item)} />
+            ))}
+          </div>
+        </section>
+      )}
+      {concerns.length > 0 && (
+        <section className="flex flex-col gap-3">
+          <SectionHeader title="Concerns" count={concerns.length} />
+          <RiskTable items={concerns} order="severe" kind={false} onOpen={onOpen} openId={openId} me={me} />
+        </section>
+      )}
+      {ended > 0 && <MetaText>Resolved and rejected · {ended}</MetaText>}
+    </div>
   )
 }
