@@ -27,7 +27,7 @@ export const commentsOn = (item: Item): StoryComment[] => {
 }
 
 /** The item beside its list: what it is as its list labels it, the whole item, then its comments. */
-export function ItemPanel({ item, me = 'miky', onClose }: { item: Item; me?: string; onClose: () => void }) {
+export function ItemPanel({ item, me = 'miky', onClose, onDecide, deciding }: { item: Item; me?: string; onClose: () => void; onDecide?: (choice: number, why: string) => void; deciding?: boolean }) {
   return (
     <div className="flex w-[384px] min-h-0 shrink-0 flex-col border-l border-border-default">
       <Panel
@@ -42,7 +42,7 @@ export function ItemPanel({ item, me = 'miky', onClose }: { item: Item; me?: str
           <ScrollArea className="max-h-[65%] shrink-0" contentClassName="flex flex-col gap-3 px-4 pb-4">
             <span className="text-h3 text-text-primary">{item.title}</span>
             <ItemFields key={item.id} item={item} me={me} />
-            <ItemContent item={item} me={me} />
+            <ItemContent key={`${item.id}-${item.status}`} item={item} me={me} onDecide={onDecide} deciding={deciding} />
           </ScrollArea>
           <div className="flex min-h-0 flex-1 flex-col border-t border-border-default">
             <CommentsColumn team={TEAM} about={item.title} comments={commentsOn(item)} />

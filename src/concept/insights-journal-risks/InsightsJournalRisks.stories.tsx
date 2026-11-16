@@ -35,7 +35,7 @@ type Story = StoryObj<typeof meta>
 
 const item = (id: string) => ITEMS.find((i) => i.id === id)!
 
-/** Overview: What's new above the document. A marked paragraph (amber line, an Insight) beside one changed since your last visit (grey, dashed). A block's ⋯ has Mark as… */
+/** Overview: Needs you above the document (the blocker waiting on you, the question for you to decide, what waits for you to accept), then one line of what is new. A marked paragraph (amber line, an Insight) beside one changed since your last visit (grey, dashed). A block's ⋯ has Mark as… */
 export const ProjectOverview: Story = { render: () => <Shell><ProjectPage start="overview" /></Shell> }
 /** Overview with the side Overview open beside it (Activity, History, Related) — to compare with What's new. */
 export const ProjectOverviewWithSidePanel: Story = { render: () => <Shell><ProjectPage start="overview" side="overview" /></Shell> }
@@ -45,7 +45,7 @@ export const ProjectIssues: Story = { render: () => <Shell><ProjectPage start="i
 export const ProjectInsights: Story = { render: () => <Shell><ProjectPage start="insights" /></Shell> }
 /** An Insight opened beside the list, as Peek opens a thread: the list stays in view. */
 export const ProjectInsightOpen: Story = { render: () => <Shell><ProjectPage start="insights" open="i3" /></Shell> }
-/** Journal: Peek's date lines, the conversation's New line, summaries, an Update read whole; Katerina's Decision waits for her. */
+/** Journal: the timeline, a blue dot after each new title, summaries, an Update read whole; Katerina's Decision waits for her. */
 export const ProjectJournal: Story = { render: () => <Shell><ProjectPage start="journal" /></Shell> }
 /** A Journal entry opened beside the timeline. */
 export const ProjectJournalEntryOpen: Story = { render: () => <Shell><ProjectPage start="journal" open="j1" /></Shell> }
@@ -58,9 +58,12 @@ export const ProjectBlockerOpen: Story = { render: () => <Shell><ProjectPage sta
 export const ProjectOverviewMarkOpen: Story = { render: () => <Shell><ProjectPage start="overview" open="i1" /></Shell> }
 /** Journal, seen by Katerina: the Decision in her name shows Accept / ✕ to her. */
 export const ProjectJournalAsKaterina: Story = { render: () => <Shell><ProjectPage start="journal" me="katerina" /></Shell> }
-/** Risks: a table as Issues are, two lines a row (Kind · Title and summary · Severity · Status · Raised by · About · When), most recent first; filtered by Open, Proposed, Resolved and rejected. */
+/** Open & Risks: a dashboard of Blockers, Open questions and Concerns, each with its own +, "None" when empty. */
 export const ProjectRisks: Story = { render: () => <Shell><ProjectPage start="risks" /></Shell> }
-/** Risks, most severe first: Critical and High lead, what ended goes last. */
+/** Decide on an open question: pick an option, the one leant towards already picked, and say why if you want. Press Decide to see what follows. */
+export const ProjectQuestionDecide: Story = { render: () => <Shell><ProjectPage start="risks" deciding="r9" /></Shell> }
+/** After Decide: the Decision at the top of the Journal with what was chosen and not, its question resolved. */
+export const ProjectQuestionDecided: Story = { render: () => <Shell><ProjectPage start="journal" decided="r9" open="d-r9" /></Shell> }
 /** A list loading. */
 export const ProjectInsightsLoading: Story = { render: () => <Shell><ProjectPage start="insights" listState="loading" /></Shell> }
 /** A list that failed to load. */

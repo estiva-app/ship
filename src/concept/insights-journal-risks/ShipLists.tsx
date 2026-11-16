@@ -11,8 +11,8 @@ import { IconPlus, IconSparkles } from '@tabler/icons-react'
 import { AvatarGroup, Button, Card, Link, MetaText, Person, SectionHeader } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
 import { ScrollArea } from '@/components/ui/ScrollArea'
-import { AcceptReject, ENDED, ItemTag, LIVE, StatusOf, acceptedStatus } from './ItemParts'
-import { InsightVisual, QuestionOptions, SeverityMark, needs, waited } from './ItemKinds'
+import { AcceptReject, ENDED, ItemTag, LIVE, NewDot, StatusOf, acceptedStatus } from './ItemParts'
+import { DecideDialog, InsightVisual, QuestionOptions, SeverityMark, needs, waited } from './ItemKinds'
 import { StatusLabel } from '@/components/ui/StatusLabel'
 import { statusOption, wordIcon, type Status } from './MarkAs'
 /** A severity's colour: the kind and the severity share it. */
@@ -20,11 +20,6 @@ import { SEVERITIES, type Item } from './fixtures'
 
 /** New first, then newest first: what waits for you leads either view. */
 const newFirst = (items: Item[]) => [...items].sort((a, b) => Number(!!b.isNew) - Number(!!a.isNew) || b.day.localeCompare(a.day))
-
-/** The dot that says new since your last visit, the tab's own dot — always just after the title (Miky, 16 Nov). */
-function NewDot({ on }: { on?: boolean }) {
-  return on ? <span aria-label="New" className="ml-1.5 inline-block size-1.5 shrink-0 rounded-full bg-accent-primary align-middle" /> : null
-}
 
 /** Accept and ✕ while Proposed, else its status; a Decision for someone else waits for them. */
 function Answer({ item, me, status, onStatus }: { item: Item; me: string; status: Status; onStatus: (s: Status) => void }) {
@@ -218,7 +213,11 @@ function BlockerRow({ item, me, onOpen, selected }: { item: Item; me: string; on
       </div>
       <div className="relative flex shrink-0 items-center gap-2 text-body-2">
         {status === 'proposed' ? (
-          <Answer item={item} me={me} status={status} onStatus={setStatus} />
+          <>
+            {/* Proposed still says how long it has stood: a blocker waits from when it was raised. */}
+            <span className="tabular-nums text-text-muted">Raised {waited(item.day) === 'today' ? 'today' : `${waited(item.day)} ago`}</span>
+            <Answer item={item} me={me} status={status} onStatus={setStatus} />
+          </>
         ) : (
           item.waitingOn && (
             <>
@@ -234,9 +233,9 @@ function BlockerRow({ item, me, onOpen, selected }: { item: Item; me: string; on
 }
 
 /** An open question as a box: its options at a glance, and the talk about them, so a team can start deciding. */
-function QuestionBox({ item, me, onOpen, selected }: { item: Item; me: string; onOpen?: () => void; selected?: boolean }) {
+function QuestionBox({ item, me, onOpen, selected, onDecide, deciding = false }: { item: Item; me: string; onOpen?: () => void; selected?: boolean; onDecide?: (choice: number, why: string) => void; deciding?: boolean }) {
   const [status, setStatus] = useState<Status>(item.status)
-  const letters = 'ABCDEF'
+  const [decide, setDecide] = useState(deciding)
   return (
     <Card fill="surface" hover="hairline" selected={selected} className="relative flex flex-col gap-3 p-4">
       <div className="flex items-start justify-between gap-3">
@@ -273,11 +272,12 @@ function QuestionBox({ item, me, onOpen, selected }: { item: Item; me: string; o
         <div className="relative flex items-center justify-between gap-3 text-body-2">
           <span className="font-medium text-text-primary">{needs(item, me)}</span>
           {item.step === 'decide' && item.decider?.key === me && (
-            <Button variant="primary" size="small" onClick={() => undefined}>
+            <Button variant="primary" size="small" onClick={() => setDecide(true)}>
               Decide
             </Button>
           )}
         </div>
+        {decide && <DecideDialog item={item} onDecide={(c, why) => onDecide?.(c, why)} onClose={() => setDecide(false)} />}
         <div className="flex items-center justify-between gap-3 text-caption text-text-muted">
           {item.discussion ? (
             <span className="flex items-center gap-2">
@@ -294,16 +294,20 @@ function QuestionBox({ item, me, onOpen, selected }: { item: Item; me: string; o
   )
 }
 
-
+/** An empty section: one quiet word, its + still beside the heading. */
+function None() {
+  return <MetaText tone="muted">None</MetaText>
+}
 
 /** A section's subtle + to add one of its kind by hand (Miky, 16 Nov). */
 const add = (tooltip: string) => ({ icon: <IconPlus size={16} stroke={1.5} />, tooltip, onClick: () => undefined })
 
 /**
  * Risks as a dashboard, not one table (Miky, 16 Nov): what someone must act on now, what is still to be decided, and
- * what to keep an eye on. Each shows only while it holds something; what ended is one line at the bottom.
+ * what to keep an eye on. Each is always there with its own +, saying None when empty (Miky, 16 Nov); what ended is
+ * one line at the bottom.
  */
-export function RiskDashboard({ items, onOpen, openId, me = 'miky' }: { items: Item[]; onOpen?: (item: Item) => void; openId?: string; me?: string }) {
+export function RiskDashboard({ items, onOpen, openId, me = 'miky', onDecide, deciding }: { items: Item[]; onOpen?: (item: Item) => void; openId?: string; me?: string; onDecide?: (item: Item, choice: number, why: string) => void; deciding?: string }) {
   const live = items.filter((i) => !ENDED.includes(i.status))
   const blockers = newFirst(live.filter((i) => i.word === 'Blocker'))
   const questions = ordered(live.filter((i) => i.word === 'Question'), 'severe')
@@ -312,34 +316,37 @@ export function RiskDashboard({ items, onOpen, openId, me = 'miky' }: { items: I
   const open = (item: Item) => () => onOpen?.(item)
   return (
     <div className="flex flex-col gap-8">
-      {blockers.length > 0 && (
-        <section className="flex flex-col gap-3">
-          <SectionHeader title="Blockers" count={blockers.length} actions={[add("Add a blocker")]} showActions="always" />
-          <Card fill="none" clip>
+      <section className="flex flex-col gap-3">
+        <SectionHeader title="Blockers" count={blockers.length} actions={[add('Add a blocker')]} showActions="always" />
+        {blockers.length ? (
+          // Urgent: someone must act now, so the warning hairline (Miky, 16 Nov: blockers to address at once).
+          <Card fill="none" clip attention="warning">
             <ul aria-label="Blockers">
               {blockers.map((item) => (
                 <BlockerRow key={item.id} item={item} me={me} selected={item.id === openId} onOpen={open(item)} />
               ))}
             </ul>
           </Card>
-        </section>
-      )}
-      {questions.length > 0 && (
-        <section className="flex flex-col gap-3">
-          <SectionHeader title="Open questions" count={questions.length} actions={[add("Add a question")]} showActions="always" />
+        ) : (
+          <None />
+        )}
+      </section>
+      <section className="flex flex-col gap-3">
+        <SectionHeader title="Open questions" count={questions.length} actions={[add('Add a question')]} showActions="always" />
+        {questions.length ? (
           <div className="grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-3" aria-label="Open questions">
             {questions.map((item) => (
-              <QuestionBox key={item.id} item={item} me={me} selected={item.id === openId} onOpen={open(item)} />
+              <QuestionBox key={item.id} item={item} me={me} selected={item.id === openId} onOpen={open(item)} deciding={item.id === deciding} onDecide={(c, why) => onDecide?.(item, c, why)} />
             ))}
           </div>
-        </section>
-      )}
-      {concerns.length > 0 && (
-        <section className="flex flex-col gap-3">
-          <SectionHeader title="Concerns" count={concerns.length} actions={[add("Add a concern")]} showActions="always" />
-          <RiskTable items={concerns} order="severe" kind={false} onOpen={onOpen} openId={openId} me={me} />
-        </section>
-      )}
+        ) : (
+          <None />
+        )}
+      </section>
+      <section className="flex flex-col gap-3">
+        <SectionHeader title="Concerns" count={concerns.length} actions={[add('Add a concern')]} showActions="always" />
+        {concerns.length ? <RiskTable items={concerns} order="severe" kind={false} onOpen={onOpen} openId={openId} me={me} /> : <None />}
+      </section>
       {ended > 0 && <MetaText>Resolved and rejected · {ended}</MetaText>}
     </div>
   )

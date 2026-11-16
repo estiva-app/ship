@@ -9,7 +9,7 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { IconBox, IconCircleDot, IconPlus, IconUsers } from '@tabler/icons-react'
 import { serializeBlockDocument } from '@estiva-app/protocol'
-import { Button, EmptyState, IconButton, LinkPickers, MetaText, NoAccessNotice, PageHeader, SectionHeader, Select, SkeletonList, Tabs } from '@estiva-app/ui'
+import { Button, Card, EmptyState, IconButton, Link, LinkPickers, MetaText, NoAccessNotice, PageHeader, SectionHeader, Select, SkeletonList, Tabs } from '@estiva-app/ui'
 import { Breadcrumb } from '@/components/ui/Breadcrumb'
 import { ScrollArea } from '@/components/ui/ScrollArea'
 import { Centred } from '@/components/layout/ReadingColumn'
@@ -22,13 +22,14 @@ import { ProjectFields } from '@/components/PageFields'
 import { useSideColumn } from '@/pages/sideColumn'
 import { ISSUES, ISSUE_STATUSES, hrefFor, ACTIVITY_ITEMS } from '@/fixtures/issues'
 import { ACTIVITY, PEOPLE as SHIP_PEOPLE, PROJECT_STATUSES } from '@/fixtures/projects'
-import { MarkAsRows, MarkedNotice, STATUSES, TYPE_META, TYPE_OF, blockLineCss, markedBlockAt, type ItemType, type MarkWord, type Status } from './MarkAs'
-import { FilterRow, ItemTimeline, ListStateView, filterItems, type ListState } from './ItemParts'
+import { MarkAsRows, MarkedNotice, STATUSES, TYPE_META, wordIcon, TYPE_OF, blockLineCss, markedBlockAt, type ItemType, type MarkWord, type Status } from './MarkAs'
+import { ENDED, FilterRow, ItemTimeline, ListStateView, filterItems, type ListState } from './ItemParts'
 import { ItemFields, ItemPanel, commentsOn } from './ItemPanel'
 import { ItemContent } from './ItemDetail'
 import { InsightGrid, RiskDashboard } from './ShipLists'
+import { SeverityMark, waited } from './ItemKinds'
 import { CommentsColumn, type StoryComment } from './CommentsColumn'
-import { HAND_TYPED, ITEMS, KATERINA, MIKY, PEOPLE, PROJECT, TEAM, byType, type Item } from './fixtures'
+import { HAND_TYPED, ITEMS, KATERINA, MIKY, PEOPLE, PROJECT, TEAM, byType, decide, type Item } from './fixtures'
 
 const noop = () => {}
 export type ConceptTab = 'overview' | 'issues' | 'insights' | 'journal' | 'risks'
@@ -66,29 +67,78 @@ function MarkableBlocks({ children, team, about, marked: m0 = {}, changed = [], 
   )
 }
 
-/** What's new since your last visit, above the document on Overview (his sketch). What it counts is still Miky's call. */
-function WhatsNew({ onTab }: { onTab: (t: ConceptTab) => void }) {
-  const fresh = ITEMS.filter((i) => i.isNew)
+/**
+ * Overview, levelled up (Miky, 16 Nov): it leads with what needs you, the blocker waiting on you, the question ready
+ * for you to decide, what waits for you to accept, each one click from acting. Then one quiet line of what is new
+ * since your last visit. What "new" counts is still Miky's call.
+ */
+function NeedsYou({ all, me, onTab, onOpen, onDecide }: { all: Item[]; me: string; onTab: (t: ConceptTab) => void; onOpen: (i: Item) => void; onDecide: (i: Item) => void }) {
+  const live = all.filter((i) => !ENDED.includes(i.status))
+  const blocking = live.filter((i) => i.word === 'Blocker' && i.status !== 'proposed' && i.waitingOn?.key === me)
+  const deciding = live.filter((i) => i.word === 'Question' && i.status !== 'proposed' && i.step === 'decide' && i.decider?.key === me)
+  const toAccept = live.filter((i) => i.status === 'proposed' && (!i.decidedBy || i.decidedBy.key === me))
+  const fresh = all.filter((i) => i.isNew)
   const count = (t: ItemType) => fresh.filter((i) => i.type === t).length
-  const waiting = fresh.filter((i) => i.status === 'proposed')
+  const tabOf = (t: ItemType): ConceptTab => (t === 'insight' ? 'insights' : t === 'journal' ? 'journal' : 'risks')
+  const rows: { item: Item; why: string; action?: string }[] = [
+    ...blocking.map((item) => ({ item, why: `Blocks the team · waiting on you ${waited(item.day)}`, action: 'Open' })),
+    ...deciding.map((item) => ({ item, why: 'Ready for you to decide', action: 'Decide' })),
+  ]
+  const byType = (['insight', 'journal', 'risk'] as ItemType[]).map((t) => ({ t, n: toAccept.filter((i) => i.type === t).length })).filter((x) => x.n)
   return (
-    <section aria-label="What's new" className="flex flex-col gap-2 rounded-lg border border-border-default p-3">
-      <span className="text-caption font-medium text-text-secondary">What’s new since your last visit</span>
-      <div className="flex flex-wrap gap-x-4 gap-y-1 text-body-2">
+    <section aria-label="Needs you" className="flex flex-col gap-3">
+      <SectionHeader title="Needs you" count={rows.length + toAccept.length} />
+      {rows.length + toAccept.length === 0 ? (
+        <MetaText tone="muted">Nothing waits for you.</MetaText>
+      ) : (
+        <Card fill="none" clip attention={blocking.length ? 'warning' : undefined}>
+          <ul aria-label="Needs you">
+            {rows.map(({ item, why, action }) => (
+              <li key={item.id} className="relative flex items-center gap-3 border-b border-border-subtle px-4 py-2.5 last:border-b-0">
+                <span className={item.word === 'Blocker' ? 'flex text-error-default' : 'flex'}>{item.word === 'Blocker' ? wordIcon('Blocker', 16) : <SeverityMark severity={item.severity} />}</span>
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <Link href="#" variant="quiet" truncate cover onClick={(e) => (e.preventDefault(), onOpen(item))}>
+                    {item.title}
+                  </Link>
+                  <MetaText tone="muted">{why}</MetaText>
+                </span>
+                <span className="relative shrink-0">
+                  <Button variant={action === 'Decide' ? 'primary' : 'outlined'} size="small" onClick={() => (action === 'Decide' ? onDecide(item) : onOpen(item))}>
+                    {action}
+                  </Button>
+                </span>
+              </li>
+            ))}
+            {byType.map(({ t, n }) => (
+              <li key={t} className="relative flex items-center gap-3 border-b border-border-subtle px-4 py-2.5 last:border-b-0">
+                <span className={`flex ${TYPE_META[t].text}`}>{TYPE_META[t].icon(16)}</span>
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <Link href="#" variant="quiet" cover onClick={(e) => (e.preventDefault(), onTab(tabOf(t)))}>
+                    {n} {t === 'insight' ? (n === 1 ? 'insight' : 'insights') : t === 'journal' ? (n === 1 ? 'Journal entry' : 'Journal entries') : n === 1 ? 'risk' : 'risks'} to accept
+                  </Link>
+                  <span className="min-w-0 truncate">
+                    <MetaText tone="muted">{toAccept.filter((i) => i.type === t).map((i) => i.title).join(' · ')}</MetaText>
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+      <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <MetaText tone="muted">New since your last visit:</MetaText>
         {(['insight', 'journal', 'risk'] as ItemType[]).map((t) =>
           count(t) ? (
-            <Button key={t} size="small" variant="muted" leadingIcon={<span className={TYPE_META[t].text}>{TYPE_META[t].icon(14)}</span>} onClick={() => onTab(t === 'insight' ? 'insights' : t === 'journal' ? 'journal' : 'risks')}>
-              {count(t)} new in {TYPE_META[t].tab}
-            </Button>
+            <Link key={t} href="#" variant="quiet" onClick={(e) => (e.preventDefault(), onTab(tabOf(t)))}>
+              {count(t)} in {TYPE_META[t].tab}
+            </Link>
           ) : null,
         )}
-        <span className="flex items-center gap-1 text-text-primary">
-          <IconCircleDot size={14} stroke={1.5} className="text-text-secondary" />3 issues changed
+        <span className="flex items-center gap-1">
+          <IconCircleDot size={14} stroke={1.5} className="text-text-secondary" />
+          <MetaText tone="muted">3 issues changed</MetaText>
         </span>
-      </div>
-      {waiting.length > 0 && (
-        <MetaText tone="muted">{waiting.length} waiting for you to accept</MetaText>
-      )}
+      </span>
     </section>
   )
 }
@@ -97,8 +147,8 @@ function WhatsNew({ onTab }: { onTab: (t: ConceptTab) => void }) {
  * Insights, Journal or Risks: the filter row, then each list's own view (Miky, 16 Nov): Insights a grid of boxes,
  * Journal the timeline in the reading column, Risks a table as wide as Issues'.
  */
-function ItemsTab({ type, state, onOpen, openId, me }: { type: ItemType; state: ListState; onOpen: (i: Item) => void; openId?: string; me?: string }) {
-  const items = byType(type)
+function ItemsTab({ type, all = ITEMS, state, onOpen, openId, me, onDecide, deciding }: { type: ItemType; all?: Item[]; state: ListState; onOpen: (i: Item) => void; openId?: string; me?: string; onDecide?: (item: Item, choice: number, why: string) => void; deciding?: string }) {
+  const items = all.filter((i) => i.type === type)
   const [filter, setFilter] = useState('all')
   const shown = filterItems(items, filter)
   return (
@@ -116,25 +166,33 @@ function ItemsTab({ type, state, onOpen, openId, me }: { type: ItemType; state: 
         )}
         {type === 'insight' && <InsightGrid items={shown} onOpen={onOpen} openId={openId} me={me} />}
         {type === 'journal' && <ItemTimeline items={shown} onOpen={onOpen} openId={openId} me={me} label="Journal" />}
-        {type === 'risk' && <RiskDashboard items={[...items, HAND_TYPED]} onOpen={onOpen} openId={openId} me={me} />}
+        {type === 'risk' && <RiskDashboard items={[...items, HAND_TYPED]} onOpen={onOpen} openId={openId} me={me} onDecide={onDecide} deciding={deciding} />}
       </ListStateView>
     </div>
   )
 }
 
 /** The project page: today's header and tab row, three more tabs; an item opens beside its list. */
-export function ProjectPage({ start = 'overview', listState = 'ready', me = 'miky', open: open0, side: side0 = 'none' }: { start?: ConceptTab; listState?: ListState; me?: string; open?: string; side?: 'comments' | 'overview' | 'none' }) {
+export function ProjectPage({ start = 'overview', listState = 'ready', me = 'miky', open: open0, side: side0 = 'none', decided, deciding }: { start?: ConceptTab; listState?: ListState; me?: string; open?: string; side?: 'comments' | 'overview' | 'none'; decided?: string; deciding?: string }) {
   const [tab, setTab] = useState<ConceptTab>(start)
-  const [open, setOpen] = useState<Item | undefined>(ITEMS.find((i) => i.id === open0))
+  // Decide changes the lists in place: the question resolves, its Decision joins the Journal (Miky, 16 Nov).
+  const [all, setAll] = useState<Item[]>(() => (decided ? decide(ITEMS, decided, Math.max(0, ITEMS.find((i) => i.id === decided)?.options?.findIndex((o) => o.lean) ?? 0)) : ITEMS))
+  const [open, setOpen] = useState<Item | undefined>(all.find((i) => i.id === open0))
+  const [decidingId, setDecidingId] = useState(deciding)
+  const onDecide = (q: Item, choice: number, why: string) => {
+    const next = decide(all, q.id, choice, why)
+    setAll(next)
+    setOpen((o) => (o ? next.find((i) => i.id === o.id) : o))
+  }
   const onOpenItem = (i: Item) => setOpen((o) => (o?.id === i.id ? undefined : i))
   const side = useSideColumn(side0)
-  const counts = useMemo(() => ({ insight: byType('insight').filter((i) => i.isNew).length, journal: byType('journal').filter((i) => i.isNew).length, risk: byType('risk').filter((i) => i.isNew).length }), [])
+  const counts = useMemo(() => ({ insight: all.filter((i) => i.type === 'insight' && i.isNew).length, journal: all.filter((i) => i.type === 'journal' && i.isNew).length, risk: all.filter((i) => i.type === 'risk' && i.isNew).length }), [all])
   const tabs: { id: ConceptTab; label: string; count?: number; unread?: boolean }[] = [
     { id: 'overview', label: 'Overview' },
     { id: 'issues', label: 'Issues' },
     { id: 'insights', label: 'Insights', unread: counts.insight > 0 },
     { id: 'journal', label: 'Journal', unread: counts.journal > 0 },
-    { id: 'risks', label: 'Risks', unread: counts.risk > 0 },
+    { id: 'risks', label: TYPE_META.risk.tab, unread: counts.risk > 0 },
   ]
   const [status, setStatus] = useState('in_progress')
   const [lead, setLead] = useState('ravi')
@@ -151,7 +209,7 @@ export function ProjectPage({ start = 'overview', listState = 'ready', me = 'mik
         <ScrollArea className="min-h-0 min-w-0 flex-1" contentClassName="flex flex-col gap-6 px-6 pb-5">
           {tab === 'overview' && (
             <Centred>
-              <WhatsNew onTab={setTab} />
+              <NeedsYou all={all} me={me} onTab={setTab} onOpen={(i) => setOpen(i)} onDecide={(i) => (setDecidingId(i.id), setOpen(i))} />
               <MarkableBlocks team={TEAM} about={PROJECT} marked={{ p2: 'insight' }} changed={['p3']} onOpenBlock={() => setOpen(ITEMS.find((i) => i.id === 'i1'))}>
                 <LiveHeader
                   fields={<ProjectFields status={status} statuses={PROJECT_STATUSES} onStatusChange={setStatus} lead={lead} people={SHIP_PEOPLE} onLeadChange={setLead} done={3} total={8} />}
@@ -168,12 +226,12 @@ export function ProjectPage({ start = 'overview', listState = 'ready', me = 'mik
             </Centred>
           )}
           {tab === 'issues' && <IssuesTable issues={ISSUES} statuses={ISSUE_STATUSES} hrefFor={hrefFor} />}
-          {tab === 'insights' && <ItemsTab type="insight" state={listState} onOpen={onOpenItem} openId={open?.id} me={me} />}
-          {tab === 'journal' && <ItemsTab type="journal" state={listState} onOpen={onOpenItem} openId={open?.id} me={me} />}
-          {tab === 'risks' && <ItemsTab type="risk" state={listState} onOpen={onOpenItem} openId={open?.id} me={me} />}
+          {tab === 'insights' && <ItemsTab type="insight" all={all} state={listState} onOpen={onOpenItem} openId={open?.id} me={me} />}
+          {tab === 'journal' && <ItemsTab type="journal" all={all} state={listState} onOpen={onOpenItem} openId={open?.id} me={me} />}
+          {tab === 'risks' && <ItemsTab type="risk" all={all} state={listState} onOpen={onOpenItem} openId={open?.id} me={me} onDecide={onDecide} deciding={deciding} />}
         </ScrollArea>
       </div>
-      {open && (tab === 'overview' || open.type === TAB_TYPE[tab]) && <ItemPanel item={open} me={me} onClose={() => setOpen(undefined)} />}
+      {open && (tab === 'overview' || open.type === TAB_TYPE[tab]) && <ItemPanel item={open} me={me} onClose={() => (setOpen(undefined), setDecidingId(undefined))} deciding={open.id === decidingId} onDecide={(c, why) => onDecide(open, c, why)} />}
       {side.overview.shown && (
         <div className="flex shrink-0 flex-col border-l border-border-default">
           <OverviewPanel activity={ACTIVITY_ITEMS} history={ACTIVITY} />
@@ -318,7 +376,7 @@ export function TeamPage({ start = 'insights' }: { start?: 'projects' | ConceptT
             { id: 'projects', label: 'Projects', count: 6 },
             { id: 'insights', label: 'Insights', count: byType('insight').length },
             { id: 'journal', label: 'Journal', count: byType('journal').length },
-            { id: 'risks', label: 'Risks', count: byType('risk').length },
+            { id: 'risks', label: TYPE_META.risk.tab, count: byType('risk').length },
           ]}
           active={tab}
           onChange={setTab}
