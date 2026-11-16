@@ -39,7 +39,8 @@ export function useTopicConversation(
   say: Say,
   refresh: (folders?: string[]) => Promise<void>,
 ) {
-  const held = useThreads(state, topic ? [topic.folder] : [], topic ? [topic.address] : [])
+  // Its own conversation, not its team's whole chat (ALO-27), with the team kept live so replies still arrive.
+  const held = useThreads(state, [], [], [], topic ? { files: [topic.address], live: [topic.folder] } : undefined)
   const conversations = useMemo(() => (topic ? ownConversations(state.conversations, { addr: topic.address, recordFolder: '' }, state.anchors) : []), [topic, state])
   const side = useSideColumn()
   const shown = side.comments.shown

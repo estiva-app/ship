@@ -97,7 +97,7 @@ import { foldEdits } from '@estiva-app/conversation'
 import { store } from '@/api/store'
 import App from '@/App'
 
-const STATE = { projects: [], issues: [], activity: [], conversations: [], anchors: {}, edits: {}, attachments: {}, urgent: {}, parts: {}, embeds: {}, folders: [], events: [], threadsAt: { [TEAM]: 1 }, mentionsOf: [TOPIC] } as unknown as WorkspaceState
+const STATE = { projects: [], issues: [], activity: [], conversations: [], anchors: {}, edits: {}, attachments: {}, urgent: {}, parts: {}, embeds: {}, folders: [], events: [], threadsAt: {}, mentionsOf: [], ownOf: [TOPIC], liveAt: { [TEAM]: 1 } } as unknown as WorkspaceState
 /** The topic with a conversation Katerina started about it ten minutes ago, which the viewer has not read. */
 const SAID_AT = Math.floor(Date.now() / 1000) - 600
 const said = { id: 'd'.repeat(64), author: KATERINA, createdAt: SAID_AT, body: 'Shipping Friday?', folder: TEAM, about: [TOPIC] }
