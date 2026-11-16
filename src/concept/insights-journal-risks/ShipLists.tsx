@@ -7,8 +7,8 @@
  *   most severe first (Miky, 16 Nov).
  */
 import { useState } from 'react'
-import { IconAntennaBars2, IconAntennaBars3, IconAntennaBars4, IconAntennaBars5, IconTrendingDown, IconTrendingUp } from '@tabler/icons-react'
-import { Card, Link, MetaText, Person, SectionHeader } from '@estiva-app/ui'
+import { IconAlertSquareRoundedFilled, IconAntennaBars3, IconAntennaBars4, IconAntennaBars5, IconTrendingDown, IconTrendingUp } from '@tabler/icons-react'
+import { Card, Link, MetaText, Person, SectionHeader, WithTooltip } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
 import { ScrollArea } from '@/components/ui/ScrollArea'
 import { AcceptReject, ENDED, ItemTag, LIVE, StatusOf, acceptedStatus } from './ItemParts'
@@ -242,20 +242,24 @@ const ordered = (items: Item[], order: RiskOrder) => {
   return [...items].sort((a, b) => rank(a) - rank(b) || b.day.localeCompare(a.day))
 }
 
-/** A risk's severity: bars as a signal's strength, in the colour of how bad it is, and the word. */
+/**
+ * A risk's severity as one icon, no word, as Linear shows priority (Miky, 16 Nov: "too many labels"): Critical a filled
+ * red square with "!", the rest bars as a signal's strength; hover names it.
+ */
 export function SeverityMark({ severity }: { severity?: Severity }) {
   if (!severity) return <span className="text-text-muted">—</span>
   const look = {
-    Critical: { icon: <IconAntennaBars5 size={16} stroke={1.5} />, text: 'text-error-default' },
-    High: { icon: <IconAntennaBars4 size={16} stroke={1.5} />, text: 'text-warning-default' },
-    Medium: { icon: <IconAntennaBars3 size={16} stroke={1.5} />, text: 'text-text-secondary' },
-    Low: { icon: <IconAntennaBars2 size={16} stroke={1.5} />, text: 'text-text-muted' },
+    Critical: { icon: <IconAlertSquareRoundedFilled size={16} />, text: 'text-error-default' },
+    High: { icon: <IconAntennaBars5 size={16} stroke={1.5} />, text: 'text-warning-default' },
+    Medium: { icon: <IconAntennaBars4 size={16} stroke={1.5} />, text: 'text-text-secondary' },
+    Low: { icon: <IconAntennaBars3 size={16} stroke={1.5} />, text: 'text-text-muted' },
   }[severity]
   return (
-    <span className={cn('flex items-center gap-1.5', look.text)}>
-      {look.icon}
-      {severity}
-    </span>
+    <WithTooltip label={severity}>
+      <span role="img" aria-label={severity} className={cn('flex items-center', look.text)}>
+        {look.icon}
+      </span>
+    </WithTooltip>
   )
 }
 
@@ -267,7 +271,7 @@ export function RiskTable({ items, order = 'recent', onOpen, openId, me = 'miky'
         <table className="w-full min-w-[840px] table-fixed border-collapse" aria-label="Risks">
           <thead className="bg-bg-surface">
             <tr className="border-b border-border-default">
-              <th className={cn(TH, 'w-28')}>Severity</th>
+              <th className={cn(TH, 'w-24')}>Severity</th>
               <th className={cn(TH, 'w-32')}>Kind</th>
               <th className={TH}>Title</th>
               <th className={cn(TH, 'w-32')}>Raised by</th>
