@@ -21,9 +21,9 @@ import { SEVERITIES, type Item, type Severity, type Visual } from './fixtures'
 /** New first, then newest first: what waits for you leads either view. */
 const newFirst = (items: Item[]) => [...items].sort((a, b) => Number(!!b.isNew) - Number(!!a.isNew) || b.day.localeCompare(a.day))
 
-/** The dot that says new since your last visit, the tab's own dot. */
+/** The dot that says new since your last visit, the tab's own dot — always just after the title (Miky, 16 Nov). */
 function NewDot({ on }: { on?: boolean }) {
-  return on ? <span aria-label="New" className="size-1.5 shrink-0 rounded-full bg-accent-primary" /> : null
+  return on ? <span aria-label="New" className="ml-1.5 inline-block size-1.5 shrink-0 rounded-full bg-accent-primary align-middle" /> : null
 }
 
 /** Accept and ✕ while Proposed, else its status; a Decision for someone else waits for them. */
@@ -123,14 +123,16 @@ function InsightBox({ item, me, onOpen, selected }: { item: Item; me: string; on
     <Card fill="surface" hover="hairline" onPress={onOpen} selected={selected} className={cn('flex', wide && 'col-span-2')}>
       <div className={cn('flex min-w-0 flex-1 flex-col gap-2 p-3', ENDED.includes(status) && 'opacity-60')}>
         <div className="flex h-6 items-center gap-2">
-          <NewDot on={item.isNew} />
           <ItemTag item={item} />
           <MetaText tone="muted">{item.at}</MetaText>
           <span className="ml-auto">
             <Answer item={item} me={me} status={status} onStatus={setStatus} />
           </span>
         </div>
-        <span className="text-body-2 font-medium text-text-primary">{item.title}</span>
+        <span className="text-body-2 font-medium text-text-primary">
+          {item.title}
+          <NewDot on={item.isNew} />
+        </span>
         {item.visual ? <InsightVisual visual={item.visual} /> : item.summary && <span className="line-clamp-3 text-body-2 text-text-secondary">{item.summary}</span>}
         <div className="mt-auto flex min-w-0 items-center gap-2 pt-1">
           <Person name={face} size={16} />
@@ -192,10 +194,6 @@ function RiskRow({ item, me, onOpen, selected, kind = true }: { item: Item; me: 
     <tr className={cn('relative border-b border-border-subtle last:border-b-0 hover:bg-bg-hover', selected && 'bg-bg-selected', ENDED.includes(status) && 'text-text-muted')}>
       {/* Severity carries the colour; the kind only says what kind of risk it is, in plain text (Miky, 16 Nov: one cell for both was "too much"). */}
       <td className={TD}>
-        {/* The new dot sits in the row's left padding, so the severities stay in one line. */}
-        <span className="absolute left-1 top-1/2 flex -translate-y-1/2">
-          <NewDot on={item.isNew} />
-        </span>
         <SeverityMark severity={item.severity} />
       </td>
       {kind && (
@@ -208,9 +206,12 @@ function RiskRow({ item, me, onOpen, selected, kind = true }: { item: Item; me: 
       )}
       {/* Two lines, as Linear's table has them (Miky, 16 Nov): the title, and the summary under it in full width. */}
       <td className="px-3 py-2 text-body-2">
-        <span className="block font-medium"><Link href="#" variant="quiet" truncate cover className="block" onClick={(e) => (e.preventDefault(), onOpen?.())}>
-          {item.title}
-        </Link></span>
+        <span className="flex items-center font-medium">
+          <Link href="#" variant="quiet" truncate cover onClick={(e) => (e.preventDefault(), onOpen?.())}>
+            {item.title}
+          </Link>
+          <NewDot on={item.isNew} />
+        </span>
         {item.summary && <span className="block truncate text-text-secondary">{item.summary}</span>}
       </td>
       <td className={cn(TD, 'text-text-secondary')}>
@@ -305,11 +306,11 @@ function BlockerRow({ item, me, onOpen, selected }: { item: Item; me: string; on
     <li className={cn('relative flex items-start gap-3 border-b border-border-subtle px-4 py-3 last:border-b-0 hover:bg-bg-hover', selected && 'bg-bg-selected')}>
       <span className="mt-0.5 flex text-error-default">{wordIcon('Blocker', 18)}</span>
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="flex items-center gap-2 font-medium">
-          <NewDot on={item.isNew} />
+        <span className="flex items-center font-medium">
           <Link href="#" variant="quiet" truncate cover onClick={(e) => (e.preventDefault(), onOpen?.())}>
             {item.title}
           </Link>
+          <NewDot on={item.isNew} />
         </span>
         {item.summary && <span className="text-body-2 text-text-secondary">{item.summary}</span>}
         {item.blocks && <MetaText>Stops: {item.blocks}</MetaText>}
@@ -338,11 +339,17 @@ function QuestionBox({ item, me, onOpen, selected }: { item: Item; me: string; o
   return (
     <Card fill="surface" hover="hairline" selected={selected} className="relative flex flex-col gap-3 p-4">
       <div className="flex items-start justify-between gap-3">
+        {/* Severity first, as in the Concerns table (Miky, 16 Nov: some questions are secondary, some critical). */}
         <span className="flex min-w-0 items-start gap-2 font-medium">
-          {item.isNew && <span className="mt-2 flex"><NewDot on /></span>}
-          <Link href="#" variant="quiet" cover onClick={(e) => (e.preventDefault(), onOpen?.())}>
-            {item.title}
-          </Link>
+          <span className="mt-0.5 flex shrink-0">
+            <SeverityMark severity={item.severity} />
+          </span>
+          <span>
+            <Link href="#" variant="quiet" cover onClick={(e) => (e.preventDefault(), onOpen?.())}>
+              {item.title}
+            </Link>
+            <NewDot on={item.isNew} />
+          </span>
         </span>
         {status === 'proposed' && (
           <span className="relative shrink-0">
@@ -395,7 +402,7 @@ function QuestionBox({ item, me, onOpen, selected }: { item: Item; me: string; o
 export function RiskDashboard({ items, onOpen, openId, me = 'miky' }: { items: Item[]; onOpen?: (item: Item) => void; openId?: string; me?: string }) {
   const live = items.filter((i) => !ENDED.includes(i.status))
   const blockers = newFirst(live.filter((i) => i.word === 'Blocker'))
-  const questions = newFirst(live.filter((i) => i.word === 'Question'))
+  const questions = ordered(live.filter((i) => i.word === 'Question'), 'severe')
   const concerns = live.filter((i) => i.word === 'Concern')
   const ended = items.length - live.length
   const open = (item: Item) => () => onOpen?.(item)
