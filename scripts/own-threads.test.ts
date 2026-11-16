@@ -123,7 +123,7 @@ check('the topic draws the new reply', conversationsAbout(foldWorkspace(reloaded
 removed = true
 const gone = await store.reloadFolders(opened, [TEAM])
 removed = false
-check("removed from the team, the topic's conversation is gone on the next re-read", opened.readAt[TEAM] === undefined && own.every((event) => !has(gone, event)))
+check("removed from the team, the topic's conversation is gone on the next re-read", opened.readAt[TEAM] === undefined && own.every((event) => has(opened, event) && !has(gone, event)))
 
 // The team's own page draws its whole conversation: that screen still reads it.
 asked = []
