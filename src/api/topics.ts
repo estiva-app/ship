@@ -7,7 +7,7 @@ import { foldersNow, heldFolders } from './useFolders'
 import { useLandedReadState } from './readStateSync'
 import { readMuted } from './useFeedJudges'
 import { nip44 } from './nip44'
-import { relay, signer } from './store'
+import { relay, signer, timesOption } from './store'
 
 /**
  * Every topic the reader can read, held per tab (SHIPS-2) — interop's
@@ -421,7 +421,7 @@ function perTopicRead<T>(read: (topics: ReadTopic[]) => Promise<ReadonlyMap<stri
  * by (interop's `readTopicActivity`, TOPI-10): the sidebar's five and Your
  * topics, and Explore's Last active.
  */
-const activity = perTopicRead<number>(async (topics) => (await readTopicActivity((filters) => relay.query(filters as never), activityTopics(topics))).at)
+const activity = perTopicRead<number>(async (topics) => (await readTopicActivity((filters) => relay.query(filters as never), activityTopics(topics), await timesOption())).at)
 
 /**
  * How many people each topic lists (record a-place-lists-who-chose-a-level-and-its-teams-members): Explore's Members.

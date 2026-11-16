@@ -44,6 +44,8 @@ vi.mock('@/api/store', () => ({
   relay: { query: (filters: Record<string, unknown>[]) => answer(filters), queryAll: (filters: Record<string, unknown>[]) => answer(filters, { paging: true }) },
   signer: { pubkey: 'c'.repeat(64) },
   projectFieldsNow: async () => undefined,
+  // A relay without the times read (NIP-11 `file_list.times`): topicTimes.wire.test.tsx reads the one with it.
+  timesOption: async () => ({}),
   store: {
     joinPlace: (args: unknown) => wire.store.joinPlace(args),
     publishMuted: (ciphertext: string) => wire.store.publishMuted(ciphertext),

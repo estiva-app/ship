@@ -25,7 +25,7 @@ export function optedIn(): boolean {
   }
 }
 
-const NONE: RelayFileReads = { list: false, text: false, switched: false, inOrder: [], search: [] }
+const NONE: RelayFileReads = { list: false, text: false, times: false, switched: false, inOrder: [], search: [] }
 
 /** The relay's NIP-11, read once per page: a relay makes the switch once, and a reload reads it again. */
 export function readFileReads(info: () => Promise<unknown>): Promise<RelayFileReads> {
