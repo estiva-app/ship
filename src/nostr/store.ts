@@ -172,6 +172,9 @@ export interface WorkspaceState extends FolderState {
   /** The Folders whose conversations were read, and the files whose mentions were (APP-5): see `WorkspaceEvents`. */
   threadsAt?: Readonly<Record<string, number>>
   mentionsOf?: readonly string[]
+  /** The files whose own conversation this holds, and the Folders kept live from then on (ALO-27): see `WorkspaceEvents`. */
+  ownOf?: readonly string[]
+  liveAt?: Readonly<Record<string, number>>
   /** The projects whose current text this holds, where projects are read by their fields: see `WorkspaceEvents`. */
   texts?: readonly string[]
   /**
@@ -206,7 +209,11 @@ export function partsIndex(events: readonly SignedEvent[]): Record<string, PartP
   return out
 }
 
-function read(events: SignedEvent[], folders: string[], threads: Required<Pick<WorkspaceState, 'threadsAt' | 'mentionsOf'>> & Pick<WorkspaceState, 'texts'> = { threadsAt: {}, mentionsOf: [] }): WorkspaceState {
+function read(
+  events: SignedEvent[],
+  folders: string[],
+  threads: Required<Pick<WorkspaceState, 'threadsAt' | 'mentionsOf'>> & Pick<WorkspaceState, 'texts' | 'ownOf' | 'liveAt'> = { threadsAt: {}, mentionsOf: [] },
+): WorkspaceState {
   return {
     ...threads,
     ...foldFolder(events, referencedAddresses),
@@ -260,6 +267,20 @@ export interface WorkspaceEvents {
    */
   mentionsOf: string[]
   /**
+   * The files whose own conversation this holds, read by what it is about and
+   * not as their Folders' whole conversation (ALO-27): every comment and reply
+   * naming one by `A`, every message naming one by `a`, and the replies and
+   * edits naming those by `e`. Asked for again on every whole read.
+   */
+  ownOf?: string[]
+  /**
+   * The Folders whose new messages, comments and edits a re-read carries from
+   * a time on (ms, as `readAt`), without holding their whole conversation
+   * (ALO-27): a file's own conversation keeps taking replies live. Not in
+   * `threadsAt`, so a screen drawing the Folder's conversation still reads it.
+   */
+  liveAt?: Record<string, number>
+  /**
    * Where projects are read by their fields (ALO-5): the projects whose
    * current text this holds. A list read carries none (§6.13), and a project
    * missing here folds its first record's seed in place of its text, so nothing
@@ -280,13 +301,19 @@ export interface ThreadsWanted {
    * only (ALO-5). Held once `texts` holds them.
    */
   changes?: readonly string[]
+  /** Files whose own conversation the screen draws, read by what it is about, not by its Folder (ALO-27). */
+  own?: readonly string[]
+  /** Folders whose new conversation the screen draws from now on, without the rest of it: an `own` file's (ALO-27). */
+  live?: readonly string[]
 }
 
 /** Whether `events` holds every conversation `wanted` asks for, and every project's changes. */
-export function holdsThreads(events: Pick<WorkspaceState, 'threadsAt' | 'mentionsOf' | 'texts'>, wanted: ThreadsWanted): boolean {
+export function holdsThreads(events: Pick<WorkspaceState, 'threadsAt' | 'mentionsOf' | 'texts' | 'ownOf' | 'liveAt'>, wanted: ThreadsWanted): boolean {
   return (
     wanted.folders.every((folder) => events.threadsAt?.[folder] !== undefined) &&
     wanted.about.every((addr) => events.mentionsOf?.includes(addr)) &&
+    (wanted.own ?? []).every((addr) => events.ownOf?.includes(addr)) &&
+    (wanted.live ?? []).every((folder) => events.threadsAt?.[folder] !== undefined || events.liveAt?.[folder] !== undefined) &&
     (!events.texts || (wanted.changes ?? []).every((addr) => events.texts!.includes(addr)))
   )
 }
@@ -379,8 +406,14 @@ class Deletions {
 }
 
 /** Fold a workspace read. `loadAll` is `foldWorkspace(await loadAllEvents())`. */
-export function foldWorkspace(snapshot: Pick<WorkspaceEvents, 'events' | 'folders'> & Partial<Pick<WorkspaceEvents, 'threadsAt' | 'mentionsOf' | 'texts'>>): WorkspaceState {
-  return read(snapshot.events, snapshot.folders, { threadsAt: snapshot.threadsAt ?? {}, mentionsOf: snapshot.mentionsOf ?? [], ...(snapshot.texts ? { texts: snapshot.texts } : {}) })
+export function foldWorkspace(snapshot: Pick<WorkspaceEvents, 'events' | 'folders'> & Partial<Pick<WorkspaceEvents, 'threadsAt' | 'mentionsOf' | 'texts' | 'ownOf' | 'liveAt'>>): WorkspaceState {
+  return read(snapshot.events, snapshot.folders, {
+    threadsAt: snapshot.threadsAt ?? {},
+    mentionsOf: snapshot.mentionsOf ?? [],
+    ...(snapshot.texts ? { texts: snapshot.texts } : {}),
+    ...(snapshot.ownOf ? { ownOf: snapshot.ownOf } : {}),
+    ...(snapshot.liveAt ? { liveAt: snapshot.liveAt } : {}),
+  })
 }
 
 function folderOfEvent(event: SignedEvent): string | undefined {
@@ -394,6 +427,9 @@ function folderOfEvent(event: SignedEvent): string | undefined {
  */
 export const MAX_MENTION_THREADS = 24
 const MENTION_THREAD_PAGE = 500
+
+/** Ids per `#e` filter in a file's own conversation (`ownThreads`), as interop's readers ask: all of them go in one request. */
+const IDS_PER_FILTER = 100
 
 /** The opened page's records by `d`, one request (`loadOpened`): one per author, so far fewer than this. */
 const OPENED_RECORDS_LIMIT = 100
@@ -1733,15 +1769,64 @@ export class Store {
       : new Set<string>()
     const folders = [...new Set([...wanted.folders, ...[...mentioning].filter((folder) => known.has(folder))])].filter((folder) => previous.threadsAt[folder] === undefined)
     const threadsAt = { ...previous.threadsAt }
+    const own = (wanted.own ?? []).filter((addr) => !previous.ownOf?.includes(addr))
+    // Stamped before the read, as `readAt`: a re-read of a live Folder from then misses nothing said meanwhile.
+    const at = Date.now()
+    const live = (wanted.live ?? []).filter((folder) => threadsAt[folder] === undefined && previous.liveAt?.[folder] === undefined)
     // A project the screen draws, opened by navigating: its current text, which no list read carries (ALO-5).
-    const [fresh, opened] = await Promise.all([this.readFolderEvents(folders, {}, {}, this.queryAll, THREAD_KINDS, threadsAt), this.openTexts(about, wanted.changes ?? [], previous.texts)])
+    const [fresh, owned, opened] = await Promise.all([
+      this.readFolderEvents(folders, {}, {}, this.queryAll, THREAD_KINDS, threadsAt),
+      this.ownThreads(own),
+      this.openTexts(about, wanted.changes ?? [], previous.texts),
+    ])
+    const ownOf = [...(previous.ownOf ?? []), ...own]
+    const liveAt = { ...previous.liveAt, ...Object.fromEntries(live.map((folder) => [folder, at])) }
     return {
       ...previous,
-      events: this.deleted.drop(mergeRead(previous.events, [...fresh, ...opened.events])),
+      events: this.deleted.drop(mergeRead(previous.events, [...fresh, ...owned, ...opened.events])),
       threadsAt,
       mentionsOf: [...previous.mentionsOf, ...about],
+      ...(ownOf.length ? { ownOf } : {}),
+      ...(Object.keys(liveAt).length ? { liveAt } : {}),
       ...(previous.texts ? { texts: [...previous.texts, ...opened.texts] } : {}),
     }
+  }
+
+  /**
+   * The conversations about `files`, read by what they are about rather than as
+   * the whole conversation of the Folder they sit in (ALO-27): a topic's page in
+   * Ship read its team's whole chat, 0.38 MB on 13 Nov and growing with every
+   * message anyone in the team wrote, to draw one topic's.
+   *
+   * A comment on a file and every reply under it name the file by `A` (§6.4: a
+   * reply keeps its comment's `A`), and an older message about one names it by
+   * `a`; so one read finds them, and one more by `#e` brings what names them
+   * only by id: the edits, and a `kind:9` reply to a `kind:9` message. Only
+   * when such replies came back, a third brings their edits. A reply counts
+   * only in its root's own Folder, as in a Folder's read.
+   */
+  private async ownThreads(files: readonly string[]): Promise<SignedEvent[]> {
+    if (!files.length) return []
+    const about = await this.queryAll([
+      { kinds: [...THREAD_KINDS], '#a': [...files] },
+      { kinds: [KIND.COMMENT], '#A': [...files] },
+    ])
+    const held = new Map(about.map((event) => [event.id, event]))
+    const named = async (ids: readonly string[], kinds: readonly number[]) => {
+      if (!ids.length) return []
+      const filters = []
+      for (let at = 0; at < ids.length; at += IDS_PER_FILTER) filters.push({ kinds: [...kinds], '#e': ids.slice(at, at + IDS_PER_FILTER) })
+      return (await this.queryAll(filters)).filter((event) => !held.has(event.id))
+    }
+    const messages = (events: Iterable<SignedEvent>) => [...events].filter((event) => event.kind !== KIND.MESSAGE_EDIT).map((event) => event.id)
+    const byId = await named(messages(held.values()), [KIND.MESSAGE, KIND.MESSAGE_EDIT])
+    const replies = byId.filter((event) => event.kind === KIND.MESSAGE)
+    const inRootsFolder = replies.filter((reply) =>
+      reply.tags.some((t) => t[0] === 'e' && held.get(t[1] ?? '') && folderOfEvent(held.get(t[1]!)!) === folderOfEvent(reply)),
+    )
+    for (const event of [...byId.filter((event) => event.kind === KIND.MESSAGE_EDIT), ...inRootsFolder]) held.set(event.id, event)
+    for (const event of await named(messages(inRootsFolder), [KIND.MESSAGE_EDIT])) held.set(event.id, event)
+    return [...held.values()]
   }
 
   /** A query for one load (`createLoadQuery`, paged): see `loadAllEvents`. */
@@ -1782,24 +1867,31 @@ export class Store {
     // The relay dated nothing it took more than its drift after its own clock; a minute more for the read itself.
     const newest = previous.events.reduce((max, event) => Math.max(max, event.created_at), 0)
     const latest = newest - RELAY_DRIFT_SECS - COMMIT_FLOOR_SECS - 60
-    const since: Record<string, number> = {}
-    for (const folder of scope) {
-      const at = previous.readAt[folder]
-      if (at === undefined) continue
+    const sinceOf = (at: number) => {
       const local = Math.floor((at - (skew ?? 0)) / 1000) - COMMIT_FLOOR_SECS - (skew === null ? RELAY_DRIFT_SECS : 0)
-      since[folder] = skew === null && newest ? Math.max(0, Math.min(local, latest)) : local
+      return skew === null && newest ? Math.max(0, Math.min(local, latest)) : local
     }
-    const kept = previous.events.filter((event) => {
-      const folder = folderOfEvent(event)
-      return !folder || !scope.has(folder) || since[folder] !== undefined
-    })
+    const since: Record<string, number> = {}
+    for (const folder of scope) if (previous.readAt[folder] !== undefined) since[folder] = sinceOf(previous.readAt[folder])
     const readAt = { ...previous.readAt }
     const threadsAt = { ...previous.threadsAt }
+    const liveAt = { ...previous.liveAt }
+    // A live Folder's new conversation, from when it was last asked (ALO-27): its whole conversation is never read here.
+    const live = new Set([...scope].filter((folder) => threadsAt[folder] === undefined && liveAt[folder] !== undefined))
+    const kept = previous.events.filter((event) => {
+      const folder = folderOfEvent(event)
+      if (folder && live.has(folder) && THREAD_KINDS.includes(event.kind)) return true
+      return !folder || !scope.has(folder) || since[folder] !== undefined
+    })
     // A Folder's conversation only where it is held (APP-5): one a screen has not asked for stays unread.
     const kinds = (folder: string) => [...(threadsAt[folder] === undefined ? FOLDER_KINDS_BUT_THREADS : FOLDER_KINDS), KIND.DELETION]
-    const fresh = await this.readFolderEvents([...scope], readAt, since, this.queryAll, kinds)
+    const liveSince = [...live].map((folder) => ({ kinds: [...THREAD_KINDS], '#h': [folder], since: sinceOf(liveAt[folder]!) }))
+    const at = Date.now()
+    const fresh = await this.readFolderEvents([...scope], readAt, since, this.queryAll, kinds, undefined, liveSince)
+    for (const folder of live) liveAt[folder] = at
     for (const event of fresh) if (event.kind === KIND.DELETION) this.deleted.note(event)
-    const lost = await this.lostFolders(this.deleted.drop(kept), Object.keys(since), foldersOf(fresh))
+    // A live Folder keeps its held conversation through a whole re-read, so it is checked for lost access as well.
+    const lost = await this.lostFolders(this.deleted.drop(kept), [...new Set([...Object.keys(since), ...live])], foldersOf(fresh))
     if (lost.size) {
       // Read whole, as a Folder never read: what this reader may still see, and nothing if it may see nothing.
       for (const folder of lost) delete readAt[folder]
@@ -1808,8 +1900,14 @@ export class Store {
     const stillHeld = lost.size ? kept.filter((event) => !lost.has(folderOfEvent(event) ?? '')) : kept
     const read = mergeRead(stillHeld, fresh.filter((event) => event.kind !== KIND.DELETION))
     const widened = await this.widen(this.deleted.drop(read), new Set([...previous.folders, ...scope]), readAt, this.queryAll, FOLDER_KINDS_BUT_THREADS, threadsAt, previous.mentionsOf)
-    // A text read before stays held: a newer one is a change in its Folder, which this re-read brings.
-    return previous.texts ? { ...widened, texts: previous.texts } : widened
+    // A text read before stays held: a newer one is a change in its Folder, which this re-read brings. So does a
+    // file's own conversation: what is new in it is in its live Folder's re-read.
+    return {
+      ...widened,
+      ...(previous.texts ? { texts: previous.texts } : {}),
+      ...(previous.ownOf ? { ownOf: previous.ownOf } : {}),
+      ...(Object.keys(liveAt).length ? { liveAt } : {}),
+    }
   }
 
   /**
@@ -1940,6 +2038,11 @@ export class Store {
     read: QueryFn = this.queryAll,
     kinds: KindsOf = FOLDER_KINDS,
     threadsAt?: Record<string, number>,
+    /**
+     * Filters sent in the same request: a live Folder's new conversation (ALO-27). They mark nothing as held; an
+     * answer from one of `folders` stamps its `readAt` as any answer does, which is right, since it was asked too.
+     */
+    alongside: readonly Record<string, unknown>[] = [],
   ): Promise<SignedEvent[]> {
     for (const folder of folders) assertFolderId(folder)
     if (!folders.length) return []
@@ -1948,12 +2051,13 @@ export class Store {
     const asked = new Map(folders.map((folder) => [folder, [...kindsFor(kinds, folder)]]))
     // One filter per Folder, and the relay clamps per filter — so this gets the
     // ceiling for each Folder rather than sharing one across all of them.
-    const events = await read(
-      folders.map((folder) => {
+    const events = await read([
+      ...folders.map((folder) => {
         const of = asked.get(folder) ?? []
         return since[folder] === undefined ? { kinds: of, '#h': [folder] } : { kinds: of, '#h': [folder], since: since[folder] }
       }),
-    )
+      ...alongside,
+    ])
     for (const folder of foldersOf(events)) if (folders.includes(folder)) readAt[folder] = at
     if (threadsAt) for (const [folder, of] of asked) if (of.includes(KIND.COMMENT)) threadsAt[folder] = at
     return events

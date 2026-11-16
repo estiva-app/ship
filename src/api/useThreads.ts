@@ -16,13 +16,20 @@ const NONE: ThreadsWanted = { folders: [], about: [] }
  * the way), and nothing is marked read. Asked again when `state` changes, so a
  * read the relay refused is asked again with the next one.
  */
-export function useThreads(state: WorkspaceState | null | undefined, folders: readonly string[], about: readonly string[] = [], changes: readonly string[] = []): { folders: boolean; all: boolean } {
+export function useThreads(
+  state: WorkspaceState | null | undefined,
+  folders: readonly string[],
+  about: readonly string[] = [],
+  changes: readonly string[] = [],
+  /** Files whose own conversation the screen draws, without their Folders' (ALO-27), and those Folders, kept live. */
+  own: { files: readonly string[]; live: readonly string[] } = { files: [], live: [] },
+): { folders: boolean; all: boolean } {
   const want = useContext(ThreadsContext)
-  const key = [folders, about, changes].map((addrs) => [...new Set(addrs)].sort().join(' ')).join('|')
+  const key = [folders, about, changes, own.files, own.live].map((addrs) => [...new Set(addrs)].sort().join(' ')).join('|')
   // One object per key, so the workspace can tell a screen drawing again from a new ask.
   const wanted = useMemo<ThreadsWanted>(() => {
-    const [f, a, c] = key.split('|').map((part) => (part ? part.split(' ') : []))
-    return { folders: f!, about: a!, ...(c!.length ? { changes: c! } : {}) }
+    const [f, a, c, o, l] = key.split('|').map((part) => (part ? part.split(' ') : []))
+    return { folders: f!, about: a!, ...(c!.length ? { changes: c! } : {}), ...(o!.length ? { own: o! } : {}), ...(l!.length ? { live: l! } : {}) }
   }, [key])
   useEffect(() => {
     if (!want || !state) return
@@ -32,5 +39,7 @@ export function useThreads(state: WorkspaceState | null | undefined, folders: re
   }, [want, wanted, state])
   if (!want || !state) return { folders: true, all: true }
   // The opened page's own read holds its Folders, not yet its mentions (APP-4): its conversation draws at once.
-  return { folders: holdsThreads(state, { folders: wanted.folders, about: [] }), all: holdsThreads(state, wanted) }
+  // A file's own conversation is the page's own too: drawn once it is held, never as empty while on the way.
+  const page = { folders: wanted.folders, about: [], ...(wanted.own ? { own: wanted.own } : {}), ...(wanted.live ? { live: wanted.live } : {}) }
+  return { folders: holdsThreads(state, page), all: holdsThreads(state, wanted) }
 }
