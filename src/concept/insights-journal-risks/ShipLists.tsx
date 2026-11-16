@@ -7,7 +7,7 @@
  *   most severe first (Miky, 16 Nov).
  */
 import { useState } from 'react'
-import { IconSparkles } from '@tabler/icons-react'
+import { IconPlus, IconSparkles } from '@tabler/icons-react'
 import { AvatarGroup, Button, Card, Link, MetaText, Person, SectionHeader } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
 import { ScrollArea } from '@/components/ui/ScrollArea'
@@ -296,6 +296,9 @@ function QuestionBox({ item, me, onOpen, selected }: { item: Item; me: string; o
 
 
 
+/** A section's subtle + to add one of its kind by hand (Miky, 16 Nov). */
+const add = (tooltip: string) => ({ icon: <IconPlus size={16} stroke={1.5} />, tooltip, onClick: () => undefined })
+
 /**
  * Risks as a dashboard, not one table (Miky, 16 Nov): what someone must act on now, what is still to be decided, and
  * what to keep an eye on. Each shows only while it holds something; what ended is one line at the bottom.
@@ -311,7 +314,7 @@ export function RiskDashboard({ items, onOpen, openId, me = 'miky' }: { items: I
     <div className="flex flex-col gap-8">
       {blockers.length > 0 && (
         <section className="flex flex-col gap-3">
-          <SectionHeader title="Blockers" count={blockers.length} />
+          <SectionHeader title="Blockers" count={blockers.length} actions={[add("Add a blocker")]} showActions="always" />
           <Card fill="none" clip>
             <ul aria-label="Blockers">
               {blockers.map((item) => (
@@ -323,7 +326,7 @@ export function RiskDashboard({ items, onOpen, openId, me = 'miky' }: { items: I
       )}
       {questions.length > 0 && (
         <section className="flex flex-col gap-3">
-          <SectionHeader title="Open questions" count={questions.length} />
+          <SectionHeader title="Open questions" count={questions.length} actions={[add("Add a question")]} showActions="always" />
           <div className="grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-3" aria-label="Open questions">
             {questions.map((item) => (
               <QuestionBox key={item.id} item={item} me={me} selected={item.id === openId} onOpen={open(item)} />
@@ -333,7 +336,7 @@ export function RiskDashboard({ items, onOpen, openId, me = 'miky' }: { items: I
       )}
       {concerns.length > 0 && (
         <section className="flex flex-col gap-3">
-          <SectionHeader title="Concerns" count={concerns.length} />
+          <SectionHeader title="Concerns" count={concerns.length} actions={[add("Add a concern")]} showActions="always" />
           <RiskTable items={concerns} order="severe" kind={false} onOpen={onOpen} openId={openId} me={me} />
         </section>
       )}

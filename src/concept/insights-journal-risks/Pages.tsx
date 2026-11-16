@@ -7,9 +7,9 @@
  * - the team page (today's Projects page for one team) gets the team's own lists.
  */
 import { useMemo, useState, type ReactNode } from 'react'
-import { IconBox, IconCircleDot, IconUsers } from '@tabler/icons-react'
+import { IconBox, IconCircleDot, IconPlus, IconUsers } from '@tabler/icons-react'
 import { serializeBlockDocument } from '@estiva-app/protocol'
-import { Button, EmptyState, LinkPickers, MetaText, NoAccessNotice, PageHeader, SectionHeader, Select, SkeletonList, Tabs } from '@estiva-app/ui'
+import { Button, EmptyState, IconButton, LinkPickers, MetaText, NoAccessNotice, PageHeader, SectionHeader, Select, SkeletonList, Tabs } from '@estiva-app/ui'
 import { Breadcrumb } from '@/components/ui/Breadcrumb'
 import { ScrollArea } from '@/components/ui/ScrollArea'
 import { Centred } from '@/components/layout/ReadingColumn'
@@ -105,7 +105,15 @@ function ItemsTab({ type, state, onOpen, openId, me }: { type: ItemType; state: 
     <div className={`flex w-full flex-col gap-3 ${type === 'journal' ? 'mx-auto max-w-[768px]' : ''}`}>
       <ListStateView state={state} type={type}>
         {/* Risks are a dashboard of three sections, so no filter row (Miky, 16 Nov). */}
-        {type !== 'risk' && <FilterRow type={type} value={filter} onChange={setFilter} items={items} />}
+        {/* A subtle + to add an item by hand, beside the filters (Miky, 16 Nov). */}
+        {type !== 'risk' && (
+          <div className="flex items-center justify-between gap-3">
+            <FilterRow type={type} value={filter} onChange={setFilter} items={items} />
+            <IconButton variant="muted" tooltip={type === 'insight' ? 'Add an insight' : 'Add to the Journal'} aria-label={type === 'insight' ? 'Add an insight' : 'Add to the Journal'} onClick={noop}>
+              <IconPlus size={16} stroke={1.5} />
+            </IconButton>
+          </div>
+        )}
         {type === 'insight' && <InsightGrid items={shown} onOpen={onOpen} openId={openId} me={me} />}
         {type === 'journal' && <ItemTimeline items={shown} onOpen={onOpen} openId={openId} me={me} label="Journal" />}
         {type === 'risk' && <RiskDashboard items={[...items, HAND_TYPED]} onOpen={onOpen} openId={openId} me={me} />}
