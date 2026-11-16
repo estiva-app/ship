@@ -1,4 +1,5 @@
 import { Relay, projectFieldsOf, type FetchLike, type RelayFileReads } from '@estiva-app/protocol'
+import type { TimesFn } from '@estiva-app/interop'
 import { isRateLimited, noteRateLimited } from '@/lib/relayBudget'
 import { estivaIdSigner, localSigner, type Signer } from '../nostr/signer'
 import { Store, type ProjectFields } from '../nostr/store'
@@ -107,6 +108,14 @@ export const inOrderOption = async (): Promise<{ inOrder?: readonly string[] }> 
   const inOrder = await inOrderTypes()
   return inOrder.length > 0 ? { inOrder } : {}
 }
+
+/**
+ * The relay's times read (NIP-11 `file_list.times`) as interop's `times` option: absent while the relay does not offer it, so a topic's files are read as before.
+ *
+ * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-relay-may-answer-when-a-file-changed-without-the-change.md
+ */
+export const timesOption = async (): Promise<{ times?: TimesFn }> =>
+  (await fileReadsNow()).times ? { times: (filters) => relay.queryTimes(filters as never) } : {}
 
 /**
  * The relay refused a change for naming no `prev`: it has made the switch

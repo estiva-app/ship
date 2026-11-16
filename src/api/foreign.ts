@@ -52,7 +52,7 @@ import { KIND_CHANGE, placeFilters, placeListing, type Listed, type ReferenceCan
 import { relatedTo } from '@/lib/ownKinds'
 import { safeLink } from '@/lib/handoff'
 import { KIND } from '../nostr/kinds'
-import { inOrderOption, projectFieldsNow, relay, signer } from './store'
+import { inOrderOption, projectFieldsNow, relay, signer, timesOption } from './store'
 
 export type { ForeignObject, ResolvedSlot, FolderContents, FolderSummary } from '@estiva-app/interop'
 
@@ -513,7 +513,7 @@ export async function readAllTopics(): Promise<TopicsRead> {
  * to one goes to Peek on every page; the sidebar leaves them out itself.
  */
 export async function readSidebarTopics(decrypt: (ciphertext: string) => Promise<string | undefined>): Promise<YourTopicsRead> {
-  return readYourTopics(query, signer.pubkey, { cache: manifests, decrypt, spaces: true, ...(await listRead()) })
+  return readYourTopics(query, signer.pubkey, { cache: manifests, decrypt, spaces: true, ...(await listRead()), ...(await timesOption()) })
 }
 
 /**
