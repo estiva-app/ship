@@ -1,13 +1,17 @@
 /**
  * CONCEPT — the parts Ship's Insights, Journal and Risks tabs draw: an item's card, the Triage, the Journal timeline,
- * the filter row and the source as marked. Reuses: the kit's Card, Chip, StatusMark, Button, Avatar, MetaText,
- * EmptyState; the timeline's line is Ship's History line (a face, the words, when) on a vertical rule.
+ * the filter row and the source as marked. Reuses: the kit's Card, Chip, StatusMark, Button, IconButton, Avatar,
+ * MetaText, EmptyState, Divider (the conversation's "New" line and Peek's date line); the timeline's line is Ship's
+ * History line (a face, the words, when) on a vertical rule.
+ * Miky's notes, 16 Nov: Accept (primary) and a secondary ✕ in place of Yes / No; an Insight shows its category, and
+ * Insights are filtered by it; a card reads title, summary, then where it came from; the Journal's "New" is the
+ * conversation's; a Journal entry shows its summary, an Update its whole text; details open in a side panel.
  */
-import { useState, type ReactNode } from 'react'
-import { IconArrowUpRight, IconTrash } from '@tabler/icons-react'
-import { Avatar, Button, Card, Chip, EmptyState, MetaText, SkeletonList, StatusMark, Tabs, type ChipType } from '@estiva-app/ui'
+import { Fragment, useState, type ReactNode } from 'react'
+import { IconTrash, IconX } from '@tabler/icons-react'
+import { Avatar, Button, Card, Chip, Divider, EmptyState, IconButton, MetaText, SkeletonList, StatusMark, Tabs, type ChipType } from '@estiva-app/ui'
 import { TYPE_META, statusOption, type ItemType, type Status } from './MarkAs'
-import type { Item, Source } from './fixtures'
+import { CATEGORIES, type Item, type Source } from './fixtures'
 
 const WORD_CHIP: Record<Item['word'], ChipType> = { Insight: 'warning', Decision: 'info', Update: 'neutral', Concern: 'error', Question: 'neutral' }
 
@@ -22,55 +26,73 @@ export function sourceLine(source?: Source) {
   return `From ${source.author.name}’s ${source.what} in ${source.app} · ${source.place}`
 }
 
-/** Yes / No on a Proposed item — accept or reject it, signed as you (Miky, kickoff: on Proposed rows in the lists). */
-export function YesNo({ onAnswer, waitingOn }: { onAnswer?: (yes: boolean) => void; waitingOn?: string }) {
+/** Where it came from, by whom, when: the card's last line. */
+export function metaLine(item: Item) {
+  const by = item.decidedBy ? `decided by ${item.decidedBy.name}, written by ${item.markedBy.name}` : item.source ? `marked by ${item.markedBy.name}` : `by ${item.markedBy.name}`
+  return `${sourceLine(item.source)} · ${by} · ${item.at}`
+}
+
+/** The label an item's card wears: an Insight's category, else its word (Decision, Update, Concern, Question). */
+export function ItemLabel({ item }: { item: Item }) {
+  if (item.type === 'insight') return item.category ? <Chip type="neutral" label={item.category} /> : null
+  return <Chip type={WORD_CHIP[item.word]} label={item.word} />
+}
+
+/** Accept (primary) and a secondary ✕ on a Proposed item, signed as you (Miky, 16 Nov, in place of Yes / No). */
+export function AcceptReject({ onAnswer, waitingOn }: { onAnswer?: (accept: boolean) => void; waitingOn?: string }) {
   if (waitingOn) return <MetaText tone="muted">Waiting for {waitingOn}</MetaText>
   return (
-    <div className="flex shrink-0 gap-2">
-      <Button size="small" variant="outlined" onClick={() => onAnswer?.(true)}>
-        Yes
+    <div className="flex shrink-0 items-center gap-1">
+      <Button size="small" variant="primary" onClick={() => onAnswer?.(true)}>
+        Accept
       </Button>
-      <Button size="small" variant="muted" onClick={() => onAnswer?.(false)}>
-        No
-      </Button>
+      <IconButton variant="muted" tooltip="Reject" aria-label="Reject" onClick={() => onAnswer?.(false)}>
+        <IconX size={16} stroke={1.5} />
+      </IconButton>
     </div>
   )
 }
 
-/** One item as a card in a list: its word, title, where it came from, its status, and Yes / No while Proposed. */
-export function ItemCard({ item, me = 'miky', onOpen }: { item: Item; me?: string; onOpen?: () => void }) {
+export const acceptedStatus = (item: Pick<Item, 'type'>): Status => (item.type === 'risk' ? 'open' : 'accepted')
+
+/** One item as a card in a list: its title, summary, then its label and where it came from; Accept / ✕ while Proposed. */
+export function ItemCard({ item, me = 'miky', onOpen, selected }: { item: Item; me?: string; onOpen?: () => void; selected?: boolean }) {
   const [status, setStatus] = useState<Status>(item.status)
   const shown = { ...item, status }
   // A Decision naming someone else waits for them (Decided, 16 Nov); everyone else sees who.
   const waitingOn = status === 'proposed' && item.decidedBy && item.decidedBy.key !== me ? item.decidedBy.name : undefined
   return (
-    <Card fill="surface" hover="hairline" onPress={onOpen} {...(item.isNew ? { attention: 'accent' as const } : {})}>
+    <Card fill="surface" hover="hairline" onPress={onOpen} selected={selected}>
       <div className="flex items-start gap-3 p-3">
         <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <div className="flex items-center gap-2">
-            <Chip type={WORD_CHIP[item.word]} label={item.word} />
-            <span className="truncate text-body-2 font-medium text-text-primary">{item.title}</span>
+          <span className="text-body-2 font-medium text-text-primary">{item.title}</span>
+          {item.summary && <span className="line-clamp-2 text-body-2 text-text-secondary">{item.summary}</span>}
+          <div className="flex min-w-0 items-center gap-2 pt-0.5">
+            <ItemLabel item={item} />
+            <span className="min-w-0 truncate">
+              <MetaText tone="muted">{metaLine(item)}</MetaText>
+            </span>
           </div>
-          {item.summary && <span className="text-body-2 text-text-secondary">{item.summary}</span>}
-          <MetaText tone="muted">
-            {sourceLine(item.source)} · {item.decidedBy ? `Decided by ${item.decidedBy.name} · written by ${item.markedBy.name}` : `Marked by ${item.markedBy.name}`} · {item.at}
-          </MetaText>
         </div>
-        {status === 'proposed' ? <YesNo waitingOn={waitingOn} onAnswer={(yes) => setStatus(yes ? (item.type === 'risk' ? 'open' : 'accepted') : 'rejected')} /> : <StatusOf item={shown} />}
+        {status === 'proposed' ? <AcceptReject waitingOn={waitingOn} onAnswer={(yes) => setStatus(yes ? acceptedStatus(item) : 'rejected')} /> : <StatusOf item={shown} />}
       </div>
     </Card>
   )
 }
 
-/** The filter row above a list: by status, the way Ship's Projects page tabs its statuses. */
-export function FilterRow({ type, value, onChange, counts }: { type: ItemType; value: string; onChange: (v: string) => void; counts: Record<string, number> }) {
+/** The filter row above a list. Insights: by category (Miky, 16 Nov). Journal and Risks: by status. */
+export function FilterRow({ type, value, onChange, items }: { type: ItemType; value: string; onChange: (v: string) => void; items: Item[] }) {
+  if (type === 'insight') {
+    const tabs = [{ id: 'all', label: 'All', count: items.length }, ...CATEGORIES.map((c) => ({ id: c, label: c, count: items.filter((i) => i.category === c).length }))]
+    return <Tabs tabs={tabs} active={value} onChange={onChange} size="small" />
+  }
   const end = { insight: 'Outdated', journal: 'Superseded', risk: 'Resolved' }[type]
   const live = type === 'risk' ? 'Open' : 'Accepted'
   const tabs = [
-    { id: 'all', label: 'All', count: counts.all },
-    { id: 'live', label: live, count: counts.live },
-    { id: 'proposed', label: 'Proposed', count: counts.proposed },
-    { id: 'ended', label: `${end} and rejected`, count: counts.ended },
+    { id: 'all', label: 'All', count: items.length },
+    { id: 'live', label: live, count: filterItems(items, 'live').length },
+    { id: 'proposed', label: 'Proposed', count: filterItems(items, 'proposed').length },
+    { id: 'ended', label: `${end} and rejected`, count: filterItems(items, 'ended').length },
   ]
   return <Tabs tabs={tabs} active={value} onChange={onChange} size="small" />
 }
@@ -81,9 +103,14 @@ export function filterItems(items: Item[], filter: string) {
   if (filter === 'live') return items.filter((i) => LIVE.includes(i.status))
   if (filter === 'proposed') return items.filter((i) => i.status === 'proposed')
   if (filter === 'ended') return items.filter((i) => ENDED.includes(i.status))
+  if ((CATEGORIES as string[]).includes(filter)) return items.filter((i) => i.category === filter)
   return items
 }
-export const countsOf = (items: Item[]) => ({ all: items.length, live: filterItems(items, 'live').length, proposed: filterItems(items, 'proposed').length, ended: filterItems(items, 'ended').length })
+/** Live first, then Proposed, then what ended; newest first inside each. */
+export const byStanding = (items: Item[]) => {
+  const rank = (s: Status) => (LIVE.includes(s) ? 0 : s === 'proposed' ? 1 : 2)
+  return [...items].sort((a, b) => rank(a.status) - rank(b.status) || b.day.localeCompare(a.day))
+}
 
 /** A list's state: what to draw while it loads, when it failed, when it is empty. */
 export type ListState = 'ready' | 'loading' | 'error' | 'empty'
@@ -107,22 +134,25 @@ export function ListStateView({ state, type, children }: { state: ListState; typ
   return <>{children}</>
 }
 
-/** The Triage: what is new since your last visit, at the top of Insights (and Risks), each with Yes / No. */
-export function Triage({ items, onOpen }: { items: Item[]; onOpen?: (item: Item) => void }) {
-  const fresh = items.filter((i) => i.isNew && i.status === 'proposed')
-  if (!fresh.length) return null
+/** The Triage: what is new since your last visit and waits for an answer, at the top of Insights and Risks. */
+export function Triage({ items, onOpen, openId }: { items: Item[]; onOpen?: (item: Item) => void; openId?: string }) {
+  if (!items.length) return null
   return (
     <section className="flex flex-col gap-2 rounded-lg bg-bg-inset p-3" aria-label="Triage">
-      <span className="text-caption font-medium text-text-secondary">New since your last visit · {fresh.length}</span>
-      {fresh.map((item) => (
-        <ItemCard key={item.id} item={item} onOpen={() => onOpen?.(item)} />
+      <span className="text-caption font-medium text-text-secondary">New since your last visit · {items.length}</span>
+      {items.map((item) => (
+        <ItemCard key={item.id} item={item} selected={item.id === openId} onOpen={() => onOpen?.(item)} />
       ))}
     </section>
   )
 }
+export const triageOf = (items: Item[]) => items.filter((i) => i.isNew && i.status === 'proposed')
 
-/** The Journal: History's lines on a vertical rule, grouped by day, newest first; a Proposed entry sits on the line with Yes / No. */
-export function JournalTimeline({ items, onOpen, me = 'miky' }: { items: Item[]; onOpen?: (item: Item) => void; me?: string }) {
+/**
+ * The Journal: History's lines on a vertical rule under Peek's date lines, newest first. The conversation's "New"
+ * line sits where what you have seen begins; newest first, the new entries are above it.
+ */
+export function JournalTimeline({ items, onOpen, openId, me = 'miky' }: { items: Item[]; onOpen?: (item: Item) => void; openId?: string; me?: string }) {
   const sorted = [...items].sort((a, b) => b.day.localeCompare(a.day))
   const days: { day: string; at: string; items: Item[] }[] = []
   for (const item of sorted) {
@@ -130,14 +160,20 @@ export function JournalTimeline({ items, onOpen, me = 'miky' }: { items: Item[];
     if (last && last.day === item.day) last.items.push(item)
     else days.push({ day: item.day, at: item.at, items: [item] })
   }
+  const anyNew = sorted.some((i) => i.isNew)
+  const firstSeen = anyNew ? sorted.find((i) => !i.isNew)?.id : undefined
   return (
-    <ol className="flex flex-col gap-4" aria-label="Journal">
+    <ol className="flex flex-col" aria-label="Journal">
       {days.map((d) => (
-        <li key={d.day} className="flex flex-col gap-2">
-          <span className="text-caption font-medium text-text-secondary">{d.at}</span>
-          <ol className="flex flex-col border-l border-border-default">
+        <li key={d.day} className="flex flex-col">
+          {d.items[0].id === firstSeen && <Divider label="New ↑" tone="warning" />}
+          <Divider look="section" label={d.at} />
+          <ol className="ml-2 flex flex-col border-l border-border-default">
             {d.items.map((item) => (
-              <TimelineEntry key={item.id} item={item} me={me} onOpen={() => onOpen?.(item)} />
+              <Fragment key={item.id}>
+                {item.id === firstSeen && item !== d.items[0] && <Divider label="New ↑" tone="warning" />}
+                <TimelineEntry item={item} me={me} selected={item.id === openId} onOpen={() => onOpen?.(item)} />
+              </Fragment>
             ))}
           </ol>
         </li>
@@ -146,31 +182,34 @@ export function JournalTimeline({ items, onOpen, me = 'miky' }: { items: Item[];
   )
 }
 
-function TimelineEntry({ item, me, onOpen }: { item: Item; me: string; onOpen: () => void }) {
+function TimelineEntry({ item, me, onOpen, selected }: { item: Item; me: string; onOpen: () => void; selected?: boolean }) {
   const [status, setStatus] = useState<Status>(item.status)
   const proposed = status === 'proposed'
   const waitingOn = proposed && item.decidedBy && item.decidedBy.key !== me ? item.decidedBy.name : undefined
   const ended = status === 'superseded' || status === 'rejected'
+  // An Update is read whole in the timeline; a Decision shows its summary (Miky, 16 Nov).
+  const body = item.word === 'Update' ? (item.details ?? item.summary) : item.summary
   return (
-    <li className="relative flex items-start gap-3 py-2 pl-4">
+    <li className="relative py-1 pl-4">
       {/* The dot on the line: filled when accepted, hollow while proposed. */}
-      <span aria-hidden className={`absolute -left-[5px] top-3.5 size-2.5 rounded-full border-2 ${proposed ? 'border-border-strong bg-bg-surface' : ended ? 'border-border-default bg-border-default' : 'border-info-default bg-info-default'}`} />
-      <Avatar name={(item.decidedBy ?? item.markedBy).name} size={20} />
-      <div className={`flex min-w-0 flex-1 flex-col gap-0.5 ${ended ? 'opacity-60' : ''}`}>
-        <span className="text-body-2 text-text-primary">
-          <span className="font-medium">{item.word}:</span>{' '}
-          <span className={status === 'superseded' ? 'line-through' : ''}>{item.title}</span>
-          {item.isNew && <span className="ml-2 text-caption font-medium text-info-default">New</span>}
-        </span>
-        <MetaText tone="muted">
-          {item.decidedBy ? `Decided by ${item.decidedBy.name} · written by ${item.markedBy.name}` : `By ${item.markedBy.name}`} · {sourceLine(item.source)}
-          {status !== 'proposed' && status !== 'accepted' ? ` · ${statusOption(item.type, status).label}` : ''}
-        </MetaText>
-      </div>
-      {proposed ? <YesNo waitingOn={waitingOn} onAnswer={(yes) => setStatus(yes ? 'accepted' : 'rejected')} /> : null}
-      <Button size="small" variant="muted" onClick={onOpen} aria-label={`Open ${item.title}`}>
-        <IconArrowUpRight size={14} stroke={1.5} />
-      </Button>
+      <span aria-hidden className={`absolute -left-[5px] top-5 size-2.5 rounded-full border-2 ${proposed ? 'border-border-strong bg-bg-surface' : ended ? 'border-border-default bg-border-default' : 'border-info-default bg-info-default'}`} />
+      <Card fill="none" hover="fill" onPress={onOpen} selected={selected}>
+        <div className="flex items-start gap-3 p-2">
+          <Avatar name={(item.decidedBy ?? item.markedBy).name} size={20} />
+          <div className={`flex min-w-0 flex-1 flex-col gap-1 ${ended ? 'opacity-60' : ''}`}>
+            <span className="text-body-2 text-text-primary">
+              <span className="text-text-secondary">{item.word} · </span>
+              <span className={`font-medium ${status === 'superseded' ? 'line-through' : ''}`}>{item.title}</span>
+            </span>
+            {body && <span className="whitespace-pre-line text-body-2 text-text-secondary">{body}</span>}
+            <MetaText tone="muted">
+              {metaLine(item)}
+              {status !== 'proposed' && status !== 'accepted' ? ` · ${statusOption(item.type, status).label}` : ''}
+            </MetaText>
+          </div>
+          {proposed ? <AcceptReject waitingOn={waitingOn} onAnswer={(yes) => setStatus(yes ? 'accepted' : 'rejected')} /> : null}
+        </div>
+      </Card>
     </li>
   )
 }

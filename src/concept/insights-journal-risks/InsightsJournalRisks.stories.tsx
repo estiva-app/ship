@@ -41,11 +41,17 @@ export const ProjectOverview: Story = { render: () => <Shell><ProjectPage start=
 export const ProjectOverviewWithSidePanel: Story = { render: () => <Shell><ProjectPage start="overview" side="overview" /></Shell> }
 /** Issues: today's table, unchanged. */
 export const ProjectIssues: Story = { render: () => <Shell><ProjectPage start="issues" /></Shell> }
-/** Insights: the Triage (new since your last visit, Yes / No), the filter, the cards. */
+/** Insights: the Triage (new since your last visit, Accept / ✕), the categories, the cards (title, summary, where from). */
 export const ProjectInsights: Story = { render: () => <Shell><ProjectPage start="insights" /></Shell> }
-/** Journal: a timeline by day, newest first; Katerina's Decision waits for her, Miky's own Proposed entry would show Yes / No. */
+/** An Insight opened beside the list, as Peek opens a thread: the list stays in view. */
+export const ProjectInsightOpen: Story = { render: () => <Shell><ProjectPage start="insights" open="i3" /></Shell> }
+/** Journal: Peek's date lines, the conversation's New line, summaries, an Update read whole; Katerina's Decision waits for her. */
 export const ProjectJournal: Story = { render: () => <Shell><ProjectPage start="journal" /></Shell> }
-/** Journal, seen by Katerina: the Decision in her name shows Yes / No to her. */
+/** A Journal entry opened beside the timeline. */
+export const ProjectJournalEntryOpen: Story = { render: () => <Shell><ProjectPage start="journal" open="j1" /></Shell> }
+/** Overview: the marked paragraph's label in the right margin opens its Insight beside the page. */
+export const ProjectOverviewMarkOpen: Story = { render: () => <Shell><ProjectPage start="overview" open="i1" /></Shell> }
+/** Journal, seen by Katerina: the Decision in her name shows Accept / ✕ to her. */
 export const ProjectJournalAsKaterina: Story = { render: () => <Shell><ProjectPage start="journal" me="katerina" /></Shell> }
 /** Risks: the Triage, the filter (Open, Proposed, Resolved and rejected), the cards. */
 export const ProjectRisks: Story = { render: () => <Shell><ProjectPage start="risks" /></Shell> }

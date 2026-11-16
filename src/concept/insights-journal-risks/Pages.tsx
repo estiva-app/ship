@@ -22,13 +22,15 @@ import { ProjectFields } from '@/components/PageFields'
 import { useSideColumn } from '@/pages/sideColumn'
 import { ISSUES, ISSUE_STATUSES, hrefFor, ACTIVITY_ITEMS } from '@/fixtures/issues'
 import { ACTIVITY, PEOPLE as SHIP_PEOPLE, PROJECT_STATUSES } from '@/fixtures/projects'
-import { MarkAsRows, MarkedNotice, STATUSES, TYPE_META, TYPE_OF, blockLineCss, type ItemType, type MarkWord, type Status } from './MarkAs'
-import { FilterRow, ItemCard, JournalTimeline, ListStateView, SourceAsMarked, Triage, countsOf, filterItems, type ListState } from './ItemParts'
+import { MarkAsRows, MarkedNotice, STATUSES, TYPE_META, TYPE_OF, blockLineCss, markedBlockAt, type ItemType, type MarkWord, type Status } from './MarkAs'
+import { FilterRow, ItemCard, JournalTimeline, ListStateView, SourceAsMarked, Triage, byStanding, filterItems, triageOf, type ListState } from './ItemParts'
+import { ItemFields, ItemPanel, commentsOn } from './ItemPanel'
 import { CommentsColumn, type StoryComment } from './CommentsColumn'
 import { ITEMS, KATERINA, MIKY, PEOPLE, PROJECT, TEAM, byType, type Item } from './fixtures'
 
 const noop = () => {}
 export type ConceptTab = 'overview' | 'issues' | 'insights' | 'journal' | 'risks'
+const TAB_TYPE: Record<string, ItemType | undefined> = { insights: 'insight', journal: 'journal', risks: 'risk' }
 
 /** A description as blocks with ids, so a block's menu can mark it and a story can draw its line by id. */
 export const blocksDoc = (...paragraphs: [string, string][]) =>
@@ -42,7 +44,7 @@ const PROJECT_DOC = blocksDoc(
 )
 
 /** The block menu's Mark as…, through the concept hook in blockRows; marks at once and says so. */
-function MarkableBlocks({ children, team, about, marked: m0 = {}, changed = [] }: { children: ReactNode; team: string; about?: string; marked?: Record<string, ItemType>; changed?: string[] }) {
+function MarkableBlocks({ children, team, about, marked: m0 = {}, changed = [], onOpenBlock }: { children: ReactNode; team: string; about?: string; marked?: Record<string, ItemType>; changed?: string[]; onOpenBlock?: (blockId: string) => void }) {
   const [marked, setMarked] = useState(m0)
   const [notice, setNotice] = useState<MarkWord>()
   const rows = (id: string) => (
@@ -55,7 +57,8 @@ function MarkableBlocks({ children, team, about, marked: m0 = {}, changed = [] }
   return (
     <ConceptBlockRows.Provider value={rows}>
       <style>{blockLineCss(marked, changed)}</style>
-      {children}
+      {/* @estiva-escape(no-raw-interactive): concept only — the margin label is CSS on the editor's own block, so its click is read here. */}
+      <div onClickCapture={(e) => { const id = markedBlockAt(e, marked); if (id) onOpenBlock?.(id) }}>{children}</div>
       {notice && <MarkedNotice word={notice} team={team} about={about} onClose={() => setNotice(undefined)} />}
     </ConceptBlockRows.Provider>
   )
@@ -82,47 +85,49 @@ function WhatsNew({ onTab }: { onTab: (t: ConceptTab) => void }) {
         </span>
       </div>
       {waiting.length > 0 && (
-        <MetaText tone="muted" className="truncate">
-          {waiting.length} waiting for a yes or no
-        </MetaText>
+        <MetaText tone="muted">{waiting.length} waiting for you to accept</MetaText>
       )}
     </section>
   )
 }
 
-/** One list tab: Insights (with the Triage) or Risks, filter row, the cards. */
-function ListTab({ type, state, onOpen }: { type: 'insight' | 'risk'; state: ListState; onOpen: (i: Item) => void }) {
+/** One list tab: Insights or Risks — the Triage on top, the filter row, then the rest, live first. */
+function ListTab({ type, state, onOpen, openId }: { type: 'insight' | 'risk'; state: ListState; onOpen: (i: Item) => void; openId?: string }) {
   const items = byType(type)
+  const triage = triageOf(items)
+  const rest = byStanding(items.filter((i) => !triage.includes(i)))
   const [filter, setFilter] = useState('all')
   return (
     <div className="mx-auto flex w-full max-w-[768px] flex-col gap-3">
       <ListStateView state={state} type={type}>
-        <Triage items={items} onOpen={onOpen} />
-        <FilterRow type={type} value={filter} onChange={setFilter} counts={countsOf(items)} />
-        {filterItems(items, filter).map((item) => (
-          <ItemCard key={item.id} item={item} onOpen={() => onOpen(item)} />
+        <Triage items={triage} onOpen={onOpen} openId={openId} />
+        <FilterRow type={type} value={filter} onChange={setFilter} items={rest} />
+        {filterItems(rest, filter).map((item) => (
+          <ItemCard key={item.id} item={item} selected={item.id === openId} onOpen={() => onOpen(item)} />
         ))}
       </ListStateView>
     </div>
   )
 }
 
-function JournalTab({ state, onOpen, me }: { state: ListState; onOpen: (i: Item) => void; me?: string }) {
+function JournalTab({ state, onOpen, openId, me }: { state: ListState; onOpen: (i: Item) => void; openId?: string; me?: string }) {
   const items = byType('journal')
   const [filter, setFilter] = useState('all')
   return (
     <div className="mx-auto flex w-full max-w-[768px] flex-col gap-3">
       <ListStateView state={state} type="journal">
-        <FilterRow type="journal" value={filter} onChange={setFilter} counts={countsOf(items)} />
-        <JournalTimeline items={filterItems(items, filter)} onOpen={onOpen} me={me} />
+        <FilterRow type="journal" value={filter} onChange={setFilter} items={items} />
+        <JournalTimeline items={filterItems(items, filter)} onOpen={onOpen} openId={openId} me={me} />
       </ListStateView>
     </div>
   )
 }
 
-/** The project page: today's header and tab row, three more tabs. */
-export function ProjectPage({ start = 'overview', listState = 'ready', me = 'miky', onOpenItem = noop, side: side0 = 'none' }: { start?: ConceptTab; listState?: ListState; me?: string; onOpenItem?: (i: Item) => void; side?: 'comments' | 'overview' | 'none' }) {
+/** The project page: today's header and tab row, three more tabs; an item opens beside its list. */
+export function ProjectPage({ start = 'overview', listState = 'ready', me = 'miky', open: open0, side: side0 = 'none' }: { start?: ConceptTab; listState?: ListState; me?: string; open?: string; side?: 'comments' | 'overview' | 'none' }) {
   const [tab, setTab] = useState<ConceptTab>(start)
+  const [open, setOpen] = useState<Item | undefined>(ITEMS.find((i) => i.id === open0))
+  const onOpenItem = (i: Item) => setOpen((o) => (o?.id === i.id ? undefined : i))
   const side = useSideColumn(side0)
   const counts = useMemo(() => ({ insight: byType('insight').filter((i) => i.isNew).length, journal: byType('journal').filter((i) => i.isNew).length, risk: byType('risk').filter((i) => i.isNew).length }), [])
   const tabs: { id: ConceptTab; label: string; count?: number; unread?: boolean }[] = [
@@ -148,7 +153,7 @@ export function ProjectPage({ start = 'overview', listState = 'ready', me = 'mik
           {tab === 'overview' && (
             <Centred>
               <WhatsNew onTab={setTab} />
-              <MarkableBlocks team={TEAM} about={PROJECT} marked={{ p2: 'insight' }} changed={['p3']}>
+              <MarkableBlocks team={TEAM} about={PROJECT} marked={{ p2: 'insight' }} changed={['p3']} onOpenBlock={() => setOpen(ITEMS.find((i) => i.id === 'i1'))}>
                 <LiveHeader
                   fields={<ProjectFields status={status} statuses={PROJECT_STATUSES} onStatusChange={setStatus} lead={lead} people={SHIP_PEOPLE} onLeadChange={setLead} done={3} total={8} />}
                   title={PROJECT}
@@ -164,11 +169,12 @@ export function ProjectPage({ start = 'overview', listState = 'ready', me = 'mik
             </Centred>
           )}
           {tab === 'issues' && <IssuesTable issues={ISSUES} statuses={ISSUE_STATUSES} hrefFor={hrefFor} />}
-          {tab === 'insights' && <ListTab type="insight" state={listState} onOpen={onOpenItem} />}
-          {tab === 'journal' && <JournalTab state={listState} onOpen={onOpenItem} me={me} />}
-          {tab === 'risks' && <ListTab type="risk" state={listState} onOpen={onOpenItem} />}
+          {tab === 'insights' && <ListTab type="insight" state={listState} onOpen={onOpenItem} openId={open?.id} />}
+          {tab === 'journal' && <JournalTab state={listState} onOpen={onOpenItem} openId={open?.id} me={me} />}
+          {tab === 'risks' && <ListTab type="risk" state={listState} onOpen={onOpenItem} openId={open?.id} />}
         </ScrollArea>
       </div>
+      {open && (tab === 'overview' || open.type === TAB_TYPE[tab]) && <ItemPanel item={open} me={me} onClose={() => setOpen(undefined)} />}
       {side.overview.shown && (
         <div className="flex shrink-0 flex-col border-l border-border-default">
           <OverviewPanel activity={ACTIVITY_ITEMS} history={ACTIVITY} />
@@ -249,8 +255,6 @@ export function IssuePage({ itemsState = 'ready', commentMark = true }: { itemsS
 
 /** An item's own page, shaped like an issue's: title, summary, its fields, its source as marked, details, comments. */
 export function ItemPage({ item, me = 'miky', state = 'ready' }: { item: Item; me?: string; state?: 'ready' | 'loading' | 'error' | 'no-access' }) {
-  const [status, setStatus] = useState<Status>(item.status)
-  const [decider, setDecider] = useState(item.decidedBy?.key)
   const crumbs = [
     { label: 'Projects', href: '#/projects' },
     { label: PROJECT, href: '#/project/p' },
@@ -266,29 +270,13 @@ export function ItemPage({ item, me = 'miky', state = 'ready' }: { item: Item; m
         </div>
       </div>
     )
-  const people = PEOPLE.map((p) => ({ value: p.key, label: p.name }))
-  const waitingOn = status === 'proposed' && item.decidedBy && item.decidedBy.key !== me ? item.decidedBy.name : undefined
   const fields = (
     <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <LinkPickers
-          status={{ value: status, options: STATUSES[item.type], onChange: (v) => setStatus(v as Status) }}
-          {...(item.type === 'journal' ? { owner: { value: decider, options: people, onChange: setDecider }, ownerLabel: 'Decided by' } : {})}
-        />
-        <MetaText tone="muted">
-          <IconUsers size={12} stroke={1.5} className="mr-1 inline" />
-          {item.team} · about {item.about ? item.about.title : 'nothing yet'} · {item.decidedBy ? `written by ${item.markedBy.name}` : `marked by ${item.markedBy.name}`} · {item.at}
-          {item.acceptedBy && status !== 'proposed' ? ` · accepted by ${item.acceptedBy.name}` : ''}
-        </MetaText>
-      </div>
-      {waitingOn && <MetaText tone="muted">Waiting for {waitingOn} to say yes — they were told once, when named.</MetaText>}
+      <ItemFields item={item} me={me} />
       <SourceAsMarked source={item.source} />
     </div>
   )
-  const comments: StoryComment[] =
-    item.type === 'journal'
-      ? [{ id: 'q1', author: KATERINA, time: '20m', text: '@Miky why not keep Folders under each team, folded?' }]
-      : [{ id: 'q1', author: KATERINA, time: '20m', text: 'Agreed, I hit this again today.' }]
+  const comments = commentsOn(item)
   return (
     <div data-surface="item" className="flex min-h-0 flex-1 [contain:size]">
       <div className="flex min-w-0 flex-1 flex-col gap-4">
@@ -318,8 +306,11 @@ export function ItemPage({ item, me = 'miky', state = 'ready' }: { item: Item; m
 /** The team page — today's Projects page for one team — with the team's own lists beside Projects. */
 export function TeamPage({ start = 'insights' }: { start?: 'projects' | ConceptTab }) {
   const [tab, setTab] = useState<string>(start)
+  const [open, setOpen] = useState<Item>()
+  const onOpen = (i: Item) => setOpen((o) => (o?.id === i.id ? undefined : i))
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4 [contain:size]">
+    <div className="flex min-h-0 flex-1 [contain:size]">
+    <div className="flex min-w-0 flex-1 flex-col gap-4">
       <PageHeader title={<Breadcrumb items={[{ label: 'Teams', href: '#/teams' }, { label: TEAM, icon: <IconUsers size={16} stroke={1.5} /> }]} />} />
       <div className="flex min-h-8 items-center gap-3 px-6">
         <Tabs
@@ -335,11 +326,13 @@ export function TeamPage({ start = 'insights' }: { start?: 'projects' | ConceptT
       </div>
       <ScrollArea className="min-h-0 min-w-0 flex-1" contentClassName="flex flex-col gap-6 px-6 pb-5">
         {tab === 'projects' && <EmptyState scope="section" message="Today's Projects list for this team, unchanged." />}
-        {tab === 'insights' && <ListTab type="insight" state="ready" onOpen={noop} />}
-        {tab === 'journal' && <JournalTab state="ready" onOpen={noop} />}
-        {tab === 'risks' && <ListTab type="risk" state="ready" onOpen={noop} />}
+        {tab === 'insights' && <ListTab type="insight" state="ready" onOpen={onOpen} openId={open?.id} />}
+        {tab === 'journal' && <JournalTab state="ready" onOpen={onOpen} openId={open?.id} />}
+        {tab === 'risks' && <ListTab type="risk" state="ready" onOpen={onOpen} openId={open?.id} />}
         {tab !== 'projects' && <MetaText tone="muted">Everything the team marked, from every project, and the items about no project.</MetaText>}
       </ScrollArea>
+    </div>
+    {open && open.type === TAB_TYPE[tab] && <ItemPanel item={open} onClose={() => setOpen(undefined)} />}
     </div>
   )
 }
