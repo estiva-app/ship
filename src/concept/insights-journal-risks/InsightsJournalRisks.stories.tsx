@@ -49,6 +49,11 @@ export const ProjectInsightOpen: Story = { render: () => <Shell><ProjectPage sta
 export const ProjectJournal: Story = { render: () => <Shell><ProjectPage start="journal" /></Shell> }
 /** A Journal entry opened beside the timeline. */
 export const ProjectJournalEntryOpen: Story = { render: () => <Shell><ProjectPage start="journal" open="j1" /></Shell> }
+/** Each kind opened beside its list, drawn as its list draws it (Miky, 16 Nov: the details felt out of touch). */
+export const ProjectToolInsightOpen: Story = { render: () => <Shell><ProjectPage start="insights" open="i9" /></Shell> }
+export const ProjectJournalUpdateOpen: Story = { render: () => <Shell><ProjectPage start="journal" open="j0" /></Shell> }
+export const ProjectQuestionOpen: Story = { render: () => <Shell><ProjectPage start="risks" open="r3" /></Shell> }
+export const ProjectBlockerOpen: Story = { render: () => <Shell><ProjectPage start="risks" open="r6" /></Shell> }
 /** Overview: the marked paragraph's label in the right margin opens its Insight beside the page. */
 export const ProjectOverviewMarkOpen: Story = { render: () => <Shell><ProjectPage start="overview" open="i1" /></Shell> }
 /** Journal, seen by Katerina: the Decision in her name shows Accept / ✕ to her. */

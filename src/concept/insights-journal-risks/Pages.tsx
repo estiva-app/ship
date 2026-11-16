@@ -23,8 +23,9 @@ import { useSideColumn } from '@/pages/sideColumn'
 import { ISSUES, ISSUE_STATUSES, hrefFor, ACTIVITY_ITEMS } from '@/fixtures/issues'
 import { ACTIVITY, PEOPLE as SHIP_PEOPLE, PROJECT_STATUSES } from '@/fixtures/projects'
 import { MarkAsRows, MarkedNotice, STATUSES, TYPE_META, TYPE_OF, blockLineCss, markedBlockAt, type ItemType, type MarkWord, type Status } from './MarkAs'
-import { FilterRow, ItemTimeline, ListStateView, SourceAsMarked, filterItems, type ListState } from './ItemParts'
+import { FilterRow, ItemTimeline, ListStateView, filterItems, type ListState } from './ItemParts'
 import { ItemFields, ItemPanel, commentsOn } from './ItemPanel'
+import { ItemContent } from './ItemDetail'
 import { InsightGrid, RiskDashboard } from './ShipLists'
 import { CommentsColumn, type StoryComment } from './CommentsColumn'
 import { HAND_TYPED, ITEMS, KATERINA, MIKY, PEOPLE, PROJECT, TEAM, byType, type Item } from './fixtures'
@@ -264,7 +265,7 @@ export function ItemPage({ item, me = 'miky', state = 'ready' }: { item: Item; m
   const fields = (
     <div className="flex flex-col gap-3">
       <ItemFields item={item} me={me} />
-      <SourceAsMarked source={item.source} />
+      <ItemContent item={item} me={me} words={false} />
     </div>
   )
   const comments = commentsOn(item)
