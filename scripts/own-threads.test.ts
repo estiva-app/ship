@@ -89,18 +89,19 @@ asked = []
 const opened = await store.readThreads(loaded, wanted)
 const own = [comment, reply, replyEdited, older, olderReply, olderReplyEdited]
 check("the topic's comments, replies and their edits are read", own.every((event) => has(opened, event)), own.filter((e) => !has(opened, e)).map((e) => e.content).join(', '))
-check("nothing else the team said is", !has(opened, teamTalk) && !has(opened, otherTopic))
-check("a reply naming the topic's thread from another Folder is not one of its replies", !has(opened, strayReply))
-check("the team's whole conversation is never asked for", !askedWholeTeam(), JSON.stringify(asked))
+// Each "not" below is asserted beside what was read, so a read that brings nothing cannot pass it.
+check("nothing else the team said is", has(opened, comment) && !has(opened, teamTalk) && !has(opened, otherTopic))
+check("a reply naming the topic's thread from another Folder is not one of its replies", has(opened, olderReply) && !has(opened, strayReply))
+check("the team's whole conversation is never asked for", has(opened, comment) && !askedWholeTeam(), JSON.stringify(asked))
 check('three requests: by what it is about, by id, and the older replies’ edits', asked.length === 3, String(asked.length))
 check('it says it holds the topic’s own conversation and keeps the team live', !!opened.ownOf?.includes(TOPIC) && opened.liveAt?.[TEAM] !== undefined)
-check("and not the team's whole conversation, which a screen drawing it still reads", opened.threadsAt[TEAM] === undefined)
+check("and not the team's whole conversation, which a screen drawing it still reads", !!opened.ownOf?.includes(TOPIC) && opened.threadsAt[TEAM] === undefined)
 const drawn = conversationsAbout(foldWorkspace(opened).conversations, TOPIC)
 check('the topic draws its two threads with their replies, edited', drawn.length === 2 && drawn.every((c) => c.replies.length === 1), JSON.stringify(drawn.map((c) => c.replies.length)))
 
 asked = []
 const again = await store.readThreads(opened, wanted)
-check('asking again for what is held reads nothing', asked.length === 0 && again.events.length === opened.events.length)
+check('asking again for what is held reads nothing', has(again, comment) && asked.length === 0 && again.events.length === opened.events.length)
 
 // Live: someone replies from Peek, and the team talks on. The team's re-read asks only for what is new.
 clock = Date.now()
@@ -111,7 +112,7 @@ asked = []
 const reloaded = await store.reloadFolders(opened, [TEAM])
 check("a reply posted afterwards arrives with the team's re-read", has(reloaded, lateReply))
 check('that re-read asks the team only for what is new', !askedWholeTeam() && asked.flat().some((f) => (f['#h'] as string[] | undefined)?.includes(TEAM) && typeof f.since === 'number'), JSON.stringify(asked))
-check("in the same request as the team's own re-read", asked.length === 1, String(asked.length))
+check("in the same request as the team's own re-read", has(reloaded, lateReply) && asked.length === 1, String(asked.length))
 check("what the topic held is kept", own.every((event) => has(reloaded, event)))
 check('and it still holds it, live', !!reloaded.ownOf?.includes(TOPIC) && (reloaded.liveAt?.[TEAM] ?? 0) >= (opened.liveAt?.[TEAM] ?? 0))
 check('the topic draws the new reply', conversationsAbout(foldWorkspace(reloaded).conversations, TOPIC).find((c) => c.id === comment.id)?.replies.length === 2)
