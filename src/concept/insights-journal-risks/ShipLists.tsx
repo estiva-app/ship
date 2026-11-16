@@ -8,7 +8,7 @@
  */
 import { useState } from 'react'
 import { IconAntennaBars2, IconAntennaBars3, IconAntennaBars4, IconAntennaBars5, IconTrendingDown, IconTrendingUp } from '@tabler/icons-react'
-import { Card, Link, MetaText, Person } from '@estiva-app/ui'
+import { Card, Link, MetaText, Person, SectionHeader } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
 import { ScrollArea } from '@/components/ui/ScrollArea'
 import { AcceptReject, ENDED, ItemTag, LIVE, StatusOf, acceptedStatus } from './ItemParts'
@@ -150,11 +150,29 @@ function InsightBox({ item, me, onOpen, selected }: { item: Item; me: string; on
 
 /** Insights as a grid of boxes, as many columns as the room beside an open item allows. */
 export function InsightGrid({ items, onOpen, openId, me = 'miky' }: { items: Item[]; onOpen?: (item: Item) => void; openId?: string; me?: string }) {
-  return (
-    <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3" aria-label="Insights">
-      {newFirst(items).map((item) => (
+  // Two sections (Miky, 16 Nov: "a clear line between triaging and going through past insights"): what waits for an
+  // answer, then everything else. With nothing to triage, only the second.
+  const triage = newFirst(items.filter((i) => i.status === 'proposed'))
+  const past = newFirst(items.filter((i) => i.status !== 'proposed'))
+  const grid = (list: Item[], label: string) => (
+    <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3" aria-label={label}>
+      {list.map((item) => (
         <InsightBox key={item.id} item={item} me={me} selected={item.id === openId} onOpen={() => onOpen?.(item)} />
       ))}
+    </div>
+  )
+  return (
+    <div className="flex flex-col gap-6">
+      {triage.length > 0 && (
+        <section className="flex flex-col gap-3">
+          <SectionHeader title="To triage" count={triage.length} />
+          {grid(triage, 'To triage')}
+        </section>
+      )}
+      <section className="flex flex-col gap-3">
+        {triage.length > 0 && <SectionHeader title="All insights" count={past.length} />}
+        {grid(past, 'All insights')}
+      </section>
     </div>
   )
 }
@@ -186,6 +204,10 @@ function RiskRow({ item, me, onOpen, selected }: { item: Item; me: string; onOpe
       <td className={TD}>
         <SeverityMark severity={item.severity} />
       </td>
+      <td className={cn(TD, 'text-text-secondary')}>
+        <Person name={author.name} size={16} />
+      </td>
+      <td className={cn(TD, 'whitespace-nowrap tabular-nums text-text-muted')}>{item.at}</td>
       <td className={TD}>
         {/* Proposed: Accept and ✕ above the row's link; after that, the status written out, as Issues' table does. */}
         {status === 'proposed' ? (
@@ -196,10 +218,6 @@ function RiskRow({ item, me, onOpen, selected }: { item: Item; me: string; onOpe
           <StatusLabel value={status} label={statusOption(item.type, status).label} colour={statusOption(item.type, status).colour} />
         )}
       </td>
-      <td className={cn(TD, 'text-text-secondary')}>
-        <Person name={author.name} size={16} />
-      </td>
-      <td className={cn(TD, 'whitespace-nowrap tabular-nums text-text-muted')}>{item.at}</td>
     </tr>
   )
 }
@@ -245,9 +263,9 @@ export function RiskTable({ items, order = 'recent', onOpen, openId, me = 'miky'
               <th className={cn(TH, 'w-28')}>Kind</th>
               <th className={TH}>Title</th>
               <th className={cn(TH, 'w-28')}>Severity</th>
-              <th className={cn(TH, 'w-36')}>Status</th>
               <th className={cn(TH, 'w-32')}>Raised by</th>
               <th className={cn(TH, 'w-20')}>When</th>
+              <th className={cn(TH, 'w-36')}>Status</th>
             </tr>
           </thead>
           <tbody>
