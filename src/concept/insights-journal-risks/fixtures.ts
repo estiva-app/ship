@@ -120,9 +120,9 @@ export const ITEMS: Item[] = [
   },
   {
     id: 'j3', type: 'journal', word: 'Update', status: 'accepted', at: '10 Nov', day: '2026-11-10', team: TEAM, about: onProject, acceptedBy: MIKY,
-    title: 'Main and All shipped in Peek, Ship and Leaf',
-    summary: 'Main and All are live in all three apps.',
-    details: 'Main and All are live in Peek, Ship and Leaf.\n\nEach app’s sidebar now switches between Main, the places you follow, and All, everything you can read. The switch sits at the top of the sidebar, in the same place in every app.\n\nNext in the initiative: the Activity indicator in Peek. What is new in Ship and Leaf waits; it needs more thinking.',
+    title: 'Topics: Main and All shipped in Peek',
+    summary: 'In Peek, the level you set on a topic is what you see.',
+    details: 'Topics: Main and All is done, in Peek only: the level you set on a topic is what you see of it.\n\nNext: the Activity indicator on each topic and team, ahead of sending a thread up and highlights. What is new in Ship and Leaf waits; it needs more thinking.',
     markedBy: MIKY,
   },
   {
