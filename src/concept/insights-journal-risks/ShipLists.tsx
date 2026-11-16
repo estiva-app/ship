@@ -16,7 +16,6 @@ import { StatusLabel } from '@/components/ui/StatusLabel'
 import { statusOption, wordIcon, type Status } from './MarkAs'
 
 /** A severity's colour: the kind and the severity share it. */
-const SEVERITY_TEXT: Record<Severity, string> = { Critical: 'text-error-default', High: 'text-warning-default', Medium: 'text-text-secondary', Low: 'text-text-muted' }
 import { SEVERITIES, type Item, type Severity, type Visual } from './fixtures'
 
 /** New first, then newest first: what waits for you leads either view. */
@@ -185,22 +184,24 @@ export function InsightGrid({ items, onOpen, openId, me = 'miky' }: { items: Ite
 const TH = 'h-9 px-3 text-left text-menu font-medium uppercase tracking-widest text-text-secondary'
 const TD = 'h-10 px-3 text-body-2'
 
-/** One risk as a row: Concern, Question or Blocker · Title (its summary on hover) · Status · Raised by · When. */
+/** One risk as a row: Severity · Kind (Concern, Question or Blocker) · Title over its summary · Raised by · When · Status. */
 function RiskRow({ item, me, onOpen, selected }: { item: Item; me: string; onOpen?: () => void; selected?: boolean }) {
   const [status, setStatus] = useState<Status>(item.status)
   const author = item.source?.author ?? item.markedBy
-  const kindTone = item.severity ? SEVERITY_TEXT[item.severity] : 'text-text-muted'
   return (
     <tr className={cn('relative border-b border-border-subtle last:border-b-0 hover:bg-bg-hover', selected && 'bg-bg-selected', ENDED.includes(status) && 'text-text-muted')}>
-      {/* Kind and severity in one cell, in the severity's colour (Miky, 16 Nov: "Kind is all red … the colors should be same"). */}
-      <td className="px-3 py-2 text-body-2">
-        <span className={cn('flex items-center gap-1.5', kindTone)}>
+      {/* Severity carries the colour; the kind only says what kind of risk it is, in plain text (Miky, 16 Nov: one cell for both was "too much"). */}
+      <td className={TD}>
+        {/* The new dot sits in the row's left padding, so the severities stay in one line. */}
+        <span className="absolute left-1 top-1/2 flex -translate-y-1/2">
           <NewDot on={item.isNew} />
+        </span>
+        <SeverityMark severity={item.severity} />
+      </td>
+      <td className={cn(TD, 'text-text-secondary')}>
+        <span className="flex items-center gap-1.5">
           {wordIcon(item.word, 16)}
           {item.word}
-        </span>
-        <span className="block pl-6 text-caption">
-          <SeverityMark severity={item.severity} />
         </span>
       </td>
       {/* Two lines, as Linear's table has them (Miky, 16 Nov): the title, and the summary under it in full width. */}
@@ -266,7 +267,8 @@ export function RiskTable({ items, order = 'recent', onOpen, openId, me = 'miky'
         <table className="w-full min-w-[840px] table-fixed border-collapse" aria-label="Risks">
           <thead className="bg-bg-surface">
             <tr className="border-b border-border-default">
-              <th className={cn(TH, 'w-36')}>Risk</th>
+              <th className={cn(TH, 'w-28')}>Severity</th>
+              <th className={cn(TH, 'w-32')}>Kind</th>
               <th className={TH}>Title</th>
               <th className={cn(TH, 'w-32')}>Raised by</th>
               <th className={cn(TH, 'w-20')}>When</th>
