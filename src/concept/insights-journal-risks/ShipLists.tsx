@@ -7,14 +7,14 @@
  *   most severe first (Miky, 16 Nov).
  */
 import { useState } from 'react'
-import { IconAntennaBars2, IconAntennaBars3, IconAntennaBars4, IconAntennaBars5 } from '@tabler/icons-react'
+import { IconAntennaBars2, IconAntennaBars3, IconAntennaBars4, IconAntennaBars5, IconTrendingDown, IconTrendingUp } from '@tabler/icons-react'
 import { Card, Link, MetaText, Person } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
 import { ScrollArea } from '@/components/ui/ScrollArea'
 import { AcceptReject, ENDED, ItemTag, LIVE, StatusOf, acceptedStatus } from './ItemParts'
 import { StatusLabel } from '@/components/ui/StatusLabel'
 import { statusOption, type Status } from './MarkAs'
-import { SEVERITIES, type Item, type Severity } from './fixtures'
+import { SEVERITIES, type Item, type Severity, type Visual } from './fixtures'
 
 /** New first, then newest first: what waits for you leads either view. */
 const newFirst = (items: Item[]) => [...items].sort((a, b) => Number(!!b.isNew) - Number(!!a.isNew) || b.day.localeCompare(a.day))
@@ -35,12 +35,90 @@ function Answer({ item, me, status, onStatus }: { item: Item; me: string; status
 
 const where = (item: Item) => (item.source ? `${item.source.app} · ${item.source.place}` : 'Typed by hand')
 
-/** One insight as a box: its category and when, the title, the summary, then who said it and where. */
+/** A chart's range over it, as an analytics tool labels its tiles ("LAST 12 WEEKS"), and the latest value on the right. */
+function ChartHead({ range, now }: { range: string; now?: string }) {
+  return (
+    <div className="flex items-baseline justify-between">
+      <span className="text-menu font-medium uppercase tracking-widest text-text-muted">{range}</span>
+      {now && <span className="text-body-2 font-medium tabular-nums text-text-primary">{now}</span>}
+    </div>
+  )
+}
+
+/** A chart's two end dates under it. */
+function ChartEnds({ labels }: { labels: [string, string] }) {
+  return (
+    <div className="flex justify-between">
+      <MetaText tone="muted">{labels[0]}</MetaText>
+      <MetaText tone="muted">{labels[1]}</MetaText>
+    </div>
+  )
+}
+
+/**
+ * What an insight from another tool shows (Miky, 16 Nov: "make it more live"): PostHog's big number, bars or line,
+ * drawn small in the accent colour, with the moment that changed it marked; a support desk's customer, in their words.
+ */
+function InsightVisual({ visual }: { visual: Visual }) {
+  if (visual.kind === 'number')
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-2 py-4">
+        <ChartHead range={visual.range} />
+        {/* eslint-disable-next-line token-values/no-restricted-classes -- @estiva-escape: a dashboard tile's big number; the kit has no display size yet, the build adds one */}
+        <span className="text-[56px] font-semibold leading-none tabular-nums text-text-primary">{visual.value}</span>
+        <span className={cn('flex items-center gap-1 text-body-2', visual.up ? 'text-success-default' : 'text-error-default')}>
+          {visual.up ? <IconTrendingUp size={16} stroke={1.5} /> : <IconTrendingDown size={16} stroke={1.5} />}
+          {visual.change}
+        </span>
+      </div>
+    )
+  if (visual.kind === 'quote')
+    return (
+      <figure className="flex flex-1 flex-col justify-center gap-2 py-1">
+        <blockquote className="text-h3 font-normal leading-snug text-text-primary">“{visual.quote}”</blockquote>
+        <figcaption>
+          <MetaText tone="muted">
+            {visual.customer}, {visual.company}
+          </MetaText>
+        </figcaption>
+      </figure>
+    )
+  const max = Math.max(...visual.points) * 1.1
+  const n = visual.points.length
+  const last = visual.points[n - 1]
+  const x = (i: number) => (visual.kind === 'bars' ? (i + 0.5) * (300 / n) : (i * 300) / (n - 1))
+  const y = (v: number) => 100 - (v / max) * 100
+  return (
+    <div className="flex flex-col gap-1">
+      <ChartHead range={visual.range} now={`${last}${visual.unit ?? ''} now`} />
+      <svg viewBox="0 0 300 100" preserveAspectRatio="none" className="h-28 w-full text-accent-primary" aria-label={`${visual.range}: ${visual.points.join(', ')}`}>
+        {visual.kind === 'bars'
+          ? visual.points.map((v, i) => (
+              <rect key={i} x={x(i) - 300 / n / 2 + 3} width={300 / n - 6} y={y(v)} height={100 - y(v)} rx={1.5} fill="currentColor" opacity={visual.marker && i < visual.marker.at ? 0.35 : 1} />
+            ))
+          : (
+            <>
+              <polygon points={`0,100 ${visual.points.map((v, i) => `${x(i)},${y(v)}`).join(' ')} 300,100`} fill="currentColor" opacity={0.12} />
+              <polyline points={visual.points.map((v, i) => `${x(i)},${y(v)}`).join(' ')} fill="none" stroke="currentColor" strokeWidth={2} vectorEffect="non-scaling-stroke" />
+            </>
+          )}
+        {visual.marker && <line x1={x(visual.marker.at) - (visual.kind === 'bars' ? 300 / n / 2 : 0)} x2={x(visual.marker.at) - (visual.kind === 'bars' ? 300 / n / 2 : 0)} y1={0} y2={100} stroke="currentColor" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" className="text-text-muted" />}
+      </svg>
+      <ChartEnds labels={visual.labels} />
+      {visual.marker && <MetaText tone="muted">┆ {visual.marker.label}</MetaText>}
+    </div>
+  )
+}
+
+/** One insight as a box: its category and when, the title, its picture or summary, then who sent it and where. */
 function InsightBox({ item, me, onOpen, selected }: { item: Item; me: string; onOpen?: () => void; selected?: boolean }) {
   const [status, setStatus] = useState<Status>(item.status)
-  const author = item.source?.author ?? item.markedBy
+  // A tool sends it: the tool is the face, its dashboard or inbox the place (the customer is in the quote itself).
+  const fromTool = item.source?.app === 'PostHog' || item.source?.app === 'Intercom'
+  const face = fromTool ? item.markedBy.name : (item.source?.author ?? item.markedBy).name
+  const wide = item.visual?.kind === 'bars' || item.visual?.kind === 'line'
   return (
-    <Card fill="surface" hover="hairline" onPress={onOpen} selected={selected} className="flex">
+    <Card fill="surface" hover="hairline" onPress={onOpen} selected={selected} className={cn('flex', wide && 'col-span-2')}>
       <div className={cn('flex min-w-0 flex-1 flex-col gap-2 p-3', ENDED.includes(status) && 'opacity-60')}>
         <div className="flex h-6 items-center gap-2">
           <NewDot on={item.isNew} />
@@ -51,12 +129,19 @@ function InsightBox({ item, me, onOpen, selected }: { item: Item; me: string; on
           </span>
         </div>
         <span className="text-body-2 font-medium text-text-primary">{item.title}</span>
-        {item.summary && <span className="line-clamp-3 text-body-2 text-text-secondary">{item.summary}</span>}
+        {item.visual ? <InsightVisual visual={item.visual} /> : item.summary && <span className="line-clamp-3 text-body-2 text-text-secondary">{item.summary}</span>}
         <div className="mt-auto flex min-w-0 items-center gap-2 pt-1">
-          <Person name={author.name} size={16} />
+          <Person name={face} size={16} />
           <span className="min-w-0 truncate">
-            <MetaText tone="muted">{where(item)}</MetaText>
+            <MetaText tone="muted">{fromTool ? item.source?.place : where(item)}</MetaText>
           </span>
+          {/* A tool's insight keeps updating: it says so, the way a dashboard tile does. */}
+          {fromTool && item.visual?.kind !== 'quote' && (
+            <span className="ml-auto flex shrink-0 items-center gap-1">
+              <span aria-hidden className="size-1.5 rounded-full bg-success-default" />
+              <MetaText tone="muted">Updated 5 min ago</MetaText>
+            </span>
+          )}
         </div>
       </div>
     </Card>
@@ -79,7 +164,7 @@ export function InsightGrid({ items, onOpen, openId, me = 'miky' }: { items: Ite
 const TH = 'h-9 px-3 text-left text-menu font-medium uppercase tracking-widest text-text-secondary'
 const TD = 'h-10 px-3 text-body-2'
 
-/** One risk as a row: Concern, Question or Blocker · Title (its summary on hover) · Severity · Status · Raised by · About · When. */
+/** One risk as a row: Concern, Question or Blocker · Title (its summary on hover) · Severity · Status · Raised by · When. */
 function RiskRow({ item, me, onOpen, selected }: { item: Item; me: string; onOpen?: () => void; selected?: boolean }) {
   const [status, setStatus] = useState<Status>(item.status)
   const author = item.source?.author ?? item.markedBy
@@ -114,7 +199,6 @@ function RiskRow({ item, me, onOpen, selected }: { item: Item; me: string; onOpe
       <td className={cn(TD, 'text-text-secondary')}>
         <Person name={author.name} size={16} />
       </td>
-      <td className={cn(TD, 'truncate text-text-secondary')}>{item.about?.title ?? 'The team'}</td>
       <td className={cn(TD, 'whitespace-nowrap tabular-nums text-text-muted')}>{item.at}</td>
     </tr>
   )
@@ -163,7 +247,6 @@ export function RiskTable({ items, order = 'recent', onOpen, openId, me = 'miky'
               <th className={cn(TH, 'w-28')}>Severity</th>
               <th className={cn(TH, 'w-36')}>Status</th>
               <th className={cn(TH, 'w-32')}>Raised by</th>
-              <th className={cn(TH, 'w-40')}>About</th>
               <th className={cn(TH, 'w-20')}>When</th>
             </tr>
           </thead>
