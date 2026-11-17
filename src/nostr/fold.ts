@@ -270,10 +270,8 @@ export function parseChanges(event: SignedEvent): Change[] {
   // Read as a one-field change for its `a`, `ts` and `h`; the fields come from the `set` tags.
   const head = parseChange({ ...event, tags: [...event.tags, ['field', 'set'], ['value', '']] })
   if (!head) return []
-  return fieldsSetBy(event).map(({ field, value, format }) => {
-    const { stage: _head, ...rest } = head
-    return { ...rest, field, value, format: (format ?? head.format) as ContentFormat, ...stageOn(event, field, value) }
-  })
+  // `head` carries no stage (its value is ''), so each field's is its own.
+  return fieldsSetBy(event).map(({ field, value, format }) => ({ ...head, field, value, format: (format ?? head.format) as ContentFormat, ...stageOn(event, field, value) }))
 }
 
 /** The tags a root names its Folder with: `h`, or Ship's older `buzz-channel` (SPEC §7.3). */
