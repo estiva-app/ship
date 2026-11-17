@@ -8,8 +8,8 @@
  * Real data: the project "Topics: level up the topic experience" as it stood on 9 Nov, its milestones, issues and
  * Later lines (raised by its /land and kickoff runs) and its Not in scope list. The two sessions are imagined.
  */
-import { useState } from 'react'
-import { IconCircleCheck, IconPlus, IconSparkles, IconTerminal2 } from '@tabler/icons-react'
+import { useState, type ReactNode } from 'react'
+import { IconCircleCheck, IconGitMerge, IconGitPullRequest, IconGitPullRequestDraft, IconPlus, IconSparkles, IconTerminal2 } from '@tabler/icons-react'
 import { Button, Card, Link, MetaText, Person, SectionHeader, Select, Tabs } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
 import { ScrollArea } from '@/components/ui/ScrollArea'
@@ -19,16 +19,17 @@ import { NewDot } from './ItemParts'
 type IssueStatus = 'todo' | 'in_progress' | 'done' | 'cancelled'
 const STATUS: Record<IssueStatus, string> = { todo: 'Todo', in_progress: 'In Progress', done: 'Done', cancelled: 'Cancelled' }
 type Session = { stage: string; last: string; when: string; waitsOnYou?: boolean }
-type PlanIssue = { ref: string; title: string; summary: string; status: IssueStatus; who: string; session?: Session; shipped?: string }
+type PrStage = 'Draft' | 'Open' | 'Merged'
+type PlanIssue = { ref: string; title: string; summary: string; status: IssueStatus; who: string; session?: Session; pr?: { name: string; stage: PrStage } }
 type Milestone = { n: number; title: string; issues: PlanIssue[] }
 
 const MILESTONES: Milestone[] = [
-  { n: 1, title: 'The prototype shows the new sidebars, Explore, the menus and a topic’s arranged files', issues: [{ ref: 'TOPI-1', title: 'Topics level-up, prototyped', summary: 'Every changed Topics screen approved as a prototype; the build issues written from it.', status: 'done', who: 'Miky', shipped: '8 Nov' }] },
+  { n: 1, title: 'The prototype shows the new sidebars, Explore, the menus and a topic’s arranged files', issues: [{ ref: 'TOPI-1', title: 'Topics level-up, prototyped', summary: 'Every changed Topics screen approved as a prototype; the build issues written from it.', status: 'done', who: 'Miky', pr: { name: 'ship#598', stage: 'Merged' } }] },
   {
     n: 2,
     title: 'Your topics come in the order things happen, in every app',
     issues: [
-      { ref: 'TOPI-10', title: 'Peek lists your topics flat, newest activity first, with archived files in Overview', summary: 'One flat list of every topic you are in, re-sorted live.', status: 'done', who: 'Miky', shipped: 'peek#635 · 9 Nov' },
+      { ref: 'TOPI-10', title: 'Peek lists your topics flat, newest activity first, with archived files in Overview', summary: 'One flat list of every topic you are in, re-sorted live.', status: 'done', who: 'Miky', pr: { name: 'peek#635', stage: 'Merged' } },
       {
         ref: 'TOPI-9',
         title: 'Ship’s sidebar shows your five newest topics, folded, then Explore topics',
@@ -36,6 +37,7 @@ const MILESTONES: Milestone[] = [
         status: 'in_progress',
         who: 'Miky',
         session: { stage: 'Waiting on you', last: 'Asked: does a topic fold open to its projects only, or to its projects and their issues?', when: '20 min ago', waitsOnYou: true },
+        pr: { name: 'ship#604', stage: 'Draft' },
       },
       {
         ref: 'TOPI-4',
@@ -43,7 +45,8 @@ const MILESTONES: Milestone[] = [
         summary: 'Leaf’s sidebar reads the same order as Peek and Ship.',
         status: 'in_progress',
         who: 'Miky',
-        session: { stage: 'PR open, in review', last: 'Opened leaf#52; the three reviewers are running', when: '4 min ago' },
+        session: { stage: 'In review', last: 'The three reviewers are running on the PR', when: '4 min ago' },
+        pr: { name: 'leaf#52', stage: 'Open' },
       },
     ],
   },
@@ -63,9 +66,15 @@ const NOW = 2
 // @estiva-escape(no-copied-look): the concept copies IssuesTable's header cell so the tables match; the build shares one table part
 const TH = 'h-9 px-3 text-left text-menu font-medium uppercase tracking-widest text-text-secondary'
 
+const PR_ICON: Record<PrStage, ReactNode> = {
+  Draft: <IconGitPullRequestDraft size={14} stroke={1.5} className="shrink-0 text-text-muted" />,
+  Open: <IconGitPullRequest size={14} stroke={1.5} className="shrink-0 text-success-default" />,
+  Merged: <IconGitMerge size={14} stroke={1.5} className="shrink-0 text-accent-primary" />,
+}
+
 /** Start or open the issue's Claude Code session: Open session leads when it waits on you. */
 function SessionCell({ issue }: { issue: PlanIssue }) {
-  if (issue.status === 'done') return <MetaText tone="muted">{issue.shipped}</MetaText>
+  if (issue.status === 'done') return <MetaText tone="muted">Ended</MetaText>
   const s = issue.session
   return (
     <span className="flex flex-col items-start gap-1">
@@ -85,7 +94,7 @@ function PlanRow({ issue, now }: { issue: PlanIssue; now: boolean }) {
       <td className="px-3 align-top text-body-2 font-mono whitespace-nowrap text-text-muted">
         <span className={cn('block', now ? 'py-3' : 'py-2')}>{issue.ref}</span>
       </td>
-      <td className={cn('px-3 text-body-2', now ? 'py-3' : 'py-2')}>
+      <td className={cn('px-3 align-top text-body-2', now ? 'py-3' : 'py-2')}>
         <span className="flex font-medium">
           <Link href="#" variant="quiet" truncate cover onClick={(e) => e.preventDefault()}>
             {issue.title}
@@ -101,8 +110,18 @@ function PlanRow({ issue, now }: { issue: PlanIssue; now: boolean }) {
         )}
       </td>
       <td className="px-3 align-top text-body-2">
-        <span className={cn('block', now ? 'py-3' : 'py-2')}>
+        <span className={cn('flex flex-col gap-0.5', now ? 'py-3' : 'py-2')}>
           <StatusLabel value={issue.status} label={STATUS[issue.status]} />
+          {/* Its pull request under the status (Miky, 17 Nov), with the PR's own stage: Draft, Open, Merged. */}
+          {issue.pr && (
+            <span className="relative flex items-center gap-1 whitespace-nowrap text-caption text-text-secondary">
+              {PR_ICON[issue.pr.stage]}
+              <Link href="#" variant="quiet" onClick={(e) => e.preventDefault()}>
+                {issue.pr.name}
+              </Link>
+              <span className="text-text-muted">· {issue.pr.stage}</span>
+            </span>
+          )}
         </span>
       </td>
       <td className="px-3 align-top text-body-2 text-text-secondary">
@@ -150,7 +169,7 @@ function MilestoneTable({ m }: { m: Milestone }) {
                 <tr className="border-b border-border-default">
                   <th className={cn(TH, 'w-24')}>Ref</th>
                   <th className={TH}>Title</th>
-                  <th className={cn(TH, 'w-32')}>Status</th>
+                  <th className={cn(TH, 'w-40')}>Status</th>
                   <th className={cn(TH, 'w-28')}>Lead</th>
                   <th className={cn(TH, 'w-40')}>Session</th>
                 </tr>
@@ -161,7 +180,7 @@ function MilestoneTable({ m }: { m: Milestone }) {
               <colgroup>
                 <col className="w-24" />
                 <col />
-                <col className="w-32" />
+                <col className="w-40" />
                 <col className="w-28" />
                 <col className="w-40" />
               </colgroup>
