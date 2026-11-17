@@ -1,6 +1,6 @@
 import type { FolderState } from '@/api'
 import type { Person } from '@/api/useDirectory'
-import { ISSUE_STATUSES, lookupStatus, progressOf, projectStatus } from '@/nostr/kinds'
+import { progressOf, projectStatus } from '@/nostr/kinds'
 import { href, type ProjectsTab } from '@/router'
 import type { Archives } from './archive'
 import { placedIn } from './placement'
@@ -37,11 +37,11 @@ export function projectTabs(
 ): Record<ProjectsTab, ProjectRowData[]> {
   const tabs: Record<ProjectsTab, ProjectRowData[]> = { all: [], planned: [], active: [], completed: [], archived: [] }
   // Each project's issues, read once: one archived with its project is still that project's to count, one archived on its own is not.
-  const issuesOf = new Map<string, string[]>()
+  const issuesOf = new Map<string, FolderState['issues']>()
   for (const issue of issues) {
     const archive = archives.ofIssue(issue)
     if (!issue.projectAddr || (archive && !archive.with)) continue
-    issuesOf.set(issue.projectAddr, [...(issuesOf.get(issue.projectAddr) ?? []), issue.status])
+    issuesOf.set(issue.projectAddr, [...(issuesOf.get(issue.projectAddr) ?? []), issue])
   }
   const byTitle = [...projects].sort((a, b) => a.title.localeCompare(b.title))
   for (const project of byTitle) {
@@ -54,7 +54,7 @@ export function projectTabs(
       ...(folders ? { folder: placedIn({ addr: project.addr, folder: project.contentFolder }, folders)[0]?.name } : {}),
       status: { value: status.value, label: status.label },
       ...(project.lead ? { lead: personOf(project.lead) } : {}),
-      progress: progressOf(issuesOf.get(project.addr) ?? [], (value) => lookupStatus(ISSUE_STATUSES, value)),
+      progress: progressOf(issuesOf.get(project.addr) ?? []),
       archived,
     }
     if (archived) {
@@ -62,7 +62,7 @@ export function projectTabs(
       continue
     }
     tabs.all.push(row)
-    const tab = status.stage && status.stage !== 'dropped' ? TAB_OF_STAGE[status.stage] : undefined
+    const tab = project.stage && project.stage !== 'dropped' ? TAB_OF_STAGE[project.stage] : undefined
     if (tab) tabs[tab].push(row)
   }
   return tabs

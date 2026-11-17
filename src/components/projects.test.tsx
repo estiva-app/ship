@@ -4,6 +4,12 @@ import type { DirectoryView, FolderState, WorkspaceState } from '@/api'
 import { ThreadsContext } from '@/api/useThreads'
 import type { Archives } from '@/lib/archive'
 import { projectTabs } from '@/lib/projects'
+type Stage = 'open' | 'started' | 'done' | 'dropped'
+/** What each of Ship's statuses means, as the fold puts it beside the status (EAC-3). */
+// `active` is an older writer's In Progress (SHIPS-7), which the fold reads as started.
+const STAGE: Record<string, Stage> = { planned: 'open', todo: 'open', in_progress: 'started', active: 'started', started: 'started', completed: 'done', done: 'done', cancelled: 'dropped' }
+const issueStage = (status: string) => STAGE[status]
+const projectStage = (status: string) => STAGE[status]
 import { ago } from '@/lib/time'
 import { ProjectsPage } from '@/pages/ProjectsPage'
 import { parse } from '@/router'
@@ -20,11 +26,13 @@ const project = (id: string, status: string, extra: Record<string, unknown> = {}
   descriptionFormat: 'marker',
   contentFolder: 'f',
   status,
+  // What the status means, as Ship's fold puts it beside the status (EAC-3).
+  stage: projectStage(status),
   archived: false,
   fields: {},
   ...extra,
 })
-const issue = (id: string, projectId: string, status: string) => ({ addr: `30851:a:${id}`, id, projectAddr: `30850:a:${projectId}`, status })
+const issue = (id: string, projectId: string, status: string) => ({ addr: `30851:a:${id}`, id, projectAddr: `30850:a:${projectId}`, status, stage: issueStage(status) })
 const archivesOf = (archived: string[] = []) =>
   ({ ofProject: (addr: string) => (archived.includes(addr) ? { at: 1 } : undefined), ofIssue: (i: { addr: string }) => (archived.includes(i.addr) ? { at: 1 } : undefined) }) as unknown as Archives
 const personOf = (pubkey: string) => ({ name: pubkey === LEAD ? 'Ana Duarte' : undefined })
@@ -55,6 +63,14 @@ describe('Projects in tabs (SHIPS-7)', () => {
     const issues = [issue('i1', 'started', 'done'), issue('i2', 'started', 'cancelled'), issue('i3', 'started', 'todo'), issue('i4', 'started', 'done')] as unknown as FolderState['issues']
     const [started] = projectTabs([projects[1]], issues, archivesOf(['30851:a:i4']), personOf).active
     expect(started.progress).toEqual({ done: 1, total: 2 })
+  })
+
+  it('counts an issue in a status Ship does not list by the stage its change says, and a project’s by its own (EAC-3)', () => {
+    const own = (id: string, status: string, stage?: Stage) => ({ ...issue(id, 'blocked', status), stage })
+    const issues = [own('i1', 'shipped', 'done'), own('i2', 'abandoned', 'dropped'), own('i3', 'blocked', 'started'), own('i4', 'waiting')] as unknown as FolderState['issues']
+    const blocked = project('blocked', 'on_hold', { stage: 'started' })
+    const tabs = projectTabs([blocked as never], issues, archivesOf(), personOf)
+    expect(tabs.active.map((row) => [row.title, row.status.label, row.progress])).toEqual([['blocked', 'on_hold', { done: 1, total: 3 }]])
   })
 
   it('names the lead, and nobody when the project has none', () => {

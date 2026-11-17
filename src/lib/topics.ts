@@ -1,6 +1,6 @@
 import { byActivity, type ReadTopic, type TopicsRead } from '@estiva-app/interop'
 import { topicAsDrawn } from '@/api/foreign'
-import { ISSUE_STATUSES, lookupStatus, progressOf, projectStatus } from '@/nostr/kinds'
+import { ISSUE_STATUSES, progressOf, projectStatus, type Stage } from '@/nostr/kinds'
 import { href } from '@/router'
 import type { Archives } from './archive'
 import { statusLabel } from './issues'
@@ -208,7 +208,7 @@ export interface TopicPageData {
 export interface TopicPageWork {
   projects: readonly { addr: string; id: string; title: string; status: string; deleted?: unknown }[]
   /** `author`, `createdAt` and `fields` give an issue row its last edit; the sidebar's fold leaves them out. */
-  issues: readonly { addr: string; id: string; title: string; status: string; projectAddr?: string; author?: string; createdAt?: number; fields?: Record<string, { by: string; at: number }> }[]
+  issues: readonly { addr: string; id: string; title: string; status: string; stage?: Stage; projectAddr?: string; author?: string; createdAt?: number; fields?: Record<string, { by: string; at: number }> }[]
 }
 
 /**
@@ -239,7 +239,7 @@ export function topicPageOf(topic: ReadTopic, work: TopicPageWork, archives: Arc
           title: project.title,
           href: href({ name: 'project', d: project.id, slug: project.title, view: 'table' }),
           status: (({ value, label }) => ({ value, label }))(projectStatus(project.status)),
-          progress: progressOf(of.map((i) => i.status), (value) => lookupStatus(ISSUE_STATUSES, value)),
+          progress: progressOf(of),
         },
       })
     } else if (issue) {

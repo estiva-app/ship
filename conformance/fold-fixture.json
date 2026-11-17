@@ -3,19 +3,19 @@
   "generatedAt": "2026-09-02T20:14:38.440Z",
   "relay": "https://estiva.estiva.app",
   "counts": {
-    "events": 1096,
+    "events": 1103,
     "recorded": 1073,
-    "adversarial": 23,
+    "adversarial": 30,
     "projects": 8,
-    "issues": 172,
-    "changes": 455,
+    "issues": 175,
+    "changes": 459,
     "conversations": 381,
     "byKind": {
       "9": 204,
       "1111": 249,
-      "1851": 462,
+      "1851": 466,
       "30850": 8,
-      "30851": 173
+      "30851": 176
     }
   },
   "events": [
@@ -454,6 +454,37 @@
           "reply"
         ]
       ]
+    },
+    {
+      "pubkey": "4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa",
+      "created_at": 1700000054,
+      "kind": 1851,
+      "tags": [
+        [
+          "h",
+          "fixture-folder"
+        ],
+        [
+          "a",
+          "30851:4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa:fixture-stage-other-field"
+        ],
+        [
+          "field",
+          "status"
+        ],
+        [
+          "value",
+          "todo"
+        ],
+        [
+          "stage",
+          "title",
+          "done"
+        ]
+      ],
+      "content": "a stage for the title counts for nothing: todo stays open",
+      "id": "037129cb7feff204a35bd6b7c6d7ccc75e36c60d66007bfe326bd0991069b9f8",
+      "sig": "afffd12ac3f1b8b7fbd4e08056ce756b17bcfadaf6669e9dad70be12a81ef222e0838234c30e5b34d64afd7298b7bc7512cb8ce17df45e7f79ecea79af524c2e"
     },
     {
       "content": "# Note\n- @Katerina Kelepouri created prototype of the intelligence form\n- I will plug it in later this week once the Projection layer is done.\n- To Miky: Explore Prompt API as it could allow us cheaply prefill the form based on the context from the thread. https://developer.chrome.com/docs/ai/prompt-api\n- Try to make searching in Peek's topic work. Check if Buzz has some search feature.",
@@ -959,7 +990,7 @@
       ],
       "content": "trusted ts, finer than a second",
       "id": "080ffed3dab1d1616f7446a57b3d3dffc4a4b8260029da1e35c374559586ad81",
-      "sig": "be3f716019fc13349be083bfb04bb97bc7012425e7e8a55759df353cdf3fb38c4dbaae2773d3e45076958486bae34909a625c1503b7c57f56bafba16d066ae10"
+      "sig": "34989aced420ec60206612fe93758ca9bcf4c7deae207e6fa233f13d70f71fe1b56c1d2d74d82b0e2946fdae6b9cb8fdf1e487c485761568535409a45f315d51"
     },
     {
       "content": "Status → done",
@@ -2047,7 +2078,7 @@
       ],
       "content": "drifted ts, refused at 1s of slack",
       "id": "0f0abd04af495a70e2fc610fea817ad9721eaa7fb15765a21422ea15a1ef2fdc",
-      "sig": "5f6136eb3749c2a294ea8141db358b0b816b73cc0b0a663f0523490f1501acfad66b02c3a4b7220db32bbbfa310d0877426ed951c1cf591a3da2d6ac5968ec4b"
+      "sig": "4703141e2033512581384e83d400e3e4a509236bf67f42e3b11f0f3ed7d2a6685736b20001505fdb06e8aa112a730635bbe3a0ace894d830d448583749bee0bd"
     },
     {
       "content": "Still live, confirmed 2026-09-02 while working in `estiva-docs`. `site/check.mjs` is absent from the repo and `npm run check` fails with `ERR_MODULE_NOT_FOUND`.\n\n`npm run build` is fine — 9 pages — so the gap is only the check. Which matters more than it sounds: `site/nav.mjs` says listing a doc in `NAV`/`INTERNAL` \"is also what makes the build's check meaningful — a link to anything in neither list is a mistake and fails the build\". That guarantee has not been running.\n\nNoticed because a docs PR today added a file to `INTERNAL` and nothing verified it.",
@@ -2271,7 +2302,7 @@
       ],
       "content": "a buzz-channel on a change proves nothing, must not count",
       "id": "0fdd49a65dcb4604d2f3760be15deebf1333fa199ba3c9f92161728a99c04277",
-      "sig": "2336b6683ec05339a271f7083fb588556de47427202f70ae69c4a90a884ae80538e245a6a0fff7f5792dde0d40089d4d56ec1fa0b5696820fe6c2ec70120ca24"
+      "sig": "0819c178541f7f861d887a4acf5ec11aea1bd21e0f63ed170a187d96f83048b8ebaf0bec04eab2f72079cd15af84d0331bd00b954771c42f7044fd3a78cb0fb8"
     },
     {
       "content": "BLOCKED on GitHub Actions minutes. PR #45 is merged (29b7ab0) but no image was published, so production still serves the vanilla app — verified by curl, not assumed: served index.html has bundle.js, an inline <style> and id=\"sidebar\", and no id=\"root\" or /assets/.\n\nThe post-merge run failed in 3 seconds with zero steps executed on both check and web. The repo is private, so minutes are metered; this is a quota block, not a code failure. CI passed on the same content on the PR branch minutes earlier.\n\nNot deployed, and nothing will deploy unattended: estiva-ship-update.timer is stopped. That is itself a trap to remember — while it is stopped, every future merge silently fails to reach production.\n\nThe image is not unverified, only unpublished. Built locally with the production build args from the commit whose tree is byte-identical to origin/main, and checked at the served-bytes level: index.html + hashed assets and no bundle.js, / no-cache and /assets/ immutable, /p/abc a real 404, the three production values baked in once each, localhost:3000 absent, and the identity package shell copy present.\n\nUnblocks by any of: restoring Actions minutes (cleanest); pushing that image to GHCR with a write:packages token; or building on the box and tagging it ghcr.io/estiva-app/ship:main locally, which needs no registry but is undone by the next docker compose pull.",
@@ -2801,7 +2832,7 @@
       ],
       "content": "signed in another Folder, must not count",
       "id": "1388c1b0747440c5e855e3b1b1d367522ea9569cf48e3d7222de58b1b527a3ba",
-      "sig": "6446ad5667ff9666870b52baa8e4946119f5195ddf17ffe0a1f8ac59a157fbb2e733f2a8317d945942baea2cfabbe81b4ae40b7c827de82b7052bc5221c894a5"
+      "sig": "35705942ae3b8d20dc5414df7774f634177862fb5ed58b720806b909dc901a2870f05f772524241667c7f036eccfa1a2de417fec9e3a69c25bb3a196a4d84a39"
     },
     {
       "content": "Status → in_progress",
@@ -2861,7 +2892,7 @@
       ],
       "content": "an empty h ahead of the real one names nothing",
       "id": "13f99cb0b7f9601f6b4748c4f3762d9f77b1991d3e7769d881d4659f2d0c519f",
-      "sig": "9b4afbd442056cc75a8c657604b3e556293cca9744f83becaf27f15d3de3ef3be6de865a06fc95932cc2583814c7551b1eaa0341ec179ba1b29170aed852489e"
+      "sig": "bc879a813449260b096c4cdbc172dffe811af6209a25f964c79dc5c76d7bd9bb3b99a51918c412f19e6ea863d09797c5768ad4d52410cda408f7d26abd79146d"
     },
     {
       "content": "https://github.com/estiva-app/ship/pull/61\n\nTwo stale bits in this description: it says `h:<folder-uuid>`, but SPEC §11.1 fixes the container context as the bare uuid (MUST NOT prefix) — Peek writes bare, so a prefix here would never match, permanently. And the React rewrite is already done, so this is in `web/`, not written twice.\n\nMapping as specified: a project takes the bare folder uuid, an issue's discussion takes `thread:<root>`. Tests pin that reading an issue never advances its project.\n\nNot done: the cross-app round trip needs a signed-in browser on both origins.",
@@ -2934,6 +2965,28 @@
           "1788344991683"
         ]
       ]
+    },
+    {
+      "pubkey": "4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa",
+      "created_at": 1700000030,
+      "kind": 30851,
+      "tags": [
+        [
+          "d",
+          "fixture-stage-blocked"
+        ],
+        [
+          "title",
+          "A status no listing names"
+        ],
+        [
+          "h",
+          "fixture-folder"
+        ]
+      ],
+      "content": "",
+      "id": "14e99c4a886d6a1e4d4ae29bb69d44f33f0676f2b8f9b5e2a22ec0aab93e7dc8",
+      "sig": "00c9db3c78dfe26ae99990656419bccbc8bd9aa60358fca110200af713bcec50e4ce04b09b226aca79d4d56a257a2cc230db54a5f07189cc1039b9e453bc358f"
     },
     {
       "content": "Migration built. peek#76, blocked on estiva-foundation#7 (protocol 0.1.2, adds KIND.APP_DATA).\n\nCHOSEN: layer 2, kind:30078 per SPEC 12 — NOT the NIP-51 set this ticket preferred and I recommended. Recording why, since the done-when asks for the choice and the reasoning.\n\nThree findings reversed it, and the first would have failed at the last step:\n\n1. Peek cannot sign a NIP-51 set. Its ceiling is [9,7,5,9007,27235,1851,9101,9002,9008,1111,30078,41010,41011,41012,22242]. 30078 is granted by CRO-2; 30000 and 30003 are not. Adding them is a seed line, a production re-seed and a deploy — and the estiva-id seed comments record THREE features that shipped, worked everywhere they were checked, and failed at /sign because a ceiling arrived after the code.\n2. It needs two kinds, not one. NIP-51 bookmark sets carry e/a/t/r. Starred PEOPLE are a follow set, 30000, with p tags.\n3. Neither half has a portable identifier. personKey is seedKey ?? _id, users.nostrPubkey is v.optional, topics.channelUuid is v.optional. A standard kind full of Convex ids is a standard kind nobody else can read.\n\nApplying 12.1 two-question test honestly gives layer 2 anyway: nothing else has asked to see Peek stars, and the person should own them. The portability problem DISSOLVES at layer 2 — only Peek reads the blob, so app-local ids are legitimate rather than a compromise. The portable identity travels where it exists (channel uuid, pubkey) so a later promotion to NIP-51 is a re-publish, not a second migration.\n\nConvex is not removed and should not be. The SET is the person and lives on the relay. The RENDERING — titles, resolved state, names, avatars — is derived from workspace data. That is 12.1 layer 3 used legitimately for an index.\n\nA FIFTH SIZE LIMIT, and it binds tighter than the one 12.5 calls operative. For an app holding no keys — every Estiva app — /nip44/encrypt refuses a plaintext over 65535 bytes, and ciphertext exceeds plaintext, so the relay 256 KiB ingest cap is never what you hit first. Worth adding to the 12.5 table.\n\nConcurrency declared as 12.3 requires: ACCEPT THE LOSS. Last write wins at one-second resolution. Cost is one star, recoverable by clicking again — unlike a read marker whose loss is invisible, which is why NIP-RS pays for slots and this does not.\n\nNot automatic, deliberately: restoreFromRelay exists and is never called on load. A stale blob would resurrect stars somebody cleared, and a blob goes stale exactly when a publish failed. missingLocally is exposed for an affordance somebody asks for.\n\nVerified: tsc -b, 498 tests (was 481), npm run build, and 30078/65535/appdata/estiva-peek in the built bundle.\n\nSTILL UNPROVEN and it needs a human: the agent credential cannot sign 30078 (ceiling [27235,1851,9,30851,30850,9007,1111]), so the blob must come from a Peek session. Star one thing after the deploy. The check is then unusually clean — I can confirm the event at the right coordinate with the right tags, and I CANNOT decrypt it despite holding a valid workspace credential, because /nip44/decrypt is self-only. That is 12.4 being true rather than aspirational, demonstrated by failing to read it.",
@@ -5291,7 +5344,7 @@
       ],
       "content": "the newest root's Folder, so this counts",
       "id": "2342b585a95e7b945498b9f719f7918d7bdc39b6597212dc7e2e0949f36abbde",
-      "sig": "3d66fe61acdaa7ebdce773c4acd9e64cfd257a1dcd171326ea3fe5c7eeddb5ca630dc3ce32c733343545829f2d702d69848860cf48e06c41fc70ee31b38fa940"
+      "sig": "f532c3d680f5a5b0338fae5c26d949322bd52ef274e37325d129e3d1b2d575f55a8e6102d16004676e3cf978bf816eaaf54acc2678a2a5ecea75cbd84cae4eea"
     },
     {
       "content": "",
@@ -6269,7 +6322,7 @@
       ],
       "content": "",
       "id": "2bbabf5609ef30434b27694dfa51d7ca0c5677c22175c0d69cb79fd76357d99a",
-      "sig": "c8d0fe68d4d72421049fa955b09c0a23465e4cd046a3ac8619a4690291c1bb1de86143270be7cca6f66401edc8c611a295957d4b0e551b9bd65e417392674c29"
+      "sig": "a0ce4999da0aae611a2a6a8317d417fd65ad07ecb601ee5e247d21ce25a25b1981a8eef81e9c4a37fde91c9fc4c6c7e7f95b6e764bb940b3590f4c5755a786ac"
     },
     {
       "content": "archived",
@@ -6883,7 +6936,7 @@
       ],
       "content": "",
       "id": "31541800b0b07dc18b852b602fc6f0b5ebb83b7ec046b3617e874372064a9657",
-      "sig": "4ea6bd9342e8b2f249af2b582ef5af78a7d4d3717f22c5836230474dcb684c217cda8ede54fe5c719dc90608187b284c582651fbf08c0af5a5f252e6db9b8d02"
+      "sig": "465b7ed32fa174c6437057f493b63c8828373962a4ded9fd61570744f4101b8d87a17c4396f783f67348a46065c4e52c67ad46a885ca0a57d60cf3ceba3ed7a6"
     },
     {
       "content": "So cool!",
@@ -7671,7 +7724,7 @@
       ],
       "content": "tie a",
       "id": "382c53fe8e826893cf63db7ca9bbd17bf5f9d5f83ddf8b63a0d8785bac90621f",
-      "sig": "02ca0902be69265989174b6367739e1c809e836b8afb6d318fca996bf73fdd2468925c180a3c67d1a8f15bef313c5eeafa59bc3c22c460d74a03a19a8eefea86"
+      "sig": "aa401fbea8a8d5d977c95c83c6e292fddb7d1ecf044fd096210f9e856e217086064dee166760618180381901f2100ee3b1e0c7237a5e6101007ef3edc53428dc"
     },
     {
       "content": "Edit is good one.",
@@ -9160,6 +9213,28 @@
           "AGE-13"
         ]
       ]
+    },
+    {
+      "pubkey": "4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa",
+      "created_at": 1700000030,
+      "kind": 30851,
+      "tags": [
+        [
+          "d",
+          "fixture-stage-cleared"
+        ],
+        [
+          "title",
+          "A stage a later change does not repeat"
+        ],
+        [
+          "h",
+          "fixture-folder"
+        ]
+      ],
+      "content": "",
+      "id": "436450689531ec03c1cf1dd298ea1c9301bc62231aacae73c7c7c05d88df9ab8",
+      "sig": "1d37ceea2730b7c05b31792f3767bf007f28b1e9094e769e26433dd4cc30103e703e51b053993fb49687866ad61c8d68e5d8440046dcf3cde081ed60ab527885"
     },
     {
       "content": "Merged in #118. Note this ships NO user-facing string by design — \"say nothing rather than apologise\" — so a deploy probe reads the API markers (responseConstraint, the instruction text) rather than UI copy. Deploy watch is running.\n\nStill unproven, and it needs a capable desktop rather than just a token: whether a real Gemini Nano suggestion is any good, and whether THREAD_CONTEXT_CHARS=4000 is the right bound. It is a stated default, not a measurement.",
@@ -11621,7 +11696,7 @@
       ],
       "content": "no h at all, must not count",
       "id": "57d513b4f4912f6be241d4f147ed8ef990402ca2b2f0455b374cf8196aae39d7",
-      "sig": "3520e1310e3dcba5589f5d16cf18025cfc5a21c1e8709b1fcfce0d816f740ea43aff899726fb356ec2416d79d33675c1e7c33a99ebb40b8a0aecc2f641a2e4a4"
+      "sig": "473f0b42c8728f208d78cae442a1c73146fbbfe186d33e83012fe0d590f0e3a18fea8500737ec4856a8618197bc0094314ce42c1cb83ea93e1d8fbdf206814c2"
     },
     {
       "content": "One issue when trying to write a comment in Ship. @Miky might be yours to take a look",
@@ -12463,7 +12538,7 @@
       ],
       "content": "",
       "id": "60a2d191bf2aa9d4431116fc27d06c3563e9e7348d319f096a7ecc22fad146b1",
-      "sig": "1b2432eec6e9ab19514c147497db8a4f707a21bcbcd7a1288b3b05b04b738984f13e55171867a4eaaaa5a6b26de58e327c6f488e01eeca0b8dd86adf2ab8e12a"
+      "sig": "39536ec0232069332ee9c618903d9059c37ca83e01d67a8e8c14a3ba96e6e68c4a39972a8781c84b8cec2a71c4bb30e6a5db0c2fecdb08724c42fe5a824462a8"
     },
     {
       "content": "",
@@ -14103,7 +14178,7 @@
       ],
       "content": "signed in another Folder, must not count",
       "id": "6db46bf4fb0153f95553d4580399107d4ea46390527a99c5ba17125f76885948",
-      "sig": "68ad3b9ce47efa9fa2c4a26afe7cf1ba0b0b10d152614cb83b24e8a1203a9327506cdb8b0168321d3326affd255a24706dda9b58d4671fc13a216815073304ed"
+      "sig": "090c398fa7e047d49d08f3a17936f9b4c246d724061f44155b6b9dd247de1eef6e3f24ea5236a89a3887e0b4c766f849397f99f6a2b0a2e7e606c3416b973a26"
     },
     {
       "content": "**Issue list, issue page, history and conversation ported** — same branch (`rew-ship-rewrite`, not pushed), same untouched data layer; `src/fold.ts` unchanged, conformance passes unchanged.\n\n**What works (side by side with the old app on the local relay):**\n- Issue list: All / Open / Assigned to me with counts (0 shown), grouped by status in the vocabulary's order, unknown statuses in their own group, parentless issues in the list. Rows: title, description (two-line clamp), ref, status, assignee, opened by, age, conversation count. Same 28 rows, same order.\n- Issue page: trail (Issues / project / ref; project linked even without a ref), title, description, **Conversations** (every thread mentioning the issue, via `conversationsAbout`; root + one level of replies; `nostr:naddr` references stripped from bodies), **Activity** as a separate section — \"<who> set <field> to <value>\", newest first, a pubkey in the value shown as the person's name, empty as \"(none)\". Rail: status, assignee, project, \"Opened by\", \"Copy reference for Peek\" (working, `nostr:naddr` with relay hint). Same messages, same history lines.\n- Ordering comes from the fold; nothing re-sorts by timestamp. Status and assignee are read off the folded issue.\n- \"That issue is not in this workspace…\" for an address the fold does not have.\n\n**Deliberate differences from the old app:**\n- The rail shows \"Opened by\" only; the old app also listed per-field provenance (\"status set by X · 1d ago\"). The same facts are in Activity.\n- Assignee picker: names only (see REW-3).\n\n**Not done:**\n- Writes (status, assignee, move to project, rename, describe, post, reply, new issue) are disabled with \"Available after sign-in\" — REW-5. Replies must carry the 1111 anchor (REW-10's leftover) when they go live.\n- Verification against production data waits for REW-2.",
@@ -16367,7 +16442,7 @@
       ],
       "content": "tie c",
       "id": "7ce4e5ab12b0124450d8ef7db3d8c054e910f43d8b853c73b3b448142dba4a99",
-      "sig": "1f7f2a62b2cf6fd9b3fc0b3ce3dfb509247b489fea11f279c64e922fb80c15fdc299d7598bc5734192d05a7b82279fd3e1ff8a4d44e0089ac40d03e8a50e6802"
+      "sig": "7ba6f4706cc21b977017c5edba5606204e8f3da1b55f7a2ee4c5b400683f89f1900ccd222580bf2e43985a9123900db7561bc8830372129a0591b3ae9e38788c"
     },
     {
       "content": "https://github.com/estiva-app/estiva-foundation/pull/16\n\nDone-when met, measured against production three times: loadAll 9.2s -> 1.63s, fold compares equal event for event (every address+status, every change and conversation id). protocol 0.4.0.\n\nNot done: unmerged, and Ship still pins ^0.2.0 so nothing user-facing is faster yet.\n\nCaveat worth reading before treating this as headroom — /query is metered at 300/min and one read is 66 requests, so Ship was already over budget serially. Filed as SHA-15.",
@@ -16838,6 +16913,37 @@
           "1788249107181"
         ]
       ]
+    },
+    {
+      "pubkey": "4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa",
+      "created_at": 1700000052,
+      "kind": 1851,
+      "tags": [
+        [
+          "h",
+          "fixture-folder"
+        ],
+        [
+          "a",
+          "30851:4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa:fixture-stage-cleared"
+        ],
+        [
+          "field",
+          "status"
+        ],
+        [
+          "value",
+          "blocked"
+        ],
+        [
+          "stage",
+          "status",
+          "done"
+        ]
+      ],
+      "content": "done, until the next change",
+      "id": "802b3f94d2e936bec90e3099fef1e5f00b909fe1a6f5f61a091bbb8f2db06704",
+      "sig": "9fe9658034bee4879361b00f15b669971794f67cb6ed1dfd41fe7afc83f792d97179d8e10d228ce503ae1412c97c6cadce162da5e486fa1ef001669ed2a539a4"
     },
     {
       "content": "",
@@ -19293,7 +19399,7 @@
       ],
       "content": "a summary counts only where the Folder can be checked",
       "id": "9539688b363d0cc9db3d74e583e55139d5808a866e2783b0e38bc27e5a7d034c",
-      "sig": "738a35622002bcbbeb9a1003e0a67071255e42beb8ad8d08514d8126c8eb3015cf72889c4c61ac6a1d7d939deb276856db23da83a07463b87cb3a7cd3104a0ac"
+      "sig": "ee3bc0a8f1eb44162d3d90ce72c1c1865d204fa25ed201dd7a0cc8f8e9b0f0f49a048f3e46053aa4b391ab94cc743f02371e071bb48e4cbf7a405468e413f865"
     },
     {
       "content": "PEE-8 live-delivery probe at 20:38:19 UTC — posted by the agent straight to the relay, not through Peek. If this appeared without a reload, the socket path works.",
@@ -22181,7 +22287,7 @@
       ],
       "content": "a Join signed in another Folder, must not count",
       "id": "a987377f53df75f1b0ff635bf655540db9f591ef9f1c7e0578d5b898d15b00dd",
-      "sig": "1099978f538d2505095a867cdc44d633b7e1457fb1f0d7629da82aa8b515f8b4f478161fddd1478bc5e686df3f1aa1d4a4646a9432cbb26e1ae3d66bb4239093"
+      "sig": "1f82e01562dc8fc21f7f5e3f61b33856676b0c84e6b42eb2135e3c54381e2501ffbe257ef8eda26eb0ed6f78d195d8782bb34054ad9d1200867a420ec996cb6c"
     },
     {
       "content": "Description",
@@ -24686,6 +24792,37 @@
       ]
     },
     {
+      "pubkey": "4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa",
+      "created_at": 1700000051,
+      "kind": 1851,
+      "tags": [
+        [
+          "h",
+          "fixture-folder"
+        ],
+        [
+          "a",
+          "30851:4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa:fixture-stage-blocked"
+        ],
+        [
+          "field",
+          "status"
+        ],
+        [
+          "value",
+          "blocked"
+        ],
+        [
+          "stage",
+          "status",
+          "started"
+        ]
+      ],
+      "content": "counts as started, shown as blocked",
+      "id": "bbc28e0a7580ace6584804eecf1522ecaffae1e5f0bccaecb4c0c33724ae18fd",
+      "sig": "a3a0a1d3f57de50f6d8a54df3b0393ef40a8fa6b0c41f4dbffb2a1932250f6a0bcc13d21f7419eaa788ce101ef1b40504a6920157305cc361c320b1dc0425318"
+    },
+    {
       "content": "it would also be useful to assign existing issue, not just create new one",
       "created_at": 1787134087,
       "id": "bbf9ec6428d2ce910fb3967e710a315cc541c6bf3e6a1918b8b42c99594e11f7",
@@ -24868,6 +25005,32 @@
       ]
     },
     {
+      "pubkey": "4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa",
+      "created_at": 1700000053,
+      "kind": 1851,
+      "tags": [
+        [
+          "h",
+          "fixture-folder"
+        ],
+        [
+          "a",
+          "30851:4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa:fixture-stage-cleared"
+        ],
+        [
+          "field",
+          "status"
+        ],
+        [
+          "value",
+          "blocked"
+        ]
+      ],
+      "content": "says no stage, so none: not the older change’s done",
+      "id": "be4e28177baa38b0aaa8362b3d906cae4910785715ee6c83311d86d9a762f904",
+      "sig": "82f4eb24d1541f69befe52c4f2137cc510cb3792b904c68607c6eb97c8af5fc8f588d1cd3439b79a7976ce7d697deb1aa152ea878203a7840d6c0d217145bc52"
+    },
+    {
       "content": "**Correcting this issue: its central claim is wrong.** I filed it, and I found out while adding a page to the site.\n\nI wrote that the guardrail `nav.mjs` describes \"is not running and has not been\". **It runs on every build.** It lives in `site/build.mjs` (~line 267), not in the missing `check.mjs`: it resolves each internal link through `BY_FILE`, treats the `INTERNAL` set as a deliberate downgrade, collects anything else into `problems`, and calls `process.exit(1)`.\n\nIt is not theoretical either — **it caught a real bad link in the design guide while I was writing it.** I had linked `/spec/` as a URL; the checker only resolves markdown paths, so it correctly refused the build until I wrote `../protocol/SPEC.md`.\n\n**What is actually true** is narrower and much less interesting: `package.json` declares `\"check\": \"node site/check.mjs\"` and that file does not exist, so `npm run check` fails with `MODULE_NOT_FOUND`. A broken script reference, not a missing safety net.\n\nSo the two resolutions I proposed were both wrong, because both assumed the check needed writing. The real options are:\n\n1. **Delete the `check` script from `package.json`** — the work it names is already done in `build.mjs`, which is the right place for it since it needs the render pass anyway.\n2. **Keep the script and point it at the existing logic**, if a check separate from a build is wanted.\n\nEither is minutes. **Do not write a new `check.mjs`** — it would duplicate a guardrail that already works, and two implementations of one rule is the drift this workspace keeps paying for.\n\nOne thing worth fixing regardless: `nav.mjs`'s comment names `check.mjs` as the enforcer, which is what sent me down this path. The comment should name `build.mjs`.",
       "created_at": 1788121137,
       "id": "be733b205d84628126e42ee6bd7d3fc296a0a5c61d26fb14dd6ba999b28de235",
@@ -24937,7 +25100,7 @@
       ],
       "content": "hostile ts, must not win",
       "id": "be7f4bb2ebbc7b05b0d4895f80b909cb34701255e1396f75ca8c3ee728a78f01",
-      "sig": "24a78a1463c95c393fc07c73aeefeba468959084c7b69820ab7df53e542e9fbc408a494141e70a08588151c3ca0a178fde788ba11bcb187ad192ae378b525df4"
+      "sig": "b21d43011ba470ea4f5034a914291a3a95e16ef32b8776774a24b020cd856194db4c19c1c0b05b582a1e371383190766ece230398f4b93f07271e151d8d55504"
     },
     {
       "content": "Ship got this in ship#72 and it changed how quickly its read-state bugs were found. Peek has the more complicated read path and none of the visibility.\n\n## The evidence, all from one day\n\nFour separate times, Peek's read-state code was correct and something one layer out meant it never ran. None of it was visible to a unit suite, and all of it surfaced only by somebody using the thing and noticing an absence:\n\n| | |\n| --- | --- |\n| `useMergedReadState` was written by CRO-5, given a cache to fill by CRO-6 and a diff by CRO-7, and **mounted by none of them** (peek#97) | the merge never ran; the cache stayed empty; the dual-run had no data |\n| the horizon cache was never written | consequence of the above, invisible |\n| the dual-run comparison was never computed | consequence of the above, invisible |\n| the debug menu holding the readout **has no button on the real app** (peek#105) | it computed all day with nothing able to open it |\n\nEach ticket was green. Each PR was correct. The failure was always in the seam between the code and the thing that runs it.\n\n## What to build\n\n`window.__readState()`, mirroring Ship's, plus the parts Peek has and Ship does not.\n\n```\n__readState()                    the queue, the cache, the diff, and whether the read path has run at all\n__readState.flush()              publish now instead of waiting on the debounce\n__readState.refresh()            re-read and re-merge from the relay\n__readState.marker('<context>')  one context's value, as a date\n```\n\nReport at least:\n\n- **the queue** — `known`, `pending`, `published`, `hydrated`, the retry backoff. `pending` non-empty with a reason is the smell.\n- **`lastAttempt`** with a named outcome, as Ship has: `nothing-pending`, `no-session`, `not-hydrated`, `unchanged`, `published`, `rejected`, `failed`. This is the difference between *\"Peek did not publish\"* and *\"Peek could not publish, and here is the gate\"*.\n- **the merged frontier**, and when it was last fetched.\n- **the horizon cache** — how many contexts Convex holds, and how many of them the relay is missing. That number is the cache earning or not earning its place.\n- **the dual-run diff**, so it can be read without the debug menu at all.\n- **`hasRun`** — whether the read path has executed even once this session.\n\nThat last one is the point. A diagnostic that answers *\"the merge has never run\"* would have caught peek#97 the moment anybody looked, instead of three tickets later.\n\n## Notes\n\n- Ship's version is not gated on a build flag, for the reason that a diagnostic absent from production is one that is never there when it is needed. Same argument applies, and Peek is equally internal.\n- Read-only apart from `flush()` and `refresh()`, both of which do only what the app already does on a timer.\n- Peek's state is spread across `useReadStateSync.ts` (queue), `readStateQueue.ts` (pending) and Convex (cache), so this needs a little assembly rather than one snapshot.\n- Worth checking whether the same shape belongs in `@estiva-app/protocol` once two apps have it, rather than a third copy.\n\n## Done when\n\n`__readState()` answers, on production, why a read marker did or did not reach the relay — without a devtools snippet that re-implements the bridge. Three such snippets were written today and each got the wire format wrong in a different way (bare-array `/query`, the NIP-98 nonce, camelCase `/token`), and every one of those bugs looked like a bug in the app.",
@@ -24993,7 +25156,7 @@
       ],
       "content": "",
       "id": "bf0a733f2d2a39b2b4079b9ba9dc3d832c9fddb9144f55e903be16b9e640c70d",
-      "sig": "9687b2941a8667ddc00b6be9761a99b0c182cd0500ff2e55dcc7b217de35f8b715abf87de4bed2e01c1322db2ee0b8c3970138b0482c22ef13dc6ea100b81ab6"
+      "sig": "da47d1dca810d98f8ddd45e60e7e5488485844b360cd38c72e2f19d4bbfa94fe4c9fe0e4a71a239c16b90ebfd6939955b20b9b2a51bd70568336fe1ed4fc7705"
     },
     {
       "content": "**Deployed 2026-08-28 14:02 UTC. The catch-up is live. Verified by digest, by schema version, and by the client-visible change actually changing.**\n\n    registry :nfb index digest   sha256:67b436a9f9ef…\n    local :nfb after pull        sha256:67b436a9f9ef…\n    container .Image             sha256:67b436a9f9ef…\n    previously running           sha256:e6aed9aae3e0…   (CAT-11 only)\n\nOnly the relay restarted — postgres, redis and minio are still up 2 weeks, so `pull relay` did what it was supposed to and nothing else was recreated.\n\n## Migrations ran, and the schema moved\n\n    _sqlx_migrations   24 -> 34|34\n\n`Database migrations complete` at 14:02:11.022 against a first log line of 14:02:10.719 — **~303 ms for all ten**, against the ~235 ms measured on the production-shaped restore in M4. Close enough that the rehearsal was worth its cost.\n\n**All four boot gates passed on real production data**, in the relay's own words:\n\n    Database migrations complete\n    Community deletion serving fences verified\n    git object-store backend admitted: A3 conformance probe passed\n    Channel roster fence verified          <- 0032's new gate, on 64 live rosters\n\n## Outage: 13.71 s against an estimate of 13–15 s\n\n    container created   14:02:04.110\n    first relay log     14:02:10.719\n    migrations done     14:02:11.022\n    TCP listening       14:02:17.825\n\n    process boot        7.11 s\n    full window        13.71 s\n\nThe corrected estimate from CAT-7 held. **Boot is still dominated by the git object-store probe** — 6.73 s of the 7.11 s — not by migrations, which were 4% of boot. That remains the thing to watch: if MinIO is ever slow, that is where a deploy stalls.\n\n## The client-visible change is live\n\n    max_limit        10000 -> 1000     <- as predicted from the source in CAT-1\n    supported_nips   ... 56, 43        <- NIP-43 is new from the merge\n\nSo the halved historical query ceiling is now in force. **CAT-8 is where that gets exercised against Peek and Ship**; nothing has been checked at the app level yet, and this is the change most likely to show up there.\n\n## Reads and writes\n\nA REQ through the HTTP bridge returned 11 issues, and **this comment is the write test** — a real signed event published through the caught-up relay. If you are reading it, both paths work on the new image.\n\n## Done-when\n\n`cargo build` succeeded, the suite passed 927/0 with a database, every Estiva kind kept its scope arm and `ALL_KINDS` entry, `relay-image.yml` survived, and no reformatting was introduced. The merge is on `nfb-demo-kinds` as `c8a4d521c` and deployed. **Marking done** — with the squash-merge ancestry caveat in the previous comment standing as the one thing the next catch-up must read first.",
@@ -26026,6 +26189,28 @@
           "1788294254983"
         ]
       ]
+    },
+    {
+      "pubkey": "4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa",
+      "created_at": 1700000030,
+      "kind": 30851,
+      "tags": [
+        [
+          "d",
+          "fixture-stage-other-field"
+        ],
+        [
+          "title",
+          "A stage naming another field"
+        ],
+        [
+          "h",
+          "fixture-folder"
+        ]
+      ],
+      "content": "",
+      "id": "c7852ef5311cd043eba4ad970f2652c0d78e1173f10985111486e7bc945340d3",
+      "sig": "c1c5387f3e08c20c52c4451760d6d8b9091f14d87216d2670f9992ca68fd83b922b8879d8003ff6e1fd918b5932472a9b3c79047913df608341a93d871dca3e3"
     },
     {
       "content": "https://github.com/estiva-app/estiva-docs/pull/54\n\nDecided: §14.5's split — marker text for messages, JSON blocks for rich text, one shared inline vocabulary. SPEC gains §13; §13.4 is the alsoRead-shaped compatibility story.\n\nRe-measured on production today: 731 bodies, not 487 — including 26 description edits carried as a kind:1851 `value` tag that §14.2 never counted. 200 of 548 messages carry a backtick span, and none reach past the dialect without one.\n\nCosts are in the PR. Not done until it merges.",
@@ -29975,7 +30160,7 @@
       ],
       "content": "a display key assigned after the fact",
       "id": "e44f5c19f274f78d6a059ccaa6bf7eb2a0962d8277c71792e869076d4f7a359a",
-      "sig": "03bf49ce464da4a9fa902e3f6e02b818c07087c74bcd033bf34f34475690d774576e14852cd81d49911792a3d9b7f4203537c28393bd65d932d4833f227c1c4e"
+      "sig": "e8aa8c2754a82efcfefd4a727ba7581fdb7baa88cf871022e53d7c53967eb22d6ee4a02d48f6a64c599ab9d98f74d7a053aa5f2de92c01b1f8637ce9f96d701d"
     },
     {
       "content": "**SPEC §6.4 now requires this, and neither app does it.**\n\n## The rule\n\nSPEC §6.4 has always said a thread attaches to whatever anyone in it referenced, *at any point*, and that the **whole** thread attaches — not just the message carrying the reference. That rule is correct and reads as surprising, and the amendment of 2026-08-31 says why it is safe: **attachment has two strengths and an app MUST present them separately.**\n\n| | in the data | presented as |\n| --- | --- | --- |\n| **a comment** | uppercase `A` at the thread root — the thread *is* about this object | the object's own discussion |\n| **a mention** | the address referenced inside a message | *Mentioned in*, secondary and collapsed |\n\n## Why it matters more than it looks\n\nShip's `conversationsAbout()` currently merges both into one list. So a twenty-message conversation that name-drops an issue on message twenty-one lands **inside that issue's comments**, indistinguishable from a comment somebody wrote about it.\n\nThat is also what makes the §6.4 rule defensible at all. Message content is immutable, so an accidental mention attaches **permanently** and cannot be withdrawn — acceptable for a secondary section, indefensible for the primary one.\n\n## Three things to get right\n\n1. **A mention may suggest, never write.** An app MAY offer \"add this to the panel\"; it MUST NOT create an association on its own. Mentions arrive retroactively and by accident, and a shared record must not reorganise itself because somebody typed a reference.\n2. **Counts are approximate.** There is no server to compute \"the 5 most recent mentions\", so any number is really \"of what I fetched\". Do not present it as authoritative.\n3. **Unreadable means invisible** — see the privacy rule below.\n\n## The privacy rule, and its cost\n\nIf a mentioning conversation is one the reader cannot access, **they do not see that it exists** — no count, no locked row, no placeholder.\n\nThe consequence has to be accepted deliberately rather than discovered: **two people open the same object and honestly see different numbers, and neither is told.** Do not \"fix\" that later by showing a global count; the inconsistency is the privacy working.\n\n## Done when\n\nBoth apps show two sections, a mention never lands in the comments, a mentioning conversation the reader cannot read is absent rather than redacted, and the count is not presented as authoritative.",
@@ -30383,7 +30568,7 @@
       ],
       "content": "its root names no Folder, so this counts",
       "id": "e790ee8690576eb227da4b6e065c40f7e922b2cc39e2727351e7dce0280962e5",
-      "sig": "8ce612883973ca80b73c7e3450244afbd99ae9b916bc0fe506ead72e6b3beb1d7e9cbe56cb282d3b8102ebabcea4c0fb730868044f7967579b29a50e9ba289cf"
+      "sig": "d354094062f42837632f8401a5697eb7d1c9834b75185be48977783365d9e35980d596300aecbfc291b04dfe0697b89d6150aac9b5b85971c45b9ffc9184f310"
     },
     {
       "content": "probe",
@@ -31383,7 +31568,7 @@
       ],
       "content": "tie b",
       "id": "ee01e3773719374bdd2f7ccb1320172a156268eb4b89217989da3f63c7b1b17a",
-      "sig": "fc1ed70dddee70dab612bac4224768ee357743858450de4b81a5fce29415d642ef1f0b4f2b37f31a5d05b2df71b44a4e8d6009f1a85abf7637966923af793e76"
+      "sig": "75e0482f5bd12d19d7f8d51df8023140620902ff87b3cb5999c58525ae1d1eca9352aa0d583592a804000fe19f1f1cb84bcf1f53664d708894b4aa1aeffbbe78"
     },
     {
       "content": "",
@@ -32527,7 +32712,7 @@
       ],
       "content": "in the Folder its root names by buzz-channel, so this counts",
       "id": "f5b84ddf33c68e0640a816a5cbb626a9f7fa7c650d2376552b244afec6adc3de",
-      "sig": "093b9121a8bb5f2e8d16a88c0a2003d5ed2023b1752875eed02a6d23ba3ed0b074107e4191306319b0905c938b40d4d3e6aedfb888b204e27facb7badd673d60"
+      "sig": "041086db1cc53da5c5f665b989a56719fc18d768c156eca6510993a301b09e37d39bc0eaa61822da8226104bd1b1f1ebd450b5465399f38ce8bdca8b413b5105"
     },
     {
       "content": "Draft https://github.com/estiva-app/peek/pull/118 — built with PEE-5, since the availability check gates whether prefill is offered at all.\n\nThe typing race is answered per FIELD: a suggestion lands in every box untouched, never in one touched. Typing a title keeps it and still gets the description; a whole-form rule loses one or the other. Clearing a box counts as touching it.\n\ncanPrefill treats \"downloadable\" as unavailable, so opening a form never starts a 22GB fetch.",
@@ -32749,7 +32934,7 @@
       ],
       "content": "the older root's Folder, must not count",
       "id": "f6471eded46b76adf0eef122b7a1f746a95aa194d3980daf42e25440524f2159",
-      "sig": "ebdaac8f9cf277fcacda8d01325161bfc2c168320c5d0be64d48e873ebce39d048416a995d7980965fe3e4c85b9a4ee774616868f4b16488926c49032419c03e"
+      "sig": "a42fe737a00632dee5a44d3f0d1be9effc6c3c602e29aa2ed8903386e54cd5c44586e78e2886efb41e397f5f21b891ce862c48b4a4e3422bdbbea69797ee17ea"
     },
     {
       "content": "`Store.archiveProject`, `linkProjectFolder` and `deleteProject` have **no caller anywhere outside src/store.ts**. They are implemented, tested by nothing, and reachable from neither the CLI nor MCP.\n\nArchiving is the one that matters, because it is the agent's *only* cleanup path: Estiva ID refuses kind:5 for claude-agent, so the agent cannot delete, and NIP-09 is author-scoped so nobody else can tidy up after it either. Today a project the agent creates by mistake is permanent and stays in everyone's project list.\n\nThat risk is not theoretical — `ship projects` already hides 5 archived projects, and creates are rate-limited in a way that makes a careless retry produce duplicates the agent cannot remove.\n\nShape: `ship archive-project <ref>` and `--unarchive`, over the existing `archiveProject`. Note the fold's rule — unarchiving writes an empty value rather than deleting the change, because an append-only stream has no undo. Same pairing over MCP.\n\n`deleteProject` should probably stay out of reach: it only removes the project *record*, leaving its issues orphaned and unreachable from any app, and it is author-scoped so it would only ever work on the agent's own projects.\n\nOpen question for `linkProjectFolder`: 3 of 14 production projects are already re-linked, so somebody is doing this somewhere. Worth finding out whether that was the UI or a script before deciding the agent needs the verb.\n\nDone when: the agent can archive and unarchive a project from the CLI and MCP, and an archived one stops appearing in the default `ship projects` listing.",
@@ -33289,7 +33474,7 @@
       ],
       "content": "later by created_at, wins while the window is 1s",
       "id": "fb592d44317d46cb8040831a62cd82ba545c9e2eaf6e4b246e96abf8f2b1eb75",
-      "sig": "0436436b483c403820382f9d66f9625eb94df46153ae90419fbdd5b1b00ba2f0640b3397b15e2d43eb5a5121043702ad28f77da762932422dfe5677a8275d8a3"
+      "sig": "2630865a617fe9b74a00fd89b9b58ca5e6b620fdc49da63ef02a4d33ff60fbbce3d37d0baad672b4d2840c09ff4e610e2245d675ebd6c73744f1319e192de1f2"
     },
     {
       "content": "https://github.com/estiva-app/peek/pull/93\n\nBoth halves of the done-when are checked through `api.unread.summary` — the query the sidebar reads — with a control proving the quiet topic goes unread without the cache. Both directions implemented; every hop takes the max, so the cache↔relay cycle settles rather than loops. Horizon also widened to 90 days.\n\nWatch the units: readState is epoch ms, NIP-RS contexts are seconds. Converted in one place, pinned by a test.\n\nNot proven: these are new Convex functions, and push failures only surface at deploy.",
@@ -33856,6 +34041,7 @@
         "descriptionFormat": "marker",
         "contentFolder": "8eb734fa-6bf7-432a-9264-d85dfc98a797",
         "status": "completed",
+        "stage": "done",
         "archived": true,
         "fields": {
           "status": {
@@ -33883,6 +34069,7 @@
         "contentFolder": "24f5c271-3ed4-47f7-92e4-e9d6cf7f42d1",
         "lead": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
         "status": "in_progress",
+        "stage": "started",
         "archived": false,
         "fields": {
           "description": {
@@ -33916,6 +34103,7 @@
         "contentFolder": "996ab3d4-5565-4335-9e17-2284fda675a0",
         "lead": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
         "status": "completed",
+        "stage": "done",
         "archived": true,
         "fields": {
           "lead": {
@@ -33948,6 +34136,7 @@
         "descriptionFormat": "marker",
         "contentFolder": "806fb4e3-ebc9-4b6a-a18c-0ca59379aa1d",
         "status": "completed",
+        "stage": "done",
         "archived": true,
         "fields": {
           "archived": {
@@ -33974,6 +34163,7 @@
         "descriptionFormat": "marker",
         "contentFolder": "88de5526-366a-4016-83a3-417a1748baa8",
         "status": "planned",
+        "stage": "open",
         "archived": false,
         "fields": {}
       },
@@ -33987,6 +34177,7 @@
         "descriptionFormat": "marker",
         "contentFolder": "fcfe9d61-2d05-4d25-b113-40b2d2e601ee",
         "status": "planned",
+        "stage": "open",
         "archived": true,
         "fields": {
           "description": {
@@ -34014,6 +34205,7 @@
         "contentFolder": "2303e8c1-c866-43b8-9b4c-e263f313a683",
         "lead": "cb77583ed45cac74ce4e46c626c1edada0204a6fc4c91f9c7be230b5af36156c",
         "status": "in_progress",
+        "stage": "started",
         "archived": false,
         "fields": {
           "lead": {
@@ -34047,6 +34239,7 @@
         "contentFolder": "fixture-folder",
         "lead": "4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa",
         "status": "planned",
+        "stage": "open",
         "archived": false,
         "fields": {
           "lead": {
@@ -34071,6 +34264,7 @@
         "projectAddr": "30850:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:254a0dee-b709-4c55-98ca-6871f3da4177",
         "ref": "FIXTURE-9",
         "status": "cancelled",
+        "stage": "dropped",
         "assignee": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
         "fields": {
           "status": {
@@ -34111,6 +34305,7 @@
         "projectAddr": "30850:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:254a0dee-b709-4c55-98ca-6871f3da4177",
         "ref": "RIC-8",
         "status": "in_progress",
+        "stage": "started",
         "fields": {
           "status": {
             "value": "in_progress",
@@ -34132,6 +34327,7 @@
         "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:cf23dbca-64fb-4802-a804-e0119b0d8584",
         "ref": "SHI-15",
         "status": "in_progress",
+        "stage": "started",
         "fields": {
           "status": {
             "value": "in_progress",
@@ -34153,6 +34349,7 @@
         "projectAddr": "30850:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:83902fcc-5bbd-4f1c-87cb-45cefd7ad4c0",
         "ref": "PRO-14",
         "status": "todo",
+        "stage": "open",
         "fields": {}
       },
       {
@@ -34167,6 +34364,7 @@
         "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c",
         "ref": "PEE-16",
         "status": "todo",
+        "stage": "open",
         "fields": {}
       },
       {
@@ -34181,6 +34379,7 @@
         "projectAddr": "30850:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:254a0dee-b709-4c55-98ca-6871f3da4177",
         "ref": "RIC-7",
         "status": "todo",
+        "stage": "open",
         "fields": {}
       },
       {
@@ -34195,6 +34394,7 @@
         "projectAddr": "30850:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:254a0dee-b709-4c55-98ca-6871f3da4177",
         "ref": "RIC-6",
         "status": "done",
+        "stage": "done",
         "fields": {
           "description": {
             "value": "**Unblocked by RIC-1.** This is the project's premise: the block model is proved in a field that exists today, with a second app already reading it, rather than in Leaf. It is also the escape from RFC 0.3's deadlock — Leaf should not start before §6 is answered, and §6 should not freeze before something can test it.\n\n## What Ship does today\n\nEvery body goes through `textContent` in `apps/ship/ui.ts`'s `h()`, deliberately: *\"no template strings holding user data — a project title goes through `textContent`, never `innerHTML`, because on a shared relay the titles are written by other people.\"*\n\n**That position does not change.** [SPEC §13.5](https://github.com/estiva-app/estiva-docs/blob/main/protocol/SPEC.md) makes it explicit that rendering a body as plain text stays conformant; what is forbidden is *interpreting* one as markup. Ship gains structure by rendering a parsed model through the same node construction, not by relaxing anything.\n\n## What must keep working\n\nMeasured 2026-09-02, and none of it moves:\n\n| corpus | bodies | carrying structure |\n| --- | --- | --- |\n| root descriptions (`kind:30850`, `kind:30851`) | 157 | 135 (86%) |\n| description changes (`kind:1851`) | 26 | 21 (81%) |\n\nThe change events are the easy ones to miss: **a description edited after creation lives in the `value` tag of a `kind:1851`, not in anyone's `content`.** RFC 0.4 §14.2 missed them and so did the first RIC-1 probe. §13.4's rule is per event, not per object — a description created as text and later edited into blocks is an untagged root plus a tagged change, and the fold must read the tag from the event it took the value from.\n\n## Moved here from RIC-4: the one safe renderer\n\n**Moved 2026-09-02.** SPEC §13.5's *\"one renderer that is safe by construction\"* was RIC-4's third build item and shipped as neither — Peek got a React renderer of its own, and Ship still has nothing. It belongs here because **Ship is the app that needs it**, and building it in RIC-4 meant designing it against no caller.\n\nOne open question comes with it, and it is why this was not obvious: **Ship renders with vanilla `h()` and Peek with React.** \"One renderer\" therefore cannot mean one component. It has to mean the package emits a node tree — marks and blocks already resolved, nothing to interpolate — and each app maps that to its own DOM. That is what makes §13.5's guarantee structural rather than a convention every app has to remember.\n\nPeek's `MessageBody` is the working reference for the mapping; it should not be the second implementation of the parsing.\n\n## Before starting\n\nThe shared `~/estiva-ship` checkout was **123 commits behind `origin/main`** on 2026-09-02, and the layouts differ: `CLAUDE.md` names `web/src/pages/IssuePage.tsx` while that checkout has `apps/ship/views/issue.ts`. Read `origin/main` from a worktree.\n\n## Done when\n\nThe package emits a renderer-agnostic node tree and Ship maps it through node construction that cannot interpolate markup; an untagged legacy description still renders exactly as it does now; **Peek reading the same description does not regress**; and the check is run against a production description of each kind — a root, and one whose current value came from a `kind:1851` — rather than against a locally created issue.\n\n*Amended on closing, 2026-09-02.* Two changes, both stated rather than quietly absorbed:\n\n- **\"Ship writes a block document with the `content-format` tag\" moved to RIC-8.** Nothing in this ticket wrote one, and holding the write back was deliberate: a published event cannot be unpublished, so the read path should be seen working on production first. It now has been.\n- **\"the same `textContent` node construction it uses today\"** was written when Ship rendered with a vanilla `h()`. Ship's UI is React + Vite and has been since before this ticket started; the guarantee is unchanged — every string reaches the DOM as a React child, no `dangerouslySetInnerHTML`, nothing to interpolate — but the mechanism named was already wrong.\n\n## Delivered\n\n- `@estiva-app/protocol@0.9.0` — `toRenderTree`, one resolved tree for either content model, plus `contentFormatOf` moved down from interop so two folds could read a tag without depending on the projection layer. estiva-foundation#29, #30.\n- `@estiva-app/ui@0.3.0` — `EditableText.displayNode`, because the component moved into the shared library mid-ticket. estiva-ui#4.\n- Ship renders both descriptions: ship#80 (issue), ship#82 (project).\n- The fold carries the format, identically in two repositories: ship#80 and estiva-agent#32, with the conformance fixture's `expected` re-recorded and its `events` and pinned checksum untouched.\n\n## What the verification was worth\n\nThe browser check found what four green suites and three green CI runs did not: after ship#80, the **project** description — the longest real body in the workspace at 6,446 characters — still rendered 49 literal `**` and `#` markers. ship#82 fixed it, and `scripts/ric6-live-check.ts` is kept as the check that catches it next time.\n\n**Peek cannot have regressed**, and it is worth saying why rather than asserting it: nothing Ship publishes changed shape. Every description is still the marker text it was. That stops being true the day RIC-8 lands, which is why a Peek check is in *that* ticket's done-when.",
@@ -34222,6 +34422,7 @@
         "projectAddr": "30850:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:254a0dee-b709-4c55-98ca-6871f3da4177",
         "ref": "RIC-5",
         "status": "done",
+        "stage": "done",
         "fields": {
           "description": {
             "value": "**Unblocked by RIC-1.** [SPEC §13.3](https://github.com/estiva-app/estiva-docs/blob/main/protocol/SPEC.md) specifies a rich text field as a JSON block document. Nothing writes one today — this is the first implementation, and §13.3 was written ahead of it deliberately.\n\n## What a block document is\n\n```jsonc\n{ \"type\": \"doc\", \"content\": [\n  { \"type\": \"paragraph\", \"id\": \"b1\", \"content\": [ … ] }\n] }\n```\n\nBlock types: `paragraph`, `heading` (level 1–3), `bulletList`, `orderedList`, `listItem`, `blockquote`, `codeBlock`, `table`, `horizontalRule`, `attachment`, and `widget` — which names a §7.5 widget and inherits that section's fallback chain.\n\n## The `id` is the whole reason this is JSON\n\n**Every block carries an `id` unique within the document, stable across every edit that does not replace the block.** That is what a comment anchors to, and it is the only thing JSON buys over text. An implementation that generates ids at render time has built a tree and not an addressable one — the anchor ticket then has nothing to bind to.\n\n## What to build\n\n- parse, serialise and **validate** a block document in `@estiva-app/protocol`\n- id generation and preservation across edits\n- write `[\"content-format\", \"estiva-blocks-1\"]` on publish; **honour its absence on read** (§13.4)\n- an unknown block type renders its inline text and is never dropped silently\n\n**Moved here from RIC-4 (2026-09-02):** the **inline JSON node parser and serialiser** — §13.1's right column, `{\"type\":\"bold\"}` and friends. RIC-4 shipped the marker-text serialisation and stopped there deliberately: its own words for this item were *\"for the block model to consume\"*, and until this ticket exists there is no consumer to design it against. It is a small symmetrical addition to `content.ts`, and it is needed here on day one, because a block's inline content is exactly these nodes.\n\nSo this ticket owns the block layer **and the inline layer's second serialisation**. What stays shared with messages is the *vocabulary* — the same six marks, the same meanings — not the encoding.\n\n## Done when\n\nThe package round-trips §13.1's inline JSON nodes against the marker text of the same content, so the two serialisations provably carry the same marks; the package can round-trip a block document; ids survive an edit that does not replace the block; a document containing an unknown block type still yields its text; **the absence of a `content-format` tag is treated as marker text on read**; and **a legacy description that begins with `{` is still read as marker text** — §13.4 forbids deciding by sniffing, and that is the case which proves it.\n\n*Amended on closing, 2026-09-02.* The original clause also said the tag is **written on publish**, which nothing in this ticket's scope can do — the package has no publisher, and RIC-6 is the first writer of a block document. That half was already stated verbatim in RIC-6's done-when, so it is dropped here rather than duplicated into a clause this ticket could never satisfy.\n\n## Delivered\n\n- `@estiva-app/protocol@0.7.0` — `blocks.ts` and the inline layer's JSON serialisation. estiva-foundation#27.\n- The read half of §13.4 is met by `contentFormatOf` in `@estiva-app/interop` (#26, another session, landed mid-ticket), not by this package. `behaviour.test.ts:1502` is the no-sniff control; the protocol side adds the matching case — a `{`-leading legacy body parses as marker text and `parseBlockDocument` refuses it.\n- 227 tests, with controls: dropping `code` from the JSON encoding fails 4, re-minting ids unconditionally fails 2.\n\n**Note for RIC-6: 0.7.0 is merged but not yet published.** The registry serves 0.6.0 until somebody pushes the `protocol@0.7.0` tag.",
@@ -34249,6 +34450,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:8ef94f49-a095-4e61-9185-e506fd9b4fc1",
         "ref": "SHA-20",
         "status": "done",
+        "stage": "done",
         "fields": {
           "status": {
             "value": "done",
@@ -34270,6 +34472,7 @@
         "projectAddr": "30850:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:254a0dee-b709-4c55-98ca-6871f3da4177",
         "ref": "RIC-4",
         "status": "done",
+        "stage": "done",
         "fields": {
           "status": {
             "value": "done",
@@ -34303,6 +34506,7 @@
         "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:cf23dbca-64fb-4802-a804-e0119b0d8584",
         "ref": "SHI-14",
         "status": "done",
+        "stage": "done",
         "fields": {
           "status": {
             "value": "done",
@@ -34324,6 +34528,7 @@
         "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c",
         "ref": "PEE-15",
         "status": "todo",
+        "stage": "open",
         "fields": {}
       },
       {
@@ -34338,6 +34543,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:8ef94f49-a095-4e61-9185-e506fd9b4fc1",
         "ref": "SHA-19",
         "status": "todo",
+        "stage": "open",
         "fields": {}
       },
       {
@@ -34352,6 +34558,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:8ef94f49-a095-4e61-9185-e506fd9b4fc1",
         "ref": "SHA-18",
         "status": "todo",
+        "stage": "open",
         "fields": {}
       },
       {
@@ -34366,6 +34573,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:62ad18f8-22bc-4a1f-a37a-f9a275d48d14",
         "ref": "CRO-14",
         "status": "done",
+        "stage": "done",
         "fields": {
           "status": {
             "value": "done",
@@ -34387,6 +34595,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:2c5fbeff-4014-4bea-a69c-3bfc10354d6f",
         "ref": "OTH-4",
         "status": "done",
+        "stage": "done",
         "fields": {
           "status": {
             "value": "done",
@@ -34408,6 +34617,7 @@
         "projectAddr": "30850:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:ef024737-6b8f-4e79-ab16-f56fbf7898f2",
         "ref": "CON-8",
         "status": "todo",
+        "stage": "open",
         "fields": {}
       },
       {
@@ -34422,6 +34632,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:8ef94f49-a095-4e61-9185-e506fd9b4fc1",
         "ref": "SHA-17",
         "status": "in_progress",
+        "stage": "started",
         "fields": {
           "status": {
             "value": "in_progress",
@@ -34443,6 +34654,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:8ef94f49-a095-4e61-9185-e506fd9b4fc1",
         "ref": "SHA-16",
         "status": "done",
+        "stage": "done",
         "fields": {
           "status": {
             "value": "done",
@@ -34464,6 +34676,7 @@
         "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:cf23dbca-64fb-4802-a804-e0119b0d8584",
         "ref": "SHI-13",
         "status": "done",
+        "stage": "done",
         "fields": {
           "status": {
             "value": "done",
@@ -34485,6 +34698,7 @@
         "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:cf23dbca-64fb-4802-a804-e0119b0d8584",
         "ref": "SHI-12",
         "status": "in_progress",
+        "stage": "started",
         "fields": {
           "status": {
             "value": "in_progress",
@@ -34506,6 +34720,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:8ef94f49-a095-4e61-9185-e506fd9b4fc1",
         "ref": "SHA-15",
         "status": "done",
+        "stage": "done",
         "fields": {
           "status": {
             "value": "done",
@@ -34527,6 +34742,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:8ef94f49-a095-4e61-9185-e506fd9b4fc1",
         "ref": "SHA-14",
         "status": "done",
+        "stage": "done",
         "fields": {
           "status": {
             "value": "done",
@@ -34548,6 +34764,7 @@
         "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:cf23dbca-64fb-4802-a804-e0119b0d8584",
         "ref": "SHI-11",
         "status": "done",
+        "stage": "done",
         "fields": {
           "status": {
             "value": "done",
@@ -34569,6 +34786,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:62ad18f8-22bc-4a1f-a37a-f9a275d48d14",
         "ref": "CRO-13",
         "status": "done",
+        "stage": "done",
         "fields": {
           "status": {
             "value": "done",
@@ -34590,6 +34808,7 @@
         "projectAddr": "30850:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:83902fcc-5bbd-4f1c-87cb-45cefd7ad4c0",
         "ref": "PRO-13",
         "status": "done",
+        "stage": "done",
         "fields": {
           "status": {
             "value": "done",
@@ -34611,6 +34830,7 @@
         "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c",
         "ref": "PEE-14",
         "status": "done",
+        "stage": "done",
         "fields": {
           "status": {
             "value": "done",
@@ -34632,6 +34852,7 @@
         "projectAddr": "30850:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:a39cafac-2b41-407b-860c-9761ded55a49",
         "ref": "PEE-6",
         "status": "done",
+        "stage": "done",
         "fields": {
           "status": {
             "value": "done",
@@ -34653,6 +34874,7 @@
         "projectAddr": "30850:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:a39cafac-2b41-407b-860c-9761ded55a49",
         "ref": "PEE-5",
         "status": "in_progress",
+        "stage": "started",
         "fields": {
           "status": {
             "value": "in_progress",
@@ -34674,6 +34896,7 @@
         "projectAddr": "30850:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:a39cafac-2b41-407b-860c-9761ded55a49",
         "ref": "PEE-4",
         "status": "in_progress",
+        "stage": "started",
         "fields": {
           "status": {
             "value": "in_progress",
@@ -34695,6 +34918,7 @@
         "projectAddr": "30850:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:a39cafac-2b41-407b-860c-9761ded55a49",
         "ref": "PEE-3",
         "status": "in_progress",
+        "stage": "started",
         "fields": {
           "status": {
             "value": "in_progress",
@@ -34716,6 +34940,7 @@
         "projectAddr": "30850:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:a39cafac-2b41-407b-860c-9761ded55a49",
         "ref": "PEE-2",
         "status": "in_progress",
+        "stage": "started",
         "fields": {
           "status": {
             "value": "in_progress",
@@ -34737,6 +34962,7 @@
         "projectAddr": "30850:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:a39cafac-2b41-407b-860c-9761ded55a49",
         "ref": "PEE-1",
         "status": "done",
+        "stage": "done",
         "fields": {
           "status": {
             "value": "done",
@@ -34758,6 +34984,7 @@
         "projectAddr": "30850:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:83902fcc-5bbd-4f1c-87cb-45cefd7ad4c0",
         "ref": "PRO-12",
         "status": "done",
+        "stage": "done",
         "fields": {
           "status": {
             "value": "done",
@@ -34779,6 +35006,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:8ef94f49-a095-4e61-9185-e506fd9b4fc1",
         "ref": "SHA-13",
         "status": "todo",
+        "stage": "open",
         "fields": {
           "description": {
             "value": "**A reading session and a decision, like SHA-10 — and a cheaper one.**\n\n[RFC 0.5](https://github.com/estiva-app/estiva-docs/blob/main/protocol/RFC-0.5-ASSOCIATION.md) specifies how files in different apps relate. It exists because RFC 0.4 lets a Folder hold several files of one kind, so **the container can no longer be the relationship** — a project's conversation used to *be* a topic because they shared one channel.\n\n## What accepting settles\n\n- **Three tiers** — none, basic (one file names another, shown in a panel, shared not personal), facet (files are perspectives on one thing and their conversations merge).\n- **Facets merge, and never copy.** One comment, two views, ordered by time, origin unlabelled.\n- **Declaration is one-sided, effect two-sided** — forced, because a `kind:39000` topic is relay-signed and Peek can never tag it.\n- **The access-compatibility invariant** — a facet may not merge conversations that are not equally readable.\n- **The two change cases**: removing a facet splits the thread *list* and never a thread; deleting an object never deletes its comments.\n\n## Why it is cheaper than 0.4's acceptance\n\n**No new kind and no Buzz change.** A facet is a tag on a file record, signed by that file's author — so authorization falls out of who holds the key rather than needing a permission model. The expensive relay-maintained version stays available for when the trigger fires.\n\n## What it does not settle\n\nDeliberately deferred with triggers in §8: who may create a facet beyond \"you can sign the file\", relay enforcement of the invariant (a read rule does it today), and whether a merged view labels which facet a comment was written against.\n\n## The one thing worth arguing about\n\n**§4, the invariant.** It is the only clause that forbids something people will want — faceting a private discussion onto a public object. The argument for it is that the failure is not disclosure (the relay still gates content) but **context collapse for the one person who can see both sides**, who then answers privately in what looks like a public place. If that argument does not hold, the invariant should go rather than be quietly ignored.\n\n## Done when\n\nAccepted or amended, and if amended, what changed and why is on this issue. Association and facet tickets get filed only after that — per rule 2, nothing is filed against the undecided parts.\n\n---\n\n## §7 Addressing was added 2026-08-31, and it is part of this decision\n\nRFC 0.5 gained a section on **what a link looks like**, because the question\nturned out to be protocol rather than per-app taste: *people copy the address\nbar*, so the URL an app puts there has to be resolvable by a different app. That\nis wire-visible under SPEC §10's test — two apps can disagree and a user sees it.\n\n**The grammar:**\n\n```\nhttps://<app>.estiva.app/<type>s                  a directory of that kind\nhttps://<app>.estiva.app/<type>/<slug>-<d>        one object\n```\n\n- the **`d` is the whole identity, untruncated** — a consumer resolves\n  `{kinds:[<type>], \"#d\":[\"<uuid>\"]}`, one query, no index and no service that\n  can go down and take every link with it\n- the **kind comes from the path segment**, so `/project/` means 30850\n- the **slug is decorative** — renaming changes it and the link still resolves\n\n**Two findings behind it, both measured rather than assumed.**\n\n*An naddr cannot be the suffix.* It is bech32 over `(kind, pubkey, d, relay\nhints)` **plus a checksum over the whole string**, so a slice of it is checksum\nbytes rather than the `d` and resolves to nothing without an index. It is also\nnot stable for one object — relay hints are part of the encoding, and both forms\nare live today: Ship's `referenceFor` passes a hint, the runtime's `buildObject`\npasses none.\n\n*The pubkey does not need to be in the URL.* `d` is a v4 uuid (0.4 §4.3), so\n`(kind, d)` is unique. Measured on production: 235 records across 30850/30851/\n39000, **zero** non-uuid `d`, **zero** `(kind, d)` shared by more than one\nauthor. This gives §4.3's existing MUST a second and quieter reason — an app\nusing a readable `d` would not fail loudly, it would collide and resolve to the\nwrong object.\n\n**A consumer resolves an app it has never met** by matching a pasted URL against\nthe patterns every app publishes in its manifest (`urls`, alongside `web`).\n`kind:31990` is global, so this needs no per-app integration and no registry.\n\n## What §7 additionally requires\n\n- **Paths, not hashes.** Ship uses hash routing because it is static files with\n  `try_files … =404`. Path URLs need an index.html fallback per app.\n- **Peek has no object URLs at all** — no routing, no per-topic path. That is\n  the prerequisite, and it is filed separately because it does not depend on\n  this decision.\n- **Messages still have no URL.** A `kind:9` has no `d`, so it has no place in\n  the grammar — the same gap §13.6 records for projections, and PRO-11's.",
@@ -34800,6 +35028,7 @@
         "projectAddr": "30850:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:ef024737-6b8f-4e79-ab16-f56fbf7898f2",
         "ref": "CON-7",
         "status": "todo",
+        "stage": "open",
         "fields": {}
       },
       {
@@ -34814,6 +35043,7 @@
         "projectAddr": "30850:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:83902fcc-5bbd-4f1c-87cb-45cefd7ad4c0",
         "ref": "PRO-11",
         "status": "done",
+        "stage": "done",
         "fields": {
           "description": {
             "value": "**A message cannot be declared in a manifest, and that is measured rather than inferred.**\n\nConfirmed on production while building PRO-6: *\"A Message carries no `d` and is not addressable.\"* Every resolver in the consumer runtime starts from an `AddressPointer`.\n\n## The gap\n\n| object | identified by |\n| --- | --- |\n| project, issue, document, folder | address — `naddr` |\n| Peek topic | address — `naddr` (the relay's `39000`) |\n| **a conversation** | **the root event's id — `nevent`** |\n| **a message** | **its own event id — `nevent`** |\n\n`projections` is keyed by kind and resolved from an `naddr`; Ship's manifest declares its `web` template as `naddr` outright. So a manifest cannot say how a message renders, and a consumer holding a `nevent` has nothing to look up.\n\n**Why it stayed hidden:** every Ship object is addressable, so the layer works in the one direction it has ever run. It only appears when you ask what a *message* widget would resolve through.\n\n## This is one of six, and the other five are on PRO-6\n\nPRO-6's comment records six things the manifest could not express, all measured against production. **Read them before starting here** — they are siblings of this one, not background:\n\n- `list` matched the parent's *address* while Peek's `h` holds a bare uuid\n- `title` is required and a message has none\n- **`records` was required by both resolvers**, so an app that folds nothing rendered as *nothing* — §13.3's worst outcome, never caught because Ship was the only publisher and Ship folds\n- a `changeKind: -1` sentinel passed 53 tests and was refused by production, because a kind is a `u16`\n- a Topic carries no `h` — it is not *in* a container, it *is* one\n\nThe third is the most severe and the least specific to messages: **any app that does not fold got an empty render.** Worth deciding whether it belongs here or against the runtime extraction in PRO-1.\n\n## What to change\n\n- a projection may be declared for an event-identified object, not only an addressable one\n- the consumer resolves `nevent` alongside `naddr`\n- the `web` template learns a second form, so \"open this in the app that owns it\" works for a message\n\n**A message is not replaceable and has no folded state**, so most of what `records` describes does not apply to it. A projection for an event-identified object is a thinner thing, and the manifest should say so rather than leaving a consumer to infer which halves are meaningful.\n\n**Not declaring actions was the right call in PRO-6** and stays true until this lands: a reply names an *event id*, and the action vocabulary only names a parent *address*, so declaring one would tell a consumer to publish a malformed reply.\n\n## Done when\n\nThe consumer resolves `nevent`, Peek's manifest declares a Message projection, a second app renders a real production message through it, and its `web` link opens that message in Peek. **RFC 0.4 §13.6 records the gap** — update it to record the resolution.",
@@ -34841,6 +35071,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:8ef94f49-a095-4e61-9185-e506fd9b4fc1",
         "ref": "SHA-12",
         "status": "todo",
+        "stage": "open",
         "fields": {}
       },
       {
@@ -34855,6 +35086,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:62ad18f8-22bc-4a1f-a37a-f9a275d48d14",
         "ref": "CRO-12",
         "status": "done",
+        "stage": "done",
         "fields": {
           "status": {
             "value": "done",
@@ -34876,6 +35108,7 @@
         "projectAddr": "30850:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:ef024737-6b8f-4e79-ab16-f56fbf7898f2",
         "ref": "CON-6",
         "status": "todo",
+        "stage": "open",
         "fields": {}
       },
       {
@@ -34890,6 +35123,7 @@
         "projectAddr": "30850:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:ef024737-6b8f-4e79-ab16-f56fbf7898f2",
         "ref": "CON-5",
         "status": "todo",
+        "stage": "open",
         "fields": {}
       },
       {
@@ -34904,6 +35138,7 @@
         "projectAddr": "30850:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:ef024737-6b8f-4e79-ab16-f56fbf7898f2",
         "ref": "CON-4",
         "status": "todo",
+        "stage": "open",
         "fields": {}
       },
       {
@@ -34918,6 +35153,7 @@
         "projectAddr": "30850:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:254a0dee-b709-4c55-98ca-6871f3da4177",
         "ref": "RIC-3",
         "status": "todo",
+        "stage": "open",
         "fields": {}
       },
       {
@@ -34932,6 +35168,7 @@
         "projectAddr": "30850:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:83902fcc-5bbd-4f1c-87cb-45cefd7ad4c0",
         "ref": "PRO-10",
         "status": "in_progress",
+        "stage": "started",
         "fields": {
           "status": {
             "value": "in_progress",
@@ -34953,6 +35190,7 @@
         "projectAddr": "30850:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:83902fcc-5bbd-4f1c-87cb-45cefd7ad4c0",
         "ref": "PRO-9",
         "status": "in_progress",
+        "stage": "started",
         "fields": {
           "status": {
             "value": "in_progress",
@@ -34974,6 +35212,7 @@
         "projectAddr": "30850:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:f3652427-fcf5-4777-86a2-1dd4ee1f3808",
         "ref": "AGE-16",
         "status": "done",
+        "stage": "done",
         "fields": {
           "status": {
             "value": "done",
@@ -34995,6 +35234,7 @@
         "projectAddr": "30850:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:f3652427-fcf5-4777-86a2-1dd4ee1f3808",
         "ref": "AGE-15",
         "status": "done",
+        "stage": "done",
         "fields": {
           "status": {
             "value": "done",
@@ -35016,6 +35256,7 @@
         "projectAddr": "30850:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:f3652427-fcf5-4777-86a2-1dd4ee1f3808",
         "ref": "AGE-14",
         "status": "done",
+        "stage": "done",
         "fields": {
           "status": {
             "value": "done",
@@ -35037,6 +35278,7 @@
         "projectAddr": "30850:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:f3652427-fcf5-4777-86a2-1dd4ee1f3808",
         "ref": "AGE-13",
         "status": "done",
+        "stage": "done",
         "fields": {
           "status": {
             "value": "done",
@@ -35058,6 +35300,7 @@
         "projectAddr": "30850:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:f3652427-fcf5-4777-86a2-1dd4ee1f3808",
         "ref": "AGE-12",
         "status": "done",
+        "stage": "done",
         "fields": {
           "status": {
             "value": "done",
@@ -35079,6 +35322,7 @@
         "projectAddr": "30850:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:f3652427-fcf5-4777-86a2-1dd4ee1f3808",
         "ref": "AGE-11",
         "status": "done",
+        "stage": "done",
         "fields": {
           "status": {
             "value": "done",
@@ -35100,6 +35344,7 @@
         "projectAddr": "30850:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:f3652427-fcf5-4777-86a2-1dd4ee1f3808",
         "ref": "AGE-10",
         "status": "done",
+        "stage": "done",
         "fields": {
           "status": {
             "value": "done",
@@ -35121,6 +35366,7 @@
         "projectAddr": "30850:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:f3652427-fcf5-4777-86a2-1dd4ee1f3808",
         "ref": "AGE-9",
         "status": "done",
+        "stage": "done",
         "fields": {
           "status": {
             "value": "done",
@@ -35142,6 +35388,7 @@
         "projectAddr": "30850:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:f3652427-fcf5-4777-86a2-1dd4ee1f3808",
         "ref": "AGE-8",
         "status": "done",
+        "stage": "done",
         "fields": {
           "status": {
             "value": "done",
@@ -35163,6 +35410,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:2c5fbeff-4014-4bea-a69c-3bfc10354d6f",
         "ref": "OTH-3",
         "status": "done",
+        "stage": "done",
         "fields": {
           "status": {
             "value": "done",
@@ -35184,6 +35432,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:8ef94f49-a095-4e61-9185-e506fd9b4fc1",
         "ref": "SHA-11",
         "status": "done",
+        "stage": "done",
         "fields": {
           "title": {
             "value": "[MS2] ADR 0002: record what makes an in-app implementation extractable",
@@ -35211,6 +35460,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:8ef94f49-a095-4e61-9185-e506fd9b4fc1",
         "ref": "SHA-10",
         "status": "done",
+        "stage": "done",
         "fields": {
           "status": {
             "value": "done",
@@ -35232,6 +35482,7 @@
         "projectAddr": "30850:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:ef024737-6b8f-4e79-ab16-f56fbf7898f2",
         "ref": "CON-3",
         "status": "todo",
+        "stage": "open",
         "fields": {
           "title": {
             "value": "[MS2] Hide the delete control from a non-author instead of offering one that fails",
@@ -35253,6 +35504,7 @@
         "projectAddr": "30850:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:ef024737-6b8f-4e79-ab16-f56fbf7898f2",
         "ref": "CON-2",
         "status": "todo",
+        "stage": "open",
         "fields": {
           "title": {
             "value": "[MS2] Ship gets reactions",
@@ -35274,6 +35526,7 @@
         "projectAddr": "30850:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:ef024737-6b8f-4e79-ab16-f56fbf7898f2",
         "ref": "CON-1",
         "status": "todo",
+        "stage": "open",
         "fields": {
           "title": {
             "value": "[MS2] Decide the reaction horizon, and say it where a reader can see it",
@@ -35295,6 +35548,7 @@
         "projectAddr": "30850:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:254a0dee-b709-4c55-98ca-6871f3da4177",
         "ref": "RIC-2",
         "status": "todo",
+        "stage": "open",
         "fields": {
           "title": {
             "value": "[MS2] Mentions become resolvable: NIP-27 references inline, not display names",
@@ -35316,6 +35570,7 @@
         "projectAddr": "30850:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:254a0dee-b709-4c55-98ca-6871f3da4177",
         "ref": "RIC-1",
         "status": "done",
+        "stage": "done",
         "fields": {
           "title": {
             "value": "[MS2] Decide the content format, knowing 487 published events cannot move",
@@ -35343,6 +35598,7 @@
         "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:cf23dbca-64fb-4802-a804-e0119b0d8584",
         "ref": "SHI-10",
         "status": "done",
+        "stage": "done",
         "fields": {
           "status": {
             "value": "done",
@@ -35364,6 +35620,7 @@
         "projectAddr": "30850:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:83902fcc-5bbd-4f1c-87cb-45cefd7ad4c0",
         "ref": "PRO-8",
         "status": "done",
+        "stage": "done",
         "fields": {
           "title": {
             "value": "[MS2] truncate must not be applied to a structured field",
@@ -35391,6 +35648,7 @@
         "projectAddr": "30850:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:83902fcc-5bbd-4f1c-87cb-45cefd7ad4c0",
         "ref": "PRO-7",
         "status": "done",
+        "stage": "done",
         "fields": {
           "title": {
             "value": "[MS2] Ship renders a Peek object — the second consumer that stops this coming out Peek-shaped",
@@ -35424,6 +35682,7 @@
         "projectAddr": "30850:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:83902fcc-5bbd-4f1c-87cb-45cefd7ad4c0",
         "ref": "PRO-6",
         "status": "done",
+        "stage": "done",
         "fields": {
           "title": {
             "value": "[MS2] Peek publishes a manifest for Topic",
@@ -35457,6 +35716,7 @@
         "projectAddr": "30850:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:83902fcc-5bbd-4f1c-87cb-45cefd7ad4c0",
         "ref": "PRO-5",
         "status": "done",
+        "stage": "done",
         "fields": {
           "title": {
             "value": "[MS2] Two machine-facing fields on an action, added now because retrofitting one is a migration",
@@ -35484,6 +35744,7 @@
         "projectAddr": "30850:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:83902fcc-5bbd-4f1c-87cb-45cefd7ad4c0",
         "ref": "PRO-4",
         "status": "done",
+        "stage": "done",
         "fields": {
           "title": {
             "value": "[MS2] Render object-creating actions as forms — the declared schema nobody draws",
@@ -35511,6 +35772,7 @@
         "projectAddr": "30850:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:83902fcc-5bbd-4f1c-87cb-45cefd7ad4c0",
         "ref": "PRO-3",
         "status": "done",
+        "stage": "done",
         "fields": {
           "title": {
             "value": "[MS2] Widget vocabulary: open, with a fallback chain that terminates in a closed type",
@@ -35538,6 +35800,7 @@
         "projectAddr": "30850:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:83902fcc-5bbd-4f1c-87cb-45cefd7ad4c0",
         "ref": "PRO-2",
         "status": "done",
+        "stage": "done",
         "fields": {
           "title": {
             "value": "[MS2] Add the image, list and body slots, so the flagship layout stops being bespoke code",
@@ -35565,6 +35828,7 @@
         "projectAddr": "30850:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:83902fcc-5bbd-4f1c-87cb-45cefd7ad4c0",
         "ref": "PRO-1",
         "status": "done",
+        "stage": "done",
         "fields": {
           "title": {
             "value": "[MS2] Extract the manifest consumer runtime, with the seam designed in from the first line",
@@ -35592,6 +35856,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:8ef94f49-a095-4e61-9185-e506fd9b4fc1",
         "ref": "SHA-9",
         "status": "done",
+        "stage": "done",
         "fields": {
           "description": {
             "value": "# Goal\nFurther strengthen the RFC 0.3 and include it in the roadmap based on research of 4 topics for whole ecosystem. One of the goal is as following: Imagine that your fresh builder of new SAAS application that doesn't exist in the ecosystem. You e.g. want to build software for hiring, but you want to be plugged in into the rest of Estiva apps. All the foundational packages should make it super easy to plug in. Currently we have those foundational packages that makes it easier for new saas builder\n* identity package to authenticate users\n* protocol to access buzz/nostr backend\n* ui so you can reuse our design building blocks\n\nI'm thinking extend those or add more based on 4 following topics:\n\n1: How to make sure that conversation across all apps works consistently\n* Message are read / unread (we have project for that)\n* Reactions are everywhere\n* You can edit / delete\n* Huddle: how you can start a huddle either you and your AI or with just specific person to brainstorm about that thing regardless in which app you current are\n\nResearch question: Should we somehow include or create new package that focus on unifing the conversation experience across apps?\n\n2: How to make sure the rich text fields like project description are consistent across all apps\n* having blocked editing ala notion\n* being able to embed widget from other apps like project or issue widget similarly you can paste in peek\n\nResearch question: SHould this again be somehow standalone or extended current package so the new saas builder can easily use this?\n\n3: Widget library\n* Basic idea objects (files) has properties and the widget library has list of different templates/layouts that all the apps can use to display that object in their app. Example you have Ship project. The library describe bunch of different templates. Ship in the manifest says that for project you can have \"inline template\" - just project name, \"card template\" - project name, description, assignee, status, \"card with list\" - similar as previous + list of issues (e.g. such we use in Peek now). Then the 3rd app like Peek see a reference of object from Peek and reads the manifest and see what tempaltes are available. Peek decide what template will use and then apply the design tokens from UI foundational library to render it\n* In other words to display file/object with properties and actions from other app, the app needs: 1. manifest from the other app 2. the widget template library 3: the ui library. If SAAS builder use those foundational libraries they can build thing like HR tool easily, because let's say there is new object like \"Candidate profile\". The HR tool defines in the manifest and says what templates should others apps use to show the candidate profile and then e.g. Peek can renders it, even though it has no clue how the HR tool works.\n\n4: Available actions\nKind a same thing as #3 but for actions/intelligence + AI to know what can be done from other apps in their apps. E.g using the HR tool example. HR tool can say that on Candidate object you can \"vote up or down\" to send the candidate to next round or not. Then AI, or simply some kind of command feature can list that this action is available.\n\nThe action has some payloads and can e.g. ask use in the 3rd app to provide that payload or automatically based on context give it. Create new issue in SHip will show the form or it can create new issue based on AI automatically filling those form fields based on Peek conversation.\nTBD",
@@ -35619,6 +35884,7 @@
         "projectAddr": "30850:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:f3652427-fcf5-4777-86a2-1dd4ee1f3808",
         "ref": "AGE-7",
         "status": "done",
+        "stage": "done",
         "fields": {
           "status": {
             "value": "done",
@@ -35640,6 +35906,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:8ef94f49-a095-4e61-9185-e506fd9b4fc1",
         "ref": "SHA-8",
         "status": "done",
+        "stage": "done",
         "fields": {
           "status": {
             "value": "done",
@@ -35661,6 +35928,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:732b746e-2d6a-4509-892d-d214c2acc4e2",
         "ref": "REW-12",
         "status": "done",
+        "stage": "done",
         "assignee": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
         "fields": {
           "status": {
@@ -35689,6 +35957,7 @@
         "projectAddr": "30850:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:f3652427-fcf5-4777-86a2-1dd4ee1f3808",
         "ref": "AGE-6",
         "status": "done",
+        "stage": "done",
         "fields": {
           "status": {
             "value": "done",
@@ -35710,6 +35979,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:8ef94f49-a095-4e61-9185-e506fd9b4fc1",
         "ref": "SHA-7",
         "status": "todo",
+        "stage": "open",
         "fields": {
           "title": {
             "value": "[MS2] Give the live relay socket a second consumer, and extract the plumbing it needs",
@@ -35731,6 +36001,7 @@
         "projectAddr": "30850:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:f3652427-fcf5-4777-86a2-1dd4ee1f3808",
         "ref": "AGE-5",
         "status": "cancelled",
+        "stage": "dropped",
         "fields": {
           "status": {
             "value": "cancelled",
@@ -35752,6 +36023,7 @@
         "projectAddr": "30850:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:f3652427-fcf5-4777-86a2-1dd4ee1f3808",
         "ref": "AGE-4",
         "status": "cancelled",
+        "stage": "dropped",
         "assignee": "",
         "fields": {
           "status": {
@@ -35786,6 +36058,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:5b2701f3-da02-47f1-9ff5-14bdfb1dd822",
         "ref": "CAT-11",
         "status": "done",
+        "stage": "done",
         "fields": {
           "status": {
             "value": "done",
@@ -35807,6 +36080,7 @@
         "projectAddr": "30850:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:f3652427-fcf5-4777-86a2-1dd4ee1f3808",
         "ref": "AGE-3",
         "status": "todo",
+        "stage": "open",
         "fields": {}
       },
       {
@@ -35821,6 +36095,7 @@
         "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c",
         "ref": "PEE-13",
         "status": "done",
+        "stage": "done",
         "assignee": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
         "fields": {
           "status": {
@@ -35849,6 +36124,7 @@
         "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:cf23dbca-64fb-4802-a804-e0119b0d8584",
         "ref": "SHI-9",
         "status": "done",
+        "stage": "done",
         "fields": {
           "status": {
             "value": "done",
@@ -35870,6 +36146,7 @@
         "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:cf23dbca-64fb-4802-a804-e0119b0d8584",
         "ref": "SHI-8",
         "status": "done",
+        "stage": "done",
         "fields": {
           "status": {
             "value": "done",
@@ -35891,6 +36168,7 @@
         "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c",
         "ref": "PEE-12",
         "status": "done",
+        "stage": "done",
         "assignee": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
         "fields": {
           "assignee": {
@@ -35919,6 +36197,7 @@
         "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c",
         "ref": "PEE-10",
         "status": "done",
+        "stage": "done",
         "fields": {
           "status": {
             "value": "done",
@@ -35940,6 +36219,7 @@
         "projectAddr": "30850:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:f3652427-fcf5-4777-86a2-1dd4ee1f3808",
         "ref": "AGE-2",
         "status": "done",
+        "stage": "done",
         "fields": {
           "status": {
             "value": "done",
@@ -35961,6 +36241,7 @@
         "projectAddr": "30850:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:f3652427-fcf5-4777-86a2-1dd4ee1f3808",
         "ref": "AGE-1",
         "status": "done",
+        "stage": "done",
         "fields": {
           "status": {
             "value": "done",
@@ -35982,6 +36263,7 @@
         "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c",
         "ref": "PEE-9",
         "status": "done",
+        "stage": "done",
         "fields": {
           "status": {
             "value": "done",
@@ -36003,6 +36285,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:5b2701f3-da02-47f1-9ff5-14bdfb1dd822",
         "ref": "CAT-10",
         "status": "done",
+        "stage": "done",
         "assignee": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
         "fields": {
           "assignee": {
@@ -36031,6 +36314,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:5b2701f3-da02-47f1-9ff5-14bdfb1dd822",
         "ref": "CAT-9",
         "status": "done",
+        "stage": "done",
         "assignee": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
         "fields": {
           "status": {
@@ -36059,6 +36343,7 @@
         "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:cf23dbca-64fb-4802-a804-e0119b0d8584",
         "ref": "SHI-7",
         "status": "done",
+        "stage": "done",
         "fields": {
           "status": {
             "value": "done",
@@ -36080,6 +36365,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:5b2701f3-da02-47f1-9ff5-14bdfb1dd822",
         "ref": "CAT-8",
         "status": "done",
+        "stage": "done",
         "assignee": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
         "fields": {
           "assignee": {
@@ -36108,6 +36394,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:5b2701f3-da02-47f1-9ff5-14bdfb1dd822",
         "ref": "CAT-7",
         "status": "done",
+        "stage": "done",
         "assignee": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
         "fields": {
           "assignee": {
@@ -36136,6 +36423,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:5b2701f3-da02-47f1-9ff5-14bdfb1dd822",
         "ref": "CAT-6",
         "status": "done",
+        "stage": "done",
         "assignee": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
         "fields": {
           "assignee": {
@@ -36164,6 +36452,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:5b2701f3-da02-47f1-9ff5-14bdfb1dd822",
         "ref": "CAT-5",
         "status": "done",
+        "stage": "done",
         "assignee": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
         "fields": {
           "assignee": {
@@ -36192,6 +36481,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:5b2701f3-da02-47f1-9ff5-14bdfb1dd822",
         "ref": "CAT-4",
         "status": "done",
+        "stage": "done",
         "assignee": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
         "fields": {
           "assignee": {
@@ -36220,6 +36510,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:5b2701f3-da02-47f1-9ff5-14bdfb1dd822",
         "ref": "CAT-3",
         "status": "done",
+        "stage": "done",
         "assignee": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
         "fields": {
           "assignee": {
@@ -36248,6 +36539,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:5b2701f3-da02-47f1-9ff5-14bdfb1dd822",
         "ref": "CAT-2",
         "status": "done",
+        "stage": "done",
         "assignee": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
         "fields": {
           "assignee": {
@@ -36276,6 +36568,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:5b2701f3-da02-47f1-9ff5-14bdfb1dd822",
         "ref": "CAT-1",
         "status": "done",
+        "stage": "done",
         "assignee": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
         "fields": {
           "assignee": {
@@ -36304,6 +36597,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:732b746e-2d6a-4509-892d-d214c2acc4e2",
         "ref": "REW-11",
         "status": "done",
+        "stage": "done",
         "assignee": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
         "fields": {
           "status": {
@@ -36332,6 +36626,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:732b746e-2d6a-4509-892d-d214c2acc4e2",
         "ref": "REW-10",
         "status": "done",
+        "stage": "done",
         "assignee": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
         "fields": {
           "assignee": {
@@ -36360,6 +36655,7 @@
         "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:cf23dbca-64fb-4802-a804-e0119b0d8584",
         "ref": "SHI-6",
         "status": "done",
+        "stage": "done",
         "fields": {
           "status": {
             "value": "done",
@@ -36381,6 +36677,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:732b746e-2d6a-4509-892d-d214c2acc4e2",
         "ref": "REW-9",
         "status": "done",
+        "stage": "done",
         "assignee": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
         "fields": {
           "assignee": {
@@ -36409,6 +36706,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:732b746e-2d6a-4509-892d-d214c2acc4e2",
         "ref": "REW-8",
         "status": "done",
+        "stage": "done",
         "assignee": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
         "fields": {
           "assignee": {
@@ -36437,6 +36735,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:732b746e-2d6a-4509-892d-d214c2acc4e2",
         "ref": "REW-7",
         "status": "done",
+        "stage": "done",
         "assignee": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
         "fields": {
           "assignee": {
@@ -36465,6 +36764,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:732b746e-2d6a-4509-892d-d214c2acc4e2",
         "ref": "REW-6",
         "status": "done",
+        "stage": "done",
         "assignee": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
         "fields": {
           "assignee": {
@@ -36493,6 +36793,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:732b746e-2d6a-4509-892d-d214c2acc4e2",
         "ref": "REW-5",
         "status": "done",
+        "stage": "done",
         "assignee": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
         "fields": {
           "assignee": {
@@ -36521,6 +36822,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:732b746e-2d6a-4509-892d-d214c2acc4e2",
         "ref": "REW-4",
         "status": "done",
+        "stage": "done",
         "assignee": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
         "fields": {
           "assignee": {
@@ -36549,6 +36851,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:732b746e-2d6a-4509-892d-d214c2acc4e2",
         "ref": "REW-3",
         "status": "done",
+        "stage": "done",
         "assignee": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
         "fields": {
           "assignee": {
@@ -36577,6 +36880,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:732b746e-2d6a-4509-892d-d214c2acc4e2",
         "ref": "REW-2",
         "status": "done",
+        "stage": "done",
         "assignee": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
         "fields": {
           "assignee": {
@@ -36605,6 +36909,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:732b746e-2d6a-4509-892d-d214c2acc4e2",
         "ref": "REW-1",
         "status": "done",
+        "stage": "done",
         "assignee": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
         "fields": {
           "assignee": {
@@ -36633,6 +36938,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:8ef94f49-a095-4e61-9185-e506fd9b4fc1",
         "ref": "SHA-6",
         "status": "todo",
+        "stage": "open",
         "assignee": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
         "fields": {
           "assignee": {
@@ -36661,6 +36967,7 @@
         "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:cf23dbca-64fb-4802-a804-e0119b0d8584",
         "ref": "SHI-5",
         "status": "done",
+        "stage": "done",
         "fields": {
           "status": {
             "value": "done",
@@ -36682,6 +36989,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:8ef94f49-a095-4e61-9185-e506fd9b4fc1",
         "ref": "SHA-5",
         "status": "done",
+        "stage": "done",
         "assignee": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
         "fields": {
           "assignee": {
@@ -36710,6 +37018,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:8ef94f49-a095-4e61-9185-e506fd9b4fc1",
         "ref": "SHA-4",
         "status": "in_progress",
+        "stage": "started",
         "assignee": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
         "fields": {
           "assignee": {
@@ -36744,6 +37053,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:8ef94f49-a095-4e61-9185-e506fd9b4fc1",
         "ref": "SHA-3",
         "status": "done",
+        "stage": "done",
         "assignee": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
         "fields": {
           "assignee": {
@@ -36772,6 +37082,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:8ef94f49-a095-4e61-9185-e506fd9b4fc1",
         "ref": "SHA-2",
         "status": "todo",
+        "stage": "open",
         "assignee": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
         "fields": {
           "assignee": {
@@ -36800,6 +37111,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:8ef94f49-a095-4e61-9185-e506fd9b4fc1",
         "ref": "SHA-1",
         "status": "done",
+        "stage": "done",
         "assignee": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
         "fields": {
           "assignee": {
@@ -36828,6 +37140,7 @@
         "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c",
         "ref": "PEE-8",
         "status": "done",
+        "stage": "done",
         "assignee": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
         "fields": {
           "status": {
@@ -36856,6 +37169,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:62ad18f8-22bc-4a1f-a37a-f9a275d48d14",
         "ref": "CRO-11",
         "status": "done",
+        "stage": "done",
         "assignee": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
         "fields": {
           "assignee": {
@@ -36884,6 +37198,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:62ad18f8-22bc-4a1f-a37a-f9a275d48d14",
         "ref": "CRO-10",
         "status": "todo",
+        "stage": "open",
         "assignee": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
         "fields": {
           "assignee": {
@@ -36912,6 +37227,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:7fc3c6f6-dc20-4e81-9894-a8123da53336",
         "ref": "DMS-11",
         "status": "todo",
+        "stage": "open",
         "assignee": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
         "fields": {
           "assignee": {
@@ -36934,6 +37250,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:7fc3c6f6-dc20-4e81-9894-a8123da53336",
         "ref": "DMS-10",
         "status": "todo",
+        "stage": "open",
         "assignee": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
         "fields": {
           "assignee": {
@@ -36962,6 +37279,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:7fc3c6f6-dc20-4e81-9894-a8123da53336",
         "ref": "DMS-9",
         "status": "todo",
+        "stage": "open",
         "assignee": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
         "fields": {
           "assignee": {
@@ -36990,6 +37308,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:7fc3c6f6-dc20-4e81-9894-a8123da53336",
         "ref": "DMS-8",
         "status": "todo",
+        "stage": "open",
         "assignee": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
         "fields": {
           "assignee": {
@@ -37012,6 +37331,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:7fc3c6f6-dc20-4e81-9894-a8123da53336",
         "ref": "DMS-7",
         "status": "todo",
+        "stage": "open",
         "assignee": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
         "fields": {
           "assignee": {
@@ -37034,6 +37354,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:7fc3c6f6-dc20-4e81-9894-a8123da53336",
         "ref": "DMS-6",
         "status": "todo",
+        "stage": "open",
         "assignee": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
         "fields": {
           "assignee": {
@@ -37056,6 +37377,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:7fc3c6f6-dc20-4e81-9894-a8123da53336",
         "ref": "DMS-5",
         "status": "todo",
+        "stage": "open",
         "assignee": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
         "fields": {
           "assignee": {
@@ -37078,6 +37400,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:7fc3c6f6-dc20-4e81-9894-a8123da53336",
         "ref": "DMS-4",
         "status": "todo",
+        "stage": "open",
         "assignee": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
         "fields": {
           "assignee": {
@@ -37100,6 +37423,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:7fc3c6f6-dc20-4e81-9894-a8123da53336",
         "ref": "DMS-3",
         "status": "todo",
+        "stage": "open",
         "assignee": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
         "fields": {
           "assignee": {
@@ -37122,6 +37446,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:7fc3c6f6-dc20-4e81-9894-a8123da53336",
         "ref": "DMS-2",
         "status": "todo",
+        "stage": "open",
         "assignee": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
         "fields": {
           "assignee": {
@@ -37144,6 +37469,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:7fc3c6f6-dc20-4e81-9894-a8123da53336",
         "ref": "DMS-1",
         "status": "done",
+        "stage": "done",
         "assignee": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
         "fields": {
           "assignee": {
@@ -37172,6 +37498,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:62ad18f8-22bc-4a1f-a37a-f9a275d48d14",
         "ref": "CRO-9",
         "status": "done",
+        "stage": "done",
         "assignee": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
         "fields": {
           "assignee": {
@@ -37206,6 +37533,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:62ad18f8-22bc-4a1f-a37a-f9a275d48d14",
         "ref": "CRO-8",
         "status": "done",
+        "stage": "done",
         "assignee": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
         "fields": {
           "assignee": {
@@ -37240,6 +37568,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:62ad18f8-22bc-4a1f-a37a-f9a275d48d14",
         "ref": "CRO-7",
         "status": "done",
+        "stage": "done",
         "assignee": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
         "fields": {
           "assignee": {
@@ -37274,6 +37603,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:62ad18f8-22bc-4a1f-a37a-f9a275d48d14",
         "ref": "CRO-6",
         "status": "done",
+        "stage": "done",
         "assignee": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
         "fields": {
           "assignee": {
@@ -37308,6 +37638,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:62ad18f8-22bc-4a1f-a37a-f9a275d48d14",
         "ref": "CRO-5",
         "status": "done",
+        "stage": "done",
         "assignee": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
         "fields": {
           "assignee": {
@@ -37342,6 +37673,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:62ad18f8-22bc-4a1f-a37a-f9a275d48d14",
         "ref": "CRO-4",
         "status": "done",
+        "stage": "done",
         "assignee": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
         "fields": {
           "assignee": {
@@ -37376,6 +37708,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:62ad18f8-22bc-4a1f-a37a-f9a275d48d14",
         "ref": "CRO-3",
         "status": "done",
+        "stage": "done",
         "assignee": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
         "fields": {
           "assignee": {
@@ -37404,6 +37737,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:62ad18f8-22bc-4a1f-a37a-f9a275d48d14",
         "ref": "CRO-2",
         "status": "done",
+        "stage": "done",
         "assignee": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
         "fields": {
           "assignee": {
@@ -37432,6 +37766,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:62ad18f8-22bc-4a1f-a37a-f9a275d48d14",
         "ref": "CRO-1",
         "status": "done",
+        "stage": "done",
         "assignee": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
         "fields": {
           "assignee": {
@@ -37460,6 +37795,7 @@
         "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:cf23dbca-64fb-4802-a804-e0119b0d8584",
         "ref": "SHI-4",
         "status": "todo",
+        "stage": "open",
         "fields": {}
       },
       {
@@ -37474,6 +37810,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:df13e841-891c-48db-a1a2-24f9c16b411e",
         "ref": "PEE-11",
         "status": "done",
+        "stage": "done",
         "assignee": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
         "fields": {
           "assignee": {
@@ -37502,6 +37839,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:df13e841-891c-48db-a1a2-24f9c16b411e",
         "ref": "PEE-10",
         "status": "done",
+        "stage": "done",
         "assignee": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
         "fields": {
           "assignee": {
@@ -37530,6 +37868,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:df13e841-891c-48db-a1a2-24f9c16b411e",
         "ref": "PEE-9",
         "status": "done",
+        "stage": "done",
         "assignee": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
         "fields": {
           "assignee": {
@@ -37558,6 +37897,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:df13e841-891c-48db-a1a2-24f9c16b411e",
         "ref": "PEE-8",
         "status": "done",
+        "stage": "done",
         "assignee": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
         "fields": {
           "assignee": {
@@ -37586,6 +37926,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:df13e841-891c-48db-a1a2-24f9c16b411e",
         "ref": "PEE-7",
         "status": "done",
+        "stage": "done",
         "assignee": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
         "fields": {
           "assignee": {
@@ -37614,6 +37955,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:df13e841-891c-48db-a1a2-24f9c16b411e",
         "ref": "PEE-6",
         "status": "done",
+        "stage": "done",
         "assignee": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
         "fields": {
           "assignee": {
@@ -37642,6 +37984,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:df13e841-891c-48db-a1a2-24f9c16b411e",
         "ref": "PEE-5",
         "status": "done",
+        "stage": "done",
         "assignee": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
         "fields": {
           "assignee": {
@@ -37670,6 +38013,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:df13e841-891c-48db-a1a2-24f9c16b411e",
         "ref": "PEE-4",
         "status": "done",
+        "stage": "done",
         "assignee": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
         "fields": {
           "assignee": {
@@ -37698,6 +38042,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:df13e841-891c-48db-a1a2-24f9c16b411e",
         "ref": "PEE-3",
         "status": "done",
+        "stage": "done",
         "assignee": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
         "fields": {
           "assignee": {
@@ -37726,6 +38071,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:df13e841-891c-48db-a1a2-24f9c16b411e",
         "ref": "PEE-2",
         "status": "done",
+        "stage": "done",
         "assignee": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
         "fields": {
           "assignee": {
@@ -37754,6 +38100,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:df13e841-891c-48db-a1a2-24f9c16b411e",
         "ref": "PEE-1",
         "status": "done",
+        "stage": "done",
         "assignee": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
         "fields": {
           "assignee": {
@@ -37782,6 +38129,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:2c5fbeff-4014-4bea-a69c-3bfc10354d6f",
         "ref": "OTH-2",
         "status": "cancelled",
+        "stage": "dropped",
         "assignee": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
         "fields": {
           "status": {
@@ -37810,6 +38158,7 @@
         "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c",
         "ref": "PEE-7",
         "status": "todo",
+        "stage": "open",
         "assignee": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
         "fields": {
           "assignee": {
@@ -37832,6 +38181,7 @@
         "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c",
         "ref": "PEE-6",
         "status": "done",
+        "stage": "done",
         "assignee": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
         "fields": {
           "status": {
@@ -37860,6 +38210,7 @@
         "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c",
         "ref": "PEE-5",
         "status": "done",
+        "stage": "done",
         "assignee": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
         "fields": {
           "status": {
@@ -37888,6 +38239,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:2c5fbeff-4014-4bea-a69c-3bfc10354d6f",
         "ref": "OTH-1",
         "status": "done",
+        "stage": "done",
         "assignee": "f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1",
         "fields": {
           "assignee": {
@@ -37916,6 +38268,7 @@
         "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:cf23dbca-64fb-4802-a804-e0119b0d8584",
         "ref": "SHI-3",
         "status": "done",
+        "stage": "done",
         "fields": {
           "title": {
             "value": "It's not possible to delete projects (from Projects page) and issues",
@@ -37943,6 +38296,7 @@
         "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c",
         "ref": "PEE-4",
         "status": "done",
+        "stage": "done",
         "assignee": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
         "fields": {
           "status": {
@@ -37971,6 +38325,7 @@
         "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c",
         "ref": "PEE-3",
         "status": "done",
+        "stage": "done",
         "assignee": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
         "fields": {
           "title": {
@@ -38005,6 +38360,7 @@
         "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:cf23dbca-64fb-4802-a804-e0119b0d8584",
         "ref": "SHI-2",
         "status": "todo",
+        "stage": "open",
         "fields": {}
       },
       {
@@ -38019,6 +38375,7 @@
         "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:cf23dbca-64fb-4802-a804-e0119b0d8584",
         "ref": "SHI-1",
         "status": "todo",
+        "stage": "open",
         "fields": {}
       },
       {
@@ -38033,6 +38390,7 @@
         "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c",
         "ref": "PEE-2",
         "status": "done",
+        "stage": "done",
         "assignee": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
         "fields": {
           "status": {
@@ -38061,6 +38419,7 @@
         "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c",
         "ref": "PEE-1",
         "status": "done",
+        "stage": "done",
         "assignee": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
         "fields": {
           "description": {
@@ -38095,6 +38454,7 @@
         "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c",
         "ref": "FEE-3",
         "status": "done",
+        "stage": "done",
         "assignee": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
         "fields": {
           "description": {
@@ -38129,6 +38489,7 @@
         "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c",
         "ref": "FEE-2",
         "status": "done",
+        "stage": "done",
         "assignee": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
         "fields": {
           "title": {
@@ -38169,6 +38530,7 @@
         "projectAddr": "30850:f3a38fa646debd4162125e0aed87b6d2393fb1ed9702b6875dcbc0c6529d64d1:360327a9-18c5-40e5-9747-9166dc284ddc",
         "ref": "EST-1",
         "status": "cancelled",
+        "stage": "dropped",
         "fields": {
           "status": {
             "value": "cancelled",
@@ -38190,6 +38552,7 @@
         "projectAddr": "30850:a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697:2a5b8f13-0364-4a84-bdd4-fc0a6ddc259c",
         "ref": "FEE-1",
         "status": "done",
+        "stage": "done",
         "assignee": "a8a7d739dda599143ec2e88a1c3b2d69808cd2a50001179c786f51d00dc3c697",
         "fields": {
           "assignee": {
@@ -38222,12 +38585,34 @@
         "descriptionFormat": "marker",
         "folder": "fixture-folder-moved",
         "status": "in_progress",
+        "stage": "started",
         "fields": {
           "status": {
             "value": "in_progress",
             "by": "4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa",
             "at": 1700000035,
             "format": "marker"
+          }
+        }
+      },
+      {
+        "addr": "30851:4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa:fixture-stage-blocked",
+        "id": "fixture-stage-blocked",
+        "author": "4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa",
+        "createdAt": 1700000030,
+        "title": "A status no listing names",
+        "description": "",
+        "descriptionFormat": "marker",
+        "folder": "fixture-folder",
+        "status": "blocked",
+        "stage": "started",
+        "fields": {
+          "status": {
+            "value": "blocked",
+            "by": "4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa",
+            "at": 1700000051,
+            "format": "marker",
+            "stage": "started"
           }
         }
       },
@@ -38241,11 +38626,51 @@
         "descriptionFormat": "marker",
         "folder": "",
         "status": "done",
+        "stage": "done",
         "fields": {
           "status": {
             "value": "done",
             "by": "4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa",
             "at": 1700000045,
+            "format": "marker"
+          }
+        }
+      },
+      {
+        "addr": "30851:4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa:fixture-stage-cleared",
+        "id": "fixture-stage-cleared",
+        "author": "4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa",
+        "createdAt": 1700000030,
+        "title": "A stage a later change does not repeat",
+        "description": "",
+        "descriptionFormat": "marker",
+        "folder": "fixture-folder",
+        "status": "blocked",
+        "fields": {
+          "status": {
+            "value": "blocked",
+            "by": "4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa",
+            "at": 1700000053,
+            "format": "marker"
+          }
+        }
+      },
+      {
+        "addr": "30851:4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa:fixture-stage-other-field",
+        "id": "fixture-stage-other-field",
+        "author": "4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa",
+        "createdAt": 1700000030,
+        "title": "A stage naming another field",
+        "description": "",
+        "descriptionFormat": "marker",
+        "folder": "fixture-folder",
+        "status": "todo",
+        "stage": "open",
+        "fields": {
+          "status": {
+            "value": "todo",
+            "by": "4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa",
+            "at": 1700000054,
             "format": "marker"
           }
         }
@@ -38385,6 +38810,52 @@
         "value": "4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa",
         "format": "marker",
         "note": "in the Folder its root names by buzz-channel, so this counts",
+        "folder": "fixture-folder"
+      },
+      {
+        "id": "bbc28e0a7580ace6584804eecf1522ecaffae1e5f0bccaecb4c0c33724ae18fd",
+        "author": "4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa",
+        "createdAt": 1700000051,
+        "target": "30851:4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa:fixture-stage-blocked",
+        "field": "status",
+        "value": "blocked",
+        "format": "marker",
+        "stage": "started",
+        "note": "counts as started, shown as blocked",
+        "folder": "fixture-folder"
+      },
+      {
+        "id": "802b3f94d2e936bec90e3099fef1e5f00b909fe1a6f5f61a091bbb8f2db06704",
+        "author": "4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa",
+        "createdAt": 1700000052,
+        "target": "30851:4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa:fixture-stage-cleared",
+        "field": "status",
+        "value": "blocked",
+        "format": "marker",
+        "stage": "done",
+        "note": "done, until the next change",
+        "folder": "fixture-folder"
+      },
+      {
+        "id": "be4e28177baa38b0aaa8362b3d906cae4910785715ee6c83311d86d9a762f904",
+        "author": "4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa",
+        "createdAt": 1700000053,
+        "target": "30851:4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa:fixture-stage-cleared",
+        "field": "status",
+        "value": "blocked",
+        "format": "marker",
+        "note": "says no stage, so none: not the older change’s done",
+        "folder": "fixture-folder"
+      },
+      {
+        "id": "037129cb7feff204a35bd6b7c6d7ccc75e36c60d66007bfe326bd0991069b9f8",
+        "author": "4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa",
+        "createdAt": 1700000054,
+        "target": "30851:4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa:fixture-stage-other-field",
+        "field": "status",
+        "value": "todo",
+        "format": "marker",
+        "note": "a stage for the title counts for nothing: todo stays open",
         "folder": "fixture-folder"
       },
       {

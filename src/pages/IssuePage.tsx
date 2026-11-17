@@ -4,7 +4,7 @@ import { useNewSince } from '@/lib/useNewSince'
 import { useCallback, useMemo, useState } from 'react'
 import { ArchiveDialog, ArchivedNotice } from '@estiva-app/ui'
 import { ARCHIVE_WORDS, archivedLine, archivedNoticeOf, lockedReason, ownArchive, type Archives } from '@/lib/archive'
-import { ISSUE_STATUSES, addMentioned, archiveIssue, commentsOn, deleteIssue, deleteMessage, editMessage, reply, setIssueField, startConversation, type DirectoryView, type FolderState, type WorkspaceState, threadContext, fileContext, useMergedReadState, useFeedJudges, unreadByThread } from '@/api'
+import { ISSUE_STATUSES, unlistedFirst, addMentioned, archiveIssue, commentsOn, deleteIssue, deleteMessage, editMessage, reply, setIssueField, startConversation, type DirectoryView, type FolderState, type WorkspaceState, threadContext, fileContext, useMergedReadState, useFeedJudges, unreadByThread } from '@/api'
 import { me, useMentionsElsewhere } from '@/api'
 import { MEMBER_FIELD_PREFIX, memberOfField } from '@estiva-app/conversation'
 import { useRelated, withoutTopics } from '@/api/useRelated'
@@ -285,7 +285,7 @@ export function IssuePage({ state, directory, archives, d, say, refresh }: { sta
         fields={{
           status: issue.status,
           // Each with its colour, so the picker draws the status's shape (ONE-6, step 4b).
-          statuses: ISSUE_STATUSES.map(({ value, label, colour }) => ({ value, label, colour })),
+          statuses: unlistedFirst(issue.status, ISSUE_STATUSES),
           onStatusChange: (value) => void set('status', value, `Status → ${value}`),
           assignee: issue.assignee ?? '',
           people,

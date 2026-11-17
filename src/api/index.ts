@@ -21,7 +21,7 @@ export { foldWorkspace } from '../nostr/store'
 export { useMentionsElsewhere } from './mentionsElsewhere'
 export type { Directory, Profile } from '../nostr/profiles'
 export { initials } from '../nostr/profiles'
-export { ISSUE_STATUSES, PROJECT_STATUSES, lookupStatus, progressOf, projectStatus, type VocabEntry } from '../nostr/kinds'
+export { ISSUE_STATUSES, PROJECT_STATUSES, issueStage, lookupStatus, progressOf, projectStatus, unlistedFirst, type VocabEntry } from '../nostr/kinds'
 export { conversationsAbout, eventOf } from '../nostr/fold'
 export { keyProblem, projectKeys, suggestKey, takenKeys } from '../nostr/keys'
 /*

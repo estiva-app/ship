@@ -54,13 +54,16 @@ const LIVE = D('01')
 const OLD = D('02')
 const MINE = D('03')
 
+/** What each of Ship's issue statuses means, as the fold puts it beside the status (EAC-3). */
+const STAGE: Record<string, 'open' | 'started' | 'done' | 'dropped'> = { todo: 'open', in_progress: 'started', done: 'done', cancelled: 'dropped' }
+
 // `archived` and the field it is folded from, together, as the fold writes them (FOL-46 reads the field).
 const project = (d: string, title: string, archived = false) => ({
-  addr: `30850:x:${d}`, id: d, author: OTHER, createdAt: 1, title, description: '', descriptionFormat: 'marker' as const, contentFolder: 'f', status: 'planned', archived,
+  addr: `30850:x:${d}`, id: d, author: OTHER, createdAt: 1, title, description: '', descriptionFormat: 'marker' as const, contentFolder: 'f', status: 'planned', stage: 'open' as const, archived,
   fields: (archived ? { archived: { value: 'true', by: OTHER, at: 1, format: 'marker' as const } } : {}) as WorkspaceState['projects'][number]['fields'],
 })
 const issue = (d: string, projectAddr: string | undefined, status: string) => ({
-  addr: `30851:x:${d}`, id: d, author: OTHER, createdAt: 1, title: `issue ${d.slice(-2)}`, description: '', descriptionFormat: 'marker' as const, folder: 'f', projectAddr, status, fields: {},
+  addr: `30851:x:${d}`, id: d, author: OTHER, createdAt: 1, title: `issue ${d.slice(-2)}`, description: '', descriptionFormat: 'marker' as const, folder: 'f', projectAddr, status, stage: STAGE[status], fields: {},
 })
 
 const STATE: WorkspaceState = {
@@ -127,7 +130,7 @@ describe('sidebarProps — the old app\'s counting rules', () => {
     expect(props.openIssues).toBe(2)
     // Every project here is Planned, so none is on Active, the tab the entry opens (SHIPS-7).
     expect(props.activeProjects).toBe(0)
-    const started = { ...STATE, projects: STATE.projects.map((p) => ({ ...p, status: 'in_progress' })) }
+    const started = { ...STATE, projects: STATE.projects.map((p) => ({ ...p, status: 'in_progress', stage: 'started' as const })) }
     // Old is archived; Live and Mine are in progress.
     expect(sidebarProps(started, { name: 'issues' }).activeProjects).toBe(2)
     expect(props.current).toEqual({ entry: 'issues' })
@@ -613,6 +616,21 @@ describe('Issue page — one issue from the fold', () => {
     expect(await screen.findByText(/Status → cancelled rejected — relay said no/)).toBeInTheDocument()
     expect(refresh).toHaveBeenCalledTimes(1)
     expect(main.getByRole('combobox', { name: 'Status' })).toHaveTextContent('In Progress')
+  })
+
+  it('a status Ship does not list is the picker’s current value, by its id and not pickable, above the four (EAC-3)', async () => {
+    const blocked = { ...STATE, issues: STATE.issues.map((i) => (i.id === D('14') ? { ...i, status: 'blocked', stage: 'started' as const } : i)) }
+    vi.mocked(useWorkspace).mockReturnValue({ state: blocked, partial: false, error: null, clock: null, loading: false, busy: false, refresh, wantThreads: () => {}, live: false })
+    goTo(`/issue/${D('14')}`)
+    render(<App />)
+    const main = within(screen.getByRole('main'))
+    expect(main.getByRole('combobox', { name: 'Status' })).toHaveTextContent('blocked')
+    fireEvent.click(main.getByRole('combobox', { name: 'Status' }))
+    const options = await screen.findAllByRole('option')
+    // The current one carries the kit's tick after its name.
+    expect(options.map((option) => option.textContent)).toEqual([expect.stringMatching(/^blocked/), 'Todo', 'In Progress', 'Done', 'Cancelled'])
+    expect(options[0]).toHaveAttribute('aria-disabled', 'true')
+    expect(options[1]).not.toHaveAttribute('aria-disabled', 'true')
   })
 
   it('asks before deleting an issue, says the conversations survive, and requests the deletion', async () => {

@@ -108,6 +108,7 @@ describe('the projects page', () => {
     descriptionFormat: 'marker',
     contentFolder: 'f',
     status: 'planned',
+    stage: 'open',
     fields: {},
   })
   const page = (projects: ReturnType<typeof project>[]) => {

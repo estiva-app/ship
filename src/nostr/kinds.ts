@@ -7,6 +7,7 @@
  * to be registered there first. See the two commits on Buzz's `nfb-demo-kinds`
  * branch.
  */
+import { progressOfStages, statusStageOf, type Stage } from '@estiva-app/interop'
 
 export const KIND = {
   /**
@@ -144,7 +145,7 @@ export const KIND = {
  * specify that would be designing another app's UI, which is the objection
  * RFC 0.4 §13.1 uses to rule out iframes.
  */
-export type Stage = 'open' | 'started' | 'done' | 'dropped'
+export type { Stage }
 
 /** A status value, what it means, and how to render it. */
 export interface VocabEntry {
@@ -240,7 +241,33 @@ export function projectStatus(value: string): VocabEntry {
  * Done of all, as Ship counts progress everywhere: by what each status means, so a company that renames Done still
  * counts it, and with the dropped ones out of both numbers, so a finished project reads full (Miky, 3 Nov, SHIPS-7).
  */
-export function progressOf(statuses: readonly string[], status: (value: string) => VocabEntry): { done: number; total: number } {
-  const stages = statuses.map((value) => status(value).stage)
-  return { done: stages.filter((stage) => stage === 'done').length, total: stages.filter((stage) => stage !== 'dropped').length }
+export function progressOf(items: readonly { stage?: Stage }[]): { done: number; total: number } {
+  return progressOfStages(items.map((item) => item.stage))
+}
+
+/**
+ * What an issue's status means, as every app counts it (EAC-3): the stage on the
+ * change that set it, then the stage TYPES.md gives the id, then the words —
+ * interop's one rule, so Ship, the agent, Peek and Leaf count alike. Ship's own
+ * table only labels and colours (until WOR-2, the issue's Engineering).
+ * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-companys-statuses-are-its-own-layer-of-a-types-properties.md
+ */
+export function issueStage(value: string, written?: Stage): Stage | undefined {
+  return statusStageOf(KIND.ISSUE, value, written)
+}
+
+/**
+ * A status picker's options: the statuses on offer, with the current value
+ * first, greyed and by its id, when it is not one of them (Miky, 30 Oct, EAC-3).
+ * It cannot be picked; picking another replaces it. Neutral, the grey a status
+ * with no colour gets (Katerina, 30 Oct), as the kit's card pickers draw it.
+ */
+export function unlistedFirst(current: string, vocab: readonly VocabEntry[]): { value: string; label: string; colour: VocabEntry['colour']; disabled?: true }[] {
+  const offered = vocab.map(({ value, label, colour }) => ({ value, label, colour }))
+  return vocab.some((entry) => entry.value === current) ? offered : [{ value: current, label: current, colour: 'neutral', disabled: true }, ...offered]
+}
+
+/** A project's, the same way, an older writer's word read first as the one it meant. */
+export function projectStage(value: string, written?: Stage): Stage | undefined {
+  return statusStageOf(KIND.PROJECT, PROJECT_STATUS_ALIASES[value] ?? value, written)
 }

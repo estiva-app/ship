@@ -136,13 +136,40 @@ const tagged = [
   change(base + 35, [['h', 'fixture-folder-moved']], TAGGED, 'status', 'in_progress', "the newest root's Folder, so this counts"),
 ]
 
+/**
+ * What a status means travels on its change (SPEC §6.2's `["stage", "status", …]`,
+ * EAC-3): no change on production carries one yet. Three issues: a status no
+ * listing names, counted by its stage; the same with a later change that says
+ * none, which leaves none; and a stage naming another field, which counts for
+ * nothing, so the id's own stage stands.
+ */
+const staged = (d: string, title: string) => {
+  const address = `${KIND.ISSUE}:${pubkey}:${d}`
+  const root = sign(base + 30, KIND.ISSUE, [['d', d], ['title', title], ['h', ELSEWHERE]], '')
+  const set = (createdAt: number, value: string, stage: string[][], note: string) =>
+    sign(createdAt, KIND.CHANGE, [['h', ELSEWHERE], ['a', address], ['field', 'status'], ['value', value], ...stage], note)
+  return { root, set }
+}
+const blocked = staged('fixture-stage-blocked', 'A status no listing names')
+const cleared = staged('fixture-stage-cleared', 'A stage a later change does not repeat')
+const elsewhere = staged('fixture-stage-other-field', 'A stage naming another field')
+const stages = [
+  blocked.root,
+  blocked.set(base + 51, 'blocked', [['stage', 'status', 'started']], 'counts as started, shown as blocked'),
+  cleared.root,
+  cleared.set(base + 52, 'blocked', [['stage', 'status', 'done']], 'done, until the next change'),
+  cleared.set(base + 53, 'blocked', [], 'says no stage, so none: not the older change’s done'),
+  elsewhere.root,
+  elsewhere.set(base + 54, 'todo', [['stage', 'title', 'done']], 'a stage for the title counts for nothing: todo stays open'),
+]
+
 const path = process.argv[2]!
 const fixture = JSON.parse(readFileSync(path, 'utf8'))
 const recorded = (fixture.events as SignedEvent[]).filter((event) => event.pubkey !== pubkey)
 const hashOf = (events: SignedEvent[]) => createHash('sha256').update(JSON.stringify(events)).digest('hex')
 const recordedBefore = hashOf(recorded)
 
-const events = [...recorded, ...ordering, ...folderRule, ...unplaced, ...buzzChannel, ...tagged].sort((a, b) =>
+const events = [...recorded, ...ordering, ...folderRule, ...unplaced, ...buzzChannel, ...tagged, ...stages].sort((a, b) =>
   a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
 )
 const expected = foldFolder(events)

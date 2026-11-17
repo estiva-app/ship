@@ -1,6 +1,6 @@
 import { Card } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
-import type { StatusEntry } from '@/lib/issues'
+import { boardColumns, type StatusEntry } from '@/lib/issues'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Person } from '@/components/ui/Person'
 import { ScrollArea } from '@/components/ui/ScrollArea'
@@ -26,11 +26,13 @@ import { linkTo } from '@/router'
  * One issue on the board as a card: its reference, title and the assignee's
  * photo and name, opening the issue when clicked.
  */
-export function BoardCard({ issue, href }: { issue: IssueRowData; href: string }) {
+export function BoardCard({ issue, href, unlisted = false }: { issue: IssueRowData; href: string; unlisted?: boolean }) {
   return (
     // The package's Card: the elevated fill on its column, 8px corners (Katerina, 2026-09-14; it was 6px).
     <Card {...linkTo(href)} fill="elevated" className="flex flex-col gap-1.5 p-2">
       {issue.ref && <span className="font-mono text-caption text-text-muted">{issue.ref}</span>}
+      {/* A status the board has no column for sits in its stage's column, by its id (Miky, 30 Oct, EAC-3). */}
+      {unlisted && <StatusLabel value={issue.status} label={issue.status} size="small" />}
       <span className="text-body-2 text-text-primary">{issue.title}</span>
       {/* The summary in two lines under the title; none, no line (the short-summary prototype's ShipBoardCard). */}
       <SummaryLine summary={issue.summary} lines={2} className="text-caption" />
@@ -69,7 +71,7 @@ export function BoardColumn({
       </header>
       <div className="flex flex-col gap-1.5">
         {issues.map((issue) => (
-          <BoardCard key={issue.addr} issue={issue} href={hrefFor(issue)} />
+          <BoardCard key={issue.addr} issue={issue} href={hrefFor(issue)} unlisted={issue.status !== status} />
         ))}
         {/* The package's quiet line; its room is this box's, since EmptyState takes no padding. */}
         {!issues.length && (
@@ -98,14 +100,8 @@ export function Board({ issues, statuses, hrefFor, className }: BoardProps) {
     /* The columns scroll sideways in a ScrollArea (D40); the grid moves onto
        the scrolling box, and its bottom padding with it, so nothing moves. */
     <ScrollArea orientation="horizontal" className={className} contentClassName="grid grid-flow-col auto-cols-[minmax(170px,1fr)] gap-2 pb-1.5">
-      {statuses.map((entry) => (
-        <BoardColumn
-          key={entry.value}
-          status={entry.value}
-          label={entry.label}
-          issues={issues.filter((issue) => issue.status === entry.value)}
-          hrefFor={hrefFor}
-        />
+      {boardColumns(issues, statuses).map((column) => (
+        <BoardColumn key={column.status} status={column.status} label={column.label} issues={column.items} hrefFor={hrefFor} />
       ))}
     </ScrollArea>
   )

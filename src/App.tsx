@@ -333,11 +333,12 @@ export function sidebarProps(
   archives: Archives | undefined = state ? archivesOf(state) : undefined,
 ) {
   const projects = state?.projects ?? []
-  const isOpen = (status: string) => status !== 'done' && status !== 'cancelled'
+  // Open work by what its status means (EAC-3), so a status Ship does not list still counts.
+  const isOpen = (stage: string | undefined) => stage !== 'done' && stage !== 'dropped'
   const issues = (state?.issues ?? []).filter((i) => !archives?.ofIssue(i))
-  const openIssues = issues.filter((i) => isOpen(i.status)).length
+  const openIssues = issues.filter((i) => isOpen(i.stage)).length
   // The number on Projects' Active tab, the one the entry opens (SHIPS-7). A deleted project is in no list (SPEC §6.5).
-  const activeProjects = projects.filter((p) => !p.deleted && !archives?.ofProject(p.addr) && projectStatus(p.status).stage === 'started').length
+  const activeProjects = projects.filter((p) => !p.deleted && !archives?.ofProject(p.addr) && p.stage === 'started').length
   // The team a project is in, by its state's listing and then its own Folder (FOL-5); the first, if two list it.
   const teamOf = (projectAddr: string | undefined) => {
     const project = projectAddr ? projects.find((p) => p.addr === projectAddr) : undefined
