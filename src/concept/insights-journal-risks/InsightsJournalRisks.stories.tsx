@@ -39,7 +39,7 @@ const item = (id: string) => ITEMS.find((i) => i.id === id)!
 export const ProjectOverview: Story = { render: () => <Shell><ProjectPage start="overview" /></Shell> }
 /** Overview with the side Overview open beside it (Activity, History, Related) — to compare with What's new. */
 export const ProjectOverviewWithSidePanel: Story = { render: () => <Shell><ProjectPage start="overview" side="overview" /></Shell> }
-/** Issues: today's table, unchanged. */
+/** Issues: Later as its own triage box above today's table (Miky, 17 Nov): what is out of scope for now, Take in or Leave out. */
 export const ProjectIssues: Story = { render: () => <Shell><ProjectPage start="issues" /></Shell> }
 /** Insights: a grid of boxes, filtered by category; new ones first with a dot, Accept / ✕ on them. */
 export const ProjectInsights: Story = { render: () => <Shell><ProjectPage start="insights" /></Shell> }

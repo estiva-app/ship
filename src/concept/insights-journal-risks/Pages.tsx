@@ -26,7 +26,7 @@ import { MarkAsRows, MarkedNotice, STATUSES, TYPE_META, wordIcon, TYPE_OF, block
 import { ENDED, FilterRow, ItemTimeline, ListStateView, filterItems, type ListState } from './ItemParts'
 import { ItemFields, ItemPanel, commentsOn } from './ItemPanel'
 import { ItemContent } from './ItemDetail'
-import { InsightGrid, RiskDashboard } from './ShipLists'
+import { InsightGrid, LaterBox, RiskDashboard } from './ShipLists'
 import { SeverityMark, waited } from './ItemKinds'
 import { CommentsColumn, type StoryComment } from './CommentsColumn'
 import { HAND_TYPED, ITEMS, KATERINA, MIKY, PEOPLE, PROJECT, TEAM, byType, decide, type Item } from './fixtures'
@@ -225,7 +225,15 @@ export function ProjectPage({ start = 'overview', listState = 'ready', me = 'mik
               </MarkableBlocks>
             </Centred>
           )}
-          {tab === 'issues' && <IssuesTable issues={ISSUES} statuses={ISSUE_STATUSES} hrefFor={hrefFor} />}
+          {tab === 'issues' && (
+            <div className="flex flex-col gap-6">
+              <LaterBox />
+              <section className="flex flex-col gap-3">
+                <SectionHeader title="In this project" count={ISSUES.length} />
+                <IssuesTable issues={ISSUES} statuses={ISSUE_STATUSES} hrefFor={hrefFor} />
+              </section>
+            </div>
+          )}
           {tab === 'insights' && <ItemsTab type="insight" all={all} state={listState} onOpen={onOpenItem} openId={open?.id} me={me} />}
           {tab === 'journal' && <ItemsTab type="journal" all={all} state={listState} onOpen={onOpenItem} openId={open?.id} me={me} />}
           {tab === 'risks' && <ItemsTab type="risk" all={all} state={listState} onOpen={onOpenItem} openId={open?.id} me={me} onDecide={onDecide} deciding={deciding} />}

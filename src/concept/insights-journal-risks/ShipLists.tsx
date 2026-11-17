@@ -351,3 +351,59 @@ export function RiskDashboard({ items, onOpen, openId, me = 'miky', onDecide, de
     </div>
   )
 }
+
+/** A line parked for later: real ones, from the Later list of the project "Ship's Topics navigation" (4 Nov). */
+type LaterLine = { id: string; title: string; from: string; by: string; at: string; isNew?: boolean }
+const LATER: LaterLine[] = [
+  { id: 'l1', title: 'A Copy link on a topic’s page, as a project’s and an issue’s have', from: 'review of the topic page', by: 'Claude', at: '3 Nov', isNew: true },
+  { id: 'l2', title: 'Ship’s Topics keeps its tab out of the URL, so a reload opens on Your topics', from: 'building the Topics page', by: 'Claude', at: '3 Nov' },
+  { id: 'l3', title: 'Archived Leaf documents behind a topic page’s Archived', from: 'review of the topic page', by: 'Claude', at: '2 Nov' },
+  { id: 'l4', title: 'Leaf’s Topics row says “(archived)” on an archived topic, as Ship’s does', from: 'Katerina’s comment', by: 'Katerina', at: '1 Nov' },
+]
+
+/**
+ * Later (Miky, 17 Nov): what came up while building and is out of this project's scope for now. Its own triage box
+ * above the Issues table, never mixed into it and no longer on Overview: scope reads in one place, what is in below,
+ * what is out above. Take in makes it an issue of this project; Leave out writes "Not doing …" into the Journal.
+ */
+export function LaterBox() {
+  const [done, setDone] = useState<Record<string, 'in' | 'out'>>({})
+  return (
+    <section className="flex flex-col gap-3">
+      <SectionHeader title="Later" count={LATER.length - Object.keys(done).length} actions={[add('Park something for later')]} showActions="always" />
+      <Card fill="none" clip>
+        <ul aria-label="Later">
+          {LATER.map((line) => (
+            <li key={line.id} className="flex items-center gap-3 border-b border-border-subtle px-4 py-2.5 last:border-b-0">
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className={cn('text-body-2 text-text-primary', done[line.id] && 'text-text-muted')}>
+                  {line.title}
+                  <NewDot on={line.isNew && !done[line.id]} />
+                </span>
+                <span className="min-w-0 truncate">
+                  <MetaText tone="muted">
+                    From {line.from} · {line.by} · {line.at}
+                  </MetaText>
+                </span>
+              </span>
+              <span className="flex shrink-0 items-center gap-1">
+                {done[line.id] ? (
+                  <MetaText tone="muted">{done[line.id] === 'in' ? 'Taken in, now an issue' : 'Left out, in the Journal'}</MetaText>
+                ) : (
+                  <>
+                    <Button variant="outlined" size="small" onClick={() => setDone((d) => ({ ...d, [line.id]: 'in' }))}>
+                      Take in
+                    </Button>
+                    <Button variant="muted" size="small" onClick={() => setDone((d) => ({ ...d, [line.id]: 'out' }))}>
+                      Leave out
+                    </Button>
+                  </>
+                )}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </Card>
+    </section>
+  )
+}
