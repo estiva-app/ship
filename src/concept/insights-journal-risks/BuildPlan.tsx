@@ -37,6 +37,7 @@ import {
 import { cn } from "@/lib/cn";
 import { ScrollArea } from "@/components/ui/ScrollArea";
 import { StatusLabel } from "@/components/ui/StatusLabel";
+import type { IssuesTableRow } from "@/components/IssuesTable";
 import { NewDot } from "./ItemParts";
 
 type IssueStatus = "todo" | "in_progress" | "done" | "cancelled";
@@ -831,4 +832,19 @@ export function BuildPlan() {
       </section>
     </div>
   );
+}
+
+/** The same issues as the dashboard, as Ship's own table and board read them: one plain list, no milestones. */
+export function planRows(): IssuesTableRow[] {
+  return MILESTONES.flatMap((m) => m.issues).map((i, n) => ({
+    addr: `30851:topi:${i.ref}`,
+    id: i.ref,
+    ref: i.ref,
+    title: i.title,
+    summary: i.summary,
+    status: i.status,
+    assignee: { name: i.who },
+    openedBy: { name: "Miky" },
+    at: 1794916000 - 86400 * n,
+  }));
 }

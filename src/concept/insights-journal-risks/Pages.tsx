@@ -7,7 +7,8 @@
  * - the team page (today's Projects page for one team) gets the team's own lists.
  */
 import { useMemo, useState, type ReactNode } from 'react'
-import { IconBox, IconCircleDot, IconPlus, IconUsers } from '@tabler/icons-react'
+import { IconBox, IconCircleDot, IconLayoutDashboard, IconLayoutKanban, IconPlus, IconTable, IconUsers } from '@tabler/icons-react'
+import { Board } from '@/components/Board'
 import { serializeBlockDocument } from '@estiva-app/protocol'
 import { Button, Card, EmptyState, IconButton, Link, LinkPickers, MetaText, NoAccessNotice, PageHeader, SectionHeader, Select, SkeletonList, Tabs } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
@@ -28,7 +29,7 @@ import { ENDED, FilterRow, ItemTimeline, ListStateView, filterItems, type ListSt
 import { ItemFields, ItemPanel, commentsOn } from './ItemPanel'
 import { ItemContent } from './ItemDetail'
 import { InsightGrid, NewlySuggested, RiskDashboard } from './ShipLists'
-import { BuildPlan } from './BuildPlan'
+import { BuildPlan, planRows } from './BuildPlan'
 import { JournalBox } from './JournalBox'
 import { SeverityMark, waited } from './ItemKinds'
 import { CommentsColumn, type StoryComment } from './CommentsColumn'
@@ -175,6 +176,8 @@ function ItemsTab({ type, all = ITEMS, state, onOpen, openId, me, onDecide, deci
 /** The project page: today's header and tab row, three more tabs; an item opens beside its list. */
 export function ProjectPage({ start = 'overview', listState = 'ready', me = 'miky', open: open0, side: side0 = 'none', decided, deciding }: { start?: ConceptTab; listState?: ListState; me?: string; open?: string; side?: 'comments' | 'overview' | 'none'; decided?: string; deciding?: string }) {
   const [tab, setTab] = useState<ConceptTab>(start)
+  // Issues in three views (Miky, 17 Nov): the Dashboard, which may be busy, beside today's plain Table and Board.
+  const [view, setView] = useState<'dashboard' | 'table' | 'board'>('dashboard')
   // Decide changes the lists in place: the question resolves, its Decision joins the Journal (Miky, 16 Nov).
   const [all, setAll] = useState<Item[]>(() => (decided ? decide(ITEMS, decided, Math.max(0, ITEMS.find((i) => i.id === decided)?.options?.findIndex((o) => o.lean) ?? 0)) : ITEMS))
   const [open, setOpen] = useState<Item | undefined>(all.find((i) => i.id === open0))
@@ -205,6 +208,20 @@ export function ProjectPage({ start = 'overview', listState = 'ready', me = 'mik
         />
         <div className="flex min-h-8 items-center gap-3 px-6">
           <Tabs tabs={tabs} active={tab} onChange={setTab} />
+          <div className="flex-1" />
+          {/* Today's Table / Board switch at the right of the tab row, with Dashboard first. */}
+          {tab === 'issues' && (
+            <Tabs
+              tabs={[
+                { id: 'dashboard', label: 'Dashboard', icon: <IconLayoutDashboard size={16} stroke={1.5} /> },
+                { id: 'table', label: 'Table', icon: <IconTable size={16} stroke={1.5} /> },
+                { id: 'board', label: 'Board', icon: <IconLayoutKanban size={16} stroke={1.5} /> },
+              ]}
+              active={view}
+              onChange={setView}
+              size="small"
+            />
+          )}
         </div>
         <ScrollArea className="min-h-0 min-w-0 flex-1" contentClassName="flex flex-col gap-6 px-6 pb-5">
           {tab === 'overview' && (
@@ -231,8 +248,8 @@ export function ProjectPage({ start = 'overview', listState = 'ready', me = 'mik
             </Centred>
           )}
           {tab === 'issues' && (
-            // Issues as the plan of the build (Miky, 17 Nov): the open milestones with Suggested in the current one, Later and Not doing, then Done.
-            <BuildPlan />
+            // Issues in three views (Miky, 17 Nov): the Dashboard (Now, Next, Done, Out of scope), and today's Table and Board, plain.
+            view === 'table' ? <IssuesTable issues={planRows()} statuses={ISSUE_STATUSES} hrefFor={hrefFor} /> : view === 'board' ? <Board issues={planRows()} statuses={ISSUE_STATUSES} hrefFor={hrefFor} /> : <BuildPlan />
           )}
           {tab === 'insights' && <ItemsTab type="insight" all={all} state={listState} onOpen={onOpenItem} openId={open?.id} me={me} />}
           {tab === 'journal' && <ItemsTab type="journal" all={all} state={listState} onOpen={onOpenItem} openId={open?.id} me={me} />}
