@@ -1,6 +1,10 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { FolderState } from '@/api'
+/** What each of Ship's statuses means, as the fold puts it beside the status (EAC-3). */
+const STAGE: Record<string, string> = { planned: 'open', todo: 'open', in_progress: 'started', completed: 'done', done: 'done', cancelled: 'dropped' }
+const issueStage = (status: string) => STAGE[status]
+const projectStage = (status: string) => STAGE[status]
 
 /*
   SHIPS-4: a topic's page in Ship, drawn from the real topics read (interop's
@@ -86,8 +90,8 @@ const issueAddr = (d: string) => `30851:${OWNER}:${d}`
 function ship(projects: { d: string; status: string; archived?: boolean }[], issues: { d: string; status: string; project?: string; archived?: boolean }[]) {
   const fields = (archived?: boolean) => (archived ? { archived: { value: 'true', by: OWNER, at: 1 } } : {})
   const state = {
-    projects: projects.map(({ d, status, archived }) => ({ addr: projectAddr(d), id: d, title: `Project ${d}`, status, fields: fields(archived) })),
-    issues: issues.map(({ d, status, project, archived }) => ({ addr: issueAddr(d), id: d, title: `Issue ${d}`, status, ...(project ? { projectAddr: projectAddr(project) } : {}), fields: fields(archived) })),
+    projects: projects.map(({ d, status, archived }) => ({ addr: projectAddr(d), id: d, title: `Project ${d}`, status, stage: projectStage(status), fields: fields(archived) })),
+    issues: issues.map(({ d, status, project, archived }) => ({ addr: issueAddr(d), id: d, title: `Issue ${d}`, status, stage: issueStage(status), ...(project ? { projectAddr: projectAddr(project) } : {}), fields: fields(archived) })),
     activity: [],
   } as unknown as FolderState
   return { state, archives: archivesOf(state as never) }

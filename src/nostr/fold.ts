@@ -16,9 +16,9 @@
  * checkable rather than hopeful.
  */
 import { blockAnchorOf, contentFormatOf, quoteOf, type ContentFormat, type Quote, type SignedEvent } from '@estiva-app/protocol'
-import { fieldsSetBy } from '@estiva-app/interop'
+import { fieldsSetBy, stageTagOf, type Stage } from '@estiva-app/interop'
 import { foldThreads, isAbout } from '@estiva-app/conversation'
-import { DEFAULT_ISSUE_STATUS, DEFAULT_PROJECT_STATUS, KIND } from './kinds'
+import { DEFAULT_ISSUE_STATUS, DEFAULT_PROJECT_STATUS, KIND, issueStage, projectStage } from './kinds'
 import { summaryText } from './summary'
 
 /** First value of a tag, or undefined. Tags are `[name, value, …]`. */
@@ -117,6 +117,12 @@ export interface Change {
    * format of a value that is no longer displayed.
    */
   format: ContentFormat
+  /**
+   * What the value means, when the change says (SPEC §6.2's `["stage", field, …]`),
+   * read by interop's `stageTagOf`. It travels with the change, like `format`:
+   * a later change with none leaves none (EAC-3).
+   */
+  stage?: Stage
   /** Optional human note from `.content`. */
   note: string
   /**
@@ -129,7 +135,7 @@ export interface Change {
 
 /** Fields on a Project or Issue that changes are allowed to set. */
 /** Each field's winning change; `id` is that change's, the field's next `prev` (SPEC §6.2). */
-export type FoldedFields = Record<string, { value: string; by: string; at: number; format: ContentFormat; id: string }>
+export type FoldedFields = Record<string, { value: string; by: string; at: number; format: ContentFormat; id: string; stage?: Stage }>
 
 export interface Project {
   addr: string
@@ -166,6 +172,8 @@ export interface Project {
   /** The project's own key, when it has one on the wire — `projectKeys` gives every project's. */
   key?: string
   status: string
+  /** What the status means, as every app counts it (`projectStage`); absent for a word nothing reads. */
+  stage?: Stage
   /**
    * Hidden from the lists, reversibly.
    *
@@ -210,6 +218,8 @@ export interface Issue {
   /** Display-only key such as `LL-12`. */
   ref?: string
   status: string
+  /** What the status means, as every app counts it (`issueStage`); absent for a word nothing reads. */
+  stage?: Stage
   assignee?: string
   fields: FoldedFields
 }
@@ -234,9 +244,16 @@ export function parseChange(event: SignedEvent): Change | null {
     field,
     value,
     format: contentFormatOf(event),
+    ...stageOn(event, field, value),
     note: event.content,
     folder: event.tags.find((t) => t[0] === 'h' && t[1])?.[1],
   }
+}
+
+/** The stage a change gives the field it sets, as interop reads it; none on a cleared value. */
+function stageOn(event: SignedEvent, field: string, value: string): { stage?: Stage } {
+  const stage = value === '' ? undefined : stageTagOf(event, field)
+  return stage ? { stage } : {}
 }
 
 /**
@@ -253,7 +270,10 @@ export function parseChanges(event: SignedEvent): Change[] {
   // Read as a one-field change for its `a`, `ts` and `h`; the fields come from the `set` tags.
   const head = parseChange({ ...event, tags: [...event.tags, ['field', 'set'], ['value', '']] })
   if (!head) return []
-  return fieldsSetBy(event).map(({ field, value, format }) => ({ ...head, field, value, format: (format ?? head.format) as ContentFormat }))
+  return fieldsSetBy(event).map(({ field, value, format }) => {
+    const { stage: _head, ...rest } = head
+    return { ...rest, field, value, format: (format ?? head.format) as ContentFormat, ...stageOn(event, field, value) }
+  })
 }
 
 /** The tags a root names its Folder with: `h`, or Ship's older `buzz-channel` (SPEC §7.3). */
@@ -349,7 +369,7 @@ function foldChanges(changes: Change[]): Map<string, FoldedFields> {
   }
   for (const change of winners.values()) {
     const fields = byTarget.get(change.target) ?? {}
-    fields[change.field] = { value: change.value, by: change.author, at: change.createdAt, format: change.format, id: change.id }
+    fields[change.field] = { value: change.value, by: change.author, at: change.createdAt, format: change.format, id: change.id, ...(change.stage ? { stage: change.stage } : {}) }
     byTarget.set(change.target, fields)
   }
   return byTarget
@@ -782,6 +802,7 @@ export function foldFolder(
       // before keys; `projectKeys` in keys.ts derives one for those.
       key: fields.key?.value ?? tag(event, 'key'),
       status: fields.status?.value ?? DEFAULT_PROJECT_STATUS,
+      stage: projectStage(fields.status?.value ?? DEFAULT_PROJECT_STATUS, fields.status?.stage),
       // Any non-empty value means archived; unarchiving writes an empty string
       // rather than deleting the change, because an append-only stream has no
       // undo and "set to nothing" is a fact like any other.
@@ -827,6 +848,7 @@ export function foldFolder(
       */
       ref: fields.ref?.value ?? tag(event, 'ref'),
       status: fields.status?.value ?? DEFAULT_ISSUE_STATUS,
+      stage: issueStage(fields.status?.value ?? DEFAULT_ISSUE_STATUS, fields.status?.stage),
       assignee: fields.assignee?.value,
       fields,
     })

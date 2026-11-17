@@ -12,9 +12,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ISSUE_STATUSES,
   PROJECT_STATUSES,
-  lookupStatus,
   progressOf,
   projectStatus,
+  unlistedFirst,
   archiveProject,
   createIssue,
   deleteMessage,
@@ -737,7 +737,7 @@ export function ProjectPage({
   // A deleted project reached by navigating is held by its newest change only (ALO-5): its first title would show until the rest lands.
   if (project.deleted && state.texts && !state.texts.includes(project.addr)) return <PageSkeleton shape="project" />
 
-  const progress = progressOf(issues.map((issue) => issue.status), (value) => lookupStatus(ISSUE_STATUSES, value))
+  const progress = progressOf(issues)
   const set = (field: 'title' | 'description' | 'status' | 'lead', value: string, note: string, contentFormat?: string) => act(note, () => setProjectField(project, field, value, note, contentFormat), say, refresh)
   // Its own archive, which the ⋯ toggles; and the one the page shows, which may be its team's (FOL-46).
   const own = ownArchive(project, state.activity)
@@ -950,7 +950,7 @@ export function ProjectPage({
           // An older writer's `active` or `done` reads as the status it meant, as on Projects (SHIPS-7).
           status: projectStatus(project.status).value,
           // Each with its colour, so the picker draws the status's shape (ONE-6, step 4b).
-          statuses: PROJECT_STATUSES.map(({ value, label, colour }) => ({ value, label, colour })),
+          statuses: unlistedFirst(projectStatus(project.status).value, PROJECT_STATUSES),
           onStatusChange: (value) => void set('status', value, `Status → ${value}`),
           lead: project.lead ?? '',
           people,

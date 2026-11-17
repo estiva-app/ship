@@ -27,6 +27,7 @@ export function rowFor(issue: FolderState['issues'][number], state: FolderState,
     title: issue.title,
     summary: issue.summary,
     status: issue.status,
+    ...(issue.stage ? { stage: issue.stage } : {}),
     // The chip names the parent and links to it; a parentless issue (B10),
     // or one whose project is not in this read, shows none.
     project: parent ? { title: parent.title, href: href({ name: 'project', d: parent.id, slug: parent.title, view: 'table' }) } : undefined,

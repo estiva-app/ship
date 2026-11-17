@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/Button'
 import { Tabs } from '@/components/ui/Tabs'
 import type { StatusEntry } from '@/lib/issues'
+import { issueStage } from '@/api'
 import { IssueList } from '@/components/IssueList'
 import type { IssueRowData } from '@/components/IssueRow'
 
@@ -28,7 +29,11 @@ export interface IssuesViewProps {
   addDisabledReason?: string
 }
 
-const isOpen = (issue: IssueRowData) => issue.status !== 'done' && issue.status !== 'cancelled'
+/** Open work, by what its status means (EAC-3): a status Ship does not list is open unless its change says done or dropped. */
+const isOpen = (issue: IssueRowData) => {
+  const stage = issue.stage ?? issueStage(issue.status)
+  return stage !== 'done' && stage !== 'dropped'
+}
 
 /** What an empty tab says: each tab's own emptiness, not the workspace's (UIG-14). */
 const EMPTY: Record<IssuesScope, string> = {

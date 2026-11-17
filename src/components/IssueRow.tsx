@@ -3,6 +3,7 @@ import { CommentCount, Link } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
 import { ago } from '@/lib/time'
 import { statusLabel, type StatusEntry } from '@/lib/issues'
+import type { Stage } from '@estiva-app/interop'
 import { Avatar } from '@/components/ui/Avatar'
 import { Chip } from '@/components/ui/Chip'
 import { StatusShape } from '@/components/ui/StatusLabel'
@@ -51,6 +52,8 @@ export interface IssueRowData {
   /** The one-line summary beside the title (SPEC §6.12), from the fold; absent when it has none. */
   summary?: string
   status: string
+  /** What the status means (EAC-3): the board places a status it has no column for by it. */
+  stage?: Stage
   /** The parent project, as the chip names it and links to it. Absent for a parentless issue. */
   project?: { title: string; href: string }
   assignee?: { name?: string; picture?: string; bot?: boolean }

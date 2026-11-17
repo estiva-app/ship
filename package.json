@@ -31,10 +31,10 @@
   "dependencies": {
     "@estiva-app/conversation": "^0.40.0",
     "@estiva-app/identity": "^0.3.0",
-    "@estiva-app/interop": "^0.101.1",
+    "@estiva-app/interop": "^0.102.1",
     "@estiva-app/platform": "^0.4.0",
     "@estiva-app/protocol": "^0.59.0",
-    "@estiva-app/ui": "^0.110.0",
+    "@estiva-app/ui": "^0.123.0",
     "@tabler/icons-react": "^3.41.1",
     "@tiptap/extension-code-block-lowlight": "^3.31.3",
     "@tiptap/extension-mention": "^3.31.3",

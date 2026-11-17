@@ -1,6 +1,9 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { groupByStatus, statusLabel } from '@/lib/issues'
+import { ISSUE_STATUSES as SHIP_STATUSES } from '@/nostr/kinds'
+
+type Stage = 'open' | 'started' | 'done' | 'dropped'
 import { ISSUES, ISSUE_STATUSES, ROWS, THREADS, hrefFor } from '@/fixtures/issues'
 import { Board } from './Board'
 import { ThreadListView } from './conversations/ThreadList'
@@ -76,6 +79,16 @@ describe('IssuesTable and Board', () => {
     for (const entry of ISSUE_STATUSES) expect(screen.getByText(entry.label)).toBeInTheDocument()
     // Two in-progress issues: the other three columns say so. No column for 'blocked' — not in the vocabulary.
     expect(screen.getAllByText('Nothing here')).toHaveLength(3)
+  })
+
+  it('an issue in a status the board does not list sits in the first column of its stage, by its id; with no stage, in the first open one (EAC-3)', () => {
+    const row = (id: string, status: string, stage?: Stage) => ({ addr: `30851:a:${id}`, id, title: `Issue ${id}`, status, ...(stage ? { stage } : {}), at: 0 })
+    render(<Board issues={[row('1', 'blocked', 'started'), row('2', 'waiting'), row('3', 'shipped', 'done')]} statuses={SHIP_STATUSES} hrefFor={hrefFor} />)
+    const column = (label: string) => within(screen.getByText(label, { selector: 'header *' }).closest('section')!)
+    expect(column('In Progress').getByRole('link', { name: /Issue 1/ })).toHaveTextContent('blocked')
+    expect(column('Todo').getByRole('link', { name: /Issue 2/ })).toHaveTextContent('waiting')
+    expect(column('Done').getByRole('link', { name: /Issue 3/ })).toHaveTextContent('shipped')
+    expect(column('Cancelled').getByText('Nothing here')).toBeInTheDocument()
   })
 })
 
