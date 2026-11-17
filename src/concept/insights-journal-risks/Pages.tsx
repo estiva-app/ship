@@ -10,6 +10,7 @@ import { useMemo, useState, type ReactNode } from 'react'
 import { IconBox, IconCircleDot, IconPlus, IconUsers } from '@tabler/icons-react'
 import { serializeBlockDocument } from '@estiva-app/protocol'
 import { Button, Card, EmptyState, IconButton, Link, LinkPickers, MetaText, NoAccessNotice, PageHeader, SectionHeader, Select, SkeletonList, Tabs } from '@estiva-app/ui'
+import { cn } from '@/lib/cn'
 import { Breadcrumb } from '@/components/ui/Breadcrumb'
 import { ScrollArea } from '@/components/ui/ScrollArea'
 import { Centred } from '@/components/layout/ReadingColumn'
@@ -145,7 +146,8 @@ function ItemsTab({ type, all = ITEMS, state, onOpen, openId, me, onDecide, deci
   const suggested = log ? [] : items.filter((i) => i.status === 'proposed')
   const shown = filterItems(log ? items : items.filter((i) => i.status !== 'proposed'), filter)
   return (
-    <div className="flex w-full flex-col gap-6">
+        // The Journal reads at the reading width, its box with it (Miky, 17 Nov: the box was "super wide").
+    <div className={cn('flex w-full flex-col gap-6', log && 'mx-auto max-w-3xl')}>
       <NewlySuggested items={suggested} onOpen={onOpen} openId={openId} me={me} />
       <ListStateView state={state} type={type}>
         {/* Risks are a dashboard of three sections, so no filter row (Miky, 16 Nov). */}

@@ -129,22 +129,24 @@ function PlanRow({ issue, now }: { issue: PlanIssue; now: boolean }) {
         )}
       </td>
       <td className="px-3 align-top text-body-2">
-        <span className={cn('flex flex-col gap-0.5', now ? 'py-3' : 'py-2')}>
+        <span className={cn('block', now ? 'py-3' : 'py-2')}>
           <StatusLabel value={issue.status} label={STATUS[issue.status]} />
-          {/* Its pull request under the status (Miky, 17 Nov): the icon alone says Draft, Open or Merged; hover names it. */}
-          {issue.pr && (
-            <span className="relative flex items-center gap-1 whitespace-nowrap text-caption text-text-secondary">
-              <WithTooltip label={issue.pr.stage}>
-                <span role="img" aria-label={issue.pr.stage} className="flex">
-                  {PR_ICON[issue.pr.stage]}
-                </span>
-              </WithTooltip>
-              <Link href="#" variant="quiet" onClick={(e) => e.preventDefault()}>
-                {issue.pr.name}
-              </Link>
-            </span>
-          )}
         </span>
+      </td>
+      <td className="px-3 align-top text-body-2">
+        {/* Its pull request in a column of its own (Miky, 17 Nov): the icon alone says Draft, Open or Merged; hover names it. */}
+        {issue.pr && (
+          <span className={cn('relative flex items-center gap-1 whitespace-nowrap', now ? 'py-3' : 'py-2')}>
+            <WithTooltip label={issue.pr.stage}>
+              <span role="img" aria-label={issue.pr.stage} className="flex">
+                {PR_ICON[issue.pr.stage]}
+              </span>
+            </WithTooltip>
+            <Link href="#" variant="quiet" onClick={(e) => e.preventDefault()}>
+              {issue.pr.name}
+            </Link>
+          </span>
+        )}
       </td>
       <td className="px-3 align-top text-body-2">
         <span className={cn('block', now ? 'py-3' : 'py-2')}>
@@ -198,13 +200,14 @@ function MilestoneTable({ m }: { m: Milestone }) {
       {open && (
       <Card clip fill={now ? 'surface' : 'none'} attention={now ? 'accent' : undefined}>
         <ScrollArea orientation="horizontal">
-          <table className="w-full min-w-[720px] table-fixed border-collapse" aria-label={`Milestone ${m.n} issues`}>
+          <table className="w-full min-w-[800px] table-fixed border-collapse" aria-label={`Milestone ${m.n} issues`}>
             {now && (
               <thead>
                 <tr className="border-b border-border-default">
                   <th className={cn(TH, 'w-24')}>Ref</th>
                   <th className={TH}>Title</th>
-                  <th className={cn(TH, 'w-36')}>Status</th>
+                  <th className={cn(TH, 'w-32')}>Status</th>
+                  <th className={cn(TH, 'w-28')}>PR</th>
                   <th className={cn(TH, 'w-52')}>AI Session</th>
                 </tr>
               </thead>
@@ -214,7 +217,8 @@ function MilestoneTable({ m }: { m: Milestone }) {
               <colgroup>
                 <col className="w-24" />
                 <col />
-                <col className="w-36" />
+                <col className="w-32" />
+                <col className="w-28" />
                 <col className="w-52" />
               </colgroup>
             )}
