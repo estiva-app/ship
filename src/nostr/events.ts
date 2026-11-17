@@ -276,6 +276,7 @@ export function buildChange(
   },
 ): UnsignedEvent {
   assertFolderId(args.folder)
+  const stage = stageTagFor(args.field, args.value, offeredOptions(args.target, args.field))
   return {
     pubkey,
     created_at: toNostrSeconds(createdAtMs),
@@ -345,7 +346,7 @@ export function buildChange(
         tag. A cleared value, or one Ship does not offer, carries none.
         why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-companys-statuses-are-its-own-layer-of-a-types-properties.md
       */
-      ...[stageTagFor(args.field, args.value, offeredOptions(args.target, args.field))].filter((tag) => tag !== undefined),
+      ...(stage ? [stage] : []),
     ],
     content: args.note ?? '',
   }
