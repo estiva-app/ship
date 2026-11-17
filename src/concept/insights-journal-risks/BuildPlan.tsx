@@ -1,52 +1,45 @@
 /**
- * CONCEPT — a project's Issues as the plan of its build (Miky, 17 Nov): sequencing is milestones.
- * - Triage first, as boxes in a grid, so what is new and unplaced never looks like the settled plan: each one goes into
- *   a milestone (needed for quality), to Later or another project, or to Not doing.
- * - Then one table per milestone, two lines a row; the milestone being built now is raised a little and tells more.
- *   A Claude Code session shows in its issue's row, one click away; an issue with none has Start session.
- * - Last, Later and Not doing, two tabs of one box.
+ * CONCEPT — a project's Issues, the Dashboard view (Miky, 17 Nov): sequencing is milestones.
+ * - One list, as Linear groups issues by milestone: each milestone a filled row, its issues one line each in Ship's own
+ *   list row, with the AI session and the PR as chips; the milestone being built first, the finished ones folded.
+ * - Then Scope to decide: what came up while building, each with a recommendation to accept or change.
+ * - Last, Out of scope: Later and Not doing as two tabs.
  * Real data: the project "Topics: level up the topic experience" as it stood on 9 Nov, its milestones, issues and
  * Later lines (raised by its /land and kickoff runs) and its Not in scope list. The two sessions are imagined.
  */
-import { Fragment, useState, type ReactNode } from "react";
+import { useState, type MouseEvent, type ReactNode } from "react";
 import {
   IconChevronDown,
   IconChevronRight,
   IconCircleCheck,
+  IconFlag3,
   IconGitMerge,
   IconGitPullRequest,
   IconGitPullRequestDraft,
   IconMessageQuestion,
   IconArrowRight,
+  IconPlayerPlay,
   IconPlus,
   IconTerminal2,
 } from "@tabler/icons-react";
 import {
   Button,
   Card,
-  Divider,
+  Chip,
   IconButton,
-  Link,
   MetaText,
   SectionHeader,
-  SectionLabel,
   Select,
   Tabs,
   WithTooltip,
 } from "@estiva-app/ui";
 import { cn } from "@/lib/cn";
-import { ScrollArea } from "@/components/ui/ScrollArea";
-import { StatusLabel } from "@/components/ui/StatusLabel";
+import { IssueRow, type IssueRowData } from "@/components/IssueRow";
 import type { IssuesTableRow } from "@/components/IssuesTable";
+import { ISSUE_STATUSES, hrefFor } from "@/fixtures/issues";
 import { NewDot } from "./ItemParts";
 
 type IssueStatus = "todo" | "in_progress" | "done" | "cancelled";
-const STATUS: Record<IssueStatus, string> = {
-  todo: "Todo",
-  in_progress: "In Progress",
-  done: "Done",
-  cancelled: "Cancelled",
-};
 type Session = {
   name: string;
   stage: string;
@@ -168,309 +161,132 @@ const MILESTONES: Milestone[] = [
 ];
 const NOW = 2;
 
-// Issues' table look, as IssuesTable keeps it (ShipLists copies it for Risks the same way).
-// @estiva-escape(no-copied-look): the concept copies IssuesTable's header cell so the tables match; the build shares one table part
-const TH =
-  "h-9 px-3 text-left text-menu font-medium uppercase tracking-widest text-text-secondary";
-
 const PR_ICON: Record<PrStage, ReactNode> = {
-  Draft: (
-    <IconGitPullRequestDraft
-      size={14}
-      stroke={1.5}
-      className="shrink-0 text-text-muted"
-    />
-  ),
-  Open: (
-    <IconGitPullRequest
-      size={14}
-      stroke={1.5}
-      className="shrink-0 text-success-default"
-    />
-  ),
-  Merged: (
-    <IconGitMerge
-      size={14}
-      stroke={1.5}
-      className="shrink-0 text-accent-primary"
-    />
-  ),
+  Draft: <IconGitPullRequestDraft size={12} stroke={1.5} className="text-text-muted" />,
+  Open: <IconGitPullRequest size={12} stroke={1.5} className="text-success-default" />,
+  Merged: <IconGitMerge size={12} stroke={1.5} className="text-accent-primary" />,
 };
 
+const stay = (e: MouseEvent) => e.preventDefault();
+
+/** An issue as Ship's own list row reads it; the Dashboard, the Table and the Board share it. */
+const rowOf = (i: PlanIssue, n: number): IssueRowData => ({
+  addr: `30851:topi:${i.ref}`,
+  id: i.ref,
+  ref: i.ref,
+  title: i.title,
+  summary: i.summary,
+  status: i.status,
+  assignee: { name: i.who },
+  openedBy: { name: "Miky" },
+  at: 1794916000 - 86400 * n,
+});
+const ORDER = MILESTONES.flatMap((m) => m.issues.map((i) => i.ref));
+
 /**
- * The AI Session column (Miky, 17 Nov, named so the same day: "AI should have its own column so it's easy to start"): the issue's session and
- * what it is doing, or Start where there is none. A done issue's cell is empty.
+ * The chips after an issue's title, as Linear's row has them (Miky, 17 Nov): its AI session, named, with its state as
+ * the icon (an amber question when it waits on you, else the terminal; hover gives its last words), or Start session
+ * where it has none; then its pull request, the icon saying Draft, Open or Merged. A done issue keeps only its PR.
  */
-function ClaudeCell({ issue }: { issue: PlanIssue }) {
-  if (issue.status === "done") return null;
+function IssueChips({ issue }: { issue: PlanIssue }) {
   const s = issue.session;
-  if (!s)
-    return (
-      <span className="relative flex">
-        <Button variant="outlined" size="small" onClick={() => undefined}>
-          Start
+  return (
+    <>
+      {issue.status !== "done" &&
+        (s ? (
+          <WithTooltip label={`${s.waitsOnYou ? "Waiting on you" : "Working"}: ${s.last}`}>
+            <span className="flex">
+              <Chip
+                href="#"
+                onClick={stay}
+                label={s.name}
+                leadingIcon={
+                  s.waitsOnYou ? (
+                    <IconMessageQuestion size={12} stroke={1.5} className="text-warning-default" />
+                  ) : (
+                    <IconTerminal2 size={12} stroke={1.5} />
+                  )
+                }
+                className="max-w-[200px]"
+              />
+            </span>
+          </WithTooltip>
+        ) : (
+          <Chip href="#" onClick={stay} label="Start session" leadingIcon={<IconPlayerPlay size={12} stroke={1.5} />} />
+        ))}
+      {issue.pr && (
+        <WithTooltip label={issue.pr.stage}>
+          <span className="flex">
+            <Chip href="#" onClick={stay} label={issue.pr.name} leadingIcon={PR_ICON[issue.pr.stage]} />
+          </span>
+        </WithTooltip>
+      )}
+    </>
+  );
+}
+
+/**
+ * A milestone in the one list, as Linear groups by milestone (Miky, 17 Nov: "better clarity and readability"): a filled
+ * row with its number and title, Now on the one being built, how many are done, and + for a new issue in it; then its
+ * issues, one line each, in Ship's own list row.
+ */
+function MilestoneGroup({ m, now = false }: { m: Milestone; now?: boolean }) {
+  const [open, setOpen] = useState(true);
+  const done = m.issues.filter((i) => i.status === "done").length;
+  const finished = done === m.issues.length;
+  return (
+    <section className="flex flex-col gap-px" aria-label={`Milestone ${m.n}`}>
+      <h3 className="flex h-9 items-center gap-2 rounded-md bg-bg-inset pr-1 pl-1">
+        <IconButton tooltip={open ? "Hide issues" : "Show issues"} onClick={() => setOpen((o) => !o)}>
+          {open ? <IconChevronDown size={16} stroke={1.5} /> : <IconChevronRight size={16} stroke={1.5} />}
+        </IconButton>
+        {finished ? (
+          <IconCircleCheck size={16} stroke={1.5} className="shrink-0 text-success-default" />
+        ) : (
+          <IconFlag3 size={16} stroke={1.5} className="shrink-0 text-text-muted" />
+        )}
+        <span className="min-w-0 truncate text-body-2 font-medium">
+          {m.n} · {m.title}
+        </span>
+        {now && <Chip type="brand" label="Now" />}
+        <MetaText tone="muted">
+          {done}/{m.issues.length}
+        </MetaText>
+        {!finished && (
+          <span className="ml-auto flex">
+            <IconButton tooltip="New issue in this milestone" onClick={() => undefined}>
+              <IconPlus size={16} stroke={1.5} />
+            </IconButton>
+          </span>
+        )}
+      </h3>
+      {open &&
+        m.issues.map((i) => {
+          // An issue accepted from Scope to decide is the newest: opened today.
+          const row = rowOf(i, Math.max(0, ORDER.indexOf(i.ref)));
+          return (
+            <IssueRow key={i.ref} issue={row} statuses={ISSUE_STATUSES} href={hrefFor(row)} chips={<IssueChips issue={i} />} />
+          );
+        })}
+    </section>
+  );
+}
+
+/** Finished milestones at the foot of the list, folded into one line, as Linear's "4 more completed". */
+function Completed({ milestones }: { milestones: Milestone[] }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <span className="flex">
+        <Button variant="muted" size="small" onClick={() => setOpen((o) => !o)}>
+          {open ? "Hide completed" : `${milestones.length} more completed`}
         </Button>
       </span>
-    );
-  return (
-    // The session's own name, then its state as an icon with no label (Miky, 17 Nov): an amber question when it waits on
-    // you, else the terminal; hover names it.
-    <span className="flex min-w-0 items-center gap-1.5">
-      <span className="relative flex min-w-0">
-        <Link
-          href="#"
-          variant="quiet"
-          truncate
-          onClick={(e) => e.preventDefault()}
-        >
-          {s.name}
-        </Link>
-      </span>
-      <WithTooltip label={s.waitsOnYou ? "Waiting on you" : "Working"}>
-        <span
-          role="img"
-          aria-label={s.waitsOnYou ? "Waiting on you" : "Working"}
-          className="flex shrink-0"
-        >
-          {s.waitsOnYou ? (
-            <IconMessageQuestion
-              size={16}
-              stroke={1.5}
-              className="text-warning-default"
-            />
-          ) : (
-            <IconTerminal2 size={16} stroke={1.5} className="text-text-muted" />
-          )}
-        </span>
-      </WithTooltip>
-    </span>
+      {open && milestones.map((m) => <MilestoneGroup key={m.n} m={m} />)}
+    </>
   );
 }
 
-/** One issue, two lines: the title, and under it what its session did last, or its summary. */
-function PlanRow({ issue, now }: { issue: PlanIssue; now: boolean }) {
-  const s = issue.session;
-  return (
-    <tr
-      className={cn(
-        "group relative border-b border-border-subtle last:border-b-0 hover:bg-bg-hover",
-        issue.status === "done" && "text-text-muted",
-      )}
-    >
-      <td className="px-3 align-top text-body-2 font-mono whitespace-nowrap text-text-muted">
-        <span className={cn("block", now ? "py-3" : "py-2")}>{issue.ref}</span>
-      </td>
-      <td className={cn("px-3 align-top text-body-2", now ? "py-3" : "py-2")}>
-        <span className="flex font-medium">
-          <Link
-            href="#"
-            variant="quiet"
-            truncate
-            cover
-            onClick={(e) => e.preventDefault()}
-          >
-            {issue.title}
-          </Link>
-        </span>
-        {s ? (
-          // The milestone being built now gives a session's last words in full: a question asked of you reads whole.
-          <span className={cn("block text-text-secondary", !now && "truncate")}>
-            {s.last} · {s.when}
-          </span>
-        ) : (
-          <span className="block truncate text-text-secondary">
-            {issue.summary}
-          </span>
-        )}
-      </td>
-      <td className="px-3 align-top text-body-2">
-        <span className={cn("block", now ? "py-3" : "py-2")}>
-          <StatusLabel value={issue.status} label={STATUS[issue.status]} />
-        </span>
-      </td>
-      <td className="px-3 align-top text-body-2">
-        {/* Its pull request in a column of its own (Miky, 17 Nov): the icon alone says Draft, Open or Merged; hover names it. */}
-        {issue.pr && (
-          <span
-            className={cn(
-              "relative flex items-center gap-1 whitespace-nowrap",
-              now ? "py-3" : "py-2",
-            )}
-          >
-            <WithTooltip label={issue.pr.stage}>
-              <span role="img" aria-label={issue.pr.stage} className="flex">
-                {PR_ICON[issue.pr.stage]}
-              </span>
-            </WithTooltip>
-            <Link href="#" variant="quiet" onClick={(e) => e.preventDefault()}>
-              {issue.pr.name}
-            </Link>
-          </span>
-        )}
-      </td>
-      <td className="px-3 align-top text-body-2">
-        <span className={cn("block", now ? "py-3" : "py-2")}>
-          <ClaudeCell issue={issue} />
-        </span>
-      </td>
-    </tr>
-  );
-}
-
-/** One step below a section's header: the kit's secondary label, which labels the rows under it (a milestone, Suggested, Later). */
-function SubHead({
-  label,
-  trailing,
-  after,
-}: {
-  label: string;
-  trailing?: ReactNode;
-  after?: ReactNode;
-}) {
-  return (
-    <div className="flex min-h-8 items-center gap-2 px-2">
-      <SectionLabel tone="secondary" truncate>
-        {label}
-      </SectionLabel>
-      {after}
-      {trailing && (
-        <span className="ml-auto flex shrink-0 items-center gap-2">
-          {trailing}
-        </span>
-      )}
-    </div>
-  );
-}
-
-const doneOf = (m: Milestone) =>
-  `${m.issues.filter((i) => i.status === "done").length} of ${m.issues.length} done`;
-
-/**
- * A milestone as a row of its own inside the table (Miky, 17 Nov: "one table with the middle rows representing the
- * milestone"): its number and title, then how many are done, or its check once finished; folded, a chevron first.
- */
-function MilestoneRow({
-  m,
-  open,
-  onToggle,
-}: {
-  m: Milestone;
-  open: boolean;
-  onToggle?: () => void;
-}) {
-  const finished = m.issues.every((i) => i.status === "done");
-  return (
-    <tr className="border-b border-border-subtle">
-      <td colSpan={5} className="px-3 py-1">
-        <span className="flex min-h-8 items-center gap-2">
-          {onToggle && (
-            <IconButton
-              tooltip={open ? "Hide issues" : "Show issues"}
-              onClick={onToggle}
-            >
-              {open ? (
-                <IconChevronDown size={16} stroke={1.5} />
-              ) : (
-                <IconChevronRight size={16} stroke={1.5} />
-              )}
-            </IconButton>
-          )}
-          <SectionLabel tone="secondary" truncate>
-            {m.n}. {m.title}
-          </SectionLabel>
-          {finished ? (
-            <WithTooltip label="Done">
-              <span role="img" aria-label="Done" className="flex shrink-0">
-                <IconCircleCheck
-                  size={16}
-                  stroke={1.5}
-                  className="text-success-default"
-                />
-              </span>
-            </WithTooltip>
-          ) : (
-            <span className="ml-auto shrink-0">
-              <MetaText tone="muted">{doneOf(m)}</MetaText>
-            </span>
-          )}
-        </span>
-      </td>
-    </tr>
-  );
-}
-
-/**
- * Now, Next and Done each as one table, every milestone a row inside it over its issues: one part, three times. Now's
- * is raised a little and carries the column names; Done's milestones start folded.
- */
-function GroupedTable({
-  label,
-  milestones,
-  now = false,
-  folded = false,
-}: {
-  label: string;
-  milestones: Milestone[];
-  now?: boolean;
-  folded?: boolean;
-}) {
-  const [opened, setOpened] = useState<Record<number, boolean>>({});
-  const isOpen = (m: Milestone) => !folded || !!opened[m.n];
-  return (
-    <Card
-      clip
-      fill={now ? "surface" : "none"}
-      attention={now ? "accent" : undefined}
-    >
-      <ScrollArea orientation="horizontal">
-        <table
-          className="w-full min-w-[800px] table-fixed border-collapse"
-          aria-label={label}
-        >
-          {now ? (
-            <thead>
-              <tr className="border-b border-border-default">
-                <th className={cn(TH, "w-24")}>Ref</th>
-                <th className={TH}>Title</th>
-                <th className={cn(TH, "w-32")}>Status</th>
-                <th className={cn(TH, "w-28")}>PR</th>
-                <th className={cn(TH, "w-52")}>AI Session</th>
-              </tr>
-            </thead>
-          ) : (
-            // The other tables keep the same columns without their names, so they line up under Now's.
-            <colgroup>
-              <col className="w-24" />
-              <col />
-              <col className="w-32" />
-              <col className="w-28" />
-              <col className="w-52" />
-            </colgroup>
-          )}
-          <tbody>
-            {milestones.map((m) => (
-              <Fragment key={m.n}>
-                <MilestoneRow
-                  m={m}
-                  open={isOpen(m)}
-                  onToggle={
-                    folded
-                      ? () => setOpened((o) => ({ ...o, [m.n]: !o[m.n] }))
-                      : undefined
-                  }
-                />
-                {isOpen(m) &&
-                  m.issues.map((i) => (
-                    <PlanRow key={i.ref} issue={i} now={now} />
-                  ))}
-              </Fragment>
-            ))}
-          </tbody>
-        </table>
-      </ScrollArea>
-    </Card>
-  );
-}
 
 /** A line raised while building: real ones from this project's /land and kickoff runs (9–10 Nov). */
 type Line = {
@@ -617,10 +433,7 @@ function Suggested({
   );
   return (
     <section className="flex flex-col gap-1" aria-label="Scope to decide">
-      <SubHead
-        label="Scope to decide"
-        after={<MetaText tone="muted">{lines.length}</MetaText>}
-      />
+      <SectionHeader title="Scope to decide" count={lines.length} />
       <Card fill="none" clip>
         <ul aria-label="Scope to decide">
           {lines.map((l) => (
@@ -737,18 +550,16 @@ function Lines({
 }
 
 /**
- * The Issues tab in four sections (Miky, 17 Nov): Now (the milestone being built, then what came up while building it),
- * Next (the milestones after it), Done, and Later / Not doing (the scoping decisions). Each section opens with the
- * kit's section header; what sits in it, one step down, with the secondary label.
+ * The Dashboard (Miky, 17 Nov, after Linear's issues by milestone): one list, every milestone a filled row over its
+ * issues, one line each; the one being built first and marked Now, the finished ones folded at the foot. Under it,
+ * the scope still to decide, then what is out of scope.
  */
 export function BuildPlan() {
   const [placed, setPlaced] = useState<Record<string, string>>({});
   const [outTab, setOutTab] = useState<"later" | "not">("later");
   const into = (to: string) => TRIAGE.filter((l) => placed[l.id] === to);
   // A suggestion accepted into a milestone becomes its next issue, numbered in the order they were accepted.
-  const accepted = Object.keys(placed).filter((id) =>
-    placed[id].startsWith("m"),
-  );
+  const accepted = Object.keys(placed).filter((id) => placed[id].startsWith("m"));
   const asIssue = (l: Line): PlanIssue => ({
     ref: `TOPI-${11 + accepted.indexOf(l.id)}`,
     title: l.title,
@@ -760,56 +571,22 @@ export function BuildPlan() {
     ...m,
     issues: [...m.issues, ...into(`m${m.n}`).map(asIssue)],
   }));
-  const finished = milestones.filter((m) =>
-    m.issues.every((i) => i.status === "done"),
-  );
+  const finished = milestones.filter((m) => m.issues.every((i) => i.status === "done"));
   const open = milestones.filter((m) => !finished.includes(m));
   const current = open.find((m) => m.n === NOW) ?? open[0];
-  const next = open.filter((m) => m !== current);
+  const ordered = current ? [current, ...open.filter((m) => m !== current)] : open;
   const left = TRIAGE.filter((l) => !placed[l.id]);
   const later = [...into("later"), ...LATER];
   const notDoing = [...into("not"), ...NOT_DOING];
   return (
-    // A line between the four sections, so each reads as its own block (Miky, 17 Nov: "4 clear sections").
-    <div className="flex flex-col gap-6">
-      {current && (
-        <section className="flex flex-col gap-2" aria-label="Now">
-          <SectionHeader
-            title="Now"
-            actions={[
-              {
-                icon: <IconPlus size={16} stroke={1.5} />,
-                tooltip: "New issue",
-                onClick: () => undefined,
-              },
-            ]}
-          />
-          <GroupedTable label="Now" milestones={[current]} now />
-          <Suggested
-            lines={left}
-            onPlace={(id, to) => setPlaced((p) => ({ ...p, [id]: to }))}
-          />
-        </section>
-      )}
-      {next.length > 0 && (
-        <>
-          <Divider />
-          <section className="flex flex-col gap-2" aria-label="Next">
-            <SectionHeader title="Next" count={next.length} />
-            <GroupedTable label="Next" milestones={next} />
-          </section>
-        </>
-      )}
-      {finished.length > 0 && (
-        <>
-          <Divider />
-          <section className="flex flex-col gap-2" aria-label="Done">
-            <SectionHeader title="Done" count={finished.length} />
-            <GroupedTable label="Done" milestones={finished} folded />
-          </section>
-        </>
-      )}
-      <Divider />
+    <div className="flex flex-col gap-10">
+      <section className="flex flex-col gap-3" aria-label="Milestones">
+        {ordered.map((m) => (
+          <MilestoneGroup key={m.n} m={m} now={m === current} />
+        ))}
+        {finished.length > 0 && <Completed milestones={finished} />}
+      </section>
+      <Suggested lines={left} onPlace={(id, to) => setPlaced((p) => ({ ...p, [id]: to }))} />
       {/* Out of scope (Miky, 17 Nov): the scoping decisions, Later and Not doing as tabs over one list. */}
       <section className="flex flex-col gap-2" aria-label="Out of scope">
         <SectionHeader title="Out of scope" />
@@ -824,27 +601,13 @@ export function BuildPlan() {
             onChange={setOutTab}
           />
         </div>
-        {outTab === "later" ? (
-          <Lines label="Later" lines={later} />
-        ) : (
-          <Lines label="Not doing" lines={notDoing} muted />
-        )}
+        {outTab === "later" ? <Lines label="Later" lines={later} /> : <Lines label="Not doing" lines={notDoing} muted />}
       </section>
     </div>
   );
 }
 
-/** The same issues as the dashboard, as Ship's own table and board read them: one plain list, no milestones. */
+/** The same issues for Ship's own Table and Board: one plain list, no milestones. */
 export function planRows(): IssuesTableRow[] {
-  return MILESTONES.flatMap((m) => m.issues).map((i, n) => ({
-    addr: `30851:topi:${i.ref}`,
-    id: i.ref,
-    ref: i.ref,
-    title: i.title,
-    summary: i.summary,
-    status: i.status,
-    assignee: { name: i.who },
-    openedBy: { name: "Miky" },
-    at: 1794916000 - 86400 * n,
-  }));
+  return MILESTONES.flatMap((m) => m.issues).map((i, n) => ({ ...rowOf(i, n), openedBy: { name: "Miky" } }));
 }

@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { IconBox } from '@tabler/icons-react'
 import { CommentCount, Link } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
@@ -65,10 +66,15 @@ export interface IssueRowProps {
   issue: IssueRowData
   statuses: StatusEntry[]
   href: string
+  /**
+   * CONCEPT (Insights, Journal and Risks): chips after the title, as Linear's row has them — the issue's AI session and
+   * its pull request on the Dashboard. Each is its own link, above the row's cover.
+   */
+  chips?: ReactNode
   className?: string
 }
 
-export function IssueRow({ issue, statuses, href, className }: IssueRowProps) {
+export function IssueRow({ issue, statuses, href, chips, className }: IssueRowProps) {
   const threads = issue.conversations ?? 0
   const link = (
     <Link {...linkTo(href)} variant="plain" cover className="flex min-w-0 flex-1 items-center gap-3">
@@ -89,6 +95,7 @@ export function IssueRow({ issue, statuses, href, className }: IssueRowProps) {
       <WithSummary summary={issue.summary} wrapperClassName="flex min-w-0 flex-1">
         {link}
       </WithSummary>
+      {chips && <span className="relative flex shrink-0 items-center gap-1.5">{chips}</span>}
       {/* The count before the chip (Katerina, 2026-09-09): what is said
           about the issue, then where it lives, then who and when. */}
       {threads > 0 && <CommentCount conversation={{ count: threads, href: routeTo({ name: 'issue', d: issue.id, slug: issue.title }) }} noun={threads === 1 ? 'conversation' : 'conversations'} />}
