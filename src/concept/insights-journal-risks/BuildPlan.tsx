@@ -9,7 +9,7 @@
  * Later lines (raised by its /land and kickoff runs) and its Not in scope list. The two sessions are imagined.
  */
 import { useState, type ReactNode } from 'react'
-import { IconChevronDown, IconChevronRight, IconCircleCheck, IconGitMerge, IconGitPullRequest, IconGitPullRequestDraft, IconPlus, IconSparkles, IconTerminal2 } from '@tabler/icons-react'
+import { IconChevronDown, IconChevronRight, IconCircleCheck, IconGitMerge, IconGitPullRequest, IconGitPullRequestDraft, IconMessageQuestion, IconPlus, IconSparkles, IconTerminal2 } from '@tabler/icons-react'
 import { Button, Card, IconButton, Link, MetaText, Person, SectionHeader, SectionLabel, Select, Tabs, WithTooltip } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
 import { ScrollArea } from '@/components/ui/ScrollArea'
@@ -88,14 +88,17 @@ function ClaudeCell({ issue }: { issue: PlanIssue }) {
       </span>
     )
   return (
-    <span className="flex flex-col gap-0.5">
-      <span className="relative flex items-center gap-1">
-        <IconTerminal2 size={14} stroke={1.5} className={cn('shrink-0', s.waitsOnYou ? 'text-warning-default' : 'text-text-muted')} />
-        <Link href="#" variant="quiet" onClick={(e) => e.preventDefault()}>
-          Open
-        </Link>
-      </span>
-      <span className={cn('text-caption', s.waitsOnYou ? 'font-medium text-warning-default' : 'text-text-secondary')}>{s.waitsOnYou ? 'Waiting on you' : 'Working'}</span>
+    // No label for its state (Miky, 17 Nov: "the icon should say that"): an amber question when it waits on you, else the
+    // terminal; hover names it.
+    <span className="relative flex items-center gap-1">
+      <WithTooltip label={s.waitsOnYou ? 'Waiting on you' : 'Working'}>
+        <span role="img" aria-label={s.waitsOnYou ? 'Waiting on you' : 'Working'} className="flex">
+          {s.waitsOnYou ? <IconMessageQuestion size={16} stroke={1.5} className="shrink-0 text-warning-default" /> : <IconTerminal2 size={16} stroke={1.5} className="shrink-0 text-text-muted" />}
+        </span>
+      </WithTooltip>
+      <Link href="#" variant="quiet" onClick={(e) => e.preventDefault()}>
+        Open
+      </Link>
     </span>
   )
 }
