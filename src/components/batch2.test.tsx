@@ -90,6 +90,14 @@ describe('IssuesTable and Board', () => {
     expect(column('Done').getByRole('link', { name: /Issue 3/ })).toHaveTextContent('shipped')
     expect(column('Cancelled').getByText('Nothing here')).toBeInTheDocument()
   })
+
+  it('with two columns of one stage, an unlisted status sits in the first of them, not the second (EAC-3)', () => {
+    const statuses = [...SHIP_STATUSES.slice(0, 2), { value: 'in_review', label: 'In Review', stage: 'started' as const }, ...SHIP_STATUSES.slice(2)]
+    render(<Board issues={[{ addr: '30851:a:1', id: '1', title: 'Issue 1', status: 'blocked', stage: 'started', at: 0 }]} statuses={statuses} hrefFor={hrefFor} />)
+    const column = (label: string) => within(screen.getByText(label, { selector: 'header *' }).closest('section')!)
+    expect(column('In Progress').getByRole('link', { name: /Issue 1/ })).toHaveTextContent('blocked')
+    expect(column('In Review').getByText('Nothing here')).toBeInTheDocument()
+  })
 })
 
 // Moved with the card to the conversations list (the old MessageCard, 30 September).
