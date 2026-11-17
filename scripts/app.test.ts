@@ -109,6 +109,7 @@ check('  …and a status change names nobody', tag(statusChange, 'p') === undefi
   check('  …nor one Ship does not offer, which it never guesses', stageOf(buildChange(PK, Date.now(), { target: `30851:${PK}:i1`, field: 'status', value: 'blocked', folder: CONTENT })) === undefined)
   check('  …nor a project status written on an issue', stageOf(buildChange(PK, Date.now(), { target: `30851:${PK}:i1`, field: 'status', value: 'completed', folder: CONTENT })) === undefined)
   check('  …nor a field that is not a status', stageOf(buildChange(PK, Date.now(), { target: `30851:${PK}:i1`, field: 'title', value: 'done', folder: CONTENT })) === undefined)
+  check('  …nor a status on a file that is neither a project nor an issue', stageOf(buildChange(PK, Date.now(), { target: `30023:${PK}:doc1`, field: 'status', value: 'done', folder: CONTENT })) === undefined)
 }
 
 const WHO = 'c'.repeat(64)
