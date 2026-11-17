@@ -72,16 +72,19 @@ const PR_ICON: Record<PrStage, ReactNode> = {
   Merged: <IconGitMerge size={14} stroke={1.5} className="shrink-0 text-accent-primary" />,
 }
 
-/** Start or open the issue's Claude Code session: Open session leads when it waits on you. */
-function SessionCell({ issue }: { issue: PlanIssue }) {
-  if (issue.status === 'done') return <MetaText tone="muted">Ended</MetaText>
+/**
+ * The issue's Claude Code session, subtle (Miky, 17 Nov: "if there is a Claude session it should be visible, but very
+ * subtle"): a quiet link beside its PR; Start session only on the row's hover, where there is none.
+ */
+function SessionLink({ issue }: { issue: PlanIssue }) {
+  if (issue.status === 'done') return null
   const s = issue.session
   return (
-    <span className="flex flex-col items-start gap-1">
-      {s && <span className={cn('text-caption', s.waitsOnYou ? 'font-medium text-warning-default' : 'text-text-secondary')}>{s.stage}</span>}
-      <Button variant={s?.waitsOnYou ? 'primary' : s ? 'outlined' : 'muted'} size="small" leadingIcon={<IconTerminal2 size={14} stroke={1.5} />} onClick={() => undefined}>
-        {s ? 'Open session' : 'Start session'}
-      </Button>
+    <span className={cn('relative flex items-center gap-1', !s && 'opacity-0 group-hover:opacity-100 focus-within:opacity-100')}>
+      <IconTerminal2 size={14} stroke={1.5} className={cn('shrink-0', s?.waitsOnYou ? 'text-warning-default' : 'text-text-muted')} />
+      <Link href="#" variant="quiet" onClick={(e) => e.preventDefault()}>
+        {s ? 'Session' : 'Start session'}
+      </Link>
     </span>
   )
 }
@@ -90,7 +93,7 @@ function SessionCell({ issue }: { issue: PlanIssue }) {
 function PlanRow({ issue, now }: { issue: PlanIssue; now: boolean }) {
   const s = issue.session
   return (
-    <tr className={cn('relative border-b border-border-subtle last:border-b-0 hover:bg-bg-hover', issue.status === 'done' && 'text-text-muted')}>
+    <tr className={cn('group relative border-b border-border-subtle last:border-b-0 hover:bg-bg-hover', issue.status === 'done' && 'text-text-muted')}>
       <td className="px-3 align-top text-body-2 font-mono whitespace-nowrap text-text-muted">
         <span className={cn('block', now ? 'py-3' : 'py-2')}>{issue.ref}</span>
       </td>
@@ -103,7 +106,8 @@ function PlanRow({ issue, now }: { issue: PlanIssue; now: boolean }) {
         {s ? (
           // The milestone being built now gives a session's last words in full: a question asked of you reads whole.
           <span className={cn('block text-text-secondary', !now && 'truncate')}>
-            Claude, for {issue.who} · {s.last} · {s.when}
+            {s.waitsOnYou && <span className="font-medium text-warning-default">Waiting on you · </span>}
+            {s.last} · {s.when}
           </span>
         ) : (
           <span className="block truncate text-text-secondary">{issue.summary}</span>
@@ -113,27 +117,22 @@ function PlanRow({ issue, now }: { issue: PlanIssue; now: boolean }) {
         <span className={cn('flex flex-col gap-0.5', now ? 'py-3' : 'py-2')}>
           <StatusLabel value={issue.status} label={STATUS[issue.status]} />
           {/* Its pull request under the status (Miky, 17 Nov): the icon alone says Draft, Open or Merged; hover names it. */}
-          {issue.pr && (
-            <span className="relative flex items-center gap-1 whitespace-nowrap text-caption text-text-secondary">
-              <WithTooltip label={issue.pr.stage}>
-                <span role="img" aria-label={issue.pr.stage} className="flex">
-                  {PR_ICON[issue.pr.stage]}
-                </span>
-              </WithTooltip>
-              <Link href="#" variant="quiet" onClick={(e) => e.preventDefault()}>
-                {issue.pr.name}
-              </Link>
-            </span>
-          )}
+          <span className="flex items-center gap-3 whitespace-nowrap text-caption text-text-secondary">
+            {issue.pr && (
+              <span className="relative flex items-center gap-1">
+                <WithTooltip label={issue.pr.stage}>
+                  <span role="img" aria-label={issue.pr.stage} className="flex">
+                    {PR_ICON[issue.pr.stage]}
+                  </span>
+                </WithTooltip>
+                <Link href="#" variant="quiet" onClick={(e) => e.preventDefault()}>
+                  {issue.pr.name}
+                </Link>
+              </span>
+            )}
+            <SessionLink issue={issue} />
+          </span>
         </span>
-      </td>
-      <td className="px-3 align-top text-body-2 text-text-secondary">
-        <span className={cn('block', now ? 'py-3' : 'py-2')}>
-          <Person name={issue.who} size={16} />
-        </span>
-      </td>
-      <td className={cn('relative px-3 align-top', now ? 'py-3' : 'py-2')}>
-        <SessionCell issue={issue} />
       </td>
     </tr>
   )
@@ -182,15 +181,13 @@ function MilestoneTable({ m }: { m: Milestone }) {
       {open && (
       <Card clip fill={now ? 'surface' : 'none'} attention={now ? 'accent' : undefined}>
         <ScrollArea orientation="horizontal">
-          <table className="w-full min-w-[840px] table-fixed border-collapse" aria-label={`Milestone ${m.n} issues`}>
+          <table className="w-full min-w-[640px] table-fixed border-collapse" aria-label={`Milestone ${m.n} issues`}>
             {now && (
               <thead>
                 <tr className="border-b border-border-default">
                   <th className={cn(TH, 'w-24')}>Ref</th>
                   <th className={TH}>Title</th>
-                  <th className={cn(TH, 'w-40')}>Status</th>
-                  <th className={cn(TH, 'w-28')}>Lead</th>
-                  <th className={cn(TH, 'w-40')}>Session</th>
+                  <th className={cn(TH, 'w-48')}>Status</th>
                 </tr>
               </thead>
             )}
@@ -199,9 +196,7 @@ function MilestoneTable({ m }: { m: Milestone }) {
               <colgroup>
                 <col className="w-24" />
                 <col />
-                <col className="w-40" />
-                <col className="w-28" />
-                <col className="w-40" />
+                <col className="w-48" />
               </colgroup>
             )}
             <tbody>

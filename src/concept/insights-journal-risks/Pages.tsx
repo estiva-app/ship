@@ -26,7 +26,7 @@ import { MarkAsRows, MarkedNotice, STATUSES, TYPE_META, wordIcon, TYPE_OF, block
 import { ENDED, FilterRow, ItemTimeline, ListStateView, filterItems, type ListState } from './ItemParts'
 import { ItemFields, ItemPanel, commentsOn } from './ItemPanel'
 import { ItemContent } from './ItemDetail'
-import { InsightGrid, RiskDashboard } from './ShipLists'
+import { InsightGrid, NewlySuggested, RiskDashboard } from './ShipLists'
 import { BuildPlan } from './BuildPlan'
 import { SeverityMark, waited } from './ItemKinds'
 import { CommentsColumn, type StoryComment } from './CommentsColumn'
@@ -78,8 +78,6 @@ function NeedsYou({ all, me, onTab, onOpen, onDecide }: { all: Item[]; me: strin
   const blocking = live.filter((i) => i.word === 'Blocker' && i.status !== 'proposed' && i.waitingOn?.key === me)
   const deciding = live.filter((i) => i.word === 'Question' && i.status !== 'proposed' && i.step === 'decide' && i.decider?.key === me)
   const toAccept = live.filter((i) => i.status === 'proposed' && (!i.decidedBy || i.decidedBy.key === me))
-  const fresh = all.filter((i) => i.isNew)
-  const count = (t: ItemType) => fresh.filter((i) => i.type === t).length
   const tabOf = (t: ItemType): ConceptTab => (t === 'insight' ? 'insights' : t === 'journal' ? 'journal' : 'risks')
   const rows: { item: Item; why: string; action?: string }[] = [
     ...blocking.map((item) => ({ item, why: `Blocks the team · waiting on you ${waited(item.day)}`, action: 'Open' })),
@@ -88,8 +86,9 @@ function NeedsYou({ all, me, onTab, onOpen, onDecide }: { all: Item[]; me: strin
   const byType = (['insight', 'journal', 'risk'] as ItemType[]).map((t) => ({ t, n: toAccept.filter((i) => i.type === t).length })).filter((x) => x.n)
   return (
     <section aria-label="Needs you" className="flex flex-col gap-3">
-      <SectionHeader title="Needs you" count={rows.length + toAccept.length} />
-      {rows.length + toAccept.length === 0 ? (
+      {/* The count is the rows below it (review, 17 Nov); the tabs' dots already say what is new. */}
+      <SectionHeader title="Needs you" count={rows.length + byType.length} />
+      {rows.length + byType.length === 0 ? (
         <MetaText tone="muted">Nothing waits for you.</MetaText>
       ) : (
         <Card fill="none" clip attention={blocking.length ? 'warning' : undefined}>
@@ -115,7 +114,7 @@ function NeedsYou({ all, me, onTab, onOpen, onDecide }: { all: Item[]; me: strin
                 <span className={`flex ${TYPE_META[t].text}`}>{TYPE_META[t].icon(16)}</span>
                 <span className="flex min-w-0 flex-1 flex-col">
                   <Link href="#" variant="quiet" cover onClick={(e) => (e.preventDefault(), onTab(tabOf(t)))}>
-                    {t === 'insight' ? `${n} newly suggested ${n === 1 ? 'insight' : 'insights'}` : `${n} ${t === 'journal' ? (n === 1 ? 'Journal entry' : 'Journal entries') : n === 1 ? 'risk' : 'risks'} to accept`}
+                    {n} newly suggested in {TYPE_META[t].tab}
                   </Link>
                   <span className="min-w-0 truncate">
                     <MetaText tone="muted">{toAccept.filter((i) => i.type === t).map((i) => i.title).join(' · ')}</MetaText>
@@ -126,20 +125,6 @@ function NeedsYou({ all, me, onTab, onOpen, onDecide }: { all: Item[]; me: strin
           </ul>
         </Card>
       )}
-      <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <MetaText tone="muted">New since your last visit:</MetaText>
-        {(['insight', 'journal', 'risk'] as ItemType[]).map((t) =>
-          count(t) ? (
-            <Link key={t} href="#" variant="quiet" onClick={(e) => (e.preventDefault(), onTab(tabOf(t)))}>
-              {count(t)} in {TYPE_META[t].tab}
-            </Link>
-          ) : null,
-        )}
-        <span className="flex items-center gap-1">
-          <IconCircleDot size={14} stroke={1.5} className="text-text-secondary" />
-          <MetaText tone="muted">3 issues changed</MetaText>
-        </span>
-      </span>
     </section>
   )
 }
@@ -149,11 +134,14 @@ function NeedsYou({ all, me, onTab, onOpen, onDecide }: { all: Item[]; me: strin
  * Journal the timeline in the reading column, Risks a table as wide as Issues'.
  */
 function ItemsTab({ type, all = ITEMS, state, onOpen, openId, me, onDecide, deciding }: { type: ItemType; all?: Item[]; state: ListState; onOpen: (i: Item) => void; openId?: string; me?: string; onDecide?: (item: Item, choice: number, why: string) => void; deciding?: string }) {
-  const items = all.filter((i) => i.type === type)
+  const items = [...all.filter((i) => i.type === type), ...(type === 'risk' ? [HAND_TYPED] : [])]
   const [filter, setFilter] = useState('all')
-  const shown = filterItems(items, filter)
+  // What is suggested and not yet added sits in one section above every tab's own list, the same everywhere.
+  const suggested = items.filter((i) => i.status === 'proposed')
+  const shown = filterItems(items.filter((i) => i.status !== 'proposed'), filter)
   return (
-    <div className={`flex w-full flex-col gap-3 ${type === 'journal' ? 'mx-auto max-w-[768px]' : ''}`}>
+    <div className="flex w-full flex-col gap-6">
+      <NewlySuggested items={suggested} onOpen={onOpen} openId={openId} me={me} />
       <ListStateView state={state} type={type}>
         {/* Risks are a dashboard of three sections, so no filter row (Miky, 16 Nov). */}
         {/* A subtle + to add an item by hand, beside the filters (Miky, 16 Nov). */}
@@ -167,7 +155,7 @@ function ItemsTab({ type, all = ITEMS, state, onOpen, openId, me, onDecide, deci
         )}
         {type === 'insight' && <InsightGrid items={shown} onOpen={onOpen} openId={openId} me={me} />}
         {type === 'journal' && <ItemTimeline items={shown} onOpen={onOpen} openId={openId} me={me} label="Journal" />}
-        {type === 'risk' && <RiskDashboard items={[...items, HAND_TYPED]} onOpen={onOpen} openId={openId} me={me} onDecide={onDecide} deciding={deciding} />}
+        {type === 'risk' && <RiskDashboard items={shown} onOpen={onOpen} openId={openId} me={me} onDecide={onDecide} deciding={deciding} />}
       </ListStateView>
     </div>
   )
@@ -210,8 +198,7 @@ export function ProjectPage({ start = 'overview', listState = 'ready', me = 'mik
         <ScrollArea className="min-h-0 min-w-0 flex-1" contentClassName="flex flex-col gap-6 px-6 pb-5">
           {tab === 'overview' && (
             <Centred>
-              <NeedsYou all={all} me={me} onTab={setTab} onOpen={(i) => setOpen(i)} onDecide={(i) => (setDecidingId(i.id), setOpen(i))} />
-              <MarkableBlocks team={TEAM} about={PROJECT} marked={{ p2: 'insight' }} changed={['p3']} onOpenBlock={() => setOpen(ITEMS.find((i) => i.id === 'i1'))}>
+              <MarkableBlocks team={TEAM} about={PROJECT} marked={{ p2: 'insight' }} onOpenBlock={() => setOpen(ITEMS.find((i) => i.id === 'i1'))}>
                 <LiveHeader
                   fields={<ProjectFields status={status} statuses={PROJECT_STATUSES} onStatusChange={setStatus} lead={lead} people={SHIP_PEOPLE} onLeadChange={setLead} done={3} total={8} />}
                   title={PROJECT}
@@ -224,6 +211,7 @@ export function ProjectPage({ start = 'overview', listState = 'ready', me = 'mik
                   onCommentOnBlock={noop}
                 />
               </MarkableBlocks>
+              <NeedsYou all={all} me={me} onTab={setTab} onOpen={(i) => setOpen(i)} onDecide={(i) => (setDecidingId(i.id), setOpen(i))} />
             </Centred>
           )}
           {tab === 'issues' && (
@@ -292,8 +280,8 @@ export function IssuePage({ itemsState = 'ready', commentMark = true }: { itemsS
               />
             </MarkableBlocks>
             {/* The items about this issue: every app that opens a file shows its items (record #450). */}
-            <section className="flex flex-col gap-2" aria-label="Insights, Journal and Risks">
-              <SectionHeader title="Insights, Journal and Risks" count={about.length} />
+            <section className="flex flex-col gap-2" aria-label="About this issue">
+              <SectionHeader title="About this issue" count={about.length} />
               {itemsState === 'loading' ? (
                 <SkeletonList rows={2} />
               ) : itemsState === 'error' ? (
@@ -301,7 +289,7 @@ export function IssuePage({ itemsState = 'ready', commentMark = true }: { itemsS
               ) : !about.length || itemsState === 'empty' ? (
                 <EmptyState scope="section" message="Nothing marked about this issue yet." />
               ) : (
-                <ItemTimeline items={about} label="Insights, Journal and Risks" />
+                <ItemTimeline items={about} label="About this issue" />
 
               )}
             </section>
@@ -377,10 +365,10 @@ export function TeamPage({ start = 'insights' }: { start?: 'projects' | ConceptT
       <div className="flex min-h-8 items-center gap-3 px-6">
         <Tabs
           tabs={[
-            { id: 'projects', label: 'Projects', count: 6 },
-            { id: 'insights', label: 'Insights', count: byType('insight').length },
-            { id: 'journal', label: 'Journal', count: byType('journal').length },
-            { id: 'risks', label: TYPE_META.risk.tab, count: byType('risk').length },
+            { id: 'projects', label: 'Projects', unread: false },
+            { id: 'insights', label: 'Insights', unread: byType('insight').some((i) => i.isNew) },
+            { id: 'journal', label: 'Journal', unread: byType('journal').some((i) => i.isNew) },
+            { id: 'risks', label: TYPE_META.risk.tab, unread: byType('risk').some((i) => i.isNew) },
           ]}
           active={tab}
           onChange={setTab}
@@ -391,7 +379,6 @@ export function TeamPage({ start = 'insights' }: { start?: 'projects' | ConceptT
         {tab === 'insights' && <ItemsTab type="insight" state="ready" onOpen={onOpen} openId={open?.id} />}
         {tab === 'journal' && <ItemsTab type="journal" state="ready" onOpen={onOpen} openId={open?.id} />}
         {tab === 'risks' && <ItemsTab type="risk" state="ready" onOpen={onOpen} openId={open?.id} />}
-        {tab !== 'projects' && <MetaText tone="muted">Everything the team marked, from every project, and the items about no project.</MetaText>}
       </ScrollArea>
     </div>
     {open && open.type === TAB_TYPE[tab] && <ItemPanel item={open} onClose={() => setOpen(undefined)} />}

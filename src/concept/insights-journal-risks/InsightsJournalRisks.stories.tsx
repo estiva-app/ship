@@ -4,7 +4,7 @@ import { AppShell } from '@/components/AppShell'
 import { IdentityMenu } from '@/components/IdentityMenu'
 import { ShipSidebar, type SidebarEntry } from '@/components/ShipSidebar'
 import { SIDEBAR_PROJECTS } from '@/fixtures/projects'
-import { ANA } from '@/fixtures/issues'
+
 import { IssuePage, ItemPage, ProjectPage, TeamPage } from './Pages'
 import { HAND_TYPED, ITEMS } from './fixtures'
 
@@ -17,7 +17,7 @@ function Shell({ current = 'projects', children }: { current?: SidebarEntry; chi
     <div className="h-screen">
       <AppShell
         logo="Estiva Ship"
-        identity={<IdentityMenu me={ANA} signedIn idBase="https://id.estiva.app" relayUrl="http://localhost:3000" onCopyKey={fn()} onSignOut={fn()} />}
+        identity={<IdentityMenu me={{ name: 'Miky' }} signedIn idBase="https://id.estiva.app" relayUrl="http://localhost:3000" onCopyKey={fn()} onSignOut={fn()} />}
         nav={<ShipSidebar openIssues={18} activeProjects={SIDEBAR_PROJECTS.length} hrefFor={(entry) => `#/${entry}`} current={{ entry: current }} topics={[]} onRetryTopics={fn()} />}
       >
         {children}

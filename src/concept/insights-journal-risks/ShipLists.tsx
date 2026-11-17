@@ -74,32 +74,27 @@ function InsightBox({ item, me, onOpen, selected }: { item: Item; me: string; on
 }
 
 /** Insights as a grid of boxes, as many columns as the room beside an open item allows. */
-export function InsightGrid({ items, onOpen, openId, me = 'miky' }: { items: Item[]; onOpen?: (item: Item) => void; openId?: string; me?: string }) {
-  // Two sections (Miky, 16 Nov: "a clear line between triaging and going through past insights"): what waits for an
-  // answer, then everything else. With nothing to triage, only the second.
-  const triage = newFirst(items.filter((i) => i.status === 'proposed'))
-  const past = newFirst(items.filter((i) => i.status !== 'proposed'))
-  const grid = (list: Item[], label: string) => (
+export function InsightGrid({ items, onOpen, openId, me = 'miky', label = 'Insights' }: { items: Item[]; onOpen?: (item: Item) => void; openId?: string; me?: string; label?: string }) {
+  return (
     <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3" aria-label={label}>
-      {list.map((item) => (
+      {newFirst(items).map((item) => (
         <InsightBox key={item.id} item={item} me={me} selected={item.id === openId} onOpen={() => onOpen?.(item)} />
       ))}
     </div>
   )
+}
+
+/**
+ * Newly suggested (Miky, 17 Nov: "simplify, simplify, simplify"): on every tab, what someone suggested and nobody has
+ * added yet, as the same boxes and the same Add, above the tab's own list. Nothing suggested, no section.
+ */
+export function NewlySuggested({ items, onOpen, openId, me = 'miky' }: { items: Item[]; onOpen?: (item: Item) => void; openId?: string; me?: string }) {
+  if (!items.length) return null
   return (
-    <div className="flex flex-col gap-6">
-      {triage.length > 0 && (
-        <section className="flex flex-col gap-3">
-          {/* Newly suggested, not "To triage" (Miky, 17 Nov): you add an insight to the Insights, you do not accept it. */}
-          <SectionHeader title="Newly suggested" count={triage.length} />
-          {grid(triage, 'Newly suggested')}
-        </section>
-      )}
-      <section className="flex flex-col gap-3">
-        {triage.length > 0 && <SectionHeader title="All insights" count={past.length} />}
-        {grid(past, 'All insights')}
-      </section>
-    </div>
+    <section className="flex flex-col gap-3">
+      <SectionHeader title="Newly suggested" count={items.length} />
+      <InsightGrid items={items} onOpen={onOpen} openId={openId} me={me} label="Newly suggested" />
+    </section>
   )
 }
 
@@ -288,7 +283,6 @@ function QuestionBox({ item, me, onOpen, selected, onDecide, deciding = false }:
           ) : (
             <span>No discussion yet</span>
           )}
-          {item.optionsBy && <span>Options by {item.optionsBy.name}</span>}
         </div>
       </div>
     </Card>
