@@ -9,7 +9,7 @@
  * Later lines (raised by its /land and kickoff runs) and its Not in scope list. The two sessions are imagined.
  */
 import { useState } from 'react'
-import { IconCircleCheck, IconPlus, IconTerminal2 } from '@tabler/icons-react'
+import { IconCircleCheck, IconPlus, IconSparkles, IconTerminal2 } from '@tabler/icons-react'
 import { Button, Card, Link, MetaText, Person, SectionHeader, Select, Tabs } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
 import { ScrollArea } from '@/components/ui/ScrollArea'
@@ -121,30 +121,27 @@ function PlanRow({ issue, now }: { issue: PlanIssue; now: boolean }) {
 function MilestoneTable({ m }: { m: Milestone }) {
   const now = m.n === NOW
   const done = m.issues.filter((i) => i.status === 'done').length
-  if (done === m.issues.length)
-    // A finished milestone folds to one line.
-    return (
-      <div className="flex items-center gap-2 px-1 text-body-2 text-text-muted">
-        <IconCircleCheck size={16} stroke={1.5} className="shrink-0 text-success-default" />
-        <span className="min-w-0 truncate">
-          {m.n}. {m.title}
-        </span>
-        <MetaText tone="muted">· done</MetaText>
-      </div>
-    )
+  const finished = done === m.issues.length
+  // A finished milestone folds closed under its header; it opens like any section.
+  const [open, setOpen] = useState(!finished)
   return (
     <section className="flex flex-col gap-2" aria-label={`Milestone ${m.n}`}>
-      <div className="flex items-baseline gap-2 px-1">
-        <span className={cn('min-w-0 truncate text-body-2', now ? 'font-semibold text-text-primary' : 'font-medium text-text-secondary')}>
-          {m.n}. {m.title}
-        </span>
-        {now && <span className="shrink-0 text-caption font-medium text-accent-primary">Now</span>}
-        <span className="shrink-0">
-          <MetaText tone="muted">
-            {done} of {m.issues.length} done
-          </MetaText>
-        </span>
-      </div>
+      {/* Every milestone heads its table with the same section header as To triage and Later, one level for all (Miky, 17 Nov: the rhythm). */}
+      <SectionHeader
+        title={`${m.n}. ${m.title}`}
+        icon={finished ? <IconCircleCheck size={16} stroke={1.5} className="text-success-default" /> : undefined}
+        chevron={finished}
+        isExpanded={open}
+        onToggle={() => setOpen((o) => !o)}
+        trailing={
+          <span className="flex items-center gap-2">
+            {now && <span className="text-caption font-medium text-accent-primary">Now</span>}
+            <MetaText tone="muted">{finished ? 'Done' : `${done} of ${m.issues.length} done`}</MetaText>
+          </span>
+        }
+        actions={finished ? undefined : [{ icon: <IconPlus size={16} stroke={1.5} />, tooltip: 'New issue', onClick: () => undefined }]}
+      />
+      {open && (
       <Card clip fill={now ? 'surface' : 'none'} attention={now ? 'accent' : undefined}>
         <ScrollArea orientation="horizontal">
           <table className="w-full min-w-[840px] table-fixed border-collapse" aria-label={`Milestone ${m.n} issues`}>
@@ -177,17 +174,18 @@ function MilestoneTable({ m }: { m: Milestone }) {
           </table>
         </ScrollArea>
       </Card>
+      )}
     </section>
   )
 }
 
 /** A line raised while building: real ones from this project's /land and kickoff runs (9–10 Nov). */
-type Line = { id: string; title: string; from: string; at: string; isNew?: boolean }
+type Line = { id: string; title: string; from: string; at: string; isNew?: boolean; rec?: { to: string; why: string } }
 const TRIAGE: Line[] = [
-  { id: 't1', title: 'Join on Ship’s Explore topics says nothing when it works: the row loses Join and gains a member', from: 'TOPI-9’s review', at: 'Today', isNew: true },
-  { id: 't2', title: 'A Members or Last active column on Ship’s Explore that did not load stays blank until you switch tabs', from: 'TOPI-9’s review', at: 'Today', isNew: true },
-  { id: 't3', title: 'After Join on Leaf’s Explore topics, its Members count leaves you out until the next open', from: 'TOPI-4’s review', at: 'Today', isNew: true },
-  { id: 't4', title: 'Peek’s Topics icon: back to Explore topics, or to your last topic?', from: 'TOPI-10’s kickoff', at: 'Yesterday' },
+  { id: 't1', title: 'Join on Ship’s Explore topics says nothing when it works: the row loses Join and gains a member', from: 'TOPI-9’s review', at: 'Today', isNew: true, rec: { to: 'm2', why: 'Joining is in this milestone’s Done when, and a silent success reads as broken.' } },
+  { id: 't2', title: 'A Members or Last active column on Ship’s Explore that did not load stays blank until you switch tabs', from: 'TOPI-9’s review', at: 'Today', isNew: true, rec: { to: 'later', why: 'Only when one read fails; the rest of the page works and nothing is lost.' } },
+  { id: 't3', title: 'After Join on Leaf’s Explore topics, its Members count leaves you out until the next open', from: 'TOPI-4’s review', at: 'Today', isNew: true, rec: { to: 'm2', why: 'TOPI-4 is still in review: one line in its PR, before it merges.' } },
+  { id: 't4', title: 'Peek’s Topics icon: back to Explore topics, or to your last topic?', from: 'TOPI-10’s kickoff', at: 'Yesterday', rec: { to: 'not', why: 'Peek’s navigation is reworked in the next stage; deciding it now would be undone.' } },
 ]
 const LATER: Line[] = [
   { id: 'l1', title: 'In Ship’s and Leaf’s sidebars, a topic whose files are all archived folds open to an empty list', from: 'TOPI-1’s prototype', at: '8 Nov' },
@@ -203,16 +201,21 @@ const PUT_IN = [
   ...MILESTONES.filter((m) => m.issues.some((i) => i.status !== 'done')).map((m) => ({ value: `m${m.n}`, label: `${m.n}. ${m.title}${m.n === NOW ? ' (now)' : ''}` })),
   { value: 'later', label: 'Later' },
   { value: 'project', label: 'Another project…' },
+  { value: 'not', label: 'Not doing' },
 ]
+
+const said = (v: string) => (v === 'not' ? 'Not doing' : v === 'later' ? 'Later' : v === 'project' ? 'Another project' : `Milestone ${v.slice(1)}${Number(v.slice(1)) === NOW ? ' (now)' : ''}`)
 
 /**
  * Triage: what came up while building and has no place yet, as boxes, not rows, so it never reads as the plan.
- * Each goes into a milestone (needed to meet the quality), to Later or another project, or to Not doing.
+ * Each comes with Claude's recommendation and why (Miky, 17 Nov: triage is accepting or editing): into a milestone
+ * (needed for the quality), Later or another project, or Not doing. Accept takes it; Edit picks another place.
  */
 function Triage() {
   const [placed, setPlaced] = useState<Record<string, string>>({})
+  const [editing, setEditing] = useState<string>()
   const left = TRIAGE.filter((l) => !placed[l.id])
-  const said = (v: string) => (v === 'not' ? 'Not doing' : v === 'later' ? 'Later' : v === 'project' ? 'Another project' : `Milestone ${v.slice(1)}`)
+  const place = (id: string, v: string) => (setPlaced((p) => ({ ...p, [id]: v })), setEditing(undefined))
   return (
     <section className="flex flex-col gap-3">
       <SectionHeader title="To triage" count={left.length} actions={[{ icon: <IconPlus size={16} stroke={1.5} />, tooltip: 'Raise something', onClick: () => undefined }]} showActions="always" />
@@ -228,14 +231,34 @@ function Triage() {
                 From {l.from} · {l.at}
               </MetaText>
             </span>
-            <span className="flex items-center gap-2">
-              <span className="min-w-0 flex-1">
-                <Select size="small" ariaLabel="Put in" placeholder="Put in…" value="" onChange={(v) => setPlaced((p) => ({ ...p, [l.id]: v }))} options={PUT_IN} />
+            {l.rec && (
+              // The recommendation reads under the line it is about, never louder than it.
+              <span className="flex gap-1.5 border-t border-border-subtle pt-3 text-body-2 text-text-secondary">
+                <IconSparkles size={14} stroke={1.5} className="mt-0.5 shrink-0 text-accent-primary" />
+                <span>
+                  <span className="text-text-primary">{said(l.rec.to)}</span>: {l.rec.why}
+                </span>
               </span>
-              <Button variant="muted" size="small" onClick={() => setPlaced((p) => ({ ...p, [l.id]: 'not' }))}>
-                Not doing
-              </Button>
-            </span>
+            )}
+            {editing === l.id ? (
+              <span className="flex items-center gap-2">
+                <span className="min-w-0 flex-1">
+                  <Select size="small" ariaLabel="Put in" placeholder="Put in…" value="" onChange={(v) => place(l.id, v)} options={PUT_IN} />
+                </span>
+                <Button variant="muted" size="small" onClick={() => setEditing(undefined)}>
+                  Cancel
+                </Button>
+              </span>
+            ) : (
+              <span className="flex items-center gap-2">
+                <Button variant="primary" size="small" onClick={() => place(l.id, l.rec?.to ?? 'later')}>
+                  Accept
+                </Button>
+                <Button variant="outlined" size="small" onClick={() => setEditing(l.id)}>
+                  Edit
+                </Button>
+              </span>
+            )}
           </Card>
         ))}
       </div>
@@ -257,6 +280,7 @@ function LaterAndNotDoing() {
     <section className="flex flex-col gap-2">
       <div className="flex min-h-8 items-center px-1">
         <Tabs
+          size="small"
           tabs={[
             { id: 'later', label: 'Later', count: LATER.length },
             { id: 'not', label: 'Not doing', count: NOT_DOING.length },
@@ -289,7 +313,6 @@ export function BuildPlan() {
     <div className="flex flex-col gap-8">
       <Triage />
       <div className="flex flex-col gap-6">
-        <SectionHeader title="Milestones" count={MILESTONES.length} actions={[{ icon: <IconPlus size={16} stroke={1.5} />, tooltip: 'New issue', onClick: () => undefined }]} showActions="always" />
         {MILESTONES.map((m) => (
           <MilestoneTable key={m.n} m={m} />
         ))}
