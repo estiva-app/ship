@@ -157,80 +157,90 @@ function PlanRow({ issue, now }: { issue: PlanIssue; now: boolean }) {
   )
 }
 
-/** A milestone: its number and title over its issues; the one being built now raised a little, with more room. */
-function MilestoneTable({ m }: { m: Milestone }) {
-  const now = m.n === NOW
+/** A milestone's issues in the one table every milestone shares; the one being built now raised a little, with a header row. */
+function IssueTable({ m, now, children }: { m: Milestone; now: boolean; children?: ReactNode }) {
+  return (
+    <Card clip fill={now ? 'surface' : 'none'} attention={now ? 'accent' : undefined}>
+      <ScrollArea orientation="horizontal">
+        <table className="w-full min-w-[800px] table-fixed border-collapse" aria-label={`Milestone ${m.n} issues`}>
+          {now ? (
+            <thead>
+              <tr className="border-b border-border-default">
+                <th className={cn(TH, 'w-24')}>Ref</th>
+                <th className={TH}>Title</th>
+                <th className={cn(TH, 'w-32')}>Status</th>
+                <th className={cn(TH, 'w-28')}>PR</th>
+                <th className={cn(TH, 'w-52')}>AI Session</th>
+              </tr>
+            </thead>
+          ) : (
+            // The quieter tables keep the same columns without a header, so every milestone lines up under the first.
+            <colgroup>
+              <col className="w-24" />
+              <col />
+              <col className="w-32" />
+              <col className="w-28" />
+              <col className="w-52" />
+            </colgroup>
+          )}
+          <tbody>
+            {m.issues.map((i) => (
+              <PlanRow key={i.ref} issue={i} now={now} />
+            ))}
+            {children}
+          </tbody>
+        </table>
+      </ScrollArea>
+    </Card>
+  )
+}
+
+/** A milestone still open: its number and title over its issues; the current one says Now, and holds what came up. */
+function MilestoneTable({ m, now, suggested }: { m: Milestone; now: boolean; suggested?: ReactNode }) {
   const done = m.issues.filter((i) => i.status === 'done').length
-  const finished = done === m.issues.length
-  // A finished milestone folds closed under its header; it opens like any section.
-  const [open, setOpen] = useState(!finished)
   return (
     <section className="flex flex-col gap-2" aria-label={`Milestone ${m.n}`}>
-      {/* Every milestone heads its table with the same section header as To triage and Later, one level for all (Miky, 17 Nov: the rhythm). */}
-      {finished ? (
-        // A finished milestone: its check after the title, so every milestone's title starts at the same place
-        // (Miky, 17 Nov); its issues fold away behind the chevron on the right.
-        <div className="flex min-h-8 items-center gap-2 px-2">
-          <SectionLabel tone="primary" truncate>
-            {m.n}. {m.title}
-          </SectionLabel>
-          <WithTooltip label="Done">
-            <span role="img" aria-label="Done" className="flex shrink-0">
-              <IconCircleCheck size={16} stroke={1.5} className="text-success-default" />
-            </span>
-          </WithTooltip>
-          <span className="ml-auto">
-            <IconButton tooltip={open ? 'Hide issues' : 'Show issues'} onClick={() => setOpen((o) => !o)}>
-              {open ? <IconChevronDown size={16} stroke={1.5} /> : <IconChevronRight size={16} stroke={1.5} />}
-            </IconButton>
+      <SectionHeader
+        title={`${m.n}. ${m.title}`}
+        trailing={
+          <span className="flex items-center gap-2">
+            {now && <span className="text-caption font-medium text-accent-primary">Now</span>}
+            <MetaText tone="muted">{`${done} of ${m.issues.length} done`}</MetaText>
           </span>
-        </div>
-      ) : (
-        <SectionHeader
-          title={`${m.n}. ${m.title}`}
-          trailing={
-            <span className="flex items-center gap-2">
-              {now && <span className="text-caption font-medium text-accent-primary">Now</span>}
-              <MetaText tone="muted">{`${done} of ${m.issues.length} done`}</MetaText>
-            </span>
-          }
-          actions={[{ icon: <IconPlus size={16} stroke={1.5} />, tooltip: 'New issue', onClick: () => undefined }]}
-        />
-      )}
-      {open && (
-      <Card clip fill={now ? 'surface' : 'none'} attention={now ? 'accent' : undefined}>
-        <ScrollArea orientation="horizontal">
-          <table className="w-full min-w-[800px] table-fixed border-collapse" aria-label={`Milestone ${m.n} issues`}>
-            {now && (
-              <thead>
-                <tr className="border-b border-border-default">
-                  <th className={cn(TH, 'w-24')}>Ref</th>
-                  <th className={TH}>Title</th>
-                  <th className={cn(TH, 'w-32')}>Status</th>
-                  <th className={cn(TH, 'w-28')}>PR</th>
-                  <th className={cn(TH, 'w-52')}>AI Session</th>
-                </tr>
-              </thead>
-            )}
-            {/* The quieter tables keep the same columns without a header, so every milestone lines up under the first. */}
-            {!now && (
-              <colgroup>
-                <col className="w-24" />
-                <col />
-                <col className="w-32" />
-                <col className="w-28" />
-                <col className="w-52" />
-              </colgroup>
-            )}
-            <tbody>
-              {m.issues.map((i) => (
-                <PlanRow key={i.ref} issue={i} now={now} />
-              ))}
-            </tbody>
-          </table>
-        </ScrollArea>
-      </Card>
-      )}
+        }
+        actions={[{ icon: <IconPlus size={16} stroke={1.5} />, tooltip: 'New issue', onClick: () => undefined }]}
+      />
+      <IssueTable m={m} now={now}>
+        {suggested}
+      </IssueTable>
+    </section>
+  )
+}
+
+/**
+ * A finished milestone, in Done at the end of the page: one line, its check after the title so every title starts at
+ * the same place (Miky, 17 Nov); its issues fold away behind the chevron on the right.
+ */
+function DoneMilestone({ m }: { m: Milestone }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <section className="flex flex-col gap-2" aria-label={`Milestone ${m.n}`}>
+      <div className="flex min-h-8 items-center gap-2 px-2">
+        <SectionLabel tone="primary" truncate>
+          {m.n}. {m.title}
+        </SectionLabel>
+        <WithTooltip label="Done">
+          <span role="img" aria-label="Done" className="flex shrink-0">
+            <IconCircleCheck size={16} stroke={1.5} className="text-success-default" />
+          </span>
+        </WithTooltip>
+        <span className="ml-auto">
+          <IconButton tooltip={open ? 'Hide issues' : 'Show issues'} onClick={() => setOpen((o) => !o)}>
+            {open ? <IconChevronDown size={16} stroke={1.5} /> : <IconChevronRight size={16} stroke={1.5} />}
+          </IconButton>
+        </span>
+      </div>
+      {open && <IssueTable m={m} now={false} />}
     </section>
   )
 }
@@ -260,45 +270,55 @@ const PUT_IN = [
   { value: 'not', label: 'Not doing' },
 ]
 
-const said = (v: string) => (v === 'not' ? 'Not doing' : v === 'later' ? 'Later' : v === 'project' ? 'Another project' : `Milestone ${v.slice(1)}${Number(v.slice(1)) === NOW ? ' (now)' : ''}`)
+const said = (v: string) => (v === 'not' ? 'Not doing' : v === 'later' ? 'Later' : v === 'project' ? 'Another project' : Number(v.slice(1)) === NOW ? 'This milestone' : `Milestone ${v.slice(1)}`)
 
 /**
- * Triage: what came up while building and has no place yet, as boxes, not rows, so it never reads as the plan.
- * Each comes with Claude's recommendation and why (Miky, 17 Nov: triage is accepting or editing): into a milestone
- * (needed for the quality), Later or another project, or Not doing. Accept takes it; Edit picks another place.
+ * What came up while building, at the foot of the milestone being built (Miky, 17 Nov: triage lives in the milestone
+ * the new things come from, usually the current one), as rows under its issues, not boxes. Each carries Claude's
+ * recommendation and why; Accept puts it there (into this milestone, it becomes an issue row just above), Edit picks
+ * another place.
  */
-function Triage() {
-  const [placed, setPlaced] = useState<Record<string, string>>({})
+function SuggestedRows({ lines, onPlace }: { lines: Line[]; onPlace: (id: string, to: string) => void }) {
   const [editing, setEditing] = useState<string>()
-  const left = TRIAGE.filter((l) => !placed[l.id])
-  const place = (id: string, v: string) => (setPlaced((p) => ({ ...p, [id]: v })), setEditing(undefined))
+  if (!lines.length) return null
+  const place = (id: string, to: string) => (onPlace(id, to), setEditing(undefined))
   return (
-    <section className="flex flex-col gap-3">
-      <SectionHeader title="To triage" count={left.length} actions={[{ icon: <IconPlus size={16} stroke={1.5} />, tooltip: 'Raise something', onClick: () => undefined }]} showActions="always" />
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3" aria-label="To triage">
-        {left.map((l) => (
-          <Card key={l.id} fill="surface" hover="hairline" className="flex flex-col justify-between gap-3 p-4">
-            <span className="flex flex-col gap-1">
-              <span className="text-body-2 font-medium text-text-primary">
-                {l.title}
-                <NewDot on={l.isNew} />
+    <>
+      <tr className="border-b border-border-subtle">
+        <td colSpan={5} className="px-3 pt-4 pb-2">
+          <span className="flex items-center gap-2">
+            <SectionLabel>Suggested</SectionLabel>
+            <MetaText tone="muted">{lines.length}</MetaText>
+          </span>
+        </td>
+      </tr>
+      {lines.map((l) => (
+        <tr key={l.id} className="border-b border-border-subtle last:border-b-0">
+          <td className="px-3 py-3 align-top">
+            <WithTooltip label="Suggested">
+              <span role="img" aria-label="Suggested" className="flex">
+                <IconSparkles size={16} stroke={1.5} className="text-accent-primary" />
               </span>
-              <MetaText tone="muted">
-                From {l.from} · {l.at}
-              </MetaText>
+            </WithTooltip>
+          </td>
+          <td className="px-3 py-3 align-top text-body-2">
+            <span className="block font-medium text-text-primary">
+              {l.title}
+              <NewDot on={l.isNew} />
             </span>
             {l.rec && (
-              // The recommendation reads under the line it is about, never louder than it.
-              <span className="flex gap-1.5 border-t border-border-subtle pt-3 text-body-2 text-text-secondary">
-                <IconSparkles size={14} stroke={1.5} className="mt-0.5 shrink-0 text-accent-primary" />
-                <span>
-                  <span className="text-text-primary">{said(l.rec.to)}</span>: {l.rec.why}
-                </span>
+              <span className="block text-text-secondary">
+                <span className="text-text-primary">{said(l.rec.to)}</span>: {l.rec.why}
               </span>
             )}
+            <MetaText tone="muted">
+              From {l.from} · {l.at}
+            </MetaText>
+          </td>
+          <td colSpan={3} className="px-3 py-3 align-top">
             {editing === l.id ? (
               <span className="flex items-center gap-2">
-                <span className="min-w-0 flex-1">
+                <span className="w-56">
                   <Select size="small" ariaLabel="Put in" placeholder="Put in…" value="" onChange={(v) => place(l.id, v)} options={PUT_IN} />
                 </span>
                 <Button variant="muted" size="small" onClick={() => setEditing(undefined)}>
@@ -315,31 +335,25 @@ function Triage() {
                 </Button>
               </span>
             )}
-          </Card>
-        ))}
-      </div>
-      {/* A placed line leaves the grid and says where it went, once. */}
-      {Object.entries(placed).map(([id, v]) => (
-        <MetaText key={id} tone="muted">
-          “{TRIAGE.find((l) => l.id === id)?.title}” → {said(v)}
-        </MetaText>
+          </td>
+        </tr>
       ))}
-    </section>
+    </>
   )
 }
 
 /** The last milestone is Later, with Not doing beside it as a tab: what was parked, and what was let go on purpose. */
-function LaterAndNotDoing() {
+function LaterAndNotDoing({ later, notDoing }: { later: Line[]; notDoing: Line[] }) {
   const [tab, setTab] = useState<'later' | 'not'>('later')
-  const lines = tab === 'later' ? LATER : NOT_DOING
+  const lines = tab === 'later' ? later : notDoing
   return (
     <section className="flex flex-col gap-2">
       <div className="flex min-h-8 items-center px-1">
         <Tabs
           size="small"
           tabs={[
-            { id: 'later', label: 'Later', count: LATER.length },
-            { id: 'not', label: 'Not doing', count: NOT_DOING.length },
+            { id: 'later', label: 'Later', count: later.length },
+            { id: 'not', label: 'Not doing', count: notDoing.length },
           ]}
           active={tab}
           onChange={setTab}
@@ -363,17 +377,35 @@ function LaterAndNotDoing() {
   )
 }
 
-/** The Issues tab: Triage, the milestones in order, then Later and Not doing. */
+/**
+ * The Issues tab (Miky, 17 Nov): the open milestones in order, so the one being built comes first, with what came up
+ * at its foot; then Later and Not doing; then Done at the end, as Linear keeps it, each finished milestone one line.
+ */
 export function BuildPlan() {
+  const [placed, setPlaced] = useState<Record<string, string>>({})
+  const into = (to: string) => TRIAGE.filter((l) => placed[l.id] === to)
+  // A suggestion accepted into a milestone becomes its next issue, numbered in the order they were accepted.
+  const accepted = Object.keys(placed).filter((id) => placed[id].startsWith('m'))
+  const asIssue = (l: Line): PlanIssue => ({ ref: `TOPI-${11 + accepted.indexOf(l.id)}`, title: l.title, summary: `From ${l.from}`, status: 'todo', who: 'Miky' })
+  const milestones = MILESTONES.map((m) => ({ ...m, issues: [...m.issues, ...into(`m${m.n}`).map(asIssue)] }))
+  const finished = milestones.filter((m) => m.issues.every((i) => i.status === 'done'))
+  const open = milestones.filter((m) => !finished.includes(m))
+  const current = open.find((m) => m.n === NOW) ?? open[0]
+  const left = TRIAGE.filter((l) => !placed[l.id])
   return (
-    <div className="flex flex-col gap-8">
-      <Triage />
-      <div className="flex flex-col gap-6">
-        {MILESTONES.map((m) => (
-          <MilestoneTable key={m.n} m={m} />
-        ))}
-        <LaterAndNotDoing />
-      </div>
+    <div className="flex flex-col gap-6">
+      {open.map((m) => (
+        <MilestoneTable key={m.n} m={m} now={m === current} suggested={m === current ? <SuggestedRows lines={left} onPlace={(id, to) => setPlaced((p) => ({ ...p, [id]: to }))} /> : undefined} />
+      ))}
+      <LaterAndNotDoing later={[...into('later'), ...LATER]} notDoing={[...into('not'), ...NOT_DOING]} />
+      {finished.length > 0 && (
+        <section className="flex flex-col gap-2" aria-label="Done">
+          <SectionHeader title="Done" count={finished.length} />
+          {finished.map((m) => (
+            <DoneMilestone key={m.n} m={m} />
+          ))}
+        </section>
+      )}
     </div>
   )
 }

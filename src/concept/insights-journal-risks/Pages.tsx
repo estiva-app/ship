@@ -231,7 +231,7 @@ export function ProjectPage({ start = 'overview', listState = 'ready', me = 'mik
             </Centred>
           )}
           {tab === 'issues' && (
-            // Issues as the plan of the build (Miky, 17 Nov): Triage, the milestones, then Later and Not doing.
+            // Issues as the plan of the build (Miky, 17 Nov): the open milestones with Suggested in the current one, Later and Not doing, then Done.
             <BuildPlan />
           )}
           {tab === 'insights' && <ItemsTab type="insight" all={all} state={listState} onOpen={onOpenItem} openId={open?.id} me={me} />}
