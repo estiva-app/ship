@@ -9,8 +9,8 @@
  * Later lines (raised by its /land and kickoff runs) and its Not in scope list. The two sessions are imagined.
  */
 import { useState, type ReactNode } from 'react'
-import { IconCircleCheck, IconGitMerge, IconGitPullRequest, IconGitPullRequestDraft, IconPlus, IconSparkles, IconTerminal2 } from '@tabler/icons-react'
-import { Button, Card, Link, MetaText, Person, SectionHeader, Select, Tabs, WithTooltip } from '@estiva-app/ui'
+import { IconChevronDown, IconChevronRight, IconCircleCheck, IconGitMerge, IconGitPullRequest, IconGitPullRequestDraft, IconPlus, IconSparkles, IconTerminal2 } from '@tabler/icons-react'
+import { Button, Card, IconButton, Link, MetaText, Person, SectionHeader, SectionLabel, Select, Tabs, WithTooltip } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
 import { ScrollArea } from '@/components/ui/ScrollArea'
 import { StatusLabel } from '@/components/ui/StatusLabel'
@@ -149,20 +149,36 @@ function MilestoneTable({ m }: { m: Milestone }) {
   return (
     <section className="flex flex-col gap-2" aria-label={`Milestone ${m.n}`}>
       {/* Every milestone heads its table with the same section header as To triage and Later, one level for all (Miky, 17 Nov: the rhythm). */}
-      <SectionHeader
-        title={`${m.n}. ${m.title}`}
-        icon={finished ? <IconCircleCheck size={16} stroke={1.5} className="text-success-default" /> : undefined}
-        chevron={finished}
-        isExpanded={open}
-        onToggle={() => setOpen((o) => !o)}
-        trailing={
-          <span className="flex items-center gap-2">
-            {now && <span className="text-caption font-medium text-accent-primary">Now</span>}
-            <MetaText tone="muted">{finished ? 'Done' : `${done} of ${m.issues.length} done`}</MetaText>
+      {finished ? (
+        // A finished milestone: its check after the title, so every milestone's title starts at the same place
+        // (Miky, 17 Nov); its issues fold away behind the chevron on the right.
+        <div className="flex min-h-8 items-center gap-2 px-2">
+          <SectionLabel tone="primary" truncate>
+            {m.n}. {m.title}
+          </SectionLabel>
+          <WithTooltip label="Done">
+            <span role="img" aria-label="Done" className="flex shrink-0">
+              <IconCircleCheck size={16} stroke={1.5} className="text-success-default" />
+            </span>
+          </WithTooltip>
+          <span className="ml-auto">
+            <IconButton tooltip={open ? 'Hide issues' : 'Show issues'} onClick={() => setOpen((o) => !o)}>
+              {open ? <IconChevronDown size={16} stroke={1.5} /> : <IconChevronRight size={16} stroke={1.5} />}
+            </IconButton>
           </span>
-        }
-        actions={finished ? undefined : [{ icon: <IconPlus size={16} stroke={1.5} />, tooltip: 'New issue', onClick: () => undefined }]}
-      />
+        </div>
+      ) : (
+        <SectionHeader
+          title={`${m.n}. ${m.title}`}
+          trailing={
+            <span className="flex items-center gap-2">
+              {now && <span className="text-caption font-medium text-accent-primary">Now</span>}
+              <MetaText tone="muted">{`${done} of ${m.issues.length} done`}</MetaText>
+            </span>
+          }
+          actions={[{ icon: <IconPlus size={16} stroke={1.5} />, tooltip: 'New issue', onClick: () => undefined }]}
+        />
+      )}
       {open && (
       <Card clip fill={now ? 'surface' : 'none'} attention={now ? 'accent' : undefined}>
         <ScrollArea orientation="horizontal">
