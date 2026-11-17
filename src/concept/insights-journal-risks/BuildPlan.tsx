@@ -18,7 +18,7 @@ import { NewDot } from './ItemParts'
 
 type IssueStatus = 'todo' | 'in_progress' | 'done' | 'cancelled'
 const STATUS: Record<IssueStatus, string> = { todo: 'Todo', in_progress: 'In Progress', done: 'Done', cancelled: 'Cancelled' }
-type Session = { stage: string; last: string; when: string; waitsOnYou?: boolean }
+type Session = { name: string; stage: string; last: string; when: string; waitsOnYou?: boolean }
 type PrStage = 'Draft' | 'Open' | 'Merged'
 type PlanIssue = { ref: string; title: string; summary: string; status: IssueStatus; who: string; session?: Session; pr?: { name: string; stage: PrStage } }
 type Milestone = { n: number; title: string; issues: PlanIssue[] }
@@ -36,7 +36,7 @@ const MILESTONES: Milestone[] = [
         summary: 'The same order as Peek; each topic folds open to its files.',
         status: 'in_progress',
         who: 'Miky',
-        session: { stage: 'Waiting on you', last: 'Asked: does a topic fold open to its projects only, or to its projects and their issues?', when: '20 min ago', waitsOnYou: true },
+        session: { name: 'Ship topics sidebar', stage: 'Waiting on you', last: 'Asked: does a topic fold open to its projects only, or to its projects and their issues?', when: '20 min ago', waitsOnYou: true },
         pr: { name: 'ship#604', stage: 'Draft' },
       },
       {
@@ -45,7 +45,7 @@ const MILESTONES: Milestone[] = [
         summary: 'Leaf’s sidebar reads the same order as Peek and Ship.',
         status: 'in_progress',
         who: 'Miky',
-        session: { stage: 'In review', last: 'The three reviewers are running on the PR', when: '4 min ago' },
+        session: { name: 'Leaf topics order', stage: 'In review', last: 'The three reviewers are running on the PR', when: '4 min ago' },
         pr: { name: 'leaf#52', stage: 'Open' },
       },
     ],
@@ -88,17 +88,19 @@ function ClaudeCell({ issue }: { issue: PlanIssue }) {
       </span>
     )
   return (
-    // No label for its state (Miky, 17 Nov: "the icon should say that"): an amber question when it waits on you, else the
-    // terminal; hover names it.
-    <span className="relative flex items-center gap-1">
+    // The session's own name, then its state as an icon with no label (Miky, 17 Nov): an amber question when it waits on
+    // you, else the terminal; hover names it.
+    <span className="flex min-w-0 items-center gap-1.5">
+      <span className="relative flex min-w-0">
+        <Link href="#" variant="quiet" truncate onClick={(e) => e.preventDefault()}>
+          {s.name}
+        </Link>
+      </span>
       <WithTooltip label={s.waitsOnYou ? 'Waiting on you' : 'Working'}>
-        <span role="img" aria-label={s.waitsOnYou ? 'Waiting on you' : 'Working'} className="flex">
-          {s.waitsOnYou ? <IconMessageQuestion size={16} stroke={1.5} className="shrink-0 text-warning-default" /> : <IconTerminal2 size={16} stroke={1.5} className="shrink-0 text-text-muted" />}
+        <span role="img" aria-label={s.waitsOnYou ? 'Waiting on you' : 'Working'} className="flex shrink-0">
+          {s.waitsOnYou ? <IconMessageQuestion size={16} stroke={1.5} className="text-warning-default" /> : <IconTerminal2 size={16} stroke={1.5} className="text-text-muted" />}
         </span>
       </WithTooltip>
-      <Link href="#" variant="quiet" onClick={(e) => e.preventDefault()}>
-        Open
-      </Link>
     </span>
   )
 }
@@ -196,14 +198,14 @@ function MilestoneTable({ m }: { m: Milestone }) {
       {open && (
       <Card clip fill={now ? 'surface' : 'none'} attention={now ? 'accent' : undefined}>
         <ScrollArea orientation="horizontal">
-          <table className="w-full min-w-[680px] table-fixed border-collapse" aria-label={`Milestone ${m.n} issues`}>
+          <table className="w-full min-w-[720px] table-fixed border-collapse" aria-label={`Milestone ${m.n} issues`}>
             {now && (
               <thead>
                 <tr className="border-b border-border-default">
                   <th className={cn(TH, 'w-24')}>Ref</th>
                   <th className={TH}>Title</th>
                   <th className={cn(TH, 'w-36')}>Status</th>
-                  <th className={cn(TH, 'w-32')}>AI Session</th>
+                  <th className={cn(TH, 'w-52')}>AI Session</th>
                 </tr>
               </thead>
             )}
@@ -213,7 +215,7 @@ function MilestoneTable({ m }: { m: Milestone }) {
                 <col className="w-24" />
                 <col />
                 <col className="w-36" />
-                <col className="w-32" />
+                <col className="w-52" />
               </colgroup>
             )}
             <tbody>
