@@ -23,7 +23,8 @@ import {
   type UnsignedEvent,
 } from '@estiva-app/protocol'
 import { buildComment, buildReply, mentionTagsFor, urgentTagsFor, type CommentRef } from '@estiva-app/conversation'
-import { KIND } from './kinds'
+import { stageTagFor } from '@estiva-app/interop'
+import { ISSUE_STATUSES, KIND, PROJECT_STATUSES } from './kinds'
 import { manifestContent } from './manifest'
 import { summaryText } from './summary'
 
@@ -336,10 +337,23 @@ export function buildChange(
         a move to "No project" names nothing.
       */
       ...(isMove(args.target, args.field) && PROJECT_ADDRESS.test(args.value) ? [['A', args.value]] : []),
+      /*
+        What the chosen status means, last — SPEC §6.2's `stage` (EAC-4): the
+        stage of the option Ship offered, so any app counts the change without
+        Ship's list. Derived here, like `imeta` and `p`, so no caller can omit
+        it; interop's rule, so Ship and every declared action write the same
+        tag. A cleared value, or one Ship does not offer, carries none.
+        why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-companys-statuses-are-its-own-layer-of-a-types-properties.md
+      */
+      ...[stageTagFor(args.field, args.value, offeredOptions(args.target, args.field))].filter((tag) => tag !== undefined),
     ],
     content: args.note ?? '',
   }
 }
+
+/** The options Ship offers for a field of the target's kind: its project or issue statuses for `status`, none otherwise. */
+const offeredOptions = (target: string, field: string) =>
+  field !== 'status' ? undefined : target.startsWith(`${KIND.PROJECT}:`) ? PROJECT_STATUSES : target.startsWith(`${KIND.ISSUE}:`) ? ISSUE_STATUSES : undefined
 
 /** Whether a change is a move: the field the manifest declares as `movedBy` for the target's kind — see `buildChange`. */
 const isMove = (target: string, field: string) => field === 'project' && target.startsWith(`${KIND.ISSUE}:`)
