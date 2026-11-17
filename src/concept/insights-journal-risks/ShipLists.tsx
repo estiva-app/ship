@@ -7,8 +7,8 @@
  *   most severe first (Miky, 16 Nov).
  */
 import { useState } from 'react'
-import { IconPlus, IconSparkles } from '@tabler/icons-react'
-import { AvatarGroup, Button, Card, Link, MetaText, Person, SectionHeader } from '@estiva-app/ui'
+import { IconPlus, IconSparkles, IconTerminal2 } from '@tabler/icons-react'
+import { AvatarGroup, Button, Card, Link, MetaText, Person, SectionHeader, Select } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
 import { ScrollArea } from '@/components/ui/ScrollArea'
 import { AcceptReject, ENDED, ItemTag, LIVE, NewDot, StatusOf, acceptedStatus } from './ItemParts'
@@ -352,6 +352,49 @@ export function RiskDashboard({ items, onOpen, openId, me = 'miky', onDecide, de
   )
 }
 
+/**
+ * What is being built (Miky, 17 Nov): each issue in progress with the Claude Code session building it, one click
+ * away, what it did last, and whether it waits on you. Imagined sessions over the table's own issues.
+ */
+type Session = { ref: string; title: string; by: string; stage: string; last: string; when: string; waitsOnYou?: boolean }
+const BUILDING: Session[] = [
+  { ref: 'REL-2', title: 'Comments lose their draft when navigating away', by: 'Ravi Mehta', stage: 'Waiting on you', last: 'Asked: keep a draft per comment box, or one per issue?', when: '1h ago', waitsOnYou: true },
+  { ref: 'REL-1', title: 'Board columns lose order after an archived project returns', by: 'Ana Duarte', stage: 'PR open, in review', last: 'Fixed the order on unarchive; the three reviewers are running', when: '4 min ago' },
+]
+
+/** Being built: the first job of Issues, to see what is in the works and steer it. */
+export function BuildingBox() {
+  return (
+    <section className="flex flex-col gap-3">
+      <SectionHeader title="Being built" count={BUILDING.length} />
+      <Card fill="none" clip attention={BUILDING.some((b) => b.waitsOnYou) ? 'warning' : undefined}>
+        <ul aria-label="Being built">
+          {BUILDING.map((b) => (
+            <li key={b.ref} className="flex items-center gap-3 border-b border-border-subtle px-4 py-2.5 last:border-b-0">
+              <span className="w-12 shrink-0 text-caption text-text-muted">{b.ref}</span>
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="truncate text-body-2 font-medium text-text-primary">{b.title}</span>
+                <span className="min-w-0 truncate">
+                  <MetaText tone="muted">
+                    {b.last} · {b.when}
+                  </MetaText>
+                </span>
+              </span>
+              <span className={cn('shrink-0 text-body-2', b.waitsOnYou ? 'font-medium text-warning-default' : 'text-text-secondary')}>{b.stage}</span>
+              <span className="hidden shrink-0 xl:block">
+                <MetaText tone="muted">Claude, for {b.by}</MetaText>
+              </span>
+              <Button variant={b.waitsOnYou ? 'primary' : 'outlined'} size="small" leadingIcon={<IconTerminal2 size={14} stroke={1.5} />} onClick={() => undefined}>
+                Open session
+              </Button>
+            </li>
+          ))}
+        </ul>
+      </Card>
+    </section>
+  )
+}
+
 /** A line parked for later: real ones, from the Later list of the project "Ship's Topics navigation" (4 Nov). */
 type LaterLine = { id: string; title: string; from: string; by: string; at: string; isNew?: boolean }
 const LATER: LaterLine[] = [
@@ -360,14 +403,22 @@ const LATER: LaterLine[] = [
   { id: 'l3', title: 'Archived Leaf documents behind a topic page’s Archived', from: 'review of the topic page', by: 'Claude', at: '2 Nov' },
   { id: 'l4', title: 'Leaf’s Topics row says “(archived)” on an archived topic, as Ship’s does', from: 'Katerina’s comment', by: 'Katerina', at: '1 Nov' },
 ]
+const MOVE_TO = [
+  { value: 'phase', label: 'A next phase of this project' },
+  { value: 'new', label: 'A new project' },
+  { value: 'bugs', label: 'Ship: Feedback & Bugs' },
+]
+type Outcome = { kind: 'needed' } | { kind: 'moved'; to: string } | { kind: 'dropped' }
 
 /**
- * Later (Miky, 17 Nov): what came up while building and is out of this project's scope for now. Its own triage box
- * above the Issues table, never mixed into it and no longer on Overview: scope reads in one place, what is in below,
- * what is out above. Take in makes it an issue of this project; Leave out writes "Not doing …" into the Journal.
+ * Later, triaged (Miky, 17 Nov): what came up while building, its own box under the issues, never mixed into them.
+ * Each line ends one of three ways: Needed for this project's quality (it becomes an issue here), Moved to a later
+ * phase or another project, or Not relevant at all.
  */
 export function LaterBox() {
-  const [done, setDone] = useState<Record<string, 'in' | 'out'>>({})
+  const [done, setDone] = useState<Record<string, Outcome>>({})
+  const set = (id: string, o: Outcome) => setDone((d) => ({ ...d, [id]: o }))
+  const said = (o: Outcome) => (o.kind === 'needed' ? 'Needed: now an issue here' : o.kind === 'moved' ? `Moved to ${MOVE_TO.find((m) => m.value === o.to)?.label.toLowerCase()}` : 'Not relevant')
   return (
     <section className="flex flex-col gap-3">
       <SectionHeader title="Later" count={LATER.length - Object.keys(done).length} actions={[add('Park something for later')]} showActions="always" />
@@ -388,14 +439,17 @@ export function LaterBox() {
               </span>
               <span className="flex shrink-0 items-center gap-1">
                 {done[line.id] ? (
-                  <MetaText tone="muted">{done[line.id] === 'in' ? 'Taken in, now an issue' : 'Left out, in the Journal'}</MetaText>
+                  <MetaText tone="muted">{said(done[line.id]!)}</MetaText>
                 ) : (
                   <>
-                    <Button variant="outlined" size="small" onClick={() => setDone((d) => ({ ...d, [line.id]: 'in' }))}>
-                      Take in
+                    <Button variant="outlined" size="small" onClick={() => set(line.id, { kind: 'needed' })}>
+                      Needed
                     </Button>
-                    <Button variant="muted" size="small" onClick={() => setDone((d) => ({ ...d, [line.id]: 'out' }))}>
-                      Leave out
+                    <span className="w-28">
+                      <Select size="small" ariaLabel="Move to" placeholder="Move to…" value="" onChange={(v) => set(line.id, { kind: 'moved', to: v })} options={MOVE_TO} />
+                    </span>
+                    <Button variant="muted" size="small" onClick={() => set(line.id, { kind: 'dropped' })}>
+                      Not relevant
                     </Button>
                   </>
                 )}
