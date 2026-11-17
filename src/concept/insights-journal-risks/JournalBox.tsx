@@ -29,28 +29,42 @@ export function JournalBox({ onAdd }: { onAdd: (item: Item) => void }) {
     })
     setText('')
   }
+  // One line until you are in it, so the log shows more (Miky, 17 Nov); in it, or holding text, it opens to a few rows
+  // with the toggle above and Post below.
+  const [focused, setFocused] = useState(false)
+  const open = focused || text.length > 0
   return (
-    <Card fill="surface" className="p-3">
+    <Card fill="surface" className="px-3 py-2">
       {/* The kit's keys: Enter is a new line in the text, Ctrl+Enter or the button posts it. */}
       <Form onSubmit={post} layout="free">
-        <span className="flex flex-col gap-2">
-          <span className="flex">
-            <Tabs tabs={WORDS} active={word} onChange={setWord} size="small" />
-          </span>
+        <span
+          className="flex flex-col gap-2"
+          onFocus={() => setFocused(true)}
+          onBlur={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget)) setFocused(false)
+          }}
+        >
+          {open && (
+            <span className="flex pt-1">
+              <Tabs tabs={WORDS} active={word} onChange={setWord} size="small" />
+            </span>
+          )}
           {/* @estiva-escape(no-restyled-part): prototype of CommentBox with its toggle inside the frame (New here); the build moves it into estiva-ui and this Textarea goes. */}
           <Textarea
             aria-label={word === 'Update' ? 'Write an update' : 'Write a decision'}
-            className="min-h-16 border-0 bg-transparent px-1 shadow-none focus:ring-0"
-            placeholder={word === 'Update' ? 'Write an update… the first line is its title' : 'Write a decision… the first line is its title'}
+            className="border-0 bg-transparent px-1 shadow-none focus:ring-0"
+            placeholder={open ? (word === 'Update' ? 'Write an update… the first line is its title' : 'Write a decision… the first line is its title') : 'Write an update or a decision…'}
             value={text}
-            rows={3}
+            rows={open ? 4 : 1}
             onChange={(e) => setText(e.target.value)}
           />
-          <span className="flex justify-end">
-            <Button type="submit" variant="outlined" size="small" disabled={!text.trim()}>
-              {word === 'Update' ? 'Post update' : 'Post decision'}
-            </Button>
-          </span>
+          {open && (
+            <span className="flex justify-end pb-1">
+              <Button type="submit" variant="outlined" size="small" disabled={!text.trim()}>
+                {word === 'Update' ? 'Post update' : 'Post decision'}
+              </Button>
+            </span>
+          )}
         </span>
       </Form>
     </Card>
