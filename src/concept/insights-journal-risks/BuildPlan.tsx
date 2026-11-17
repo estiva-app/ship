@@ -8,7 +8,7 @@
  * Real data: the project "Topics: level up the topic experience" as it stood on 9 Nov, its milestones, issues and
  * Later lines (raised by its /land and kickoff runs) and its Not in scope list. The two sessions are imagined.
  */
-import { useState, type ReactNode } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 import {
   IconChevronDown,
   IconChevronRight,
@@ -19,7 +19,6 @@ import {
   IconMessageQuestion,
   IconArrowRight,
   IconPlus,
-  IconSparkles,
   IconTerminal2,
 } from "@tabler/icons-react";
 import {
@@ -317,50 +316,6 @@ function PlanRow({ issue, now }: { issue: PlanIssue; now: boolean }) {
   );
 }
 
-/** A milestone's issues in the one table every milestone shares; the one being built now raised a little, with a header row. */
-function IssueTable({ m, now }: { m: Milestone; now: boolean }) {
-  return (
-    <Card
-      clip
-      fill={now ? "surface" : "none"}
-      attention={now ? "accent" : undefined}
-    >
-      <ScrollArea orientation="horizontal">
-        <table
-          className="w-full min-w-[800px] table-fixed border-collapse"
-          aria-label={`Milestone ${m.n} issues`}
-        >
-          {now ? (
-            <thead>
-              <tr className="border-b border-border-default">
-                <th className={cn(TH, "w-24")}>Ref</th>
-                <th className={TH}>Title</th>
-                <th className={cn(TH, "w-32")}>Status</th>
-                <th className={cn(TH, "w-28")}>PR</th>
-                <th className={cn(TH, "w-52")}>AI Session</th>
-              </tr>
-            </thead>
-          ) : (
-            // The quieter tables keep the same columns without a header, so every milestone lines up under Now's.
-            <colgroup>
-              <col className="w-24" />
-              <col />
-              <col className="w-32" />
-              <col className="w-28" />
-              <col className="w-52" />
-            </colgroup>
-          )}
-          <tbody>
-            {m.issues.map((i) => (
-              <PlanRow key={i.ref} issue={i} now={now} />
-            ))}
-          </tbody>
-        </table>
-      </ScrollArea>
-    </Card>
-  );
-}
-
 /** One step below a section's header: the kit's secondary label, which labels the rows under it (a milestone, Suggested, Later). */
 function SubHead({
   label,
@@ -389,52 +344,130 @@ function SubHead({
 const doneOf = (m: Milestone) =>
   `${m.issues.filter((i) => i.status === "done").length} of ${m.issues.length} done`;
 
-/** A milestone still to build, under Next: its label, then its issues. */
-function NextMilestone({ m }: { m: Milestone }) {
+/**
+ * A milestone as a row of its own inside the table (Miky, 17 Nov: "one table with the middle rows representing the
+ * milestone"): its number and title, then how many are done, or its check once finished; folded, a chevron first.
+ */
+function MilestoneRow({
+  m,
+  open,
+  onToggle,
+}: {
+  m: Milestone;
+  open: boolean;
+  onToggle?: () => void;
+}) {
+  const finished = m.issues.every((i) => i.status === "done");
   return (
-    <section className="flex flex-col gap-1" aria-label={`Milestone ${m.n}`}>
-      <SubHead
-        label={`${m.n}. ${m.title}`}
-        trailing={<MetaText tone="muted">{doneOf(m)}</MetaText>}
-      />
-      <IssueTable m={m} now={false} />
-    </section>
+    <tr className="border-b border-border-subtle">
+      <td colSpan={5} className="px-3 py-1">
+        <span className="flex min-h-8 items-center gap-2">
+          {onToggle && (
+            <IconButton
+              tooltip={open ? "Hide issues" : "Show issues"}
+              onClick={onToggle}
+            >
+              {open ? (
+                <IconChevronDown size={16} stroke={1.5} />
+              ) : (
+                <IconChevronRight size={16} stroke={1.5} />
+              )}
+            </IconButton>
+          )}
+          <SectionLabel tone="secondary" truncate>
+            {m.n}. {m.title}
+          </SectionLabel>
+          {finished ? (
+            <WithTooltip label="Done">
+              <span role="img" aria-label="Done" className="flex shrink-0">
+                <IconCircleCheck
+                  size={16}
+                  stroke={1.5}
+                  className="text-success-default"
+                />
+              </span>
+            </WithTooltip>
+          ) : (
+            <span className="ml-auto shrink-0">
+              <MetaText tone="muted">{doneOf(m)}</MetaText>
+            </span>
+          )}
+        </span>
+      </td>
+    </tr>
   );
 }
 
-/** A finished milestone, under Done: one line, its check after the title (Miky, 17 Nov), its issues behind the chevron. */
-function DoneMilestone({ m }: { m: Milestone }) {
-  const [open, setOpen] = useState(false);
+/**
+ * Now, Next and Done each as one table, every milestone a row inside it over its issues: one part, three times. Now's
+ * is raised a little and carries the column names; Done's milestones start folded.
+ */
+function GroupedTable({
+  label,
+  milestones,
+  now = false,
+  folded = false,
+}: {
+  label: string;
+  milestones: Milestone[];
+  now?: boolean;
+  folded?: boolean;
+}) {
+  const [opened, setOpened] = useState<Record<number, boolean>>({});
+  const isOpen = (m: Milestone) => !folded || !!opened[m.n];
   return (
-    <section className="flex flex-col gap-1" aria-label={`Milestone ${m.n}`}>
-      <SubHead
-        label={`${m.n}. ${m.title}`}
-        after={
-          <WithTooltip label="Done">
-            <span role="img" aria-label="Done" className="flex shrink-0">
-              <IconCircleCheck
-                size={16}
-                stroke={1.5}
-                className="text-success-default"
-              />
-            </span>
-          </WithTooltip>
-        }
-        trailing={
-          <IconButton
-            tooltip={open ? "Hide issues" : "Show issues"}
-            onClick={() => setOpen((o) => !o)}
-          >
-            {open ? (
-              <IconChevronDown size={16} stroke={1.5} />
-            ) : (
-              <IconChevronRight size={16} stroke={1.5} />
-            )}
-          </IconButton>
-        }
-      />
-      {open && <IssueTable m={m} now={false} />}
-    </section>
+    <Card
+      clip
+      fill={now ? "surface" : "none"}
+      attention={now ? "accent" : undefined}
+    >
+      <ScrollArea orientation="horizontal">
+        <table
+          className="w-full min-w-[800px] table-fixed border-collapse"
+          aria-label={label}
+        >
+          {now ? (
+            <thead>
+              <tr className="border-b border-border-default">
+                <th className={cn(TH, "w-24")}>Ref</th>
+                <th className={TH}>Title</th>
+                <th className={cn(TH, "w-32")}>Status</th>
+                <th className={cn(TH, "w-28")}>PR</th>
+                <th className={cn(TH, "w-52")}>AI Session</th>
+              </tr>
+            </thead>
+          ) : (
+            // The other tables keep the same columns without their names, so they line up under Now's.
+            <colgroup>
+              <col className="w-24" />
+              <col />
+              <col className="w-32" />
+              <col className="w-28" />
+              <col className="w-52" />
+            </colgroup>
+          )}
+          <tbody>
+            {milestones.map((m) => (
+              <Fragment key={m.n}>
+                <MilestoneRow
+                  m={m}
+                  open={isOpen(m)}
+                  onToggle={
+                    folded
+                      ? () => setOpened((o) => ({ ...o, [m.n]: !o[m.n] }))
+                      : undefined
+                  }
+                />
+                {isOpen(m) &&
+                  m.issues.map((i) => (
+                    <PlanRow key={i.ref} issue={i} now={now} />
+                  ))}
+              </Fragment>
+            ))}
+          </tbody>
+        </table>
+      </ScrollArea>
+    </Card>
   );
 }
 
@@ -594,11 +627,6 @@ function Suggested({
               key={l.id}
               className="flex items-start gap-3 border-b border-border-subtle px-4 py-3 last:border-b-0"
             >
-              <IconSparkles
-                size={16}
-                stroke={1.5}
-                className="mt-0.5 shrink-0 text-accent-primary"
-              />
               <span className="flex min-w-0 flex-1 flex-col text-body-2">
                 <span className="font-medium text-text-primary">
                   {l.title}
@@ -747,7 +775,6 @@ export function BuildPlan() {
         <section className="flex flex-col gap-2" aria-label="Now">
           <SectionHeader
             title="Now"
-            trailing={<MetaText tone="muted">{doneOf(current)}</MetaText>}
             actions={[
               {
                 icon: <IconPlus size={16} stroke={1.5} />,
@@ -756,13 +783,7 @@ export function BuildPlan() {
               },
             ]}
           />
-          <section
-            className="flex flex-col gap-1"
-            aria-label={`Milestone ${current.n}`}
-          >
-            <SubHead label={`${current.n}. ${current.title}`} />
-            <IssueTable m={current} now />
-          </section>
+          <GroupedTable label="Now" milestones={[current]} now />
           <Suggested
             lines={left}
             onPlace={(id, to) => setPlaced((p) => ({ ...p, [id]: to }))}
@@ -774,11 +795,7 @@ export function BuildPlan() {
           <Divider />
           <section className="flex flex-col gap-2" aria-label="Next">
             <SectionHeader title="Next" count={next.length} />
-            <div className="flex flex-col gap-4">
-              {next.map((m) => (
-                <NextMilestone key={m.n} m={m} />
-              ))}
-            </div>
+            <GroupedTable label="Next" milestones={next} />
           </section>
         </>
       )}
@@ -787,9 +804,7 @@ export function BuildPlan() {
           <Divider />
           <section className="flex flex-col gap-2" aria-label="Done">
             <SectionHeader title="Done" count={finished.length} />
-            {finished.map((m) => (
-              <DoneMilestone key={m.n} m={m} />
-            ))}
+            <GroupedTable label="Done" milestones={finished} folded />
           </section>
         </>
       )}
