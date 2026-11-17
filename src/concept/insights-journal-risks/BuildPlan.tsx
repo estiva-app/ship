@@ -73,7 +73,7 @@ const PR_ICON: Record<PrStage, ReactNode> = {
 }
 
 /**
- * Claude's own column (Miky, 17 Nov: "AI should have its own column so it's easy to start"): the issue's session and
+ * The AI Session column (Miky, 17 Nov, named so the same day: "AI should have its own column so it's easy to start"): the issue's session and
  * what it is doing, or Start where there is none. A done issue's cell is empty.
  */
 function ClaudeCell({ issue }: { issue: PlanIssue }) {
@@ -92,7 +92,7 @@ function ClaudeCell({ issue }: { issue: PlanIssue }) {
       <span className="relative flex items-center gap-1">
         <IconTerminal2 size={14} stroke={1.5} className={cn('shrink-0', s.waitsOnYou ? 'text-warning-default' : 'text-text-muted')} />
         <Link href="#" variant="quiet" onClick={(e) => e.preventDefault()}>
-          Session
+          Open
         </Link>
       </span>
       <span className={cn('text-caption', s.waitsOnYou ? 'font-medium text-warning-default' : 'text-text-secondary')}>{s.waitsOnYou ? 'Waiting on you' : 'Working'}</span>
@@ -200,7 +200,7 @@ function MilestoneTable({ m }: { m: Milestone }) {
                   <th className={cn(TH, 'w-24')}>Ref</th>
                   <th className={TH}>Title</th>
                   <th className={cn(TH, 'w-36')}>Status</th>
-                  <th className={cn(TH, 'w-32')}>Claude</th>
+                  <th className={cn(TH, 'w-32')}>AI Session</th>
                 </tr>
               </thead>
             )}
