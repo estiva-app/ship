@@ -27,7 +27,7 @@ import { foldAttachments, messageReference } from '@estiva-app/conversation'
 import { addrToNaddr, encodeNpub, toRenderTree } from '@estiva-app/protocol'
 import { directoryFrom, initials, parseProfile } from '../src/nostr/profiles'
 import type { SignedEvent } from '@estiva-app/protocol'
-import { actionProblems, linkTagsOf } from '@estiva-app/interop'
+import { actionProblems, buildActionEvent, linkTagsOf } from '@estiva-app/interop'
 
 let failures = 0
 function check(label: string, condition: boolean, detail = '') {
@@ -82,6 +82,35 @@ const projectChange = buildChange(PK, Date.now(), {
 })
 check('a change to a project carries that same Folder', tag(projectChange, 'h') === CONTENT)
 check('  …and a status change names nobody', tag(statusChange, 'p') === undefined && tag(projectChange, 'p') === undefined)
+
+// Every status change says what it means, last (SPEC §6.2, EAC-4): for every
+// status the manifest offers, Ship writes the same `stage` the agent and Peek
+// write through the declared action, so every app counts it without Ship's list.
+{
+  const manifest = manifestContent() as Parameters<typeof buildActionEvent>[0]['manifest']
+  const statusActions = (manifest.actions ?? []).filter((action) => action.emits.field === 'status' && action.input?.enum)
+  check('the manifest declares a status action for a project and an issue', statusActions.length >= 2, String(statusActions.length))
+  for (const action of statusActions) {
+    const kind = Number(Array.isArray(action.appliesTo) ? action.appliesTo[0] : action.appliesTo)
+    for (const option of manifest.vocabularies?.[action.input!.enum!] ?? []) {
+      const target = `${kind}:${PK}:x1`
+      const ship = buildChange(PK, Date.now(), { target, field: 'status', value: option.value, folder: CONTENT })
+      const declared = buildActionEvent({ manifest, kind, address: target, objectAuthor: PK, folder: CONTENT, actionId: action.id, value: option.value, pubkey: PK, createdAtMs: Date.now() })
+      const last = ship.tags[ship.tags.length - 1]
+      check(
+        `a ${kind} set to ${option.value} ends with its stage, as the declared action writes it`,
+        typeof declared !== 'string' && JSON.stringify(last) === JSON.stringify(['stage', 'status', option.stage]) && JSON.stringify(last) === JSON.stringify(declared.tags[declared.tags.length - 1]),
+        JSON.stringify(last),
+      )
+    }
+  }
+  const stageOf = (event: { tags: string[][] }) => event.tags.find((t) => t[0] === 'stage')
+  check('  …a cleared status carries no stage', stageOf(buildChange(PK, Date.now(), { target: `30851:${PK}:i1`, field: 'status', value: '', folder: CONTENT })) === undefined)
+  check('  …nor one Ship does not offer, which it never guesses', stageOf(buildChange(PK, Date.now(), { target: `30851:${PK}:i1`, field: 'status', value: 'blocked', folder: CONTENT })) === undefined)
+  check('  …nor a project status written on an issue', stageOf(buildChange(PK, Date.now(), { target: `30851:${PK}:i1`, field: 'status', value: 'completed', folder: CONTENT })) === undefined)
+  check('  …nor a field that is not a status', stageOf(buildChange(PK, Date.now(), { target: `30851:${PK}:i1`, field: 'title', value: 'done', folder: CONTENT })) === undefined)
+  check('  …nor a status on a file that is neither a project nor an issue', stageOf(buildChange(PK, Date.now(), { target: `30023:${PK}:doc1`, field: 'status', value: 'done', folder: CONTENT })) === undefined)
+}
 
 const WHO = 'c'.repeat(64)
 const assign = buildChange(PK, Date.now(), { target: `30851:${PK}:i1`, field: 'assignee', value: WHO, folder: CONTENT })
