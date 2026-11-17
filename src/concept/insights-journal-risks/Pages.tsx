@@ -115,7 +115,7 @@ function NeedsYou({ all, me, onTab, onOpen, onDecide }: { all: Item[]; me: strin
                 <span className={`flex ${TYPE_META[t].text}`}>{TYPE_META[t].icon(16)}</span>
                 <span className="flex min-w-0 flex-1 flex-col">
                   <Link href="#" variant="quiet" cover onClick={(e) => (e.preventDefault(), onTab(tabOf(t)))}>
-                    {n} {t === 'insight' ? (n === 1 ? 'insight' : 'insights') : t === 'journal' ? (n === 1 ? 'Journal entry' : 'Journal entries') : n === 1 ? 'risk' : 'risks'} to accept
+                    {t === 'insight' ? `${n} newly suggested ${n === 1 ? 'insight' : 'insights'}` : `${n} ${t === 'journal' ? (n === 1 ? 'Journal entry' : 'Journal entries') : n === 1 ? 'risk' : 'risks'} to accept`}
                   </Link>
                   <span className="min-w-0 truncate">
                     <MetaText tone="muted">{toAccept.filter((i) => i.type === t).map((i) => i.title).join(' · ')}</MetaText>

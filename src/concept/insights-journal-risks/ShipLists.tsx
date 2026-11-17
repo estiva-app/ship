@@ -25,7 +25,7 @@ const newFirst = (items: Item[]) => [...items].sort((a, b) => Number(!!b.isNew) 
 function Answer({ item, me, status, onStatus }: { item: Item; me: string; status: Status; onStatus: (s: Status) => void }) {
   if (status === 'proposed') {
     const waitingOn = item.decidedBy && item.decidedBy.key !== me ? item.decidedBy.name : undefined
-    return <AcceptReject waitingOn={waitingOn} onAnswer={(yes) => onStatus(yes ? acceptedStatus(item) : 'rejected')} />
+    return <AcceptReject waitingOn={waitingOn} label={item.type === 'insight' ? 'Add' : undefined} onAnswer={(yes) => onStatus(yes ? acceptedStatus(item) : 'rejected')} />
   }
   return LIVE.includes(status) ? null : <StatusOf item={{ type: item.type, status }} />
 }
@@ -90,8 +90,9 @@ export function InsightGrid({ items, onOpen, openId, me = 'miky' }: { items: Ite
     <div className="flex flex-col gap-6">
       {triage.length > 0 && (
         <section className="flex flex-col gap-3">
-          <SectionHeader title="To triage" count={triage.length} />
-          {grid(triage, 'To triage')}
+          {/* Newly suggested, not "To triage" (Miky, 17 Nov): you add an insight to the Insights, you do not accept it. */}
+          <SectionHeader title="Newly suggested" count={triage.length} />
+          {grid(triage, 'Newly suggested')}
         </section>
       )}
       <section className="flex flex-col gap-3">
