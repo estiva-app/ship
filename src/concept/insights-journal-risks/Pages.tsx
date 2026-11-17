@@ -28,6 +28,7 @@ import { ItemFields, ItemPanel, commentsOn } from './ItemPanel'
 import { ItemContent } from './ItemDetail'
 import { InsightGrid, NewlySuggested, RiskDashboard } from './ShipLists'
 import { BuildPlan } from './BuildPlan'
+import { JournalBox } from './JournalBox'
 import { SeverityMark, waited } from './ItemKinds'
 import { CommentsColumn, type StoryComment } from './CommentsColumn'
 import { HAND_TYPED, ITEMS, KATERINA, MIKY, PEOPLE, PROJECT, TEAM, byType, decide, type Item } from './fixtures'
@@ -135,7 +136,8 @@ function NeedsYou({ all, me, onTab, onOpen, onDecide }: { all: Item[]; me: strin
  * Journal the timeline in the reading column, Risks a table as wide as Issues'.
  */
 function ItemsTab({ type, all = ITEMS, state, onOpen, openId, me, onDecide, deciding }: { type: ItemType; all?: Item[]; state: ListState; onOpen: (i: Item) => void; openId?: string; me?: string; onDecide?: (item: Item, choice: number, why: string) => void; deciding?: string }) {
-  const items = [...all.filter((i) => i.type === type), ...(type === 'risk' ? [HAND_TYPED] : [])]
+  const [typed, setTyped] = useState<Item[]>([])
+  const items = [...(type === 'journal' ? typed : []), ...all.filter((i) => i.type === type), ...(type === 'risk' ? [HAND_TYPED] : [])]
   const [filter, setFilter] = useState('all')
   // What is suggested and not yet added sits in one section above Insights' and Risks' own lists. The Journal is a
   // log for looking back, with no action in it (Miky, 17 Nov): a suggested entry sits in its place in the log.
@@ -147,13 +149,17 @@ function ItemsTab({ type, all = ITEMS, state, onOpen, openId, me, onDecide, deci
       <NewlySuggested items={suggested} onOpen={onOpen} openId={openId} me={me} />
       <ListStateView state={state} type={type}>
         {/* Risks are a dashboard of three sections, so no filter row (Miky, 16 Nov). */}
-        {/* A subtle + to add an item by hand, beside the filters (Miky, 16 Nov). */}
+        {/* The Journal is written in a box at its top, not behind a + (Miky, 17 Nov). */}
+        {log && <JournalBox onAdd={(i) => setTyped((t) => [i, ...t])} />}
+        {/* A subtle + to add an insight by hand, beside the filters (Miky, 16 Nov). */}
         {type !== 'risk' && (
           <div className="flex items-center justify-between gap-3">
             <FilterRow type={type} value={filter} onChange={setFilter} items={items} />
-            <IconButton variant="muted" tooltip={type === 'insight' ? 'Add an insight' : 'Add to the Journal'} aria-label={type === 'insight' ? 'Add an insight' : 'Add to the Journal'} onClick={noop}>
-              <IconPlus size={16} stroke={1.5} />
-            </IconButton>
+            {!log && (
+              <IconButton variant="muted" tooltip="Add an insight" aria-label="Add an insight" onClick={noop}>
+                <IconPlus size={16} stroke={1.5} />
+              </IconButton>
+            )}
           </div>
         )}
         {type === 'insight' && <InsightGrid items={shown} onOpen={onOpen} openId={openId} me={me} />}
