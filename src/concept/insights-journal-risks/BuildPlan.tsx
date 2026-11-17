@@ -73,18 +73,29 @@ const PR_ICON: Record<PrStage, ReactNode> = {
 }
 
 /**
- * The issue's Claude Code session, subtle (Miky, 17 Nov: "if there is a Claude session it should be visible, but very
- * subtle"): a quiet link beside its PR; Start session only on the row's hover, where there is none.
+ * Claude's own column (Miky, 17 Nov: "AI should have its own column so it's easy to start"): the issue's session and
+ * what it is doing, or Start where there is none. A done issue's cell is empty.
  */
-function SessionLink({ issue }: { issue: PlanIssue }) {
+function ClaudeCell({ issue }: { issue: PlanIssue }) {
   if (issue.status === 'done') return null
   const s = issue.session
+  if (!s)
+    return (
+      <span className="relative flex">
+        <Button variant="outlined" size="small" onClick={() => undefined}>
+          Start
+        </Button>
+      </span>
+    )
   return (
-    <span className={cn('relative flex items-center gap-1', !s && 'opacity-0 group-hover:opacity-100 focus-within:opacity-100')}>
-      <IconTerminal2 size={14} stroke={1.5} className={cn('shrink-0', s?.waitsOnYou ? 'text-warning-default' : 'text-text-muted')} />
-      <Link href="#" variant="quiet" onClick={(e) => e.preventDefault()}>
-        {s ? 'Session' : 'Start session'}
-      </Link>
+    <span className="flex flex-col gap-0.5">
+      <span className="relative flex items-center gap-1">
+        <IconTerminal2 size={14} stroke={1.5} className={cn('shrink-0', s.waitsOnYou ? 'text-warning-default' : 'text-text-muted')} />
+        <Link href="#" variant="quiet" onClick={(e) => e.preventDefault()}>
+          Session
+        </Link>
+      </span>
+      <span className={cn('text-caption', s.waitsOnYou ? 'font-medium text-warning-default' : 'text-text-secondary')}>{s.waitsOnYou ? 'Waiting on you' : 'Working'}</span>
     </span>
   )
 }
@@ -106,7 +117,6 @@ function PlanRow({ issue, now }: { issue: PlanIssue; now: boolean }) {
         {s ? (
           // The milestone being built now gives a session's last words in full: a question asked of you reads whole.
           <span className={cn('block text-text-secondary', !now && 'truncate')}>
-            {s.waitsOnYou && <span className="font-medium text-warning-default">Waiting on you · </span>}
             {s.last} · {s.when}
           </span>
         ) : (
@@ -117,21 +127,23 @@ function PlanRow({ issue, now }: { issue: PlanIssue; now: boolean }) {
         <span className={cn('flex flex-col gap-0.5', now ? 'py-3' : 'py-2')}>
           <StatusLabel value={issue.status} label={STATUS[issue.status]} />
           {/* Its pull request under the status (Miky, 17 Nov): the icon alone says Draft, Open or Merged; hover names it. */}
-          <span className="flex items-center gap-3 whitespace-nowrap text-caption text-text-secondary">
-            {issue.pr && (
-              <span className="relative flex items-center gap-1">
-                <WithTooltip label={issue.pr.stage}>
-                  <span role="img" aria-label={issue.pr.stage} className="flex">
-                    {PR_ICON[issue.pr.stage]}
-                  </span>
-                </WithTooltip>
-                <Link href="#" variant="quiet" onClick={(e) => e.preventDefault()}>
-                  {issue.pr.name}
-                </Link>
-              </span>
-            )}
-            <SessionLink issue={issue} />
-          </span>
+          {issue.pr && (
+            <span className="relative flex items-center gap-1 whitespace-nowrap text-caption text-text-secondary">
+              <WithTooltip label={issue.pr.stage}>
+                <span role="img" aria-label={issue.pr.stage} className="flex">
+                  {PR_ICON[issue.pr.stage]}
+                </span>
+              </WithTooltip>
+              <Link href="#" variant="quiet" onClick={(e) => e.preventDefault()}>
+                {issue.pr.name}
+              </Link>
+            </span>
+          )}
+        </span>
+      </td>
+      <td className="px-3 align-top text-body-2">
+        <span className={cn('block', now ? 'py-3' : 'py-2')}>
+          <ClaudeCell issue={issue} />
         </span>
       </td>
     </tr>
@@ -181,13 +193,14 @@ function MilestoneTable({ m }: { m: Milestone }) {
       {open && (
       <Card clip fill={now ? 'surface' : 'none'} attention={now ? 'accent' : undefined}>
         <ScrollArea orientation="horizontal">
-          <table className="w-full min-w-[640px] table-fixed border-collapse" aria-label={`Milestone ${m.n} issues`}>
+          <table className="w-full min-w-[680px] table-fixed border-collapse" aria-label={`Milestone ${m.n} issues`}>
             {now && (
               <thead>
                 <tr className="border-b border-border-default">
                   <th className={cn(TH, 'w-24')}>Ref</th>
                   <th className={TH}>Title</th>
-                  <th className={cn(TH, 'w-48')}>Status</th>
+                  <th className={cn(TH, 'w-36')}>Status</th>
+                  <th className={cn(TH, 'w-32')}>Claude</th>
                 </tr>
               </thead>
             )}
@@ -196,7 +209,8 @@ function MilestoneTable({ m }: { m: Milestone }) {
               <colgroup>
                 <col className="w-24" />
                 <col />
-                <col className="w-48" />
+                <col className="w-36" />
+                <col className="w-32" />
               </colgroup>
             )}
             <tbody>

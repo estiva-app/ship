@@ -83,7 +83,8 @@ function NeedsYou({ all, me, onTab, onOpen, onDecide }: { all: Item[]; me: strin
     ...blocking.map((item) => ({ item, why: `Blocks the team · waiting on you ${waited(item.day)}`, action: 'Open' })),
     ...deciding.map((item) => ({ item, why: 'Ready for you to decide', action: 'Decide' })),
   ]
-  const byType = (['insight', 'journal', 'risk'] as ItemType[]).map((t) => ({ t, n: toAccept.filter((i) => i.type === t).length })).filter((x) => x.n)
+  // The Journal asks nothing of you (Miky, 17 Nov), so it has no row here.
+  const byType = (['insight', 'risk'] as ItemType[]).map((t) => ({ t, n: toAccept.filter((i) => i.type === t).length })).filter((x) => x.n)
   return (
     <section aria-label="Needs you" className="flex flex-col gap-3">
       {/* The count is the rows below it (review, 17 Nov); the tabs' dots already say what is new. */}
@@ -136,9 +137,11 @@ function NeedsYou({ all, me, onTab, onOpen, onDecide }: { all: Item[]; me: strin
 function ItemsTab({ type, all = ITEMS, state, onOpen, openId, me, onDecide, deciding }: { type: ItemType; all?: Item[]; state: ListState; onOpen: (i: Item) => void; openId?: string; me?: string; onDecide?: (item: Item, choice: number, why: string) => void; deciding?: string }) {
   const items = [...all.filter((i) => i.type === type), ...(type === 'risk' ? [HAND_TYPED] : [])]
   const [filter, setFilter] = useState('all')
-  // What is suggested and not yet added sits in one section above every tab's own list, the same everywhere.
-  const suggested = items.filter((i) => i.status === 'proposed')
-  const shown = filterItems(items.filter((i) => i.status !== 'proposed'), filter)
+  // What is suggested and not yet added sits in one section above Insights' and Risks' own lists. The Journal is a
+  // log for looking back, with no action in it (Miky, 17 Nov): a suggested entry sits in its place in the log.
+  const log = type === 'journal'
+  const suggested = log ? [] : items.filter((i) => i.status === 'proposed')
+  const shown = filterItems(log ? items : items.filter((i) => i.status !== 'proposed'), filter)
   return (
     <div className="flex w-full flex-col gap-6">
       <NewlySuggested items={suggested} onOpen={onOpen} openId={openId} me={me} />
@@ -200,7 +203,13 @@ export function ProjectPage({ start = 'overview', listState = 'ready', me = 'mik
             <Centred>
               <MarkableBlocks team={TEAM} about={PROJECT} marked={{ p2: 'insight' }} onOpenBlock={() => setOpen(ITEMS.find((i) => i.id === 'i1'))}>
                 <LiveHeader
-                  fields={<ProjectFields status={status} statuses={PROJECT_STATUSES} onStatusChange={setStatus} lead={lead} people={SHIP_PEOPLE} onLeadChange={setLead} done={3} total={8} />}
+                  fields={
+                    // Needs you under the title, above the document, which can stay long (Miky, 17 Nov).
+                    <div className="flex flex-col gap-6">
+                      <ProjectFields status={status} statuses={PROJECT_STATUSES} onStatusChange={setStatus} lead={lead} people={SHIP_PEOPLE} onLeadChange={setLead} done={3} total={8} />
+                      <NeedsYou all={all} me={me} onTab={setTab} onOpen={(i) => setOpen(i)} onDecide={(i) => (setDecidingId(i.id), setOpen(i))} />
+                    </div>
+                  }
                   title={PROJECT}
                   titlePlaceholder="Untitled project"
                   onRename={() => true}
@@ -211,7 +220,6 @@ export function ProjectPage({ start = 'overview', listState = 'ready', me = 'mik
                   onCommentOnBlock={noop}
                 />
               </MarkableBlocks>
-              <NeedsYou all={all} me={me} onTab={setTab} onOpen={(i) => setOpen(i)} onDecide={(i) => (setDecidingId(i.id), setOpen(i))} />
             </Centred>
           )}
           {tab === 'issues' && (

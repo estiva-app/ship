@@ -91,7 +91,8 @@ export function ItemEntry({ item, me = 'miky', onOpen, selected }: { item: Item;
             </MetaText>
           </span>
           <span className="ml-auto flex shrink-0 items-center gap-2">
-            {proposed ? (
+            {/* The Journal is a log with no action in it (Miky, 17 Nov): a suggested entry says so, and Add is in its panel. */}
+            {proposed && item.type !== 'journal' ? (
               <AcceptReject waitingOn={waitingOn} label={item.type === 'insight' ? 'Add' : undefined} onAnswer={(yes) => setStatus(yes ? acceptedStatus(item) : 'rejected')} />
             ) : LIVE.includes(status) ? null : (
               <StatusOf item={{ type: item.type, status }} />
