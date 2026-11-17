@@ -39,7 +39,7 @@ const item = (id: string) => ITEMS.find((i) => i.id === id)!
 export const ProjectOverview: Story = { render: () => <Shell><ProjectPage start="overview" /></Shell> }
 /** Overview with the side Overview open beside it (Activity, History, Related) — to compare with What's new. */
 export const ProjectOverviewWithSidePanel: Story = { render: () => <Shell><ProjectPage start="overview" side="overview" /></Shell> }
-/** Issues as the build's dashboard (Miky, 17 Nov): Being built, each with its Claude Code session; Next, today's table; Later to triage: Needed, Move to…, Not relevant. */
+/** Issues as the plan of the build (Miky, 17 Nov): To triage as boxes; one two-line table per milestone, the one being built now raised, each issue's Claude Code session in its row (Open session, or Start session); Later and Not doing as two tabs last. Real data: "Topics: level up the topic experience" as on 9 Nov; the two sessions are imagined. */
 export const ProjectIssues: Story = { render: () => <Shell><ProjectPage start="issues" /></Shell> }
 /** Insights: a grid of boxes, filtered by category; new ones first with a dot, Accept / ✕ on them. */
 export const ProjectInsights: Story = { render: () => <Shell><ProjectPage start="insights" /></Shell> }

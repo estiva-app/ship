@@ -26,7 +26,8 @@ import { MarkAsRows, MarkedNotice, STATUSES, TYPE_META, wordIcon, TYPE_OF, block
 import { ENDED, FilterRow, ItemTimeline, ListStateView, filterItems, type ListState } from './ItemParts'
 import { ItemFields, ItemPanel, commentsOn } from './ItemPanel'
 import { ItemContent } from './ItemDetail'
-import { BuildingBox, InsightGrid, LaterBox, RiskDashboard } from './ShipLists'
+import { InsightGrid, RiskDashboard } from './ShipLists'
+import { BuildPlan } from './BuildPlan'
 import { SeverityMark, waited } from './ItemKinds'
 import { CommentsColumn, type StoryComment } from './CommentsColumn'
 import { HAND_TYPED, ITEMS, KATERINA, MIKY, PEOPLE, PROJECT, TEAM, byType, decide, type Item } from './fixtures'
@@ -172,9 +173,6 @@ function ItemsTab({ type, all = ITEMS, state, onOpen, openId, me, onDecide, deci
   )
 }
 
-/** Next: the issues not started yet, in the table as today; what is in progress sits in Being built above it. */
-const NEXT = ISSUES.filter((i) => i.status === 'todo' || i.status === 'blocked')
-
 /** The project page: today's header and tab row, three more tabs; an item opens beside its list. */
 export function ProjectPage({ start = 'overview', listState = 'ready', me = 'miky', open: open0, side: side0 = 'none', decided, deciding }: { start?: ConceptTab; listState?: ListState; me?: string; open?: string; side?: 'comments' | 'overview' | 'none'; decided?: string; deciding?: string }) {
   const [tab, setTab] = useState<ConceptTab>(start)
@@ -229,16 +227,8 @@ export function ProjectPage({ start = 'overview', listState = 'ready', me = 'mik
             </Centred>
           )}
           {tab === 'issues' && (
-            // Issues as a dashboard of the build (Miky, 17 Nov): what is being built, what is next, then Later to triage.
-            <div className="flex flex-col gap-8">
-              <BuildingBox />
-              <section className="flex flex-col gap-3">
-                <SectionHeader title="Next" count={NEXT.length} actions={[{ icon: <IconPlus size={16} stroke={1.5} />, tooltip: 'New issue', onClick: noop }]} showActions="always" />
-                <IssuesTable issues={NEXT} statuses={ISSUE_STATUSES} hrefFor={hrefFor} />
-              </section>
-              <LaterBox />
-              <MetaText>Done and cancelled · {ISSUES.length - NEXT.length - 2}</MetaText>
-            </div>
+            // Issues as the plan of the build (Miky, 17 Nov): Triage, the milestones, then Later and Not doing.
+            <BuildPlan />
           )}
           {tab === 'insights' && <ItemsTab type="insight" all={all} state={listState} onOpen={onOpenItem} openId={open?.id} me={me} />}
           {tab === 'journal' && <ItemsTab type="journal" all={all} state={listState} onOpen={onOpenItem} openId={open?.id} me={me} />}
