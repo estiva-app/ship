@@ -17,6 +17,7 @@ import {
   IconGitPullRequest,
   IconGitPullRequestDraft,
   IconMessageQuestion,
+  IconArrowRight,
   IconPlus,
   IconSparkles,
   IconTerminal2,
@@ -31,6 +32,7 @@ import {
   SectionHeader,
   SectionLabel,
   Select,
+  Tabs,
   WithTooltip,
 } from "@estiva-app/ui";
 import { cn } from "@/lib/cn";
@@ -580,13 +582,13 @@ function Suggested({
     setEditing(undefined)
   );
   return (
-    <section className="flex flex-col gap-1" aria-label="Suggested">
+    <section className="flex flex-col gap-1" aria-label="Scope to decide">
       <SubHead
-        label="Suggested"
+        label="Scope to decide"
         after={<MetaText tone="muted">{lines.length}</MetaText>}
       />
       <Card fill="none" clip>
-        <ul aria-label="Suggested">
+        <ul aria-label="Scope to decide">
           {lines.map((l) => (
             <li
               key={l.id}
@@ -603,9 +605,19 @@ function Suggested({
                   <NewDot on={l.isNew} />
                 </span>
                 {l.rec && (
-                  <span className="text-text-secondary">
-                    <span className="text-text-primary">{said(l.rec.to)}</span>:{" "}
-                    {l.rec.why}
+                  // An arrow before where it would go, so the recommendation reads as one (Miky, 17 Nov).
+                  <span className="flex items-start gap-1 text-text-secondary">
+                    <IconArrowRight
+                      size={14}
+                      stroke={1.5}
+                      className="mt-0.5 shrink-0"
+                    />
+                    <span>
+                      <span className="text-text-primary">
+                        {said(l.rec.to)}
+                      </span>
+                      : {l.rec.why}
+                    </span>
                   </span>
                 )}
               </span>
@@ -667,10 +679,6 @@ function Lines({
 }) {
   return (
     <section className="flex flex-col gap-1" aria-label={label}>
-      <SubHead
-        label={label}
-        after={<MetaText tone="muted">{lines.length}</MetaText>}
-      />
       <Card fill="none" clip>
         <ul aria-label={label}>
           {lines.map((l) => (
@@ -706,6 +714,7 @@ function Lines({
  */
 export function BuildPlan() {
   const [placed, setPlaced] = useState<Record<string, string>>({});
+  const [outTab, setOutTab] = useState<"later" | "not">("later");
   const into = (to: string) => TRIAGE.filter((l) => placed[l.id] === to);
   // A suggestion accepted into a milestone becomes its next issue, numbered in the order they were accepted.
   const accepted = Object.keys(placed).filter((id) =>
@@ -785,12 +794,25 @@ export function BuildPlan() {
         </>
       )}
       <Divider />
-      <section className="flex flex-col gap-2" aria-label="Later / Not doing">
-        <SectionHeader title="Later / Not doing" />
-        <div className="flex flex-col gap-4">
-          <Lines label="Later" lines={later} />
-          <Lines label="Not doing" lines={notDoing} muted />
+      {/* Out of scope (Miky, 17 Nov): the scoping decisions, Later and Not doing as tabs over one list. */}
+      <section className="flex flex-col gap-2" aria-label="Out of scope">
+        <SectionHeader title="Out of scope" />
+        <div className="flex min-h-8 items-center px-1">
+          <Tabs
+            size="small"
+            tabs={[
+              { id: "later", label: "Later", count: later.length },
+              { id: "not", label: "Not doing", count: notDoing.length },
+            ]}
+            active={outTab}
+            onChange={setOutTab}
+          />
         </div>
+        {outTab === "later" ? (
+          <Lines label="Later" lines={later} />
+        ) : (
+          <Lines label="Not doing" lines={notDoing} muted />
+        )}
       </section>
     </div>
   );
