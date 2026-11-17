@@ -10,7 +10,7 @@
  */
 import { useState, type ReactNode } from 'react'
 import { IconCircleCheck, IconGitMerge, IconGitPullRequest, IconGitPullRequestDraft, IconPlus, IconSparkles, IconTerminal2 } from '@tabler/icons-react'
-import { Button, Card, Link, MetaText, Person, SectionHeader, Select, Tabs } from '@estiva-app/ui'
+import { Button, Card, Link, MetaText, Person, SectionHeader, Select, Tabs, WithTooltip } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
 import { ScrollArea } from '@/components/ui/ScrollArea'
 import { StatusLabel } from '@/components/ui/StatusLabel'
@@ -112,14 +112,17 @@ function PlanRow({ issue, now }: { issue: PlanIssue; now: boolean }) {
       <td className="px-3 align-top text-body-2">
         <span className={cn('flex flex-col gap-0.5', now ? 'py-3' : 'py-2')}>
           <StatusLabel value={issue.status} label={STATUS[issue.status]} />
-          {/* Its pull request under the status (Miky, 17 Nov), with the PR's own stage: Draft, Open, Merged. */}
+          {/* Its pull request under the status (Miky, 17 Nov): the icon alone says Draft, Open or Merged; hover names it. */}
           {issue.pr && (
             <span className="relative flex items-center gap-1 whitespace-nowrap text-caption text-text-secondary">
-              {PR_ICON[issue.pr.stage]}
+              <WithTooltip label={issue.pr.stage}>
+                <span role="img" aria-label={issue.pr.stage} className="flex">
+                  {PR_ICON[issue.pr.stage]}
+                </span>
+              </WithTooltip>
               <Link href="#" variant="quiet" onClick={(e) => e.preventDefault()}>
                 {issue.pr.name}
               </Link>
-              <span className="text-text-muted">· {issue.pr.stage}</span>
             </span>
           )}
         </span>
