@@ -48,7 +48,7 @@ import {
 
 /** Chain-walking, from the runtime — one implementation, not one per consumer. */
 export { pickWidget } from '@estiva-app/interop'
-import { KIND_CHANGE, placeFilters, placeListing, type Listed, type ReferenceCandidate } from '@estiva-app/conversation'
+import { KIND_CHANGE, placeFilters, placeListing, teamMembersOf, type Listed, type ReferenceCandidate, type TeamMember } from '@estiva-app/conversation'
 import { relatedTo } from '@/lib/ownKinds'
 import { safeLink } from '@/lib/handoff'
 import { KIND } from '../nostr/kinds'
@@ -608,6 +608,23 @@ export async function readTopicMembers(topics: readonly ReadTopic[]): Promise<Ma
       return [topic.address, placeListing(place, { events: own, roster, listing }).map((listed) => listed.pubkey)]
     }),
   )
+}
+
+/** How many stored roster commands one team's read asks for at most, as Peek's team read does. */
+const ROSTER_COMMANDS_LIMIT = 1_000
+
+/**
+ * Who is in a team, for its page's members pill (D6, Katerina 18 November: "a team's page as Peek's"): its current
+ * `kind:39002` and the stored commands naming it, read as Peek reads a team's roster (its `teamsFilters`'s first two),
+ * and conversation's `teamMembersOf` — everyone the list names, in the order they joined; never a follower (§11.8).
+ * One read. **Throws when the read failed**: a failed read is not "nobody".
+ */
+export async function readTeamMembers(team: string): Promise<TeamMember[]> {
+  const events: SignedEvent[] = await relay.queryAll([
+    { kinds: [KIND_ROSTER], '#d': [team] },
+    { kinds: [...ROSTER_COMMANDS], '#h': [team], limit: ROSTER_COMMANDS_LIMIT },
+  ] as never)
+  return teamMembersOf(team, events)
 }
 
 /**

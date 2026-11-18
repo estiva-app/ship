@@ -4,8 +4,8 @@ import { ANA, MARA, RAVI } from '@/fixtures/issues'
 import { TeamView, type TeamInitiativeRow } from './TeamView'
 
 /**
- * The team page as Peek draws its own (D6), on the same invented team as `Views/FolderView`'s Three apps, so the two
- * stories are its before and after: "Onboarding" holds one initiative, one project, one issue filed in it directly, and
+ * The team page as Peek draws its own (D6), on the same invented team the old Folder page's story drew, so the two
+ * compare: "Onboarding" holds one initiative, one project, one issue filed in it directly, and
  * one file of an app nobody wrote, which Ship counts and does not list. Every row with its facts in one column set
  * (Katerina, 18 November: "keep with the facts … aligned on initiatives/projects/issues"; progress as the small ring).
  */
@@ -41,7 +41,7 @@ const meta = {
 export default meta
 type Story = StoryObj<typeof meta>
 
-/** The after of `Views/FolderView` › Three apps: its initiative, its projects and its issue listed with their facts, lined up in one column set; the other app's file counted. */
+/** The old Folder page's team, now: its initiative, its projects and its issue listed with their facts, lined up in one column set; the other app's file counted. */
 export const Default: Story = {}
 
 /** An owner or admin: the ⋮ holds Rename… and Archive team…, where the old page had the editable title and a button. */

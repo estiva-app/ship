@@ -291,7 +291,7 @@ function Page({ route, state, loading, directory, teams, folders, archives, say,
     so it never waits for the workspace, and draws its own rows while its
     files load (UIG-14 C8). The workspace's skeleton used to sit there first.
   */
-  if (route.name === 'folder') return <FolderPage id={route.id} folders={folders} nameOf={directory.nameOf} say={say} />
+  if (route.name === 'folder') return <FolderPage id={route.id} folders={folders} directory={directory} state={state} archives={archives} say={say} />
   // Another app's file is not Ship's fold either: it resolves on its own (PRO-22).
   if (route.name === 'elsewhere') return <HandoffPage word={route.word} fileRef={route.ref} query={route.query} />
   if (!state && loading) return <PageSkeleton shape={SKELETON[route.name] ?? 'rows'} />

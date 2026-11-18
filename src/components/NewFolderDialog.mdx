@@ -1,0 +1,42 @@
+import { Meta } from '@storybook/addon-docs/blocks'
+
+<Meta title="Overlays/NewFolderDialog" />
+
+# NewFolderDialog
+
+A team's name in one field: New team from the sidebar's +, or Rename team from a
+team page's ⋮, word for word Peek's dialog for both.
+
+**Seen in** *Overlays/Dialogs*: **New Team** and **Rename Team**.
+
+## When
+
+- **New team**: the sidebar's + over Teams (FOL-8). The new team shows in
+  everyone's sidebar at once.
+- **Rename team**: the ⋮ of a team's page, for its owners and admins (D6). Give
+  `rename` the name it has; the field opens filled with it.
+
+## When not
+
+- **A project's or an issue's title** → it is edited where it stands, in the
+  page's own title.
+- **Moving a project to a team** → **MoveProject**.
+
+## How
+
+```tsx
+<NewFolderDialog onCreate={newFolder} onClose={close} />
+<NewFolderDialog rename={team.name ?? ''} onCreate={rename} onClose={close} />
+```
+
+- `onCreate` resolves `false` to keep the dialog open: the caller has said why
+  (a refusal, with its reason).
+
+## What it owns
+
+- **The words**: New team · Create team · Creating…, or Rename team · Rename ·
+  Renaming… (Peek's `CreateFolderDialog`).
+- **What may be sent**: a name with something in it; in a rename, a name other
+  than the one it has.
+- The send itself is the kit's `FormDialog`'s: its busy words, everything
+  waiting, closing once it went through.

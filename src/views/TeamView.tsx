@@ -48,6 +48,11 @@ export interface TeamViewProps {
   issues: TeamFileRow[]
   /** Other apps' files it holds that Ship does not list (a Leaf document, an app nobody wrote): counted on the last line. */
   others: number
+  /**
+   * Its files were read from its chat's contents, as no list of its own exists yet: the short list is then the only
+   * symptom, so the last line says why, in the old page's words.
+   */
+  fromChannel?: boolean
   /** A person's face by their key. Default a dash: the number alone tells. */
   faceOf?: (pubkey: string) => AvatarGroupMember
   /** What Active counts back from, in ms: when the page opened. */
@@ -57,7 +62,7 @@ export interface TeamViewProps {
 const NO_FACE = (): AvatarGroupMember => ({ name: '—' })
 
 /** A team's page, as Peek's: its header, then its initiatives, projects and issues in the kit's lists. */
-export function TeamView({ name, members, onRename, onArchive, archivedNotice, initiatives, onRetryInitiatives, projects, issues, others, faceOf = NO_FACE, now }: TeamViewProps) {
+export function TeamView({ name, members, onRename, onArchive, archivedNotice, initiatives, onRetryInitiatives, projects, issues, others, fromChannel = false, faceOf = NO_FACE, now }: TeamViewProps) {
   const title = name ?? 'Untitled team'
   const nothing = Array.isArray(initiatives) && initiatives.length === 0 && projects.length === 0 && issues.length === 0
   return (
@@ -92,7 +97,7 @@ export function TeamView({ name, members, onRename, onArchive, archivedNotice, i
         {/* The page's heading for assistive technology: the kit's PageHeader draws its title as text, not a heading (a kit gap). */}
         <h1 className="sr-only">{title}</h1>
         {archivedNotice}
-        {nothing && others === 0 ? (
+        {nothing && others === 0 && !fromChannel ? (
           <EmptyState scope="section" message="Nothing in this team yet." />
         ) : (
           <>
@@ -135,6 +140,7 @@ export function TeamView({ name, members, onRename, onArchive, archivedNotice, i
             {/* What Ship does not list, counted, so a short list is not taken for the whole team (RFC 0.5 §10.7). */}
             {/* px-2: the same 8px in as the headings' own titles (SectionHeader), so the line starts where they do. */}
             {others > 0 && <p className="px-2 text-caption text-text-muted">{others === 1 ? '1 other file, listed in Peek' : `${others} other files, listed in Peek`}</p>}
+            {fromChannel && <p className="px-2 text-caption text-text-muted">From channel contents; this team has no list of its own yet.</p>}
           </>
         )}
       </ScrollArea>
