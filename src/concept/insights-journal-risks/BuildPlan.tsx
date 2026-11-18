@@ -21,19 +21,23 @@ import {
   IconPlayerPlay,
   IconPlus,
   IconTerminal2,
+  IconX,
 } from "@tabler/icons-react";
 import {
   Button,
   Card,
   Chip,
   IconButton,
+  Link,
   MetaText,
+  Panel,
   SectionHeader,
   Select,
   Tabs,
   WithTooltip,
 } from "@estiva-app/ui";
 import { cn } from "@/lib/cn";
+import { ScrollArea } from "@/components/ui/ScrollArea";
 import { IssueRow, type IssueRowData } from "@/components/IssueRow";
 import type { IssuesTableRow } from "@/components/IssuesTable";
 import { ISSUE_STATUSES, hrefFor } from "@/fixtures/issues";
@@ -288,6 +292,8 @@ function Completed({ milestones }: { milestones: Milestone[] }) {
 }
 
 
+/** Where a line came up: the issue being worked on, and at which step; its PR and AI session, if it had them then. */
+type Found = { ref: string; step: "review" | "kickoff" | "build"; pr?: string; session?: string };
 /** A line raised while building: real ones from this project's /land and kickoff runs (9–10 Nov). */
 type Line = {
   id: string;
@@ -296,15 +302,20 @@ type Line = {
   at: string;
   isNew?: boolean;
   rec?: { to: string; why: string };
+  found?: Found;
+  /** What was seen, in a few sentences: what a person does, what happens, why it matters. */
+  detail?: string;
 };
 const TRIAGE: Line[] = [
   {
     id: "t1",
-    title:
-      "Join on Ship’s Explore topics says nothing when it works: the row loses Join and gains a member",
+    title: "Join on Ship’s Explore topics says nothing when it works",
     from: "TOPI-9’s review",
     at: "Today",
     isNew: true,
+    found: { ref: "TOPI-9", step: "review", pr: "ship#604", session: "Ship topics sidebar" },
+    detail:
+      "On Ship’s Explore topics, Join on a topic you are not in works, but the row does not change: Join stays and the Members count stays the same until you reload. It looks as if nothing happened, so people press it again.",
     rec: {
       to: "m2",
       why: "Joining is in this milestone’s Done when, and a silent success reads as broken.",
@@ -312,11 +323,13 @@ const TRIAGE: Line[] = [
   },
   {
     id: "t2",
-    title:
-      "A Members or Last active column on Ship’s Explore that did not load stays blank until you switch tabs",
+    title: "A Members or Last active cell on Ship’s Explore that did not load stays blank",
     from: "TOPI-9’s review",
     at: "Today",
     isNew: true,
+    found: { ref: "TOPI-9", step: "review", pr: "ship#604", session: "Ship topics sidebar" },
+    detail:
+      "When the read for one topic’s members or last activity fails, those cells stay empty. They fill in only after you switch to another tab and back. The rest of the page works.",
     rec: {
       to: "later",
       why: "Only when one read fails; the rest of the page works and nothing is lost.",
@@ -324,11 +337,13 @@ const TRIAGE: Line[] = [
   },
   {
     id: "t3",
-    title:
-      "After Join on Leaf’s Explore topics, its Members count leaves you out until the next open",
+    title: "After Join on Leaf’s Explore topics, its Members count leaves you out",
     from: "TOPI-4’s review",
     at: "Today",
     isNew: true,
+    found: { ref: "TOPI-4", step: "review", pr: "leaf#52", session: "Leaf topics order" },
+    detail:
+      "Join a topic from Leaf’s Explore topics and its Members count stays one short, without you, until you open the page again.",
     rec: {
       to: "m2",
       why: "TOPI-4 is still in review: one line in its PR, before it merges.",
@@ -339,6 +354,9 @@ const TRIAGE: Line[] = [
     title: "Peek’s Topics icon: back to Explore topics, or to your last topic?",
     from: "TOPI-10’s kickoff",
     at: "Yesterday",
+    found: { ref: "TOPI-10", step: "kickoff" },
+    detail:
+      "In Peek’s rail, the Topics icon opens Explore topics every time. Once you are in a topic, it could instead take you back to the last topic you were in, as the other icons do.",
     rec: {
       to: "not",
       why: "Peek’s navigation is reworked in the next stage; deciding it now would be undone.",
@@ -413,99 +431,137 @@ const said = (v: string) =>
           ? "This milestone"
           : `Milestone ${v.slice(1)}`;
 
-/**
- * What came up while building, under Now and apart from its issues (Miky, 17 Nov: one table for both "looks messy"):
- * a list of its own, each line with Claude's recommendation and why. Accept puts it there (into this milestone, it
- * becomes an issue row in the table above); Edit picks another place.
- */
-function Suggested({
-  lines,
-  onPlace,
-}: {
-  lines: Line[];
-  onPlace: (id: string, to: string) => void;
-}) {
-  const [editing, setEditing] = useState<string>();
-  if (!lines.length) return null;
-  const place = (id: string, to: string) => (
-    onPlace(id, to),
-    setEditing(undefined)
-  );
+const STEP: Record<Found["step"], string> = { review: "reviewing", kickoff: "kicking off", build: "building" };
+const issueOf = (ref: string) => MILESTONES.flatMap((m) => m.issues).find((i) => i.ref === ref);
+
+/** One line to decide: its title, the recommendation as a chip (→ where it would go), when. A click opens it beside the list. */
+function ScopeRow({ line, selected, onOpen }: { line: Line; selected: boolean; onOpen: () => void }) {
   return (
-    <section className="flex flex-col gap-1" aria-label="Scope to decide">
+    <div className={cn("relative flex h-9 min-w-0 items-center gap-3 rounded-md px-3 transition-colors hover:bg-bg-hover", selected && "bg-bg-selected")}>
+      <span className="flex min-w-0 flex-1 items-center gap-1.5">
+        <Link href="#" variant="plain" truncate cover onClick={(e) => (e.preventDefault(), onOpen())}>
+          {line.title}
+        </Link>
+        <NewDot on={line.isNew} />
+      </span>
+      {line.rec && <Chip label={said(line.rec.to)} leadingIcon={<IconArrowRight size={12} stroke={1.5} />} />}
+      <span className="w-16 shrink-0 text-right">
+        <MetaText tone="muted">{line.at}</MetaText>
+      </span>
+    </div>
+  );
+}
+
+/**
+ * Scope to decide (Miky, 18 Nov: "messy and lacks key information"): what came up while building, grouped under the
+ * work it was found in (the issue and the step, reviewing or kicking off), so each line reads with its context. Each
+ * line is one row with Claude's recommendation as a chip; a click opens it beside the list, where it is decided.
+ */
+function ScopeToDecide({ lines, openId, onOpen }: { lines: Line[]; openId?: string; onOpen: (id: string) => void }) {
+  if (!lines.length) return null;
+  const refs = [...new Set(lines.map((l) => l.found?.ref ?? ""))];
+  return (
+    <section className="flex flex-col gap-2" aria-label="Scope to decide">
       <SectionHeader title="Scope to decide" count={lines.length} />
-      <Card fill="none" clip>
-        <ul aria-label="Scope to decide">
-          {lines.map((l) => (
-            <li
-              key={l.id}
-              className="flex items-start gap-3 border-b border-border-subtle px-4 py-3 last:border-b-0"
-            >
-              <span className="flex min-w-0 flex-1 flex-col text-body-2">
-                <span className="font-medium text-text-primary">
-                  {l.title}
-                  <NewDot on={l.isNew} />
+      <div className="flex flex-col gap-4">
+        {refs.map((ref) => {
+          const group = lines.filter((l) => (l.found?.ref ?? "") === ref);
+          const step = group[0].found?.step ?? "build";
+          return (
+            <section key={ref} className="flex flex-col gap-px" aria-label={`Found while ${STEP[step]} ${ref}`}>
+              <h3 className="flex h-8 min-w-0 items-center gap-1.5 px-3">
+                <MetaText tone="muted">Found while {STEP[step]}</MetaText>
+                <span className="flex min-w-0 truncate">
+                  <MetaText tone="secondary">
+                    {ref} · {issueOf(ref)?.title}
+                  </MetaText>
                 </span>
-                {l.rec && (
-                  // An arrow before where it would go, so the recommendation reads as one (Miky, 17 Nov).
-                  <span className="flex items-start gap-1 text-text-secondary">
-                    <IconArrowRight
-                      size={14}
-                      stroke={1.5}
-                      className="mt-0.5 shrink-0"
-                    />
-                    <span>
-                      <span className="text-text-primary">
-                        {said(l.rec.to)}
-                      </span>
-                      : {l.rec.why}
-                    </span>
-                  </span>
-                )}
+              </h3>
+              {group.map((l) => (
+                <ScopeRow key={l.id} line={l} selected={l.id === openId} onOpen={() => onOpen(l.id)} />
+              ))}
+            </section>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+/**
+ * A line to decide, opened beside the list (Miky, 18 Nov: "clickable so in the right sidebar you can see details"):
+ * what was seen, where it was found (the issue, its PR and AI session, when), then the recommendation and why, with
+ * Accept, or another place.
+ */
+export function ScopePanel({ id, onPlace, onClose }: { id: string; onPlace: (to: string) => void; onClose: () => void }) {
+  const [editing, setEditing] = useState(false);
+  const l = TRIAGE.find((t) => t.id === id);
+  if (!l) return null;
+  const f = l.found;
+  const issue = f && issueOf(f.ref);
+  return (
+    <div className="flex w-[384px] min-h-0 shrink-0 flex-col border-l border-border-default">
+      <Panel
+        title={<MetaText tone="muted">Scope to decide</MetaText>}
+        actions={
+          <IconButton variant="muted" tooltip="Close" aria-label="Close" onClick={onClose}>
+            <IconX size={16} stroke={1.5} />
+          </IconButton>
+        }
+      >
+        <ScrollArea className="min-h-0 flex-1" contentClassName="flex flex-col gap-5 px-4 pb-4">
+          <span className="text-h3 text-text-primary">{l.title}</span>
+          {l.detail && <span className="text-body-2 text-text-primary">{l.detail}</span>}
+          {f && (
+            <section className="flex flex-col gap-2" aria-label="Found while">
+              <MetaText tone="muted">
+                Found while {STEP[f.step]} · {l.at}
+              </MetaText>
+              <span className="flex min-w-0 items-center gap-2 text-body-2">
+                <MetaText tone="muted">{f.ref}</MetaText>
+                <Link href="#" variant="quiet" truncate onClick={(e) => e.preventDefault()}>
+                  {issue?.title}
+                </Link>
               </span>
-              {editing === l.id ? (
-                <span className="flex shrink-0 items-center gap-2">
-                  <span className="w-56">
-                    <Select
-                      size="small"
-                      ariaLabel="Put in"
-                      placeholder="Put in…"
-                      value=""
-                      onChange={(v) => place(l.id, v)}
-                      options={PUT_IN}
-                    />
+              {(f.pr || f.session) && (
+                <span className="flex flex-wrap items-center gap-1.5">
+                  {f.session && <Chip href="#" onClick={stay} label={f.session} leadingIcon={<IconTerminal2 size={12} stroke={1.5} />} />}
+                  {f.pr && <Chip href="#" onClick={stay} label={f.pr} leadingIcon={<IconGitPullRequest size={12} stroke={1.5} />} />}
+                </span>
+              )}
+            </section>
+          )}
+          {l.rec && (
+            <Card fill="surface" className="flex flex-col gap-3 p-3">
+              <span className="flex items-center gap-1.5 text-body-2 font-medium text-text-primary">
+                <IconArrowRight size={16} stroke={1.5} />
+                {said(l.rec.to)}
+              </span>
+              <span className="text-body-2 text-text-secondary">{l.rec.why}</span>
+              {editing ? (
+                <span className="flex items-center gap-2">
+                  <span className="min-w-0 flex-1">
+                    <Select size="small" ariaLabel="Put in" placeholder="Put in…" value="" onChange={(v) => onPlace(v)} options={PUT_IN} />
                   </span>
-                  <Button
-                    variant="muted"
-                    size="small"
-                    onClick={() => setEditing(undefined)}
-                  >
+                  <Button variant="muted" size="small" onClick={() => setEditing(false)}>
                     Cancel
                   </Button>
                 </span>
               ) : (
-                <span className="flex shrink-0 items-center gap-2">
-                  <Button
-                    variant="primary"
-                    size="small"
-                    onClick={() => place(l.id, l.rec?.to ?? "later")}
-                  >
+                <span className="flex items-center gap-2">
+                  <Button variant="primary" size="small" onClick={() => onPlace(l.rec?.to ?? "later")}>
                     Accept
                   </Button>
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    onClick={() => setEditing(l.id)}
-                  >
-                    Edit
+                  <Button variant="outlined" size="small" onClick={() => setEditing(true)}>
+                    Put elsewhere
                   </Button>
                 </span>
               )}
-            </li>
-          ))}
-        </ul>
-      </Card>
-    </section>
+            </Card>
+          )}
+        </ScrollArea>
+      </Panel>
+    </div>
   );
 }
 
@@ -550,12 +606,12 @@ function Lines({
 }
 
 /**
- * The Dashboard (Miky, 17 Nov, after Linear's issues by milestone): one list, every milestone a filled row over its
- * issues, one line each; the one being built first and marked Now, the finished ones folded at the foot. Under it,
- * the scope still to decide, then what is out of scope.
+ * The List view (Miky, 17–18 Nov, after Linear's issues by milestone; it replaced both the Dashboard and the Table):
+ * one list, every milestone a filled row over its issues, one line each; the one being built first and marked Now,
+ * the finished ones folded at the foot. Under it, the scope still to decide, then what is out of scope. Where each
+ * line to decide was placed lives on the page, since the line opens beside the list.
  */
-export function BuildPlan() {
-  const [placed, setPlaced] = useState<Record<string, string>>({});
+export function BuildPlan({ placed, openId, onOpen }: { placed: Record<string, string>; openId?: string; onOpen: (id: string) => void }) {
   const [outTab, setOutTab] = useState<"later" | "not">("later");
   const into = (to: string) => TRIAGE.filter((l) => placed[l.id] === to);
   // A suggestion accepted into a milestone becomes its next issue, numbered in the order they were accepted.
@@ -586,7 +642,7 @@ export function BuildPlan() {
         ))}
         {finished.length > 0 && <Completed milestones={finished} />}
       </section>
-      <Suggested lines={left} onPlace={(id, to) => setPlaced((p) => ({ ...p, [id]: to }))} />
+      <ScopeToDecide lines={left} openId={openId} onOpen={onOpen} />
       {/* Out of scope (Miky, 17 Nov): the scoping decisions, Later and Not doing as tabs over one list. */}
       <section className="flex flex-col gap-2" aria-label="Out of scope">
         <SectionHeader title="Out of scope" />
