@@ -12,6 +12,8 @@ import { IssuesView, type IssuesScope } from './IssuesView'
 import { ProjectView } from './ProjectView'
 import { ProjectsView, type ProjectsLayout } from './ProjectsView'
 import { TopicsView } from './TopicsView'
+import { TopicView } from './TopicView'
+import { ThreadListView } from '@/components/conversations/ThreadList'
 import type { SidebarTopic, TopicRowData, TopicsTab } from '@/lib/topics'
 import type { ProjectTab, ProjectsTab } from '@/router'
 import { useSideColumn, type Side } from '@/pages/sideColumn'
@@ -74,13 +76,13 @@ const SIDEBAR_TOPICS: SidebarTopic[] = [
   { id: `30840:${'a'.repeat(64)}:triage`, title: 'Triage', href: '#/topic/triage', work: [] },
 ]
 
-function Shell({ current, children }: { current: SidebarEntry; children: React.ReactNode }) {
+function Shell({ current, openTopic, children }: { current?: SidebarEntry; openTopic?: string; children: React.ReactNode }) {
   return (
     <div className="h-screen">
       <AppShell
         logo="Estiva Ship"
         identity={<IdentityMenu me={ANA} signedIn idBase="https://id.estiva.app" relayUrl="http://localhost:3000" onCopyKey={fn()} onSignOut={fn()} />}
-        nav={<ShipSidebar openIssues={18} activeProjects={SIDEBAR_PROJECTS.length} hrefFor={(entry) => `#/${entry}`} current={{ entry: current }} topics={SIDEBAR_TOPICS} onRetryTopics={fn()} />}
+        nav={<ShipSidebar openIssues={18} activeProjects={SIDEBAR_PROJECTS.length} hrefFor={(entry) => `#/${entry}`} {...(current ? { current: { entry: current } } : {})} {...(openTopic ? { openTopic } : {})} topics={SIDEBAR_TOPICS} onRetryTopics={fn()} />}
       >
         {children}
       </AppShell>
@@ -204,6 +206,41 @@ export const TopicsFailed: Story = {
       <TopicsView title="Explore initiatives" lists="failed" tab="yours" onTab={fn()} onRetry={fn()} onJoin={fn()} />
     </Shell>
   ),
+}
+
+/**
+ * An initiative's page (SHIPS-4): its trail, then its team as the one chip and Open into Peek after its name (Katerina,
+ * 18 November, D4, D5), the conversation's button and the ⋯ (Copy link); what it lists that Ship holds, and its Leaf
+ * documents. Its row is lit in the sidebar.
+ */
+export const Initiative: Story = {
+  render: () => {
+    const [shown, setShown] = useState(false)
+    return (
+      <Shell openTopic={SIDEBAR_TOPICS[0].id}>
+        <TopicView
+          topic={{
+            title: 'Cross-app navigation',
+            summary: 'Teams and initiatives instead of Folders, in every app.',
+            team: 'Product',
+            teamId: '0212db6d-bcbf-40d0-890e-f4f056db2f5d',
+            archived: false,
+            projects: PROJECT_TABS.all.slice(0, 3),
+            issues: [{ address: '30851:a:nav-1', kind: 'issue', title: 'Explore initiatives opens its page', href: '#/issue/nav-1', status: { value: 'in_progress', label: 'In Progress' }, project: 'Relay Migration', editedLabel: 'Ana, 1h ago' }],
+            archivedWork: [],
+          }}
+          documents={[{ address: '30842:a:brainstorm', title: 'Navigation brainstorm', href: 'https://leaf.estiva.app/document/brainstorm', edited: 'Mara, 2d ago' }]}
+          onRetry={fn()}
+          onRetryDocuments={fn()}
+          topicsHref="#/topics"
+          comments={{ shown, onShownChange: setShown }}
+          conversation={<ThreadListView threads={THREADS} onStart={fn()} onReply={fn()} />}
+          onCopyLink={fn()}
+          peekUrl="https://peek.estiva.app/topic/cross-app-navigation"
+        />
+      </Shell>
+    )
+  },
 }
 
 /** Every issue in the workspace: All / Open / Assigned to me, grouped by status. Forty rows, so the page scrolls — in the frame's bar, not a native one. */

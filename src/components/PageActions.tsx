@@ -19,12 +19,11 @@ import { Menu, MenuItem, MenuSeparator, Toolbar, ToolbarButton } from '@estiva-a
  */
 export interface PageActionsProps {
   /**
-   * A topic's page uses it too (TOPI-8): its button shows or hides the topic's conversation, and its ⋯ holds only
-   * Copy link and Open in Peek. Ship does not archive, move or delete a topic; Peek does (Miky, 6 Nov).
+   * An initiative's page uses it too (TOPI-8; `topic` in the code): its button shows or hides the initiative's
+   * conversation, and its ⋯ holds only Copy link; Open in Peek is the Open button after its name (Katerina,
+   * 18 November, D5). Ship does not archive, move or delete an initiative; Peek does (Miky, 6 Nov).
    */
   what: 'issue' | 'project' | 'topic'
-  /** A topic's ⋯: "Open in Peek", where its "Conversation in Peek" link was. Absent: no row. */
-  onOpenInPeek?: () => void
   /**
    * The comments column, shown or not, and the button that shows or hides it. Omitted: no button. `unread`: something
    * in them is new to the reader; while the column is hidden the button carries the kit's dot on its icon's corner, and
@@ -48,7 +47,7 @@ export interface PageActionsProps {
   lockedReason?: string
 }
 
-export function PageActions({ what, comments, overview, archive, onArchive, onDelete, onMove, onCopyLink, onOpenInPeek, readOnlyReason, lockedReason }: PageActionsProps) {
+export function PageActions({ what, comments, overview, archive, onArchive, onDelete, onMove, onCopyLink, readOnlyReason, lockedReason }: PageActionsProps) {
   // Under its Folder's archive, archiving a project again is an edit; an issue's own stays offered whatever is archived above it.
   const archiveShut = archive === 'with' && what === 'project' ? (readOnlyReason ?? lockedReason) : readOnlyReason
   const commentsWord = what === 'topic' ? (comments?.shown ? 'Hide conversation' : 'Show conversation') : comments?.shown ? 'Hide comments' : 'Show comments'
@@ -84,10 +83,7 @@ export function PageActions({ what, comments, overview, archive, onArchive, onDe
         }
       >
         {what === 'topic' ? (
-          <>
-            <MenuItem label="Copy link" onClick={onCopyLink} />
-            {onOpenInPeek && <MenuItem label="Open in Peek" onClick={onOpenInPeek} />}
-          </>
+          <MenuItem label="Copy link" onClick={onCopyLink} />
         ) : (
           <>
             {archive === 'none' && (

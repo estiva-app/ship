@@ -131,7 +131,7 @@ export function TopicPage({
       .filter((row) => row.kind === 'issue')
       .map((row) => ({ ...row, ...(row.edited ? { editedLabel: editedLabel(nameOf(row.edited.by), row.edited.at) } : {}) }))
     const team = folders?.find((folder) => folder.id === page.folder)?.name
-    return { title: page.title, ...(page.summary ? { summary: page.summary } : {}), ...(team ? { team } : {}), archived: page.archived, projects, issues, archivedWork: page.archivedWork }
+    return { title: page.title, ...(page.summary ? { summary: page.summary } : {}), ...(team ? { team, teamId: page.folder } : {}), archived: page.archived, projects, issues, archivedWork: page.archivedWork }
   }, [page, state, archives, personOf, nameOf, folders])
 
   const conversation = useTopicConversation(topic && !sendsOn ? { address: topic.address, folder: topic.folder, createdAt: topic.createdAt } : undefined, state, directory, say, refresh)
@@ -207,7 +207,7 @@ export function TopicPage({
         )
       }
       onCopyLink={() => void copyText(new URL(topic ? topicHref(topic.address, view?.title ?? '') : location.pathname, window.location.origin).href, 'Link copied', 'Copy this link:', say)}
-      {...(page?.peekUrl ? { onOpenInPeek: () => void window.open(page.peekUrl, '_blank', 'noopener') } : {})}
+      {...(page?.peekUrl ? { peekUrl: page.peekUrl } : {})}
       onRetry={() => {
         if (readAgain !== 'failed') return void reloadTopics()
         setReadAgain(undefined)

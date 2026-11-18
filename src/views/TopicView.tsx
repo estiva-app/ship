@@ -1,8 +1,9 @@
 import { useState, type ReactNode } from 'react'
-import { IconArchive, IconChevronDown, IconChevronRight, IconExternalLink, IconTarget } from '@tabler/icons-react'
-import { KindIcon, Link, NoAccessNotice, PageHeader, SectionLabel } from '@estiva-app/ui'
+import { IconArchive, IconChevronDown, IconChevronRight, IconExternalLink, IconTarget, IconUsers } from '@tabler/icons-react'
+import { KindIcon, Link, NoAccessNotice, PageHeader, SectionLabel, WithTooltip } from '@estiva-app/ui'
 import { Breadcrumb } from '@/components/ui/Breadcrumb'
 import { Button } from '@/components/ui/Button'
+import { Chip } from '@/components/ui/Chip'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { IconButton } from '@/components/ui/IconButton'
 import { ScrollArea } from '@/components/ui/ScrollArea'
@@ -14,7 +15,7 @@ import { EditedCaption, TopicWorkRow } from '@/components/TopicWorkRow'
 import { cn } from '@/lib/cn'
 import type { ProjectRowData } from '@/lib/projects'
 import type { TopicWorkRow as WorkRow } from '@/lib/topics'
-import { linkTo } from '@/router'
+import { href, linkTo } from '@/router'
 
 /** A Leaf document on a topic's page: its title, where it opens, who edited it last and when, and its pages. */
 export interface TopicDocument {
@@ -33,6 +34,8 @@ export interface TopicPageView {
   summary?: string
   /** The team it is in, by name. */
   team?: string
+  /** That team's id: its chip opens the team's page. */
+  teamId?: string
   archived: boolean
   /** Not archived, in the topic's order. */
   projects: ProjectRowData[]
@@ -43,8 +46,9 @@ export interface TopicPageView {
 
 /**
  * A topic's page in Ship (SHIPS-4; TOPI-8, the approved stories on `concept/topics-level-up`, Miky 4 and 6 Nov):
- * - the kit's `PageHeader`, as a project's and an issue's: "Topics › <topic>", its members, then the conversation's
- *   button and the ⋯ (Copy link, Open in Peek);
+ * - the kit's `PageHeader`, as a project's and an issue's: "Initiatives › <initiative>", then its team as ONE chip and
+ *   Open (into Peek), as Peek's initiative page and file page have them (Katerina, 17 and 18 November, D4, D5); its
+ *   members, then the conversation's button and the ⋯ (Copy link);
  * - **Projects** as the Projects page draws them (`ProjectRow`: status, lead, progress) under All, Planned, Active and
  *   Completed; then **Issues**; then **Documents**, each with who edited it last and when, a document folding open to
  *   its pages; each kind keeps the topic's order;
@@ -59,7 +63,7 @@ export interface TopicViewProps {
   documents: TopicDocument[] | 'loading' | 'failed'
   onRetry: () => void
   onRetryDocuments: () => void
-  /** Where "Topics" in the path goes: the Topics page. */
+  /** Where "Initiatives" in the path goes: Explore initiatives. */
   topicsHref: string
   /** The members pill (Ship's `Members`), at the end of the header's path. */
   members?: ReactNode
@@ -68,8 +72,8 @@ export interface TopicViewProps {
   /** The topic's conversation (`ThreadList`), drawn in that column. */
   conversation: ReactNode
   onCopyLink: () => void
-  /** Absent when the topic's Peek link is not known: no row. */
-  onOpenInPeek?: () => void
+  /** Its page in Peek, for the Open button after its name. Absent when the link is not known: no button. */
+  peekUrl?: string
 }
 
 type ProjectsTab = 'all' | 'planned' | 'active' | 'completed'
@@ -78,7 +82,7 @@ const EMPTY: Record<ProjectsTab, string> = { all: 'No projects here.', planned: 
 const TAB_OF: Record<string, ProjectsTab> = { planned: 'planned', in_progress: 'active', completed: 'completed' }
 const inTab = (tab: ProjectsTab, project: ProjectRowData) => tab === 'all' || TAB_OF[project.status.value] === tab
 
-export function TopicView({ topic, documents, onRetry, onRetryDocuments, topicsHref, members, comments, conversation, onCopyLink, onOpenInPeek }: TopicViewProps) {
+export function TopicView({ topic, documents, onRetry, onRetryDocuments, topicsHref, members, comments, conversation, onCopyLink, peekUrl }: TopicViewProps) {
   const [showArchived, setShowArchived] = useState(false)
   const [tab, setTab] = useState<ProjectsTab>('all')
   if (topic === 'unavailable') return <NoAccessNotice what="initiative" />
@@ -91,8 +95,26 @@ export function TopicView({ topic, documents, onRetry, onRetryDocuments, topicsH
       <div className="flex min-w-0 flex-1 flex-col">
         <PageHeader
           title={<Breadcrumb items={[{ label: 'Initiatives', ...linkTo(topicsHref) }, ...(loaded ? [{ label: loaded.title, icon: <KindIcon kind="topic" /> }] : [])]} />}
+          after={
+            loaded && (
+              <>
+                {/* The team it belongs to, the one chip after its name, opening the team's page (Katerina, 17 November: one chip; 18 November, D4). */}
+                {loaded.team && loaded.teamId && (
+                  <Chip label={loaded.team} leadingIcon={<IconUsers size={12} stroke={1.5} aria-hidden />} {...linkTo(href({ name: 'folder', id: loaded.teamId }))} />
+                )}
+                {/* Open into Peek, as Peek's and Leaf's Open into another app (Katerina, 30 October; 18 November, D5): in place of the ⋯'s Open in Peek. */}
+                {peekUrl && (
+                  <WithTooltip label="Open in Peek">
+                    <Button href={peekUrl} external size="small" className="shrink-0" leadingIcon={<IconExternalLink size={14} stroke={1.5} />} aria-label="Open in Peek">
+                      Open
+                    </Button>
+                  </WithTooltip>
+                )}
+              </>
+            )
+          }
           members={loaded && members}
-          actions={loaded && <PageActions what="topic" comments={comments} archive="none" onArchive={() => {}} onDelete={() => {}} onCopyLink={onCopyLink} onOpenInPeek={onOpenInPeek} />}
+          actions={loaded && <PageActions what="topic" comments={comments} archive="none" onArchive={() => {}} onDelete={() => {}} onCopyLink={onCopyLink} />}
         />
         {topic === 'failed' ? (
           <EmptyState icon={<IconTarget size={16} stroke={1.5} />} scope="page" message="This initiative didn’t load." action={{ label: 'Try again', onClick: onRetry }} />
@@ -108,7 +130,8 @@ export function TopicView({ topic, documents, onRetry, onRetryDocuments, topicsH
                   </span>
                   <div className="flex min-w-0 flex-1 flex-col">
                     <h1 className="text-h3 text-text-primary">{topic.title}</h1>
-                    {(topic.team || topic.archived) && <span className="text-caption text-text-muted">{[topic.team, topic.archived ? 'Archived' : undefined].filter(Boolean).join(' · ')}</span>}
+                    {/* Its team is the header's chip now, said once (D4); only Archived stays here. */}
+                    {topic.archived && <span className="text-caption text-text-muted">Archived</span>}
                   </div>
                 </div>
                 {topic.summary && <p className="text-body-2 text-text-secondary">{topic.summary}</p>}

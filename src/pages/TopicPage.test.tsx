@@ -125,8 +125,7 @@ beforeEach(() => {
 })
 
 describe("A topic's page in Ship", () => {
-  it('draws its title, team and summary, its projects as the Projects page does, its issues with their status, its Leaf documents opening Leaf, and Open in Peek in its ⋯ (TOPI-8)', async () => {
-    const opened = vi.spyOn(window, 'open').mockReturnValue(null)
+  it('draws its title, team and summary, its projects as the Projects page does, its issues with their status, its Leaf documents opening Leaf; its team as the one chip and Open into Peek after its name, its ⋯ only Copy link (TOPI-8; D4, D5)', async () => {
     held.push(manifest('ship', 'ship.estiva.app', ['30850', '30851']), manifest('peek', 'peek.estiva.app', ['30840']), manifest('leaf', 'leaf.estiva.app', ['30842']))
     held.push(projectRoot('p1'), issueRoot('i1'), leafDocument('doc1', 'Testing widgets'))
     held.push(topic(D, 'Widgets', { summary: 'Small live cards' }), lists(D, 'i1'), lists(D, 'p1'), lists(D, 'doc1'))
@@ -138,15 +137,19 @@ describe("A topic's page in Ship", () => {
 
     await waitFor(() => expect(page().querySelector('[data-topic-loaded]')).not.toBeNull())
     expect(screen.getByRole('heading', { name: 'Widgets' })).toBeTruthy()
-    expect(within(page()).getByText('HQ')).toBeTruthy()
+    // Its team: the one chip after its name, opening the team's page; said once, not again under the title (Katerina, 18 November, D4).
+    expect(screen.getByRole('link', { name: 'HQ' }).getAttribute('href')).toBe('/app/teams/team')
+    expect(within(page()).getAllByText('HQ')).toHaveLength(1)
     expect(within(page()).getByText('Small live cards')).toBeTruthy()
-    // No "Conversation in Peek" link: the ⋯ opens the topic in Peek, and the conversation is in the column beside the page.
+    // No "Conversation in Peek" link: Open after its name opens it in Peek, in a new tab, as Peek's and Leaf's Open into
+    // another app (D5); the conversation is in the column beside the page.
     expect(screen.queryByRole('link', { name: /Conversation in Peek/ })).toBeNull()
+    const open = screen.getByRole('link', { name: 'Open in Peek' })
+    expect(open.getAttribute('href')).toBe(`https://peek.estiva.app/topic/widgets-${D}`)
+    expect(open.getAttribute('target')).toBe('_blank')
+    expect(open.textContent).toBe('Open')
     fireEvent.click(screen.getByRole('button', { name: 'More actions' }))
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Open in Peek' }))
-    expect(opened).toHaveBeenCalledWith(`https://peek.estiva.app/topic/widgets-${D}`, '_blank', 'noopener')
-    expect(screen.queryByRole('menuitem', { name: /Archive|Delete|Move/ })).toBeNull()
-    opened.mockRestore()
+    await waitFor(() => expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual(['Copy link']))
     // The project first though the topic listed the issue first, drawn as the Projects page draws it, under All.
     const [project, ...more] = [...page().querySelectorAll<HTMLElement>('[data-project]')]
     expect(more).toEqual([])

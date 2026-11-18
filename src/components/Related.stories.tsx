@@ -56,8 +56,8 @@ const meta = {
 export default meta
 type Story = StoryObj<typeof meta>
 
-/** Two topics under a project: one with seven conversations, one nobody has spoken in yet — which draws no count. */
-export const Topics: Story = {}
+/** Two initiatives under a project: one with seven conversations, one nobody has spoken in yet — which draws no count. */
+export const Topics: Story = { name: 'Initiatives' }
 
 /** Any kind, not only the bare file — a record from an app nobody here has heard of, through the fallback chain. */
 export const AnyKind: Story = { args: { related: { files: [TOPIC, TIDE], inside: {}, counts: { t1: 7, x: 1 } } } }
