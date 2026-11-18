@@ -6,6 +6,7 @@ import { SkeletonList } from '@/components/ui/Skeleton'
 import { Tabs } from '@/components/ui/Tabs'
 import { TopicRow } from '@/components/TopicRow'
 import type { TopicRowData, TopicsTab } from '@/lib/topics'
+import { useReportFailure } from '@/lib/failureReports'
 
 /**
  * Ship's Topics, which the sidebar's Explore topics opens (TOPI-9, the
@@ -52,6 +53,7 @@ export function findsTopic(title: string, query: string): boolean {
 export function TopicsView({ title, lists, tab, onTab, onRetry, onJoin, joining, query: firstQuery = '' }: TopicsViewProps) {
   const [query, setQuery] = useState(firstQuery)
   const asked = query.trim()
+  useReportFailure(lists === 'failed' ? 'not-loaded' : undefined)
   const shown = typeof lists === 'string' ? [] : lists[tab].filter((topic) => !asked || findsTopic(topic.title, asked))
   return (
     // `data-surface` is the smoke test's waypoint — see IssuesView.

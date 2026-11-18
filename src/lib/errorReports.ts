@@ -9,8 +9,9 @@
  * own events), and every crash an `ErrorBoundary` catches.
  */
 import { useEffect, useLayoutEffect, useState } from 'react'
-import { createErrorReporter } from '@estiva-app/platform'
-import { reportCrashesTo } from '@estiva-app/ui'
+import { createErrorReporter, type Failure } from '@estiva-app/platform'
+import { reportCrashesTo, reportFailuresTo } from '@estiva-app/ui'
+import { reportDrawnFailuresTo, reportRefusalsTo } from '@/lib/failureReports'
 import { ID_CONFIG, RELEASE } from '@/config'
 import { currentToken } from '@/auth/estivaId'
 import { parse, useRoute, type Route } from '@/router'
@@ -56,6 +57,11 @@ export const errorReporter = createErrorReporter({
 export function startErrorReports(): void {
   errorReporter.listen(window)
   reportCrashesTo((error) => errorReporter.report(error, 'boundary'))
+  // A failure Ship shows (its error banner says its own, below; the kit's error toasts here), and a write the relay
+  // refuses, by its reason code (PROD-5).
+  reportFailuresTo((failure) => errorReporter.failure((failure ?? 'unnamed') as Failure))
+  reportRefusalsTo((code) => errorReporter.refused(code))
+  reportDrawnFailuresTo((failure) => errorReporter.failure(failure))
   window.__crashOnPurpose = crashOnPurpose
 }
 

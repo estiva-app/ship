@@ -27,7 +27,7 @@ describe('resolveAnswer', () => {
     resolveThread.mockResolvedValueOnce({ ok: false, reason: 'restricted: not a member' })
     const say = vi.fn()
     expect(await resolveAnswer(state, COMMENT, false, undefined, say)).not.toBe(true)
-    expect(say).toHaveBeenCalledWith(expect.stringMatching(/^Not reopened: .+\.$/), 'error')
+    expect(say).toHaveBeenCalledWith(expect.stringMatching(/^Not reopened: .+\.$/), 'error', 'not-saved')
   })
 
   it('hands a refused resolve back to its dialog and says nothing on the page', async () => {

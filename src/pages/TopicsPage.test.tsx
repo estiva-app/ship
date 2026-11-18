@@ -309,7 +309,7 @@ describe("Ship's Topics (Explore topics)", () => {
 
     fireEvent.click(within(rowOf('Muted')).getByRole('button', { name: 'Join' }))
 
-    await waitFor(() => expect(say).toHaveBeenCalledWith('Joined “Muted”, but it is still muted. Join again to unmute it.', 'error'))
+    await waitFor(() => expect(say).toHaveBeenCalledWith('Joined “Muted”, but it is still muted. Join again to unmute it.', 'error', 'not-saved'))
     expect(wire.sent.map((e) => e.kind)).toEqual([1851])
     expect(within(rowOf('Muted')).getByRole('button', { name: 'Join' })).toBeTruthy()
   })

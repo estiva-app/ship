@@ -16,6 +16,7 @@ import { noteCardAvailability, rememberedUnavailable } from '@/lib/unavailableCa
 import { KIND } from '@/nostr/kinds'
 import { href } from '@/router'
 import { Reference } from './Reference'
+import { useReportFailure } from '@/lib/failureReports'
 
 /*
   A message's links, drawn by the kit (`@estiva-app/ui` 0.75): a chip in a
@@ -159,6 +160,7 @@ export function MessageCard({
   const naddr = uri.replace(/^nostr:/i, '')
   // A failed read (a 429, the network) is not an answer: it says neither "not available" nor "available again".
   const failed = object === null && resolveFailed(uri)
+  useReportFailure(error ? 'not-sent' : failed ? 'not-loaded' : undefined)
   const availability = object === undefined || failed ? undefined : !!object && !object.unreachable
   useEffect(() => {
     if (availability !== undefined) noteCardAvailability(naddr, availability)

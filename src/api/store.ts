@@ -7,6 +7,7 @@ import { issueFieldsOptedIn, optedIn, readFileReads } from './fileReads'
 import { ID_CONFIG, RELAY_URL } from '../config'
 import { relayClockSkew } from './clock'
 import { heldBearer, heldToken, renew } from '../auth/estivaId'
+import { heardRefusal } from '../lib/failureReports'
 
 /**
  * Who signs, decided once.
@@ -82,7 +83,8 @@ const fetchReportingQuota: FetchLike = async (url, init) => {
   return { status: response.status, text: async () => body }
 }
 
-export const relay = new Relay(RELAY_URL, signer, { fetch: fetchReportingQuota })
+// Every refused write is reported by its reason code, busy answers included (PROD-5).
+export const relay = new Relay(RELAY_URL, signer, { fetch: fetchReportingQuota, onRefused: heardRefusal })
 
 /** The switch (ALO-5): the relay's NIP-11 asked once, on the first read that needs it. */
 let fileReads: Promise<RelayFileReads> | undefined

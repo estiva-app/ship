@@ -187,7 +187,7 @@ describe('FolderPage renames its Folder (FOL-8)', () => {
     renameFolder.mockResolvedValue({ ok: true })
     render(<FolderPage id="f1" say={say} />)
     await rename('Onboarding 2')
-    await waitFor(() => expect(say).toHaveBeenCalledWith('Renamed to Onboarding 2, but the team could not be read back — reload to see it.', 'error'))
+    await waitFor(() => expect(say).toHaveBeenCalledWith('Renamed to Onboarding 2, but the team could not be read back — reload to see it.', 'error', 'not-loaded'))
   })
 
   it('a refusal is said with its reason, the field stays open, and nothing is re-read', async () => {
@@ -195,7 +195,7 @@ describe('FolderPage renames its Folder (FOL-8)', () => {
     renameFolder.mockResolvedValue({ ok: false, reason: 'restricted: not an admin' })
     render(<FolderPage id="f1" say={say} />)
     await rename('Nope')
-    await waitFor(() => expect(say).toHaveBeenCalledWith('Rename rejected — restricted: not an admin', 'error'))
+    await waitFor(() => expect(say).toHaveBeenCalledWith('Rename rejected — restricted: not an admin', 'error', 'not-renamed'))
     expect(screen.getByRole('textbox', { name: 'Team name' })).toBeInTheDocument()
     expect(reloadFolders).not.toHaveBeenCalled()
   })
@@ -204,7 +204,7 @@ describe('FolderPage renames its Folder (FOL-8)', () => {
     readFolder.mockResolvedValue(folder())
     render(<FolderPage id="f1" say={say} />)
     await rename('   ')
-    await waitFor(() => expect(say).toHaveBeenCalledWith('A team needs a name.', 'error'))
+    await waitFor(() => expect(say).toHaveBeenCalledWith('A team needs a name.', 'error', null))
     expect(renameFolder).not.toHaveBeenCalled()
   })
 })

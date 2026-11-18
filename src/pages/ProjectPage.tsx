@@ -223,7 +223,7 @@ export function resolveAnswer(state: FolderState, threadId: string, resolved: bo
   const folder = folderOfMessage(state, threadId)
   if (!folder) return Promise.resolve('That conversation is no longer on this page.')
   return answerOf(() => resolveThread({ folder, threadId, resolved, note })).then((answer) => {
-    if (answer !== true && !resolved) say(`Not reopened: ${refusalReason(answer)}.`, 'error')
+    if (answer !== true && !resolved) say(`Not reopened: ${refusalReason(answer)}.`, 'error', 'not-saved')
     return answer
   })
 }
@@ -994,7 +994,7 @@ export function ProjectPage({
           onCreate={async (draft) => {
             const result = await createIssue(project, state, draft)
             if (!result.ok) {
-              say(`Issue rejected — ${result.reason}`, 'error')
+              say(`Issue rejected — ${result.reason}`, 'error', 'not-created')
               return false
             }
             await refresh([result.folder ?? project.contentFolder])
@@ -1030,7 +1030,7 @@ export function ProjectPage({
           onConfirm={async () => {
             const result = await deleteProject(project)
             if (!result.ok) {
-              say(`Delete rejected — ${result.reason}`, 'error')
+              say(`Delete rejected — ${result.reason}`, 'error', 'not-deleted')
               return false
             }
             say('Project deleted')
