@@ -51,7 +51,7 @@ describe('Ship error reports', () => {
     render(
       <>
         <ScreenSteps />
-        <ErrorBoundary label="page">
+        <ErrorBoundary>
           <CrashOnPurpose />
           <h1>{PLANTED_TITLE}</h1>
         </ErrorBoundary>
@@ -61,7 +61,7 @@ describe('Ship error reports', () => {
     await flush()
 
     expect(screen.queryByText(PLANTED_TITLE)).toBeNull()
-    expect(screen.getByText(/Something went wrong in the page/)).toBeTruthy()
+    expect(screen.getByText('Something went wrong. Your data is safe — try again.')).toBeTruthy()
 
     expect(requests.map((r) => r.url)).toEqual(['https://id.estiva.app/report'])
     const [{ body }] = requests as [{ url: string; body: string }]
