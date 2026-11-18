@@ -107,7 +107,8 @@ export function PartCardView({ view, address, block, nameOf }: { view: PartView;
   if (view.state === 'unreadable' || view.state === 'deleted') {
     return (
       <div data-part={view.state} data-part-address={address}>
-        <KitPartCard state={view.state === 'deleted' ? 'deleted' : 'unavailable'} kind={kind} noun={kind[0].toUpperCase() + kind.slice(1)} />
+        {/* The kind's word on screen: "topic" is the code's name for an initiative (Katerina, 18 November). */}
+        <KitPartCard state={view.state === 'deleted' ? 'deleted' : 'unavailable'} kind={kind} noun={kind === 'topic' ? 'Initiative' : kind[0].toUpperCase() + kind.slice(1)} />
       </div>
     )
   }

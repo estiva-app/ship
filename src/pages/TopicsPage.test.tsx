@@ -4,7 +4,7 @@ import { MUTED_D_TAG, serializeMutedBlob } from '@estiva-app/conversation'
 import type { FolderState } from '@/api'
 
 /*
-  TOPI-9: Ship's Topics, which the sidebar's Explore topics opens, and the
+  TOPI-9: Ship's Topics, which the sidebar's Explore initiatives opens, and the
   sidebar's five, drawn from the real reads (interop's `readTopics` and
   `readTopicActivity`, conversation's `placeListing`) over a fake relay that
   answers filters as the relay does. Join is signed by a real `Store` and
@@ -174,8 +174,8 @@ beforeEach(() => {
 
 afterEach(() => vi.useRealTimers())
 
-describe("Ship's Topics (Explore topics)", () => {
-  it('opens on Your topics newest activity first, every topic you can open counted, each row with its team, members and last active', async () => {
+describe("Ship's Topics (Explore initiatives)", () => {
+  it('opens on Your initiatives newest activity first, every topic you can open counted, each row with its team, members and last active', async () => {
     held.push(shipManifest(), issueRoot('i-1'))
     // Zebra is made first, Alpha later; then Katerina writes in Zebra, so Zebra is the newest.
     held.push(topic('t-z', 'Zebra launch', { summary: 'Ship the zebra' }), joined('t-z'), lists('t-z', 'i-1'))
@@ -184,8 +184,8 @@ describe("Ship's Topics (Explore topics)", () => {
     held.push({ ...commented('t-z', KATERINA), created_at: NOW() - 2 * 3600 })
     render(page())
 
-    await waitFor(() => expect(tabs()).toEqual(['All3', 'Your topics2', 'Other topics1', 'Archived0']))
-    expect(screen.getByRole('tab', { selected: true }).textContent).toBe('Your topics2')
+    await waitFor(() => expect(tabs()).toEqual(['All3', 'Your initiatives2', 'Other initiatives1', 'Archived0']))
+    expect(screen.getByRole('tab', { selected: true }).textContent).toBe('Your initiatives2')
     // Newest first, not A to Z.
     expect(titles()).toEqual(['Zebra launch', 'Alpha'])
     const zebra = rowOf('Zebra launch')
@@ -200,7 +200,7 @@ describe("Ship's Topics (Explore topics)", () => {
     // The other tabs are A to Z, and a topic listing no project or issue is on them.
     fireEvent.click(screen.getByRole('tab', { name: /^All/ }))
     expect(titles()).toEqual(['Alpha', 'Others’ topic', 'Zebra launch'])
-    fireEvent.click(screen.getByRole('tab', { name: /Other topics/ }))
+    fireEvent.click(screen.getByRole('tab', { name: /Other initiatives/ }))
     expect(titles()).toEqual(['Others’ topic'])
     await waitFor(() => expect(within(rowOf('Others’ topic')).getByText('1')).toBeTruthy())
   })
@@ -212,7 +212,7 @@ describe("Ship's Topics (Explore topics)", () => {
     held.push(topic('t-live', 'Live'), joined('t-live'))
     render(page())
 
-    await waitFor(() => expect(tabs()).toEqual(['All1', 'Your topics1', 'Other topics0', 'Archived1']))
+    await waitFor(() => expect(tabs()).toEqual(['All1', 'Your initiatives1', 'Other initiatives0', 'Archived1']))
     expect(titles()).toEqual(['Live'])
     fireEvent.click(screen.getByRole('tab', { name: /Archived/ }))
     expect(titles()).toEqual(['Archived in Peek'])
@@ -220,27 +220,27 @@ describe("Ship's Topics (Explore topics)", () => {
     expect(within(rows()[0]).queryByRole('button', { name: 'Join' })).toBeNull()
   })
 
-  it('a topic you only commented in is under Other topics, not Your topics: writing in a topic is not following it', async () => {
+  it('a topic you only commented in is under Other initiatives, not Your initiatives: writing in a topic is not following it', async () => {
     held.push(shipManifest())
     held.push(topic('t-in', 'Joined'), joined('t-in'))
     held.push(topic('t-said', 'Commented'), commented('t-said'))
     render(page())
 
-    await waitFor(() => expect(tabs()).toEqual(['All2', 'Your topics1', 'Other topics1', 'Archived0']))
+    await waitFor(() => expect(tabs()).toEqual(['All2', 'Your initiatives1', 'Other initiatives1', 'Archived0']))
     expect(titles()).toEqual(['Joined'])
-    fireEvent.click(screen.getByRole('tab', { name: /Other topics/ }))
+    fireEvent.click(screen.getByRole('tab', { name: /Other initiatives/ }))
     expect(titles()).toEqual(['Commented'])
   })
 
-  it('a topic you joined and then muted is under Other topics, not Your topics, as Peek shows a mute as Not following', async () => {
+  it('a topic you joined and then muted is under Other initiatives, not Your initiatives, as Peek shows a mute as Not following', async () => {
     held.push(shipManifest(), mutes(address('t-hush')))
     held.push(topic('t-in', 'Joined'), joined('t-in'))
     held.push(topic('t-hush', 'Muted'), joined('t-hush'))
     render(page())
 
-    await waitFor(() => expect(tabs()).toEqual(['All2', 'Your topics1', 'Other topics1', 'Archived0']))
+    await waitFor(() => expect(tabs()).toEqual(['All2', 'Your initiatives1', 'Other initiatives1', 'Archived0']))
     expect(titles()).toEqual(['Joined'])
-    fireEvent.click(screen.getByRole('tab', { name: /Other topics/ }))
+    fireEvent.click(screen.getByRole('tab', { name: /Other initiatives/ }))
     expect(titles()).toEqual(['Muted'])
   })
 
@@ -249,21 +249,21 @@ describe("Ship's Topics (Explore topics)", () => {
     render(page())
     await waitFor(() => expect(titles()).toHaveLength(3))
 
-    fireEvent.change(screen.getByLabelText('Find a topic'), { target: { value: 'lau' } })
+    fireEvent.change(screen.getByLabelText('Find an initiative'), { target: { value: 'lau' } })
     expect(titles()).toEqual(['Zebra launch'])
     // Typed as the title is written, hyphen and all.
-    fireEvent.change(screen.getByLabelText('Find a topic'), { target: { value: 'q4-pl' } })
+    fireEvent.change(screen.getByLabelText('Find an initiative'), { target: { value: 'q4-pl' } })
     expect(titles()).toEqual(['Q4-plan'])
     // Never the middle of a word.
-    fireEvent.change(screen.getByLabelText('Find a topic'), { target: { value: 'aunch' } })
+    fireEvent.change(screen.getByLabelText('Find an initiative'), { target: { value: 'aunch' } })
     expect(titles()).toEqual([])
-    expect(screen.getByText('No topic matches “aunch”.')).toBeTruthy()
+    expect(screen.getByText('No initiative matches “aunch”.')).toBeTruthy()
   })
 
   it('Join follows the topic at All, as Peek’s Join does, and the row keeps its place with Join gone and one more member', async () => {
     held.push(shipManifest(), topic('t-in', 'Mine'), joined('t-in'), topic('t-o', 'Theirs'))
     render(page())
-    fireEvent.click(await screen.findByRole('tab', { name: /Other topics/ }))
+    fireEvent.click(await screen.findByRole('tab', { name: /Other initiatives/ }))
     await waitFor(() => expect(within(rowOf('Theirs')).getByText('1')).toBeTruthy())
 
     fireEvent.click(within(rowOf('Theirs')).getByRole('button', { name: 'Join' }))
@@ -275,7 +275,7 @@ describe("Ship's Topics (Explore topics)", () => {
     expect(sent.tags).toEqual(expect.arrayContaining([['a', address('t-o')], ['field', `follow:${ME}`], ['value', 'all'], ['h', TEAM]]))
     await waitFor(() => expect(within(rowOf('Theirs')).queryByRole('button', { name: 'Join' })).toBeNull())
     expect(within(rowOf('Theirs')).getByText('2')).toBeTruthy()
-    // Not moved under the pointer: it goes to Your topics on the next open.
+    // Not moved under the pointer: it goes to Your initiatives on the next open.
     expect(titles()).toEqual(['Theirs'])
     expect(say).not.toHaveBeenCalled()
   })
@@ -283,7 +283,7 @@ describe("Ship's Topics (Explore topics)", () => {
   it('Join on a topic you muted takes it out of your mute list, keeping the rest, and counts you once', async () => {
     held.push(shipManifest(), mutes(address('t-hush'), address('t-other')), topic('t-hush', 'Muted'), joined('t-hush'), topic('t-other', 'Other'))
     render(page())
-    fireEvent.click(await screen.findByRole('tab', { name: /Other topics/ }))
+    fireEvent.click(await screen.findByRole('tab', { name: /Other initiatives/ }))
     // Its maker and you, muted.
     await waitFor(() => expect(within(rowOf('Muted')).getByText('2')).toBeTruthy())
 
@@ -304,7 +304,7 @@ describe("Ship's Topics (Explore topics)", () => {
     refuseKinds.add(30078)
     held.push(shipManifest(), mutes(address('t-hush')), topic('t-hush', 'Muted'), joined('t-hush'))
     render(page())
-    fireEvent.click(await screen.findByRole('tab', { name: /Other topics/ }))
+    fireEvent.click(await screen.findByRole('tab', { name: /Other initiatives/ }))
     await waitFor(() => expect(titles()).toContain('Muted'))
 
     fireEvent.click(within(rowOf('Muted')).getByRole('button', { name: 'Join' }))
@@ -321,7 +321,7 @@ describe("Ship's Topics (Explore topics)", () => {
     render(page(DESIGN, [{ id: DESIGN, name: 'Design' } as never]))
 
     await waitFor(() => expect(titles()).toEqual(['Design topic']))
-    expect(screen.getByRole('heading', { name: 'Design · Topics' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Design · Initiatives' })).toBeTruthy()
   })
 
   it("says Topics didn't load when the read fails, and Try again reads them", async () => {
@@ -329,7 +329,7 @@ describe("Ship's Topics (Explore topics)", () => {
     held.push(shipManifest(), topic('t-a', 'Alpha'), joined('t-a'))
     render(page())
 
-    await waitFor(() => expect(screen.getByText('Topics didn’t load.')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('Initiatives didn’t load.')).toBeTruthy())
     down = false
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
     await waitFor(() => expect(titles()).toEqual(['Alpha']))
@@ -358,7 +358,7 @@ describe("Ship's Topics (Explore topics)", () => {
     expect(topicReads()).toBe(1)
   })
 
-  it('reads who is in a topic only for the tab shown: a cold open on Your topics reads none of the others', async () => {
+  it('reads who is in a topic only for the tab shown: a cold open on Your initiatives reads none of the others', async () => {
     held.push(shipManifest(), topic('t-in', 'Mine'), joined('t-in'), topic('t-o', 'Theirs'))
     // The members read is the only one asking a team's roster commands, and a topic's own Folder commands.
     const rosterReads = () => asked.filter((f) => (f.kinds as number[] | undefined)?.includes(9000)).flatMap((f) => (f['#h'] as string[]) ?? [])
@@ -369,7 +369,7 @@ describe("Ship's Topics (Explore topics)", () => {
     expect(before).toContain(address('t-in'))
     expect(before).not.toContain(address('t-o'))
 
-    fireEvent.click(screen.getByRole('tab', { name: /Other topics/ }))
+    fireEvent.click(screen.getByRole('tab', { name: /Other initiatives/ }))
     await waitFor(() => expect(membersOf().length).toBeGreaterThan(before.length))
     expect(membersOf().slice(before.length)).toContain(address('t-o'))
   })
@@ -508,7 +508,7 @@ describe("Ship's sidebar: where your five are read from (ALO-17)", () => {
     expect(muteReads()).toBe(1)
   })
 
-  it('on Topics, when the read of every topic fails, your five from the read of yours stay drawn rather than “Didn’t load.”', async () => {
+  it('on Topics, when the read of every topic fails, your five from the read of yours stay drawn rather than “Couldn’t load your initiatives.”', async () => {
     held.push(shipManifest(), topic('t-1', 'Topic 1'), joined('t-1'), topic('t-2', 'Topic 2'), joined('t-2'))
     const { container, rerender } = render(<Sidebar state={ship([], [])} route={{ name: 'issues' }} />)
     await waitFor(() => expect(linksIn(container)).toEqual(['Topic 2', 'Topic 1']))
@@ -518,7 +518,7 @@ describe("Ship's sidebar: where your five are read from (ALO-17)", () => {
     rerender(<Sidebar state={ship([], [])} route={{ name: 'topics' }} />)
     await waitFor(() => expect(everyTopicReads()).toBeGreaterThan(0))
     await settle()
-    expect(screen.queryByText('Didn’t load.')).toBeNull()
+    expect(screen.queryByText('Couldn’t load your initiatives.')).toBeNull()
     expect(linksIn(container)).toEqual(['Topic 2', 'Topic 1'])
   })
 
@@ -548,7 +548,7 @@ describe("Ship's sidebar: where your five are read from (ALO-17)", () => {
     down = true
     held.push(shipManifest(), topic('t-1', 'Topic 1'), joined('t-1'), topic('t-2', 'Topic 2'))
     render(<Sidebar state={ship([], [])} route={{ name: 'issues' }} />)
-    await waitFor(() => expect(screen.getByText('Didn’t load.')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('Couldn’t load your initiatives.')).toBeTruthy())
     const failed = rootReads()
 
     down = false
@@ -560,7 +560,7 @@ describe("Ship's sidebar: where your five are read from (ALO-17)", () => {
 })
 
 describe("Ship's sidebar: your five newest topics", () => {
-  it('shows your five newest topics, newest first, then Explore topics; never an archived, muted or other topic', async () => {
+  it('shows your five newest topics, newest first, then Explore initiatives; never an archived, muted or other topic', async () => {
     held.push(shipManifest(), mutes(address('t-hush')))
     for (const n of [1, 2, 3, 4, 5, 6]) held.push(topic(`t-${n}`, `Topic ${n}`), joined(`t-${n}`))
     held.push(topic('t-hush', 'T muted'), joined('t-hush'), topic('t-old', 'T archived'), joined('t-old'), archiving('t-old'), topic('t-not', 'T not mine'))
@@ -569,7 +569,7 @@ describe("Ship's sidebar: your five newest topics", () => {
     render(<Sidebar state={ship([], [])} />)
 
     await waitFor(() => expect(sidebarTopics()).toEqual(['Topic 2', 'Topic 6', 'Topic 5', 'Topic 4', 'Topic 3']))
-    expect(screen.getAllByRole('link').at(-1)?.textContent).toBe('Explore topics')
+    expect(screen.getAllByRole('link').at(-1)?.textContent).toBe('Explore initiatives')
   })
 
   it('with fewer than five of yours, shows only those, and waits for the mute list so a muted topic never shows', async () => {
@@ -605,7 +605,7 @@ describe("Ship's sidebar: your five newest topics", () => {
     render(<Sidebar state={ship(['p-1'], ['i-1'])} />)
 
     fireEvent.click(await screen.findByRole('button', { name: /Topic 1/ }))
-    expect(screen.getAllByRole('link').map((a) => a.textContent)).toEqual(['Projects', 'Issues', 'Topic 1', 'p-1', 'i-1', 'Explore topics'])
+    expect(screen.getAllByRole('link').map((a) => a.textContent)).toEqual(['Projects', 'Issues', 'Topic 1', 'p-1', 'i-1', 'Explore initiatives'])
   })
 
   it('keeps its order while you work, and reorders when you come back to the tab a minute later', async () => {
@@ -636,7 +636,7 @@ describe("Ship's sidebar: your five newest topics", () => {
     down = true
     held.push(shipManifest(), topic('t-1', 'Topic 1'), joined('t-1'))
     render(<Sidebar state={ship([], [])} />)
-    await waitFor(() => expect(screen.getByText('Didn’t load.')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('Couldn’t load your initiatives.')).toBeTruthy())
 
     down = false
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }))

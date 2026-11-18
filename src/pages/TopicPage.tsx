@@ -182,19 +182,19 @@ export function TopicPage({
                   if (!member) return leaveTopic(topic)
                   const joined = await joinTopic(topic)
                   // Said as Topics says it (TopicsPage): joined, but a mute you kept stays.
-                  if ('stillMuted' in joined) say(`Joined “${view?.title ?? 'this topic'}”, but it is still muted. Join again to unmute it.`, 'error')
+                  if ('stillMuted' in joined) say(`Joined “${view?.title ?? 'this initiative'}”, but it is still muted. Join again to unmute it.`, 'error')
                   return joined.ok ? { ok: true as const } : joined
                 },
                 say,
                 async () => {
                   await Promise.all([reloadPlace(), rereadTopics()])
                 },
-                (reason) => `Nothing changed: “${view?.title ?? 'this topic'}” could not be ${member ? 'joined' : 'left'}. ${reason}`,
+                (reason) => `Nothing changed: “${view?.title ?? 'this initiative'}” could not be ${member ? 'joined' : 'left'}. ${reason}`,
               )
             }
             onAdd={async (pubkeys) => {
               for (const pubkey of pubkeys) {
-                const added = await act('Add member', () => addToTopic(topic, pubkey, place?.events ?? []), say, undefined, (reason) => `Nothing changed: ${nameOf(pubkey)} could not be added to “${view?.title ?? 'this topic'}”. ${reason}`)
+                const added = await act('Add member', () => addToTopic(topic, pubkey, place?.events ?? []), say, undefined, (reason) => `Nothing changed: ${nameOf(pubkey)} could not be added to “${view?.title ?? 'this initiative'}”. ${reason}`)
                 if (!added) {
                   await reloadPlace()
                   return false

@@ -47,7 +47,7 @@ export function FileTopics({ topics, busy, onChange, readChoices, choicesNow }: 
       </div>
     )
   }
-  if (topics === 'failed') return <span className="text-caption text-text-muted">Topics could not be read.</span>
+  if (topics === 'failed') return <span className="text-caption text-text-muted">Initiatives could not be read.</span>
   return (
     <div className="flex flex-col items-start gap-2" data-file-topics>
       {topics.length === 0 ? (
@@ -71,7 +71,7 @@ export function FileTopics({ topics, busy, onChange, readChoices, choicesNow }: 
         </div>
       )}
       <Button size="small" variant="muted" leadingIcon={<IconPlus size={14} stroke={1.5} />} onClick={() => setPicking(true)}>
-        Add to topic
+        Add to initiative
       </Button>
       {picking && (
         <AddToTopic
@@ -138,16 +138,16 @@ function AddToTopic({ listed, readChoices, choicesNow, onPick, onClose }: {
     topics
       .filter((topic) => !listed.includes(topic.address) && startsWords(topic.title, words))
       .map((topic) => ({ id: topic.address, label: topic.title, icon: <KindIcon kind="topic" tone="inherit" />, onSelect: () => onPick(topic) }))
-  const groups = typeof choices === 'object' ? [{ label: 'Your topics', rows: rows(choices.yours) }, { label: 'Other topics', rows: rows(choices.others) }].filter((group) => group.rows.length > 0) : []
+  const groups = typeof choices === 'object' ? [{ label: 'Your initiatives', rows: rows(choices.yours) }, { label: 'Other initiatives', rows: rows(choices.others) }].filter((group) => group.rows.length > 0) : []
   return (
-    <CommandPalette open onOpenChange={(open) => !open && onClose()} label="Add to topic">
+    <CommandPalette open onOpenChange={(open) => !open && onClose()} label="Add to initiative">
       <CommandPaletteSearch
         query={query}
         onQueryChange={setQuery}
-        placeholder="Find a topic…"
+        placeholder="Find an initiative…"
         groups={groups}
-        pending={choices === undefined ? 'Reading topics…' : undefined}
-        empty={choices === 'failed' ? 'Topics could not be read.' : words.length ? `No topic is called “${query.trim()}”.` : 'No topic to add it to.'}
+        pending={choices === undefined ? 'Reading initiatives…' : undefined}
+        empty={choices === 'failed' ? 'Initiatives could not be read.' : words.length ? `No initiative is called “${query.trim()}”.` : 'No initiative to add it to.'}
       />
     </CommandPalette>
   )

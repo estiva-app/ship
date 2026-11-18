@@ -4,6 +4,7 @@ import type { Say } from '@/pages/act'
 import { reloadTopics, useMuted, useTopicActivity, useTopicMembers, useTopics } from '@/api/topics'
 import { joinTopic } from '@/api/writes'
 import { topicAsDrawn } from '@/api/foreign'
+import { useTabTitle } from '@/lib/tabTitle'
 import { topicsByTab, yourTopics, type TopicRowData, type TopicsTab } from '@/lib/topics'
 import { TopicsView } from '@/views/TopicsView'
 
@@ -48,6 +49,9 @@ export function TopicsPage({ folders, folder, say }: { folders: FolderSummary[] 
     return Object.fromEntries(Object.entries(drawn).map(([id, rows]) => [id, rows.map(withJoined)])) as typeof drawn
   }, [held, order.values, order.failed, active.values, members.values, teamName, folder, muted, joined])
   const folderName = folder ? (folders?.find((summary) => summary.id === folder)?.name ?? 'Untitled team') : undefined
+  // Peek's words (Katerina, 18 November): Explore initiatives; a team's, as its sidebar entry says. The tab says the heading, as every page's does (SFX-2).
+  const title = folderName ? `${folderName} · Initiatives` : 'Explore initiatives'
+  useTabTitle(folder && !folders ? undefined : title)
 
   const onJoin = async (address: string) => {
     const topic = held?.topics.find((candidate) => candidate.address === address)
@@ -68,7 +72,7 @@ export function TopicsPage({ folders, folder, say }: { folders: FolderSummary[] 
 
   return (
     <TopicsView
-      title={folderName ? `${folderName} · Topics` : 'Topics'}
+      title={title}
       lists={lists ?? (read === 'failed' ? 'failed' : 'loading')}
       tab={tab}
       onTab={setTab}

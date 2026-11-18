@@ -21,24 +21,24 @@ describe('ShipSidebar', () => {
 
   afterEach(() => window.localStorage.clear())
 
-  it('reads Projects, Issues, then Explore topics where the top Topics was, with the counts on Projects and Issues only (TOPI-9)', () => {
+  it('reads Projects, Issues, then Explore initiatives where the top Topics was, with the counts on Projects and Issues only (TOPI-9)', () => {
     render(<ShipSidebar topics={[]} onRetryTopics={noop} openIssues={18} activeProjects={5} hrefFor={hrefFor} current={{ entry: 'topics' }} />)
-    expect(links()).toEqual([['Projects5', '/projects'], ['Issues18', '/issues'], ['Explore topics', '/topics']])
+    expect(links()).toEqual([['Projects5', '/projects'], ['Issues18', '/issues'], ['Explore initiatives', '/topics']])
     expect(screen.getByRole('link', { name: /^Projects/ })).toHaveTextContent('5')
-    expect(screen.getByRole('link', { name: 'Explore topics' })).toHaveAttribute('aria-current', 'page')
-    expect(screen.getByText('You are in no topic yet.')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Explore initiatives' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByText('You’re in no initiatives yet.')).toBeInTheDocument()
     expect(screen.queryByText(/^Home$|^Views$|^Starred$/)).not.toBeInTheDocument()
   })
 
   const topic = (n: number, work: SidebarTopic['work'] = []): SidebarTopic => ({ id: `30840:p:t${n}`, title: `Topic ${n}`, href: `/topic/t${n}`, work })
 
-  it('draws your topics in the order given, each folding to its projects then issues, then Explore topics with no icon', async () => {
+  it('draws your initiatives in the order given, each folding to its projects then issues, then Explore initiatives with Peek’s icon', async () => {
     const work: SidebarTopic['work'] = [
       { id: '30850:p:launch', kind: 'project', title: 'Launch', href: '/project/launch' },
       { id: '30851:p:fix', kind: 'issue', title: 'Fix login', href: '/issue/fix' },
     ]
     render(<ShipSidebar topics={[topic(2, work), topic(1)]} onRetryTopics={noop} openIssues={0} activeProjects={0} hrefFor={hrefFor} />)
-    expect(links().map(([text]) => text)).toEqual(['Projects', 'Issues', 'Topic 2', 'Topic 1', 'Explore topics'])
+    expect(links().map(([text]) => text)).toEqual(['Projects', 'Issues', 'Topic 2', 'Topic 1', 'Explore initiatives'])
     await userEvent.click(screen.getByRole('button', { name: /Topic 2/ }))
     expect(links().map(([text, to]) => `${text} ${to}`)).toEqual([
       'Projects /projects',
@@ -47,9 +47,10 @@ describe('ShipSidebar', () => {
       'Launch /project/launch',
       'Fix login /issue/fix',
       'Topic 1 /topic/t1',
-      'Explore topics /topics',
+      'Explore initiatives /topics',
     ])
-    expect(screen.getByRole('link', { name: 'Explore topics' }).querySelector('svg')).toBeNull()
+    // Peek's row, icon and all (Katerina, 18 November: "along with the icon we used in Peek").
+    expect(screen.getByRole('link', { name: 'Explore initiatives' }).querySelector('svg')).not.toBeNull()
   })
 
   it('on a project a topic lists, that topic opens and the project is marked under it', () => {
@@ -58,21 +59,22 @@ describe('ShipSidebar', () => {
     expect(screen.getByRole('link', { name: 'Launch' })).toHaveAttribute('aria-current', 'page')
   })
 
-  it("on a topic's page its row is marked, not Explore topics", () => {
+  it("on an initiative's page its row is marked, not Explore initiatives", () => {
     render(<ShipSidebar topics={[topic(1)]} openTopic="30840:p:t1" onRetryTopics={noop} openIssues={0} activeProjects={0} hrefFor={hrefFor} />)
     expect(screen.getByRole('link', { name: 'Topic 1' })).toHaveAttribute('aria-current', 'page')
-    expect(screen.getByRole('link', { name: 'Explore topics' })).not.toHaveAttribute('aria-current')
+    expect(screen.getByRole('link', { name: 'Explore initiatives' })).not.toHaveAttribute('aria-current')
   })
 
-  it("says the topics didn't load, with Try again, and still offers Explore topics", async () => {
+  it("says the initiatives didn't load, in Peek's words, with Try again, and still offers Explore initiatives", async () => {
     const onRetryTopics = vi.fn()
     render(<ShipSidebar topics="failed" onRetryTopics={onRetryTopics} openIssues={0} activeProjects={0} hrefFor={hrefFor} />)
+    expect(screen.getByText('Couldn’t load your initiatives.')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Try again' }))
     expect(onRetryTopics).toHaveBeenCalledOnce()
-    expect(screen.getByRole('link', { name: 'Explore topics' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Explore initiatives' })).toBeInTheDocument()
   })
 
-  it("folds each team, alphabetically and closed, to its own Topics, Projects and Issues, with no count and no catch-all fold", async () => {
+  it("folds each team, alphabetically and closed, to its own Initiatives, Projects and Issues, with no count and no catch-all fold", async () => {
     const { container } = render(<ShipSidebar topics={[]} onRetryTopics={noop} openIssues={3} activeProjects={2} hrefFor={hrefFor} folders={teams} current={{ entry: 'topics' }} />)
     expect(screen.getAllByRole('button').map((b) => [b.textContent, b.getAttribute('aria-expanded')])).toEqual([
       ['Estiva HQ', 'false'],
@@ -80,7 +82,7 @@ describe('ShipSidebar', () => {
     ])
     await userEvent.click(screen.getByRole('button', { name: 'Estiva HQ' }))
     expect(rowsOf(container, 'hq').map((a) => [a.textContent, a.getAttribute('href')])).toEqual([
-      ['Topics', '/app/teams/hq/topics'],
+      ['Initiatives', '/app/teams/hq/topics'],
       ['Projects', '/app/teams/hq/projects'],
       ['Issues', '/app/teams/hq/issues'],
     ])
@@ -126,7 +128,7 @@ describe('ShipSidebar', () => {
   it('draws no counts while the workspace is coming, and placeholder rows while the Folders are', () => {
     const { container } = render(<ShipSidebar topics={[]} onRetryTopics={noop} openIssues={0} activeProjects={0} hrefFor={hrefFor} loading folders={[]} foldersLoading />)
     // A zero would be a claim (SHI-20).
-    expect(links().map(([text]) => text)).toEqual(['Projects', 'Issues', 'Explore topics'])
+    expect(links().map(([text]) => text)).toEqual(['Projects', 'Issues', 'Explore initiatives'])
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
     expect(container.querySelectorAll('[aria-hidden="true"].animate-skeleton-in')).toHaveLength(1)
   })

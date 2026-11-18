@@ -60,7 +60,7 @@ export function OverviewPanel({ activity, activityTruncated, loading, history, h
       )}
       {topics && (
         <>
-          <SectionHeader title="Topics" hover="none" className="mx-2 mt-4" />
+          <SectionHeader title="Initiatives" hover="none" className="mx-2 mt-4" />
           <div className="px-4 pt-1">{topics}</div>
         </>
       )}

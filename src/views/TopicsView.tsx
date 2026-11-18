@@ -31,14 +31,15 @@ export interface TopicsViewProps {
   query?: string
 }
 
-const TABS: Record<TopicsTab, string> = { all: 'All', yours: 'Your topics', others: 'Other topics', archived: 'Archived' }
+// Peek's words for its Explore initiatives, word for word (Katerina, 18 November); the code still says topics.
+const TABS: Record<TopicsTab, string> = { all: 'All', yours: 'Your initiatives', others: 'Other initiatives', archived: 'Archived' }
 
 /** What an empty tab says; with no topic shown at all, every open tab says the first. */
 const EMPTY: Record<TopicsTab, string> = {
-  all: 'No topics yet.',
-  yours: 'You are in no topic yet.',
-  others: 'No other topics.',
-  archived: 'No archived topics.',
+  all: 'No initiatives yet.',
+  yours: 'You’re in no initiatives yet.',
+  others: 'No other initiatives.',
+  archived: 'No archived initiatives.',
 }
 
 /** A topic is found by the start of a word of its title, as search is everywhere (Miky, 19 Oct). */
@@ -60,17 +61,17 @@ export function TopicsView({ title, lists, tab, onTab, onRetry, onJoin, joining,
       {lists === 'loading' ? (
         <SkeletonList rows={8} />
       ) : lists === 'failed' ? (
-        <EmptyState icon={<IconTarget size={16} stroke={1.5} />} scope="page" message="Topics didn’t load." action={{ label: 'Try again', onClick: onRetry }} />
+        <EmptyState icon={<IconTarget size={16} stroke={1.5} />} scope="page" message="Initiatives didn’t load." action={{ label: 'Try again', onClick: onRetry }} />
       ) : (
         <>
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <Tabs<TopicsTab> aria-label="Topics" tabs={(Object.keys(TABS) as TopicsTab[]).map((id) => ({ id, label: TABS[id], count: lists[id].length }))} active={tab} onChange={onTab} />
+            <Tabs<TopicsTab> aria-label={title} tabs={(Object.keys(TABS) as TopicsTab[]).map((id) => ({ id, label: TABS[id], count: lists[id].length }))} active={tab} onChange={onTab} />
             <div className="w-64">
-              <SearchInput placeholder="Find a topic" aria-label="Find a topic" value={query} onChange={(event) => setQuery(event.target.value)} />
+              <SearchInput placeholder="Find an initiative" aria-label="Find an initiative" value={query} onChange={(event) => setQuery(event.target.value)} />
             </div>
           </div>
           {shown.length === 0 ? (
-            <EmptyState scope="section" message={asked ? `No topic matches “${asked}”.` : lists.all.length === 0 && tab !== 'archived' ? EMPTY.all : EMPTY[tab]} />
+            <EmptyState scope="section" message={asked ? `No initiative matches “${asked}”.` : lists.all.length === 0 && tab !== 'archived' ? EMPTY.all : EMPTY[tab]} />
           ) : (
             <div className="flex flex-col gap-2">
               <div className="hidden items-center gap-3 px-3 text-caption text-text-muted sm:flex">

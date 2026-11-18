@@ -81,7 +81,7 @@ const inTab = (tab: ProjectsTab, project: ProjectRowData) => tab === 'all' || TA
 export function TopicView({ topic, documents, onRetry, onRetryDocuments, topicsHref, members, comments, conversation, onCopyLink, onOpenInPeek }: TopicViewProps) {
   const [showArchived, setShowArchived] = useState(false)
   const [tab, setTab] = useState<ProjectsTab>('all')
-  if (topic === 'unavailable') return <NoAccessNotice what="topic" />
+  if (topic === 'unavailable') return <NoAccessNotice what="initiative" />
   const loaded = typeof topic === 'object' ? topic : undefined
   const shownProjects = loaded ? loaded.projects.filter((project) => inTab(tab, project)) : []
   const listed = documents === 'loading' || documents === 'failed' ? undefined : documents
@@ -90,12 +90,12 @@ export function TopicView({ topic, documents, onRetry, onRetryDocuments, topicsH
     <div data-surface="topic" className="flex min-h-0 flex-1 [contain:size]">
       <div className="flex min-w-0 flex-1 flex-col">
         <PageHeader
-          title={<Breadcrumb items={[{ label: 'Topics', ...linkTo(topicsHref) }, ...(loaded ? [{ label: loaded.title, icon: <KindIcon kind="topic" /> }] : [])]} />}
+          title={<Breadcrumb items={[{ label: 'Initiatives', ...linkTo(topicsHref) }, ...(loaded ? [{ label: loaded.title, icon: <KindIcon kind="topic" /> }] : [])]} />}
           members={loaded && members}
           actions={loaded && <PageActions what="topic" comments={comments} archive="none" onArchive={() => {}} onDelete={() => {}} onCopyLink={onCopyLink} onOpenInPeek={onOpenInPeek} />}
         />
         {topic === 'failed' ? (
-          <EmptyState icon={<IconTarget size={16} stroke={1.5} />} scope="page" message="This topic didn’t load." action={{ label: 'Try again', onClick: onRetry }} />
+          <EmptyState icon={<IconTarget size={16} stroke={1.5} />} scope="page" message="This initiative didn’t load." action={{ label: 'Try again', onClick: onRetry }} />
         ) : (
           <ScrollArea className="min-h-0 min-w-0 flex-1" contentClassName="flex flex-col gap-5 px-6 py-5">
             {topic === 'loading' ? (

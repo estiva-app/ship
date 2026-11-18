@@ -71,7 +71,7 @@ export function useTopicConversation(
       about: topic?.address,
       nameOf: directory.nameOf,
       onStart: (body, files, picks) => {
-        if (!topic) return Promise.resolve('This topic is not on this page yet.')
+        if (!topic) return Promise.resolve('This initiative is not on this page yet.')
         return answerOf(() => startConversation({ folder: topic.folder, about: topic.address, body, files, urgent: picks?.urgent, embeds: picks?.embeds }), () => refresh([topic.folder]))
       },
       onReply: (threadId, body, files, picks) => {

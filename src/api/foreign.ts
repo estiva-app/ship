@@ -468,7 +468,7 @@ export interface TopicOfFile {
 /** A topic as its chip and Add to topic's row draw it. */
 export function topicAsDrawn(address: string, folder: string, object: ForeignObject): TopicOfFile {
   // https only: the link comes from a manifest anyone may publish until WOR-2.
-  return { address, folder, title: object.slots.title?.value || 'Untitled topic', openUrl: safeLink(object.openUrl), archived: isArchived(object) }
+  return { address, folder, title: object.slots.title?.value || 'Untitled initiative', openUrl: safeLink(object.openUrl), archived: isArchived(object) }
 }
 
 /**
@@ -731,6 +731,6 @@ function countOf(kind: number, n: number): string {
 const KIND_WORDS: Record<number, [string, string]> = {
   30850: ['project', 'projects'],
   30851: ['issue', 'issues'],
-  30840: ['topic', 'topics'],
+  30840: ['initiative', 'initiatives'],
   39000: ['team', 'teams'],
 }

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { IconArrowUpRight, IconBox, IconListDetails, IconPlus, IconTarget } from '@tabler/icons-react'
+import { IconArrowUpRight, IconBox, IconListDetails, IconListSearch, IconPlus, IconTarget } from '@tabler/icons-react'
 import { KindIcon, NavItem, NavTree, Sidebar as SidebarShell, type NavTreeGroup } from '@estiva-app/ui'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { SkeletonList } from '@/components/ui/Skeleton'
@@ -112,7 +112,8 @@ export interface ShipSidebarProps {
 }
 
 const ENTRIES: { entry: SidebarEntry; label: string; icon: ReactNode }[] = [
-  { entry: 'topics', label: 'Topics', icon: <IconTarget size={16} stroke={1.5} /> },
+  // A team's initiatives (Katerina, 18 November: "Initiatives, just like we do in Peek's Teams"); the code still says topics.
+  { entry: 'topics', label: 'Initiatives', icon: <IconTarget size={16} stroke={1.5} /> },
   { entry: 'projects', label: 'Projects', icon: <IconBox size={16} stroke={1.5} /> },
   { entry: 'issues', label: 'Issues', icon: <IconListDetails size={16} stroke={1.5} /> },
 ]
@@ -157,16 +158,17 @@ export function ShipSidebar({ openIssues, activeProjects, hrefFor, folders = [],
         <NavItem key={entry} label={label} href={hrefFor(entry)} icon={icon} {...counts[entry]} active={!!at && !at.folder && at.entry === entry} />
       ))}
       {/* Your five newest topics, each folding to what Ship opens of it; then the way to every topic. */}
-      <NavTree title="Topics">
+      {/* In Peek's words (Katerina, 18 November): what was a topic is an initiative on screen; the code keeps "topic". */}
+      <NavTree title="Initiatives">
         {topics === 'loading' ? (
           <SkeletonList rows={TOPICS_SHOWN} />
         ) : topics === 'failed' ? (
           <div className="px-2 py-1">
-            <EmptyState scope="section" message="Didn’t load." action={{ label: 'Try again', onClick: onRetryTopics }} />
+            <EmptyState scope="section" message="Couldn’t load your initiatives." action={{ label: 'Try again', onClick: onRetryTopics }} />
           </div>
         ) : topics.length === 0 ? (
           <div className="px-2 py-1">
-            <EmptyState scope="section" message="You are in no topic yet." />
+            <EmptyState scope="section" message="You’re in no initiatives yet." />
           </div>
         ) : (
           topics.map((topic) => (
@@ -186,8 +188,8 @@ export function ShipSidebar({ openIssues, activeProjects, hrefFor, folders = [],
             </NavItem>
           ))
         )}
-        {/* No icon: it is a way in, not another topic (Miky, 6 Nov). Where the top "Topics" entry went. */}
-        <NavItem label="Explore topics" href={hrefFor('topics')} active={!!at && !at.folder && at.entry === 'topics'} />
+        {/* Peek's row, word and icon (Katerina, 18 November: "Explore initiatives along with the icon we used in Peek"). Where the top "Topics" entry went. */}
+        <NavItem label="Explore initiatives" href={hrefFor('topics')} icon={<IconListSearch size={16} stroke={1.5} aria-hidden />} active={!!at && !at.folder && at.entry === 'topics'} />
       </NavTree>
       {/*
         A quiet "Folders" label, its + on the right for a new top-level Folder

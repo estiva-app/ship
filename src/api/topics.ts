@@ -41,7 +41,7 @@ async function topicsFresh(): Promise<TopicsRead> {
   await held.reload(readAllTopics)
   const { value, error } = held.snapshot()
   if (value) return value
-  throw error ?? new Error('Topics could not be read.')
+  throw error ?? new Error('Initiatives could not be read.')
 }
 
 /** Test seam: forget the held topics and choices. */

@@ -270,7 +270,7 @@ describe("A topic's page in Ship", () => {
     const before = asked.filter((f) => (f.kinds as number[] | undefined)?.includes(30840)).length
     const { state, archives } = ship([], [])
     render(<Page d={D} state={state} folders={[]} archives={archives} />)
-    await waitFor(() => expect(screen.getByText("You can't open this topic")).toBeTruthy())
+    await waitFor(() => expect(screen.getByText("You can't open this initiative")).toBeTruthy())
     expect(asked.filter((f) => (f.kinds as number[] | undefined)?.includes(30840)).length).toBe(before * 2)
   })
 
@@ -282,18 +282,18 @@ describe("A topic's page in Ship", () => {
     asked.length = 0
     const { state, archives } = ship([], [])
     render(<Page d={D} state={state} folders={[]} archives={archives} />)
-    await waitFor(() => expect(screen.getByText("You can't open this topic")).toBeTruthy())
+    await waitFor(() => expect(screen.getByText("You can't open this initiative")).toBeTruthy())
     expect(asked.filter((f) => (f.kinds as number[] | undefined)?.includes(30840)).length).toBe(one)
   })
 
-  it('offers Try again, not "You can’t open this topic", when reading the topics again failed', async () => {
+  it('offers Try again, not "You can’t open this initiative", when reading the topics again failed', async () => {
     held.push(manifest('peek', 'peek.estiva.app', ['30840']), topic('other', 'Other'))
     await prefetchTopics()
     down = true
     const { state, archives } = ship([], [])
     render(<Page d={D} state={state} folders={[]} archives={archives} />)
     await waitFor(() => expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy())
-    expect(screen.queryByText("You can't open this topic")).toBeNull()
+    expect(screen.queryByText("You can't open this initiative")).toBeNull()
     // The topic was started meanwhile, and the relay answers again.
     down = false
     held.push(topic(D, 'New one'))

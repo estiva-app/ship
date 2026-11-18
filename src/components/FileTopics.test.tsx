@@ -24,15 +24,15 @@ describe('FileTopics, a project’s or an issue’s Topics in its rail (TOP-5)',
     expect(screen.getByRole('link', { name: /Widgets/ }).getAttribute('href')).toBe('/topic/widgets-w')
   })
 
-  it('says None when no topic lists it, and still offers Add to topic', () => {
+  it('says None when no topic lists it, and still offers Add to initiative', () => {
     render(<FileTopics topics={[]} busy={new Set()} onChange={vi.fn()} readChoices={vi.fn()} />)
     expect(screen.getByText('None')).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Add to topic' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Add to initiative' })).toBeTruthy()
   })
 
   it('says so when the topics could not be read', () => {
     render(<FileTopics topics="failed" busy={new Set()} onChange={vi.fn()} readChoices={vi.fn()} />)
-    expect(screen.getByText('Topics could not be read.')).toBeTruthy()
+    expect(screen.getByText('Initiatives could not be read.')).toBeTruthy()
   })
 
   it('Remove takes it off that topic; an archived topic keeps its chip with no Remove', () => {
@@ -50,41 +50,41 @@ describe('FileTopics, a project’s or an issue’s Topics in its rail (TOP-5)',
     expect(screen.getByRole('link', { name: /Widgets/ }).textContent).not.toContain('archived')
   })
 
-  it('Add to topic draws choices already in hand at once, never “Reading topics…”, and the fresh ones when they land', async () => {
+  it('Add to initiative draws choices already in hand at once, never “Reading initiatives…”, and the fresh ones when they land', async () => {
     let land: (choices: { yours: TopicOfFile[]; others: TopicOfFile[] }) => void = () => undefined
     const readChoices = vi.fn(() => new Promise<{ yours: TopicOfFile[]; others: TopicOfFile[] }>((resolve) => (land = resolve)))
     render(<FileTopics topics={[]} busy={new Set()} onChange={vi.fn()} readChoices={readChoices} choicesNow={() => ({ yours: [ROADMAP], others: [DESIGN] })} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Add to topic' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Add to initiative' }))
     const dialog = screen.getByRole('dialog')
     expect(within(dialog).getByText('Roadmap')).toBeTruthy()
-    expect(within(dialog).queryByText('Reading topics…')).toBeNull()
+    expect(within(dialog).queryByText('Reading initiatives…')).toBeNull()
     expect(readChoices).toHaveBeenCalledTimes(1)
     await act(async () => land({ yours: [ROADMAP], others: [DESIGN, WIDGETS] }))
     expect(within(dialog).getByText('Widgets')).toBeTruthy()
   })
 
-  it('Add to topic keeps the choices in hand when reading them again fails', async () => {
+  it('Add to initiative keeps the choices in hand when reading them again fails', async () => {
     const readChoices = vi.fn().mockRejectedValue(new Error('relay down'))
     render(<FileTopics topics={[]} busy={new Set()} onChange={vi.fn()} readChoices={readChoices} choicesNow={() => ({ yours: [ROADMAP], others: [] })} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Add to topic' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Add to initiative' }))
     const dialog = screen.getByRole('dialog')
     await waitFor(() => expect(readChoices).toHaveBeenCalled())
     await act(async () => undefined)
     expect(within(dialog).getByText('Roadmap')).toBeTruthy()
-    expect(within(dialog).queryByText('Topics could not be read.')).toBeNull()
+    expect(within(dialog).queryByText('Initiatives could not be read.')).toBeNull()
   })
 
-  it('Add to topic offers your topics first, then the others, never one that lists it already, and adds the one picked', async () => {
+  it('Add to initiative offers your topics first, then the others, never one that lists it already, and adds the one picked', async () => {
     const onChange = vi.fn()
     const readChoices = vi.fn().mockResolvedValue({ yours: [WIDGETS, ROADMAP], others: [DESIGN] })
     render(<FileTopics topics={[WIDGETS]} busy={new Set()} onChange={onChange} readChoices={readChoices} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Add to topic' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Add to initiative' }))
     const dialog = await screen.findByRole('dialog')
     await waitFor(() => expect(within(dialog).getByText('Design')).toBeTruthy())
     const text = dialog.textContent ?? ''
-    expect(text.indexOf('Your topics')).toBeLessThan(text.indexOf('Roadmap'))
-    expect(text.indexOf('Roadmap')).toBeLessThan(text.indexOf('Other topics'))
-    expect(text.indexOf('Other topics')).toBeLessThan(text.indexOf('Design'))
+    expect(text.indexOf('Your initiatives')).toBeLessThan(text.indexOf('Roadmap'))
+    expect(text.indexOf('Roadmap')).toBeLessThan(text.indexOf('Other initiatives'))
+    expect(text.indexOf('Other initiatives')).toBeLessThan(text.indexOf('Design'))
     expect(within(dialog).queryByText('Widgets')).toBeNull()
     await act(async () => fireEvent.click(within(dialog).getByText('Design')))
     expect(onChange).toHaveBeenCalledWith(DESIGN, true)
@@ -93,7 +93,7 @@ describe('FileTopics, a project’s or an issue’s Topics in its rail (TOP-5)',
   it('typing narrows the choices by title', async () => {
     const readChoices = vi.fn().mockResolvedValue({ yours: [ROADMAP], others: [DESIGN] })
     render(<FileTopics topics={[]} busy={new Set()} onChange={vi.fn()} readChoices={readChoices} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Add to topic' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Add to initiative' }))
     const dialog = await screen.findByRole('dialog')
     await waitFor(() => expect(within(dialog).getByText('Design')).toBeTruthy())
     fireEvent.change(within(dialog).getByRole('combobox'), { target: { value: 'road' } })
@@ -104,7 +104,7 @@ describe('FileTopics, a project’s or an issue’s Topics in its rail (TOP-5)',
   it('matches every typed word at a word start, in any order, never inside a word', async () => {
     const readChoices = vi.fn().mockResolvedValue({ yours: [topic('b', 'Widgets 2: build 1')], others: [DESIGN] })
     render(<FileTopics topics={[]} busy={new Set()} onChange={vi.fn()} readChoices={readChoices} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Add to topic' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Add to initiative' }))
     const dialog = await screen.findByRole('dialog')
     await waitFor(() => expect(within(dialog).getByText('Design')).toBeTruthy())
     const box = within(dialog).getByRole('combobox')
