@@ -1,10 +1,10 @@
 import type { ReactNode } from 'react'
-import { IconArrowUpRight, IconBox, IconListDetails, IconListSearch, IconPlus, IconTarget } from '@tabler/icons-react'
-import { KindIcon, NavItem, NavTree, Sidebar as SidebarShell, type NavTreeGroup } from '@estiva-app/ui'
+import { IconBox, IconListDetails, IconListSearch, IconPlus, IconTarget, IconUsers } from '@tabler/icons-react'
+import { KindIcon, NavItem, NavTree, Sidebar as SidebarShell, useRememberedOpen } from '@estiva-app/ui'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { SkeletonList } from '@/components/ui/Skeleton'
 import { TOPICS_SHOWN, type SidebarTopic } from '@/lib/topics'
-import { linkTo } from '@/router'
+import { href } from '@/router'
 
 /**
  * The sidebar: Projects, Issues, your five newest topics then Explore topics
@@ -26,9 +26,11 @@ import { linkTo } from '@/router'
  * say (`topLevelFolders` — the ones with state that nothing lists), and which
  * team a project is in is the team's state (FOL-5, `placedIn`).
  *
- * A team's title toggles its fold; the arrow on hover opens the Folder page,
- * which lists everything in it — the topics Peek filed there beside the
- * projects.
+ * A team is a row like Peek's (Katerina, 18 November, C1: "A"): the team's icon
+ * and name, a link to its page; under the pointer its icon turns into the
+ * arrow, which alone folds its Initiatives, Projects and Issues (her 16 Nov rule:
+ * a thing with a page is a link row). It replaced a heading whose whole row
+ * folded, with the page behind a ↗ on hover.
  *
  * Two kinds of number, each saying what it counts in its tooltip (ruling
  * A2): the Issues entry counts OPEN issues ("18 open"); the Projects entry
@@ -83,8 +85,6 @@ export interface ShipSidebarProps {
    * disclosure in its own right, so the fold states the name and nothing else.
    */
   folders?: SidebarFolder[]
-  /** The arrow on a team's fold: open the Folder page. */
-  onOpenFolder?: (folder: SidebarFolder) => void
   /**
    * "New folder" under the teams (FOL-8): a new top-level Folder, which then
    * shows here beside them. Absent, there is no such entry.
@@ -123,29 +123,13 @@ const TOP = ENTRIES.filter(({ entry }) => entry !== 'topics')
 /** A team entry's row id: the tree's `selected` names one. */
 const rowId = (folder: string, entry: SidebarEntry) => `${folder}/${entry}`
 
-export function ShipSidebar({ openIssues, activeProjects, hrefFor, folders = [], onOpenFolder, onNewFolder, current, topics, onRetryTopics, openTopic, openFile, loading = false, foldersLoading = false, className }: ShipSidebarProps) {
+export function ShipSidebar({ openIssues, activeProjects, hrefFor, folders = [], onNewFolder, current, topics, onRetryTopics, openTopic, openFile, loading = false, foldersLoading = false, className }: ShipSidebarProps) {
   const at = current && 'entry' in current ? current : undefined
   // Alphabetical teams, as Peek's column draws them; the relay's order tells the person nothing.
   const teams = [...folders].sort((a, b) =>
     (a.name ?? a.id).localeCompare(b.name ?? b.id, undefined, { sensitivity: 'base' }),
   )
   const pending = folders.length === 0 && foldersLoading
-  /*
-    The teams as the package's tree (Katerina, 2 October): each team a group,
-    closed unless the reader opened it or it holds where you are, its three
-    entries lightly indented under its name, the arrow on hover opening the
-    Folder page.
-  */
-  const groups: NavTreeGroup[] | null = pending
-    ? null
-    : teams.map((team) => ({
-        id: team.id,
-        title: team.name ?? team.id,
-        actions: onOpenFolder
-          ? [{ icon: <IconArrowUpRight size={16} stroke={1.5} />, tooltip: 'Open team', onClick: () => onOpenFolder(team) }]
-          : undefined,
-        nodes: ENTRIES.map(({ entry, label, icon }) => ({ id: rowId(team.id, entry), label, icon, href: hrefFor(entry, team.id) })),
-      }))
   const counts: Partial<Record<SidebarEntry, { count: number; countLabel: string }>> = loading
     ? {}
     : {
@@ -196,14 +180,44 @@ export function ShipSidebar({ openIssues, activeProjects, hrefFor, folders = [],
         (FOL-8), over the teams. No label while the Folders are being read:
         which teams are coming is exactly what is not known yet.
       */}
+      {/* The kit's skeleton while the teams are read; then a row each, 8px apart, as Peek's Teams column spaces them. */}
       <NavTree
         title={pending ? undefined : 'Teams'}
         titleActions={onNewFolder ? [{ icon: <IconPlus size={16} stroke={1.5} />, tooltip: 'New team', onClick: onNewFolder }] : undefined}
-        groups={groups}
-        selected={at?.folder ? rowId(at.folder, at.entry) : undefined}
-        onSelect={(selected, event) => linkTo(selected.href).onClick(event)}
-        storageKey={STORAGE_KEY}
-      />
+        {...(pending ? { groups: null } : {})}
+        spaced
+      >
+        {teams.map((team) => (
+          <TeamRow key={team.id} team={team} current={current} hrefFor={hrefFor} />
+        ))}
+      </NavTree>
     </SidebarShell>
+  )
+}
+
+/**
+ * One team in the sidebar, as Peek's Teams column draws it: a link row to its page with the team's icon, lit while that
+ * page is open, folding to its Initiatives, Projects and Issues. The fold is remembered in this browser under the key
+ * the old group used, so nobody's folds change; it opens for the page it holds, as a click would, even when closed by
+ * hand, and stays as left otherwise.
+ */
+function TeamRow({ team, current, hrefFor }: { team: SidebarFolder; current?: SidebarPlace; hrefFor: (entry: SidebarEntry, folder?: string) => string }) {
+  const at = current && 'entry' in current && current.folder === team.id ? current : undefined
+  const pageOpen = !!current && 'folderId' in current && current.folderId === team.id
+  const [open, setOpen] = useRememberedOpen(`${STORAGE_KEY}.${team.id}`, !!at)
+  return (
+    <NavItem
+      href={href({ name: 'folder', id: team.id })}
+      label={team.name ?? team.id}
+      icon={<IconUsers size={16} stroke={1.5} aria-hidden />}
+      active={pageOpen}
+      open={open}
+      onOpenChange={setOpen}
+      {...(at ? { openFor: rowId(team.id, at.entry) } : {})}
+    >
+      {ENTRIES.map(({ entry, label, icon }) => (
+        <NavItem key={entry} label={label} href={hrefFor(entry, team.id)} icon={icon} active={!!at && at.entry === entry} />
+      ))}
+    </NavItem>
   )
 }

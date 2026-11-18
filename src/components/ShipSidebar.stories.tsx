@@ -36,7 +36,6 @@ const meta = {
     activeProjects: 5,
     hrefFor: (entry, folder) => (folder ? `#/app/teams/${folder}/${entry}` : `#/${entry}`),
     folders: FOLDERS,
-    onOpenFolder: () => {},
     onNewFolder: () => {},
     current: { entry: 'topics' },
     topics: TOPICS,
@@ -57,10 +56,11 @@ type Story = StoryObj<typeof meta>
 
 /**
  * Where Ship opens (SHIPS-5, TOPI-9): Projects ("5 active"), Issues ("18 open"),
- * your five newest topics folded, Explore topics (no icon, lit: Ship opens on
- * it), then the teams under a quiet "Teams" label, closed, alphabetically. A
- * team carries **no count** — a Folder holds files from apps Ship does not own,
- * so any number would be Ship's records only.
+ * your five newest initiatives folded, Explore initiatives (Peek's icon, lit:
+ * Ship opens on it), then the teams under a quiet "Teams" label, alphabetically,
+ * each a row like Peek's — the team's icon and name, a link to its page — folded
+ * (C1). A team carries **no count** — a Folder holds files from apps Ship does
+ * not own, so any number would be Ship's records only.
  */
 export const OnTopics: Story = { name: 'On Explore initiatives' }
 
@@ -81,13 +81,13 @@ export const TopicsFailed: Story = { name: 'Initiatives failed', args: { topics:
 
 export const OnIssues: Story = { args: { current: { entry: 'issues' } } }
 
-/** A project in Estiva HQ: its fold opens and its Projects is marked, not the top one. */
+/** A project in Estiva HQ: its team's row opens and its Projects is marked, not the top one. */
 export const OnAProject: Story = { args: { current: { entry: 'projects', folder: HQ } } }
 
-/** An issue whose project is in Ship: that fold opens, its Issues marked. */
+/** An issue whose project is in Ship: that team's row opens, its Issues marked. */
 export const OnAnIssue: Story = { args: { current: { entry: 'issues', folder: SHIP } } }
 
-/** The Folder page: nothing is marked; the arrow on a fold's hover is how you get there. */
+/** A team's page: its row is lit, as Peek's Teams column lights a team whose page is open. */
 export const OnAFolder: Story = { args: { current: { folderId: SHIP } } }
 
 /**

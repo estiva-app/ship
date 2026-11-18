@@ -213,7 +213,6 @@ function Shell() {
             archives,
           )}
           {...sidebarTopics}
-          onOpenFolder={(folder) => go({ name: 'folder', id: folder.id })}
           onNewFolder={() => setCreatingFolder(true)}
           loading={(!state && loading) || partial}
           foldersLoading={folders === undefined}
