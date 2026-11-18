@@ -302,7 +302,8 @@ type Line = {
   from: string;
   at: string;
   isNew?: boolean;
-  rec?: { to: string; why: string };
+  /** Where Claude would put it, and why; `project` names the other project when `to` is "project". */
+  rec?: { to: string; why: string; project?: string };
   found?: Found;
   /** What was seen, in a few sentences: what a person does, what happens, why it matters. */
   detail?: string;
@@ -348,6 +349,21 @@ const TRIAGE: Line[] = [
     rec: {
       to: "m2",
       why: "TOPI-4 is still in review: one line in its PR, before it merges.",
+    },
+  },
+  {
+    id: "t5",
+    title: "Peek’s composer loses a draft when you switch topics before sending",
+    from: "TOPI-10’s review",
+    at: "Today",
+    isNew: true,
+    found: { ref: "TOPI-10", step: "review", pr: "peek#635" },
+    detail:
+      "Start a message in one topic, open another topic from the new list, and come back: the message you were writing is gone. It happens with the old list too, so this project did not cause it.",
+    rec: {
+      to: "project",
+      project: "Peek: Feedback & Bugs",
+      why: "A Peek bug outside this project’s Goal, and older than it; Peek’s bugs are fixed from Feedback & Bugs.",
     },
   },
   {
@@ -421,6 +437,9 @@ const PUT_IN = [
   { value: "not", label: "Not doing" },
 ];
 
+/** A recommendation as its chip and the panel say it: the other project by name, else the place. */
+const recSaid = (rec: { to: string; project?: string }) => (rec.to === "project" && rec.project ? rec.project : said(rec.to));
+
 const said = (v: string) =>
   v === "not"
     ? "Not doing"
@@ -459,7 +478,7 @@ function FoundIn({ line, title = false }: { line: Line; title?: boolean }) {
 
 /** Where Claude would put it, as a chip: → This milestone, → Later, → Not doing. */
 const RecChip = ({ line }: { line: Line }) =>
-  line.rec ? <Chip label={said(line.rec.to)} leadingIcon={<IconArrowRight size={12} stroke={1.5} />} /> : null;
+  line.rec ? <Chip label={recSaid(line.rec)} leadingIcon={<IconArrowRight size={12} stroke={1.5} />} /> : null;
 
 /**
  * Accept and ✕ on a line to decide (Miky, 18 Nov), the Insights' own pair: Accept puts it where Claude would, ✕ drops it
@@ -595,7 +614,7 @@ export function ScopePanel({ id, onPlace, onClose }: { id: string; onPlace: (to:
             <Card fill="surface" className="flex flex-col gap-3 p-3">
               <span className="flex items-center gap-1.5 text-body-2 font-medium text-text-primary">
                 <IconArrowRight size={16} stroke={1.5} />
-                {said(l.rec.to)}
+                {recSaid(l.rec)}
               </span>
               <span className="text-body-2 text-text-secondary">{l.rec.why}</span>
               {editing ? (
