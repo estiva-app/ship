@@ -42,6 +42,22 @@ export const Default: Story = {}
 /** An owner or admin: the ⋮ holds Rename… and Archive team…, where the old page had the editable title and a button. */
 export const ForAnOwner: Story = { args: { onRename: fn(), onArchive: fn() } }
 
+/**
+ * Option for the rows (her 18 Nov question, "what do they show today?"): the facts Ship's own lists show — a project's
+ * status, lead and progress (the Projects list), an issue's status, assignee and last change (the Issues list).
+ */
+export const RowsWithTheirFacts: Story = {
+  args: {
+    onRename: fn(),
+    onArchive: fn(),
+    projects: [
+      { address: '30850:a:p', title: 'Payment integration', href: '#', status: { value: 'in_progress', label: 'In Progress' }, person: ANA, progress: { done: 4, total: 9 } },
+      { address: '30850:a:q', title: 'Welcome emails', href: '#', status: { value: 'planned', label: 'Planned' }, progress: { done: 0, total: 3 } },
+    ],
+    issues: [{ address: '30851:a:i', title: 'Refund webhook retries', href: '#', status: { value: 'in_progress', label: 'In Progress' }, person: RAVI, at: Math.floor(NOW / 1000) - 3 * 3600 }],
+  },
+}
+
 /** Its initiatives still being read: the heading, and a skeleton in their place. */
 export const InitiativesLoading: Story = { args: { initiatives: 'loading' } }
 

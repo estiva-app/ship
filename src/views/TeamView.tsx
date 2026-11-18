@@ -1,10 +1,13 @@
 import type { ReactNode } from 'react'
 import { IconDotsVertical, IconUsers } from '@tabler/icons-react'
 import { KindIcon, ListTable, ListTableRow, Menu, MenuItem, MembersPill, PageHeader, SectionHeader, Toolbar, ToolbarButton, type AvatarGroupMember, type ListTableColumn } from '@estiva-app/ui'
+import { ProjectProgress } from '@/components/ProjectProgress'
+import { Avatar } from '@/components/ui/Avatar'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { ScrollArea } from '@/components/ui/ScrollArea'
 import { SkeletonList } from '@/components/ui/Skeleton'
-import { formatActive } from '@/lib/time'
+import { StatusLabel } from '@/components/ui/StatusLabel'
+import { ago, formatActive } from '@/lib/time'
 
 /** One initiative the team holds, as Explore lists it: its name and line, who is in it, when it was last active. */
 export interface TeamInitiativeRow {
@@ -20,11 +23,22 @@ export interface TeamInitiativeRow {
   active?: number
 }
 
-/** One of Ship's own files the team holds: a project or an issue. */
+/**
+ * One of Ship's own files the team holds: a project or an issue. Its facts are optional: with any, the list shows the
+ * ones Ship's own lists show — a project's status, lead and progress (the Projects list), an issue's status, assignee
+ * and last change (the Issues list).
+ */
 export interface TeamFileRow {
   address: string
   title: string
   href: string
+  status?: { value: string; label: string }
+  /** A project's lead, an issue's assignee. */
+  person?: { name: string; picture?: string; bot?: boolean }
+  /** A project's issues done of all. */
+  progress?: { done: number; total: number }
+  /** An issue's last change, unix seconds. */
+  at?: number
 }
 
 /**
@@ -137,8 +151,8 @@ export function TeamView({ name, members, onRename, onArchive, archivedNotice, i
                 </section>
               )
             )}
-            <FileSection title="Projects" kind="project" rows={projects} team={title} />
-            <FileSection title="Issues" kind="issue" rows={issues} team={title} />
+            <FileSection title="Projects" kind="project" rows={projects} team={title} now={now} />
+            <FileSection title="Issues" kind="issue" rows={issues} team={title} now={now} />
             {/* What Ship does not list, counted, so a short list is not taken for the whole team (RFC 0.5 §10.7). */}
             {/* px-2: the same 8px in as the headings' own titles (SectionHeader), so the line starts where they do. */}
             {others > 0 && <p className="px-2 text-caption text-text-muted">{others === 1 ? '1 other file, listed in Peek' : `${others} other files, listed in Peek`}</p>}
@@ -149,15 +163,40 @@ export function TeamView({ name, members, onRename, onArchive, archivedNotice, i
   )
 }
 
-/** One kind of Ship's own files, as Peek's team page lists its Files: the kit's list, no headings, each row its icon and name. */
-function FileSection({ title, kind, rows, team }: { title: string; kind: 'project' | 'issue'; rows: TeamFileRow[]; team: string }) {
+/** A project's facts, as the Projects list shows them; they give way in a narrow window, progress last. */
+const PROJECT_COLUMNS: ListTableColumn[] = [
+  { label: 'Status', width: 'medium', keep: 'low' },
+  { label: 'Lead', width: 'small', keep: 'low' },
+  { label: 'Progress', width: 'large' },
+]
+
+/** An issue's facts, as the Issues list shows them; the same widths as a project's, so the two lists' columns line up. */
+const ISSUE_COLUMNS: ListTableColumn[] = [
+  { label: 'Status', width: 'medium', keep: 'low' },
+  { label: 'Assignee', width: 'small', keep: 'low' },
+  { label: 'Updated', width: 'large' },
+]
+
+/**
+ * One kind of Ship's own files: the kit's list under its heading. With no facts, as Peek's team page lists its Files,
+ * each row its icon and name; with facts, Ship's own lists' columns, headings off (the heading over it names the list).
+ */
+function FileSection({ title, kind, rows, team, now }: { title: string; kind: 'project' | 'issue'; rows: TeamFileRow[]; team: string; now: number }) {
   if (rows.length === 0) return null
+  const facts = rows.some((row) => row.status || row.person || row.progress || row.at)
+  const face = (row: TeamFileRow) => row.person && <Avatar name={row.person.name} src={row.person.picture} bot={row.person.bot} size={16} label={row.person.name} />
+  const cellsOf = (row: TeamFileRow) =>
+    !facts
+      ? []
+      : kind === 'project'
+        ? [row.status && <StatusLabel value={row.status.value} label={row.status.label} size="small" />, face(row), row.progress && <ProjectProgress {...row.progress} wide />]
+        : [row.status && <StatusLabel value={row.status.value} label={row.status.label} size="small" />, face(row), row.at ? ago(row.at, now) : undefined]
   return (
     <section className="flex flex-col gap-1">
       <SectionHeader title={title} count={rows.length} hover="none" />
-      <ListTable aria-label={`${team}’s ${title.toLowerCase()}`} columns={[]}>
+      <ListTable aria-label={`${team}’s ${title.toLowerCase()}`} columns={facts ? (kind === 'project' ? PROJECT_COLUMNS : ISSUE_COLUMNS) : []} headings={false}>
         {rows.map((row) => (
-          <ListTableRow key={row.address} href={row.href} label={row.title} icon={<KindIcon kind={kind} />} cells={[]} />
+          <ListTableRow key={row.address} href={row.href} label={row.title} icon={<KindIcon kind={kind} />} cells={cellsOf(row)} />
         ))}
       </ListTable>
     </section>
