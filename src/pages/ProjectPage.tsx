@@ -54,6 +54,7 @@ import {
 } from '@/api'
 import { useRelated, withoutTopics } from '@/api/useRelated'
 import { useHistoryFold } from '@/api/useFileChanges'
+import { useChangedAt } from '@/api/useChangedAt'
 import { useFileTopics } from '@/api/useFileTopics'
 import { useThreads } from '@/api/useThreads'
 import { editTargetOf, MEMBER_FIELD_PREFIX, refusalReason } from '@estiva-app/conversation'
@@ -582,21 +583,32 @@ export function ProjectPage({
     if (project) noteProjectText(project)
   }, [project])
 
-  const issues = useMemo<IssuesTableRow[]>(() => {
-    if (!project) return []
-    // An issue archived on its own is out of the list (FOL-46); one archived
-    // only with this project is the project's, and on its page.
-    return state.issues
-      .filter((issue) => {
-        const archive = archives.ofIssue(issue)
-        return issue.projectAddr === project.addr && (!archive || !!archive.with)
-      })
-      .map((issue) => {
+  // An issue archived on its own is out of the list (FOL-46); one archived
+  // only with this project is the project's, and on its page.
+  const listed = useMemo(
+    () =>
+      project
+        ? state.issues.filter((issue) => {
+            const archive = archives.ofIssue(issue)
+            return issue.projectAddr === project.addr && (!archive || !!archive.with)
+          })
+        : [],
+    [project, state.issues, archives],
+  )
+  // Where issues are read by their fields the load holds no text save (ISS-4): when each last changed comes from the relay.
+  const changedAt = useChangedAt(
+    useMemo(() => listed.map((issue) => issue.addr), [listed]),
+    state.issueTexts !== undefined,
+  )
+  const issues = useMemo<IssuesTableRow[]>(
+    () =>
+      listed.map((issue) => {
         // Who follows an issue is not an update to it (SHI-31): a Join or an Add does not move it up the table.
         const touched = state.activity.filter((change) => change.target === issue.addr && !change.field.startsWith(MEMBER_FIELD_PREFIX)).at(-1)
-        return { ...rowFor(issue, state, directory), openedBy: directory.personOf(issue.author), at: touched?.createdAt ?? issue.createdAt }
-      })
-  }, [project, state, directory, archives])
+        return { ...rowFor(issue, state, directory), openedBy: directory.personOf(issue.author), at: Math.max(touched?.createdAt ?? issue.createdAt, changedAt[issue.addr] ?? 0) }
+      }),
+    [listed, state, directory, changedAt],
+  )
 
   const { events: elsewhere, reread: rereadElsewhere } = useMentionsElsewhere(project?.addr, state)
   const linksAnswered = useMentionLinks(project?.addr, state, elsewhere)

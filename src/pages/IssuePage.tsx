@@ -17,7 +17,8 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { IssueView } from '@/views/IssueView'
 import { go, href } from '../router'
 import { act, actInField, answerOf, deleteAnswer, sayOnceLeft, type Say } from './act'
-import { editedFor, historyFor } from './history'
+import { editedFor, historyFor, withChangesOf } from './history'
+import { useHistoryFold } from '@/api/useFileChanges'
 import { useSideColumn } from './sideColumn'
 import { FileTopicsOf } from '@/components/FileTopicsOf'
 import { activityFor, cardEditOf, copyText, folderOfMessage, pickerPeople, reactTo, refreshAfter, resolveAnswer, threadFor, useMentionLinks, withElsewhere } from './ProjectPage'
@@ -100,7 +101,17 @@ export function IssuePage({ state, directory, archives, d, say, refresh }: { sta
   )
   // Judged against the frontier this visit opened on, so the divider outlives the page's own marks (99557309).
   const { unread, stillUnread } = useNewSince(issue?.addr, merged, verdictAt)
-  const history = useMemo(() => (issue ? historyFor(issue.addr, state, directory) : []), [issue, state, directory])
+  /*
+    Where issues are read by their fields (ISS-4) the load holds each field's
+    current change only: History is folded, and its every change read when it
+    is opened, as a project's. "Edited" reads the same, so it names the text's
+    last save, which the opened issue's read carries.
+  */
+  const byFields = state.issueTexts !== undefined
+  const historyRead = useHistoryFold(byFields ? issue?.addr : undefined)
+  const everyChange = historyRead.changes
+  const ownChanges = useMemo(() => (issue && byFields ? withChangesOf(issue.addr, state, everyChange ?? undefined) : state), [issue, byFields, state, everyChange])
+  const history = useMemo(() => (issue ? historyFor(issue.addr, ownChanges, directory) : []), [issue, ownChanges, directory])
   const people = useMemo(() => pickerPeople(state, directory), [state, directory])
   const projects = useMemo(
     // No move into an archived project, a new child under it (SPEC §6.5); its own stays listed, and moving out stays offered.
@@ -148,7 +159,11 @@ export function IssuePage({ state, directory, archives, d, say, refresh }: { sta
     <>
       <IssueView
         // When it last changed, over the page (ONE-6, step 4a).
-        edited={editedFor(issue.addr, state, directory, { at: issue.createdAt, by: issue.author })}
+        edited={editedFor(issue.addr, ownChanges, directory, { at: issue.createdAt, by: issue.author })}
+        // Folded and read on opening where the load holds only current changes; where it holds every change, open and read already.
+        historyFold={byFields ? { open: historyRead.open, onOpenChange: historyRead.setOpen, pending: historyRead.open && everyChange === undefined } : undefined}
+        // The list read carries no text: the first record's would show, and a save would overwrite the current one from it.
+        textPending={byFields && !state.issueTexts!.includes(issue.addr)}
         comments={side.comments}
         overview={side.overview}
         archivedNotice={

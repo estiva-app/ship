@@ -28,7 +28,7 @@ import {
   type CommentRef,
 } from './events'
 import { findNaddrs, naddrToAddr, buildReaction, buildResolution, buildEdit, buildDeletion as buildEventDeletion, imetaTag, needsRelayKey, RELAY_KEY_FILTER, type Authored } from '@estiva-app/protocol'
-import { listFiles, openFile, writeChange, TEXT_FIELD, type WriteChangeResult } from '@estiva-app/interop'
+import { DELETED_FIELD, fieldsSetBy, listFiles, openFile, writeChange, TEXT_FIELD, type FileFields, type WriteChangeResult } from '@estiva-app/interop'
 import { createLoadQuery, planArchiveFolder, planCreateFolder, planDeleteFolder, planListInTopic, planMoveFromFolders, planPlaceFile, planRemoveFromTopic, planRenameFolder, planUnlistFile, readMentionedIn, readMoveRefusal, type ListHolder, type FolderRef, type MovableFile, type MoveRefusal } from '@estiva-app/interop'
 import { foldFolder, type FolderState } from './fold'
 import { buildMembershipChange, buildMutedEvent, buildPlaceAdd, switchWrites, type Following, type Place, decorationsOf, foldAttachments, foldEdits, foldEmbeds, URGENT_TAG, type Decorations, type EditFold, type QueryFn } from '@estiva-app/conversation'
@@ -177,6 +177,8 @@ export interface WorkspaceState extends FolderState {
   liveAt?: Readonly<Record<string, number>>
   /** The projects whose current text this holds, where projects are read by their fields: see `WorkspaceEvents`. */
   texts?: readonly string[]
+  /** The issues whose current text this holds, where issues are read by their fields: see `WorkspaceEvents`. */
+  issueTexts?: readonly string[]
   /**
    * The events this was folded from, as the relay answered them: what the
    * shared "Mentioned in" reader (interop's `mentionedInOf`) reads, since it
@@ -212,7 +214,7 @@ export function partsIndex(events: readonly SignedEvent[]): Record<string, PartP
 function read(
   events: SignedEvent[],
   folders: string[],
-  threads: Required<Pick<WorkspaceState, 'threadsAt' | 'mentionsOf'>> & Pick<WorkspaceState, 'texts' | 'ownOf' | 'liveAt'> = { threadsAt: {}, mentionsOf: [] },
+  threads: Required<Pick<WorkspaceState, 'threadsAt' | 'mentionsOf'>> & Pick<WorkspaceState, 'texts' | 'issueTexts' | 'ownOf' | 'liveAt'> = { threadsAt: {}, mentionsOf: [] },
 ): WorkspaceState {
   return {
     ...threads,
@@ -287,6 +289,12 @@ export interface WorkspaceEvents {
    * may be saved on it. Absent where every change is read: every text is held.
    */
   texts?: string[]
+  /**
+   * `texts` for issues, which switch on their own (ISS-4): the issues whose
+   * current text this holds where issues are read by their fields. Absent where
+   * every issue change is read.
+   */
+  issueTexts?: string[]
 }
 
 /** The Folders and files a screen draws conversations for (APP-5) — see `Store.readThreads`. */
@@ -406,11 +414,12 @@ class Deletions {
 }
 
 /** Fold a workspace read. `loadAll` is `foldWorkspace(await loadAllEvents())`. */
-export function foldWorkspace(snapshot: Pick<WorkspaceEvents, 'events' | 'folders'> & Partial<Pick<WorkspaceEvents, 'threadsAt' | 'mentionsOf' | 'texts' | 'ownOf' | 'liveAt'>>): WorkspaceState {
+export function foldWorkspace(snapshot: Pick<WorkspaceEvents, 'events' | 'folders'> & Partial<Pick<WorkspaceEvents, 'threadsAt' | 'mentionsOf' | 'texts' | 'issueTexts' | 'ownOf' | 'liveAt'>>): WorkspaceState {
   return read(snapshot.events, snapshot.folders, {
     threadsAt: snapshot.threadsAt ?? {},
     mentionsOf: snapshot.mentionsOf ?? [],
     ...(snapshot.texts ? { texts: snapshot.texts } : {}),
+    ...(snapshot.issueTexts ? { issueTexts: snapshot.issueTexts } : {}),
     ...(snapshot.ownOf ? { ownOf: snapshot.ownOf } : {}),
     ...(snapshot.liveAt ? { liveAt: snapshot.liveAt } : {}),
   })
@@ -436,6 +445,16 @@ const OPENED_RECORDS_LIMIT = 100
 
 /** Issue addresses per `#a` filter: about 900 issues are a handful of filters in one request. */
 const ISSUES_PER_FILTER = 200
+
+/** At most this many pages of a list read: 100,000 files, far past any workspace, so a relay that ignores `until` cannot loop. */
+const MAX_LIST_PAGES = 100
+
+/** `values` in runs of `size`. */
+function chunk<T>(values: readonly T[], size: number): T[][] {
+  const runs: T[][] = []
+  for (let at = 0; at < values.length; at += size) runs.push(values.slice(at, at + size))
+  return runs
+}
 
 /** Every change to `addrs`, by `#a` (§6.2), {@link ISSUES_PER_FILTER} addresses per filter. */
 function changeFilters(addrs: readonly string[]): Record<string, unknown>[] {
@@ -476,7 +495,14 @@ export class Store {
      * comment, card or listing names a file of one by its id too (ALO-8).
      */
     readonly inOrderTypes: () => Promise<readonly string[]> = () => Promise.resolve([]),
+    /** Whether issues are read by their fields (`api/fileReads.ts`, ISS-4), switched apart from projects; off when it answers nothing. */
+    readonly issueFields: () => Promise<ProjectFields | undefined> = () => Promise.resolve(undefined),
   ) {}
+
+  /** Both switches, read together: projects' and issues'. */
+  private switches(): Promise<[ProjectFields | undefined, ProjectFields | undefined]> {
+    return Promise.all([this.projectFields(), this.issueFields()])
+  }
 
   /** `inOrder` for the shared builders, absent while the relay keeps no type in order. */
   private async inOrderOption(): Promise<{ inOrder?: readonly string[] }> {
@@ -486,6 +512,8 @@ export class Store {
 
   /** Projects opened on this page: each whole load reads its current text too, which a list never carries (§6.13). */
   private readonly openedProjects = new Set<string>()
+  /** Issues opened on this page, as `openedProjects`, where issues are read by their fields (ISS-4). */
+  private readonly openedIssues = new Set<string>()
 
   /**
    * The current fields of the projects `addrs` names, read by the list read —
@@ -497,20 +525,37 @@ export class Store {
    * shown — its page (`opened`) here, the Archived tab by `openTexts` — or when
    * its newest change is not the delete. On production 4 Nov every change of the
    * 19 deleted was 138 KB of each cold load, one throwaway's 121 changes 86 KB.
+   *
+   * Issues the same way once they switch (ISS-4), `kind` saying which. A whole
+   * load's issues come already `listed` (`listEvery`): their roots are the
+   * list's own, so nothing is unlisted and only the opened ones' texts are read.
    */
-  private async projectFileEvents(read: QueryFn, fields: ProjectFields, roots: readonly SignedEvent[], opened: ReadonlySet<string>, scope: 'all' | 'these' = 'all'): Promise<{ events: SignedEvent[]; texts: string[] }> {
-    const own = roots.filter((root) => root.kind === KIND.PROJECT)
+  private async fileEvents(
+    kind: number,
+    read: QueryFn,
+    fields: ProjectFields,
+    roots: readonly SignedEvent[],
+    opened: Set<string>,
+    scope: 'all' | 'these' = 'all',
+    listedAlready?: readonly FileFields[],
+  ): Promise<{ events: SignedEvent[]; texts: string[] }> {
+    const own = roots.filter((root) => root.kind === kind)
     const dOf = (root: SignedEvent) => root.tags.find((t) => t[0] === 'd')?.[1] ?? ''
+    const addrOf = (root: SignedEvent) => `${kind}:${root.pubkey}:${dOf(root)}`
     if (scope === 'these' && !own.length) return { events: [], texts: [] }
     const open = (addr: string) => {
       const [, pubkey, ...d] = addr.split(':')
-      return openFile(read, { kind: KIND.PROJECT, pubkey: pubkey!, d: d.join(':') }, { text: true })
+      return openFile(read, { kind, pubkey: pubkey!, d: d.join(':') }, { text: true })
     }
-    const addrs = [...new Set(own.map((root) => `${KIND.PROJECT}:${root.pubkey}:${dOf(root)}`))]
+    const addrs = [...new Set(own.map(addrOf))]
     // The texts beside the list, not after it: a deleted one answers no text either (§6.13), and is dropped below.
     const asked = fields.text ? [...opened].filter((addr) => scope === 'all' || addrs.includes(addr)) : []
+    const ds = [...new Set(own.map(dOf))]
     const [listed, opens] = await Promise.all([
-      listFiles(read, { kinds: [KIND.PROJECT], ...(scope === 'these' ? { '#d': [...new Set(own.map(dOf))] } : {}) }),
+      listedAlready ??
+        (scope === 'these'
+          ? Promise.all(chunk(ds, ISSUES_PER_FILTER).map((part) => listFiles(read, { kinds: [kind], '#d': part }))).then((parts) => parts.flat())
+          : listFiles(read, { kinds: [kind] })),
       Promise.all(asked.map(open)),
     ])
     const held = new Set(listed.map((file) => file.address))
@@ -520,19 +565,55 @@ export class Store {
     const shown = unlisted.filter((addr) => opened.has(addr))
     const rest = unlisted.filter((addr) => !opened.has(addr))
     // Read whole this once, not kept: its page, while it shows, asks for it again by `readThreads`.
-    for (const addr of shown) this.openedProjects.delete(addr)
+    for (const addr of shown) opened.delete(addr)
     const [whole, newest] = await Promise.all([this.changesOf(read, shown), this.newestChanges(rest)])
     // A change written after the delete (a stale tab's) hides it: that one is read whole, as before.
-    const resting = new Set(rest)
-    const unsure = foldFolder([...own.filter((root) => resting.has(`${KIND.PROJECT}:${root.pubkey}:${dOf(root)}`)), ...newest], referencedAddresses)
-      .projects.filter((project) => !project.deleted)
-      .map((project) => project.addr)
+    const deletedNow = new Set(newest.filter((change) => fieldsSetBy(change).some((set) => set.field === DELETED_FIELD && !!set.value)).flatMap((change) => change.tags.filter((t) => t[0] === 'a').map((t) => t[1]!)))
+    const unsure = rest.filter((addr) => !deletedNow.has(addr))
     const strays = await this.changesOf(read, unsure)
     return {
-      events: [...listed, ...texts.flatMap((file) => (file ? [file] : []))].flatMap((file) => file.events).concat(whole, newest, strays),
+      events: [...(listedAlready ? [] : listed), ...texts.flatMap((file) => (file ? [file] : []))].flatMap((file) => file.events).concat(whole, newest, strays),
       // Every change of a deleted one read whole is held, its text with them.
       texts: [...shown, ...unsure, ...withText],
     }
+  }
+
+  /**
+   * Every file of `kind` by the list read (§6.13): its first record and each
+   * field's newest change, never its text (ISS-4). The relay answers at most
+   * `RELAY_PAGE_CEILING` first records a filter, with their changes beside
+   * them, so this pages on the first records' times, not on the answer's
+   * length, which the changes make longer than any page.
+   */
+  private async listEvery(kind: number): Promise<FileFields[]> {
+    const query: QueryFn = (filters) => this.relay.query(filters as never)
+    const files: FileFields[] = []
+    const seen = new Set<string>()
+    let until: number | undefined
+    let ceiling = 0
+    for (let page = 0; page < MAX_LIST_PAGES; page++) {
+      const answer = await listFiles(query, { kinds: [kind], limit: RELAY_PAGE_CEILING, ...(until === undefined ? {} : { until }) })
+      for (const file of answer) {
+        if (seen.has(file.address)) continue
+        seen.add(file.address)
+        files.push(file)
+      }
+      // As the protocol's `queryAll`: a short page ends the list only when it is
+      // shorter than the relay has answered before (a relay may cap lower than
+      // RELAY_PAGE_CEILING), and a full page whose cursor cannot move means more
+      // first records share one second than a page holds — a throw, never a
+      // quietly shorter list.
+      ceiling = Math.max(ceiling, answer.length)
+      if (answer.length < RELAY_PAGE_CEILING && answer.length < ceiling) break
+      if (!answer.length) break
+      const oldest = Math.min(...answer.map((file) => file.root.created_at))
+      if (until !== undefined && oldest >= until) {
+        if (answer.length >= RELAY_PAGE_CEILING) throw new Error(`listEvery: more than ${RELAY_PAGE_CEILING} first records share created_at=${until}`)
+        break
+      }
+      until = oldest
+    }
+    return files
   }
 
   /** The newest change to each of `addrs`, by `#a`, one filter each: `limit` is per filter, which the paged read does not keep. */
@@ -551,21 +632,35 @@ export class Store {
    * is read instead, for its page, and only while it is shown — kept, every
    * whole load would read it whole again. `changes` (the Archived tab's deleted
    * ones) is read that way alone, with no text asked for. Nothing where
-   * projects are not read by their fields.
+   * projects are not read by their fields. Issues the same, by `issueTexts`
+   * (ISS-4).
    */
-  private async openTexts(addrs: readonly string[], changes: readonly string[], held: readonly string[] | undefined): Promise<{ events: SignedEvent[]; texts: string[] }> {
-    const unheld = (addr: string) => addr.startsWith(`${KIND.PROJECT}:`) && !held?.includes(addr)
+  private async openTexts(
+    addrs: readonly string[],
+    changes: readonly string[],
+    held: Pick<WorkspaceEvents, 'texts' | 'issueTexts'>,
+  ): Promise<{ events: SignedEvent[]; texts: string[]; issueTexts: string[] }> {
+    const [projects, issues] = await Promise.all([
+      this.openTextsOf(KIND.PROJECT, addrs, changes, held.texts, this.openedProjects),
+      this.openTextsOf(KIND.ISSUE, addrs, [], held.issueTexts, this.openedIssues),
+    ])
+    return { events: [...projects.events, ...issues.events], texts: projects.texts, issueTexts: issues.texts }
+  }
+
+  /** `openTexts` for one kind: `held` is absent where that kind is not read by its fields. */
+  private async openTextsOf(kind: number, addrs: readonly string[], changes: readonly string[], held: readonly string[] | undefined, opened: Set<string>): Promise<{ events: SignedEvent[]; texts: string[] }> {
+    const unheld = (addr: string) => addr.startsWith(`${kind}:`) && !held?.includes(addr)
     const wanted = addrs.filter(unheld)
     const whole = changes.filter((addr) => unheld(addr) && !wanted.includes(addr))
-    if (!held || !(wanted.length || whole.length) || !(await this.projectFields())) return { events: [], texts: [] }
+    if (!held || !(wanted.length || whole.length)) return { events: [], texts: [] }
     const query: QueryFn = (filters) => this.relay.query(filters as never)
     const files = await Promise.all(
       wanted.map((addr) => {
         const [, pubkey, ...d] = addr.split(':')
-        return openFile(query, { kind: KIND.PROJECT, pubkey: pubkey!, d: d.join(':') }, { text: true })
+        return openFile(query, { kind, pubkey: pubkey!, d: d.join(':') }, { text: true })
       }),
     )
-    for (const addr of wanted.filter((_, i) => files[i])) this.openedProjects.add(addr)
+    for (const addr of wanted.filter((_, i) => files[i])) opened.add(addr)
     const read = await this.changesOf(this.queryAll, [...wanted.filter((_, i) => !files[i]), ...whole])
     return { events: [...files.flatMap((file) => file?.events ?? []), ...read], texts: [...wanted, ...whole] }
   }
@@ -577,9 +672,9 @@ export class Store {
   }
 
   /**
-   * Every change to `issues`, by `#a` (§6.2): issues are not read by their
-   * fields until their stage, so their History and Updated column stay whole,
-   * while project changes leave the load. A few hundred addresses per filter.
+   * Every change to `issues`, by `#a` (§6.2), where issues are not read by
+   * their fields (their switch off, ISS-4): their History and Updated column
+   * stay whole. A few hundred addresses per filter.
    */
   private issueChanges(read: QueryFn, issues: readonly string[]): Promise<SignedEvent[]> {
     return this.changesOf(read, issues)
@@ -1547,8 +1642,8 @@ export class Store {
    */
   async loadAllEvents(read: QueryFn = this.loadQuery(), threads: (folder: string) => boolean = () => true): Promise<WorkspaceEvents> {
     const at = Date.now()
-    const fields = await this.projectFields()
-    if (fields) return this.loadByFields(read, threads, fields, at)
+    const [fields, issueFields] = await this.switches()
+    if (fields || issueFields) return this.loadByFields(read, threads, fields, issueFields, at)
     /*
       Two discovery queries, not one, and the second is the whole of SHI-7.
 
@@ -1593,20 +1688,31 @@ export class Store {
    * to every project was 25.7 MB of a cold load on 29 Oct. Issue changes are
    * read by the issues' `#a` once their roots are in: one more round trip.
    * Every other step is `loadAllEvents`'s.
+   *
+   * Issues switch on their own (ISS-4): with theirs on, each issue is its first
+   * record and its fields' current changes from the list read, which is also
+   * how they are found — about 5 MB for 958 issues where every change to every
+   * issue was 25.6 MB on 16 Nov, and further edits add nothing. Which project
+   * one is in is its newest `project` change, which the list carries. Each
+   * switch off reads that kind's every change by `#a`, as before.
    * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-file-is-its-fields-each-kept-in-order-by-the-relay.md
    */
-  private async loadByFields(read: QueryFn, threads: (folder: string) => boolean, fields: ProjectFields, at: number): Promise<WorkspaceEvents> {
+  private async loadByFields(read: QueryFn, threads: (folder: string) => boolean, fields: ProjectFields | undefined, issueFields: ProjectFields | undefined, at: number): Promise<WorkspaceEvents> {
     const fetched = new Set<string>()
     const threadsAt: Record<string, number> = {}
     const kinds = loadKinds(threads)
-    const found = await read([{ kinds: [KIND.PROJECT] }, { kinds: [KIND.ISSUE] }])
-    const issues = [...new Set(found.filter((event) => event.kind === KIND.ISSUE).map((event) => `${KIND.ISSUE}:${event.pubkey}:${event.tags.find((t) => t[0] === 'd')?.[1] ?? ''}`))]
-    const projects = this.projectFileEvents(read, fields, found, this.openedProjects)
-    const changes = Promise.all([projects.then((p) => p.events), this.issueChanges(read, issues)]).then((parts) => parts.flat())
+    const listing = issueFields ? this.listEvery(KIND.ISSUE) : Promise.resolve(undefined)
+    listing.catch(() => undefined)
+    const [plain, listed] = await Promise.all([read([{ kinds: [KIND.PROJECT] }, ...(issueFields ? [] : [{ kinds: [KIND.ISSUE] }])]), listing])
+    const found = [...plain, ...(listed?.flatMap((file) => file.events) ?? [])]
+    const addrsOf = (kind: number) => [...new Set(found.filter((event) => event.kind === kind).map((event) => `${kind}:${event.pubkey}:${event.tags.find((t) => t[0] === 'd')?.[1] ?? ''}`))]
+    const projects = fields ? this.fileEvents(KIND.PROJECT, read, fields, found, this.openedProjects) : this.changesOf(read, addrsOf(KIND.PROJECT)).then((events) => ({ events, texts: [] }))
+    const issues = issueFields ? this.fileEvents(KIND.ISSUE, read, issueFields, found, this.openedIssues, 'all', listed) : this.issueChanges(read, addrsOf(KIND.ISSUE)).then((events) => ({ events, texts: [] }))
+    const changes = Promise.all([projects, issues]).then((parts) => parts.flatMap((part) => part.events))
     changes.catch(() => undefined)
     const roots = await this.widen(found, fetched, {}, read, kinds, threadsAt)
     const all = await this.widen([...roots.events, ...(await changes)], fetched, {}, read, kinds, threadsAt)
-    const { texts } = await projects
+    const [{ texts }, { texts: issueTexts }] = await Promise.all([projects, issues])
     const folders = new Set(all.folders)
     const events = all.events.filter((event) => event.kind !== KIND.CHANGE || folders.has(folderOfEvent(event) ?? ''))
     return {
@@ -1615,7 +1721,8 @@ export class Store {
       readAt: Object.fromEntries([...foldersOf(events)].filter((folder) => folders.has(folder)).map((folder) => [folder, at])),
       threadsAt,
       mentionsOf: [],
-      texts,
+      ...(fields ? { texts } : {}),
+      ...(issueFields ? { issueTexts } : {}),
     }
   }
 
@@ -1643,9 +1750,9 @@ export class Store {
   async loadOpened(opened: { kind: 'project' | 'issue'; d: string }): Promise<WorkspaceEvents> {
     const byD = (kind: number, ds: string[]): Promise<SignedEvent[]> =>
       this.relay.query([{ kinds: [kind], '#d': ds, limit: OPENED_RECORDS_LIMIT }])
-    const fields = await this.projectFields()
+    const [fields, issueFields] = await this.switches()
     let events = await byD(opened.kind === 'project' ? KIND.PROJECT : KIND.ISSUE, [opened.d])
-    if (fields) return this.openedByFields(opened, events, fields, byD)
+    if (fields || issueFields) return this.openedByFields(opened, events, fields, issueFields, byD)
     const read = new Set<string>()
     const threadsAt: Record<string, number> = {}
     for (let round = 0; round < 3; round++) {
@@ -1676,7 +1783,8 @@ export class Store {
   private async openedByFields(
     opened: { kind: 'project' | 'issue'; d: string },
     found: SignedEvent[],
-    fields: ProjectFields,
+    fields: ProjectFields | undefined,
+    issueFields: ProjectFields | undefined,
     byD: (kind: number, ds: string[]) => Promise<SignedEvent[]>,
   ): Promise<WorkspaceEvents> {
     let events = found
@@ -1685,11 +1793,14 @@ export class Store {
     // Each Folder's conversation is paged as every Folder read is; its projects and issues come at once, so their changes need not wait for it.
     const talk: Promise<SignedEvent[]>[] = []
     const query: QueryFn = (filters) => this.relay.query(filters as never)
-    // An opened project's fields and text need only its record, so they are read beside its Folder, not after it.
-    const isOwn = (event: SignedEvent) => opened.kind === 'project' && event.kind === KIND.PROJECT && event.tags.some((t) => t[0] === 'd' && t[1] === opened.d)
+    // An opened file's fields and text need only its record, so they are read beside its Folder, not after it — where its kind is read by its fields.
+    const ownKind = opened.kind === 'project' ? KIND.PROJECT : KIND.ISSUE
+    const ownFields = opened.kind === 'project' ? fields : issueFields
+    const ownOpened = opened.kind === 'project' ? this.openedProjects : this.openedIssues
+    const isOwn = (event: SignedEvent) => !!ownFields && event.kind === ownKind && event.tags.some((t) => t[0] === 'd' && t[1] === opened.d)
     const own = found.filter(isOwn)
-    for (const project of foldFolder(own, referencedAddresses).projects) this.openedProjects.add(project.addr)
-    const first = this.projectFileEvents(query, fields, own, this.openedProjects, 'these')
+    for (const root of own) ownOpened.add(`${ownKind}:${root.pubkey}:${opened.d}`)
+    const first = ownFields ? this.fileEvents(ownKind, query, ownFields, own, ownOpened, 'these') : Promise.resolve({ events: [] as SignedEvent[], texts: [] as string[] })
     first.catch(() => undefined)
     for (let round = 0; round < 3; round++) {
       const state = foldFolder(events, referencedAddresses)
@@ -1704,27 +1815,36 @@ export class Store {
       const said =this.readFolderEvents(folders, {}, {}, this.queryAll, THREAD_KINDS, threadsAt)
       said.catch(() => undefined)
       talk.push(said)
-      const [inFolders, records] = await Promise.all([
+      const [inFolders, records, current] = await Promise.all([
         this.openedRead(folders.map((folder) => ({ kinds: [KIND.PROJECT, KIND.ISSUE], '#h': [folder] }))),
         missing.length ? byD(KIND.PROJECT, missing) : Promise.resolve([]),
+        // An opened issue's current fields, beside its own Folder: a moved one's project is its newest `project` change, so the next round reads that project.
+        round === 0 && opened.kind === 'issue' ? first.then((file) => file.events) : Promise.resolve([]),
       ])
-      events = mergeRead(events, [...inFolders, ...records])
+      events = mergeRead(events, [...inFolders, ...records, ...current])
     }
     const state = foldFolder(events, referencedAddresses)
     const rest = events.filter((event) => !isOwn(event))
-    const [early, projects, changed, conversations] = await Promise.all([
+    const none = { events: [] as SignedEvent[], texts: [] as string[] }
+    const [early, projects, issues, conversations] = await Promise.all([
       first,
-      this.projectFileEvents(query, fields, rest, this.openedProjects, 'these'),
-      this.openedRead(changeFilters(state.issues.map((issue) => issue.addr))),
+      fields
+        ? this.fileEvents(KIND.PROJECT, query, fields, rest, this.openedProjects, 'these')
+        : this.openedRead(changeFilters(state.projects.map((project) => project.addr))).then((changes) => ({ ...none, events: changes })),
+      issueFields
+        ? this.fileEvents(KIND.ISSUE, query, issueFields, rest, this.openedIssues, 'these')
+        : this.openedRead(changeFilters(state.issues.map((issue) => issue.addr))).then((changes) => ({ ...none, events: changes })),
       Promise.all(talk),
     ])
+    const ownTexts = (on: boolean) => (on ? early.texts : [])
     return {
-      events: mergeRead(events, [...conversations.flat(), ...early.events, ...projects.events, ...changed]),
+      events: mergeRead(events, [...conversations.flat(), ...early.events, ...projects.events, ...issues.events]),
       folders: [...read],
       readAt: {},
       threadsAt,
       mentionsOf: [],
-      texts: [...early.texts, ...projects.texts],
+      ...(fields ? { texts: [...ownTexts(opened.kind === 'project'), ...projects.texts] } : {}),
+      ...(issueFields ? { issueTexts: [...ownTexts(opened.kind === 'issue'), ...issues.texts] } : {}),
     }
   }
 
@@ -1777,7 +1897,7 @@ export class Store {
     const [fresh, owned, opened] = await Promise.all([
       this.readFolderEvents(folders, {}, {}, this.queryAll, THREAD_KINDS, threadsAt),
       this.ownThreads(own),
-      this.openTexts(about, wanted.changes ?? [], previous.texts),
+      this.openTexts(about, wanted.changes ?? [], previous),
     ])
     const ownOf = [...(previous.ownOf ?? []), ...own]
     const liveAt = { ...previous.liveAt, ...Object.fromEntries(live.map((folder) => [folder, at])) }
@@ -1789,6 +1909,7 @@ export class Store {
       ...(ownOf.length ? { ownOf } : {}),
       ...(Object.keys(liveAt).length ? { liveAt } : {}),
       ...(previous.texts ? { texts: [...previous.texts, ...opened.texts] } : {}),
+      ...(previous.issueTexts ? { issueTexts: [...previous.issueTexts, ...opened.issueTexts] } : {}),
     }
   }
 
@@ -1905,6 +2026,7 @@ export class Store {
     return {
       ...widened,
       ...(previous.texts ? { texts: previous.texts } : {}),
+      ...(previous.issueTexts ? { issueTexts: previous.issueTexts } : {}),
       ...(previous.ownOf ? { ownOf: previous.ownOf } : {}),
       ...(Object.keys(liveAt).length ? { liveAt } : {}),
     }

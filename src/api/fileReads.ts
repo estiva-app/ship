@@ -1,4 +1,4 @@
-import { fieldsOptedIn, relayFileReadsOf, type RelayFileReads } from '@estiva-app/protocol'
+import { ISSUE_TYPE, fieldsOptedIn, relayFileReadsOf, typeFieldsOptedIn, type RelayFileReads } from '@estiva-app/protocol'
 
 /*
   Ship's switch for projects (ALO-5, SPEC §6.13) is protocol's `projectFieldsOf`,
@@ -20,6 +20,18 @@ const OPT_IN_KEY = 'ship.projectFields'
 export function optedIn(): boolean {
   try {
     return fieldsOptedIn(window.location.search, sessionStorage, OPT_IN_KEY)
+  } catch {
+    return false
+  }
+}
+
+/**
+ * This tab's opt-in to reading issues by their fields (ISS-4): `?issueFields=on|off`,
+ * kept for the tab only as the projects' one, and apart from it.
+ */
+export function issueFieldsOptedIn(): boolean {
+  try {
+    return typeFieldsOptedIn(ISSUE_TYPE, window.location.search, sessionStorage)
   } catch {
     return false
   }

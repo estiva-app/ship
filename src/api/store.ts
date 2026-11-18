@@ -1,9 +1,9 @@
-import { Relay, projectFieldsOf, type FetchLike, type RelayFileReads } from '@estiva-app/protocol'
+import { ISSUE_TYPE, Relay, fileFieldsOf, projectFieldsOf, type FetchLike, type RelayFileReads } from '@estiva-app/protocol'
 import type { TimesFn } from '@estiva-app/interop'
 import { isRateLimited, noteRateLimited } from '@/lib/relayBudget'
 import { estivaIdSigner, localSigner, type Signer } from '../nostr/signer'
 import { Store, type ProjectFields } from '../nostr/store'
-import { optedIn, readFileReads } from './fileReads'
+import { issueFieldsOptedIn, optedIn, readFileReads } from './fileReads'
 import { ID_CONFIG, RELAY_URL } from '../config'
 import { relayClockSkew } from './clock'
 import { heldBearer, heldToken, renew } from '../auth/estivaId'
@@ -93,6 +93,16 @@ export const projectFieldsNow = (): Promise<ProjectFields | undefined> =>
   (projectFields ??= fileReadsNow().then((reads) => projectFieldsOf(reads, opted)))
 
 /**
+ * Issues' own switch (ISS-4): on once the relay keeps issues in order, or for a
+ * tab opened with `?issueFields=on`, apart from projects'. Read once per page,
+ * as the projects' one.
+ */
+let issueFields: Promise<ProjectFields | undefined> | undefined
+const issuesOpted = issueFieldsOptedIn()
+export const issueFieldsNow = (): Promise<ProjectFields | undefined> =>
+  (issueFields ??= fileReadsNow().then((reads) => fileFieldsOf(reads, ISSUE_TYPE, issuesOpted)))
+
+/**
  * The types the relay keeps in order (NIP-11 `files.requires_prev`), for the
  * shared packages' `inOrder`: a comment, a mention, a card, a listing, a block
  * link or a `[` pick names a file of one by its id as well (ALO-8). Read
@@ -128,4 +138,4 @@ export const projectFieldsAgain = (): Promise<ProjectFields | undefined> => {
   return projectFieldsNow()
 }
 
-export const store = new Store(relay, signer, relayClockSkew, projectFieldsNow, inOrderTypes)
+export const store = new Store(relay, signer, relayClockSkew, projectFieldsNow, inOrderTypes, issueFieldsNow)
