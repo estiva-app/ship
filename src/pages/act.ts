@@ -20,6 +20,19 @@ export function sayOnceLeft(say: Say, title: string, left?: () => boolean): Say 
   return (text, tone, failure) => say(tone === 'error' && left?.() ? `Your last changes to ${title} were not saved.` : text, tone, failure)
 }
 
+/** The failure each of `act`'s verbs reports, so an archive that failed groups with the same failure in Peek and Leaf. */
+const FAILURE_OF: Record<string, Failure> = {
+  'New team': 'not-created',
+  'Add member': 'not-added',
+  Join: 'not-joined',
+  Leave: 'not-left',
+  Archive: 'not-archived',
+  Unarchive: 'not-restored',
+  Restore: 'not-restored',
+  Rename: 'not-renamed',
+  Move: 'not-moved',
+}
+
 /**
  * Every write the pages make goes through here, but a conversation's (`answerOf`) — the old app's `publish`:
  * a refusal is said with its reason ("<what> rejected — …"), and a success
@@ -53,8 +66,8 @@ export async function act(
   refresh?: () => Promise<void>,
   /** The words for a refusal, where the default "<what> rejected — <reason>" is not what the person should read. */
   refused?: (reason: string) => string,
-  /** What failed, for the error report (PROD-5): a save unless said otherwise. */
-  failure: Failure = 'not-saved',
+  /** What failed, for the error report (PROD-5): read from `what` when it names one, else a save. */
+  failure: Failure = FAILURE_OF[what] ?? 'not-saved',
 ): Promise<boolean> {
   const result = await write()
   if (!result.ok) {
