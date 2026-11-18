@@ -18,6 +18,7 @@ import {
   IconGitPullRequestDraft,
   IconMessageQuestion,
   IconArrowRight,
+  IconCornerDownRight,
   IconPlayerPlay,
   IconPlus,
   IconTerminal2,
@@ -434,14 +435,23 @@ const said = (v: string) =>
 const STEP: Record<Found["step"], string> = { review: "reviewing", kickoff: "kicking off", build: "building" };
 const issueOf = (ref: string) => MILESTONES.flatMap((m) => m.issues).find((i) => i.ref === ref);
 
-/** Where a line was found, as a chip saying only the issue's ref (Miky, 18 Nov); hover gives the step, the issue and when. */
-function FoundChip({ line }: { line: Line }) {
+/**
+ * Where a line was found, first (Miky, 18 Nov): ↪ and the issue's ref, as a reply points back at what it answers; with
+ * `title`, the issue's title after it. Hover gives the step, the issue and when.
+ */
+function FoundIn({ line, title = false }: { line: Line; title?: boolean }) {
   const f = line.found;
   if (!f) return null;
   return (
     <WithTooltip label={`Found while ${STEP[f.step]} ${f.ref}: ${issueOf(f.ref)?.title ?? ""} · ${line.at}`}>
-      <span className="relative flex">
-        <Chip href="#" onClick={stay} label={f.ref} />
+      <span className="relative flex min-w-0 items-center gap-1">
+        <IconCornerDownRight size={14} stroke={1.5} className="shrink-0 text-text-muted" />
+        <span className="min-w-0 truncate">
+          <MetaText tone="muted">
+            {f.ref}
+            {title && ` · ${issueOf(f.ref)?.title ?? ""}`}
+          </MetaText>
+        </span>
       </span>
     </WithTooltip>
   );
@@ -459,17 +469,22 @@ const Answer = ({ line, onPlace }: { line: Line; onPlace: (to: string) => void }
   <AcceptReject label="Accept" onAnswer={(yes) => onPlace(yes ? (line.rec?.to ?? "later") : "not")} />
 );
 
-/** One line to decide: its title, where it was found, where it would go, Accept / ✕. A click opens it beside the list. */
+/**
+ * One line to decide, its columns as an issue row's: first the issue it was found in (↪ TOPI-9, at the ref's width),
+ * then its title, where Claude would put it, and Accept / ✕. A click opens it beside the list.
+ */
 function ScopeRow({ line, selected, onOpen, onPlace }: { line: Line; selected: boolean; onOpen: () => void; onPlace: (to: string) => void }) {
   return (
     <div className={cn("relative flex h-9 min-w-0 items-center gap-3 rounded-md px-3 transition-colors hover:bg-bg-hover", selected && "bg-bg-selected")}>
+      <span className="flex w-24 shrink-0">
+        <FoundIn line={line} />
+      </span>
       <span className="flex min-w-0 flex-1 items-center gap-1.5">
         <Link href="#" variant="plain" truncate cover onClick={(e) => (e.preventDefault(), onOpen())}>
           {line.title}
         </Link>
         <NewDot on={line.isNew} />
       </span>
-      <FoundChip line={line} />
       <RecChip line={line} />
       <span className="relative flex">
         <Answer line={line} onPlace={onPlace} />
@@ -479,9 +494,8 @@ function ScopeRow({ line, selected, onOpen, onPlace }: { line: Line; selected: b
 }
 
 /**
- * Scope to decide on the List (Miky, 18 Nov: "concise and clear"): one line each, the title, then two chips, where it
- * was found (the issue's ref; hover for the rest) and where Claude would put it. A click opens it beside the list,
- * where it is decided.
+ * Scope to decide on the List (Miky, 18 Nov: "concise and clear"): one line each, first the issue it was found in, then
+ * its title, where Claude would put it, and Accept / ✕. A click opens it beside the list.
  */
 function ScopeToDecide({ lines, openId, onOpen, onPlace }: { lines: Line[]; openId?: string; onOpen: (id: string) => void; onPlace: (id: string, to: string) => void }) {
   if (!lines.length) return null;
@@ -501,8 +515,9 @@ function ScopeToDecide({ lines, openId, onOpen, onPlace }: { lines: Line[]; open
 export const scopeLeft = (placed: Record<string, string>) => TRIAGE.filter((l) => !placed[l.id]);
 
 /**
- * Scope to decide on the Board (Miky, 18 Nov: "on board view it would be boxes"): the same lines as boxes above the
- * columns, the title, then the same two chips. A click opens it beside the board.
+ * Scope to decide on the Board (Miky, 18 Nov), under the columns, each line a box shaped as an Open question's: the
+ * issue it was found in as its header (↪ TOPI-9 · its title), the line itself, then a footer with where Claude would put
+ * it and Accept / ✕. A click opens it beside the board.
  */
 export function ScopeBoxes({ placed, openId, onOpen, onPlace }: { placed: Record<string, string>; openId?: string; onOpen: (id: string) => void; onPlace: (id: string, to: string) => void }) {
   const lines = scopeLeft(placed);
@@ -510,20 +525,22 @@ export function ScopeBoxes({ placed, openId, onOpen, onPlace }: { placed: Record
   return (
     <section className="flex flex-col gap-2" aria-label="Scope to decide">
       <SectionHeader title="Scope to decide" count={lines.length} />
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-3">
         {lines.map((l) => (
-          <Card key={l.id} fill="surface" hover="hairline" onPress={() => onOpen(l.id)} selected={l.id === openId} className="flex flex-col gap-3 p-3">
-            <span className="line-clamp-2 text-body-2 font-medium">
-              {l.title}
+          <Card key={l.id} fill="surface" hover="hairline" selected={l.id === openId} className="relative flex flex-col gap-3 p-4">
+            <FoundIn line={l} title />
+            <span className="font-medium">
+              <Link href="#" variant="quiet" cover onClick={(e) => (e.preventDefault(), onOpen(l.id))}>
+                {l.title}
+              </Link>
               <NewDot on={l.isNew} />
             </span>
-            <span className="mt-auto flex flex-wrap items-center gap-1.5">
-              <FoundChip line={l} />
+            <div className="mt-auto flex items-center justify-between gap-3 border-t border-border-subtle pt-3">
               <RecChip line={l} />
-              <span className="ml-auto flex">
+              <span className="relative flex">
                 <Answer line={l} onPlace={(to) => onPlace(l.id, to)} />
               </span>
-            </span>
+            </div>
           </Card>
         ))}
       </div>
