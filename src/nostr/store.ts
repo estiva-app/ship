@@ -1700,7 +1700,10 @@ export class Store {
   private async loadByFields(read: QueryFn, threads: (folder: string) => boolean, fields: ProjectFields | undefined, issueFields: ProjectFields | undefined, at: number): Promise<WorkspaceEvents> {
     const fetched = new Set<string>()
     const threadsAt: Record<string, number> = {}
-    const kinds = loadKinds(threads)
+    // With issues listed, a team's read asks for no issue first records: the list already holds every
+    // issue there is, and leaves a deleted one out, which a team read would bring back with no changes
+    // (a Todo nobody set) and 3.4 MB of first records a second time (ISS-4, measured 18 Nov).
+    const kinds = issueFields ? (folder: string) => loadKinds(threads)(folder).filter((kind) => kind !== KIND.ISSUE) : loadKinds(threads)
     const listing = issueFields ? this.listEvery(KIND.ISSUE) : Promise.resolve(undefined)
     listing.catch(() => undefined)
     const [plain, listed] = await Promise.all([read([{ kinds: [KIND.PROJECT] }, ...(issueFields ? [] : [{ kinds: [KIND.ISSUE] }])]), listing])
