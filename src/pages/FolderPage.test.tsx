@@ -146,6 +146,23 @@ describe('FolderPage', () => {
     expect(screen.getByText('1 other file, listed in Peek')).toBeInTheDocument()
   })
 
+  it('before the workspace lands, a project’s and an issue’s facts are the kit’s “not read yet” dash, not empty cells', async () => {
+    readFolder.mockResolvedValue(
+      folder({
+        files: [
+          file({ ref: 'p', address: `30850:${ANA}:p1`, kind: 30850, slots: { title: { value: 'Onboarding work' } } }),
+          file({ ref: 'i', address: `30851:${ANA}:i1`, kind: 30851, slots: { title: { value: 'Broken link' } } }),
+        ],
+      }),
+    )
+    // No `state` yet: the page draws from the team's own read while Ship's workspace is still read.
+    render(<FolderPage id="f1" say={say} />)
+    await waitFor(() => expect(titles('project')).toEqual(['Onboarding work']))
+    // A project has a status, a lead, progress and a last change: four dashes. An issue has no progress: three, and an empty cell.
+    expect(within(work('project')[0]!).getAllByText('–')).toHaveLength(4)
+    expect(within(work('issue')[0]!).getAllByText('–')).toHaveLength(3)
+  })
+
   it('lists the initiatives filed in this team as Explore does: never a space, never another team’s', async () => {
     readFolder.mockResolvedValue(folder({ files: [] }))
     topicsNow.value = topics(topic('t1', 'Onboarding guide'), topic('t2', 'Elsewhere', 'f2'), topic('t3', 'A room', 'f1', true))

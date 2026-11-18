@@ -26,6 +26,11 @@ export interface WorkListRow {
   progress?: { done: number; total: number }
   /** Unix seconds: when anything last happened in it — an initiative's Active, a project's or an issue's last change. */
   at?: number
+  /**
+   * Its facts are not read yet (a team's page drawn before Ship's workspace lands): every fact its kind has is the kit's
+   * dash, "not read yet", never the empty cell that says "this kind has none".
+   */
+  pending?: boolean
 }
 
 /**
@@ -55,15 +60,18 @@ const NONE = ''
  * empty, so every list's columns line up. No headings on screen: the heading over the list names it.
  */
 export function WorkList({ label, kind, rows, now = Date.now() }: { label: string; kind: WorkKind; rows: WorkListRow[]; now?: number }) {
-  const status = (row: WorkListRow) => (kind === 'topic' ? NONE : row.status ? <StatusLabel value={row.status.value} label={row.status.label} size="small" /> : NONE)
+  // A project's or an issue's facts not read yet: the dash in every column its kind has (`undefined` is the kit's dash).
+  const waiting = (row: WorkListRow) => kind !== 'topic' && !!row.pending
+  const status = (row: WorkListRow) => (kind === 'topic' ? NONE : waiting(row) ? undefined : row.status ? <StatusLabel value={row.status.value} label={row.status.label} size="small" /> : NONE)
   const people = (row: WorkListRow) => {
     if (kind === 'topic') return row.members === undefined ? undefined : row.members.count === 0 ? '0' : <MembersPill readOnly members={row.members.faces.slice(0, 3)} count={row.members.count} />
+    if (waiting(row)) return undefined
     // As `ProjectRow` draws a lead: a person with no name read yet is the kit's face for nobody named, not a letter.
     return row.person ? <Avatar name={row.person.name} src={row.person.picture} bot={row.person.bot} size={16} label={row.person.name} /> : NONE
   }
-  const progress = (row: WorkListRow) => (kind === 'project' && row.progress ? <ProgressRing done={row.progress.done} total={row.progress.total} /> : NONE)
+  const progress = (row: WorkListRow) => (kind !== 'project' ? NONE : waiting(row) ? undefined : row.progress ? <ProgressRing done={row.progress.done} total={row.progress.total} /> : NONE)
   // An initiative's Active not read yet is the dash, as Explore's; for a project or an issue no time is nothing to say.
-  const when = (row: WorkListRow) => (row.at ? formatActive(row.at * 1000, now) : kind === 'topic' ? undefined : NONE)
+  const when = (row: WorkListRow) => (row.at ? formatActive(row.at * 1000, now) : kind === 'topic' || waiting(row) ? undefined : NONE)
   return (
     <ListTable aria-label={label} columns={COLUMNS} headings={false}>
       {rows.map((row) => (

@@ -163,7 +163,8 @@ export function FolderPage({ id, folders, directory, state = null, archives, say
         projects.push(
           row
             ? { address, title: row.title, href: row.href, status: row.status, ...(row.lead ? { person: row.lead } : {}), progress: row.progress, ...(edit ? { at: edit.at } : {}) }
-            : { address, title, href: href({ name: 'project', d, slug: title, view: 'table' }) },
+            : // Before the workspace lands: its name and link now, its facts as the kit's "not read yet" dash.
+              { address, title, href: href({ name: 'project', d, slug: title, view: 'table' }), ...(tabs ? {} : { pending: true }) },
         )
       } else if (file.kind === KIND_ISSUE) {
         const issue = issuesByAddr.get(address)
@@ -178,7 +179,7 @@ export function FolderPage({ id, folders, directory, state = null, archives, say
                 ...(issue.assignee && personOf ? { person: personOf(issue.assignee) } : {}),
                 ...(edit ? { at: edit.at } : {}),
               }
-            : { address, title, href: href({ name: 'issue', d, slug: title }) },
+            : { address, title, href: href({ name: 'issue', d, slug: title }), ...(state ? {} : { pending: true }) },
         )
       }
     }
