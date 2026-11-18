@@ -1,6 +1,7 @@
 import { IconLink } from '@tabler/icons-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AppProvider } from '@estiva-app/ui'
+import { AppProvider, ErrorBoundary } from '@estiva-app/ui'
+import { CrashOnPurpose, ScreenSteps } from '@/lib/errorReports'
 import { createFolder, me, peopleIn, projectStatus, resolveInbound, settleClaims, useDirectory, useWorkspace, type DirectoryView, type FolderState, type WorkspaceState, installReadStateFlush } from '@/api'
 import { AppShell } from '@/components/AppShell'
 import { Banner } from '@/components/Banner'
@@ -225,7 +226,14 @@ function Shell() {
         <WorkspacePeopleProvider value={cardPeople}>
           {/* Each page asks for the conversations it draws (APP-5). */}
           <ThreadsContext.Provider value={wantThreads}>
-            <Page route={route} state={partial && !opens(route, state) ? null : state} loading={loading || partial} directory={directory} teams={teams} folders={folders} archives={archives} say={say} refresh={refresh} />
+            <ScreenSteps />
+            {/* A page that crashes shows "Something went wrong … try again" in
+                its place, and the sidebar keeps working (PROD-4). Keyed by the
+                kind of page, so opening another kind draws it afresh. */}
+            <ErrorBoundary key={route.name} label="page">
+              <CrashOnPurpose />
+              <Page route={route} state={partial && !opens(route, state) ? null : state} loading={loading || partial} directory={directory} teams={teams} folders={folders} archives={archives} say={say} refresh={refresh} />
+            </ErrorBoundary>
           </ThreadsContext.Provider>
         </WorkspacePeopleProvider>
       </MentionPeopleProvider>

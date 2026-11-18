@@ -1,6 +1,7 @@
 import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import { fileURLToPath } from 'node:url'
+import { execSync } from 'node:child_process'
 
 /**
  * The three values baked in at build time. deploy.yml's `publish` job sets
@@ -15,11 +16,23 @@ import { fileURLToPath } from 'node:url'
  * - An empty `ID_BASE` means sign-in is not offered at all — a deliberate
  *   fail-closed default, never "use production".
  * - `CLIENT_ID` is what Estiva ID knows this app as.
+ * - `RELEASE` is the commit the bundle is built from, for its error reports
+ *   (PROD-4): CI's `GITHUB_SHA`, or this checkout's HEAD.
  */
 export const BUILD_DEFINES = {
   __RELAY_URL__: JSON.stringify(process.env.RELAY_URL ?? 'http://localhost:3000'),
   __ID_BASE__: JSON.stringify(process.env.ID_BASE ?? ''),
   __CLIENT_ID__: JSON.stringify(process.env.CLIENT_ID ?? 'estiva-ship'),
+  __RELEASE__: JSON.stringify(release()),
+}
+
+function release(): string {
+  if (process.env.GITHUB_SHA) return process.env.GITHUB_SHA
+  try {
+    return execSync('git rev-parse HEAD', { encoding: 'utf8' }).trim()
+  } catch {
+    return 'unknown'
+  }
 }
 
 // `react` is deduped because @estiva-app/ui declares it a peer: two copies in
@@ -44,6 +57,9 @@ export default defineConfig({
   build: {
     outDir: 'dist/ship',
     emptyOutDir: true,
+    // Served beside the bundle so Sentry turns a report's frames into readable
+    // code (PROD-4). The repo is public, so they show nothing new.
+    sourcemap: true,
   },
   resolve: {
     alias: {

@@ -19,6 +19,11 @@ import { bootAuth, enterFromShell } from './auth/boot'
 import { AuthShell } from './auth/AuthShell'
 import { SessionGate } from './auth/SessionGate'
 import { followOtherTabs } from './auth/estivaId'
+import { ErrorBoundary } from '@estiva-app/ui'
+import { startErrorReports } from './lib/errorReports'
+
+// A crash anywhere in Ship is reported to Estiva ID, built from a fixed list (PROD-4).
+startErrorReports()
 
 /*
   An async IIFE rather than top-level await. TLA works in a `type="module"`
@@ -50,9 +55,14 @@ void (async () => {
   followOtherTabs()
   root.render(
     <StrictMode>
-      <SessionGate>
-        <App />
-      </SessionGate>
+      {/* The last line of defence: a crash outside the page (the frame, the
+          sidebar, the session gate) shows the message full-screen instead of
+          a blank page. The page itself has its own, inside the frame (App). */}
+      <ErrorBoundary label="app" fallbackClassName="h-screen flex flex-col">
+        <SessionGate>
+          <App />
+        </SessionGate>
+      </ErrorBoundary>
     </StrictMode>,
   )
 })()
