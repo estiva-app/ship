@@ -24,7 +24,7 @@ import { ProjectFields } from '@/components/PageFields'
 import { useSideColumn } from '@/pages/sideColumn'
 import { ISSUES, ISSUE_STATUSES, hrefFor, ACTIVITY_ITEMS } from '@/fixtures/issues'
 import { ACTIVITY, PEOPLE as SHIP_PEOPLE, PROJECT_STATUSES } from '@/fixtures/projects'
-import { MarkAsRows, MarkedNotice, STATUSES, TYPE_META, wordIcon, TYPE_OF, blockLineCss, markedBlockAt, type ItemType, type MarkWord, type Status } from './MarkAs'
+import { MarkAsRows, MarkedNotice, STATUSES, TYPE_META, wordIcon, TYPE_OF, blockLineCss, markedBlockAt, useMarkHover, type ItemType, type MarkWord, type Status } from './MarkAs'
 import { ENDED, FilterRow, ItemTimeline, ListStateView, ShowWhere, filterItems, type ListState } from './ItemParts'
 import { ELSEWHERE, INITIATIVES, initiativesOf } from './lens'
 import { ItemFields, ItemPanel, commentsOn } from './ItemPanel'
@@ -62,9 +62,11 @@ function MarkableBlocks({ children, team, about, marked: m0 = {}, changed = [], 
       onUnmark={() => setMarked((m) => Object.fromEntries(Object.entries(m).filter(([k]) => k !== id)))}
     />
   )
+  const hover = useMarkHover(marked)
   return (
     <ConceptBlockRows.Provider value={rows}>
       <style>{blockLineCss(marked, changed)}</style>
+      {hover}
       {/* @estiva-escape(no-raw-interactive): concept only — the margin label is CSS on the editor's own block, so its click is read here. */}
       <div onClickCapture={(e) => { const id = markedBlockAt(e, marked); if (id) onOpenBlock?.(id) }}>{children}</div>
       {notice && <MarkedNotice word={notice} team={team} about={about} onClose={() => setNotice(undefined)} />}
