@@ -18,7 +18,6 @@ import {
   IconGitPullRequestDraft,
   IconMessageQuestion,
   IconArrowRight,
-  IconBox,
   IconCornerDownRight,
   IconPlayerPlay,
   IconPlus,
@@ -503,7 +502,8 @@ function FoundIn({ line, title = false }: { line: Line; title?: boolean }) {
     return (
       <WithTooltip label={`Moved from ${from} · ${line.filed.as} filed by ${line.filed.by} · ${line.at}`} wrapperClassName="flex min-w-0">
         <span className="relative flex min-w-0 items-center gap-1">
-          <IconBox size={14} stroke={1.5} className="shrink-0 text-text-muted" />
+          {/* ↪ marks a source, an issue here or another project (Miky, 18 Nov). */}
+          <IconCornerDownRight size={14} stroke={1.5} className="shrink-0 text-text-muted" />
           {/* The row shows the project's key (Miky, 18 Nov), as a note shows its issue's; the box's header has room for the name. */}
           <MetaText tone="muted">{title ? from : (line.filed.fromKey ?? from)}</MetaText>
         </span>
@@ -685,7 +685,7 @@ export function ScopePanel({ id, onPlace, onClose }: { id: string; onPlace: (to:
               <Person size={16} name={l.filed.by} />
               {l.filed.from && (
                 <span className="flex min-w-0 items-center gap-1.5">
-                  <IconBox size={14} stroke={1.5} className="shrink-0 text-text-muted" />
+                  <IconCornerDownRight size={14} stroke={1.5} className="shrink-0 text-text-muted" />
                   <MetaText tone="muted">Moved from {l.filed.from}</MetaText>
                 </span>
               )}
