@@ -4,6 +4,7 @@
 declare const __RELAY_URL__: string
 declare const __ID_BASE__: string
 declare const __CLIENT_ID__: string
+declare const __RELEASE__: string
 
 // Vite serves images imported from source as URLs; fixtures import fictional portraits.
 declare module '*.png' {

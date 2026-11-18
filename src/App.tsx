@@ -1,6 +1,7 @@
 import { IconLink } from '@tabler/icons-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AppProvider } from '@estiva-app/ui'
+import { AppProvider, ErrorBoundary } from '@estiva-app/ui'
+import { CrashOnPurpose, ScreenSteps } from '@/lib/errorReports'
 import { createFolder, me, peopleIn, projectStatus, resolveInbound, settleClaims, useDirectory, useWorkspace, type DirectoryView, type FolderState, type WorkspaceState, installReadStateFlush } from '@/api'
 import { AppShell } from '@/components/AppShell'
 import { Banner } from '@/components/Banner'
@@ -225,7 +226,15 @@ function Shell() {
         <WorkspacePeopleProvider value={cardPeople}>
           {/* Each page asks for the conversations it draws (APP-5). */}
           <ThreadsContext.Provider value={wantThreads}>
-            <Page route={route} state={partial && !opens(route, state) ? null : state} loading={loading || partial} directory={directory} teams={teams} folders={folders} archives={archives} say={say} refresh={refresh} />
+            <ScreenSteps />
+            {/* A page that crashes shows "Something went wrong … try again" in
+                its place, and the sidebar keeps working (PROD-4). Keyed by the
+                page and what it shows, so opening any other page draws it
+                afresh; a tab or view inside the same page does not. */}
+            <ErrorBoundary key={pageKey(route)}>
+              <CrashOnPurpose />
+              <Page route={route} state={partial && !opens(route, state) ? null : state} loading={loading || partial} directory={directory} teams={teams} folders={folders} archives={archives} say={say} refresh={refresh} />
+            </ErrorBoundary>
           </ThreadsContext.Provider>
         </WorkspacePeopleProvider>
       </MentionPeopleProvider>
@@ -247,6 +256,13 @@ const SKELETON: Partial<Record<Route['name'], PageSkeletonShape>> = {
  * its own page, or a `/o/<naddr>` — Peek's Open link — whose address already
  * names it while `useInbound` resolves it.
  */
+/** Which page is open, as the page boundary's key: the kind of page and the object or team it shows. */
+function pageKey(route: Route): string {
+  const which =
+    'd' in route ? route.d : 'id' in route ? route.id : 'naddr' in route ? route.naddr : 'ref' in route ? route.ref : (route.folder ?? '')
+  return `${route.name}:${which}`
+}
+
 function openedBy(route: Route): Opened | undefined {
   if (route.name === 'project' || route.name === 'issue') return { kind: route.name, d: route.d }
   if (route.name !== 'inbound') return undefined
