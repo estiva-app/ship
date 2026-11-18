@@ -1,11 +1,10 @@
 import type { ReactNode } from 'react'
 import { IconDotsVertical, IconUsers } from '@tabler/icons-react'
-import { KindIcon, ListTable, ListTableRow, Menu, MenuItem, MembersPill, PageHeader, SectionHeader, Toolbar, ToolbarButton, type AvatarGroupMember, type ListTableColumn } from '@estiva-app/ui'
+import { Menu, MenuItem, MembersPill, PageHeader, SectionHeader, Toolbar, ToolbarButton, type AvatarGroupMember } from '@estiva-app/ui'
 import { WorkList, type WorkListRow } from '@/components/WorkList'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { ScrollArea } from '@/components/ui/ScrollArea'
 import { SkeletonList } from '@/components/ui/Skeleton'
-import { ago, formatActive } from '@/lib/time'
 
 /** One initiative the team holds, as Explore lists it: its name and line, who is in it, when it was last active. */
 export interface TeamInitiativeRow {
@@ -21,11 +20,8 @@ export interface TeamInitiativeRow {
   active?: number
 }
 
-/** One of Ship's own files the team holds, as the shared {@link WorkList} draws it; an issue's last change in unix seconds. */
-export type TeamFileRow = Omit<WorkListRow, 'updated'> & {
-  /** An issue's last change, unix seconds. */
-  at?: number
-}
+/** One of Ship's own files the team holds, as the shared {@link WorkList} draws it: its status, lead or assignee, progress, last change. */
+export type TeamFileRow = Omit<WorkListRow, 'members' | 'description'>
 
 /**
  * **A team's page in Ship, drawn as Peek's** (Katerina, 18 November, D6: "show me the before and after"): the kit's
@@ -59,12 +55,6 @@ export interface TeamViewProps {
 }
 
 const NO_FACE = (): AvatarGroupMember => ({ name: '—' })
-
-/** Who is in it and when it was last active, as Explore lists them; both give way first in a narrow window (Peek's team page). */
-const INITIATIVE_COLUMNS: ListTableColumn[] = [
-  { label: 'Members', width: 'large', keep: 'low' },
-  { label: 'Active', width: 'medium', keep: 'low' },
-]
 
 /** A team's page, as Peek's: its header, then its initiatives, projects and issues in the kit's lists. */
 export function TeamView({ name, members, onRename, onArchive, archivedNotice, initiatives, onRetryInitiatives, projects, issues, others, faceOf = NO_FACE, now }: TeamViewProps) {
@@ -123,22 +113,20 @@ export function TeamView({ name, members, onRename, onArchive, archivedNotice, i
               initiatives.length > 0 && (
                 <section className="flex flex-col gap-1">
                   <SectionHeader title="Initiatives" count={initiatives.length} hover="none" />
-                  <ListTable aria-label={`${title}’s initiatives`} columns={INITIATIVE_COLUMNS} headings={false}>
-                    {initiatives.map((row) => (
-                      <ListTableRow
-                        key={row.address}
-                        data-topic={row.address}
-                        href={row.href}
-                        label={row.title}
-                        {...(row.summary ? { description: row.summary } : {})}
-                        icon={<KindIcon kind="topic" />}
-                        cells={[
-                          row.members === undefined ? undefined : row.members === 0 ? '0' : <MembersPill readOnly members={(row.people ?? []).slice(0, 3).map(faceOf)} count={row.members} />,
-                          row.active ? formatActive(row.active * 1000, now) : undefined,
-                        ]}
-                      />
-                    ))}
-                  </ListTable>
+                  {/* The same columns as Projects and Issues below, so its people and its Active stack with theirs. */}
+                  <WorkList
+                    label={`${title}’s initiatives`}
+                    kind="topic"
+                    now={now}
+                    rows={initiatives.map((row) => ({
+                      address: row.address,
+                      title: row.title,
+                      href: row.href,
+                      ...(row.summary ? { description: row.summary } : {}),
+                      ...(row.members !== undefined ? { members: { faces: (row.people ?? []).slice(0, 3).map(faceOf), count: row.members } } : {}),
+                      ...(row.active ? { at: row.active } : {}),
+                    }))}
+                  />
                 </section>
               )
             )}
@@ -160,7 +148,7 @@ function FileSection({ title, kind, rows, team, now }: { title: string; kind: 'p
   return (
     <section className="flex flex-col gap-1">
       <SectionHeader title={title} count={rows.length} hover="none" />
-      <WorkList label={`${team}’s ${title.toLowerCase()}`} kind={kind} rows={rows.map(({ at, ...row }) => ({ ...row, ...(at ? { updated: ago(at, now) } : {}) }))} />
+      <WorkList label={`${team}’s ${title.toLowerCase()}`} kind={kind} rows={rows} now={now} />
     </section>
   )
 }

@@ -126,11 +126,16 @@ export function TopicPage({
       state.issues,
       archives,
       personOf,
-    ).all.sort((a, b) => (order.get(a.addr) ?? 0) - (order.get(b.addr) ?? 0))
-    // An issue's row: who edited it last and when, and its assignee's face (the Issues list's facts, A4).
+    )
+      .all.sort((a, b) => (order.get(a.addr) ?? 0) - (order.get(b.addr) ?? 0))
+      // When it last changed, for the page's When column (A4), from the row the topic's read made of it.
+      .map((project) => {
+        const at = page.live.find((row) => row.address === project.addr)?.edited?.at
+        return at ? { ...project, changedAt: at } : project
+      })
+    // An issue's row: its assignee's face (the People column, A4); its last change is the row's own `edited`.
     const withFacts = (row: (typeof page.live)[number]) => ({
       ...row,
-      ...(row.edited ? { editedLabel: editedLabel(nameOf(row.edited.by), row.edited.at) } : {}),
       ...(row.assignee ? { assigneePerson: personOf(row.assignee) } : {}),
     })
     const issues = page.live.filter((row) => row.kind === 'issue').map(withFacts)

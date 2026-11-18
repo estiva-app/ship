@@ -239,20 +239,23 @@ const INITIATIVE_DOCUMENTS: TopicViewProps['documents'] = [
   },
 ]
 
+/** Now, in seconds, so the stories' When reads the same each day. */
+const SECONDS_NOW = Math.floor(Date.now() / 1000)
+
 const INITIATIVE: TopicPageView = {
   title: 'Cross-app navigation',
   summary: 'Teams and initiatives instead of Folders, in every app.',
   team: 'Product',
   teamId: '0212db6d-bcbf-40d0-890e-f4f056db2f5d',
   archived: false,
-  projects: PROJECT_TABS.all.slice(0, 3),
+  projects: PROJECT_TABS.all.slice(0, 3).map((project, i) => ({ ...project, changedAt: SECONDS_NOW - (i + 1) * 5 * 3600 })),
   issues: [
-    { address: '30851:a:nav-1', kind: 'issue', title: 'Explore initiatives opens its page', href: '#/issue/nav-1', status: { value: 'in_progress', label: 'In Progress' }, project: 'Relay Migration', editedLabel: 'Ana, 1h ago', assigneePerson: RAVI },
-    { address: '30851:a:nav-2', kind: 'issue', title: 'The open file lights its team', href: '#/issue/nav-2', status: { value: 'todo', label: 'Todo' }, editedLabel: 'Mara, 3d ago' },
+    { address: '30851:a:nav-1', kind: 'issue', title: 'Explore initiatives opens its page', href: '#/issue/nav-1', status: { value: 'in_progress', label: 'In Progress' }, project: 'Relay Migration', edited: { by: 'a', at: SECONDS_NOW - 3600 }, assigneePerson: RAVI },
+    { address: '30851:a:nav-2', kind: 'issue', title: 'The open file lights its team', href: '#/issue/nav-2', status: { value: 'todo', label: 'Todo' }, edited: { by: 'm', at: SECONDS_NOW - 3 * 86400 } },
   ],
   archivedWork: [
     { address: '30850:a:old', kind: 'project', title: 'Folders sidebar', href: '#/project/old', status: { value: 'completed', label: 'Completed' }, progress: { done: 6, total: 6 } },
-    { address: '30851:a:old-1', kind: 'issue', title: 'Rename Folders to Teams', href: '#/issue/old-1', status: { value: 'done', label: 'Done' }, editedLabel: 'Ana, 2w ago' },
+    { address: '30851:a:old-1', kind: 'issue', title: 'Rename Folders to Teams', href: '#/issue/old-1', status: { value: 'done', label: 'Done' }, edited: { by: 'a', at: SECONDS_NOW - 14 * 86400 } },
   ],
 }
 

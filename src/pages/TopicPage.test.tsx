@@ -159,7 +159,8 @@ describe("A topic's page in Ship", () => {
     expect(within(project!).getByRole('link').textContent).toBe('Project p1')
     expect(within(project!).getByText('In Progress')).toBeTruthy()
     // Done of all but the cancelled one, so a finished project reads full (Miky, 3 Nov, SHIPS-7).
-    expect(within(project!).getByText('1 / 2')).toBeTruthy()
+    // As the kit's small ring and its count (Katerina, 18 November: "the small progress which is a circle").
+    expect(within(project!).getByText('1/2')).toBeTruthy()
     // An issue it does not list is not drawn; the one it lists names its project under its name, and its status.
     const [issue, ...rest] = [...page().querySelectorAll<HTMLElement>('[data-work-kind="issue"]')]
     expect(rest).toEqual([])
@@ -209,7 +210,7 @@ describe("A topic's page in Ship", () => {
     expect(screen.queryByRole('tab')).toBeNull()
   })
 
-  it('shows an issue’s assignee as a face on its row, as the Issues list does (A4)', async () => {
+  it('shows an issue’s assignee as a face on its row, and nothing where an issue has no such fact (A4)', async () => {
     held.push(manifest('ship', 'ship.estiva.app', ['30850', '30851']), manifest('peek', 'peek.estiva.app', ['30840']))
     held.push(issueRoot('i1'), topic(D, 'Widgets'), lists(D, 'i1'))
     const { state, archives } = ship([], [{ d: 'i1', status: 'todo' }])
@@ -221,9 +222,11 @@ describe("A topic's page in Ship", () => {
       return found!
     })
     expect(within(row).getByLabelText('Ana Duarte')).toBeTruthy()
+    // A fact an issue does not have (progress) is an empty cell, not the dash that means "not read yet" (Katerina, 18 November).
+    expect(within(row).queryByText('–')).toBeNull()
   })
 
-  it('says who edited an issue and a document last, and folds a document open to its pages (TOPI-8)', async () => {
+  it('says when an issue last changed, who edited a document last and when, and folds a document open to its pages (TOPI-8; A4)', async () => {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date((1_700_000_000 + 3 * 3600) * 1000))
     const KATERINA = 'b'.repeat(64)
@@ -253,7 +256,8 @@ describe("A topic's page in Ship", () => {
     render(<Page d={D} state={state} folders={[]} archives={archives} />)
 
     await waitFor(() => expect(page().querySelector('[data-work-kind="issue"]')).not.toBeNull())
-    expect(within(page().querySelector<HTMLElement>('[data-work-kind="issue"]')!).getByText('bbbbbbbb, 1h ago')).toBeTruthy()
+    // The When column, in Peek's words; who is in its People column (its assignee), not who edited it (A4: one column set).
+    expect(within(page().querySelector<HTMLElement>('[data-work-kind="issue"]')!).getByText('1 hour ago')).toBeTruthy()
     const row = await waitFor(() => {
       const found = page().querySelector<HTMLElement>(`[data-topic-document="${SPEC}"]`)
       expect(found).not.toBeNull()

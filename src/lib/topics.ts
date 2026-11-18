@@ -175,7 +175,7 @@ export interface TopicWorkRow {
   progress?: { done: number; total: number }
   /** An issue's project, by title. */
   project?: string
-  /** An issue's last edit: who made its newest change, and when, in seconds (TOPI-8). */
+  /** Its last edit: who made its newest change, and when, in seconds (TOPI-8; a project's too, for the page's When, A4). */
   edited?: { by: string; at: number }
   /** An issue's assignee, by key: its row's face on the initiative's page (Katerina, 18 November, A4: the Issues list's facts). */
   assignee?: string
@@ -210,7 +210,8 @@ export interface TopicPageData {
 
 /** Ship's projects and issues, with what their rows say. */
 export interface TopicPageWork {
-  projects: readonly { addr: string; id: string; title: string; status: string; deleted?: unknown }[]
+  /** `author`, `createdAt` and `fields` give a project row its last change (the page's When, A4). */
+  projects: readonly { addr: string; id: string; title: string; status: string; deleted?: unknown; author?: string; createdAt?: number; fields?: Record<string, { by: string; at: number }> }[]
   /** `author`, `createdAt` and `fields` give an issue row its last edit; the sidebar's fold leaves them out. */
   issues: readonly { addr: string; id: string; title: string; status: string; stage?: Stage; projectAddr?: string; assignee?: string; author?: string; createdAt?: number; fields?: Record<string, { by: string; at: number }> }[]
 }
@@ -244,6 +245,7 @@ export function topicPageOf(topic: ReadTopic, work: TopicPageWork, archives: Arc
           href: href({ name: 'project', d: project.id, slug: project.title, view: 'table' }),
           status: (({ value, label }) => ({ value, label }))(projectStatus(project.status)),
           progress: progressOf(of),
+          ...(project.author && project.createdAt !== undefined ? { edited: lastEditOf({ author: project.author, createdAt: project.createdAt, fields: project.fields ?? {} }) } : {}),
         },
       })
     } else if (issue) {

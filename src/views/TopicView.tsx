@@ -28,8 +28,8 @@ export interface TopicDocument {
   children?: TopicDocument[]
 }
 
-/** A project's or an issue's row on the page: who edited it last ("Miky, 1d ago") and an issue's assignee. */
-export type TopicWork = WorkRow & { editedLabel?: string; assigneePerson?: Person }
+/** A project's or an issue's row on the page, with an issue's assignee as a face. */
+export type TopicWork = WorkRow & { assigneePerson?: Person }
 
 /** What the page draws of a topic: its projects as the Projects page draws them, its issues, and the archived ones. */
 export interface TopicPageView {
@@ -42,8 +42,8 @@ export interface TopicPageView {
   archived: boolean
   /** Who archived it and when, for the kit's notice at the top of the page; absent when it is not archived. */
   archive?: Pick<ArchivedNoticeProps, 'by' | 'when' | 'resolution' | 'withWhat' | 'withTitle'>
-  /** Not archived, in the topic's order. */
-  projects: ProjectRowData[]
+  /** Not archived, in the topic's order, each with when it last changed (unix seconds). */
+  projects: (ProjectRowData & { changedAt?: number })[]
   /** Not archived, in the topic's order. */
   issues: TopicWork[]
   archivedWork: TopicWork[]
@@ -83,14 +83,15 @@ export interface TopicViewProps {
   peekUrl?: string
 }
 
-/** A project as `WorkList` draws it: the Projects list's facts. */
-const projectRow = (project: ProjectRowData): WorkListRow => ({
+/** A project as `WorkList` draws it: its status, lead, progress and last change. */
+const projectRow = (project: ProjectRowData & { changedAt?: number }): WorkListRow => ({
   address: project.addr,
   title: project.title,
   href: project.href,
   status: project.status,
   ...(project.lead ? { person: project.lead } : {}),
   progress: project.progress,
+  ...(project.changedAt ? { at: project.changedAt } : {}),
 })
 
 /** A project or an issue on the page as `WorkList` draws it: an issue with its project under its name, as its row here named it. */
@@ -102,7 +103,7 @@ const workRow = (row: TopicWork): WorkListRow => ({
   ...(row.project ? { description: row.project } : {}),
   ...(row.assigneePerson ? { person: row.assigneePerson } : {}),
   ...(row.progress ? { progress: row.progress } : {}),
-  ...(row.editedLabel ? { updated: row.editedLabel } : {}),
+  ...(row.edited ? { at: row.edited.at } : {}),
 })
 
 export function TopicView({ topic, documents, onRetry, onRetryDocuments, topicsHref, members, comments, conversation, onCopyLink, peekUrl }: TopicViewProps) {
