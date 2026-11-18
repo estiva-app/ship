@@ -18,6 +18,7 @@ import type { IssueRowData } from '@/components/IssueRow'
 import { IssuesTable, type IssuesTableRow } from '@/components/IssuesTable'
 import { ProjectFields, type ProjectFieldsProps } from '@/components/PageFields'
 import { PageActions, type PageActionsProps } from '@/components/PageActions'
+import { TeamChip } from '@/components/TeamChip'
 import { OverviewPanel, type OverviewPanelProps } from '@/components/OverviewPanel'
 import { LiveHeader, type LiveHeaderProps } from '@/components/editing/LiveHeader'
 import { ThreadList } from '@/components/conversations/ThreadList'
@@ -40,6 +41,8 @@ import type { RelatedState } from '@/api/useRelated'
  */
 export interface ProjectViewProps {
   crumbs: { projectsHref: string; title: string }
+  /** The team it is in (`placedIn`): the one chip after the trail (Katerina, 18 November, D7). Absent: in no team, or not read yet. */
+  team?: { id: string; name: string }
   header: {
     title: string
     /** The one-line summary under the title (SPEC §6.12); absent when it has none. */
@@ -138,7 +141,7 @@ const TABS: { id: ProjectTab; label: string }[] = [
 ]
 
 /** One project's page, in tabs: Overview and Issues; its comments or its Overview beside it. */
-export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onView, issues, issueStatuses, hrefFor, related, topics, threads, conversationsLoading, mentionsLoading, unread, stillUnread, onThreadShown, onStartConversation, onReply, onCopyBlockLink, activity, activityTruncated, history, historyFold, fields, menu, comments, overview, about, onReact, onResolve, onDeleteMessage, onEditMessage, readOnlyReason, lockedReason, commentsClosed, upload, archivedNotice, members, edited }: ProjectViewProps) {
+export function ProjectView({ crumbs, team, header, onAddIssue, tab, onTab, view, onView, issues, issueStatuses, hrefFor, related, topics, threads, conversationsLoading, mentionsLoading, unread, stillUnread, onThreadShown, onStartConversation, onReply, onCopyBlockLink, activity, activityTruncated, history, historyFold, fields, menu, comments, overview, about, onReact, onResolve, onDeleteMessage, onEditMessage, readOnlyReason, lockedReason, commentsClosed, upload, archivedNotice, members, edited }: ProjectViewProps) {
   // A block menu's Comment shows the column, with that block above its box (RIC-18).
   const comment = useBlockComment(header.description, header.descriptionFormat, () => comments.onShownChange(true), onStartConversation)
   return (
@@ -150,6 +153,7 @@ export function ProjectView({ crumbs, header, onAddIssue, tab, onTab, view, onVi
       {/* The kit's PageHeader (ONE-6, steps 4a and 4b) — see IssueView. The box before the name says it is a project — the sidebar's icon for one (Katerina, 2026-09-09). */}
       <PageHeader
         title={<Breadcrumb items={[{ label: 'Projects', ...linkTo(crumbs.projectsHref) }, { label: crumbs.title, icon: <IconBox size={16} stroke={1.5} /> }]} />}
+        after={team && <TeamChip id={team.id} name={team.name} />}
         {...(edited ? { time: edited } : {})}
         members={members}
         actions={<PageActions what="project" comments={{ ...comments, unread: Object.values(stillUnread ?? {}).some((ids) => ids.length > 0) }} overview={overview} {...menu} readOnlyReason={readOnlyReason} lockedReason={lockedReason} />}

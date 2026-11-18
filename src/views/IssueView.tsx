@@ -11,6 +11,7 @@ import type { ActivityItem } from '@/components/Activity'
 import type { ThreadData, UnreadByThread } from '@/components/ConversationThread'
 import { IssueFields, type IssueFieldsProps } from '@/components/PageFields'
 import { PageActions, type PageActionsProps } from '@/components/PageActions'
+import { TeamChip } from '@/components/TeamChip'
 import { OverviewPanel } from '@/components/OverviewPanel'
 import { LiveHeader, type LiveHeaderProps } from '@/components/editing/LiveHeader'
 import { ThreadList } from '@/components/conversations/ThreadList'
@@ -36,6 +37,8 @@ import { Centred } from '@/components/layout/ReadingColumn'
  */
 export interface IssueViewProps {
   crumbs: { issuesHref: string; project?: { title: string; href: string }; ref?: string }
+  /** The team its project is in, as the sidebar marks it: the one chip after the trail (Katerina, 18 November, D7). Absent: in no project's team. */
+  team?: { id: string; name: string }
   title: string
   description: string
   /** Which content model the description is in — from the fold, never sniffed. */
@@ -118,7 +121,7 @@ export interface IssueViewProps {
 }
 
 /** One issue's page, its comments or its Overview beside it. */
-export function IssueView({ crumbs, title, summary, onSummarize, description, descriptionFormat, nameOf, onRename, onCopyBlockLink, onDescribe, onMention, descriptionBy, related, topics, threads, conversationsLoading, mentionsLoading, unread, stillUnread, onThreadShown, onStartConversation, onReply, activity, activityTruncated, history, fields, menu, comments, overview, about, onReact, onResolve, onDeleteMessage, onEditMessage, readOnlyReason, lockedReason, commentsClosed, upload, archivedNotice, members, edited }: IssueViewProps) {
+export function IssueView({ crumbs, team, title, summary, onSummarize, description, descriptionFormat, nameOf, onRename, onCopyBlockLink, onDescribe, onMention, descriptionBy, related, topics, threads, conversationsLoading, mentionsLoading, unread, stillUnread, onThreadShown, onStartConversation, onReply, activity, activityTruncated, history, fields, menu, comments, overview, about, onReact, onResolve, onDeleteMessage, onEditMessage, readOnlyReason, lockedReason, commentsClosed, upload, archivedNotice, members, edited }: IssueViewProps) {
   // `linkTo` on each crumb (S15, 0.10.0): the breadcrumbs were the last links in Ship that reloaded the app (SHI-20).
   const items: Crumb[] = [{ label: 'Issues', ...linkTo(crumbs.issuesHref) }]
   // The box before the project's name says it is a project, as the sidebar's entry does (Katerina, 2026-09-09).
@@ -133,7 +136,7 @@ export function IssueView({ crumbs, title, summary, onSummarize, description, de
     <div data-surface="issue" className="flex min-h-0 flex-1 [contain:size]">
       <div className="flex min-w-0 flex-1 flex-col gap-4">
       {/* The kit's PageHeader (ONE-6, step 4a): the path, when it last changed, who is in it, and the page's own buttons (4b–4d). 48px whatever it holds, so the members pill arriving moves nothing. */}
-      <PageHeader title={<Breadcrumb items={items} />} {...(edited ? { time: edited } : {})} members={members} actions={<PageActions what="issue" comments={{ ...comments, unread: Object.values(stillUnread ?? {}).some((ids) => ids.length > 0) }} overview={overview} {...menu} readOnlyReason={readOnlyReason} lockedReason={lockedReason} />} />
+      <PageHeader title={<Breadcrumb items={items} />} after={team && <TeamChip id={team.id} name={team.name} />} {...(edited ? { time: edited } : {})} members={members} actions={<PageActions what="issue" comments={{ ...comments, unread: Object.values(stillUnread ?? {}).some((ids) => ids.length > 0) }} overview={overview} {...menu} readOnlyReason={readOnlyReason} lockedReason={lockedReason} />} />
 
       {/* No tab row: with Activity in the Overview, an issue has one page (Katerina, 2 November). */}
       <ScrollArea className="min-h-0 min-w-0 flex-1" contentClassName="flex flex-col gap-6 px-6 pb-5">

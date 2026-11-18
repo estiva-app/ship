@@ -1,21 +1,21 @@
 import { useState, type ReactNode } from 'react'
-import { IconArchive, IconChevronDown, IconChevronRight, IconExternalLink, IconTarget, IconUsers } from '@tabler/icons-react'
+import { IconArchive, IconChevronDown, IconChevronRight, IconExternalLink, IconTarget } from '@tabler/icons-react'
 import { KindIcon, Link, NoAccessNotice, PageHeader, SectionLabel, WithTooltip } from '@estiva-app/ui'
 import { Breadcrumb } from '@/components/ui/Breadcrumb'
 import { Button } from '@/components/ui/Button'
-import { Chip } from '@/components/ui/Chip'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { IconButton } from '@/components/ui/IconButton'
 import { ScrollArea } from '@/components/ui/ScrollArea'
 import { SkeletonList } from '@/components/ui/Skeleton'
 import { Tabs } from '@/components/ui/Tabs'
 import { PageActions } from '@/components/PageActions'
+import { TeamChip } from '@/components/TeamChip'
 import { ProjectRow } from '@/components/ProjectRow'
 import { EditedCaption, TopicWorkRow } from '@/components/TopicWorkRow'
 import { cn } from '@/lib/cn'
 import type { ProjectRowData } from '@/lib/projects'
 import type { TopicWorkRow as WorkRow } from '@/lib/topics'
-import { href, linkTo } from '@/router'
+import { linkTo } from '@/router'
 
 /** A Leaf document on a topic's page: its title, where it opens, who edited it last and when, and its pages. */
 export interface TopicDocument {
@@ -99,9 +99,7 @@ export function TopicView({ topic, documents, onRetry, onRetryDocuments, topicsH
             loaded && (
               <>
                 {/* The team it belongs to, the one chip after its name, opening the team's page (Katerina, 17 November: one chip; 18 November, D4). */}
-                {loaded.team && loaded.teamId && (
-                  <Chip label={loaded.team} leadingIcon={<IconUsers size={12} stroke={1.5} aria-hidden />} {...linkTo(href({ name: 'folder', id: loaded.teamId }))} />
-                )}
+                {loaded.team && loaded.teamId && <TeamChip id={loaded.teamId} name={loaded.team} />}
                 {/* Open into Peek, as Peek's and Leaf's Open into another app (Katerina, 30 October; 18 November, D5): in place of the ⋯'s Open in Peek. */}
                 {peekUrl && (
                   <WithTooltip label="Open in Peek">

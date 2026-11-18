@@ -1,0 +1,35 @@
+import { Meta } from '@storybook/addon-docs/blocks'
+
+<Meta title="Navigation/TeamChip" />
+
+# TeamChip
+
+The team a page's thing belongs to, as the one chip after its name in the
+page's header, opening the team's page. Peek's initiative and file pages draw
+the same chip.
+
+**Seen in** *Pages/In the shell*: **Initiative**, **Project**, **Issue**.
+
+## When
+
+- **In a page header's `after`**, right after the name: an initiative's page,
+  a project's, an issue's (Katerina, 17 and 18 November).
+
+## When not
+
+- **The initiatives a file is in**: **FileTopicsOf**, in its Overview. A
+  header has one chip, the team.
+- **A team in a list's row**: the kit's **ListTable** Team column says it in
+  words.
+- No alternative: a thing in no team gets no chip.
+
+## How
+
+```tsx
+<PageHeader title={trail} after={team && <TeamChip id={team.id} name={team.name} />} />
+```
+
+## What it owns
+
+- The kit's `Chip`, the team icon at 12px, and the link to the team's page
+  through Ship's router.

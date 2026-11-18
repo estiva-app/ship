@@ -272,6 +272,8 @@ export const IssuesEmpty: Story = {
 const ARCHIVED_AT = Math.floor(Date.now() / 1000) - 2 * 86400
 
 /** The header's "Edited … ago" (ONE-6, step 4a), as the pages make it: who changed it last, and exactly when under the pointer. */
+/** The team the story's project, and so its issues, are in: the one chip after the trail (Katerina, 18 November, D7). */
+const STORY_TEAM = { id: '7b32200c-e4c0-4216-b79a-8490fc05e0bd', name: 'Estiva HQ' }
 const STORY_EDITED = { label: 'Edited 5m ago', exact: 'Edited by Ana Duarte · Nov 2, 2026, 10:30 AM' }
 const archivedNotice = (withProject?: boolean) => (
   <ArchivedNotice
@@ -322,6 +324,7 @@ const projectPage = (startTab: ProjectTab, startView: 'table' | 'board' = 'table
           edited={STORY_EDITED}
           {...(archived ? {} : { onAddIssue: fn() })}
           crumbs={{ projectsHref: '#/projects', title }}
+          team={STORY_TEAM}
           header={{ title, summary, description, descriptionFormat: 'marker', archived, onRename: (v) => (setTitle(v), true), onSummarize: async (v) => (setSummary(v || undefined), true), onDescribe: (v) => (setDescription(v), true) }}
           tab={tab}
           onTab={setTab}
@@ -389,6 +392,7 @@ const issuePage = (archivedWithProject = false, withSummary = true, newWhileHidd
         <IssueView
           edited={STORY_EDITED}
           crumbs={{ issuesHref: '#/issues', project: { title: 'Relay Migration', href: '#/project/30850%3Aa%3Arel' }, ref: issue.ref }}
+          team={STORY_TEAM}
           title={title}
           summary={summary}
           onSummarize={async (v) => (setSummary(v || undefined), true)}
