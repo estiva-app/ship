@@ -82,12 +82,12 @@ export function IssuesPage({ state, directory, teams, archives, folder, say, ref
           onCreate={async (draft) => {
             const project = state.projects.find((p) => p.addr === draft.projectAddr)
             if (!project) {
-              say('Pick a project for this issue.', 'error')
+              say('Pick a project for this issue.', 'error', null)
               return false
             }
             const result = await createIssue(project, state, draft)
             if (!result.ok) {
-              say(`Issue rejected — ${result.reason}`, 'error')
+              say(`Issue rejected — ${result.reason}`, 'error', 'not-created')
               return false
             }
             await refresh()

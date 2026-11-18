@@ -9,6 +9,7 @@ import { ForeignObject } from '@/components/ui/ForeignObject'
 import { SkeletonList } from '@/components/ui/Skeleton'
 import { KIND } from '@/nostr/kinds'
 import { replace } from '@/router'
+import { useReportFailure } from '@/lib/failureReports'
 
 /**
  * Another app's file, opened on Ship's host, handed off to the app that draws
@@ -23,6 +24,7 @@ import { replace } from '@/router'
  */
 export function HandoffPage({ word, fileRef, query }: { word: string; fileRef: string; query?: string }) {
   const handoff = useHandoff(word, fileRef, query)
+  useReportFailure(handoff === 'failed' ? 'not-loaded' : undefined)
 
   // A word nobody declares that turned out to be Ship's own file (§7.7 rule
   // 4): drawn at its right word, without a history entry to bounce off.

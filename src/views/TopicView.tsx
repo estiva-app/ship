@@ -15,6 +15,7 @@ import { cn } from '@/lib/cn'
 import type { ProjectRowData } from '@/lib/projects'
 import type { TopicWorkRow as WorkRow } from '@/lib/topics'
 import { linkTo } from '@/router'
+import { useReportFailure } from '@/lib/failureReports'
 
 /** A Leaf document on a topic's page: its title, where it opens, who edited it last and when, and its pages. */
 export interface TopicDocument {
@@ -81,6 +82,7 @@ const inTab = (tab: ProjectsTab, project: ProjectRowData) => tab === 'all' || TA
 export function TopicView({ topic, documents, onRetry, onRetryDocuments, topicsHref, members, comments, conversation, onCopyLink, onOpenInPeek }: TopicViewProps) {
   const [showArchived, setShowArchived] = useState(false)
   const [tab, setTab] = useState<ProjectsTab>('all')
+  useReportFailure(topic === 'failed' || documents === 'failed' ? 'not-loaded' : undefined)
   if (topic === 'unavailable') return <NoAccessNotice what="topic" />
   const loaded = typeof topic === 'object' ? topic : undefined
   const shownProjects = loaded ? loaded.projects.filter((project) => inTab(tab, project)) : []

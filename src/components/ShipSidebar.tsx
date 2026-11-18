@@ -5,6 +5,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { SkeletonList } from '@/components/ui/Skeleton'
 import { TOPICS_SHOWN, type SidebarTopic } from '@/lib/topics'
 import { linkTo } from '@/router'
+import { useReportFailure } from '@/lib/failureReports'
 
 /**
  * The sidebar: Projects, Issues, your five newest topics then Explore topics
@@ -124,6 +125,7 @@ const rowId = (folder: string, entry: SidebarEntry) => `${folder}/${entry}`
 
 export function ShipSidebar({ openIssues, activeProjects, hrefFor, folders = [], onOpenFolder, onNewFolder, current, topics, onRetryTopics, openTopic, openFile, loading = false, foldersLoading = false, className }: ShipSidebarProps) {
   const at = current && 'entry' in current ? current : undefined
+  useReportFailure(topics === 'failed' ? 'not-loaded' : undefined)
   // Alphabetical teams, as Peek's column draws them; the relay's order tells the person nothing.
   const teams = [...folders].sort((a, b) =>
     (a.name ?? a.id).localeCompare(b.name ?? b.id, undefined, { sensitivity: 'base' }),

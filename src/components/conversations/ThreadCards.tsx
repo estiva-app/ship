@@ -15,6 +15,7 @@ import { useReopenHeld } from '@/auth/heldTyping'
 import { MessageText } from './MessageText'
 import { Box } from './lazyBox'
 import type { Answer } from './shared'
+import { useReportFailure } from '@/lib/failureReports'
 
 /** What the relay said about a reaction, as the kit's row takes it back (its `ReactionAnswer`, not exported by name). */
 type ReactionAnswer = Exclude<Awaited<ReturnType<NonNullable<ReactionRowProps['onToggle']>>>, void>
@@ -102,6 +103,7 @@ function useMessageWrites({ message, reactions, onToggleReaction, onEdit, nameOf
   // One ✕ at a time: the next one reads the set this one leaves, once the page has read it back.
   const [removing, setRemoving] = useState(false)
   const [cardRefused, setCardRefused] = useState<string | null>(null)
+  useReportFailure(cardRefused ? 'not-saved' : undefined)
   const removeCard =
     onEdit && !removing
       ? (value: string) => {
@@ -223,6 +225,7 @@ export function ShipComment(props: ShipCommentProps) {
   const { message, nameOf, deleted = false, unseen = false, replies, repliesLeftBehind = 0, onReply, onClick, resolution, onResolve } = props
   const named = (pubkey: string) => nameOf?.(pubkey) ?? `${pubkey.slice(0, 8)}…`
   const [resolveRefused, setResolveRefused] = useState<string>()
+  useReportFailure(resolveRefused ? 'not-resolved' : undefined)
   const resolve =
     onResolve && !resolution
       ? async (note: string) => {

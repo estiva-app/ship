@@ -11,6 +11,7 @@ import { Chip } from '@/components/ui/Chip'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { IconButton } from '@/components/ui/IconButton'
 import { SkeletonBar } from '@/components/ui/Skeleton'
+import { useReportFailure } from '@/lib/failureReports'
 
 /**
  * **A project's or an issue's topics** (TOP-5; why:
@@ -39,6 +40,7 @@ export function FileTopics({ topics, busy, onChange, readChoices, choicesNow }: 
   choicesNow?: () => TopicChoices | undefined
 }) {
   const [picking, setPicking] = useState(false)
+  useReportFailure(topics === 'failed' ? 'not-loaded' : undefined)
   if (topics === undefined) {
     return (
       // Held back 150ms as the Folder's placeholder is, so a fast read never flashes it.
@@ -123,6 +125,7 @@ function AddToTopic({ listed, readChoices, choicesNow, onPick, onClose }: {
   const [query, setQuery] = useState('')
   // Choices already in hand draw with the palette, so it never says "Reading topics…" for them.
   const [choices, setChoices] = useState<TopicChoices | 'failed' | undefined>(() => choicesNow?.())
+  useReportFailure(choices === 'failed' ? 'not-loaded' : undefined)
   useEffect(() => {
     let live = true
     readChoices()

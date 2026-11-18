@@ -106,13 +106,13 @@ export function ProjectsPage({ state, directory, teams, archives, tab, folder, s
           onCreate={async (draft) => {
             const result = await createProject(draft)
             if (!result.ok) {
-              say(`Project rejected — ${result.reason}`, 'error')
+              say(`Project rejected — ${result.reason}`, 'error', 'not-created')
               return false
             }
             await refresh()
             // A new project is Planned: show it where it now is, not on a tab it is missing from.
             if (tab !== 'all' && tab !== 'planned') go({ name: 'projects', tab: 'planned', folder })
-            if (result.unlisted) say(`Project created, but not listed in its team, so Peek will not show it there — ${result.unlisted}`, 'error')
+            if (result.unlisted) say(`Project created, but not listed in its team, so Peek will not show it there — ${result.unlisted}`, 'error', 'not-added')
             else say('Project created')
             return true
           }}

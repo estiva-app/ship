@@ -57,6 +57,7 @@ export function MoveProject({
           reloadFolders,
           // Already Ship's sentence: "Nothing was moved: …".
           (reason) => reason,
+          'not-moved',
         )
         if (!ok) {
           // A list changed since it was read: read the Folders again, so Move tries from where it is now.
@@ -65,7 +66,7 @@ export function MoveProject({
         }
         if (stillIn) {
           // Only the Folder whose move was refused is named; any after it were never asked.
-          say(`Moved to ${to.name}, but ${nameOf(stillIn.folder)} still lists it too${stillIn.why ? `: ${stillIn.why}` : stillIn.retry === false ? '.' : '. Try moving it again.'}`, 'error')
+          say(`Moved to ${to.name}, but ${nameOf(stillIn.folder)} still lists it too${stillIn.why ? `: ${stillIn.why}` : stillIn.retry === false ? '.' : '. Try moving it again.'}`, 'error', 'not-moved')
           return false
         }
         say(`Moved to ${to.name}`)

@@ -330,7 +330,7 @@ export function IssuePage({ state, directory, archives, d, say, refresh }: { sta
           onConfirm={async () => {
             const result = await deleteIssue(issue)
             if (!result.ok) {
-              say(`Delete rejected — ${result.reason}`, 'error')
+              say(`Delete rejected — ${result.reason}`, 'error', 'not-deleted')
               return false
             }
             say('Issue deleted')

@@ -1,8 +1,14 @@
 import { refusalReason } from '@estiva-app/conversation'
+import type { Failure } from '@estiva-app/platform'
 import type { WriteResult } from '@/api'
 import { isRateLimited, isRelayBusy, retryHintMs } from '@/lib/relayBudget'
 
-export type Say = (text: string, tone?: 'ok' | 'error') => void
+/**
+ * An error says what failed from the reporter's fixed list (`not-saved`), so it reaches Sentry without the text, which
+ * carries titles and the relay's words (PROD-5). Omitted → reported as `unnamed`; `null` → the person's own slip ("A
+ * team needs a name."), not a failure, never reported.
+ */
+export type Say = (text: string, tone?: 'ok' | 'error', failure?: Failure | null) => void
 
 /**
  * A description's `say`: a refusal that comes back once the description has
@@ -11,7 +17,7 @@ export type Say = (text: string, tone?: 'ok' | 'error') => void
  * (LTX-3). `left` is read when the relay answers, not when the save went out.
  */
 export function sayOnceLeft(say: Say, title: string, left?: () => boolean): Say {
-  return (text, tone) => say(tone === 'error' && left?.() ? `Your last changes to ${title} were not saved.` : text, tone)
+  return (text, tone, failure) => say(tone === 'error' && left?.() ? `Your last changes to ${title} were not saved.` : text, tone, failure)
 }
 
 /**
@@ -47,6 +53,8 @@ export async function act(
   refresh?: () => Promise<void>,
   /** The words for a refusal, where the default "<what> rejected — <reason>" is not what the person should read. */
   refused?: (reason: string) => string,
+  /** What failed, for the error report (PROD-5): a save unless said otherwise. */
+  failure: Failure = 'not-saved',
 ): Promise<boolean> {
   const result = await write()
   if (!result.ok) {
@@ -61,10 +69,10 @@ export async function act(
     */
     if (isRateLimited(result.reason) || isRelayBusy(result.reason)) {
       const wait = retryHintMs(result.reason)
-      say(wait ? `Too busy right now — try again in ${Math.ceil(wait / 1000)}s.` : 'Too busy right now — try again shortly.', 'error')
+      say(wait ? `Too busy right now — try again in ${Math.ceil(wait / 1000)}s.` : 'Too busy right now — try again shortly.', 'error', failure)
       return false
     }
-    say(refused ? refused(result.reason) : `${what} rejected — ${result.reason}`, 'error')
+    say(refused ? refused(result.reason) : `${what} rejected — ${result.reason}`, 'error', failure)
     return false
   }
   await refresh?.()
@@ -99,7 +107,7 @@ export async function answerOf(write: () => Promise<WriteResult>, refresh?: () =
  */
 export async function deleteAnswer(write: () => Promise<WriteResult>, say: Say, refresh?: () => Promise<void>): Promise<boolean> {
   const answer = await answerOf(write, refresh)
-  if (answer !== true) say(`Not deleted: ${refusalReason(answer)}.`, 'error')
+  if (answer !== true) say(`Not deleted: ${refusalReason(answer)}.`, 'error', 'not-deleted')
   return answer === true
 }
 
