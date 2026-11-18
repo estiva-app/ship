@@ -18,6 +18,7 @@ import {
   IconGitPullRequestDraft,
   IconMessageQuestion,
   IconArrowRight,
+  IconBox,
   IconCornerDownRight,
   IconPlayerPlay,
   IconPlus,
@@ -25,7 +26,6 @@ import {
   IconX,
 } from "@tabler/icons-react";
 import {
-  Avatar,
   Button,
   Card,
   Chip,
@@ -311,7 +311,7 @@ type Line = {
    * An issue someone filed into the project with no milestone (Miky, 18 Nov: Scope to decide holds both the rough
    * notes and the issues to sort out, one list). It keeps its ref when accepted; ✕ cancels it and tells its filer why.
    */
-  filed?: { ref: string; by: string; as: "Bug" | "Improvement" };
+  filed?: { ref: string; by: string; as: "Bug" | "Improvement"; /** The project it was moved from, if any, and its key. */ from?: string; fromKey?: string };
   /** What was seen, in a few sentences: what a person does, what happens, why it matters. */
   detail?: string;
 };
@@ -393,7 +393,7 @@ const TRIAGE: Line[] = [
     from: "Katerina’s bug",
     at: "2 days ago",
     isNew: true,
-    filed: { ref: "TOPI-12", by: "Katerina", as: "Bug" },
+    filed: { ref: "TOPI-12", by: "Katerina", as: "Bug", from: "Ship: Feedback & Bugs", fromKey: "SHI" },
     detail:
       "Katerina left the Release notes topic in Peek. In Ship it stayed under Topics in the sidebar, and opening it said she could not read it.",
     rec: {
@@ -494,22 +494,22 @@ const issueOf = (ref: string) => MILESTONES.flatMap((m) => m.issues).find((i) =>
  */
 function FoundIn({ line, title = false }: { line: Line; title?: boolean }) {
   const f = line.found;
-  // A filed issue: the face of who filed it and its own ref, where a note has ↪ and the issue it was found in. Hover
-  // says what it is; on a box, the kind and who follow the ref.
-  if (line.filed)
+  // The first column only ever says where it came from (Miky, 18 Nov: a key there read as an origin). A filed issue
+  // moved from another project names that project; one filed straight into this project leaves it empty. Its own key
+  // goes with its title.
+  if (line.filed) {
+    const from = line.filed.from;
+    if (!from) return null;
     return (
-      <WithTooltip label={`${line.filed.as} filed by ${line.filed.by} · ${line.at}`}>
+      <WithTooltip label={`Moved from ${from} · ${line.filed.as} filed by ${line.filed.by} · ${line.at}`} wrapperClassName="flex min-w-0">
         <span className="relative flex min-w-0 items-center gap-1">
-          <Avatar size={14} name={line.filed.by} />
-          <span className="min-w-0 truncate">
-            <MetaText tone="muted">
-              {line.filed.ref}
-              {title && ` · ${line.filed.as} filed by ${line.filed.by}`}
-            </MetaText>
-          </span>
+          <IconBox size={14} stroke={1.5} className="shrink-0 text-text-muted" />
+          {/* The row shows the project's key (Miky, 18 Nov), as a note shows its issue's; the box's header has room for the name. */}
+          <MetaText tone="muted">{title ? from : (line.filed.fromKey ?? from)}</MetaText>
         </span>
       </WithTooltip>
     );
+  }
   if (!f) return null;
   return (
     <WithTooltip label={`Found while ${STEP[f.step]} ${f.ref}: ${issueOf(f.ref)?.title ?? ""} · ${line.at}`}>
@@ -525,6 +525,16 @@ function FoundIn({ line, title = false }: { line: Line; title?: boolean }) {
     </WithTooltip>
   );
 }
+
+/** A filed issue's own key before its title, as an issue row draws it, so it reads as an issue already; hover says who filed it. */
+const Key = ({ line }: { line: Line }) =>
+  line.filed ? (
+    <WithTooltip label={`${line.filed.as} filed by ${line.filed.by} · ${line.at}`}>
+      <span className="relative flex shrink-0">
+        <MetaText tone="muted">{line.filed.ref}</MetaText>
+      </span>
+    </WithTooltip>
+  ) : null;
 
 /** Where Claude would put it, as a chip: → This milestone, → Later, → Not doing. */
 const RecChip = ({ line }: { line: Line }) =>
@@ -549,6 +559,7 @@ function ScopeRow({ line, selected, onOpen, onPlace }: { line: Line; selected: b
         <FoundIn line={line} />
       </span>
       <span className="flex min-w-0 flex-1 items-center gap-1.5">
+        <Key line={line} />
         <Link href="#" variant="plain" truncate cover onClick={(e) => (e.preventDefault(), onOpen())}>
           {line.title}
         </Link>
@@ -598,11 +609,14 @@ export function ScopeBoxes({ placed, openId, onOpen, onPlace }: { placed: Record
         {lines.map((l) => (
           <Card key={l.id} fill="surface" hover="hairline" selected={l.id === openId} className="relative flex flex-col gap-3 p-4">
             <FoundIn line={l} title />
-            <span className="font-medium">
-              <Link href="#" variant="quiet" cover onClick={(e) => (e.preventDefault(), onOpen(l.id))}>
-                {l.title}
-              </Link>
-              <NewDot on={l.isNew} />
+            <span className="flex items-baseline gap-1.5 font-medium">
+              <Key line={l} />
+              <span>
+                <Link href="#" variant="quiet" cover onClick={(e) => (e.preventDefault(), onOpen(l.id))}>
+                  {l.title}
+                </Link>
+                <NewDot on={l.isNew} />
+              </span>
             </span>
             <div className="mt-auto flex items-center justify-between gap-3 border-t border-border-subtle pt-3">
               <RecChip line={l} />
@@ -639,7 +653,10 @@ export function ScopePanel({ id, onPlace, onClose }: { id: string; onPlace: (to:
         }
       >
         <ScrollArea className="min-h-0 flex-1" contentClassName="flex flex-col gap-5 px-4 pb-4">
-          <span className="text-h3 text-text-primary">{l.title}</span>
+          <span className="flex flex-col gap-1">
+            {l.filed && <MetaText tone="muted">{l.filed.ref}</MetaText>}
+            <span className="text-h3 text-text-primary">{l.title}</span>
+          </span>
           {l.detail && <span className="text-body-2 text-text-primary">{l.detail}</span>}
           {f && (
             <section className="flex flex-col gap-2" aria-label="Found while">
@@ -665,10 +682,13 @@ export function ScopePanel({ id, onPlace, onClose }: { id: string; onPlace: (to:
               <MetaText tone="muted">
                 {l.filed.as} filed · {l.at}
               </MetaText>
-              <span className="flex min-w-0 items-center gap-2 text-body-2">
-                <Person size={16} name={l.filed.by} />
-                <MetaText tone="muted">{l.filed.ref}</MetaText>
-              </span>
+              <Person size={16} name={l.filed.by} />
+              {l.filed.from && (
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <IconBox size={14} stroke={1.5} className="shrink-0 text-text-muted" />
+                  <MetaText tone="muted">Moved from {l.filed.from}</MetaText>
+                </span>
+              )}
             </section>
           )}
           {l.rec && (
