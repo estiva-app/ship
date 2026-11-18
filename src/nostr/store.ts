@@ -1409,23 +1409,6 @@ export class Store {
   }
 
   /**
-   * Join a topic (TOPI-9, Explore topics' Join): the public changes
-   * conversation's `switchWrites` gives for All, the ones Peek's switch signs
-   * for the same pick — a `follow:<you>` = `all` on the topic, after a leave
-   * when you had left. Whether a mute is to be taken out is the answer's
-   * `clearsMute`; the caller does it ({@link publishMuted}).
-   * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-persons-level-on-a-place-is-theirs-alone.md
-   */
-  async joinPlace(args: { place: Place; following: Following }): Promise<PublishResult & { clearsMute?: boolean }> {
-    const writes = switchWrites(this.signer.pubkey, Date.now(), { place: args.place, folder: args.place.team, choice: 'all', following: args.following })
-    for (const change of writes.changes) {
-      const result = await this.publish(change)
-      if (!result.ok) return result
-    }
-    return { ok: true, clearsMute: writes.clearsMute }
-  }
-
-  /**
    * Leave a topic from its page's Members (TOPI-8): the public changes `switchWrites` gives for Not following, the
    * ones Peek's switch signs for the same pick.
    * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-persons-level-on-a-place-is-theirs-alone.md

@@ -80,9 +80,9 @@ export function TopicsPage({ folders, folder, say, directory }: { folders: Folde
     else if ('stillMuted' in result) say(`Joined “${title}”, but it is still muted. Join again to unmute it.`, 'error')
     else {
       setJoined((now) => new Set(now).add(address))
-      // Peek's Join toast and, like Peek's Explore, no Undo (Katerina, 18 November, E1). Ship's Join follows at All, which
-      // Peek's bell calls Everything; Peek's own Join lands at Important, so its words would not be true here.
-      say(`You joined ${title}. Notifications: Everything.`)
+      // Peek's Join toast, word for word, and like Peek's Explore no Undo (Katerina, 18 November, E1). Join lands at
+      // Important, as Peek's does (her 18 November "let's make it to important"): `joinTopic` writes what Peek's writes.
+      say(`You joined ${title}. Notifications: Important.`)
     }
   }
 

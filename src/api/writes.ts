@@ -96,21 +96,22 @@ export function setListedInTopic(topic: { address: string; folder: string }, fil
 }
 
 /**
- * Join a topic from Explore topics (TOPI-9): you follow it at All, as Peek's
- * Join does, and a mute you kept on it is taken out (§11.8 *Muting*), so it
- * is yours in both apps. The mute list is read just before and never written
- * over when it cannot be read.
+ * Join an initiative (a topic, in the code) from Explore initiatives or its page's Members (TOPI-9): what Peek's Join
+ * on its Explore writes, a `member:<you>` = true change on the initiative (SPEC §11.8), with no level, so it lights at
+ * Important, the level of anyone in it who chose none (Katerina, 18 November: "let's make it to important"). Until then
+ * Ship wrote `follow:<you>` = `all`. A mute you kept on it is taken out (§11.8 *Muting*), so it is yours in every app.
+ * The mute list is read just before and never written over when it cannot be read.
+ * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-team-has-members-and-followers-and-a-place-is-followed-at-a-level.md
  */
 export async function joinTopic(topic: ReadTopic): Promise<WriteResult | { ok: true; stillMuted: true }> {
   const clock = await clockProblem()
   if (clock) return refused(clock)
   let followed = false
   try {
-    const joined = await store.joinPlace({ place: { address: topic.address, team: topic.folder }, following: topic.following })
+    const me = signer.pubkey
+    const joined = await store.setMembership({ folder: topic.folder, file: topic.address, person: me, member: true })
     if (!joined.ok) return refused('The relay did not take it. Try again.')
     followed = true
-    if (!joined.clearsMute) return { ok: true }
-    const me = signer.pubkey
     const events = await relay.query([mutedFilter(me)] as never)
     const newest = [...events].sort((a, b) => b.created_at - a.created_at)[0]
     if (!newest) return { ok: true }

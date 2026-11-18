@@ -148,17 +148,19 @@ describe("A topic's page at the wire (TOPI-8)", () => {
     expect(published.filter((event) => event.kind === 1851)).toEqual([])
   })
 
-  it('Join from the members pill follows the topic at All, on the topic, in its team, as Peek’s switch writes it', async () => {
+  it('Join from the members pill puts you in the initiative with no level, on it, in its team, as Peek’s Join writes it, so it lights at Important', async () => {
     await open()
     fireEvent.click(await screen.findByRole('button', { name: /members?$/ }))
     const dialog = await screen.findByRole('dialog', { name: /Members/ })
     fireEvent.click(within(dialog).getByRole('button', { name: 'Join' }))
     await waitFor(() => expect(published.some((event) => event.kind === 1851)).toBe(true))
-    const follow = published.find((event) => event.kind === 1851)!
-    expect(tag(follow, 'a')).toBe(TOPIC)
-    expect(tag(follow, 'h')).toBe(TEAM)
-    expect(tag(follow, 'field')).toBe(`follow:${follow.pubkey}`)
-    expect(tag(follow, 'value')).toBe('all')
+    const join = published.find((event) => event.kind === 1851)!
+    expect(tag(join, 'a')).toBe(TOPIC)
+    expect(tag(join, 'h')).toBe(TEAM)
+    expect(tag(join, 'field')).toBe(`member:${join.pubkey}`)
+    expect(tag(join, 'value')).toBe('true')
+    // No level: Important is the level of anyone in it who chose none (Katerina, 18 November).
+    expect(published.some((event) => event.kind === 1851 && tag(event, 'field')?.startsWith('follow:'))).toBe(false)
   })
 
   it('Leave from the members pill, for someone in the topic at All, takes them out of it, on the topic, in its team', async () => {

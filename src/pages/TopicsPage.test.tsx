@@ -13,7 +13,7 @@ import type { FolderState } from '@/api'
 const wire = vi.hoisted(() => ({
   held: [] as TestEvent[],
   sent: [] as TestEvent[],
-  store: undefined as unknown as { joinPlace: (args: unknown) => unknown; publishMuted: (ciphertext: string) => unknown },
+  store: undefined as unknown as { setMembership: (args: unknown) => unknown; publishMuted: (ciphertext: string) => unknown },
 }))
 const held = wire.held
 let down = false
@@ -47,7 +47,7 @@ vi.mock('@/api/store', () => ({
   // A relay without the times read (NIP-11 `file_list.times`): topicTimes.wire.test.tsx reads the one with it.
   timesOption: async () => ({}),
   store: {
-    joinPlace: (args: unknown) => wire.store.joinPlace(args),
+    setMembership: (args: unknown) => wire.store.setMembership(args),
     publishMuted: (ciphertext: string) => wire.store.publishMuted(ciphertext),
   },
 }))
@@ -269,7 +269,7 @@ describe("Ship's Topics (Explore initiatives)", () => {
     expect(screen.getByText('No initiative matches “aunch”.')).toBeTruthy()
   })
 
-  it('Join follows the topic at All, as Peek’s Join does, and the row keeps its place with Join gone and one more member', async () => {
+  it('Join puts you in the initiative with no level, as Peek’s Join does, so it lights at Important, and the row keeps its place with Join gone and one more member', async () => {
     held.push(shipManifest(), topic('t-in', 'Mine'), joined('t-in'), topic('t-o', 'Theirs'))
     render(page())
     fireEvent.click(await screen.findByRole('tab', { name: /Other initiatives/ }))
@@ -281,13 +281,15 @@ describe("Ship's Topics (Explore initiatives)", () => {
     const [sent] = wire.sent
     expect(sent.kind).toBe(1851)
     expect(sent.pubkey).toBe(ME)
-    expect(sent.tags).toEqual(expect.arrayContaining([['a', address('t-o')], ['field', `follow:${ME}`], ['value', 'all'], ['h', TEAM]]))
+    expect(sent.tags).toEqual(expect.arrayContaining([['a', address('t-o')], ['field', `member:${ME}`], ['value', 'true'], ['h', TEAM]]))
+    // No level chosen: Important is the level of anyone in it who chose none (Katerina, 18 November: "let's make it to important").
+    expect(sent.tags.some((t) => t[0] === 'field' && t[1].startsWith('follow:'))).toBe(false)
     await waitFor(() => expect(within(rowOf('Theirs')).queryByRole('button', { name: 'Join' })).toBeNull())
     expect(within(rowOf('Theirs')).getByText('2')).toBeTruthy()
     // Not moved under the pointer: it goes to Your initiatives on the next open.
     expect(titles()).toEqual(['Theirs'])
-    // Peek's Join toast, with the level Ship's Join writes (All, Peek's bell's Everything), and no Undo (Katerina, 18 November, E1).
-    expect(say).toHaveBeenCalledExactlyOnceWith('You joined Theirs. Notifications: Everything.')
+    // Peek's Join toast, word for word, and no Undo (Katerina, 18 November, E1).
+    expect(say).toHaveBeenCalledExactlyOnceWith('You joined Theirs. Notifications: Important.')
   })
 
   it('Join on a topic you muted takes it out of your mute list, keeping the rest, and counts you once', async () => {
