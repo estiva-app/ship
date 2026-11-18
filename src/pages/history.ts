@@ -34,8 +34,8 @@ import { parseChanges, type Change as FoldChange } from '@/nostr/fold'
  */
 export function withChangesOf(addr: string, state: FolderState, changes: readonly SignedEvent[] | undefined): FolderState {
   if (!changes) return state
-  // Only changes filed in the project's own Folder, as the fold takes them: one filed elsewhere is not its history.
-  const folder = state.projects.find((project) => project.addr === addr)?.contentFolder
+  // Only changes filed in the file's own Folder, as the fold takes them: one filed elsewhere is not its history. An issue's is the one it was filed in (ISS-4).
+  const folder = state.projects.find((project) => project.addr === addr)?.contentFolder ?? state.issues.find((issue) => issue.addr === addr)?.folder
   const at = (change: FoldChange) => (change.ts !== undefined && Math.floor(change.ts / 1000) === change.createdAt ? change.ts : change.createdAt * 1000)
   const own = changes
     .flatMap(parseChanges)

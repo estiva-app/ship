@@ -11,7 +11,7 @@ import type { ActivityItem } from '@/components/Activity'
 import type { ThreadData, UnreadByThread } from '@/components/ConversationThread'
 import { IssueFields, type IssueFieldsProps } from '@/components/PageFields'
 import { PageActions, type PageActionsProps } from '@/components/PageActions'
-import { OverviewPanel } from '@/components/OverviewPanel'
+import { OverviewPanel, type OverviewPanelProps } from '@/components/OverviewPanel'
 import { LiveHeader, type LiveHeaderProps } from '@/components/editing/LiveHeader'
 import { ThreadList } from '@/components/conversations/ThreadList'
 import { useBlockComment } from '@/components/conversations/useBlockComment'
@@ -83,6 +83,10 @@ export interface IssueViewProps {
   onReply: (threadId: string, text: string, files: readonly Imeta[], picks?: Picks) => Promise<Answer>
   /** Its own changes, in words: the Overview's History. */
   history: HistoryEntry[]
+  /** History folded until opened, and read then (ISS-4): `OverviewPanel`'s `historyFold`. */
+  historyFold?: OverviewPanelProps['historyFold']
+  /** Its current text is still on the way (ISS-4): the description shows and cannot be saved until it lands. */
+  textPending?: boolean
   /** Status, assignee and project, as a row between the summary and the description (ONE-6, step 4b). */
   fields: Omit<IssueFieldsProps, 'readOnlyReason' | 'lockedReason'>
   /** The header's ⋯: Copy link, Archive or Unarchive, Delete. */
@@ -118,7 +122,7 @@ export interface IssueViewProps {
 }
 
 /** One issue's page, its comments or its Overview beside it. */
-export function IssueView({ crumbs, title, summary, onSummarize, description, descriptionFormat, nameOf, onRename, onCopyBlockLink, onDescribe, onMention, descriptionBy, related, topics, threads, conversationsLoading, mentionsLoading, unread, stillUnread, onThreadShown, onStartConversation, onReply, activity, activityTruncated, history, fields, menu, comments, overview, about, onReact, onResolve, onDeleteMessage, onEditMessage, readOnlyReason, lockedReason, commentsClosed, upload, archivedNotice, members, edited }: IssueViewProps) {
+export function IssueView({ crumbs, title, summary, onSummarize, description, descriptionFormat, nameOf, onRename, onCopyBlockLink, onDescribe, onMention, descriptionBy, related, topics, threads, conversationsLoading, mentionsLoading, unread, stillUnread, onThreadShown, onStartConversation, onReply, activity, activityTruncated, history, historyFold, textPending, fields, menu, comments, overview, about, onReact, onResolve, onDeleteMessage, onEditMessage, readOnlyReason, lockedReason, commentsClosed, upload, archivedNotice, members, edited }: IssueViewProps) {
   // `linkTo` on each crumb (S15, 0.10.0): the breadcrumbs were the last links in Ship that reloaded the app (SHI-20).
   const items: Crumb[] = [{ label: 'Issues', ...linkTo(crumbs.issuesHref) }]
   // The box before the project's name says it is a project, as the sidebar's entry does (Katerina, 2026-09-09).
@@ -140,7 +144,7 @@ export function IssueView({ crumbs, title, summary, onSummarize, description, de
         {/* Blocks 16px apart (Katerina, 1 November). */}
         <Centred>
           {archivedNotice}
-          <LiveHeader fields={<IssueFields {...fields} readOnlyReason={readOnlyReason} lockedReason={lockedReason} />} title={title} titlePlaceholder="Untitled issue" onRename={onRename} summary={summary} onSummarize={onSummarize} description={description} format={descriptionFormat} onDescribe={onDescribe} onMention={onMention} descriptionBy={descriptionBy} nameOf={nameOf} readOnly={!!(readOnlyReason ?? lockedReason)} upload={upload} onCommentOnBlock={readOnlyReason ?? commentsClosed ? undefined : comment.start} onCopyBlockLink={onCopyBlockLink} holdKey={about && `description:${about}`} />
+          <LiveHeader fields={<IssueFields {...fields} readOnlyReason={readOnlyReason} lockedReason={lockedReason} />} title={title} titlePlaceholder="Untitled issue" onRename={onRename} summary={summary} onSummarize={onSummarize} description={description} format={descriptionFormat} onDescribe={onDescribe} textPending={textPending} onMention={onMention} descriptionBy={descriptionBy} nameOf={nameOf} readOnly={!!(readOnlyReason ?? lockedReason)} upload={upload} onCommentOnBlock={readOnlyReason ?? commentsClosed ? undefined : comment.start} onCopyBlockLink={onCopyBlockLink} holdKey={about && `description:${about}`} />
         </Centred>
       </ScrollArea>
       </div>
@@ -148,7 +152,7 @@ export function IssueView({ crumbs, title, summary, onSummarize, description, de
       {/* Its Overview, in the comments' place (ONE-6, step 4d): Activity, History, and what is placed under it ("Related"). */}
       {overview.shown && (
         <div className="flex shrink-0 flex-col border-l border-border-default" data-overview-column>
-          <OverviewPanel activity={activity} activityTruncated={activityTruncated} loading={mentionsLoading} history={history} topics={topics} related={related} about={about} nameOf={nameOf} />
+          <OverviewPanel activity={activity} activityTruncated={activityTruncated} loading={mentionsLoading} history={history} historyFold={historyFold} topics={topics} related={related} about={about} nameOf={nameOf} />
         </div>
       )}
       {/* Its comments, the kit's one column, 384px beside the page, the full height of the page (Katerina, 2 November). */}
