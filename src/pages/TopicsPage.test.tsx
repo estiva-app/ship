@@ -145,7 +145,9 @@ const rows = () => [...document.querySelectorAll('[data-topic]')].map((row) => r
 const titles = () => rows().map((row) => within(row).getAllByText(/./)[0].textContent)
 const rowOf = (title: string) => rows().find((row) => within(row).queryByText(title))!
 const say = vi.fn()
-const page = (folder?: string, folders = TEAMS) => <TopicsPage folders={folders} folder={folder} say={say} />
+/** Who Ship knows by profile: the topics' maker, with a face; anyone else is a dash, as in Peek. */
+const DIRECTORY = { profileOf: (pubkey: string) => (pubkey === OWNER ? { pubkey, name: 'Ana Duarte', picture: 'https://example.test/ana.png', createdAt: 0 } : undefined) }
+const page = (folder?: string, folders = TEAMS) => <TopicsPage folders={folders} folder={folder} say={say} directory={DIRECTORY} />
 
 beforeEach(() => {
   held.length = 0
@@ -191,9 +193,15 @@ describe("Ship's Topics (Explore initiatives)", () => {
     const zebra = rowOf('Zebra launch')
     expect(within(zebra).getByText('Ship the zebra')).toBeTruthy()
     expect(within(zebra).getByText('Product')).toBeTruthy()
-    await waitFor(() => expect(within(zebra).getByText('2h ago')).toBeTruthy())
-    // Its maker and you.
+    // Active in Peek's words (Katerina, 18 November: "just like in Peek").
+    await waitFor(() => expect(within(zebra).getByText('2 hours ago')).toBeTruthy())
+    // Its maker and you: the kit's members pill, with their faces, nothing to press.
     await waitFor(() => expect(within(zebra).getByText('2')).toBeTruthy())
+    expect(within(zebra).getByLabelText('2 members')).toBeTruthy()
+    expect(within(zebra).queryByRole('button', { name: '2 members' })).toBeNull()
+    // Faces from Ship's profiles; someone Ship knows no profile for is a dash, as Peek draws them.
+    expect(zebra.querySelector('[aria-label="Ana Duarte"]')).not.toBeNull()
+    expect(zebra.querySelector('[aria-label="—"]')).not.toBeNull()
     // A topic you are in has no Join.
     expect(within(zebra).queryByRole('button', { name: 'Join' })).toBeNull()
 
@@ -216,7 +224,8 @@ describe("Ship's Topics (Explore initiatives)", () => {
     expect(titles()).toEqual(['Live'])
     fireEvent.click(screen.getByRole('tab', { name: /Archived/ }))
     expect(titles()).toEqual(['Archived in Peek'])
-    expect(within(rows()[0]).getByLabelText('Archived')).toBeTruthy()
+    // The tab says it is archived; the row does not say it again (as Peek's).
+    expect(within(rows()[0]).queryByLabelText('Archived')).toBeNull()
     expect(within(rows()[0]).queryByRole('button', { name: 'Join' })).toBeNull()
   })
 
@@ -277,7 +286,8 @@ describe("Ship's Topics (Explore initiatives)", () => {
     expect(within(rowOf('Theirs')).getByText('2')).toBeTruthy()
     // Not moved under the pointer: it goes to Your initiatives on the next open.
     expect(titles()).toEqual(['Theirs'])
-    expect(say).not.toHaveBeenCalled()
+    // Peek's Join toast, with the level Ship's Join writes (All, Peek's bell's Everything), and no Undo (Katerina, 18 November, E1).
+    expect(say).toHaveBeenCalledExactlyOnceWith('You joined Theirs. Notifications: Everything.')
   })
 
   it('Join on a topic you muted takes it out of your mute list, keeping the rest, and counts you once', async () => {

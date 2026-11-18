@@ -18,6 +18,8 @@ export interface TopicRowData {
   team?: string
   /** How many people it lists (record a-place-lists-who-chose-a-level-and-its-teams-members); `undefined` until read. */
   members?: number
+  /** Who it lists, by key, in the listing's order: the first three are its row's faces. Absent until read. */
+  people?: readonly string[]
   /** When anything last happened in it, Unix seconds (the shared rule, TOPI-10); `undefined` until read. */
   active?: number
   archived: boolean
@@ -31,8 +33,8 @@ export type TopicsTab = 'all' | 'yours' | 'others' | 'archived'
 export interface TopicFacts {
   /** Each topic's newest activity (interop's `readTopicActivity`). */
   at?: ReadonlyMap<string, number>
-  /** `undefined` for a topic whose people could not be judged. */
-  members?: ReadonlyMap<string, number | undefined>
+  /** Who each topic lists, by key; `undefined` for a topic whose people could not be judged. */
+  members?: ReadonlyMap<string, readonly string[] | undefined>
   /** A team's name, by its id. */
   teamName?: (id: string) => string | undefined
 }
@@ -70,7 +72,7 @@ export function topicsByTab(read: TopicsRead, facts: TopicFacts = {}, folder?: s
     if (topic.space || (folder && topic.folder !== folder)) continue
     const drawn = topicAsDrawn(topic.address, topic.folder, topic.object)
     const team = facts.teamName?.(topic.folder)
-    const members = facts.members?.get(topic.address)
+    const people = facts.members?.get(topic.address)
     const active = facts.at?.get(topic.address)
     const yours = isYours(topic, drawn.archived, muted)
     const row: TopicRowData = {
@@ -80,7 +82,7 @@ export function topicsByTab(read: TopicsRead, facts: TopicFacts = {}, folder?: s
       ...(topic.object.slots.subtitle?.value ? { summary: topic.object.slots.subtitle.value } : {}),
       href: topicHref(topic.address, drawn.title),
       ...(team ? { team } : {}),
-      ...(members !== undefined ? { members } : {}),
+      ...(people !== undefined ? { members: people.length, people } : {}),
       ...(active ? { active } : {}),
       archived: drawn.archived,
       yours: topic.yours && !muted?.has(topic.address),

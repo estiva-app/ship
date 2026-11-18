@@ -301,7 +301,7 @@ function Page({ route, state, loading, directory, teams, folders, archives, say,
   if ((route.name === 'projects' || route.name === 'issues') && route.folder && !teams) return <PageSkeleton shape={SKELETON[route.name] ?? 'rows'} />
   switch (route.name) {
     case 'topics':
-      return <TopicsPage folders={folders} folder={route.folder} say={say} />
+      return <TopicsPage folders={folders} folder={route.folder} say={say} directory={directory} />
     case 'topic':
       return <TopicPage key={route.d} d={route.d} state={state} folders={folders} archives={archives} directory={directory} say={say} refresh={refresh} />
     case 'projects':

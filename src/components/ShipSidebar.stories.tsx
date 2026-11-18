@@ -11,7 +11,7 @@ const FOLDERS: SidebarFolder[] = [
   { id: HQ, name: 'Estiva HQ', addresses: ['30850:a:des', '30850:a:onb'] },
 ]
 
-/** Your five newest topics, newest activity first, each folding to the projects then issues it lists (TOPI-9). */
+/** Your five newest initiatives, newest activity first, each folding to the projects then issues it lists (TOPI-9). */
 const TOPICS: SidebarTopic[] = [
   {
     id: '30840:a:nav',
@@ -19,7 +19,7 @@ const TOPICS: SidebarTopic[] = [
     href: '#/topic/nav',
     work: [
       { id: '30850:a:rel', kind: 'project', title: 'Release 2', href: '#/project/rel' },
-      { id: '30851:a:1', kind: 'issue', title: 'Explore topics opens Topics', href: '#/issue/1' },
+      { id: '30851:a:1', kind: 'issue', title: 'Explore initiatives opens its page', href: '#/issue/1' },
     ],
   },
   { id: '30840:a:speed', title: 'Speed', href: '#/topic/speed', work: [{ id: '30850:a:pay', kind: 'project', title: 'Payments', href: '#/project/pay' }] },
@@ -62,22 +62,22 @@ type Story = StoryObj<typeof meta>
  * team carries **no count** — a Folder holds files from apps Ship does not own,
  * so any number would be Ship's records only.
  */
-export const OnTopics: Story = {}
+export const OnTopics: Story = { name: 'On Explore initiatives' }
 
-/** A project a topic lists: that topic opens, the project lit under it, and its team's Projects. */
-export const OnAProjectInATopic: Story = { args: { current: { entry: 'projects', folder: SHIP }, openFile: '30850:a:rel' } }
+/** A project an initiative lists: that initiative opens, the project lit under it, and its team's Projects. */
+export const OnAProjectInATopic: Story = { name: 'On a project in an initiative', args: { current: { entry: 'projects', folder: SHIP }, openFile: '30850:a:rel' } }
 
-/** A topic's page: its row is lit, not Explore topics. */
-export const OnATopic: Story = { args: { current: undefined, openTopic: '30840:a:speed' } }
+/** An initiative's page: its row is lit, not Explore initiatives. */
+export const OnATopic: Story = { name: 'On an initiative', args: { current: undefined, openTopic: '30840:a:speed' } }
 
-/** You are in no topic yet: the line says so, and Explore topics is the way in. */
-export const NoTopics: Story = { args: { topics: [] } }
+/** You are in no initiative yet: the line says so, and Explore initiatives is the way in. */
+export const NoTopics: Story = { name: 'No initiatives', args: { topics: [] } }
 
-/** The topics or their order are being read. */
-export const TopicsLoading: Story = { args: { topics: 'loading' } }
+/** The initiatives or their order are being read. */
+export const TopicsLoading: Story = { name: 'Initiatives loading', args: { topics: 'loading' } }
 
-/** The topics or their order did not load. */
-export const TopicsFailed: Story = { args: { topics: 'failed' } }
+/** The initiatives or their order did not load. */
+export const TopicsFailed: Story = { name: 'Initiatives failed', args: { topics: 'failed' } }
 
 export const OnIssues: Story = { args: { current: { entry: 'issues' } } }
 

@@ -5,7 +5,7 @@ import { AppShell } from '@/components/AppShell'
 import { IdentityMenu } from '@/components/IdentityMenu'
 import { ShipSidebar, type SidebarEntry } from '@/components/ShipSidebar'
 import { ACTIVITY, PEOPLE, PROJECT_STATUSES, PROJECT_TABS, SIDEBAR_PROJECTS } from '@/fixtures/projects'
-import { ACTIVITY_ITEMS, ANA, ISSUES, ISSUE_STATUSES, THREADS, hrefFor, makeIssues } from '@/fixtures/issues'
+import { ACTIVITY_ITEMS, ANA, ISSUES, ISSUE_STATUSES, MARA, RAVI, THREADS, hrefFor, makeIssues } from '@/fixtures/issues'
 import type { RelatedState } from '@/api/useRelated'
 import { IssueView } from './IssueView'
 import { IssuesView, type IssuesScope } from './IssuesView'
@@ -59,15 +59,15 @@ const RELATED: RelatedState = {
  * on invented data. What wiring (REW-3 step c) does is feed these the fold's
  * data instead of fixtures; the pages do not change.
  */
-/** Your five newest topics, as the sidebar draws them (TOPI-9). */
+/** Your five newest initiatives, as the sidebar draws them (TOPI-9). */
 const SIDEBAR_TOPICS: SidebarTopic[] = [
   {
     id: `30840:${'a'.repeat(64)}:nav`,
     title: 'Cross-app navigation',
     href: '#/topic/nav',
     work: [
-      { id: '30850:a:nav-ship', kind: 'project', title: 'Ship’s Topics navigation', href: '#/project/nav-ship' },
-      { id: '30851:a:nav-1', kind: 'issue', title: 'Explore topics opens Topics', href: '#/issue/nav-1' },
+      { id: '30850:a:nav-ship', kind: 'project', title: 'Ship’s initiatives navigation', href: '#/project/nav-ship' },
+      { id: '30851:a:nav-1', kind: 'issue', title: 'Explore initiatives opens its page', href: '#/issue/nav-1' },
     ],
   },
   { id: `30840:${'a'.repeat(64)}:speed`, title: 'Speed', href: '#/topic/speed', work: [] },
@@ -122,6 +122,11 @@ export const ProjectsEmpty: Story = { render: () => <ProjectsStory lists={{ all:
 
 const HOUR = 3600
 const NOW = Math.floor(Date.now() / 1000)
+/** Who an initiative lists, by key: the row's faces are the first three. */
+const CAST = ['ana', 'ravi', 'mara', 'sam', 'lee', 'kim', 'ola', 'ben', 'eve']
+const FACES: Record<string, { name: string; picture?: string }> = { ana: ANA, ravi: RAVI, mara: MARA }
+/** Faces from the profiles Ship knows; anyone else a dash, as Peek draws them. */
+const faceOf = (key: string) => FACES[key] ?? { name: '—' }
 const topicRow = (d: string, title: string, team: string, members: number, hoursAgo: number, yours: boolean, summary?: string, archived = false): TopicRowData => ({
   address: `30840:${'a'.repeat(64)}:${d}`,
   title,
@@ -129,13 +134,14 @@ const topicRow = (d: string, title: string, team: string, members: number, hours
   href: `https://peek.estiva.app/topic/${d}`,
   team,
   members,
+  people: CAST.slice(0, members),
   active: NOW - hoursAgo * HOUR,
   archived,
   yours,
 })
 // Newest activity first, as the sidebar's five.
 const YOUR_TOPICS = [
-  topicRow('nav', 'Cross-app navigation', 'Product', 4, 0.2, true, 'Teams and topics instead of Folders, in every app.'),
+  topicRow('nav', 'Cross-app navigation', 'Product', 4, 0.2, true, 'Teams and initiatives instead of Folders, in every app.'),
   topicRow('speed', 'Speed', 'Engineering', 3, 5, true, 'Every app opens in under a second on Miky’s workspace.'),
   topicRow('triage', 'Triage', 'Engineering', 2, 30, true),
 ]
@@ -147,50 +153,55 @@ const TOPICS: Record<TopicsTab, TopicRowData[]> = {
   archived: [topicRow('launch', 'Launch week', 'Company', 9, 400, false, undefined, true)],
 }
 
-/** Topics, which the sidebar's Explore topics opens (TOPI-9): a search, All / Your topics / Other topics / Archived opening on yours, newest first; team, members, last active, and Join on a topic you are not in. */
+/** Explore initiatives, which the sidebar's Explore initiatives opens (TOPI-9): a search, All / Your initiatives / Other initiatives / Archived opening on yours, newest first; the kit's list table with team, members' faces, last active, and Join on one you are not in. */
 export const Topics: Story = {
+  name: 'Explore initiatives',
   render: () => {
     const [tab, setTab] = useState<TopicsTab>('yours')
     return (
       <Shell current="topics">
-        <TopicsView title="Topics" lists={TOPICS} tab={tab} onTab={setTab} onRetry={fn()} onJoin={fn()} />
+        <TopicsView title="Explore initiatives" lists={TOPICS} tab={tab} onTab={setTab} onRetry={fn()} onJoin={fn()} faceOf={faceOf} />
       </Shell>
     )
   },
 }
 
-/** Other topics, where Join is. */
+/** Other initiatives, where Join is. */
 export const TopicsOthers: Story = {
+  name: 'Explore initiatives: others',
   render: () => (
     <Shell current="topics">
-      <TopicsView title="Topics" lists={TOPICS} tab="others" onTab={fn()} onRetry={fn()} onJoin={fn()} />
+      <TopicsView title="Explore initiatives" lists={TOPICS} tab="others" onTab={fn()} onRetry={fn()} onJoin={fn()} faceOf={faceOf} />
     </Shell>
   ),
 }
 
 /** A search that finds nothing says so, in the words asked. */
 export const TopicsNoMatch: Story = {
+  name: 'Explore initiatives: no match',
   render: () => (
     <Shell current="topics">
-      <TopicsView title="Topics" lists={TOPICS} tab="all" onTab={fn()} onRetry={fn()} onJoin={fn()} query="zebra" />
+      <TopicsView title="Explore initiatives" lists={TOPICS} tab="all" onTab={fn()} onRetry={fn()} onJoin={fn()} query="zebra" />
     </Shell>
   ),
 }
 
-/** Topics while the read is out: skeleton rows in the list's place. */
+/** Explore initiatives while the read is out: skeleton rows in the list's place. */
 export const TopicsLoading: Story = {
+  name: 'Explore initiatives: loading',
   render: () => (
     <Shell current="topics">
-      <TopicsView title="Topics" lists="loading" tab="yours" onTab={fn()} onRetry={fn()} onJoin={fn()} />
+      <TopicsView title="Explore initiatives" lists="loading" tab="yours" onTab={fn()} onRetry={fn()} onJoin={fn()} />
     </Shell>
   ),
 }
 
-/** The topics read failed: the page says so and offers Try again. */
+/** The initiatives read failed: the page says so and offers Try again. */
 export const TopicsFailed: Story = {
+  name: 'Explore initiatives: failed',
   render: () => (
     <Shell current="topics">
-      <TopicsView title="Topics" lists="failed" tab="yours" onTab={fn()} onRetry={fn()} onJoin={fn()} />
+      <TopicsView title="Explore initiatives" lists="failed" tab="yours" onTab={fn()} onRetry={fn()} onJoin={fn()} />
     </Shell>
   ),
 }

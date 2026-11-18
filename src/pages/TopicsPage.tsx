@@ -1,5 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import type { FolderSummary } from '@estiva-app/interop'
+import type { AvatarGroupMember } from '@estiva-app/ui'
+import type { DirectoryView } from '@/api'
 import type { Say } from '@/pages/act'
 import { reloadTopics, useMuted, useTopicActivity, useTopicMembers, useTopics } from '@/api/topics'
 import { joinTopic } from '@/api/writes'
@@ -21,7 +23,7 @@ import { TopicsView } from '@/views/TopicsView'
  * where it is, Join gone and one more member, and moves to Your topics and
  * into the sidebar's five on the next open (Miky, 6 Nov).
  */
-export function TopicsPage({ folders, folder, say }: { folders: FolderSummary[] | undefined; folder?: string; say: Say }) {
+export function TopicsPage({ folders, folder, say, directory }: { folders: FolderSummary[] | undefined; folder?: string; say: Say; directory?: Pick<DirectoryView, 'profileOf'> }) {
   const [tab, setTab] = useState<TopicsTab>('yours')
   const [joining, setJoining] = useState<ReadonlySet<string>>(new Set())
   const [joined, setJoined] = useState<ReadonlySet<string>>(new Set())
@@ -48,6 +50,15 @@ export function TopicsPage({ folders, folder, say }: { folders: FolderSummary[] 
       joined.has(row.address) && !row.yours ? { ...row, yours: true, ...(row.members !== undefined && !following.has(row.address) ? { members: row.members + 1 } : {}) } : row
     return Object.fromEntries(Object.entries(drawn).map(([id, rows]) => [id, rows.map(withJoined)])) as typeof drawn
   }, [held, order.values, order.failed, active.values, members.values, teamName, folder, muted, joined])
+  // A row's faces: who Ship knows by profile, a dash for anyone it does not, as Peek's Explore draws them (Katerina, 18 November).
+  const profileOf = directory?.profileOf
+  const faceOf = useCallback(
+    (pubkey: string): AvatarGroupMember => {
+      const profile = profileOf?.(pubkey)
+      return { name: profile?.name ?? '—', ...(profile?.picture ? { picture: profile.picture } : {}), ...(profile?.bot ? { bot: true } : {}) }
+    },
+    [profileOf],
+  )
   const folderName = folder ? (folders?.find((summary) => summary.id === folder)?.name ?? 'Untitled team') : undefined
   // Peek's words (Katerina, 18 November): Explore initiatives; a team's, as its sidebar entry says. The tab says the heading, as every page's does (SFX-2).
   const title = folderName ? `${folderName} · Initiatives` : 'Explore initiatives'
@@ -67,7 +78,12 @@ export function TopicsPage({ folders, folder, say }: { folders: FolderSummary[] 
     // As Peek's Join says it (useFileControls). Joined while the mute stays: Join stays too, so a second click takes the mute out.
     if (!result.ok) say(`Nothing changed: “${title}” could not be joined. ${result.reason}`, 'error')
     else if ('stillMuted' in result) say(`Joined “${title}”, but it is still muted. Join again to unmute it.`, 'error')
-    else setJoined((now) => new Set(now).add(address))
+    else {
+      setJoined((now) => new Set(now).add(address))
+      // Peek's Join toast and, like Peek's Explore, no Undo (Katerina, 18 November, E1). Ship's Join follows at All, which
+      // Peek's bell calls Everything; Peek's own Join lands at Important, so its words would not be true here.
+      say(`You joined ${title}. Notifications: Everything.`)
+    }
   }
 
   return (
@@ -79,6 +95,7 @@ export function TopicsPage({ folders, folder, say }: { folders: FolderSummary[] 
       onRetry={() => void reloadTopics()}
       onJoin={(address) => void onJoin(address)}
       joining={joining}
+      faceOf={faceOf}
     />
   )
 }

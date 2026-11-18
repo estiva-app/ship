@@ -573,17 +573,18 @@ function answersFilter(event: SignedEvent, filter: Record<string, unknown>): boo
 }
 
 /**
- * How many people each topic lists, for Explore's Members (TOPI-9; Miky,
- * 6 Nov: the same columns in every app): conversation's `placeListing`, the
- * rule Peek's people list draws — who chose a level, was added or made it,
- * and its team's members.
+ * Who each topic lists, by key, for Explore's Members (TOPI-9; Miky, 6 Nov:
+ * the same columns in every app): conversation's `placeListing`, the rule
+ * Peek's people list draws — who chose a level, was added or made it, and its
+ * team's members. How many is the list's length; the first three are a row's
+ * faces (Katerina, 18 November, as Peek's `topicMembersAsViewer`).
  * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-place-lists-who-chose-a-level-and-its-teams-members.md
  *
  * One paged read for every topic asked: each topic's `placeFilters` without
  * the viewer's private teams list (a topic's listing never needs it), merged
  * by shape. A failed read rejects: a failed read is not "nobody".
  */
-export async function readTopicMembers(topics: readonly ReadTopic[]): Promise<Map<string, number | undefined>> {
+export async function readTopicMembers(topics: readonly ReadTopic[]): Promise<Map<string, string[] | undefined>> {
   if (topics.length === 0) return new Map()
   const asked = topics.map((topic) => {
     const place = { address: topic.address, team: topic.folder }
@@ -597,13 +598,14 @@ export async function readTopicMembers(topics: readonly ReadTopic[]): Promise<Ma
   })
   const events: SignedEvent[] = await relay.queryAll(mergedFilters(asked.flatMap(({ filters }) => filters ?? [])) as never)
   return new Map(
-    asked.map(({ topic, place, filters }): [string, number | undefined] => {
+    asked.map(({ topic, place, filters }): [string, string[] | undefined] => {
       if (!filters) return [topic.address, undefined]
       const mine = events.filter((event) => filters.some((filter) => answersFilter(event, filter)))
       const roster = mine.filter((event) => event.kind === KIND_ROSTER || ROSTER_COMMANDS.includes(event.kind))
       const listing = mine.filter((event) => event.kind === KIND_FOLDER_STATE || event.kind === KIND_FOLDER_COMMAND)
       const own = mine.filter((event) => !roster.includes(event) && !listing.includes(event))
-      return [topic.address, placeListing(place, { events: own, roster, listing }).length]
+      // Who, by key, in the listing's order: the count is how many, and a row's faces are the first three (as Peek's topicMembersAsViewer).
+      return [topic.address, placeListing(place, { events: own, roster, listing }).map((listed) => listed.pubkey)]
     }),
   )
 }
