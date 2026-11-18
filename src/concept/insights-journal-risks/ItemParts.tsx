@@ -7,11 +7,36 @@
  * - the conversation's "New" line where what you have seen begins.
  * Reuses: the kit's Card, StatusMark, Button, IconButton, Avatar, MetaText, EmptyState, Tabs.
  */
-import { Fragment, useState, type ReactNode } from 'react'
-import { IconExternalLink, IconFileText, IconTrash, IconX } from '@tabler/icons-react'
-import { Avatar, Button, Card, EmptyState, IconButton, MetaText, SkeletonList, StatusMark, Tabs } from '@estiva-app/ui'
+import { Fragment, createContext, useContext, useState, type ReactNode } from 'react'
+import { IconBox, IconCircleDot, IconExternalLink, IconFileText, IconTarget, IconTrash, IconUsers, IconX } from '@tabler/icons-react'
+import { Avatar, Button, Card, Chip, EmptyState, IconButton, MetaText, SkeletonList, StatusMark, Tabs, WithTooltip } from '@estiva-app/ui'
 import { TYPE_META, statusOption, wordIcon, type ItemType, type Status } from './MarkAs'
-import { CATEGORIES, type Item, type Source } from './fixtures'
+import { CATEGORIES, PROJECT, type Item, type Source } from './fixtures'
+
+/** True on a page that gathers items from many places (a team, an Initiative): each item then says where it lives. */
+export const ShowWhere = createContext(false)
+
+const WHERE_ICON = { issue: IconCircleDot, project: IconBox, initiative: IconTarget }
+
+/**
+ * Where an item lives, as a chip after its title (Miky, 18 Nov: on a team's lists "make it clear where it lives"): the
+ * issue, the project or the Initiative it is about, by its kind's icon and its name, or the team's own. Hover says the
+ * kind, and an issue's project.
+ */
+export function WhereChip({ item }: { item: Item }) {
+  const show = useContext(ShowWhere)
+  if (!show) return null
+  const a = item.about
+  const Icon = a ? WHERE_ICON[a.kind] : IconUsers
+  const tip = !a ? `The team’s own: ${item.team}` : a.kind === 'issue' ? `Issue in ${a.project ?? PROJECT}` : a.kind === 'project' ? 'Project' : 'Initiative'
+  return (
+    <WithTooltip label={tip}>
+      <span className="relative ml-2 inline-flex max-w-[240px] align-middle">
+        <Chip href="#" onClick={(e) => e.preventDefault()} label={a ? a.title : item.team} leadingIcon={<Icon size={12} stroke={1.5} />} className="max-w-full" />
+      </span>
+    </WithTooltip>
+  )
+}
 
 export function StatusOf({ item }: { item: Pick<Item, 'type' | 'status'> }) {
   const o = statusOption(item.type, item.status)
@@ -103,6 +128,7 @@ export function ItemEntry({ item, me = 'miky', onOpen, selected }: { item: Item;
           <span className={`text-body-2 font-medium text-text-primary ${status === 'superseded' ? 'line-through' : ''}`}>
             {item.title}
             <NewDot on={item.isNew} />
+            <WhereChip item={item} />
           </span>
           {body && <span className="line-clamp-2 text-body-2 text-text-secondary">{body}</span>}
           {/* A Decision's Chosen and Not chosen stay; an Update's measures and open lines open with the entry. */}

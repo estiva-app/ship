@@ -6,12 +6,13 @@
  * unchanged into Leaf.
  */
 import { useState } from 'react'
-import { IconExternalLink, IconSparkles, IconUsers } from '@tabler/icons-react'
+import { IconExternalLink, IconSparkles, IconTarget, IconUsers } from '@tabler/icons-react'
 import { Button, Card, Link, LinkPickers, MetaText, Select } from '@estiva-app/ui'
 import { STATUSES, type Status } from './MarkAs'
 import { AcceptReject, ItemTag, JournalExtras, SourceAsMarked, acceptedStatus } from './ItemParts'
 import { DecideDialog, InsightVisual, QuestionOptions, SeverityMark, needs, waited } from './ItemKinds'
 import { CATEGORIES, SEVERITIES, PEOPLE, type Item } from './fixtures'
+import { initiativesOf } from './lens'
 
 /** An Insight sent by another tool on the protocol: its chart or quote is the source, live. */
 export const fromTool = (item: Item) => item.source?.app === 'PostHog' || item.source?.app === 'Intercom'
@@ -71,6 +72,15 @@ export function ItemFields({ item, me = 'miky' }: { item: Item; me?: string }) {
             {item.team} · {item.about ? item.about.title : 'the team’s own'}
           </MetaText>
         </span>
+        {/* Initiatives are lenses (Miky, 18 Nov): the item shows in each that lists its project; it lives in none. */}
+        {initiativesOf(item).length > 0 && (
+          <span className="min-w-0 truncate">
+            <MetaText tone="muted">
+              <IconTarget size={12} stroke={1.5} className="mr-1 inline" />
+              Shows in {initiativesOf(item).map((n) => n.title).join(', ')}
+            </MetaText>
+          </span>
+        )}
         <span className="min-w-0 truncate">
           <MetaText tone="muted">
             Suggested by {item.markedBy.name}, {item.at}

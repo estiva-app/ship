@@ -97,6 +97,8 @@ export interface ShipSidebarProps {
    */
   topics: SidebarTopic[] | 'loading' | 'failed'
   onRetryTopics: () => void
+  /** CONCEPT (Insights, Journal and Risks, Miky 18 Nov): the section's word, today's Topics or Initiatives. */
+  naming?: "topics" | "initiatives"
   /** The topic whose page is open, by address: its row is lit and opens. */
   openTopic?: string
   /** The project or issue open, by address: lit under the topic listing it, which opens. */
@@ -122,7 +124,7 @@ const TOP = ENTRIES.filter(({ entry }) => entry !== 'topics')
 /** A team entry's row id: the tree's `selected` names one. */
 const rowId = (folder: string, entry: SidebarEntry) => `${folder}/${entry}`
 
-export function ShipSidebar({ openIssues, activeProjects, hrefFor, folders = [], onOpenFolder, onNewFolder, current, topics, onRetryTopics, openTopic, openFile, loading = false, foldersLoading = false, className }: ShipSidebarProps) {
+export function ShipSidebar({ openIssues, activeProjects, hrefFor, folders = [], onOpenFolder, onNewFolder, current, topics, onRetryTopics, naming = "topics", openTopic, openFile, loading = false, foldersLoading = false, className }: ShipSidebarProps) {
   const at = current && 'entry' in current ? current : undefined
   // Alphabetical teams, as Peek's column draws them; the relay's order tells the person nothing.
   const teams = [...folders].sort((a, b) =>
@@ -157,7 +159,7 @@ export function ShipSidebar({ openIssues, activeProjects, hrefFor, folders = [],
         <NavItem key={entry} label={label} href={hrefFor(entry)} icon={icon} {...counts[entry]} active={!!at && !at.folder && at.entry === entry} />
       ))}
       {/* Your five newest topics, each folding to what Ship opens of it; then the way to every topic. */}
-      <NavTree title="Topics">
+      <NavTree title={naming === "initiatives" ? "Initiatives" : "Topics"}>
         {topics === 'loading' ? (
           <SkeletonList rows={TOPICS_SHOWN} />
         ) : topics === 'failed' ? (
@@ -166,7 +168,7 @@ export function ShipSidebar({ openIssues, activeProjects, hrefFor, folders = [],
           </div>
         ) : topics.length === 0 ? (
           <div className="px-2 py-1">
-            <EmptyState scope="section" message="You are in no topic yet." />
+            <EmptyState scope="section" message={naming === "initiatives" ? "You are in no Initiative yet." : "You are in no topic yet."} />
           </div>
         ) : (
           topics.map((topic) => (
@@ -174,7 +176,7 @@ export function ShipSidebar({ openIssues, activeProjects, hrefFor, folders = [],
               key={topic.id}
               label={topic.title}
               href={topic.href}
-              icon={<KindIcon kind="topic" />}
+              icon={naming === "initiatives" ? <IconTarget size={16} stroke={1.5} /> : <KindIcon kind="topic" />}
               active={openTopic === topic.id}
               // Opens each time its page or one of its files is opened, as a click would; folded by hand, it stays so until then.
               openFor={openTopic === topic.id ? topic.id : topic.work.some((work) => work.id === openFile) ? openFile : undefined}
@@ -187,7 +189,7 @@ export function ShipSidebar({ openIssues, activeProjects, hrefFor, folders = [],
           ))
         )}
         {/* No icon: it is a way in, not another topic (Miky, 6 Nov). Where the top "Topics" entry went. */}
-        <NavItem label="Explore topics" href={hrefFor('topics')} active={!!at && !at.folder && at.entry === 'topics'} />
+        <NavItem label={naming === "initiatives" ? "Explore Initiatives" : "Explore topics"} href={hrefFor("topics")} active={!!at && !at.folder && at.entry === 'topics'} />
       </NavTree>
       {/*
         A quiet "Folders" label, its + on the right for a new top-level Folder

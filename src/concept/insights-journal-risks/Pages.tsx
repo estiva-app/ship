@@ -7,7 +7,7 @@
  * - the team page (today's Projects page for one team) gets the team's own lists.
  */
 import { useMemo, useState, type ReactNode } from 'react'
-import { IconBox, IconCircleDot, IconLayoutKanban, IconList, IconPlus, IconUsers } from '@tabler/icons-react'
+import { IconBox, IconCircleDot, IconLayoutKanban, IconList, IconPlus, IconTarget, IconUsers } from '@tabler/icons-react'
 import { Board } from '@/components/Board'
 import { serializeBlockDocument } from '@estiva-app/protocol'
 import { Button, Card, EmptyState, IconButton, Link, LinkPickers, MetaText, NoAccessNotice, PageHeader, SectionHeader, Select, SkeletonList, Tabs } from '@estiva-app/ui'
@@ -25,7 +25,8 @@ import { useSideColumn } from '@/pages/sideColumn'
 import { ISSUES, ISSUE_STATUSES, hrefFor, ACTIVITY_ITEMS } from '@/fixtures/issues'
 import { ACTIVITY, PEOPLE as SHIP_PEOPLE, PROJECT_STATUSES } from '@/fixtures/projects'
 import { MarkAsRows, MarkedNotice, STATUSES, TYPE_META, wordIcon, TYPE_OF, blockLineCss, markedBlockAt, type ItemType, type MarkWord, type Status } from './MarkAs'
-import { ENDED, FilterRow, ItemTimeline, ListStateView, filterItems, type ListState } from './ItemParts'
+import { ENDED, FilterRow, ItemTimeline, ListStateView, ShowWhere, filterItems, type ListState } from './ItemParts'
+import { ELSEWHERE, INITIATIVES, initiativesOf } from './lens'
 import { ItemFields, ItemPanel, commentsOn } from './ItemPanel'
 import { ItemContent } from './ItemDetail'
 import { InsightGrid, NewlySuggested, RiskDashboard } from './ShipLists'
@@ -403,33 +404,75 @@ export function ItemPage({ item, me = 'miky', state = 'ready' }: { item: Item; m
 
 /** The team page — today's Projects page for one team — with the team's own lists beside Projects. */
 export function TeamPage({ start = 'insights' }: { start?: 'projects' | ConceptTab }) {
+  return <GatheredPage crumbs={[{ label: 'Teams', href: '#/teams' }, { label: TEAM, icon: <IconUsers size={16} stroke={1.5} /> }]} items={[...ITEMS, ...ELSEWHERE]} start={start} />
+}
+
+/**
+ * An Initiative's page (Miky, 18 Nov: today's topic, renamed): a lens. Projects lists what it holds; Insights, Journal
+ * and Risks show every item about those projects or their issues, and about the Initiative itself. Nothing lives here,
+ * so the same item shows in every Initiative that lists its project.
+ */
+export function InitiativePage({ id = 'ini1', start = 'insights' }: { id?: string; start?: 'projects' | ConceptTab }) {
+  const ini = INITIATIVES.find((n) => n.id === id) ?? INITIATIVES[0]
+  const items = [...ITEMS, ...ELSEWHERE].filter((i) => initiativesOf(i).includes(ini))
+  return (
+    <GatheredPage
+      crumbs={[{ label: 'Initiatives', href: '#/initiatives' }, { label: ini.title, icon: <IconTarget size={16} stroke={1.5} /> }]}
+      items={items}
+      start={start}
+      projects={
+        <Card fill="none" clip>
+          <ul aria-label="Projects">
+            {ini.projects.map((p) => (
+              <li key={p} className="flex items-center gap-2 border-b border-border-subtle px-4 py-2 last:border-b-0">
+                <IconBox size={16} stroke={1.5} className="shrink-0 text-text-muted" />
+                <Link href="#" variant="quiet" onClick={(e) => e.preventDefault()}>
+                  {p}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      }
+    />
+  )
+}
+
+/**
+ * A page that gathers items from many places, a team's or an Initiative's: Projects, then its Insights, Journal and
+ * Risks, each item with a chip saying where it lives (the issue, the project, the Initiative, or the team's own).
+ */
+function GatheredPage({ crumbs, items, start, projects }: { crumbs: { label: string; href?: string; icon?: ReactNode }[]; items: Item[]; start: 'projects' | ConceptTab; projects?: ReactNode }) {
   const [tab, setTab] = useState<string>(start)
   const [open, setOpen] = useState<Item>()
   const onOpen = (i: Item) => setOpen((o) => (o?.id === i.id ? undefined : i))
+  const fresh = (t: ItemType) => items.some((i) => i.type === t && i.isNew)
   return (
-    <div className="flex min-h-0 flex-1 [contain:size]">
-    <div className="flex min-w-0 flex-1 flex-col gap-4">
-      <PageHeader title={<Breadcrumb items={[{ label: 'Teams', href: '#/teams' }, { label: TEAM, icon: <IconUsers size={16} stroke={1.5} /> }]} />} />
-      <div className="flex min-h-8 items-center gap-3 px-6">
-        <Tabs
-          tabs={[
-            { id: 'projects', label: 'Projects', unread: false },
-            { id: 'insights', label: 'Insights', unread: byType('insight').some((i) => i.isNew) },
-            { id: 'journal', label: 'Journal', unread: byType('journal').some((i) => i.isNew) },
-            { id: 'risks', label: TYPE_META.risk.tab, unread: byType('risk').some((i) => i.isNew) },
-          ]}
-          active={tab}
-          onChange={setTab}
-        />
+    <ShowWhere.Provider value>
+      <div className="flex min-h-0 flex-1 [contain:size]">
+        <div className="flex min-w-0 flex-1 flex-col gap-4">
+          <PageHeader title={<Breadcrumb items={crumbs} />} />
+          <div className="flex min-h-8 items-center gap-3 px-6">
+            <Tabs
+              tabs={[
+                { id: 'projects', label: 'Projects', unread: false },
+                { id: 'insights', label: 'Insights', unread: fresh('insight') },
+                { id: 'journal', label: 'Journal', unread: fresh('journal') },
+                { id: 'risks', label: TYPE_META.risk.tab, unread: fresh('risk') },
+              ]}
+              active={tab}
+              onChange={setTab}
+            />
+          </div>
+          <ScrollArea className="min-h-0 min-w-0 flex-1" contentClassName="flex flex-col gap-6 px-6 pb-5">
+            {tab === 'projects' && (projects ?? <EmptyState scope="section" message="Today's Projects list for this team, unchanged." />)}
+            {tab === 'insights' && <ItemsTab type="insight" all={items} state="ready" onOpen={onOpen} openId={open?.id} />}
+            {tab === 'journal' && <ItemsTab type="journal" all={items} state="ready" onOpen={onOpen} openId={open?.id} />}
+            {tab === 'risks' && <ItemsTab type="risk" all={items} state="ready" onOpen={onOpen} openId={open?.id} />}
+          </ScrollArea>
+        </div>
+        {open && open.type === TAB_TYPE[tab] && <ItemPanel item={open} onClose={() => setOpen(undefined)} />}
       </div>
-      <ScrollArea className="min-h-0 min-w-0 flex-1" contentClassName="flex flex-col gap-6 px-6 pb-5">
-        {tab === 'projects' && <EmptyState scope="section" message="Today's Projects list for this team, unchanged." />}
-        {tab === 'insights' && <ItemsTab type="insight" state="ready" onOpen={onOpen} openId={open?.id} />}
-        {tab === 'journal' && <ItemsTab type="journal" state="ready" onOpen={onOpen} openId={open?.id} />}
-        {tab === 'risks' && <ItemsTab type="risk" state="ready" onOpen={onOpen} openId={open?.id} />}
-      </ScrollArea>
-    </div>
-    {open && open.type === TAB_TYPE[tab] && <ItemPanel item={open} onClose={() => setOpen(undefined)} />}
-    </div>
+    </ShowWhere.Provider>
   )
 }

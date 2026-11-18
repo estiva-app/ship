@@ -11,7 +11,7 @@ import { IconPlus, IconSparkles } from '@tabler/icons-react'
 import { AvatarGroup, Button, Card, Link, MetaText, Person, SectionHeader } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
 import { ScrollArea } from '@/components/ui/ScrollArea'
-import { AcceptReject, ENDED, ItemTag, LIVE, NewDot, StatusOf, acceptedStatus } from './ItemParts'
+import { AcceptReject, ENDED, ItemTag, LIVE, NewDot, StatusOf, WhereChip, acceptedStatus } from './ItemParts'
 import { DecideDialog, InsightVisual, QuestionOptions, SeverityMark, needs, waited } from './ItemKinds'
 import { StatusLabel } from '@/components/ui/StatusLabel'
 import { statusOption, wordIcon, type Status } from './MarkAs'
@@ -53,6 +53,7 @@ function InsightBox({ item, me, onOpen, selected }: { item: Item; me: string; on
         <span className="text-body-2 font-medium text-text-primary">
           {item.title}
           <NewDot on={item.isNew} />
+          <WhereChip item={item} />
         </span>
         {item.visual ? <InsightVisual visual={item.visual} /> : item.summary && <span className="line-clamp-3 text-body-2 text-text-secondary">{item.summary}</span>}
         <div className="mt-auto flex min-w-0 items-center gap-2 pt-1">
@@ -128,6 +129,7 @@ function RiskRow({ item, me, onOpen, selected, kind = true }: { item: Item; me: 
             {item.title}
           </Link>
           <NewDot on={item.isNew} />
+          <WhereChip item={item} />
         </span>
         {item.summary && <span className="block truncate text-text-secondary">{item.summary}</span>}
       </td>
@@ -203,6 +205,7 @@ function BlockerRow({ item, me, onOpen, selected }: { item: Item; me: string; on
             {item.title}
           </Link>
           <NewDot on={item.isNew} />
+          <WhereChip item={item} />
         </span>
         {item.summary && <span className="text-body-2 text-text-secondary">{item.summary}</span>}
         {item.blocks && <MetaText>Stops: {item.blocks}</MetaText>}
@@ -245,6 +248,7 @@ function QuestionBox({ item, me, onOpen, selected, onDecide, deciding = false }:
               {item.title}
             </Link>
             <NewDot on={item.isNew} />
+            <WhereChip item={item} />
           </span>
         </span>
         {status === 'proposed' && (

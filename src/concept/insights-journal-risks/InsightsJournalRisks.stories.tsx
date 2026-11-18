@@ -5,20 +5,29 @@ import { IdentityMenu } from '@/components/IdentityMenu'
 import { ShipSidebar, type SidebarEntry } from '@/components/ShipSidebar'
 import { SIDEBAR_PROJECTS } from '@/fixtures/projects'
 
-import { IssuePage, ItemPage, ProjectPage, TeamPage } from './Pages'
+import { InitiativePage, IssuePage, ItemPage, ProjectPage, TeamPage } from './Pages'
+import { INITIATIVES } from './lens'
 import { HAND_TYPED, ITEMS } from './fixtures'
 
 /**
  * CONCEPT — Insights, Journal and Risks in Ship (prototype issue 009bc509). Drawn on today's shell and pages; the
  * Read me lists what changed from today and what is new here.
  */
-function Shell({ current = 'projects', children }: { current?: SidebarEntry; children: React.ReactNode }) {
+// Topics are Initiatives here (Miky, 18 Nov), each folding to its projects; one project is in both.
+const SIDEBAR_INITIATIVES = INITIATIVES.map((n) => ({
+  id: n.id,
+  title: n.title,
+  href: `#/initiative/${n.id}`,
+  work: n.projects.map((p) => ({ id: `${n.id}-${p}`, kind: 'project' as const, title: p, href: '#' })),
+}))
+
+function Shell({ current = 'projects', initiative, children }: { current?: SidebarEntry; initiative?: string; children: React.ReactNode }) {
   return (
     <div className="h-screen">
       <AppShell
         logo="Estiva Ship"
         identity={<IdentityMenu me={{ name: 'Miky' }} signedIn idBase="https://id.estiva.app" relayUrl="http://localhost:3000" onCopyKey={fn()} onSignOut={fn()} />}
-        nav={<ShipSidebar openIssues={18} activeProjects={SIDEBAR_PROJECTS.length} hrefFor={(entry) => `#/${entry}`} current={{ entry: current }} topics={[]} onRetryTopics={fn()} />}
+        nav={<ShipSidebar openIssues={18} activeProjects={SIDEBAR_PROJECTS.length} hrefFor={(entry) => `#/${entry}`} current={{ entry: current }} topics={SIDEBAR_INITIATIVES} naming="initiatives" openTopic={initiative} onRetryTopics={fn()} />}
       >
         {children}
       </AppShell>
@@ -111,3 +120,16 @@ export const ItemNoAccess: Story = { render: () => <Shell><ItemPage item={item('
 export const TeamInsights: Story = { render: () => <Shell current="projects"><TeamPage start="insights" /></Shell> }
 /** The team page's Journal. */
 export const TeamJournal: Story = { render: () => <Shell current="projects"><TeamPage start="journal" /></Shell> }
+/** The team page's Risks & questions: each item says where it lives, the team's own included. */
+export const TeamRisks: Story = { render: () => <Shell current="projects"><TeamPage start="risks" /></Shell> }
+
+/** An Initiative (today's topic, renamed): its projects. */
+export const InitiativeProjects: Story = { render: () => <Shell initiative="ini1"><InitiativePage id="ini1" start="projects" /></Shell> }
+/** An Initiative's Insights: every item about its projects and their issues, each saying where it lives. */
+export const InitiativeInsights: Story = { render: () => <Shell initiative="ini1"><InitiativePage id="ini1" start="insights" /></Shell> }
+/** An Initiative's Journal, with a Decision about the Initiative itself. */
+export const InitiativeJournal: Story = { render: () => <Shell initiative="ini1"><InitiativePage id="ini1" start="journal" /></Shell> }
+/** An Initiative's Risks & questions. */
+export const InitiativeRisks: Story = { render: () => <Shell initiative="ini1"><InitiativePage id="ini1" start="risks" /></Shell> }
+/** A second Initiative listing one of the same projects: the same items show here too, since an Initiative is a lens. */
+export const SecondInitiativeInsights: Story = { render: () => <Shell initiative="ini2"><InitiativePage id="ini2" start="insights" /></Shell> }

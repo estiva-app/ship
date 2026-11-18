@@ -75,8 +75,8 @@ export interface Item {
   at: string
   day: string
   team: string
-  /** What it is about: an issue, else the project, else nothing (the team's own). */
-  about?: { kind: 'issue' | 'project'; title: string }
+  /** What it is about: an issue (in `project`, else this prototype's), a project, an Initiative, or nothing (the team's own). */
+  about?: { kind: 'issue' | 'project' | 'initiative'; title: string; project?: string }
   markedBy: Person
   /** A Journal entry's decider. */
   decidedBy?: Person
