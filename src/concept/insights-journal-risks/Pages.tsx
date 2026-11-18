@@ -29,7 +29,7 @@ import { ENDED, FilterRow, ItemTimeline, ListStateView, filterItems, type ListSt
 import { ItemFields, ItemPanel, commentsOn } from './ItemPanel'
 import { ItemContent } from './ItemDetail'
 import { InsightGrid, NewlySuggested, RiskDashboard } from './ShipLists'
-import { BuildPlan, ScopePanel, planRows } from './BuildPlan'
+import { BuildPlan, ScopeBoxes, ScopePanel, planRows } from './BuildPlan'
 import { JournalBox } from './JournalBox'
 import { SeverityMark, waited } from './ItemKinds'
 import { CommentsColumn, type StoryComment } from './CommentsColumn'
@@ -251,14 +251,22 @@ export function ProjectPage({ start = 'overview', listState = 'ready', me = 'mik
             </Centred>
           )}
           {tab === 'issues' && (
-            view === 'board' ? <Board issues={planRows()} statuses={ISSUE_STATUSES} hrefFor={hrefFor} /> : <BuildPlan placed={placed} openId={scopeId} onOpen={(id) => setScopeId((o) => (o === id ? undefined : id))} />
+            view === 'board' ? (
+              // On the Board, Scope to decide is boxes above the columns (Miky, 18 Nov); on the List, rows.
+              <div className="flex flex-col gap-6">
+                <ScopeBoxes placed={placed} openId={scopeId} onOpen={(id) => setScopeId((o) => (o === id ? undefined : id))} />
+                <Board issues={planRows()} statuses={ISSUE_STATUSES} hrefFor={hrefFor} />
+              </div>
+            ) : (
+              <BuildPlan placed={placed} openId={scopeId} onOpen={(id) => setScopeId((o) => (o === id ? undefined : id))} />
+            )
           )}
           {tab === 'insights' && <ItemsTab type="insight" all={all} state={listState} onOpen={onOpenItem} openId={open?.id} me={me} />}
           {tab === 'journal' && <ItemsTab type="journal" all={all} state={listState} onOpen={onOpenItem} openId={open?.id} me={me} />}
           {tab === 'risks' && <ItemsTab type="risk" all={all} state={listState} onOpen={onOpenItem} openId={open?.id} me={me} onDecide={onDecide} deciding={deciding} />}
         </ScrollArea>
       </div>
-      {tab === 'issues' && view === 'list' && scopeId && !placed[scopeId] && (
+      {tab === 'issues' && scopeId && !placed[scopeId] && (
         <ScopePanel key={scopeId} id={scopeId} onPlace={(to) => (setPlaced((p) => ({ ...p, [scopeId]: to })), setScopeId(undefined))} onClose={() => setScopeId(undefined)} />
       )}
       {open && (tab === 'overview' || open.type === TAB_TYPE[tab]) && <ItemPanel item={open} me={me} onClose={() => (setOpen(undefined), setDecidingId(undefined))} deciding={open.id === decidingId} onDecide={(c, why) => onDecide(open, c, why)} />}

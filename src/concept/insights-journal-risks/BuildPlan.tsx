@@ -434,7 +434,24 @@ const said = (v: string) =>
 const STEP: Record<Found["step"], string> = { review: "reviewing", kickoff: "kicking off", build: "building" };
 const issueOf = (ref: string) => MILESTONES.flatMap((m) => m.issues).find((i) => i.ref === ref);
 
-/** One line to decide: its title, the recommendation as a chip (→ where it would go), when. A click opens it beside the list. */
+/** Where a line was found, as a chip saying only the issue's ref (Miky, 18 Nov); hover gives the step, the issue and when. */
+function FoundChip({ line }: { line: Line }) {
+  const f = line.found;
+  if (!f) return null;
+  return (
+    <WithTooltip label={`Found while ${STEP[f.step]} ${f.ref}: ${issueOf(f.ref)?.title ?? ""} · ${line.at}`}>
+      <span className="relative flex">
+        <Chip href="#" onClick={stay} label={f.ref} />
+      </span>
+    </WithTooltip>
+  );
+}
+
+/** Where Claude would put it, as a chip: → This milestone, → Later, → Not doing. */
+const RecChip = ({ line }: { line: Line }) =>
+  line.rec ? <Chip label={said(line.rec.to)} leadingIcon={<IconArrowRight size={12} stroke={1.5} />} /> : null;
+
+/** One line to decide: its title, where it was found, where it would go. A click opens it beside the list. */
 function ScopeRow({ line, selected, onOpen }: { line: Line; selected: boolean; onOpen: () => void }) {
   return (
     <div className={cn("relative flex h-9 min-w-0 items-center gap-3 rounded-md px-3 transition-colors hover:bg-bg-hover", selected && "bg-bg-selected")}>
@@ -444,45 +461,57 @@ function ScopeRow({ line, selected, onOpen }: { line: Line; selected: boolean; o
         </Link>
         <NewDot on={line.isNew} />
       </span>
-      {line.rec && <Chip label={said(line.rec.to)} leadingIcon={<IconArrowRight size={12} stroke={1.5} />} />}
-      <span className="w-16 shrink-0 text-right">
-        <MetaText tone="muted">{line.at}</MetaText>
-      </span>
+      <FoundChip line={line} />
+      <RecChip line={line} />
     </div>
   );
 }
 
 /**
- * Scope to decide (Miky, 18 Nov: "messy and lacks key information"): what came up while building, grouped under the
- * work it was found in (the issue and the step, reviewing or kicking off), so each line reads with its context. Each
- * line is one row with Claude's recommendation as a chip; a click opens it beside the list, where it is decided.
+ * Scope to decide on the List (Miky, 18 Nov: "concise and clear"): one line each, the title, then two chips, where it
+ * was found (the issue's ref; hover for the rest) and where Claude would put it. A click opens it beside the list,
+ * where it is decided.
  */
 function ScopeToDecide({ lines, openId, onOpen }: { lines: Line[]; openId?: string; onOpen: (id: string) => void }) {
   if (!lines.length) return null;
-  const refs = [...new Set(lines.map((l) => l.found?.ref ?? ""))];
   return (
     <section className="flex flex-col gap-2" aria-label="Scope to decide">
       <SectionHeader title="Scope to decide" count={lines.length} />
-      <div className="flex flex-col gap-4">
-        {refs.map((ref) => {
-          const group = lines.filter((l) => (l.found?.ref ?? "") === ref);
-          const step = group[0].found?.step ?? "build";
-          return (
-            <section key={ref} className="flex flex-col gap-px" aria-label={`Found while ${STEP[step]} ${ref}`}>
-              <h3 className="flex h-8 min-w-0 items-center gap-1.5 px-3">
-                <MetaText tone="muted">Found while {STEP[step]}</MetaText>
-                <span className="flex min-w-0 truncate">
-                  <MetaText tone="secondary">
-                    {ref} · {issueOf(ref)?.title}
-                  </MetaText>
-                </span>
-              </h3>
-              {group.map((l) => (
-                <ScopeRow key={l.id} line={l} selected={l.id === openId} onOpen={() => onOpen(l.id)} />
-              ))}
-            </section>
-          );
-        })}
+      <div className="flex flex-col gap-px">
+        {lines.map((l) => (
+          <ScopeRow key={l.id} line={l} selected={l.id === openId} onOpen={() => onOpen(l.id)} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/** The lines still to decide, given where each has been placed. */
+export const scopeLeft = (placed: Record<string, string>) => TRIAGE.filter((l) => !placed[l.id]);
+
+/**
+ * Scope to decide on the Board (Miky, 18 Nov: "on board view it would be boxes"): the same lines as boxes above the
+ * columns, the title, then the same two chips. A click opens it beside the board.
+ */
+export function ScopeBoxes({ placed, openId, onOpen }: { placed: Record<string, string>; openId?: string; onOpen: (id: string) => void }) {
+  const lines = scopeLeft(placed);
+  if (!lines.length) return null;
+  return (
+    <section className="flex flex-col gap-2" aria-label="Scope to decide">
+      <SectionHeader title="Scope to decide" count={lines.length} />
+      <div className="grid grid-cols-4 gap-3">
+        {lines.map((l) => (
+          <Card key={l.id} fill="surface" hover="hairline" onPress={() => onOpen(l.id)} selected={l.id === openId} className="flex flex-col gap-3 p-3">
+            <span className="line-clamp-2 text-body-2 font-medium">
+              {l.title}
+              <NewDot on={l.isNew} />
+            </span>
+            <span className="mt-auto flex flex-wrap items-center gap-1.5">
+              <FoundChip line={l} />
+              <RecChip line={l} />
+            </span>
+          </Card>
+        ))}
       </div>
     </section>
   );
@@ -631,7 +660,7 @@ export function BuildPlan({ placed, openId, onOpen }: { placed: Record<string, s
   const open = milestones.filter((m) => !finished.includes(m));
   const current = open.find((m) => m.n === NOW) ?? open[0];
   const ordered = current ? [current, ...open.filter((m) => m !== current)] : open;
-  const left = TRIAGE.filter((l) => !placed[l.id]);
+  const left = scopeLeft(placed);
   const later = [...into("later"), ...LATER];
   const notDoing = [...into("not"), ...NOT_DOING];
   return (
