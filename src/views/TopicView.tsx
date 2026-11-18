@@ -1,17 +1,17 @@
 import { useState, type ReactNode } from 'react'
-import { IconArchive, IconChevronDown, IconChevronRight, IconExternalLink, IconTarget } from '@tabler/icons-react'
-import { KindIcon, Link, NoAccessNotice, PageHeader, SectionLabel, WithTooltip } from '@estiva-app/ui'
+import { IconChevronDown, IconChevronRight, IconExternalLink, IconTarget } from '@tabler/icons-react'
+import { ArchivedNotice, CollapsibleSection, KindIcon, Link, NoAccessNotice, PageHeader, SectionHeader, WithTooltip, type ArchivedNoticeProps } from '@estiva-app/ui'
 import { Breadcrumb } from '@/components/ui/Breadcrumb'
 import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { IconButton } from '@/components/ui/IconButton'
 import { ScrollArea } from '@/components/ui/ScrollArea'
 import { SkeletonList } from '@/components/ui/Skeleton'
-import { Tabs } from '@/components/ui/Tabs'
+import { EditedCaption } from '@/components/EditedCaption'
 import { PageActions } from '@/components/PageActions'
 import { TeamChip } from '@/components/TeamChip'
-import { ProjectRow } from '@/components/ProjectRow'
-import { EditedCaption, TopicWorkRow } from '@/components/TopicWorkRow'
+import { WorkList, type WorkListRow } from '@/components/WorkList'
+import type { Person } from '@/api/useDirectory'
 import { cn } from '@/lib/cn'
 import type { ProjectRowData } from '@/lib/projects'
 import type { TopicWorkRow as WorkRow } from '@/lib/topics'
@@ -28,6 +28,9 @@ export interface TopicDocument {
   children?: TopicDocument[]
 }
 
+/** A project's or an issue's row on the page: who edited it last ("Miky, 1d ago") and an issue's assignee. */
+export type TopicWork = WorkRow & { editedLabel?: string; assigneePerson?: Person }
+
 /** What the page draws of a topic: its projects as the Projects page draws them, its issues, and the archived ones. */
 export interface TopicPageView {
   title: string
@@ -37,23 +40,27 @@ export interface TopicPageView {
   /** That team's id: its chip opens the team's page. */
   teamId?: string
   archived: boolean
+  /** Who archived it and when, for the kit's notice at the top of the page; absent when it is not archived. */
+  archive?: Pick<ArchivedNoticeProps, 'by' | 'when' | 'resolution' | 'withWhat' | 'withTitle'>
   /** Not archived, in the topic's order. */
   projects: ProjectRowData[]
-  /** Not archived, in the topic's order, each with who edited it last ("Miky, 1d ago"). */
-  issues: (WorkRow & { editedLabel?: string })[]
-  archivedWork: WorkRow[]
+  /** Not archived, in the topic's order. */
+  issues: TopicWork[]
+  archivedWork: TopicWork[]
 }
 
 /**
- * A topic's page in Ship (SHIPS-4; TOPI-8, the approved stories on `concept/topics-level-up`, Miky 4 and 6 Nov):
- * - the kit's `PageHeader`, as a project's and an issue's: "Initiatives › <initiative>", then its team as ONE chip and
- *   Open (into Peek), as Peek's initiative page and file page have them (Katerina, 17 and 18 November, D4, D5); its
- *   members, then the conversation's button and the ⋯ (Copy link);
- * - **Projects** as the Projects page draws them (`ProjectRow`: status, lead, progress) under All, Planned, Active and
- *   Completed; then **Issues**; then **Documents**, each with who edited it last and when, a document folding open to
- *   its pages; each kind keeps the topic's order;
- * - the topic's conversation in the column beside the page, where a project's or an issue's comments sit, in place of
- *   the "Conversation in Peek" link.
+ * An initiative's page in Ship (SHIPS-4; TOPI-8; Katerina, 18 November, A4: direction A on the brainstorm page, "one
+ * page, Peek's team-page look"):
+ * - the kit's `PageHeader`, as a project's and an issue's, the one place the name is said: "Initiatives › ◎ <name>",
+ *   then its team as ONE chip and Open (into Peek), as Peek's initiative page has them (D4, D5); its members, then the
+ *   conversation's button and the ⋯ (Copy link);
+ * - an archived one: the kit's notice first, who archived it and when, as every archived file shows it;
+ * - its summary, then one list per kind under a heading with its count, each kind in the topic's order: **Projects**
+ *   (status, lead, progress) and **Issues** (status, assignee, who edited it last), the shared `WorkList`, as a team's
+ *   page lists them; no tabs (the status is a column); **Documents** from Leaf, each opening Leaf, folding to its pages;
+ * - **Archived** last, a fold, shut while anything is not archived;
+ * - the topic's conversation in the column beside the page, where a project's or an issue's comments sit.
  * A topic the reader cannot read is the card any file they cannot open gets.
  * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/each-file-on-a-topic-keeps-its-own-place-and-look.md
  */
@@ -76,19 +83,33 @@ export interface TopicViewProps {
   peekUrl?: string
 }
 
-type ProjectsTab = 'all' | 'planned' | 'active' | 'completed'
-const TABS: Record<ProjectsTab, string> = { all: 'All', planned: 'Planned', active: 'Active', completed: 'Completed' }
-const EMPTY: Record<ProjectsTab, string> = { all: 'No projects here.', planned: 'No planned projects.', active: 'No active projects.', completed: 'No completed projects.' }
-const TAB_OF: Record<string, ProjectsTab> = { planned: 'planned', in_progress: 'active', completed: 'completed' }
-const inTab = (tab: ProjectsTab, project: ProjectRowData) => tab === 'all' || TAB_OF[project.status.value] === tab
+/** A project as `WorkList` draws it: the Projects list's facts. */
+const projectRow = (project: ProjectRowData): WorkListRow => ({
+  address: project.addr,
+  title: project.title,
+  href: project.href,
+  status: project.status,
+  ...(project.lead ? { person: project.lead } : {}),
+  progress: project.progress,
+})
+
+/** A project or an issue on the page as `WorkList` draws it: an issue with its project under its name, as its row here named it. */
+const workRow = (row: TopicWork): WorkListRow => ({
+  address: row.address,
+  title: row.title,
+  href: row.href,
+  status: row.status,
+  ...(row.project ? { description: row.project } : {}),
+  ...(row.assigneePerson ? { person: row.assigneePerson } : {}),
+  ...(row.progress ? { progress: row.progress } : {}),
+  ...(row.editedLabel ? { updated: row.editedLabel } : {}),
+})
 
 export function TopicView({ topic, documents, onRetry, onRetryDocuments, topicsHref, members, comments, conversation, onCopyLink, peekUrl }: TopicViewProps) {
-  const [showArchived, setShowArchived] = useState(false)
-  const [tab, setTab] = useState<ProjectsTab>('all')
   if (topic === 'unavailable') return <NoAccessNotice what="initiative" />
   const loaded = typeof topic === 'object' ? topic : undefined
-  const shownProjects = loaded ? loaded.projects.filter((project) => inTab(tab, project)) : []
   const listed = documents === 'loading' || documents === 'failed' ? undefined : documents
+  const live = loaded ? loaded.projects.length + loaded.issues.length : 0
   return (
     // `data-surface` is the smoke test's waypoint — see IssuesView. A page that scrolls inside itself, as an issue's.
     <div data-surface="topic" className="flex min-h-0 flex-1 [contain:size]">
@@ -117,92 +138,69 @@ export function TopicView({ topic, documents, onRetry, onRetryDocuments, topicsH
         {topic === 'failed' ? (
           <EmptyState icon={<IconTarget size={16} stroke={1.5} />} scope="page" message="This initiative didn’t load." action={{ label: 'Try again', onClick: onRetry }} />
         ) : (
-          <ScrollArea className="min-h-0 min-w-0 flex-1" contentClassName="flex flex-col gap-5 px-6 py-5">
+          // The page's whole width, 24px in, its parts 24px apart, as Peek's team page and Ship's (A4: "Peek's team-page look").
+          <ScrollArea className="min-h-0 min-w-0 flex-1" contentClassName="flex flex-col gap-6 px-6 py-5">
             {topic === 'loading' ? (
               <SkeletonList rows={8} />
             ) : (
-              <div data-topic-loaded className="flex flex-col gap-5">
-                <div className="flex items-start gap-3">
-                  <span className="flex h-8 items-center">
-                    <KindIcon kind="topic" />
-                  </span>
-                  <div className="flex min-w-0 flex-1 flex-col">
-                    <h1 className="text-h3 text-text-primary">{topic.title}</h1>
-                    {/* Its team is the header's chip now, said once (D4); only Archived stays here. */}
-                    {topic.archived && <span className="text-caption text-text-muted">Archived</span>}
-                  </div>
-                </div>
-                {topic.summary && <p className="text-body-2 text-text-secondary">{topic.summary}</p>}
-                {topic.projects.length + topic.issues.length === 0 && listed?.length === 0 ? (
-                  <EmptyState scope="section" message={topic.archivedWork.length > 0 ? 'All of its projects and issues are archived.' : 'No projects, issues or documents yet.'} />
+              <div data-topic-loaded className="flex flex-col gap-6">
+                {/* The page's heading for assistive technology: the name is said once on screen, in the header's trail, and the
+                    kit's PageHeader draws its title as text, not a heading (a kit gap, as Ship's list-page prototype found). */}
+                <h1 className="sr-only">{topic.title}</h1>
+                {/* Archived, said once (the header says the name; nothing else repeats it). */}
+                {topic.archive && <ArchivedNotice {...topic.archive} />}
+                {topic.summary && <p className="px-2 text-body-2 text-text-secondary">{topic.summary}</p>}
+                {live === 0 && listed?.length === 0 ? (
+                  <EmptyState scope="rows" message={topic.archivedWork.length > 0 ? 'All of its projects and issues are archived.' : 'No projects, issues or documents yet.'} />
                 ) : (
                   <>
                     {topic.projects.length > 0 && (
-                      // Drawn as the Projects page draws them: the same tabs, header and rows; no team column, status on All only.
-                      <section className="flex flex-col gap-2">
-                        <SectionLabel tone="muted">Projects</SectionLabel>
-                        <Tabs<ProjectsTab>
-                          aria-label="Projects by status"
-                          tabs={(Object.keys(TABS) as ProjectsTab[]).map((id) => ({ id, label: TABS[id], count: topic.projects.filter((project) => inTab(id, project)).length }))}
-                          active={tab}
-                          onChange={setTab}
-                        />
-                        {shownProjects.length === 0 ? (
-                          <EmptyState scope="section" message={EMPTY[tab]} />
-                        ) : (
-                          <div className="flex flex-col gap-2">
-                            <div className="hidden items-center gap-3 px-3 text-caption text-text-muted sm:flex">
-                              <span className="flex-1 pl-7">Name</span>
-                              {tab === 'all' && <span className="w-20">Status</span>}
-                              <span className="w-10">Lead</span>
-                              <span className="w-36">Progress</span>
-                            </div>
-                            <div className="flex flex-col gap-px">
-                              {shownProjects.map((project) => (
-                                <ProjectRow key={project.addr} project={project} showFolder={false} showStatus={tab === 'all'} />
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </section>
+                      <Section title="Projects" count={topic.projects.length}>
+                        <WorkList label={`${topic.title}’s projects`} kind="project" rows={topic.projects.map(projectRow)} />
+                      </Section>
                     )}
                     {topic.issues.length > 0 && (
-                      <Section label="Issues">
-                        {topic.issues.map((row) => (
-                          <TopicWorkRow key={row.address} row={row} edited={row.editedLabel} />
-                        ))}
+                      <Section title="Issues" count={topic.issues.length}>
+                        <WorkList label={`${topic.title}’s issues`} kind="issue" rows={topic.issues.map(workRow)} />
                       </Section>
                     )}
                     {documents === 'loading' ? (
-                      <SkeletonList rows={3} />
+                      <Section title="Documents">
+                        <SkeletonList rows={3} />
+                      </Section>
                     ) : documents === 'failed' ? (
-                      <Section label="Documents">
-                        <EmptyState scope="section" message="Documents didn’t load." action={{ label: 'Try again', onClick: onRetryDocuments }} />
+                      <Section title="Documents">
+                        {/* The section-level line (the row-level one draws no button), in a box 8px in, where the headings start: the gate puts the room on the box, not on the part. */}
+                        <div className="px-2">
+                          <EmptyState scope="section" message="Documents didn’t load." action={{ label: 'Try again', onClick: onRetryDocuments }} />
+                        </div>
                       </Section>
                     ) : (
                       documents.length > 0 && (
-                        <Section label="Documents">
-                          {documents.map((document) => (
-                            <DocumentRow key={document.address} document={document} />
-                          ))}
+                        // Today's rows, not the kit's list: a document opens Leaf in a new tab and folds to its pages, and the kit's
+                        // list row does neither yet (a kit gap, asked of Katerina, 18 November).
+                        <Section title="Documents" count={documents.length}>
+                          <div className="flex flex-col gap-px">
+                            {documents.map((document) => (
+                              <DocumentRow key={document.address} document={document} />
+                            ))}
+                          </div>
                         </Section>
                       )
                     )}
                   </>
                 )}
-                {topic.archivedWork.length > 0 &&
-                  (showArchived || topic.projects.length + topic.issues.length === 0 ? (
-                    <Section label="Archived">
-                      {topic.archivedWork.map((row) => (
-                        <TopicWorkRow key={row.address} row={row} archived />
-                      ))}
-                    </Section>
-                  ) : (
-                    // A button, not the story's link: it opens nothing, it shows the rows below.
-                    <Button size="small" variant="muted" leadingIcon={<IconArchive size={14} stroke={1.5} />} className="self-start" onClick={() => setShowArchived(true)}>
-                      Archived · {topic.archivedWork.length}
-                    </Button>
-                  ))}
+                {topic.archivedWork.length > 0 && (
+                  // A fold of its own at the end: shut while anything is not archived, open when everything is.
+                  <CollapsibleSection title="Archived" count={topic.archivedWork.length} defaultOpen={live === 0} contentClassName="flex flex-col gap-2">
+                    {topic.archivedWork.some((row) => row.kind === 'project') && (
+                      <WorkList label={`${topic.title}’s archived projects`} kind="project" rows={topic.archivedWork.filter((row) => row.kind === 'project').map(workRow)} />
+                    )}
+                    {topic.archivedWork.some((row) => row.kind === 'issue') && (
+                      <WorkList label={`${topic.title}’s archived issues`} kind="issue" rows={topic.archivedWork.filter((row) => row.kind === 'issue').map(workRow)} />
+                    )}
+                  </CollapsibleSection>
+                )}
               </div>
             )}
           </ScrollArea>
@@ -215,6 +213,16 @@ export function TopicView({ topic, documents, onRetry, onRetryDocuments, topicsH
         </div>
       )}
     </div>
+  )
+}
+
+/** One kind under its heading with its count: the kit's `SectionHeader`, as a team's page heads its lists. */
+function Section({ title, count, children }: { title: string; count?: number; children: ReactNode }) {
+  return (
+    <section className="flex flex-col gap-1">
+      <SectionHeader title={title} {...(count !== undefined ? { count } : {})} hover="none" />
+      {children}
+    </section>
   )
 }
 
@@ -255,14 +263,5 @@ function DocumentRow({ document, depth = 0 }: { document: TopicDocument; depth?:
       </div>
       {open && pages.map((page) => <DocumentRow key={page.address} document={page} depth={depth + 1} />)}
     </>
-  )
-}
-
-function Section({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <section className="flex flex-col gap-2">
-      <SectionLabel tone="muted">{label}</SectionLabel>
-      <div className="flex flex-col gap-px">{children}</div>
-    </section>
   )
 }

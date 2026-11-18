@@ -177,6 +177,8 @@ export interface TopicWorkRow {
   project?: string
   /** An issue's last edit: who made its newest change, and when, in seconds (TOPI-8). */
   edited?: { by: string; at: number }
+  /** An issue's assignee, by key: its row's face on the initiative's page (Katerina, 18 November, A4: the Issues list's facts). */
+  assignee?: string
 }
 
 /** Who made a file's newest change and when: its root's author until a field change is newer (TOPI-8). */
@@ -210,7 +212,7 @@ export interface TopicPageData {
 export interface TopicPageWork {
   projects: readonly { addr: string; id: string; title: string; status: string; deleted?: unknown }[]
   /** `author`, `createdAt` and `fields` give an issue row its last edit; the sidebar's fold leaves them out. */
-  issues: readonly { addr: string; id: string; title: string; status: string; stage?: Stage; projectAddr?: string; author?: string; createdAt?: number; fields?: Record<string, { by: string; at: number }> }[]
+  issues: readonly { addr: string; id: string; title: string; status: string; stage?: Stage; projectAddr?: string; assignee?: string; author?: string; createdAt?: number; fields?: Record<string, { by: string; at: number }> }[]
 }
 
 /**
@@ -255,6 +257,7 @@ export function topicPageOf(topic: ReadTopic, work: TopicPageWork, archives: Arc
           href: href({ name: 'issue', d: issue.id, slug: issue.title }),
           status: { value: issue.status, label: statusLabel(issue.status, ISSUE_STATUSES) },
           ...(parent ? { project: parent.title } : {}),
+          ...(issue.assignee ? { assignee: issue.assignee } : {}),
           ...(issue.author && issue.createdAt !== undefined ? { edited: lastEditOf({ author: issue.author, createdAt: issue.createdAt, fields: issue.fields ?? {} }) } : {}),
         },
       })

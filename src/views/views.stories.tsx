@@ -12,7 +12,7 @@ import { IssuesView, type IssuesScope } from './IssuesView'
 import { ProjectView } from './ProjectView'
 import { ProjectsView, type ProjectsLayout } from './ProjectsView'
 import { TopicsView } from './TopicsView'
-import { TopicView } from './TopicView'
+import { TopicView, type TopicPageView, type TopicViewProps } from './TopicView'
 import { ThreadListView } from '@/components/conversations/ThreadList'
 import type { SidebarTopic, TopicRowData, TopicsTab } from '@/lib/topics'
 import type { ProjectTab, ProjectsTab } from '@/router'
@@ -208,40 +208,88 @@ export const TopicsFailed: Story = {
   ),
 }
 
-/**
- * An initiative's page (SHIPS-4): its trail, then its team as the one chip and Open into Peek after its name (Katerina,
- * 18 November, D4, D5), the conversation's button and the ⋯ (Copy link); what it lists that Ship holds, and its Leaf
- * documents. Its row is lit in the sidebar.
- */
-export const Initiative: Story = {
-  render: () => {
-    const [shown, setShown] = useState(false)
-    return (
-      <Shell openTopic={SIDEBAR_TOPICS[0].id}>
-        <TopicView
-          topic={{
-            title: 'Cross-app navigation',
-            summary: 'Teams and initiatives instead of Folders, in every app.',
-            team: 'Product',
-            teamId: '0212db6d-bcbf-40d0-890e-f4f056db2f5d',
-            archived: false,
-            projects: PROJECT_TABS.all.slice(0, 3),
-            issues: [{ address: '30851:a:nav-1', kind: 'issue', title: 'Explore initiatives opens its page', href: '#/issue/nav-1', status: { value: 'in_progress', label: 'In Progress' }, project: 'Relay Migration', editedLabel: 'Ana, 1h ago' }],
-            archivedWork: [],
-          }}
-          documents={[{ address: '30842:a:brainstorm', title: 'Navigation brainstorm', href: 'https://leaf.estiva.app/document/brainstorm', edited: 'Mara, 2d ago' }]}
-          onRetry={fn()}
-          onRetryDocuments={fn()}
-          topicsHref="#/topics"
-          comments={{ shown, onShownChange: setShown }}
-          conversation={<ThreadListView threads={THREADS} onStart={fn()} onReply={fn()} />}
-          onCopyLink={fn()}
-          peekUrl="https://peek.estiva.app/topic/cross-app-navigation"
-        />
-      </Shell>
-    )
-  },
+/** The page as `Shell` draws it, with the conversation's column shown or hidden from its header. */
+function InitiativeStory({ topic, documents = INITIATIVE_DOCUMENTS }: { topic: TopicViewProps['topic']; documents?: TopicViewProps['documents'] }) {
+  const [shown, setShown] = useState(false)
+  return (
+    <Shell openTopic={SIDEBAR_TOPICS[0].id}>
+      <TopicView
+        topic={topic}
+        documents={documents}
+        onRetry={fn()}
+        onRetryDocuments={fn()}
+        topicsHref="#/topics"
+        comments={{ shown, onShownChange: setShown }}
+        conversation={<ThreadListView threads={THREADS} onStart={fn()} onReply={fn()} />}
+        onCopyLink={fn()}
+        peekUrl="https://peek.estiva.app/topic/cross-app-navigation"
+      />
+    </Shell>
+  )
 }
+
+const INITIATIVE_DOCUMENTS: TopicViewProps['documents'] = [
+  { address: '30842:a:brainstorm', title: 'Navigation brainstorm', href: 'https://leaf.estiva.app/document/brainstorm', edited: 'Mara, 2d ago' },
+  {
+    address: '30842:a:spec',
+    title: 'Sidebar spec',
+    href: 'https://leaf.estiva.app/document/spec',
+    edited: 'Ana, 5h ago',
+    children: [{ address: '30842:a:spec-rows', title: 'Rows and folds', href: 'https://leaf.estiva.app/document/spec-rows', edited: 'Ana, 5h ago' }],
+  },
+]
+
+const INITIATIVE: TopicPageView = {
+  title: 'Cross-app navigation',
+  summary: 'Teams and initiatives instead of Folders, in every app.',
+  team: 'Product',
+  teamId: '0212db6d-bcbf-40d0-890e-f4f056db2f5d',
+  archived: false,
+  projects: PROJECT_TABS.all.slice(0, 3),
+  issues: [
+    { address: '30851:a:nav-1', kind: 'issue', title: 'Explore initiatives opens its page', href: '#/issue/nav-1', status: { value: 'in_progress', label: 'In Progress' }, project: 'Relay Migration', editedLabel: 'Ana, 1h ago', assigneePerson: RAVI },
+    { address: '30851:a:nav-2', kind: 'issue', title: 'The open file lights its team', href: '#/issue/nav-2', status: { value: 'todo', label: 'Todo' }, editedLabel: 'Mara, 3d ago' },
+  ],
+  archivedWork: [
+    { address: '30850:a:old', kind: 'project', title: 'Folders sidebar', href: '#/project/old', status: { value: 'completed', label: 'Completed' }, progress: { done: 6, total: 6 } },
+    { address: '30851:a:old-1', kind: 'issue', title: 'Rename Folders to Teams', href: '#/issue/old-1', status: { value: 'done', label: 'Done' }, editedLabel: 'Ana, 2w ago' },
+  ],
+}
+
+/**
+ * An initiative's page (SHIPS-4; Katerina, 18 November, A4: direction A, "Peek's team-page look"): its name once, in
+ * the header's trail, then its team as the one chip and Open into Peek (D4, D5), the conversation's button and the ⋯
+ * (Copy link); its summary; Projects and Issues in the kit's list with their facts, no tabs; its Leaf documents, one
+ * folding to its page; Archived shut at the end. Its row is lit in the sidebar.
+ */
+export const Initiative: Story = { render: () => <InitiativeStory topic={INITIATIVE} /> }
+
+/** An archived initiative: the kit's notice first, who archived it and when, said once. */
+export const InitiativeArchived: Story = {
+  name: 'Initiative: archived',
+  render: () => <InitiativeStory topic={{ ...INITIATIVE, archived: true, archive: { by: 'Ana Duarte', when: '2d ago', resolution: 'Shipped in every app.' } }} />,
+}
+
+/** Everything it lists is archived: said in words, and Archived open. */
+export const InitiativeAllArchived: Story = {
+  name: 'Initiative: all archived',
+  render: () => <InitiativeStory topic={{ ...INITIATIVE, projects: [], issues: [] }} documents={[]} />,
+}
+
+/** It lists nothing yet. */
+export const InitiativeEmpty: Story = {
+  name: 'Initiative: empty',
+  render: () => <InitiativeStory topic={{ ...INITIATIVE, projects: [], issues: [], archivedWork: [] }} documents={[]} />,
+}
+
+/** The initiative is being read. */
+export const InitiativeLoading: Story = { name: 'Initiative: loading', render: () => <InitiativeStory topic="loading" documents="loading" /> }
+
+/** The initiative did not load: said, with Try again. */
+export const InitiativeFailed: Story = { name: 'Initiative: failed', render: () => <InitiativeStory topic="failed" /> }
+
+/** Its Leaf documents did not load: the rest of the page stands, and the Documents heading says so with Try again. */
+export const InitiativeDocumentsFailed: Story = { name: 'Initiative: documents failed', render: () => <InitiativeStory topic={INITIATIVE} documents="failed" /> }
 
 /** Every issue in the workspace: All / Open / Assigned to me, grouped by status. Forty rows, so the page scrolls — in the frame's bar, not a native one. */
 export const Issues: Story = {

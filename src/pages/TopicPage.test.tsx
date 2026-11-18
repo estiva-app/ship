@@ -107,7 +107,8 @@ function Page(props: { d: string; state: FolderState; folders: never[] | { id: s
   return <TopicPage d={props.d} state={state} folders={props.folders as never} archives={props.archives} directory={DIRECTORY} say={() => {}} refresh={async () => {}} />
 }
 const page = () => document.querySelector('[data-surface="topic"]') as HTMLElement
-const workRows = () => [...page().querySelectorAll('[data-topic-work]')].map((row) => row.textContent)
+/** The projects and issues drawn, by name, in the page's order (the shared `WorkList`'s rows). */
+const workRows = () => [...page().querySelectorAll<HTMLElement>('[data-work]')].map((row) => row.querySelector('a > span')?.textContent)
 
 // A failed test leaves no fake clock or spy behind it.
 afterEach(() => {
@@ -150,21 +151,23 @@ describe("A topic's page in Ship", () => {
     expect(open.textContent).toBe('Open')
     fireEvent.click(screen.getByRole('button', { name: 'More actions' }))
     await waitFor(() => expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual(['Copy link']))
-    // The project first though the topic listed the issue first, drawn as the Projects page draws it, under All.
-    const [project, ...more] = [...page().querySelectorAll<HTMLElement>('[data-project]')]
+    // No tabs: a project's status is a column of its row (Katerina, 18 November, A4: direction A).
+    expect(screen.queryByRole('tab')).toBeNull()
+    // The project first though the topic listed the issue first, with the Projects list's facts.
+    const [project, ...more] = [...page().querySelectorAll<HTMLElement>('[data-work-kind="project"]')]
     expect(more).toEqual([])
     expect(within(project!).getByRole('link').textContent).toBe('Project p1')
-    expect(screen.getByRole('tab', { name: /All/ }).getAttribute('aria-selected')).toBe('true')
+    expect(within(project!).getByText('In Progress')).toBeTruthy()
     // Done of all but the cancelled one, so a finished project reads full (Miky, 3 Nov, SHIPS-7).
     expect(within(project!).getByText('1 / 2')).toBeTruthy()
-    // An issue it does not list is not drawn.
-    const [issue, ...rest] = [...page().querySelectorAll<HTMLElement>('[data-topic-work]')]
+    // An issue it does not list is not drawn; the one it lists names its project under its name, and its status.
+    const [issue, ...rest] = [...page().querySelectorAll<HTMLElement>('[data-work-kind="issue"]')]
     expect(rest).toEqual([])
-    expect(within(issue!).getByRole('link').textContent).toBe('Issue i1')
+    expect(within(issue!).getByText('Issue i1')).toBeTruthy()
     expect(within(issue!).getByText('Project p1')).toBeTruthy()
     expect(within(issue!).getByText('Todo')).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Project p1' }).getAttribute('href')).toBe('/project/project-p1-p1')
-    expect(screen.getByRole('link', { name: 'Issue i1' }).getAttribute('href')).toBe('/issue/issue-i1-i1')
+    expect(screen.getByRole('link', { name: /^Issue i1/ }).getAttribute('href')).toBe('/issue/issue-i1-i1')
     await waitFor(() => expect(screen.getByRole('link', { name: /Testing widgets/ }).getAttribute('href')).toMatch(/^https:\/\/leaf\.estiva\.app\//))
     // The address bar gets the topic's slug.
     expect(location.pathname).toBe(`/topic/widgets-${D}`)
@@ -181,7 +184,7 @@ describe("A topic's page in Ship", () => {
     render(<Page d={D} state={state} folders={[{ id: 'team', name: 'HQ' } as never]} archives={archives} />)
 
     await waitFor(() => expect(page().querySelector('[data-topic-loaded]')).not.toBeNull())
-    const titles = [...page().querySelectorAll<HTMLElement>('[data-project], [data-topic-work]')].map((row) => within(row).getAllByRole('link')[0]!.textContent)
+    const titles = workRows()
     expect(titles).toEqual(['Project p2', 'Project p1', 'Issue i2', 'Issue i1'])
   })
 
@@ -193,19 +196,31 @@ describe("A topic's page in Ship", () => {
     expect(screen.queryByRole('button', { name: /Archived/ })).toBeNull()
   })
 
-  it('draws its projects under the Projects page’s tabs: Active holds only the one in progress, in the topic’s order (TOPI-8)', async () => {
+  it('lists its projects in the topic’s order, each with its status, and no tabs (TOPI-8; A4)', async () => {
     held.push(manifest('ship', 'ship.estiva.app', ['30850', '30851']), manifest('peek', 'peek.estiva.app', ['30840']))
     held.push(projectRoot('p1'), projectRoot('p2'), projectRoot('p3'))
     held.push(topic(D, 'Widgets'), lists(D, 'p3'), lists(D, 'p1'), lists(D, 'p2'))
     const { state, archives } = ship([{ d: 'p1', status: 'in_progress' }, { d: 'p2', status: 'planned' }, { d: 'p3', status: 'completed' }], [])
     render(<Page d={D} state={state} folders={[]} archives={archives} />)
-    await waitFor(() => expect(page().querySelectorAll('[data-project]').length).toBe(3))
-    const names = () => [...page().querySelectorAll<HTMLElement>('[data-project]')].map((row) => within(row).getByRole('link').textContent)
-    expect(names()).toEqual(['Project p3', 'Project p1', 'Project p2'])
-    fireEvent.click(screen.getByRole('tab', { name: /Active/ }))
-    expect(names()).toEqual(['Project p1'])
-    fireEvent.click(screen.getByRole('tab', { name: /Completed/ }))
-    expect(names()).toEqual(['Project p3'])
+    await waitFor(() => expect(page().querySelectorAll('[data-work-kind="project"]').length).toBe(3))
+    expect(workRows()).toEqual(['Project p3', 'Project p1', 'Project p2'])
+    const statuses = [...page().querySelectorAll<HTMLElement>('[data-work-kind="project"]')].map((row) => ['Completed', 'In Progress', 'Planned'].find((word) => within(row).queryByText(word)))
+    expect(statuses).toEqual(['Completed', 'In Progress', 'Planned'])
+    expect(screen.queryByRole('tab')).toBeNull()
+  })
+
+  it('shows an issue’s assignee as a face on its row, as the Issues list does (A4)', async () => {
+    held.push(manifest('ship', 'ship.estiva.app', ['30850', '30851']), manifest('peek', 'peek.estiva.app', ['30840']))
+    held.push(issueRoot('i1'), topic(D, 'Widgets'), lists(D, 'i1'))
+    const { state, archives } = ship([], [{ d: 'i1', status: 'todo' }])
+    Object.assign((state as unknown as { issues: Record<string, unknown>[] }).issues[0]!, { assignee: OWNER })
+    render(<Page d={D} state={state} folders={[]} archives={archives} />)
+    const row = await waitFor(() => {
+      const found = page().querySelector<HTMLElement>('[data-work-kind="issue"]')
+      expect(found).not.toBeNull()
+      return found!
+    })
+    expect(within(row).getByLabelText('Ana Duarte')).toBeTruthy()
   })
 
   it('says who edited an issue and a document last, and folds a document open to its pages (TOPI-8)', async () => {
@@ -237,8 +252,8 @@ describe("A topic's page in Ship", () => {
     })
     render(<Page d={D} state={state} folders={[]} archives={archives} />)
 
-    await waitFor(() => expect(page().querySelector('[data-topic-work]')).not.toBeNull())
-    expect(within(page().querySelector<HTMLElement>('[data-topic-work]')!).getByText('bbbbbbbb, 1h ago')).toBeTruthy()
+    await waitFor(() => expect(page().querySelector('[data-work-kind="issue"]')).not.toBeNull())
+    expect(within(page().querySelector<HTMLElement>('[data-work-kind="issue"]')!).getByText('bbbbbbbb, 1h ago')).toBeTruthy()
     const row = await waitFor(() => {
       const found = page().querySelector<HTMLElement>(`[data-topic-document="${SPEC}"]`)
       expect(found).not.toBeNull()
@@ -251,20 +266,24 @@ describe("A topic's page in Ship", () => {
     vi.useRealTimers()
   })
 
-  it('keeps archived work behind "Archived · n", and when all of it is archived says so and shows it', async () => {
+  it('keeps archived work in a shut Archived fold at the end, and when all of it is archived says so and opens it (A4)', async () => {
     held.push(manifest('peek', 'peek.estiva.app', ['30840']), issueRoot('live'), issueRoot('gone'))
     held.push(topic(D, 'Mixed'), lists(D, 'live'), lists(D, 'gone'))
     const { state, archives } = ship([], [{ d: 'live', status: 'todo' }, { d: 'gone', status: 'done', archived: true }])
     const { unmount } = render(<Page d={D} state={state} folders={[]} archives={archives} />)
-    await waitFor(() => expect(workRows()).toEqual(['Issue liveTodo']))
-    fireEvent.click(screen.getByRole('button', { name: 'Archived · 1' }))
-    expect(workRows()).toEqual(['Issue liveTodo', 'Issue goneDone'])
+    await waitFor(() => expect(within(page()).getByText('Issue live')).toBeTruthy())
+    const fold = screen.getByRole('button', { name: /^Archived/ })
+    expect(fold.getAttribute('aria-expanded')).toBe('false')
+    fireEvent.click(fold)
+    expect(fold.getAttribute('aria-expanded')).toBe('true')
+    expect(workRows()).toEqual(['Issue live', 'Issue gone'])
     unmount()
 
     const all = ship([], [{ d: 'live', status: 'todo', archived: true }, { d: 'gone', status: 'done', archived: true }])
     render(<Page d={D} state={all.state} folders={[]} archives={all.archives} />)
     await waitFor(() => expect(within(page()).getByText('All of its projects and issues are archived.')).toBeTruthy())
-    expect(workRows()).toEqual(['Issue liveTodo', 'Issue goneDone'])
+    expect(screen.getByRole('button', { name: /^Archived/ }).getAttribute('aria-expanded')).toBe('true')
+    expect(workRows()).toEqual(['Issue live', 'Issue gone'])
   })
 
   it('reads the topics once more for a topic the held read lacks, then says it is not available', async () => {

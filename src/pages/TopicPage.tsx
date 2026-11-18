@@ -6,7 +6,7 @@ import { reloadTopics, rereadTopics, useTopicDocuments, useTopicPlace, useTopics
 import { addToTopic, joinTopic, leaveTopic } from '@/api/writes'
 import { Members } from '@/components/Members'
 import { ThreadList } from '@/components/conversations/ThreadList'
-import type { Archives } from '@/lib/archive'
+import { archivedNoticeOf, type Archives } from '@/lib/archive'
 import { safeLink } from '@/lib/handoff'
 import { projectTabs } from '@/lib/projects'
 import { useTabTitle } from '@/lib/tabTitle'
@@ -127,12 +127,32 @@ export function TopicPage({
       archives,
       personOf,
     ).all.sort((a, b) => (order.get(a.addr) ?? 0) - (order.get(b.addr) ?? 0))
-    const issues = page.live
-      .filter((row) => row.kind === 'issue')
-      .map((row) => ({ ...row, ...(row.edited ? { editedLabel: editedLabel(nameOf(row.edited.by), row.edited.at) } : {}) }))
+    // An issue's row: who edited it last and when, and its assignee's face (the Issues list's facts, A4).
+    const withFacts = (row: (typeof page.live)[number]) => ({
+      ...row,
+      ...(row.edited ? { editedLabel: editedLabel(nameOf(row.edited.by), row.edited.at) } : {}),
+      ...(row.assignee ? { assigneePerson: personOf(row.assignee) } : {}),
+    })
+    const issues = page.live.filter((row) => row.kind === 'issue').map(withFacts)
     const team = folders?.find((folder) => folder.id === page.folder)?.name
-    return { title: page.title, ...(page.summary ? { summary: page.summary } : {}), ...(team ? { team, teamId: page.folder } : {}), archived: page.archived, projects, issues, archivedWork: page.archivedWork }
-  }, [page, state, archives, personOf, nameOf, folders])
+    // Archived, said once, in the kit's notice every archived file shows (a3257366): who and when, and, hidden with its
+    // archived team (an initiative's only ancestor), that team. Ship does not unarchive an initiative; Peek does.
+    const archive = topic?.object.archived
+    const notice = archive && {
+      ...archivedNoticeOf({ by: archive.by, at: archive.at, ...(archive.resolution ? { resolution: archive.resolution } : {}) }, nameOf),
+      ...(archive.with ? { withWhat: 'team', ...(team ? { withTitle: team } : {}) } : {}),
+    }
+    return {
+      title: page.title,
+      ...(page.summary ? { summary: page.summary } : {}),
+      ...(team ? { team, teamId: page.folder } : {}),
+      archived: page.archived,
+      ...(notice ? { archive: notice } : {}),
+      projects,
+      issues,
+      archivedWork: page.archivedWork.map(withFacts),
+    }
+  }, [page, topic, state, archives, personOf, nameOf, folders])
 
   const conversation = useTopicConversation(topic && !sendsOn ? { address: topic.address, folder: topic.folder, createdAt: topic.createdAt } : undefined, state, directory, say, refresh)
   const { place, reload: reloadPlace } = useTopicPlace(topic && !sendsOn ? topic : undefined)
