@@ -129,6 +129,13 @@ describe('a cold load with the issues switch on', () => {
     expect(state.issues.length).toBe(1005)
   })
 
+  it('refuses to load rather than drop the older issues when more than 1000 share one second', async () => {
+    held.push(issue('older', 'alpha', 500))
+    for (let n = 0; n < 1001; n++) held.push(issue(`same${n}`, 'alpha', 2000))
+
+    await expect(storeWith(true).loadAllEvents()).rejects.toThrow(/share created_at/)
+  })
+
   it('reads every change of every issue with the switch off, as before', async () => {
     held.push(issue('one', 'alpha'), change('one', 'status', 'done', 120))
 

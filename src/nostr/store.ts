@@ -590,16 +590,28 @@ export class Store {
     const files: FileFields[] = []
     const seen = new Set<string>()
     let until: number | undefined
+    let ceiling = 0
     for (let page = 0; page < MAX_LIST_PAGES; page++) {
       const answer = await listFiles(query, { kinds: [kind], limit: RELAY_PAGE_CEILING, ...(until === undefined ? {} : { until }) })
-      const fresh = answer.filter((file) => !seen.has(file.address))
-      for (const file of fresh) {
+      for (const file of answer) {
+        if (seen.has(file.address)) continue
         seen.add(file.address)
         files.push(file)
       }
-      // A page short of the ceiling is the last; `until` is inclusive, so a page of only repeats is too.
-      if (answer.length < RELAY_PAGE_CEILING || !fresh.length) break
-      until = Math.min(...answer.map((file) => file.root.created_at))
+      // As the protocol's `queryAll`: a short page ends the list only when it is
+      // shorter than the relay has answered before (a relay may cap lower than
+      // RELAY_PAGE_CEILING), and a full page whose cursor cannot move means more
+      // first records share one second than a page holds — a throw, never a
+      // quietly shorter list.
+      ceiling = Math.max(ceiling, answer.length)
+      if (answer.length < RELAY_PAGE_CEILING && answer.length < ceiling) break
+      if (!answer.length) break
+      const oldest = Math.min(...answer.map((file) => file.root.created_at))
+      if (until !== undefined && oldest >= until) {
+        if (answer.length >= RELAY_PAGE_CEILING) throw new Error(`listEvery: more than ${RELAY_PAGE_CEILING} first records share created_at=${until}`)
+        break
+      }
+      until = oldest
     }
     return files
   }

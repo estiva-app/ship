@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { MEMBER_FIELD_PREFIX } from '@estiva-app/conversation'
+import { MAX_FILTERS_PER_QUERY } from '@estiva-app/protocol'
 import { KIND } from '../nostr/kinds'
 import { signedIn } from '../auth/estivaId'
 import { timesOption } from './store'
@@ -31,7 +32,10 @@ export function useChangedAt(issues: readonly string[], on: boolean): Readonly<R
       const ds = key.split(' ').map((addr) => addr.split(':').slice(2).join(':'))
       const filters: Record<string, unknown>[] = []
       for (let at = 0; at < ds.length; at += PER_FILTER) filters.push({ fields: 'times', kinds: [KIND.ISSUE], '#d': ds.slice(at, at + PER_FILTER) })
-      const answer = await times(filters)
+      // The relay takes at most MAX_FILTERS_PER_QUERY filters a request: a project of over 1000 issues asks in several.
+      const parts: Promise<Awaited<ReturnType<typeof times>>>[] = []
+      for (let at = 0; at < filters.length; at += MAX_FILTERS_PER_QUERY) parts.push(times(filters.slice(at, at + MAX_FILTERS_PER_QUERY)))
+      const answer = (await Promise.all(parts)).flat()
       const at: Record<string, number> = {}
       for (const file of answer) {
         const touched = file.changes.filter((change) => change.fields.some((field) => !field.startsWith(MEMBER_FIELD_PREFIX)))
