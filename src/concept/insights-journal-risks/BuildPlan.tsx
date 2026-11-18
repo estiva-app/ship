@@ -25,6 +25,7 @@ import {
   IconX,
 } from "@tabler/icons-react";
 import {
+  Avatar,
   Button,
   Card,
   Chip,
@@ -32,6 +33,7 @@ import {
   Link,
   MetaText,
   Panel,
+  Person,
   SectionHeader,
   Select,
   Tabs,
@@ -305,6 +307,11 @@ type Line = {
   /** Where Claude would put it, and why; `project` names the other project when `to` is "project". */
   rec?: { to: string; why: string; project?: string };
   found?: Found;
+  /**
+   * An issue someone filed into the project with no milestone (Miky, 18 Nov: Scope to decide holds both the rough
+   * notes and the issues to sort out, one list). It keeps its ref when accepted; ✕ cancels it and tells its filer why.
+   */
+  filed?: { ref: string; by: string; as: "Bug" | "Improvement" };
   /** What was seen, in a few sentences: what a person does, what happens, why it matters. */
   detail?: string;
 };
@@ -377,6 +384,33 @@ const TRIAGE: Line[] = [
     rec: {
       to: "not",
       why: "Peek’s navigation is reworked in the next stage; deciding it now would be undone.",
+    },
+  },
+  // Two issues filed into the project, imagined: a bug Katerina hit, and a small improvement she sent.
+  {
+    id: "t6",
+    title: "A topic you left still shows in Ship’s sidebar",
+    from: "Katerina’s bug",
+    at: "2 days ago",
+    isNew: true,
+    filed: { ref: "TOPI-12", by: "Katerina", as: "Bug" },
+    detail:
+      "Katerina left the Release notes topic in Peek. In Ship it stayed under Topics in the sidebar, and opening it said she could not read it.",
+    rec: {
+      to: "m2",
+      why: "Leaving a topic is the other half of joining one, which is in this milestone’s Done when.",
+    },
+  },
+  {
+    id: "t7",
+    title: "Sort the sidebar’s topics A–Z",
+    from: "Katerina’s improvement",
+    at: "Yesterday",
+    filed: { ref: "TOPI-13", by: "Katerina", as: "Improvement" },
+    detail: "Ship lists topics in the order they were made. With more than a few, Katerina scans for one by name.",
+    rec: {
+      to: "later",
+      why: "The order of topics is not in this project’s Goal; a small polish for after its Done when.",
     },
   },
 ];
@@ -460,6 +494,22 @@ const issueOf = (ref: string) => MILESTONES.flatMap((m) => m.issues).find((i) =>
  */
 function FoundIn({ line, title = false }: { line: Line; title?: boolean }) {
   const f = line.found;
+  // A filed issue: the face of who filed it and its own ref, where a note has ↪ and the issue it was found in. Hover
+  // says what it is; on a box, the kind and who follow the ref.
+  if (line.filed)
+    return (
+      <WithTooltip label={`${line.filed.as} filed by ${line.filed.by} · ${line.at}`}>
+        <span className="relative flex min-w-0 items-center gap-1">
+          <Avatar size={14} name={line.filed.by} />
+          <span className="min-w-0 truncate">
+            <MetaText tone="muted">
+              {line.filed.ref}
+              {title && ` · ${line.filed.as} filed by ${line.filed.by}`}
+            </MetaText>
+          </span>
+        </span>
+      </WithTooltip>
+    );
   if (!f) return null;
   return (
     <WithTooltip label={`Found while ${STEP[f.step]} ${f.ref}: ${issueOf(f.ref)?.title ?? ""} · ${line.at}`}>
@@ -610,6 +660,17 @@ export function ScopePanel({ id, onPlace, onClose }: { id: string; onPlace: (to:
               )}
             </section>
           )}
+          {l.filed && (
+            <section className="flex flex-col gap-2" aria-label="Filed by">
+              <MetaText tone="muted">
+                {l.filed.as} filed · {l.at}
+              </MetaText>
+              <span className="flex min-w-0 items-center gap-2 text-body-2">
+                <Person size={16} name={l.filed.by} />
+                <MetaText tone="muted">{l.filed.ref}</MetaText>
+              </span>
+            </section>
+          )}
           {l.rec && (
             <Card fill="surface" className="flex flex-col gap-3 p-3">
               <span className="flex items-center gap-1.5 text-body-2 font-medium text-text-primary">
@@ -633,6 +694,12 @@ export function ScopePanel({ id, onPlace, onClose }: { id: string; onPlace: (to:
                     Put elsewhere
                   </Button>
                 </span>
+              )}
+              {/* ✕ on someone's issue cancels it, so it says so before you press it. */}
+              {l.filed && (
+                <MetaText tone="muted">
+                  ✕ cancels {l.filed.by}’s issue and tells {l.filed.by} why.
+                </MetaText>
               )}
             </Card>
           )}
@@ -693,10 +760,11 @@ export function BuildPlan({ placed, openId, onOpen, onPlace }: { placed: Record<
   const into = (to: string) => TRIAGE.filter((l) => placed[l.id] === to);
   // A suggestion accepted into a milestone becomes its next issue, numbered in the order they were accepted.
   const accepted = Object.keys(placed).filter((id) => placed[id].startsWith("m"));
+  // A filed issue keeps its own ref; a note gets the next free one.
   const asIssue = (l: Line): PlanIssue => ({
-    ref: `TOPI-${11 + accepted.indexOf(l.id)}`,
+    ref: l.filed?.ref ?? `TOPI-${14 + accepted.filter((id) => !TRIAGE.find((t) => t.id === id)?.filed).indexOf(l.id)}`,
     title: l.title,
-    summary: `From ${l.from}`,
+    summary: l.filed ? `${l.filed.as} filed by ${l.filed.by}` : `From ${l.from}`,
     status: "todo",
     who: "Miky",
   });
