@@ -1,3 +1,4 @@
+import { PageHeader, Panel } from '@estiva-app/ui'
 import { Button } from '@/components/ui/Button'
 import { Tabs } from '@/components/ui/Tabs'
 import type { StatusEntry } from '@/lib/issues'
@@ -49,13 +50,28 @@ export function IssuesView({ title = 'Issues', issues, statuses, mine, scope, on
     // surface, on the element that *is* the surface, so a browser test can wait
     // for "the issue list is on screen" without coupling to a Tailwind class —
     // which is a styling decision and free to change.
-    <div data-surface="issues" className="flex flex-1 flex-col gap-4 px-6 py-5">
-      <div className="flex items-center gap-3">
-        <h1 className="flex-1 text-h3 text-text-primary">{title}</h1>
-        <Button variant="primary" onClick={onAddIssue} disabledReason={addDisabledReason}>
-          Add issue
-        </Button>
-      </div>
+    // The list's name in the page's bar, as Peek's and Leaf's Explore (Katerina, 18 November: "the title of the page sits
+    // in a header … We should unify that"), "Add issue" in the bar's button place. A page that scrolls inside itself, as
+    // an issue's: `flex-1 min-h-0 [contain:size]` takes exactly the frame's height, so the panel's body scrolls and its
+    // bar stays.
+    <div data-surface="issues" className="flex min-h-0 flex-1 [contain:size]">
+      <div className="flex min-w-0 flex-1 flex-col">
+      <Panel
+        title={title}
+        header={
+          <PageHeader
+            title={title}
+            button={
+              <Button variant="primary" size="small" onClick={onAddIssue} disabledReason={addDisabledReason}>
+                Add issue
+              </Button>
+            }
+          />
+        }
+        bodyClassName="flex flex-col gap-4 px-6 py-5"
+      >
+      {/* The bar's title is words, not a heading: the page's heading, for assistive technology. */}
+      <h1 className="sr-only">{title}</h1>
       <Tabs<IssuesScope>
         tabs={[
           { id: 'all', label: 'All', count: issues.length },
@@ -65,6 +81,8 @@ export function IssuesView({ title = 'Issues', issues, statuses, mine, scope, on
         onChange={onScope}
       />
       <IssueList issues={shown} statuses={statuses} hrefFor={hrefFor} emptyMessage={EMPTY[scope]} />
+      </Panel>
+      </div>
     </div>
   )
 }

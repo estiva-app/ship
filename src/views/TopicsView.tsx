@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { IconTarget } from '@tabler/icons-react'
-import { KindIcon, ListTable, ListTableRow, MembersPill, SearchInput, type AvatarGroupMember, type ListTableColumn } from '@estiva-app/ui'
+import { KindIcon, ListTable, ListTableRow, MembersPill, Panel, SearchInput, type AvatarGroupMember, type ListTableColumn } from '@estiva-app/ui'
 import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { SkeletonList } from '@/components/ui/Skeleton'
@@ -76,9 +76,15 @@ export function TopicsView({ title, lists, tab, onTab, onRetry, onJoin, joining,
   const asked = query.trim()
   const shown = typeof lists === 'string' ? [] : lists[tab].filter((topic) => !asked || findsTopic(topic.title, asked))
   return (
-    // `data-surface` is the smoke test's waypoint — see IssuesView.
-    <div data-surface="topics" className="flex flex-1 flex-col gap-4 px-6 py-5">
-      <h1 className="text-h3 text-text-primary">{title}</h1>
+    // `data-surface` is the smoke test's waypoint — see IssuesView. The list's name in the page's bar, as Peek's and Leaf's
+    // Explore (Katerina, 18 November: "the title of the page sits in a header … We should unify that"), the kit's Panel. A page that
+    // scrolls inside itself, as an issue's: `flex-1 min-h-0 [contain:size]` takes exactly the frame's height, so the
+    // panel's body scrolls and its bar stays.
+    <div data-surface="topics" className="flex min-h-0 flex-1 [contain:size]">
+      <div className="flex min-w-0 flex-1 flex-col">
+      <Panel title={title} bodyClassName="flex flex-col gap-4 px-6 py-5">
+      {/* The bar's title is words, not a heading: the page's heading, for assistive technology. */}
+      <h1 className="sr-only">{title}</h1>
       {lists === 'loading' ? (
         <SkeletonList rows={8} />
       ) : lists === 'failed' ? (
@@ -110,6 +116,8 @@ export function TopicsView({ title, lists, tab, onTab, onRetry, onJoin, joining,
           )}
         </div>
       )}
+      </Panel>
+      </div>
     </div>
   )
 }
