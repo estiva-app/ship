@@ -49,7 +49,10 @@ function answer(filters: Record<string, unknown>[]): SignedEvent[] {
     // At most 1000 a filter, newest first, as the relay clamps a plain read and a list read's first records.
     const limit = Math.min(typeof f.limit === 'number' ? f.limit : 1000, 1000)
     if (f.fields === 'newest') {
-      const roots = held.filter((event) => isRoot(event) && matches(event)).sort((x, y) => y.created_at - x.created_at).slice(0, limit)
+      // A file whose newest `deleted` change says true is left out of the list read (SPEC §6.13), after the
+      // limit is taken, as the relay does (buzz `with_newest_changes`): a page holding a deleted file is short.
+      const deleted = (root: SignedEvent) => newestFields(addrOf(root), false).some((e) => tagOf(e, 'field') === 'deleted' && tagOf(e, 'value') === 'true')
+      const roots = held.filter((event) => isRoot(event) && matches(event)).sort((x, y) => y.created_at - x.created_at).slice(0, limit).filter((root) => !deleted(root))
       for (const root of roots) {
         out.add(root)
         for (const change of newestFields(addrOf(root), f.text === true)) out.add(change)
@@ -127,6 +130,26 @@ describe('a cold load with the issues switch on', () => {
     const state = foldWorkspace(await storeWith(true).loadAllEvents())
 
     expect(state.issues.length).toBe(1005)
+  })
+
+  it('leaves a deleted issue out of the lists, not back as a Todo with no changes', async () => {
+    held.push(issue('kept', 'alpha'), change('kept', 'status', 'in_progress', 110))
+    held.push(issue('gone', 'alpha'), change('gone', 'status', 'in_progress', 110), change('gone', 'deleted', 'true', 120))
+
+    const state = foldWorkspace(await storeWith(true).loadAllEvents())
+
+    expect(state.issues.map((one) => one.id)).toEqual(['kept'])
+    expect(state.issues[0]!.status).toBe('in_progress')
+  })
+
+  it('lists every live issue past a page the relay answered short because it held deleted ones', async () => {
+    for (let n = 0; n < 2500; n++) held.push(issue(`i${n}`, 'alpha', 1000 + n))
+    // Five deleted inside the second page of 1000 first records, which the relay answers with 995.
+    for (let n = 1000; n < 1005; n++) held.push(change(`i${n}`, 'deleted', 'true', 5000))
+
+    const state = foldWorkspace(await storeWith(true).loadAllEvents())
+
+    expect(state.issues.length).toBe(2495)
   })
 
   it('refuses to load rather than drop the older issues when more than 1000 share one second', async () => {
