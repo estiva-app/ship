@@ -41,7 +41,7 @@ import { ScrollArea } from "@/components/ui/ScrollArea";
 import { IssueRow, type IssueRowData } from "@/components/IssueRow";
 import type { IssuesTableRow } from "@/components/IssuesTable";
 import { ISSUE_STATUSES, hrefFor } from "@/fixtures/issues";
-import { NewDot } from "./ItemParts";
+import { AcceptReject, NewDot } from "./ItemParts";
 
 type IssueStatus = "todo" | "in_progress" | "done" | "cancelled";
 type Session = {
@@ -451,8 +451,16 @@ function FoundChip({ line }: { line: Line }) {
 const RecChip = ({ line }: { line: Line }) =>
   line.rec ? <Chip label={said(line.rec.to)} leadingIcon={<IconArrowRight size={12} stroke={1.5} />} /> : null;
 
-/** One line to decide: its title, where it was found, where it would go. A click opens it beside the list. */
-function ScopeRow({ line, selected, onOpen }: { line: Line; selected: boolean; onOpen: () => void }) {
+/**
+ * Accept and ✕ on a line to decide (Miky, 18 Nov), the Insights' own pair: Accept puts it where Claude would, ✕ drops it
+ * to Not doing. Another place is in the side panel.
+ */
+const Answer = ({ line, onPlace }: { line: Line; onPlace: (to: string) => void }) => (
+  <AcceptReject label="Accept" onAnswer={(yes) => onPlace(yes ? (line.rec?.to ?? "later") : "not")} />
+);
+
+/** One line to decide: its title, where it was found, where it would go, Accept / ✕. A click opens it beside the list. */
+function ScopeRow({ line, selected, onOpen, onPlace }: { line: Line; selected: boolean; onOpen: () => void; onPlace: (to: string) => void }) {
   return (
     <div className={cn("relative flex h-9 min-w-0 items-center gap-3 rounded-md px-3 transition-colors hover:bg-bg-hover", selected && "bg-bg-selected")}>
       <span className="flex min-w-0 flex-1 items-center gap-1.5">
@@ -463,6 +471,9 @@ function ScopeRow({ line, selected, onOpen }: { line: Line; selected: boolean; o
       </span>
       <FoundChip line={line} />
       <RecChip line={line} />
+      <span className="relative flex">
+        <Answer line={line} onPlace={onPlace} />
+      </span>
     </div>
   );
 }
@@ -472,14 +483,14 @@ function ScopeRow({ line, selected, onOpen }: { line: Line; selected: boolean; o
  * was found (the issue's ref; hover for the rest) and where Claude would put it. A click opens it beside the list,
  * where it is decided.
  */
-function ScopeToDecide({ lines, openId, onOpen }: { lines: Line[]; openId?: string; onOpen: (id: string) => void }) {
+function ScopeToDecide({ lines, openId, onOpen, onPlace }: { lines: Line[]; openId?: string; onOpen: (id: string) => void; onPlace: (id: string, to: string) => void }) {
   if (!lines.length) return null;
   return (
     <section className="flex flex-col gap-2" aria-label="Scope to decide">
       <SectionHeader title="Scope to decide" count={lines.length} />
       <div className="flex flex-col gap-px">
         {lines.map((l) => (
-          <ScopeRow key={l.id} line={l} selected={l.id === openId} onOpen={() => onOpen(l.id)} />
+          <ScopeRow key={l.id} line={l} selected={l.id === openId} onOpen={() => onOpen(l.id)} onPlace={(to) => onPlace(l.id, to)} />
         ))}
       </div>
     </section>
@@ -493,7 +504,7 @@ export const scopeLeft = (placed: Record<string, string>) => TRIAGE.filter((l) =
  * Scope to decide on the Board (Miky, 18 Nov: "on board view it would be boxes"): the same lines as boxes above the
  * columns, the title, then the same two chips. A click opens it beside the board.
  */
-export function ScopeBoxes({ placed, openId, onOpen }: { placed: Record<string, string>; openId?: string; onOpen: (id: string) => void }) {
+export function ScopeBoxes({ placed, openId, onOpen, onPlace }: { placed: Record<string, string>; openId?: string; onOpen: (id: string) => void; onPlace: (id: string, to: string) => void }) {
   const lines = scopeLeft(placed);
   if (!lines.length) return null;
   return (
@@ -509,6 +520,9 @@ export function ScopeBoxes({ placed, openId, onOpen }: { placed: Record<string, 
             <span className="mt-auto flex flex-wrap items-center gap-1.5">
               <FoundChip line={l} />
               <RecChip line={l} />
+              <span className="ml-auto flex">
+                <Answer line={l} onPlace={(to) => onPlace(l.id, to)} />
+              </span>
             </span>
           </Card>
         ))}
@@ -578,9 +592,7 @@ export function ScopePanel({ id, onPlace, onClose }: { id: string; onPlace: (to:
                 </span>
               ) : (
                 <span className="flex items-center gap-2">
-                  <Button variant="primary" size="small" onClick={() => onPlace(l.rec?.to ?? "later")}>
-                    Accept
-                  </Button>
+                  <AcceptReject label="Accept" onAnswer={(yes) => onPlace(yes ? (l.rec?.to ?? "later") : "not")} />
                   <Button variant="outlined" size="small" onClick={() => setEditing(true)}>
                     Put elsewhere
                   </Button>
@@ -640,7 +652,7 @@ function Lines({
  * the finished ones folded at the foot. Under it, the scope still to decide, then what is out of scope. Where each
  * line to decide was placed lives on the page, since the line opens beside the list.
  */
-export function BuildPlan({ placed, openId, onOpen }: { placed: Record<string, string>; openId?: string; onOpen: (id: string) => void }) {
+export function BuildPlan({ placed, openId, onOpen, onPlace }: { placed: Record<string, string>; openId?: string; onOpen: (id: string) => void; onPlace: (id: string, to: string) => void }) {
   const [outTab, setOutTab] = useState<"later" | "not">("later");
   const into = (to: string) => TRIAGE.filter((l) => placed[l.id] === to);
   // A suggestion accepted into a milestone becomes its next issue, numbered in the order they were accepted.
@@ -671,7 +683,7 @@ export function BuildPlan({ placed, openId, onOpen }: { placed: Record<string, s
         ))}
         {finished.length > 0 && <Completed milestones={finished} />}
       </section>
-      <ScopeToDecide lines={left} openId={openId} onOpen={onOpen} />
+      <ScopeToDecide lines={left} openId={openId} onOpen={onOpen} onPlace={onPlace} />
       {/* Out of scope (Miky, 17 Nov): the scoping decisions, Later and Not doing as tabs over one list. */}
       <section className="flex flex-col gap-2" aria-label="Out of scope">
         <SectionHeader title="Out of scope" />

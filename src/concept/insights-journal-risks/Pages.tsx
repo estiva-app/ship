@@ -182,6 +182,8 @@ export function ProjectPage({ start = 'overview', listState = 'ready', me = 'mik
   // A line to decide opens beside the List; where each was placed is kept here, so the List and the panel agree.
   const [placed, setPlaced] = useState<Record<string, string>>({})
   const [scopeId, setScopeId] = useState<string>()
+  // Accept, ✕ or another place, from a row, a box or the panel: the line leaves Scope to decide, and its panel closes.
+  const place = (id: string, to: string) => (setPlaced((p) => ({ ...p, [id]: to })), setScopeId((o) => (o === id ? undefined : o)))
   // Decide changes the lists in place: the question resolves, its Decision joins the Journal (Miky, 16 Nov).
   const [all, setAll] = useState<Item[]>(() => (decided ? decide(ITEMS, decided, Math.max(0, ITEMS.find((i) => i.id === decided)?.options?.findIndex((o) => o.lean) ?? 0)) : ITEMS))
   const [open, setOpen] = useState<Item | undefined>(all.find((i) => i.id === open0))
@@ -252,13 +254,13 @@ export function ProjectPage({ start = 'overview', listState = 'ready', me = 'mik
           )}
           {tab === 'issues' && (
             view === 'board' ? (
-              // On the Board, Scope to decide is boxes above the columns (Miky, 18 Nov); on the List, rows.
+              // On the Board, Scope to decide is boxes under the columns (Miky, 18 Nov); on the List, rows.
               <div className="flex flex-col gap-6">
-                <ScopeBoxes placed={placed} openId={scopeId} onOpen={(id) => setScopeId((o) => (o === id ? undefined : id))} />
                 <Board issues={planRows()} statuses={ISSUE_STATUSES} hrefFor={hrefFor} />
+                <ScopeBoxes placed={placed} openId={scopeId} onOpen={(id) => setScopeId((o) => (o === id ? undefined : id))} onPlace={place} />
               </div>
             ) : (
-              <BuildPlan placed={placed} openId={scopeId} onOpen={(id) => setScopeId((o) => (o === id ? undefined : id))} />
+              <BuildPlan placed={placed} openId={scopeId} onOpen={(id) => setScopeId((o) => (o === id ? undefined : id))} onPlace={place} />
             )
           )}
           {tab === 'insights' && <ItemsTab type="insight" all={all} state={listState} onOpen={onOpenItem} openId={open?.id} me={me} />}
@@ -267,7 +269,7 @@ export function ProjectPage({ start = 'overview', listState = 'ready', me = 'mik
         </ScrollArea>
       </div>
       {tab === 'issues' && scopeId && !placed[scopeId] && (
-        <ScopePanel key={scopeId} id={scopeId} onPlace={(to) => (setPlaced((p) => ({ ...p, [scopeId]: to })), setScopeId(undefined))} onClose={() => setScopeId(undefined)} />
+        <ScopePanel key={scopeId} id={scopeId} onPlace={(to) => place(scopeId, to)} onClose={() => setScopeId(undefined)} />
       )}
       {open && (tab === 'overview' || open.type === TAB_TYPE[tab]) && <ItemPanel item={open} me={me} onClose={() => (setOpen(undefined), setDecidingId(undefined))} deciding={open.id === decidingId} onDecide={(c, why) => onDecide(open, c, why)} />}
       {side.overview.shown && (
