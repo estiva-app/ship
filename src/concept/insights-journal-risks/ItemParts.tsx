@@ -10,7 +10,7 @@
 import { Fragment, createContext, useContext, useState, type ReactNode } from 'react'
 import { IconBox, IconCircleDot, IconExternalLink, IconFileText, IconTarget, IconTrash, IconUsers, IconX } from '@tabler/icons-react'
 import { Avatar, Button, Card, Chip, EmptyState, IconButton, MetaText, SkeletonList, StatusMark, Tabs, WithTooltip } from '@estiva-app/ui'
-import { TYPE_META, statusOption, wordIcon, type ItemType, type Status } from './MarkAs'
+import { QUESTION_COLOUR, TYPE_META, statusOption, wordIcon, wordTone, type ItemType, type Status } from './MarkAs'
 import { CATEGORIES, PROJECT, type Item, type Source } from './fixtures'
 
 /** True on a page that gathers items from many places (a team, an Initiative): each item then says where it lives. */
@@ -79,7 +79,7 @@ export const acceptedStatus = (item: Pick<Item, 'type'>): Status => (item.type =
 export function ItemTag({ item }: { item: Item }) {
   const word = item.type === 'insight' ? (item.category ?? 'Insight') : item.word
   return (
-    <span className={`flex shrink-0 items-center gap-1 text-caption ${TYPE_META[item.type].text}`}>
+    <span className="flex shrink-0 items-center gap-1 text-caption" style={wordTone(item.word)}>
       {wordIcon(item.word, 14)}
       {word}
     </span>
@@ -224,6 +224,9 @@ const MARKER: Record<ItemType, { border: string; fill: string }> = {
   journal: { border: 'border-info-default', fill: 'bg-info-default' },
   risk: { border: 'border-error-default', fill: 'bg-error-default' },
 }
+/** A Question's square is orange, not its type's red (Miky, 18 Nov), until it ends and goes grey. */
+const markerOrange = (item: Item) =>
+  item.word !== 'Question' || ENDED.includes(item.status) ? undefined : { borderColor: QUESTION_COLOUR, ...(item.status === 'proposed' ? {} : { backgroundColor: QUESTION_COLOUR }) }
 const markerClass = (item: Item) =>
   item.status === 'proposed' ? `${MARKER[item.type].border} bg-bg-surface` : ENDED.includes(item.status) ? 'border-border-strong bg-border-strong' : `${MARKER[item.type].border} ${MARKER[item.type].fill}`
 
@@ -238,7 +241,7 @@ export function ItemTimeline({ items, onOpen, openId, me = 'miky', label }: { it
     <ol className="ml-2 flex flex-col border-l-2 border-border-strong pl-5" aria-label={label}>
       {sorted.map((item) => (
         <li key={item.id} className="relative">
-          <span aria-hidden className={`absolute -left-[25px] top-4 size-2 rounded-sm border-2 ${markerClass(item)}`} />
+          <span aria-hidden className={`absolute -left-[25px] top-4 size-2 rounded-sm border-2 ${markerClass(item)}`} style={markerOrange(item)} />
           <ItemEntry item={item} me={me} selected={item.id === openId} onOpen={() => onOpen?.(item)} />
         </li>
       ))}
