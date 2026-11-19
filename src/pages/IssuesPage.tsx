@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useUnfinished } from './creating'
 import { ISSUE_STATUSES, conversationsAbout, createIssue, me, setIssueDeleted, type DirectoryView, type FolderState, type WorkspaceState } from '@/api'
 import { useDeletedIssues } from '@/api/useDeletedIssues'
@@ -71,9 +71,16 @@ export function IssuesPage({ state, directory, teams, archives, folder, say, ref
   }, [state, archives, folder, projects])
   // The deleted ones are read anew each time the Archived tab opens (SPEC §6.5), never on a load.
   const gone = useDeletedIssues(scope === 'archived', true)
+  // A read that did not answer is said, not drawn as "none": someone looking for a deleted issue must not conclude it is gone.
+  useEffect(() => {
+    if (gone.failed) say('Deleted issues could not load. Open Archived again to retry.', 'error', 'not-loaded')
+  }, [gone.failed, say])
   const deleted = useMemo(() => {
     const here = folder ? new Set(projects.map((project) => project.addr)) : undefined
-    return (gone.deleted ?? [])
+    // The ones this page's load holds too: every deleted one before the switch, and any heard deleted since.
+    const read = gone.deleted ?? []
+    const known = new Set(read.map((issue) => issue.addr))
+    return [...read, ...(gone.deleted ? (state.deletedIssues ?? []).filter((issue) => !known.has(issue.addr)) : [])]
       .filter((issue) => !here || (!!issue.projectAddr && here.has(issue.projectAddr)))
       .map((issue) => ({
         href: hrefForIssue(issue),
@@ -86,7 +93,7 @@ export function IssuesPage({ state, directory, teams, archives, folder, say, ref
             gone.reload()
           }),
       }))
-  }, [gone, folder, projects, directory, say, refresh])
+  }, [gone, state.deletedIssues, folder, projects, directory, say, refresh])
   // A row counts its issue's conversations wherever they are, so every Folder's, read after the rows draw (APP-5).
   const counted = useThreads(state, state.folders).all
   const rows = useMemo(() => live.map((issue) => rowFor(issue, state, directory, counted)), [live, state, directory, counted])

@@ -58,7 +58,8 @@ import type { ReadTopic } from '@estiva-app/interop'
  * something downstream would catch a mistake. It would not.
  */
 export type WriteResult = { ok: true } | { ok: false; reason: string }
-export type CreateResult = { ok: true; addr: string } | { ok: false; reason: string; unfinished?: Unfinished }
+/** `elsewhere`: Create again picked another project or team than the one the unfinished file was created in; `reason` says so to the person. */
+export type CreateResult = { ok: true; addr: string } | { ok: false; reason: string; unfinished?: Unfinished; elsewhere?: true }
 
 const refused = (reason?: string): WriteResult => ({ ok: false, reason: reason ?? 'no reason given' })
 
@@ -171,13 +172,13 @@ export async function createProject(draft: { title: string; description: string;
   const clock = await clockProblem()
   if (clock) return { ok: false, reason: clock }
   try {
-    if (unfinished) return await finish(unfinished, draft)
+    if (unfinished) return await finish(unfinished, draft, draft.team.folder, 'team')
     // Filed in its team's Folder by `h` where projects are kept in order (SPEC §6.13, D5), as Leaf and the agent file theirs.
     const filedIn = !!(await projectFieldsNow())
     const { result, placed, addr, created } = await store.createProject({ title: draft.title, description: draft.description, summary: draft.summary, key: draft.key, team: draft.team, filedIn })
     if (result.ok) claimedHere.add(addr)
     if (!result.ok) return { ok: false, reason: result.reason ?? 'no reason given' }
-    if (created && !created.ok) return createdOf(created, draft.team.folder, draft.title)
+    if (created && !created.ok) return createdOf(created, draft.team.folder, draft.title, draft.team.folder)
     if (placed && !placed.ok) return { ok: true, addr, unlisted: placed.reason ?? 'no reason given' }
     return { ok: true, addr }
   } catch (error) {
@@ -603,17 +604,17 @@ export async function createIssue(project: Project, visible: Visible, draft: { t
   if (clock) return { ok: false, reason: clock }
   try {
     // Create again after the text did not land: the rest is sent, never a second first record (SPEC §6.1).
-    if (unfinished) return { ...(await finish(unfinished, draft)), folder: unfinished.folder }
+    if (unfinished) return { ...(await finish(unfinished, draft, project.addr, 'project')), folder: unfinished.folder }
     const folder = workFolder(project)
     const inOrder = !!(await issueFieldsNow())
     // Where issues are kept in order a deleted issue keeps its number, so a new one never takes it (SPEC §6.1).
-    const numbering = inOrder ? await withDeleted(visible) : visible
+    const numbering = inOrder ? await withDeleted(visible) : withHeldDeleted(visible)
     const key = await keyFor(project, numbering)
     const issue = { folder, title: draft.title, description: draft.description, summary: draft.summary, projectAddr: project.addr, ref: nextRef(key, numbering.issues.map((one) => one.ref)) }
     if (inOrder) {
       const created = await store.createIssueInOrder(issue)
       if (created.ok || created.created) claimedHere.add(created.address)
-      return { ...createdOf(created, folder, draft.title), folder }
+      return { ...createdOf(created, folder, draft.title, project.addr), folder }
     }
     const { result, addr } = await store.createIssue(issue)
     if (!result.ok) return { ok: false, reason: result.reason ?? 'no reason given' }
@@ -635,20 +636,27 @@ export interface Unfinished {
   addr: string
   folder: string
   title: string
+  /** Where it was created: the issue's project, or the project's team. */
+  place: string
 }
 
 /** What `createFile` answered, as a page reads a creation: created, nothing created, or created without its text. */
-function createdOf(created: CreateFileResult, folder: string, title: string): CreateResult {
+function createdOf(created: CreateFileResult, folder: string, title: string, place: string): CreateResult {
   if (created.ok) return { ok: true, addr: created.address }
   if (!created.created) return { ok: false, reason: created.refused }
   const why = 'refused' in created.failed ? created.failed.refused : 'someone wrote its text first'
-  return { ok: false, reason: why, unfinished: { root: created.root, addr: created.address, folder, title } }
+  return { ok: false, reason: why, unfinished: { root: created.root, addr: created.address, folder, title, place } }
 }
 
-/** The rest of an unfinished creation: its text as written now, and its title when the person changed it since. */
-async function finish(unfinished: Unfinished, draft: { title: string; description: string }): Promise<CreateResult> {
+/**
+ * The rest of an unfinished creation: its text as written now, and its title
+ * when the person changed it since. Its text goes where it was created, so a
+ * project or team picked since is refused, never written to the first one.
+ */
+async function finish(unfinished: Unfinished, draft: { title: string; description: string }, place: string, what: 'project' | 'team'): Promise<CreateResult> {
+  if (place !== unfinished.place) return { ok: false, reason: `It was created in another ${what}. Choose that one again to send its description.`, unfinished, elsewhere: true }
   const created = await store.finishCreating(unfinished.root, unfinished.folder, draft.description, draft.title !== unfinished.title ? draft.title : undefined)
-  return createdOf(created, unfinished.folder, unfinished.title)
+  return createdOf(created, unfinished.folder, unfinished.title, unfinished.place)
 }
 
 /**
@@ -667,6 +675,16 @@ async function withDeleted(visible: Visible): Promise<Visible> {
     extra.push(issue)
   }
   return { projects: visible.projects, issues: [...visible.issues, ...extra] }
+}
+
+/**
+ * What numbering counts before issues are kept in order: every issue it can
+ * see and the deleted ones its load holds, which before the switch is every
+ * one (the whole read carries them), so a hidden issue's number is not given
+ * again.
+ */
+function withHeldDeleted(visible: Visible): Visible {
+  return { projects: visible.projects, issues: [...visible.issues, ...(visible.deletedIssues ?? [])] }
 }
 
 /**
@@ -689,6 +707,11 @@ export function readDeletedIssues(fresh = false): Promise<Issue[]> {
     deletedRead = read
   }
   return deletedRead
+}
+
+/** An issue by the `d` of its link, folded with every change, a deleted one with who deleted it (SPEC §6.5); undefined when there is none this reader can read. */
+export async function readIssueByLink(d: string): Promise<Issue | undefined> {
+  return foldFolder(await store.issueByLink(d)).issues.find((issue) => issue.id === d)
 }
 
 /**
@@ -837,7 +860,7 @@ export async function assignMissingRefs(project: Project, visible: Visible): Pro
   const missing = mine.filter((issue) => !issue.ref).sort((a, b) => a.createdAt - b.createdAt)
   if (missing.length === 0) return []
   // Deleted issues count where issues are kept in order (SPEC §6.1); a read that fails numbers nothing.
-  let numbering = visible
+  let numbering = withHeldDeleted(visible)
   try {
     if (await issueFieldsNow()) numbering = await withDeleted(visible)
   } catch (error) {
@@ -883,13 +906,15 @@ export async function settleClaims(visible: Visible): Promise<WriteResult[]> {
       const key = suggestKey(project.title, takenKeys(visible.projects, visible.issues))
       results.push(await setProjectField(project, 'key', key, `Key → ${key}, ${project.key} was taken`))
     }
-    const losing = clashes(visible.issues, (issue) => issue.ref, 'ref', claimedHere).filter((issue) => keyOfRef(issue.ref) && once(issue.addr, issue.ref ?? ''))
+    const unsettled = (issue: Issue) => !settled.has(`${issue.addr}=${issue.ref ?? ''}`)
+    const losing = clashes(visible.issues, (issue) => issue.ref, 'ref', claimedHere).filter((issue) => keyOfRef(issue.ref) && unsettled(issue))
     if (losing.length === 0) return results
     // The next free number counts deleted issues too, read only when a claim has to move (SPEC §6.1).
-    const numbering = (await issueFieldsNow()) ? await withDeleted(visible).catch(() => undefined) : visible
+    // A read that fails moves nothing yet: the claim is tried again on the next refresh, not marked as moved.
+    const numbering = (await issueFieldsNow()) ? await withDeleted(visible).catch(() => undefined) : withHeldDeleted(visible)
     if (!numbering) return results
     const assigned = numbering.issues.map((issue) => issue.ref)
-    for (const issue of losing) {
+    for (const issue of losing.filter((one) => once(one.addr, one.ref ?? ''))) {
       const ref = nextRef(keyOfRef(issue.ref)!, assigned)
       assigned.push(ref)
       results.push(await claimRef(issue, ref, `Ref → ${ref}, ${issue.ref} was taken`))

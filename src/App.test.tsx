@@ -708,10 +708,11 @@ describe('Issue page — one issue from the fold', () => {
     expect(main.getByRole('link', { name: 'Live' })).toHaveAttribute('href', `/project/live-${LIVE}`)
   })
 
-  it('says so when the issue is not in this workspace', () => {
+  it('says so when the issue is not in this workspace', async () => {
     goTo(`/issue/${D('98')}`)
     render(<App />)
-    expect(screen.getByText(/not in this workspace/)).toBeInTheDocument()
+    // Once its link has been looked up (a deleted issue still opens by it, SPEC §6.5).
+    expect(await screen.findByText(/not in this workspace/)).toBeInTheDocument()
   })
 })
 

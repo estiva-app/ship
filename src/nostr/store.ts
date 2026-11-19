@@ -1563,14 +1563,6 @@ export class Store {
   }
 
   /**
-   * Delete a project or an issue, or restore it (SPEC §6.5): a `deleted`
-   * change after the one it follows. Written in the file's own team.
-   */
-  setDeleted(args: { folder: string; target: string; deleted: boolean; prev: string }): Promise<WriteChangeResult> {
-    return this.writeField({ folder: args.folder, target: args.target, field: DELETED_FIELD, value: args.deleted ? 'true' : '', note: args.deleted ? 'Delete' : 'Restore', prev: args.prev })
-  }
-
-  /**
    * Every deleted issue this reader can read, with each one's changes (SPEC
    * §6.5, "Finding a team's deleted files"): the times read of issues, page by
    * page until its `until` cursor stops, then one read by `ids` of the changes
@@ -1578,6 +1570,18 @@ export class Store {
    * signed events, never on the rows. For the Archived tab and for numbering
    * (§6.1: deleted issues count), never on a load.
    */
+  /**
+   * An issue by the `d` its link carries, its first record and every change
+   * (SPEC §6.5): a deleted issue opened by its link, which no load carries,
+   * since the list read leaves deleted files out and teams are asked for no
+   * issues (ISS-4). Every author's issue with that `d`; the page picks.
+   */
+  async issueByLink(d: string): Promise<SignedEvent[]> {
+    const roots = await this.relay.query([{ kinds: [KIND.ISSUE], '#d': [d] }])
+    if (!roots.length) return []
+    return [...roots, ...(await this.changesOf(this.queryAll, roots.map((root) => `${KIND.ISSUE}:${root.pubkey}:${d}`)))]
+  }
+
   async deletedIssueEvents(): Promise<SignedEvent[]> {
     const rows: FileTimes[] = []
     let until: number | undefined

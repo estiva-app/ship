@@ -27,7 +27,8 @@ export function useUnfinished(what: 'Issue' | 'Project') {
       }
       if (result.unfinished) {
         held.current = result.unfinished
-        say(`${what} created without its text — ${result.reason}. Create again to send it.`, 'error', 'not-created')
+        // The relay's reason is a code, not words for a person; where it went wrong is.
+        say(result.elsewhere ? result.reason : `${what} created, but its description didn't save. Create again to send it.`, 'error', 'not-created')
         return false
       }
       say(`${what} rejected — ${result.reason}`, 'error', 'not-created')

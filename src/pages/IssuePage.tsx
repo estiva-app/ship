@@ -13,6 +13,7 @@ import { MEMBER_FIELD_PREFIX, memberOfField } from '@estiva-app/conversation'
 import { useRelated, withoutTopics } from '@/api/useRelated'
 import { useFileTopics } from '@/api/useFileTopics'
 import { useThreads } from '@/api/useThreads'
+import { useIssueByLink } from '@/api/useDeletedIssues'
 import { Members } from '@/components/Members'
 import { membershipActions } from './membership'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
@@ -37,7 +38,10 @@ import { useReferencePage } from '@/api/references'
  */
 export function IssuePage({ state, directory, archives, d, say, refresh }: { state: WorkspaceState; directory: DirectoryView; /** What is archived, and what with — FOL-46. */ archives: Archives; /** The object's `d`, which is all a §7.2 URL carries. */ d: string; say: Say; refresh: (folders?: string[]) => Promise<void> }) {
   // A deleted issue leaves the lists and still opens by its link, with who deleted it and Restore (SPEC §6.5).
-  const issue = state.issues.find((candidate) => candidate.id === d) ?? state.deletedIssues?.find((candidate) => candidate.id === d)
+  const loaded = state.issues.find((candidate) => candidate.id === d) ?? state.deletedIssues?.find((candidate) => candidate.id === d)
+  // No load carries a deleted issue's first record, so its link reads it by its `d`.
+  const byLink = useIssueByLink(d, !loaded)
+  const issue = loaded ?? byLink.issue
   const project = issue?.projectAddr ? state.projects.find((candidate) => candidate.addr === issue.projectAddr) : undefined
   /*
     The conversations this page draws, read for it (APP-5): its own Folder's,
@@ -144,6 +148,7 @@ export function IssuePage({ state, directory, archives, d, say, refresh }: { sta
   }, [issue])
 
   if (!issue) {
+    if (byLink.reading) return <PageSkeleton shape="issue" />
     return (
       <EmptyState
         icon={<IconLinkOff size={16} stroke={1.5} />}
@@ -159,7 +164,7 @@ export function IssuePage({ state, directory, archives, d, say, refresh }: { sta
   const archive = archives.ofIssue(issue)
   const deleted = issue.deleted
   // A deleted issue reached by its link draws once its every change is held, not by a first title it may have lost (as a project's).
-  if (deleted && byFields && !state.issueTexts!.includes(issue.addr)) return <PageSkeleton shape="issue" />
+  if (deleted && loaded && byFields && !state.issueTexts!.includes(issue.addr)) return <PageSkeleton shape="issue" />
   // The notice's Unarchive waits for the answer.
   const unarchive = () =>
     act('Unarchive', () => archiveIssue(issue, false), say, () => refresh([issue.folder])).then((ok) => {
@@ -185,7 +190,10 @@ export function IssuePage({ state, directory, archives, d, say, refresh }: { sta
               when={day(deleted.at)}
               onRestore={() =>
                 act('Restore', () => setIssueDeleted(issue, false), say, () => refresh([issue.folder])).then((ok) => {
-                  if (ok) say('Issue restored')
+                  if (!ok) return
+                  say('Issue restored')
+                  // Read by its link, it is read again: restored, it is not deleted any more.
+                  if (!loaded) byLink.reread()
                 })
               }
             />
@@ -401,12 +409,16 @@ export function IssuePage({ state, directory, archives, d, say, refresh }: { sta
           ) : (
             <p>This publishes a NIP-09 deletion request. Relays may decline it, and copies held elsewhere are unaffected.</p>
           )}
-          {!byFields && conversations.length > 0 && (
-            <p>
-              Its {conversations.length} {conversations.length === 1 ? 'conversation is a separate event and is' : 'conversations are separate events and are'} not deleted — they stay
-              in the team and stop being reachable from here.
-            </p>
-          )}
+          {/* Deleting the issue never deletes the discussion, and the dialog says so (SHI-3). */}
+          {conversations.length > 0 &&
+            (byFields ? (
+              <p>Its {conversations.length === 1 ? 'conversation stays' : `${conversations.length} conversations stay`} in the team, and come back with it.</p>
+            ) : (
+              <p>
+                Its {conversations.length} {conversations.length === 1 ? 'conversation is a separate event and is' : 'conversations are separate events and are'} not deleted — they stay
+                in the team and stop being reachable from here.
+              </p>
+            ))}
         </ConfirmDialog>
       )}
     </>

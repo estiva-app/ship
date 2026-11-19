@@ -75,7 +75,8 @@ export function IssuesView({ title = 'Issues', issues, statuses, mine, scope, on
         tabs={[
           { id: 'all', label: 'All', count: issues.length },
           { id: 'mine', label: 'Assigned to me', count: assigned.length },
-          { id: 'archived', label: 'Archived', count: archived.length + deleted.length },
+          // The archived ones alone: the deleted are read only when the tab opens, so counting them here would make the number jump.
+          { id: 'archived', label: 'Archived', count: archived.length },
         ]}
         active={scope}
         onChange={onScope}

@@ -53,6 +53,13 @@ describe('assignMissingRefs — Ship numbers what Ship can number', () => {
     expect(targets).toEqual(['30851:a:early', '30851:a:late'])
   })
 
+  it('skips a number a deleted issue holds, before issues are kept in order too', async () => {
+    // A `deleted` change hides an issue from every list; its number stays its own (SPEC §6.1).
+    setField.mockClear()
+    await assignMissingRefs(payments, { ...visible([issue('a', 'PAY-1'), issue('new', undefined, 3)]), deletedIssues: [issue('gone', 'PAY-2', 2)] })
+    expect(valuesWritten()).toEqual(['PAY-3'])
+  })
+
   it('writes nothing when every issue already has a key', async () => {
     setField.mockClear()
     await assignMissingRefs(payments, visible([issue('a', 'PAY-1')]))

@@ -140,7 +140,7 @@ vi.mock('./store', async () => {
 })
 vi.mock('./clock', () => ({ clockProblem: async () => undefined }))
 
-const { assignMissingRefs, createIssue, createProject, deleteIssue, noteFileText, readDeletedIssues, setIssueDeleted, setIssueField } = await import('./writes')
+const { assignMissingRefs, createIssue, createProject, deleteIssue, noteFileText, readDeletedIssues, readIssueByLink, setIssueDeleted, setIssueField } = await import('./writes')
 const { foldFolder } = await import('../nostr/fold')
 const { foldWorkspace } = await import('../nostr/store')
 
@@ -264,6 +264,16 @@ describe('a new issue', () => {
     expect(tagOf(sent[0]!, 'ref')).toBe('PAY-4')
   })
 
+  it('sends no text when Create again picks another project than the one it was created in', async () => {
+    refuseOnce = { field: 'description', reason: 'invalid: blocked for the test' }
+    const first = await createIssue(project, { projects: [project], issues: [] }, { title: 'Two', description: 'Private words' })
+    sent.length = 0
+    const elsewhere = { ...(project as object), addr: `30850:${PK}:q`, contentFolder: 'f0f0f0f0-0000-4000-8000-000000000000' } as never
+    const again = await createIssue(elsewhere, { projects: [project, elsewhere], issues: [] }, { title: 'Two', description: 'Private words' }, !first.ok ? first.unfinished : undefined)
+    expect(again.ok).toBe(false)
+    expect(sent).toEqual([])
+  })
+
   it('keeps the words when the text did not land, and Create again sends the text, never a second issue', async () => {
     refuseOnce = { field: 'description', reason: 'invalid: blocked for the test' }
     const first = await createIssue(project, { projects: [project], issues: [] }, { title: 'Two', description: 'Its words' })
@@ -298,7 +308,9 @@ describe('deleting an issue', () => {
     expect(gone.issues).toEqual([])
     expect(gone.deletedIssues!.map((issue) => [issue.ref, issue.deleted!.by])).toEqual([['PAY-7', PK]])
 
-    expect((await readDeletedIssues()).map((issue) => issue.ref)).toEqual(['PAY-7'])
+    expect((await readDeletedIssues(true)).map((issue) => issue.ref)).toEqual(['PAY-7'])
+    // Its link still opens it, with who deleted it: no list read carries it.
+    expect((await readIssueByLink('i'))?.deleted?.by).toBe(PK)
 
     expect(await setIssueDeleted(issueNow('i'), false)).toEqual({ ok: true })
     const back = foldWorkspace({ events: held, folders: [FOLDER], readAt: {}, threadsAt: {}, mentionsOf: [] } as never)
