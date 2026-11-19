@@ -108,7 +108,16 @@ export const ItemRiskResolved: Story = { render: () => <Shell><ItemPage item={it
 /** A Risk, Rejected. */
 export const ItemRiskRejected: Story = { render: () => <Shell><ItemPage item={item('r5')} /></Shell> }
 /** A Risk typed by hand, with no source. */
-export const ItemTypedByHand: Story = { render: () => <Shell><ItemPage item={HAND_TYPED} /></Shell> }
+/** A dreaming loop changed an Accepted item (Miky, 19 Nov): it says who, what and why, and whoever added it can undo it. */
+export const ItemChangedByLoop: Story = {
+  render: () => (
+    <Shell>
+      <ItemPage item={{ ...item('i4'), changed: { by: 'The dreaming loop', what: 'merged “Search finds only word starts” into it', why: 'Both say how search matches words', ago: '2h ago' } }} />
+    </Shell>
+  ),
+}
+
+export const ItemTypedByHand: Story ={ render: () => <Shell><ItemPage item={HAND_TYPED} /></Shell> }
 /** An item's page loading. */
 export const ItemLoading: Story = { render: () => <Shell><ItemPage item={item('i1')} state="loading" /></Shell> }
 /** An item's page that failed to load. */
