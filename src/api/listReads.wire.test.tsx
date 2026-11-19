@@ -61,6 +61,17 @@ describe("Ship's relay, a cold tab's paged read of list reads", () => {
     expect(got.filter((e) => e.kind === 1851)).toHaveLength(30)
   })
 
+  it('still gets every author’s file under one d when a list read names no author', async () => {
+    held.push(...file(30850, B, 'p1', 3000))
+    try {
+      const { relay } = await import('./store')
+      const got = await relay.queryAll([{ kinds: [30850], '#d': ['p1'], limit: 1, fields: 'newest' }])
+      expect(new Set(got.filter((e) => e.kind === 30850).map((e) => e.pubkey))).toEqual(new Set([A, B]))
+    } finally {
+      held.splice(-7)
+    }
+  })
+
   it('asks plain filters beside them in a request of their own, as the relay requires', async () => {
     const { relay } = await import('./store')
     const got = await relay.queryAll([listRead(30850, A, ['p1', 'p2', 'p3']), { kinds: [30078], authors: [A], '#t': ['read-state'] }])

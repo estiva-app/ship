@@ -17,9 +17,13 @@
  */
 import { MAX_FILTERS_PER_QUERY, RELAY_PAGE_CEILING, Relay, type QueryAllOptions, type SignedEvent } from '@estiva-app/protocol'
 
-/** Whether one answer holds all of this filter: a list read by `#d`, its `limit` covering every file it names. */
+/**
+ * Whether one answer holds all of this filter: a list read of one author's files by `#d`, its `limit` covering
+ * every file it names. One author, as interop's `listReadOf` asks: two authors may each hold a file under one `d`.
+ */
 export function isWholeListRead(filter: Record<string, unknown>): boolean {
   if (filter.fields !== 'newest') return false
+  if (!Array.isArray(filter.authors) || filter.authors.length !== 1) return false
   const ds = filter['#d']
   if (!Array.isArray(ds) || ds.length === 0 || ds.length > RELAY_PAGE_CEILING) return false
   if (filter.until !== undefined || filter.since !== undefined) return false
