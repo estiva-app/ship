@@ -1,4 +1,5 @@
 import { defineConfig } from 'vitest/config'
+import type { Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import { fileURLToPath } from 'node:url'
 import { execSync } from 'node:child_process'
@@ -35,6 +36,25 @@ function release(): string {
   }
 }
 
+/**
+ * `/version.json` names the commit this bundle is built from, so a check after
+ * a deploy (`/land`, the smoke test) knows it is looking at the new build and
+ * not the old one. deploy/nginx.conf serves it uncached.
+ */
+function versionFile(): Plugin {
+  return {
+    name: 'version-file',
+    apply: 'build',
+    generateBundle() {
+      this.emitFile({
+        type: 'asset',
+        fileName: 'version.json',
+        source: `${JSON.stringify({ app: 'ship', commit: release() })}\n`,
+      })
+    },
+  }
+}
+
 // `react` is deduped because @estiva-app/ui declares it a peer: two copies in
 // one tree is the "invalid hook call" crash, which appears at runtime and not
 // at build time. The package itself needs no `fs.allow` entry — it installs
@@ -52,7 +72,7 @@ function release(): string {
 // `emptyOutDir` is said out loud rather than left to Vite's default: a stale
 // file left in dist/ship would go into the image.
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), versionFile()],
   define: BUILD_DEFINES,
   build: {
     outDir: 'dist/ship',
