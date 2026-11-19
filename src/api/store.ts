@@ -137,7 +137,16 @@ export const timesOption = async (): Promise<{ times?: TimesFn }> =>
 export const projectFieldsAgain = (): Promise<ProjectFields | undefined> => {
   fileReads = undefined
   projectFields = undefined
+  issueFields = undefined
   return projectFieldsNow()
+}
+
+/** `projectFieldsAgain` for issues, whose switch the relay makes apart from projects' (ISS-5). */
+export const issueFieldsAgain = (): Promise<ProjectFields | undefined> => {
+  fileReads = undefined
+  projectFields = undefined
+  issueFields = undefined
+  return issueFieldsNow()
 }
 
 export const store = new Store(relay, signer, relayClockSkew, projectFieldsNow, inOrderTypes, issueFieldsNow)

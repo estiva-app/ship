@@ -12,7 +12,7 @@ type SetFieldArgs = { folder: string; target: string; field: string; value: stri
 const { setField } = vi.hoisted(() => ({
   setField: vi.fn(async (_args: { folder: string; target: string; field: string; value: string; note?: string }) => ({ ok: true })),
 }))
-vi.mock('./store', () => ({ store: { setField }, signer: { pubkey: 'a'.repeat(64) }, projectFieldsNow: async () => undefined }))
+vi.mock('./store', () => ({ store: { setField }, signer: { pubkey: 'a'.repeat(64) }, projectFieldsNow: async () => undefined, issueFieldsNow: async () => undefined }))
 vi.mock('./clock', () => ({ clockProblem: async () => undefined }))
 
 import type { Issue, Project } from '../nostr/fold'
@@ -51,6 +51,13 @@ describe('assignMissingRefs — Ship numbers what Ship can number', () => {
     await assignMissingRefs(payments, visible([issue('late', undefined, 300), issue('early', undefined, 100)]))
     const targets = setField.mock.calls.map((c): string => c[0].target)
     expect(targets).toEqual(['30851:a:early', '30851:a:late'])
+  })
+
+  it('skips a number a deleted issue holds, before issues are kept in order too', async () => {
+    // A `deleted` change hides an issue from every list; its number stays its own (SPEC §6.1).
+    setField.mockClear()
+    await assignMissingRefs(payments, { ...visible([issue('a', 'PAY-1'), issue('new', undefined, 3)]), deletedIssues: [issue('gone', 'PAY-2', 2)] })
+    expect(valuesWritten()).toEqual(['PAY-3'])
   })
 
   it('writes nothing when every issue already has a key', async () => {

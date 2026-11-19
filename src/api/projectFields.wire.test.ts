@@ -92,7 +92,7 @@ vi.mock('./store', async () => {
 })
 vi.mock('./clock', () => ({ clockProblem: async () => undefined }))
 
-const { createProject, deleteProject, noteProjectText, setProjectDeleted, setProjectField } = await import('./writes')
+const { createProject, deleteProject, noteFileText, setProjectDeleted, setProjectField } = await import('./writes')
 const { store } = await import('./store')
 const { foldWorkspace } = await import('../nostr/store')
 
@@ -141,11 +141,11 @@ describe('a project field, with the switch on', () => {
     held = [root('p'), first]
     const opened = await store.loadOpened({ kind: 'project', d: 'p' })
     const shown = foldWorkspace(opened).projects.find((candidate) => candidate.id === 'p')!
-    noteProjectText(shown)
+    noteFileText(shown)
     // Someone saves a newer text while the editor is open on the first.
     held.push(change('p', 'd2', 'description', 'Their words', 120, first.id))
     const { project: now } = await project('p')
-    noteProjectText(now)
+    noteFileText(now)
     await setProjectField(now, 'description', 'Mine', 'Description', undefined, { content: 'First words' })
     expect(sent.at(-1)!.tags).toContainEqual(['prev', first.id])
   })

@@ -221,6 +221,15 @@ export interface Issue {
   /** What the status means, as every app counts it (`issueStage`); absent for a word nothing reads. */
   stage?: Stage
   assignee?: string
+  /**
+   * Deleted by a `deleted` change (SPEC §6.5), as a project is: who and when.
+   * It keeps its ref, so a restore brings back the same name and a new issue
+   * never takes it (§6.1). An old kind-5 delete never reaches the fold.
+   * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-file-is-its-fields-each-kept-in-order-by-the-relay.md
+   */
+  deleted?: { by: string; at: number }
+  /** The record's event id: the `prev` of a field's first change (SPEC §6.2). */
+  rootId?: string
   fields: FoldedFields
 }
 
@@ -848,6 +857,8 @@ export function foldFolder(
       status: fields.status?.value ?? DEFAULT_ISSUE_STATUS,
       stage: issueStage(fields.status?.value ?? DEFAULT_ISSUE_STATUS, fields.status?.stage),
       assignee: fields.assignee?.value,
+      ...(fields.deleted?.value ? { deleted: { by: fields.deleted.by, at: fields.deleted.at } } : {}),
+      rootId: event.id,
       fields,
     })
   }

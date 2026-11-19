@@ -9,6 +9,7 @@ import type { AttachmentIndex, EditIndex } from '@/api'
 import { signedIn } from '@/auth/estivaId'
 import { useReopenHeld } from '@/auth/heldTyping'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useUnfinished } from './creating'
 import {
   ISSUE_STATUSES,
   PROJECT_STATUSES,
@@ -32,7 +33,7 @@ import {
   addMentioned,
   setProjectField,
   setProjectDeleted,
-  noteProjectText,
+  noteFileText,
   startConversation,
   workFolder,
   channelContext,
@@ -568,6 +569,7 @@ export function ProjectPage({
 }) {
   const project = state.projects.find((candidate) => candidate.id === d)
   const [dialog, setDialog] = useState<'issue' | 'delete' | 'move' | 'archive' | null>(null)
+  const unfinished = useUnfinished('Issue')
   const newIssueHold = project && `new-issue:${project.addr}`
   useReopenHeld(newIssueHold, () => setDialog('issue'))
   const record = recordChannel(project?.contentFolder, teams)
@@ -580,7 +582,7 @@ export function ProjectPage({
   const held = useThreads(state, project ? [project.contentFolder, ...(record ? [record] : [])] : [], project ? [project.addr] : [])
   // Each text shown is one a save may be edited from (ALO-5): the change it follows.
   useEffect(() => {
-    if (project) noteProjectText(project)
+    if (project) noteFileText(project)
   }, [project])
 
   // An issue archived on its own is out of the list (FOL-46); one archived
@@ -990,13 +992,13 @@ export function ProjectPage({
           projects={[{ value: project.addr, label: project.title }]}
           project={{ addr: project.addr, title: project.title }}
           holdKey={newIssueHold}
-          onClose={() => setDialog(null)}
+          onClose={() => {
+            unfinished.forget()
+            setDialog(null)
+          }}
           onCreate={async (draft) => {
-            const result = await createIssue(project, state, draft)
-            if (!result.ok) {
-              say(`Issue rejected — ${result.reason}`, 'error', 'not-created')
-              return false
-            }
+            const result = await createIssue(project, state, draft, unfinished.held())
+            if (!unfinished.landed(result, say)) return false
             await refresh([result.folder ?? project.contentFolder])
             say('Issue created')
             return true

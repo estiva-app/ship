@@ -7,7 +7,7 @@
  * of the state, "two apps agree on the data" would be measuring Ship's
  * cache rather than the shared record.
  */
-import type { Embed, Imeta, NostrTag, PartPointer, PublishResult, Relay } from '@estiva-app/protocol'
+import type { Embed, FileTimes, Imeta, NostrTag, PartPointer, PublishResult, Relay } from '@estiva-app/protocol'
 import { MAX_FILTERS_PER_QUERY, RELAY_PAGE_CEILING, partsOf } from '@estiva-app/protocol'
 import type { Signer } from './signer'
 import {
@@ -28,9 +28,9 @@ import {
   type CommentRef,
 } from './events'
 import { findNaddrs, naddrToAddr, buildReaction, buildResolution, buildEdit, buildDeletion as buildEventDeletion, imetaTag, needsRelayKey, RELAY_KEY_FILTER, type Authored } from '@estiva-app/protocol'
-import { DELETED_FIELD, fieldsSetBy, listFiles, openFile, writeChange, TEXT_FIELD, type FileFields, type WriteChangeResult } from '@estiva-app/interop'
+import { DELETED_FIELD, createFile, finishCreating, fieldsSetBy, listFiles, openFile, writeChange, TEXT_FIELD, type CreateFileArgs, type CreateFileResult, type FileFields, type WriteChangeResult } from '@estiva-app/interop'
 import { createLoadQuery, planArchiveFolder, planCreateFolder, planDeleteFolder, planListInTopic, planMoveFromFolders, planPlaceFile, planRemoveFromTopic, planRenameFolder, planUnlistFile, readMentionedIn, readMoveRefusal, type ListHolder, type FolderRef, type MovableFile, type MoveRefusal } from '@estiva-app/interop'
-import { foldFolder, type FolderState } from './fold'
+import { foldFolder, type FolderState, type Issue } from './fold'
 import { buildMembershipChange, buildMutedEvent, buildPlaceAdd, switchWrites, type Following, type Place, decorationsOf, foldAttachments, foldEdits, foldEmbeds, URGENT_TAG, type Decorations, type EditFold, type QueryFn } from '@estiva-app/conversation'
 import { anchorIndex, type AnchorIndex } from './references'
 import { directoryFrom, type Directory } from './profiles'
@@ -112,6 +112,12 @@ function referencedAddresses(body: string): string[] {
  * into both — so no amount of subtracting one from the other separates them.
  */
 export interface WorkspaceState extends FolderState {
+  /**
+   * The deleted issues this read holds (SPEC §6.5): one opened by its link, or
+   * read for the Archived tab. Never in `issues`, so no list, count or picker
+   * shows one; its page and the Deleted filter read them here.
+   */
+  deletedIssues?: Issue[]
   /** Message id → the addresses it is a comment on, by §6.4's per-tag rule. `references.ts` reads it. */
   anchors: AnchorIndex
   /**
@@ -216,9 +222,13 @@ function read(
   folders: string[],
   threads: Required<Pick<WorkspaceState, 'threadsAt' | 'mentionsOf'>> & Pick<WorkspaceState, 'texts' | 'issueTexts' | 'ownOf' | 'liveAt'> = { threadsAt: {}, mentionsOf: [] },
 ): WorkspaceState {
+  const folded = foldFolder(events, referencedAddresses)
   return {
     ...threads,
-    ...foldFolder(events, referencedAddresses),
+    ...folded,
+    // A deleted issue leaves every list (SPEC §6.5); its page and the Deleted filter find it in `deletedIssues`.
+    issues: folded.issues.filter((issue) => !issue.deleted),
+    deletedIssues: folded.issues.filter((issue) => issue.deleted),
     anchors: anchorIndex(events),
     edits: foldEdits(events),
     attachments: foldAttachments(events),
@@ -807,28 +817,42 @@ export class Store {
     team: { folder: string; hasState: boolean }
     /** Filed in the team's Folder by `h`, where the relay keeps projects in order: see `buildProject`. */
     filedIn?: boolean
-  }): Promise<{ result: PublishResult; placed?: PublishResult; addr: string; id: string; folder: string }> {
+  }): Promise<{ result: PublishResult; placed?: PublishResult; addr: string; id: string; folder: string; created?: CreateFileResult }> {
     assertFolderId(args.team.folder)
     const id = crypto.randomUUID()
     const folder = args.team.folder
     const addr = projectAddr(this.signer.pubkey, id)
-
-    const result = await this.publish(
+    const record = (description?: string) =>
       buildProject(this.signer.pubkey, Date.now(), {
         projectId: id,
         title: args.title,
-        description: args.description,
+        description,
         lead: args.lead,
         key: args.key,
         summary: args.summary,
         folder,
         filedIn: args.filedIn,
-      }),
-    )
+      })
+
+    /*
+      Where projects are kept in order, a new project's text is its first
+      change and never in its first record (SPEC §6.1; Miky, 18 Nov, ISS-1's
+      kickoff): the relay refuses the old shape from the issues switch. A
+      project whose text did not land is still listed, and `created` says so.
+      why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-new-files-text-is-its-first-change.md
+    */
+    let created: CreateFileResult | undefined
+    let result: PublishResult
+    if (args.filedIn) {
+      created = await this.createInOrder(record(), folder, args.description)
+      result = created.ok || created.created ? { ok: true } : { ok: false, reason: created.refused }
+    } else {
+      result = await this.publish(record(args.description))
+    }
     if (!result.ok) return { result, addr, id, folder }
 
     const { result: placed } = await this.publishInOrder(planPlaceFile(this.signer.pubkey, Date.now(), { folder, address: addr, hasState: args.team.hasState, ...(await this.inOrderOption()) }))
-    return { result, placed, addr, id, folder }
+    return { result, placed, addr, id, folder, ...(created ? { created } : {}) }
   }
 
   /**
@@ -1164,6 +1188,16 @@ export class Store {
   }
 
   /**
+   * `createIssue` where issues are kept in order (ISS-5): its first record says
+   * what it is (title, team, project, ref, summary) and carries no text; the
+   * text is its first change (SPEC §6.1, `createInOrder`).
+   */
+  async createIssueInOrder(args: { folder: string; title: string; description?: string; summary?: string; projectAddr?: string; ref?: string }): Promise<CreateFileResult> {
+    const { description, ...record } = args
+    return this.createInOrder(buildIssue(this.signer.pubkey, Date.now(), { issueId: crypto.randomUUID(), ...record }), args.folder, description)
+  }
+
+  /**
    * Start a conversation, or reply in one.
    *
    * A comment about an object, and a reply to one, is a NIP-22 `kind:1111`;
@@ -1433,8 +1467,8 @@ export class Store {
   }
 
   /**
-   * Set one field of a project after the change it follows (SPEC §6.2), with
-   * the switch on: `prev` is the field's change as this page read it, or the
+   * Set one field of a project or an issue after the change it follows (SPEC
+   * §6.2), with its type's switch on: `prev` is the field's change as this page read it, or the
    * record's id for its first. interop's `writeChange` answers the relay's
    * `conflict:` — a field set again keeps the later without asking (Miky, 30
    * Oct), a text merges onto the newer one, and a block both changed asks with
@@ -1451,9 +1485,11 @@ export class Store {
     prev: string
     /** The text the tab loaded, for a text written again after the switch (ALO-8): words saved since are merged, not written over. */
     base?: { value: string; format?: string }
+    /** 1 for a change that must not be set again after someone's newer one: an automatic ref claim takes the current value (SPEC §6.1). */
+    tries?: number
   }): Promise<WriteChangeResult> {
-    const [, pubkey, ...d] = args.target.split(':')
     return writeChange({
+      ...(args.tries ? { tries: args.tries } : {}),
       field: args.field,
       value: args.value,
       ...(args.contentFormat ? { format: args.contentFormat } : {}),
@@ -1475,9 +1511,98 @@ export class Store {
         return { ok: result.ok, reason: result.reason, eventId: event.id }
       },
       query: (filters) => this.relay.query(filters as never),
-      current: async (field) =>
-        (await openFile((filters) => this.relay.query(filters as never), { kind: KIND.PROJECT, pubkey: pubkey!, d: d.join(':') }, { text: field === TEXT_FIELD && !!(await this.projectFields())?.text }))?.fields[field]?.event,
+      current: this.currentOf(args.target),
     })
+  }
+
+  /**
+   * A field's current change, read again, for `writeChange` and `createFile`:
+   * of a project or an issue, its text where that type's switch reads it.
+   */
+  private currentOf(target: string): (field: string) => Promise<SignedEvent | undefined> {
+    const [kind, pubkey, ...d] = target.split(':')
+    const switched = Number(kind) === KIND.ISSUE ? this.issueFields : this.projectFields
+    return async (field) =>
+      (await openFile((filters) => this.relay.query(filters as never), { kind: Number(kind), pubkey: pubkey!, d: d.join(':') }, { text: field === TEXT_FIELD && !!(await switched())?.text }))?.fields[field]?.event
+  }
+
+  /**
+   * Create a project or an issue where the relay keeps its type in order
+   * (SPEC §6.1): its first record with no text, then the text as its first
+   * change, `prev` the first record's id. An answer of `created: true` with
+   * `ok: false` is a file that exists without its text: the caller keeps the
+   * words and sends them again with `finishCreating`, never the record.
+   * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-new-files-text-is-its-first-change.md
+   */
+  async createInOrder(root: UnsignedEvent, folder: string, text: string | undefined): Promise<CreateFileResult> {
+    return createFile({ root, ...(await this.creating(root, folder, text)) })
+  }
+
+  /** The rest of a creation whose text did not land: the text, and a title the person changed since, after the first record. */
+  async finishCreating(root: SignedEvent, folder: string, text: string | undefined, title?: string): Promise<CreateFileResult> {
+    const others = title !== undefined ? [{ field: 'title', value: title }] : []
+    return finishCreating({ ...(await this.creating(root, folder, text)), others }, root)
+  }
+
+  private async creating(root: UnsignedEvent, folder: string, text: string | undefined): Promise<Omit<CreateFileArgs, 'root'>> {
+    const d = root.tags.find((t) => t[0] === 'd')?.[1] ?? ''
+    const target = `${root.kind}:${this.signer.pubkey}:${d}`
+    return {
+      ...(text ? { text: { value: text } } : {}),
+      inOrder: await this.inOrderTypes(),
+      build: (input) =>
+        buildChange(this.signer.pubkey, input.createdAtMs, { folder, target, field: input.field, value: input.value, contentFormat: input.format, prev: input.prev }),
+      sign: (event) => this.signer.sign(event),
+      publish: async (event) => {
+        const result = await this.relay.publish(event)
+        return { ok: result.ok, reason: result.reason, eventId: event.id }
+      },
+      query: (filters) => this.relay.query(filters as never),
+      current: this.currentOf(target),
+    }
+  }
+
+  /**
+   * Every deleted issue this reader can read, with each one's changes (SPEC
+   * §6.5, "Finding a team's deleted files"): the times read of issues, page by
+   * page until its `until` cursor stops, then one read by `ids` of the changes
+   * of each row that names `deleted`, and their first records. Decided on the
+   * signed events, never on the rows. For the Archived tab and for numbering
+   * (§6.1: deleted issues count), never on a load.
+   */
+  /**
+   * An issue by the `d` its link carries, its first record and every change
+   * (SPEC §6.5): a deleted issue opened by its link, which no load carries,
+   * since the list read leaves deleted files out and teams are asked for no
+   * issues (ISS-4). Every author's issue with that `d`; the page picks.
+   */
+  async issueByLink(d: string): Promise<SignedEvent[]> {
+    const roots = await this.relay.query([{ kinds: [KIND.ISSUE], '#d': [d] }])
+    if (!roots.length) return []
+    return [...roots, ...(await this.changesOf(this.queryAll, roots.map((root) => `${KIND.ISSUE}:${root.pubkey}:${d}`)))]
+  }
+
+  async deletedIssueEvents(): Promise<SignedEvent[]> {
+    const rows: FileTimes[] = []
+    let until: number | undefined
+    for (;;) {
+      const page = await this.relay.queryTimes([{ fields: 'times', kinds: [KIND.ISSUE], limit: RELAY_PAGE_CEILING, ...(until !== undefined ? { until } : {}) }])
+      rows.push(...page)
+      const oldest = Math.min(...page.map((row) => row.created_at))
+      if (page.length === 0 || oldest === until) break
+      until = oldest
+    }
+    const named = new Map<string, FileTimes>()
+    for (const row of rows) if (row.changes.some((change) => change.fields.includes(DELETED_FIELD))) named.set(row.a, row)
+    if (named.size === 0) return []
+    const ids = [...new Set([...named.values()].flatMap((row) => row.changes.map((change) => change.id)))]
+    const ds = [...named.keys()].map((addr) => addr.split(':').slice(2).join(':'))
+    const read = await Promise.all([
+      ...chunk(ids, ISSUES_PER_FILTER).map((part) => this.relay.query([{ ids: part }])),
+      ...chunk(ds, ISSUES_PER_FILTER).map((part) => this.relay.query([{ kinds: [KIND.ISSUE], '#d': part }])),
+    ])
+    // A row's address names its author: a first record by anyone else with the same `d` is another file.
+    return read.flat().filter((event) => event.kind !== KIND.ISSUE || named.has(`${KIND.ISSUE}:${event.pubkey}:${event.tags.find((t) => t[0] === 'd')?.[1] ?? ''}`))
   }
 
   /**

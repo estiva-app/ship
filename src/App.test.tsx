@@ -293,7 +293,8 @@ describe('Projects page — cards from the fold', () => {
     await userEvent.click(dialog.getByRole('combobox', { name: 'Team' }))
     await userEvent.click(await screen.findByRole('option', { name: 'Ship' }))
     fireEvent.click(dialog.getByRole('button', { name: 'Create project' }))
-    await waitFor(() => expect(createProject).toHaveBeenCalledWith({ title: 'Mobile app', summary: '', description: '', key: 'MOB', team: { folder: '3167adea-877f-43c4-96fb-517a2b2d5d24', hasState: true } }))
+    // No creation is waiting to be finished: a new project, not the rest of one (SPEC §6.1).
+    await waitFor(() => expect(createProject).toHaveBeenCalledWith({ title: 'Mobile app', summary: '', description: '', key: 'MOB', team: { folder: '3167adea-877f-43c4-96fb-517a2b2d5d24', hasState: true } }, undefined))
     await waitFor(() => expect(refresh).toHaveBeenCalled())
     expect(await screen.findByText('Project created')).toBeInTheDocument()
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'New project' })).not.toBeInTheDocument())
@@ -330,7 +331,7 @@ describe('Projects page — cards from the fold', () => {
     const dialog = within(screen.getByRole('dialog', { name: 'New project' }))
     fireEvent.change(dialog.getByPlaceholderText('New project title'), { target: { value: 'Mobile app' } })
     fireEvent.click(dialog.getByRole('button', { name: 'Create project' }))
-    await waitFor(() => expect(createProject).toHaveBeenCalledWith(expect.objectContaining({ title: 'Mobile app', team: { folder: '3167adea-877f-43c4-96fb-517a2b2d5d24', hasState: true } })))
+    await waitFor(() => expect(createProject).toHaveBeenCalledWith(expect.objectContaining({ title: 'Mobile app', team: { folder: '3167adea-877f-43c4-96fb-517a2b2d5d24', hasState: true } }), undefined))
   })
 
   it('shows the archived list when the route asks for it', () => {
@@ -347,8 +348,8 @@ describe('Issues page — rows from the fold', () => {
     goTo('/issues')
     render(<App />)
     const main = within(screen.getByRole('main'))
-    // Issue 13 is in the archived project, so it is archived with it (FOL-46).
-    expect(main.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['All3', 'Assigned to me1'])
+    // Issue 13 is in the archived project, so it is archived with it (FOL-46), and listed under Archived (Miky, 19 Nov).
+    expect(main.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['All3', 'Assigned to me1', 'Archived1'])
     expect(main.getByRole('tab', { name: /Assigned to me/ })).toHaveAttribute('aria-selected', 'true')
     expect(main.getByRole('link', { name: /X-4/ })).toBeInTheDocument()
     fireEvent.click(main.getByRole('tab', { name: /^All/ }))
@@ -372,7 +373,7 @@ describe('Issues page — rows from the fold', () => {
     render(<App />)
     const main = within(screen.getByRole('main'))
     expect(await main.findByRole('heading', { name: 'Ship · Issues' })).toBeInTheDocument()
-    expect(main.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['All2', 'Assigned to me0'])
+    expect(main.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['All2', 'Assigned to me0', 'Archived0'])
     fireEvent.click(main.getByRole('tab', { name: /^All/ }))
     const hrefs = main.getAllByRole('link').map((a) => a.getAttribute('href') ?? '').filter((h) => h.startsWith('/issue/') && !h.includes('thread'))
     expect(new Set(hrefs.map((h) => h.slice(-36)))).toEqual(new Set([D('11'), D('12')]))
@@ -707,10 +708,11 @@ describe('Issue page — one issue from the fold', () => {
     expect(main.getByRole('link', { name: 'Live' })).toHaveAttribute('href', `/project/live-${LIVE}`)
   })
 
-  it('says so when the issue is not in this workspace', () => {
+  it('says so when the issue is not in this workspace', async () => {
     goTo(`/issue/${D('98')}`)
     render(<App />)
-    expect(screen.getByText(/not in this workspace/)).toBeInTheDocument()
+    // Once its link has been looked up (a deleted issue still opens by it, SPEC §6.5).
+    expect(await screen.findByText(/not in this workspace/)).toBeInTheDocument()
   })
 })
 
