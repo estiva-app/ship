@@ -7,6 +7,26 @@ description: Use when you check a change to Ship's screens by looking at it (Sto
 
 "It looks right" is not a result. Say what you measured, not what you saw.
 
+## The smoke test's Ship part
+
+The smoke test ([estiva-app/smoke](https://github.com/estiva-app/smoke), checked out beside this repository as
+`../smoke`) walks the core flows on production as two test accounts of its own. Ship takes part in flows 1, 3, 4, 5,
+6, 8 and 10; its section of `../smoke/CORE-FLOWS.md` says what a person sees in each. `/land` runs every flow after
+each deploy.
+
+Against a local build, served at ship.estiva.app to the test's browser only, so sign-in and the relay behave as on
+production while everyone else keeps the live app:
+
+```bash
+RELAY_URL=https://estiva.estiva.app ID_BASE=https://id.estiva.app CLIENT_ID=estiva-ship npm run build
+cd ../smoke && npm ci && node run.mjs --flow 1,3,4,5,6,8,10 --serve ship=$OLDPWD/dist/ship
+```
+
+Against production, drop `--serve`. It exits 0 when every step passed or is known, 1 on a failed step (its screenshot
+is in `out/<time>/`), 2 when it could not run. A change to how a core flow looks or works changes its step in the
+smoke repository in the same work (`../smoke/README.md`). `npm run smoke` below is a different, older check against a
+fake relay, and stays.
+
 ## Render it and measure it
 
 - Start Ship's Storybook: `npm run storybook` → `http://localhost:6007`.
