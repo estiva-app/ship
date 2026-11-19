@@ -765,7 +765,15 @@ check(
   'archive-project names a vocabulary holding exactly true and empty',
   declared.vocabularies[byId('archive-project')?.input?.enum ?? '']?.map((v) => v.value).sort().join('|') === '|true',
 )
-check('delete-issue emits kind:5 on an issue', byId('delete-issue')?.emits.kind === KIND.DELETION && byId('delete-issue')?.appliesTo === String(KIND.ISSUE))
+// ISS-5: a `deleted` change, as delete-project, since the relay refuses a kind:5 of an issue once issues are kept in order (SPEC §6.5).
+check(
+  'delete-issue sets an issue\'s `deleted` field, never a kind:5',
+  byId('delete-issue')?.emits.kind === KIND.CHANGE && byId('delete-issue')?.emits.field === 'deleted' && byId('delete-issue')?.appliesTo === String(KIND.ISSUE),
+)
+check(
+  'add-project\'s description is the new project\'s text, written as its first change (SPEC §7.3)',
+  (byId('add-project')?.input as { properties?: Record<string, { target?: string }> } | undefined)?.properties?.description?.target === 'content',
+)
 // RFC 0.4 §13.9: the display key is derived by its owner alone.
 check('no action sets `ref`', declared.actions.every((a) => a.emits.field !== 'ref'))
 

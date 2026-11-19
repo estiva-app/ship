@@ -1,5 +1,9 @@
 import { useMemo, useState } from 'react'
-import { ISSUE_STATUSES, conversationsAbout, createIssue, me, type DirectoryView, type FolderState, type WorkspaceState } from '@/api'
+import { useUnfinished } from './creating'
+import { ISSUE_STATUSES, conversationsAbout, createIssue, me, setIssueDeleted, type DirectoryView, type FolderState, type WorkspaceState } from '@/api'
+import { useDeletedIssues } from '@/api/useDeletedIssues'
+import { act } from './act'
+import { day } from '@/lib/time'
 import type { IssueRowData } from '@/components/IssueRow'
 import { NewIssueDialog } from '@/components/NewIssueDialog'
 import { IssuesView, type IssuesScope } from '@/views/IssuesView'
@@ -47,24 +51,46 @@ export const hrefForIssue = (issue: { id: string; title?: string }) =>
  * list is what `loadAll` could read, and nothing here calls it complete.
  * "Add issue" asks which project, since none is selected here.
  *
- * An archived issue is not listed, nor one archived with its project or its
- * team (FOL-46); a link still opens it. An archived project is not offered for
- * a new issue.
+ * An archived issue, or one archived with its project or its team (FOL-46),
+ * is listed only under Archived, and a deleted one under Archived's Deleted
+ * filter (Miky, 19 Nov); a link still opens either. An archived project is
+ * not offered for a new issue.
  */
 export function IssuesPage({ state, directory, teams, archives, folder, say, refresh }: { state: WorkspaceState; directory: DirectoryView; teams: FolderSummary[] | undefined; archives: Archives; folder?: string; say: Say; refresh: () => Promise<void> }) {
   // Opens on your own work (Miky, 2 November).
   const [scope, setScope] = useState<IssuesScope>('mine')
   const [adding, setAdding] = useState(false)
+  const unfinished = useUnfinished('Issue')
   useReopenHeld(NEW_ISSUE_HOLD, () => setAdding(true))
   // A Folder's Issues are the issues of the projects in it (SHIPS-5), and its Add issue offers only those projects.
   const projects = useMemo(() => (folder ? projectsIn(state.projects, teams ?? [], folder) : state.projects), [state, folder, teams])
-  const live = useMemo(() => {
+  const { live, archivedIssues } = useMemo(() => {
     const here = folder ? new Set(projects.map((project) => project.addr)) : undefined
-    return state.issues.filter((issue) => !archives.ofIssue(issue) && (!here || (!!issue.projectAddr && here.has(issue.projectAddr))))
+    const inScope = state.issues.filter((issue) => !here || (!!issue.projectAddr && here.has(issue.projectAddr)))
+    return { live: inScope.filter((issue) => !archives.ofIssue(issue)), archivedIssues: inScope.filter((issue) => archives.ofIssue(issue)) }
   }, [state, archives, folder, projects])
+  // The deleted ones are read when the Archived tab opens (SPEC §6.5), never on a load.
+  const gone = useDeletedIssues(scope === 'archived')
+  const deleted = useMemo(() => {
+    const here = folder ? new Set(projects.map((project) => project.addr)) : undefined
+    return (gone.deleted ?? [])
+      .filter((issue) => !here || (!!issue.projectAddr && here.has(issue.projectAddr)))
+      .map((issue) => ({
+        href: hrefForIssue(issue),
+        title: [issue.ref, issue.title || 'Untitled issue'].filter(Boolean).join(' '),
+        deleted: `Deleted by ${issue.deleted!.by === me ? 'you' : directory.nameOf(issue.deleted!.by)} · ${day(issue.deleted!.at)}`,
+        onRestore: () =>
+          act('Restore', () => setIssueDeleted(issue, false), say, refresh).then((ok) => {
+            if (!ok) return
+            say('Issue restored')
+            gone.reload()
+          }),
+      }))
+  }, [gone, folder, projects, directory, say, refresh])
   // A row counts its issue's conversations wherever they are, so every Folder's, read after the rows draw (APP-5).
   const counted = useThreads(state, state.folders).all
   const rows = useMemo(() => live.map((issue) => rowFor(issue, state, directory, counted)), [live, state, directory, counted])
+  const archivedRows = useMemo(() => archivedIssues.map((issue) => rowFor(issue, state, directory, counted)), [archivedIssues, state, directory, counted])
   const mine = useMemo(() => new Set(live.filter((issue) => issue.assignee === me).map((issue) => issue.addr)), [live])
   const projectOptions = useMemo(
     () => projects.filter((p) => !p.deleted && !archives.ofProject(p.addr)).map((p) => ({ value: p.addr, label: p.title })),
@@ -73,23 +99,23 @@ export function IssuesPage({ state, directory, teams, archives, folder, say, ref
 
   return (
     <>
-      <IssuesView title={folder ? `${folderName(teams, folder)} · Issues` : 'Issues'} issues={rows} statuses={ISSUE_STATUSES} mine={mine} scope={scope} onScope={setScope} hrefFor={hrefForIssue} onAddIssue={() => setAdding(true)} />
+      <IssuesView title={folder ? `${folderName(teams, folder)} · Issues` : 'Issues'} issues={rows} statuses={ISSUE_STATUSES} mine={mine} scope={scope} onScope={setScope} hrefFor={hrefForIssue} onAddIssue={() => setAdding(true)} archived={archivedRows} deleted={deleted} deletedLoading={scope === 'archived' && !gone.deleted} />
       {adding && (
         <NewIssueDialog
           projects={projectOptions}
           holdKey={NEW_ISSUE_HOLD}
-          onClose={() => setAdding(false)}
+          onClose={() => {
+            unfinished.forget()
+            setAdding(false)
+          }}
           onCreate={async (draft) => {
             const project = state.projects.find((p) => p.addr === draft.projectAddr)
             if (!project) {
               say('Pick a project for this issue.', 'error', null)
               return false
             }
-            const result = await createIssue(project, state, draft)
-            if (!result.ok) {
-              say(`Issue rejected — ${result.reason}`, 'error', 'not-created')
-              return false
-            }
+            const result = await createIssue(project, state, draft, unfinished.held())
+            if (!unfinished.landed(result, say)) return false
             await refresh()
             say('Issue created')
             return true

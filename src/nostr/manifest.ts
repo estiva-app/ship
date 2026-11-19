@@ -636,12 +636,22 @@ export function manifestContent(): ManifestContent {
       {
         id: 'delete-issue',
         label: 'Delete',
+        /*
+          A `deleted` change, as `delete-project` (SPEC §6.5, ISS-5): the relay
+          refuses a `kind:5` of an issue from the issues switch
+          (`delete-by-field`), so the action is the field. Republished at the
+          switch, not before: until then a consumer's `deleted` change on a
+          relay that keeps no order would be read by Ship alone.
+          why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-file-is-its-fields-each-kept-in-order-by-the-relay.md
+        */
         description:
-          'Ask the relay to delete an issue outright. The relay decides — only its author, or the owner of an ' +
-          'agent that wrote it, may — and its status changes and comments are separate events that stay.',
+          'Delete an issue, or bring a deleted one back: `true` deletes, an empty value restores. Anyone in its ' +
+          'team may. A deleted issue leaves every list and search but keeps its id, its number and its history, ' +
+          'so a link to it says who deleted it and when; its comments stay where they are.',
         effect: 'destructive',
         appliesTo: String(KIND.ISSUE),
-        emits: { kind: KIND.DELETION },
+        emits: { kind: KIND.CHANGE, field: 'deleted' },
+        input: { type: 'string', enum: 'deleted' },
       },
       /*
         The rest of Ship's set — MAN-4's second slice, declarable since MAN-1
@@ -755,13 +765,16 @@ export function manifestContent(): ManifestContent {
             // `name`, the tag `buildProject` writes since REW-11 — the title slot reads it first.
             name: { type: 'string' },
             /*
-              A tag, not `content`, and so no `format`: `buildProject` writes
-              the description to a `description` tag and leaves content empty,
-              so a reader holding only tags — a discovery query, another app's
-              index — has it. Rich text arrives by `describe-project` afterwards,
-              as it does in Ship.
+              The new project's text, so `content`: SPEC §7.3 ("A creation's
+              text is its first change") has a consumer write the root with
+              none and the text as its `description` change after it, as Ship's
+              own `createProject` does where projects are kept in order. Never
+              the root's `description` tag, which the relay refuses from the
+              issues switch (`text-is-a-change`). Marker text, as before, so no
+              `format`; rich text arrives by `describe-project` afterwards.
+              why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-new-files-text-is-its-first-change.md
             */
-            description: { type: 'string' },
+            description: { type: 'string', target: 'content' },
             // SHI-4: written as `["key", …]`, the tag `buildProject` writes after `lead`.
             key: { type: 'string' },
             // The root's `summary` tag (SPEC §6.12), after `key` as `buildProject`

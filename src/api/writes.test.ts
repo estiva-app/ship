@@ -16,6 +16,8 @@ vi.mock('./store', () => ({
   },
   // Off unless a test turns it on: the relay keeps no order (ALO-5).
   projectFieldsNow: vi.fn(async () => undefined),
+  issueFieldsNow: vi.fn(async () => undefined),
+  issueFieldsAgain: vi.fn(async () => undefined),
   // No type kept in order unless a test says so: a file is named by its address alone (ALO-8).
   inOrderOption: vi.fn(async () => ({})),
 }))

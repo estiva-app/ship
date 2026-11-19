@@ -87,6 +87,8 @@ export interface IssueViewProps {
   historyFold?: OverviewPanelProps['historyFold']
   /** Its current text is still on the way (ISS-4): the description shows and cannot be saved until it lands. */
   textPending?: boolean
+  /** Where issues are kept in order (ISS-5): a save is merged with words saved since, and a block both changed asks. */
+  merges?: boolean
   /** Status, assignee and project, as a row between the summary and the description (ONE-6, step 4b). */
   fields: Omit<IssueFieldsProps, 'readOnlyReason' | 'lockedReason'>
   /** The header's ⋯: Copy link, Archive or Unarchive, Delete. */
@@ -122,7 +124,7 @@ export interface IssueViewProps {
 }
 
 /** One issue's page, its comments or its Overview beside it. */
-export function IssueView({ crumbs, title, summary, onSummarize, description, descriptionFormat, nameOf, onRename, onCopyBlockLink, onDescribe, onMention, descriptionBy, related, topics, threads, conversationsLoading, mentionsLoading, unread, stillUnread, onThreadShown, onStartConversation, onReply, activity, activityTruncated, history, historyFold, textPending, fields, menu, comments, overview, about, onReact, onResolve, onDeleteMessage, onEditMessage, readOnlyReason, lockedReason, commentsClosed, upload, archivedNotice, members, edited }: IssueViewProps) {
+export function IssueView({ crumbs, title, summary, onSummarize, description, descriptionFormat, nameOf, onRename, onCopyBlockLink, onDescribe, onMention, descriptionBy, related, topics, threads, conversationsLoading, mentionsLoading, unread, stillUnread, onThreadShown, onStartConversation, onReply, activity, activityTruncated, history, historyFold, textPending, merges, fields, menu, comments, overview, about, onReact, onResolve, onDeleteMessage, onEditMessage, readOnlyReason, lockedReason, commentsClosed, upload, archivedNotice, members, edited }: IssueViewProps) {
   // `linkTo` on each crumb (S15, 0.10.0): the breadcrumbs were the last links in Ship that reloaded the app (SHI-20).
   const items: Crumb[] = [{ label: 'Issues', ...linkTo(crumbs.issuesHref) }]
   // The box before the project's name says it is a project, as the sidebar's entry does (Katerina, 2026-09-09).
@@ -144,7 +146,7 @@ export function IssueView({ crumbs, title, summary, onSummarize, description, de
         {/* Blocks 16px apart (Katerina, 1 November). */}
         <Centred>
           {archivedNotice}
-          <LiveHeader fields={<IssueFields {...fields} readOnlyReason={readOnlyReason} lockedReason={lockedReason} />} title={title} titlePlaceholder="Untitled issue" onRename={onRename} summary={summary} onSummarize={onSummarize} description={description} format={descriptionFormat} onDescribe={onDescribe} textPending={textPending} onMention={onMention} descriptionBy={descriptionBy} nameOf={nameOf} readOnly={!!(readOnlyReason ?? lockedReason)} upload={upload} onCommentOnBlock={readOnlyReason ?? commentsClosed ? undefined : comment.start} onCopyBlockLink={onCopyBlockLink} holdKey={about && `description:${about}`} />
+          <LiveHeader fields={<IssueFields {...fields} readOnlyReason={readOnlyReason} lockedReason={lockedReason} />} title={title} titlePlaceholder="Untitled issue" onRename={onRename} summary={summary} onSummarize={onSummarize} description={description} format={descriptionFormat} onDescribe={onDescribe} merges={merges} textPending={textPending} onMention={onMention} descriptionBy={descriptionBy} nameOf={nameOf} readOnly={!!(readOnlyReason ?? lockedReason)} upload={upload} onCommentOnBlock={readOnlyReason ?? commentsClosed ? undefined : comment.start} onCopyBlockLink={onCopyBlockLink} holdKey={about && `description:${about}`} />
         </Centred>
       </ScrollArea>
       </div>
