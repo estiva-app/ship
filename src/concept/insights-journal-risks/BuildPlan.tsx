@@ -44,6 +44,7 @@ import { IssueRow, type IssueRowData } from "@/components/IssueRow";
 import type { IssuesTableRow } from "@/components/IssuesTable";
 import { ISSUE_STATUSES, hrefFor } from "@/fixtures/issues";
 import { AcceptReject, NewDot } from "./ItemParts";
+import { wordIcon, wordTone } from "./MarkAs";
 
 type IssueStatus = "todo" | "in_progress" | "done" | "cancelled";
 type Session = {
@@ -313,8 +314,23 @@ type Line = {
   filed?: { ref: string; by: string; as: "Bug" | "Improvement"; /** The project it was moved from, if any, and its key. */ from?: string; fromKey?: string };
   /** What was seen, in a few sentences: what a person does, what happens, why it matters. */
   detail?: string;
+  /**
+   * A To-do someone marked on a message or a block about this project (trial, Miky 19 Nov: "same category as those
+   * Laters"): it waits here like any line, and Accept into a milestone makes it an issue.
+   */
+  marked?: { by: string; in: "chat" | "a document"; place: string };
 };
 const TRIAGE: Line[] = [
+  {
+    id: "td1",
+    title: "Show Katerina the Explore topics empty state before it ships",
+    from: "a message Katerina marked as a To-do",
+    at: "Today",
+    isNew: true,
+    marked: { by: "Katerina", in: "chat", place: "Universal Navigation" },
+    detail: "Katerina, in Universal Navigation: “Before this goes out I’d like to see what Explore topics looks like when there’s nothing to join.” She marked her own message as a To-do.",
+    rec: { to: "m2", why: "The empty state is part of this milestone’s Explore topics screen." },
+  },
   {
     id: "t1",
     title: "Join on Ship’s Explore topics says nothing when it works",
@@ -415,6 +431,13 @@ const TRIAGE: Line[] = [
 ];
 const LATER: Line[] = [
   {
+    id: "ltd1",
+    title: "Write up how Topics differ from Teams for the docs site",
+    from: "a block Miky marked as a To-do in “Topics: what they are”",
+    at: "12 Nov",
+    marked: { by: "Miky", in: "a document", place: "Topics: what they are" },
+  },
+  {
     id: "l1",
     title:
       "In Ship’s and Leaf’s sidebars, a topic whose files are all archived folds open to an empty list",
@@ -506,6 +529,18 @@ function FoundIn({ line, title = false }: { line: Line; title?: boolean }) {
           <IconCornerDownRight size={14} stroke={1.5} className="shrink-0 text-text-muted" />
           {/* The row shows the project's key (Miky, 18 Nov), as a note shows its issue's; the box's header has room for the name. */}
           <MetaText tone="muted">{title ? from : (line.filed.fromKey ?? from)}</MetaText>
+        </span>
+      </WithTooltip>
+    );
+  }
+  // A marked To-do points back at its message or block, with the To-do's own icon (trial, Miky 19 Nov).
+  if (line.marked) {
+    const m = line.marked;
+    return (
+      <WithTooltip label={`Marked as a To-do by ${m.by} in ${m.place} · ${line.at}`} wrapperClassName="flex min-w-0">
+        <span className="relative flex min-w-0 items-center gap-1">
+          <span className="flex shrink-0" style={wordTone("To-do")}>{wordIcon("To-do", 14)}</span>
+          <MetaText tone="muted">{title ? m.place : m.in === "chat" ? "Chat" : "Doc"}</MetaText>
         </span>
       </WithTooltip>
     );
@@ -750,10 +785,11 @@ function Lines({
             >
               <span
                 className={cn(
-                  "text-body-2",
+                  "flex items-center gap-1.5 text-body-2",
                   muted ? "text-text-secondary" : "text-text-primary",
                 )}
               >
+                {l.marked && <span className="flex shrink-0" style={wordTone("To-do")}>{wordIcon("To-do", 14)}</span>}
                 {l.title}
               </span>
               <span className="min-w-0 truncate">

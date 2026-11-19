@@ -7,10 +7,10 @@
  * - the team page (today's Projects page for one team) gets the team's own lists.
  */
 import { useMemo, useState, type ReactNode } from 'react'
-import { IconBox, IconCircleDot, IconLayoutKanban, IconList, IconPlus, IconTarget, IconUsers } from '@tabler/icons-react'
+import { IconBox, IconChevronDown, IconCircleDot, IconLayoutKanban, IconList, IconPlus, IconTarget, IconUsers } from '@tabler/icons-react'
 import { Board } from '@/components/Board'
 import { serializeBlockDocument } from '@estiva-app/protocol'
-import { Button, Card, EmptyState, IconButton, Link, LinkPickers, MetaText, NoAccessNotice, PageHeader, SectionHeader, Select, SkeletonList, Tabs } from '@estiva-app/ui'
+import { Button, Card, EmptyState, IconButton, Link, LinkPickers, Menu, MenuItem, MetaText, NoAccessNotice, PageHeader, SectionHeader, Select, SkeletonList, Tabs } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
 import { Breadcrumb } from '@/components/ui/Breadcrumb'
 import { ScrollArea } from '@/components/ui/ScrollArea'
@@ -24,7 +24,7 @@ import { ProjectFields } from '@/components/PageFields'
 import { useSideColumn } from '@/pages/sideColumn'
 import { ISSUES, ISSUE_STATUSES, hrefFor, ACTIVITY_ITEMS } from '@/fixtures/issues'
 import { ACTIVITY, PEOPLE as SHIP_PEOPLE, PROJECT_STATUSES } from '@/fixtures/projects'
-import { MarkAsRows, MarkedNotice, STATUSES, TYPE_META, wordIcon, TYPE_OF, blockLineCss, markedBlockAt, useMarkHover, type ItemType, type MarkWord, type Status } from './MarkAs'
+import { MarkAsRows, MarkedNotice, STATUSES, TYPE_META, WORDS, wordIcon, wordTone, TYPE_OF, blockLineCss, markedBlockAt, useMarkHover, type ItemType, type MarkWord, type Status } from './MarkAs'
 import { ENDED, FilterRow, ItemTimeline, ListStateView, ShowWhere, filterItems, type ListState } from './ItemParts'
 import { ELSEWHERE, INITIATIVES, initiativesOf } from './lens'
 import { ItemFields, ItemPanel, commentsOn } from './ItemPanel'
@@ -91,11 +91,15 @@ function NeedsYou({ all, me, onTab, onOpen, onDecide }: { all: Item[]; me: strin
   ]
   // The Journal asks nothing of you (Miky, 17 Nov), so it has no row here.
   const byType = (['insight', 'risk'] as ItemType[]).map((t) => ({ t, n: toAccept.filter((i) => i.type === t).length })).filter((x) => x.n)
+  // Highlights to sort (trial, Miky 19 Nov): one row each, Claude's word one click away, any other word in the menu.
+  const [sorted, setSorted] = useState<Record<string, MarkWord>>({})
+  const toSort = live.filter((i) => i.type === 'highlight' && !sorted[i.id])
+  const n = rows.length + byType.length + toSort.length
   return (
     <section aria-label="Needs you" className="flex flex-col gap-3">
       {/* The count is the rows below it (review, 17 Nov); the tabs' dots already say what is new. */}
-      <SectionHeader title="Needs you" count={rows.length + byType.length} />
-      {rows.length + byType.length === 0 ? (
+      <SectionHeader title="Needs you" count={n} />
+      {n === 0 ? (
         <MetaText tone="muted">Nothing waits for you.</MetaText>
       ) : (
         <Card fill="none" clip attention={blocking.length ? 'warning' : undefined}>
@@ -126,6 +130,29 @@ function NeedsYou({ all, me, onTab, onOpen, onDecide }: { all: Item[]; me: strin
                   <span className="min-w-0 truncate">
                     <MetaText tone="muted">{toAccept.filter((i) => i.type === t).map((i) => i.title).join(' · ')}</MetaText>
                   </span>
+                </span>
+              </li>
+            ))}
+            {toSort.map((item) => (
+              <li key={item.id} className="relative flex items-center gap-3 border-b border-border-subtle px-4 py-2.5 last:border-b-0">
+                <span className="flex" style={wordTone('Highlight')}>{wordIcon('Highlight', 16)}</span>
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <Link href="#" variant="quiet" truncate cover onClick={(e) => (e.preventDefault(), onOpen(item))}>
+                    {item.title}
+                  </Link>
+                  <MetaText tone="muted">{`To sort · ${item.markedBy.name} highlighted it in ${item.source?.app === 'Leaf' ? 'a document' : 'chat'}`}</MetaText>
+                </span>
+                <span className="relative flex shrink-0 items-center gap-1">
+                  {item.suggest && (
+                    <Button variant="outlined" size="small" leadingIcon={<span style={wordTone(item.suggest)}>{wordIcon(item.suggest, 14)}</span>} onClick={() => setSorted((s) => ({ ...s, [item.id]: item.suggest! }))}>
+                      {item.suggest}
+                    </Button>
+                  )}
+                  <Menu align="right" trigger={<IconButton variant="muted" tooltip="Sort as…" aria-label="Sort as…"><IconChevronDown size={16} stroke={1.5} /></IconButton>}>
+                    {WORDS.map((w) => (
+                      <MenuItem key={w} label={w} leading={<span style={wordTone(w)}>{wordIcon(w)}</span>} onClick={() => setSorted((s) => ({ ...s, [item.id]: w }))} />
+                    ))}
+                  </Menu>
                 </span>
               </li>
             ))}

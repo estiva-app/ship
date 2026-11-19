@@ -95,6 +95,8 @@ export interface Item {
   /** Who decides it: the Decision it ends in inherits them. */
   decider?: Person
   discussion?: { people: Person[]; replies: number; last: string }
+  /** A Highlight not sorted yet: the word Claude would give it (trial, Miky 19 Nov). */
+  suggest?: Exclude<MarkWord, 'Highlight'>
   /** A decided Question: the Decision it ended in, in the Journal. */
   decidedIn?: string
   /** A Decision that answered a Question: what was chosen, what was not, and the question. */
@@ -128,6 +130,19 @@ const onProject = { kind: 'project' as const, title: PROJECT }
 const onIssue = (title: string) => ({ kind: 'issue' as const, title })
 
 export const ITEMS: Item[] = [
+  // Highlights not sorted yet (trial, Miky 19 Nov): marked now, given a word later. Miky's own words of 19 Nov.
+  {
+    id: 'h1', type: 'highlight', word: 'Highlight', suggest: 'Insight', status: 'proposed', at: 'Today', day: '2026-11-19', team: TEAM, about: onProject, isNew: true,
+    title: 'A to-do is the same thing as a project’s Later line',
+    markedBy: MIKY,
+    source: { app: 'Peek', what: 'message', place: 'Insights, Journal and Risks', author: MIKY, quote: 'A task to do: I almost feel it’s same category as those Laters in Ship. Turning it into an issue makes it formal.' },
+  },
+  {
+    id: 'h2', type: 'highlight', word: 'Highlight', suggest: 'Question', status: 'proposed', at: 'Today', day: '2026-11-19', team: TEAM, about: onProject, isNew: true,
+    title: 'Are there highlights the seven words don’t cover?',
+    markedBy: KATERINA,
+    source: { app: 'Leaf', what: 'block', place: 'Insights, Journal and Risks: real examples', author: MIKY, quote: 'Just wondering if there are highlights that we don’t cover by the current categories.' },
+  },
   // Insights
   {
     id: 'i1', type: 'insight', word: 'Insight', category: 'Product', status: 'proposed', at: '13 Nov', day: '2026-11-13', team: TEAM, about: onIssue('Ship and Leaf sidebar match Peek'), isNew: true,
