@@ -54,11 +54,13 @@ const PROJECT_DOC = blocksDoc(
 /** The block menu's Mark as…, through the concept hook in blockRows; marks at once and says so. */
 function MarkableBlocks({ children, team, about, marked: m0 = {}, changed = [], onOpenBlock }: { children: ReactNode; team: string; about?: string; marked?: Record<string, ItemType>; changed?: string[]; onOpenBlock?: (blockId: string) => void }) {
   const [marked, setMarked] = useState(m0)
-  const [notice, setNotice] = useState<MarkWord>()
+  const [notice, setNotice] = useState<{ word: MarkWord; title: string }>()
+  // The title starts from the block's first sentence (concept: read off the drawn block) and is edited in the notice.
+  const titleOf = (id: string) => (document.querySelector(`[data-block-id="${id}"]`)?.textContent ?? '').split(/(?<=[.!?])\s/)[0].slice(0, 80)
   const rows = (id: string) => (
     <MarkAsRows
       mark={marked[id] ? { type: marked[id], word: TYPE_META[marked[id]].label as MarkWord, title: '', href: '#', status: 'accepted' } : undefined}
-      onMark={(word) => (setMarked((m) => ({ ...m, [id]: TYPE_OF[word] })), setNotice(word))}
+      onMark={(word) => (setMarked((m) => ({ ...m, [id]: TYPE_OF[word] })), setNotice({ word, title: titleOf(id) }))}
       onUnmark={() => setMarked((m) => Object.fromEntries(Object.entries(m).filter(([k]) => k !== id)))}
     />
   )
@@ -69,7 +71,7 @@ function MarkableBlocks({ children, team, about, marked: m0 = {}, changed = [], 
       {hover}
       {/* @estiva-escape(no-raw-interactive): concept only — the margin label is CSS on the editor's own block, so its click is read here. */}
       <div onClickCapture={(e) => { const id = markedBlockAt(e, marked); if (id) onOpenBlock?.(id) }}>{children}</div>
-      {notice && <MarkedNotice word={notice} team={team} about={about} onClose={() => setNotice(undefined)} />}
+      {notice && <MarkedNotice word={notice.word} team={team} about={about} title={notice.title} onClose={() => setNotice(undefined)} />}
     </ConceptBlockRows.Provider>
   )
 }

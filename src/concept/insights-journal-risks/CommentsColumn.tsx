@@ -20,13 +20,15 @@ export interface StoryComment {
 
 export function CommentsColumn({ comments, team, about, startMenuOn }: { comments: StoryComment[]; team: string; about?: string; startMenuOn?: string }) {
   const [marks, setMarks] = useState<Record<string, Mark | undefined>>(() => Object.fromEntries(comments.map((c) => [c.id, c.mark])))
-  const [notice, setNotice] = useState<MarkWord>()
+  const [notice, setNotice] = useState<{ word: MarkWord; id: string; title: string }>()
   const mark = (c: StoryComment, word: MarkWord) => {
-    // Marks at once: the title from the comment's first line, the source's team, what it is about (Decided, kickoff).
+    // Marks at once: the title starts from the comment's first line and is edited in the notice; the source's team,
+    // what it is about (Decided, kickoff).
     const title = c.text.split(/(?<=[.!?])\s/)[0].slice(0, 80)
     setMarks((m) => ({ ...m, [c.id]: { type: TYPE_OF[word], word, title, href: '#', status: 'accepted' } }))
-    setNotice(word)
+    setNotice({ word, id: c.id, title })
   }
+  const retitle = (id: string, title: string) => setMarks((m) => (m[id] ? { ...m, [id]: { ...m[id], title } } : m))
   const items = comments.map((c) => ({
     id: c.id,
     card: (
@@ -50,7 +52,7 @@ export function CommentsColumn({ comments, team, about, startMenuOn }: { comment
   return (
     <div className="flex w-[384px] min-h-0 flex-1 flex-col" data-start-menu={startMenuOn}>
       <ConversationLayout threads="under" items={items} title="Comments" />
-      {notice && <MarkedNotice word={notice} team={team} about={about} onClose={() => setNotice(undefined)} />}
+      {notice && <MarkedNotice word={notice.word} team={team} about={about} title={notice.title} onTitle={(t) => retitle(notice.id, t)} onClose={() => setNotice(undefined)} />}
     </div>
   )
 }
