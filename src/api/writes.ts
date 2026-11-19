@@ -344,8 +344,11 @@ export function setProjectDeleted(project: Project, deleted: boolean): Promise<W
  * Restore brings back the same name (§6.1).
  * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-file-is-its-fields-each-kept-in-order-by-the-relay.md
  */
-export function setIssueDeleted(issue: Issue, deleted: boolean): Promise<WriteResult> {
-  return writeInOrder(asOrdered(issue), 'deleted', deleted ? 'true' : '', deleted ? 'Delete' : 'Restore')
+export async function setIssueDeleted(issue: Issue, deleted: boolean): Promise<WriteResult> {
+  const result = await writeInOrder(asOrdered(issue), 'deleted', deleted ? 'true' : '', deleted ? 'Delete' : 'Restore')
+  // The deleted issues this tab read are out of date now.
+  if (result.ok) deletedRead = undefined
+  return result
 }
 
 /** Archive one issue, or restore it — the project's rule, one level down (FOL-46). */
@@ -556,6 +559,8 @@ export function workFolder(project: Project): string {
 export interface Visible {
   projects: Project[]
   issues: Issue[]
+  /** The deleted issues the page already holds: ones it heard deleted while open. */
+  deletedIssues?: Issue[]
 }
 
 /**
@@ -653,14 +658,37 @@ async function finish(unfinished: Unfinished, draft: { title: string; descriptio
  * deleted issue's number again.
  */
 async function withDeleted(visible: Visible): Promise<Visible> {
-  const deleted = await readDeletedIssues()
+  const deleted = [...(visible.deletedIssues ?? []), ...(await readDeletedIssues())]
   const held = new Set(visible.issues.map((issue) => issue.addr))
-  return { projects: visible.projects, issues: [...visible.issues, ...deleted.filter((issue) => !held.has(issue.addr))] }
+  const extra: Issue[] = []
+  for (const issue of deleted) {
+    if (held.has(issue.addr)) continue
+    held.add(issue.addr)
+    extra.push(issue)
+  }
+  return { projects: visible.projects, issues: [...visible.issues, ...extra] }
 }
 
-/** Every deleted issue this reader can read, folded, with who deleted it (SPEC §6.5): for the Archived tab and numbering. */
-export async function readDeletedIssues(): Promise<Issue[]> {
-  return foldFolder(await store.deletedIssueEvents()).issues.filter((issue) => issue.deleted)
+/**
+ * The deleted issues, read once per tab. The read is every issue's times
+ * (about 700 KB on a workspace of 1,000 issues, 19 Nov), too much to pay on
+ * every new issue or every project page that numbers one. Numbering adds the
+ * ones the page heard deleted since (`Visible.deletedIssues`), and this tab's
+ * own Delete and Restore drop it, so the next read is fresh.
+ */
+let deletedRead: Promise<Issue[]> | undefined
+
+/** Every deleted issue this reader can read, folded, with who deleted it (SPEC §6.5): for the Archived tab and numbering. `fresh` reads again. */
+export function readDeletedIssues(fresh = false): Promise<Issue[]> {
+  if (fresh || !deletedRead) {
+    const read = store.deletedIssueEvents().then((events) => foldFolder(events).issues.filter((issue) => issue.deleted))
+    // A failed read is not kept: the next one tries again.
+    read.catch(() => {
+      if (deletedRead === read) deletedRead = undefined
+    })
+    deletedRead = read
+  }
+  return deletedRead
 }
 
 /**

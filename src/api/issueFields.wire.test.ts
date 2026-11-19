@@ -14,6 +14,8 @@ const FOLDER = '3167adea-877f-43c4-96fb-517a2b2d5d24'
 
 let held: SignedEvent[] = []
 let count = 0
+/** How many times reads (§6.13) the relay was asked, each from its first page: the deleted issues' read. */
+let timesReads = 0
 /** Refuse the next change to this field once, with this reason: a text that did not land. */
 let refuseOnce: { field: string; reason: string } | undefined
 /** Before answering the next change to this field, someone else's lands first: a save from another copy. */
@@ -67,6 +69,8 @@ function answer(filters: Record<string, unknown>[]): SignedEvent[] {
 function times(filters: Record<string, unknown>[]) {
   const f = filters[0]!
   const until = f.until as number | undefined
+  // A read starts with no cursor; its later pages carry one.
+  if (until === undefined) timesReads++
   return held
     .filter((event) => (f.kinds as number[]).includes(event.kind) && (until === undefined || event.created_at <= until))
     .map((root) => ({
@@ -236,9 +240,28 @@ describe('a new issue', () => {
 
   it("never takes a deleted issue's number", async () => {
     held = [issueRoot('one', 'PAY-1'), issueRoot('gone', 'PAY-2'), change('gone', 'x1', 'deleted', 'true', 120, issueRoot('gone').id)]
+    // A tab opened now: its one read of the deleted issues is this one.
+    await readDeletedIssues(true)
     // The page holds only the live one: the deleted one leaves every list.
     await createIssue(project, { projects: [project], issues: [issueNow('one')] }, { title: 'Three', description: '' })
     expect(tagOf(sent[0]!, 'ref')).toBe('PAY-3')
+  })
+
+  it('reads the deleted issues once per tab, and again after this tab deletes one', async () => {
+    held = [issueRoot('one', 'PAY-1')]
+    await readDeletedIssues(true)
+    timesReads = 0
+    await createIssue(project, { projects: [project], issues: foldFolder(held).issues }, { title: 'Two', description: '' })
+    await createIssue(project, { projects: [project], issues: foldFolder(held).issues }, { title: 'Three', description: '' })
+    expect(timesReads).toBe(0)
+    // The page heard one deleted while open: it is counted without a read.
+    const two = foldFolder(held).issues.find((issue) => issue.ref === 'PAY-3')!
+    expect(await deleteIssue(two)).toEqual({ ok: true })
+    sent.length = 0
+    const gone = foldWorkspace({ events: held, folders: [FOLDER], readAt: {}, threadsAt: {}, mentionsOf: [] } as never)
+    await createIssue(project, { projects: [project], issues: gone.issues, deletedIssues: gone.deletedIssues }, { title: 'Four', description: '' })
+    expect(timesReads).toBe(1)
+    expect(tagOf(sent[0]!, 'ref')).toBe('PAY-4')
   })
 
   it('keeps the words when the text did not land, and Create again sends the text, never a second issue', async () => {

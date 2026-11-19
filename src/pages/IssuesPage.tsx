@@ -69,8 +69,8 @@ export function IssuesPage({ state, directory, teams, archives, folder, say, ref
     const inScope = state.issues.filter((issue) => !here || (!!issue.projectAddr && here.has(issue.projectAddr)))
     return { live: inScope.filter((issue) => !archives.ofIssue(issue)), archivedIssues: inScope.filter((issue) => archives.ofIssue(issue)) }
   }, [state, archives, folder, projects])
-  // The deleted ones are read when the Archived tab opens (SPEC §6.5), never on a load.
-  const gone = useDeletedIssues(scope === 'archived')
+  // The deleted ones are read anew each time the Archived tab opens (SPEC §6.5), never on a load.
+  const gone = useDeletedIssues(scope === 'archived', true)
   const deleted = useMemo(() => {
     const here = folder ? new Set(projects.map((project) => project.addr)) : undefined
     return (gone.deleted ?? [])
