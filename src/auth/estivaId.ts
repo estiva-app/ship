@@ -127,7 +127,9 @@ const client = ID_CONFIG
         for (const leave of leavingListeners)
           try {
             leave()
-          } catch {}
+          } catch {
+            // A timer that fails only loses this one timing.
+          }
         navigateTo(url)
       },
     })
