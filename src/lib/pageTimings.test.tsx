@@ -13,7 +13,14 @@ vi.mock('@/config', () => ({
   ID_CONFIG: { base: 'https://id.estiva.app', clientId: 'estiva-ship' },
   RELEASE: 'abc123',
 }))
-vi.mock('@/auth/estivaId', () => ({ currentToken: () => ({ accessToken: 'qa-1-token' }) }))
+const leaving = new Set<() => void>()
+vi.mock('@/auth/estivaId', () => ({
+  currentToken: () => ({ accessToken: 'qa-1-token' }),
+  onLeavingForSignIn: (listener: () => void) => {
+    leaving.add(listener)
+    return () => leaving.delete(listener)
+  },
+}))
 
 const PLANTED_TITLE = 'plantedtitle board offsite'
 const PLANTED_SLUG = 'plantedslug-board-offsite'
@@ -110,5 +117,18 @@ describe('Ship page-open timings', () => {
     window.dispatchEvent(new PopStateEvent('popstate'))
     await load(400)
     expect(bodies().map((b) => [b.screen, b.how, b.waitMs])).toEqual([['issue', 'in-app', 400]])
+  })
+
+  it('leaving for sign-in while a page loads sends nothing and keeps the open for the page the tab comes back to', async () => {
+    sessionStorage.clear()
+    const { navigateTo } = await import('@/router')
+    navigateTo(OTHER_ISSUE)
+    document.body.innerHTML = '<main><div class="animate-pulse"></div></main>'
+    await flush()
+    for (const leave of leaving) leave()
+    vi.advanceTimersByTime(60_000)
+    await flush()
+    expect(requests).toEqual([])
+    expect(JSON.parse(sessionStorage.getItem('estiva.pageTimer.carried') ?? 'null')).toMatchObject({ how: 'in-app' })
   })
 })

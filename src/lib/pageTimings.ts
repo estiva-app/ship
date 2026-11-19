@@ -7,7 +7,7 @@
  * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/page-open-timings-go-to-sentry-named-by-the-person-built-from-an-allowed-list.md
  */
 import { browserPage, createPageTimer } from '@estiva-app/platform'
-import { currentToken } from '@/auth/estivaId'
+import { currentToken, onLeavingForSignIn } from '@/auth/estivaId'
 import { ID_CONFIG, RELEASE } from '@/config'
 import { onOpen } from '@/router'
 import { SCREENS, screenOf } from './errorReports'
@@ -26,8 +26,11 @@ export const pageTimer = createPageTimer({
 export function startPageTimings(): () => void {
   pageTimer.loaded()
   const off = onOpen(() => pageTimer.opened())
+  // A new tab passing through Estiva ID to sign in is timed from its first page (Miky, 19 Nov).
+  const offLeaving = onLeavingForSignIn(() => pageTimer.leaving())
   return () => {
     off()
+    offLeaving()
     pageTimer.stop()
   }
 }
