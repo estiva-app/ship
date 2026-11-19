@@ -183,6 +183,16 @@ describe('opening an issue with the issues switch on', () => {
     expect(everyIssueChange()).toEqual([])
   })
 
+  it('asks for it by its fields once, with its text, not once more without (ISS-9)', async () => {
+    held.push(issue('one', 'alpha'), change('one', 'description', 'Newest text', 120), change('one', 'status', 'done', 121))
+
+    const state = foldWorkspace(await storeWith(true).loadOpened({ kind: 'issue', d: 'one' }))
+
+    const byFields = asked.flat().filter((f) => f.fields === 'newest' && (f['#d'] as string[] | undefined)?.includes('one'))
+    expect(byFields).toEqual([expect.objectContaining({ text: true })])
+    expect(state.issues.find((candidate) => candidate.id === 'one')?.status).toBe('done')
+  })
+
   it('reads its newest text when reached by navigating, and keeps reading it on each whole load', async () => {
     held.push(issue('one', 'alpha'), change('one', 'description', 'Newest text', 120))
     const store = storeWith(true)

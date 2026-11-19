@@ -560,7 +560,9 @@ export class Store {
     const addrs = [...new Set(own.map(addrOf))]
     // The texts beside the list, not after it: a deleted one answers no text either (§6.13), and is dropped below.
     const asked = fields.text ? [...opened].filter((addr) => scope === 'all' || addrs.includes(addr)) : []
-    const ds = [...new Set(own.map(dOf))]
+    // A file opened with its text comes back with its fields too, so it is not list-read beside it (ISS-9): one read for an opened issue, not two.
+    const withTextAsked = new Set(asked)
+    const ds = [...new Set(own.filter((root) => !withTextAsked.has(addrOf(root))).map(dOf))]
     const [listed, opens] = await Promise.all([
       listedAlready ??
         (scope === 'these'
@@ -568,7 +570,7 @@ export class Store {
           : listFiles(read, { kinds: [kind] })),
       Promise.all(asked.map(open)),
     ])
-    const held = new Set(listed.map((file) => file.address))
+    const held = new Set([...listed, ...opens.flatMap((file) => (file ? [file] : []))].map((file) => file.address))
     const unlisted = addrs.filter((addr) => !held.has(addr))
     const withText = asked.filter((addr, i) => held.has(addr) && opens[i])
     const texts = opens.filter((file, i) => file && held.has(asked[i]!))
