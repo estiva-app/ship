@@ -21,9 +21,12 @@ import { SessionGate } from './auth/SessionGate'
 import { followOtherTabs } from './auth/estivaId'
 import { ErrorBoundary } from '@estiva-app/ui'
 import { startErrorReports } from './lib/errorReports'
+import { startPageTimings } from './lib/pageTimings'
 
 // A crash anywhere in Ship is reported to Estiva ID, built from a fixed list (PROD-4).
 startErrorReports()
+// So is how long each page took to open: from here for this load, then each open in place.
+startPageTimings()
 
 /*
   An async IIFE rather than top-level await. TLA works in a `type="module"`
