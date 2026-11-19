@@ -24,7 +24,7 @@ import { ProjectFields } from '@/components/PageFields'
 import { useSideColumn } from '@/pages/sideColumn'
 import { ISSUES, ISSUE_STATUSES, hrefFor, ACTIVITY_ITEMS } from '@/fixtures/issues'
 import { ACTIVITY, PEOPLE as SHIP_PEOPLE, PROJECT_STATUSES } from '@/fixtures/projects'
-import { MarkAsRows, MarkedNotice, STATUSES, SYMBOL, TYPE_META, WORDS, wordIcon, wordTone, TYPE_OF, blockLineCss, markedBlockAt, useMarkHover, type ItemType, type MarkWord, type Status } from './MarkAs'
+import { MarkAsRows, MarkedNotice, STATUSES, symbolHint, TYPE_META, WORDS, wordIcon, wordTone, TYPE_OF, blockLineCss, markedBlockAt, useMarkHover, type ItemType, type MarkWord, type Status } from './MarkAs'
 import { ENDED, FilterRow, ItemTimeline, ListStateView, ShowWhere, filterItems, type ListState } from './ItemParts'
 import { ELSEWHERE, INITIATIVES, initiativesOf } from './lens'
 import { ItemFields, ItemPanel, commentsOn } from './ItemPanel'
@@ -150,7 +150,7 @@ function NeedsYou({ all, me, onTab, onOpen, onDecide }: { all: Item[]; me: strin
                   )}
                   <Menu align="right" trigger={<IconButton variant="muted" tooltip="Sort as…" aria-label="Sort as…"><IconChevronDown size={16} stroke={1.5} /></IconButton>}>
                     {WORDS.map((w) => (
-                      <MenuItem key={w} label={w} shortcut={SYMBOL[w]} leading={<span style={wordTone(w)}>{wordIcon(w)}</span>} onClick={() => setSorted((s) => ({ ...s, [item.id]: w }))} />
+                      <MenuItem key={w} label={w} trailing={symbolHint(w)} leading={<span style={wordTone(w)}>{wordIcon(w)}</span>} onClick={() => setSorted((s) => ({ ...s, [item.id]: w }))} />
                     ))}
                   </Menu>
                 </span>
