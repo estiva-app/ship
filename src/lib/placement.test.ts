@@ -18,6 +18,14 @@ describe('placedIn — the sidebar’s rule, which the project rail names too', 
     expect(placedIn({ addr: '30850:x:old' }, [SHIP, PEEK])).toEqual([])
   })
 
+  it('is the team that lists it by its id, not its own Folder, once a move listed it by id (SHI-64)', () => {
+    const author = 'b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46'
+    const addr = `30850:${author}:68589030-6e8d-41b7-8608-6cbb8bc342a6`
+    const steer = { id: 'steer', addresses: [] }
+    const building = { id: 'building', addresses: [], ids: ['68589030-6e8d-41b7-8608-6cbb8bc342a6'] }
+    expect(placedIn({ addr, folder: 'steer' }, [steer, building])).toEqual([building])
+  })
+
   it('is both when two states list it', () => {
     const other = { id: 'other', addresses: ['30850:x:listed'] }
     expect(placedIn({ addr: '30850:x:listed' }, [SHIP, other])).toEqual([SHIP, other])

@@ -1,18 +1,37 @@
+/** What a Folder's state lists (`FolderSummary.addresses` and `.ids`, SPEC §3.3). */
+export interface Listing {
+  addresses?: readonly string[]
+  ids?: readonly string[]
+}
+
+/**
+ * Whether a Folder's state lists the file at `address`: by its address (an
+ * `a` entry) or by its id (an `o` entry). A move writes the id once the relay
+ * keeps the file in order, so a project moved since then is listed only by
+ * its id (SHI-64). Interop's own `listsFile`, which its package does not export.
+ */
+export function listsFile(folder: Listing, address: string): boolean {
+  if (folder.addresses?.includes(address)) return true
+  const id = /^\d+:[0-9a-f]{64}:([^]*)$/.exec(address)?.[1]
+  return id !== undefined && !!folder.ids?.includes(id)
+}
+
 /**
  * Which top-level Folders a project is in — the rule the sidebar places it by
  * and the project rail names (FOL-5, FOL-3), kept in one place so the two
  * cannot disagree.
  *
- * The Folders whose state lists its address, which is what Peek's Folders
- * column draws it under. Failing that, its own Folder if that is one of them:
- * a project created a moment ago, before the listing is read again. Empty when
- * it is in none. Usually one; a project two states list is under both.
+ * The Folders whose state lists it, by its address or by its id
+ * (`listsFile`), which is what Peek's Folders column draws it under. Failing
+ * that, its own Folder if that is one of them: a project created a moment ago,
+ * before the listing is read again. Empty when it is in none. Usually one; a
+ * project two states list is under both.
  */
-export function placedIn<F extends { id: string; addresses?: readonly string[] }>(
+export function placedIn<F extends Listing & { id: string }>(
   project: { addr: string; folder?: string },
   folders: readonly F[],
 ): F[] {
-  const listing = folders.filter((folder) => folder.addresses?.includes(project.addr))
+  const listing = folders.filter((folder) => listsFile(folder, project.addr))
   if (listing.length > 0) return listing
   const own = project.folder ? folders.find((folder) => folder.id === project.folder) : undefined
   return own ? [own] : []
@@ -30,7 +49,7 @@ export function folderName(folders: readonly { id: string; name?: string }[] | u
  */
 export function projectsIn<P extends { addr: string; contentFolder?: string }>(
   projects: readonly P[],
-  folders: readonly { id: string; addresses?: readonly string[] }[],
+  folders: readonly (Listing & { id: string })[],
   id: string,
 ): P[] {
   return projects.filter((project) => placedIn({ addr: project.addr, folder: project.contentFolder }, folders).some((folder) => folder.id === id))

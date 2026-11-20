@@ -24,7 +24,7 @@ export function MoveProject({
   onClose,
 }: {
   project: Project
-  teams: readonly { id: string; name?: string; hasState: boolean; private?: boolean; addresses?: readonly string[] }[]
+  teams: readonly { id: string; name?: string; hasState: boolean; private?: boolean; addresses?: readonly string[]; ids?: readonly string[] }[]
   say: Say
   onClose: () => void
 }) {
@@ -33,7 +33,7 @@ export function MoveProject({
   const current = folders.filter((folder) => here.has(folder.id))
   // What each one's state lists, as read: its own Folder, where `placedIn` puts a project no Folder lists, may hold none of
   // it, and `moveProject` then places it rather than moving it out of a Folder that does not list it.
-  const sources = teams.filter((team) => here.has(team.id)).map((team) => ({ id: team.id, hasState: team.hasState, addresses: team.addresses }))
+  const sources = teams.filter((team) => here.has(team.id)).map((team) => ({ id: team.id, hasState: team.hasState, addresses: team.addresses, ids: team.ids }))
   const nameOf = (id: string) => folders.find((folder) => folder.id === id)?.name ?? 'Untitled team'
 
   return (
