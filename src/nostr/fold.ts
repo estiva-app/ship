@@ -16,7 +16,7 @@
  * checkable rather than hopeful.
  */
 import { blockAnchorOf, contentFormatOf, quoteOf, type ContentFormat, type Quote, type SignedEvent } from '@estiva-app/protocol'
-import { fieldsSetBy, stageTagOf, type Stage } from '@estiva-app/interop'
+import { DELETED_FIELD, fieldsSetBy, stageTagOf, type Stage } from '@estiva-app/interop'
 import { foldThreads, isAbout } from '@estiva-app/conversation'
 import { DEFAULT_ISSUE_STATUS, DEFAULT_PROJECT_STATUS, KIND, issueStage, projectStage } from './kinds'
 import { summaryText } from './summary'
@@ -131,6 +131,8 @@ export interface Change {
    * change proves nothing, so it is not read (SPEC §6.2).
    */
   folder?: string
+  /** The file the change says it is about, by its id: its `O` (SPEC §6.2). */
+  about?: string
 }
 
 /** Fields on a Project or Issue that changes are allowed to set. */
@@ -256,6 +258,7 @@ export function parseChange(event: SignedEvent): Change | null {
     ...stageOn(event, field, value),
     note: event.content,
     folder: event.tags.find((t) => t[0] === 'h' && t[1])?.[1],
+    ...(tag(event, 'O') !== undefined ? { about: tag(event, 'O') } : {}),
   }
 }
 
@@ -314,19 +317,40 @@ function rootFolders(root: SignedEvent): ReadonlySet<string> | undefined {
  *
  * A `summary` takes neither exception (SPEC §6.12): new, so nothing written
  * before the rule depends on it, it counts only where the check can be made.
+ * Nor does a `deleted` (SPEC §6.5): a delete is by "anyone who may write in the
+ * file's team", and a root that names no team has none, so nothing deletes it
+ * — as every manifest reader reads it (TES-2).
+ *
+ * Also dropped, by the same reasoning: a change whose `O` names another file
+ * than its `a` (SPEC §6.2: "a reader ignores one"). It is about neither, and
+ * every manifest reader skips it (interop's `foldChanges`); Ship applied it,
+ * so a rename aimed by `O` elsewhere showed only in Ship (TES-2). Checked
+ * against the held root's id, as interop does, so a target whose root is not
+ * in the read counts as before.
  */
 function changesInTargetFolder(changes: Change[], roots: Map<string, SignedEvent>): Change[] {
   const folders = new Map<string, ReadonlySet<string> | undefined>()
   for (const [address, root] of roots) folders.set(address, rootFolders(root))
   return changes.filter((change) => {
+    const root = roots.get(change.target)
+    if (change.about !== undefined && root && change.about !== tag(root, 'd')) return false
     const held = folders.get(change.target)
-    if (!held) return change.field !== SUMMARY_FIELD
+    if (!held) return change.field !== SUMMARY_FIELD && change.field !== DELETED_FIELD
     return change.folder !== undefined && held.has(change.folder)
   })
 }
 
 /** The one-line summary beside a file's title (SPEC §6.12). */
 const SUMMARY_FIELD = 'summary'
+
+/**
+ * The one value that archives or deletes a file (SPEC §6.5; the manifest's
+ * `hiddenWhen` and vocabularies say the same). Any other value, `false`
+ * included, reads as live, as every manifest reader reads it: Ship took any
+ * non-empty value, so a file another app restored with `false` stayed
+ * archived or deleted in Ship alone (TES-2).
+ */
+export const ARCHIVED_OR_DELETED = 'true'
 
 /**
  * Keep one event per address.
@@ -813,8 +837,8 @@ export function foldFolder(
       // Any non-empty value means archived; unarchiving writes an empty string
       // rather than deleting the change, because an append-only stream has no
       // undo and "set to nothing" is a fact like any other.
-      archived: !!fields.archived?.value,
-      ...(fields.deleted?.value ? { deleted: { by: fields.deleted.by, at: fields.deleted.at } } : {}),
+      archived: fields.archived?.value === ARCHIVED_OR_DELETED,
+      ...(fields.deleted?.value === ARCHIVED_OR_DELETED ? { deleted: { by: fields.deleted.by, at: fields.deleted.at } } : {}),
       rootId: event.id,
       fields,
     })
@@ -857,7 +881,7 @@ export function foldFolder(
       status: fields.status?.value ?? DEFAULT_ISSUE_STATUS,
       stage: issueStage(fields.status?.value ?? DEFAULT_ISSUE_STATUS, fields.status?.stage),
       assignee: fields.assignee?.value,
-      ...(fields.deleted?.value ? { deleted: { by: fields.deleted.by, at: fields.deleted.at } } : {}),
+      ...(fields.deleted?.value === ARCHIVED_OR_DELETED ? { deleted: { by: fields.deleted.by, at: fields.deleted.at } } : {}),
       rootId: event.id,
       fields,
     })
