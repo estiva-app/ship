@@ -57,6 +57,8 @@ export interface SidebarFolder {
   name?: string
   /** What the team's state lists (`FolderSummary.addresses`): which projects are in it (`placedIn`). */
   addresses?: string[]
+  /** What it lists by id (`FolderSummary.ids`): a project moved there since the relay keeps it in order (SHI-64). */
+  ids?: string[]
 }
 
 /**

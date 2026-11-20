@@ -213,7 +213,7 @@ function Shell() {
           {...sidebarProps(
             partial ? null : state,
             route,
-            (teams ?? []).map((f) => ({ id: f.id, name: f.name, addresses: f.addresses })),
+            (teams ?? []).map((f) => ({ id: f.id, name: f.name, addresses: f.addresses, ids: f.ids })),
             archives,
           )}
           {...sidebarTopics}

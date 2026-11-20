@@ -16,6 +16,7 @@
  * Generic over the shapes it reads, so this file knows no kinds.
  */
 import { archivedAncestorOf } from '@estiva-app/interop'
+import { listsFile } from './placement'
 import { archivedLine as sharedArchivedLine, type ArchiveDialogProps, type ArchivedNoticeProps } from '@estiva-app/ui'
 import { ago } from './time'
 import { ARCHIVED_OR_DELETED } from '../nostr/fold'
@@ -51,6 +52,7 @@ interface FolderLike {
   name?: string
   channel?: string
   addresses?: readonly string[]
+  ids?: readonly string[]
   archived?: { by: string; at: number; resolution?: string }
 }
 
@@ -145,7 +147,7 @@ export function archivesOf(
       continue
     }
     // Placed as the sidebar places it: by the states that list it, then by its own Folder.
-    const listing = folders.filter((folder) => folder.addresses?.includes(project.addr))
+    const listing = folders.filter((folder) => listsFile(folder, project.addr))
     const placed = listing.length ? listing : folders.filter((folder) => folder.id === project.contentFolder)
     const archivedTeam = placed.length && placed.every((folder) => folder.archived) ? placed[0] : undefined
     projects.set(

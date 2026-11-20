@@ -12,6 +12,7 @@ import { loadQuery, readFolderListing } from './foreign'
 import { links } from './linkCards'
 import { linkResolverFor } from '../lib/linksNamingCards'
 import { isRelayBusy } from '../lib/relayBudget'
+import { listsFile } from '../lib/placement'
 import { SignerTokenExpired } from '../nostr/signer'
 import { inOrderOption, issueFieldsAgain, issueFieldsNow, projectFieldsAgain, projectFieldsNow, relay, signer, store } from './store'
 import { nip44 } from './nip44'
@@ -431,8 +432,8 @@ function ownFailure(stopped: { reason?: string; httpStatus?: number; threw?: unk
  */
 export async function moveProject(
   project: Project,
-  /** With `addresses`, what each one's state lists. */
-  from: readonly { id: string; hasState: boolean; addresses?: readonly string[] }[],
+  /** With `addresses` and `ids`, what each one's state lists. */
+  from: readonly { id: string; hasState: boolean; addresses?: readonly string[]; ids?: readonly string[] }[],
   to: { id: string; hasState: boolean; private?: boolean },
 ): Promise<MoveResult> {
   const clock = await clockProblem()
@@ -450,7 +451,7 @@ export async function moveProject(
     const holds = (folder: (typeof from)[number]) => {
       const listing = listings.get(folder.id)
       if (!listing) return true
-      return !!folder.addresses?.includes(project.addr) || listing.some((file) => file.address === project.addr) || listedBeneath(listing, { ref: project.addr }).length > 0
+      return listsFile(folder, project.addr) || listing.some((file) => file.address === project.addr) || listedBeneath(listing, { ref: project.addr }).length > 0
     }
     const sources = from.filter(holds).map((folder) => (listings.has(folder.id) ? { ...folder, addresses: [project.addr] } : folder))
     const { refused: unsafe, moveRefused } = await store.moveProject({ project: project.addr, from: sources, to, listings })

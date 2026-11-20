@@ -557,7 +557,7 @@ export function ProjectPage({
    * Folder's chat (`recordChannel`), and so Related and Move to Folder… know the
    * one it is in (`placedIn`). `undefined` while they are read.
    */
-  teams: readonly { id: string; name?: string; hasState: boolean; addresses?: readonly string[] }[] | undefined
+  teams: readonly { id: string; name?: string; hasState: boolean; addresses?: readonly string[]; ids?: readonly string[] }[] | undefined
   /** The object's `d`, which is all a §7.2 URL carries. */
   d: string
   view: ProjectViewName
