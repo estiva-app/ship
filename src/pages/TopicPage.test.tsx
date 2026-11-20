@@ -125,6 +125,17 @@ beforeEach(() => {
 })
 
 describe("A topic's page in Ship", () => {
+  // SHI-64: a move leaves the topic's `h` in the team it left, and the team it went to lists it by its id.
+  it('names the team whose list names the topic by its id, not the team it was started in', async () => {
+    held.push(manifest('peek', 'peek.estiva.app', ['30840']), topic(D, 'Widgets'))
+    const { state, archives } = ship([], [])
+    render(<Page d={D} state={state} folders={[{ id: 'team', name: 'Started here', addresses: [] } as never, { id: 'moved', name: 'Moved here', addresses: [], ids: [D] } as never]} archives={archives} />)
+
+    await waitFor(() => expect(page().querySelector('[data-topic-loaded]')).not.toBeNull())
+    expect(within(page()).getByText('Moved here')).toBeTruthy()
+    expect(within(page()).queryByText('Started here')).toBeNull()
+  })
+
   it('draws its title, team and summary, its projects as the Projects page does, its issues with their status, its Leaf documents opening Leaf, and Open in Peek in its ⋯ (TOPI-8)', async () => {
     const opened = vi.spyOn(window, 'open').mockReturnValue(null)
     held.push(manifest('ship', 'ship.estiva.app', ['30850', '30851']), manifest('peek', 'peek.estiva.app', ['30840']), manifest('leaf', 'leaf.estiva.app', ['30842']))
@@ -344,15 +355,3 @@ describe("A topic's page in Ship", () => {
   })
 })
 
-/* SHI-64: a move leaves the topic's `h` in the team it left, and the team it went to lists it by its id. Last, as it reads the topic alone. */
-describe("A moved topic's page in Ship", () => {
-  it('names the team whose list names the topic by its id, not the team it was started in', async () => {
-    held.push(topic(D, 'Widgets'))
-    const { state, archives } = ship([], [])
-    render(<Page d={D} state={state} folders={[{ id: 'team', name: 'Started here', addresses: [] } as never, { id: 'moved', name: 'Moved here', addresses: [], ids: [D] } as never]} archives={archives} />)
-
-    await waitFor(() => expect(page().querySelector('[data-topic-loaded]')).not.toBeNull())
-    expect(within(page()).getByText('Moved here')).toBeTruthy()
-    expect(within(page()).queryByText('Started here')).toBeNull()
-  })
-})
