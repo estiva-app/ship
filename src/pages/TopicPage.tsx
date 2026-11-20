@@ -18,6 +18,7 @@ import { TopicView, type TopicDocument, type TopicPageView } from '@/views/Topic
 import { act, type Say } from './act'
 import { copyText, pickerPeople } from './ProjectPage'
 import { useTopicConversation } from './topicConversation'
+import { placedIn } from '@/lib/placement'
 
 /** "Katerina, 2h ago": who edited a file last, by first name, and when (the prototype's rows, Miky 4 Nov). */
 export function editedLabel(name: string, at: number, now: number = Date.now()): string {
@@ -130,7 +131,8 @@ export function TopicPage({
     const issues = page.live
       .filter((row) => row.kind === 'issue')
       .map((row) => ({ ...row, ...(row.edited ? { editedLabel: editedLabel(nameOf(row.edited.by), row.edited.at) } : {}) }))
-    const team = folders?.find((folder) => folder.id === page.folder)?.name
+    // The team whose list names it, by address or id; its `h` only when none does: a move leaves the `h` behind (SHI-64).
+    const team = folders ? placedIn({ addr: page.address, folder: page.folder }, folders)[0]?.name : undefined
     return { title: page.title, ...(page.summary ? { summary: page.summary } : {}), ...(team ? { team } : {}), archived: page.archived, projects, issues, archivedWork: page.archivedWork }
   }, [page, state, archives, personOf, nameOf, folders])
 

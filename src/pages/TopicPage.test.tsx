@@ -343,3 +343,16 @@ describe("A topic's page in Ship", () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy())
   })
 })
+
+/* SHI-64: a move leaves the topic's `h` in the team it left, and the team it went to lists it by its id. Last, as it reads the topic alone. */
+describe("A moved topic's page in Ship", () => {
+  it('names the team whose list names the topic by its id, not the team it was started in', async () => {
+    held.push(topic(D, 'Widgets'))
+    const { state, archives } = ship([], [])
+    render(<Page d={D} state={state} folders={[{ id: 'team', name: 'Started here', addresses: [] } as never, { id: 'moved', name: 'Moved here', addresses: [], ids: [D] } as never]} archives={archives} />)
+
+    await waitFor(() => expect(page().querySelector('[data-topic-loaded]')).not.toBeNull())
+    expect(within(page()).getByText('Moved here')).toBeTruthy()
+    expect(within(page()).queryByText('Started here')).toBeNull()
+  })
+})
