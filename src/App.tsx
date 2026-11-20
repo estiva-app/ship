@@ -236,7 +236,8 @@ function Shell() {
                 afresh; a tab or view inside the same page does not. */}
             <ErrorBoundary key={pageKey(route)}>
               <CrashOnPurpose />
-              <Page route={route} state={partial && !opens(route, state) ? null : state} loading={loading || partial} directory={directory} teams={teams} folders={folders} archives={archives} say={say} refresh={refresh} />
+              {/* Waiting out the person's minute (busy) is still loading: the page's shape, not a blank page (SHI-61). */}
+              <Page route={route} state={partial && !opens(route, state) ? null : state} loading={loading || busy || partial} directory={directory} teams={teams} folders={folders} archives={archives} say={say} refresh={refresh} />
             </ErrorBoundary>
           </ThreadsContext.Provider>
         </WorkspacePeopleProvider>
