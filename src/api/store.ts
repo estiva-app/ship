@@ -86,7 +86,7 @@ const fetchReportingQuota: FetchLike = async (url, init) => {
 
 // Every refused write is reported by its reason code, busy answers included (PROD-5).
 // A list read in one request, never paged (ISS-9).
-// Plain reads asked together go out as one request: an open spent 74–95 of a person's 300 a minute (SHI-61).
+// Plain reads asked together go out as one request: an open spent 74–99 of a person's 300 a minute (SHI-61).
 export const relay = new ListReadRelay(RELAY_URL, signer, { fetch: fetchReportingQuota, onRefused: heardRefusal, mergeReadsMs: MERGE_READS_MS })
 
 /** The switch (ALO-5): the relay's NIP-11 asked once, on the first read that needs it. */
