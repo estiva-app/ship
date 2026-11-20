@@ -192,13 +192,26 @@ export const HOME: Route = { name: 'topics' }
  * the uuid off the tail of either shape, which is the same rule §7.2 states for
  * ignoring a slug.
  */
+/**
+ * A path segment decoded, or as written when its escape is malformed: a pasted
+ * `/issue/%` threw out of `parse` and took the page down with it (TES-4). The
+ * router in Peek and Leaf's `decodeRef` keep it the same way.
+ */
+function decodeSegment(segment: string): string {
+  try {
+    return decodeURIComponent(segment)
+  } catch {
+    return segment
+  }
+}
+
 export function parse(location: string): Route {
   // Only an old `#/…` link carries its route in the hash. Any other fragment — a block link's `#block-<id>`
   // (RIC-18) — belongs to the page the path names.
   const at = location.indexOf('#')
   const raw = at !== -1 && location[at + 1] === '/' ? location.slice(at + 1) : at !== -1 ? location.slice(0, at) : location
   const [path, query] = raw.replace(/^\/?/, '').split('?')
-  const parts = path.split('/').filter(Boolean).map(decodeURIComponent)
+  const parts = path.split('/').filter(Boolean).map(decodeSegment)
 
   if (parts[0] === 'o' && parts[1]) return { name: 'inbound', naddr: parts[1] }
   if (parts[0] === 'projects') {
