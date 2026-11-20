@@ -347,6 +347,15 @@ const SUMMARY_FIELD = 'summary'
 const DELETED_FIELD = 'deleted'
 
 /**
+ * The one value that archives or deletes a file (SPEC §6.5; the manifest's
+ * `hiddenWhen` and vocabularies say the same). Any other value, `false`
+ * included, reads as live, as every manifest reader reads it: Ship took any
+ * non-empty value, so a file another app restored with `false` stayed
+ * archived or deleted in Ship alone (TES-2).
+ */
+export const ARCHIVED_OR_DELETED = 'true'
+
+/**
  * Keep one event per address.
  *
  * The relay replaces addressable events on ingest, so in practice this sees one
@@ -831,8 +840,8 @@ export function foldFolder(
       // Any non-empty value means archived; unarchiving writes an empty string
       // rather than deleting the change, because an append-only stream has no
       // undo and "set to nothing" is a fact like any other.
-      archived: !!fields.archived?.value,
-      ...(fields.deleted?.value ? { deleted: { by: fields.deleted.by, at: fields.deleted.at } } : {}),
+      archived: fields.archived?.value === ARCHIVED_OR_DELETED,
+      ...(fields.deleted?.value === ARCHIVED_OR_DELETED ? { deleted: { by: fields.deleted.by, at: fields.deleted.at } } : {}),
       rootId: event.id,
       fields,
     })
@@ -875,7 +884,7 @@ export function foldFolder(
       status: fields.status?.value ?? DEFAULT_ISSUE_STATUS,
       stage: issueStage(fields.status?.value ?? DEFAULT_ISSUE_STATUS, fields.status?.stage),
       assignee: fields.assignee?.value,
-      ...(fields.deleted?.value ? { deleted: { by: fields.deleted.by, at: fields.deleted.at } } : {}),
+      ...(fields.deleted?.value === ARCHIVED_OR_DELETED ? { deleted: { by: fields.deleted.by, at: fields.deleted.at } } : {}),
       rootId: event.id,
       fields,
     })

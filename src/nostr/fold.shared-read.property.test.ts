@@ -25,7 +25,7 @@ import fc from 'fast-check'
 import { deliveryArb, historyArb, runSettings } from '@estiva-app/protocol/testing'
 import { projectEvents, type ForeignObject } from '@estiva-app/interop'
 import type { SignedEvent } from '@estiva-app/protocol'
-import { foldFolder, type Issue, type Project } from './fold'
+import { ARCHIVED_OR_DELETED, foldFolder, type Issue, type Project } from './fold'
 import { manifestContent } from './manifest'
 import { ISSUE_STATUSES, KIND, PROJECT_STATUSES } from './kinds'
 import { statusLabel } from '../lib/issues'
@@ -74,7 +74,8 @@ function seenByShip(file: Project | Issue): Seen {
     summary: file.summary ?? '',
     parent: issue?.projectAddr ?? '',
     assignee: issue?.assignee ?? '',
-    archived: !!file.fields.archived?.value,
+    // A project's own `archived`; an issue's is read by `ownArchive` (src/lib/archive.ts) by the same value.
+    archived: file.fields.archived?.value === ARCHIVED_OR_DELETED,
     deleted: !!file.deleted,
   }
 }
@@ -107,6 +108,28 @@ describe("Ship's read and the shared read Peek and Leaf use", () => {
   test('show the same title, status, summary, parent, assignee, archived and deleted for every project and issue', () => {
     fc.assert(
       fc.property(historyArb().chain((history) => deliveryArb(history.events)), (events) => {
+        const { ship, shared } = bothReads(events)
+        expect(shared).toEqual(ship)
+      }),
+      settings,
+    )
+  })
+
+  // SPEC §6.5 archives and deletes with `true` and restores with the empty
+  // value; Ship's manifest says the same (`hiddenWhen`, the vocabularies). An
+  // app that restores with `false` must not leave the file archived in Ship
+  // alone (TES-2).
+  test('agree when an archive or a delete is undone by writing false', () => {
+    const undoneWithFalse = (event: SignedEvent): SignedEvent => {
+      const sets = (field: string) => event.tags.some((t) => (t[0] === 'field' && t[1] === field) || (t[0] === 'set' && t[1] === field))
+      if (event.kind !== KIND.CHANGE || !(sets('archived') || sets('deleted'))) return event
+      const tags = event.tags.map((t) =>
+        t[0] === 'value' && t[1] === '' ? ['value', 'false'] : t[0] === 'set' && (t[1] === 'archived' || t[1] === 'deleted') && t[2] === '' ? ['set', t[1], 'false'] : t,
+      )
+      return { ...event, tags }
+    }
+    fc.assert(
+      fc.property(historyArb().chain((history) => deliveryArb(history.events.map(undoneWithFalse))), (events) => {
         const { ship, shared } = bothReads(events)
         expect(shared).toEqual(ship)
       }),
