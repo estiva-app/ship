@@ -1,4 +1,4 @@
-import { ISSUE_TYPE, fileFieldsOf, projectFieldsOf, type FetchLike, type RelayFileReads } from '@estiva-app/protocol'
+import { ISSUE_TYPE, MERGE_READS_MS, fileFieldsOf, projectFieldsOf, type FetchLike, type RelayFileReads } from '@estiva-app/protocol'
 import type { TimesFn } from '@estiva-app/interop'
 import { isRateLimited, noteRateLimited } from '@/lib/relayBudget'
 import { estivaIdSigner, localSigner, type Signer } from '../nostr/signer'
@@ -86,7 +86,8 @@ const fetchReportingQuota: FetchLike = async (url, init) => {
 
 // Every refused write is reported by its reason code, busy answers included (PROD-5).
 // A list read in one request, never paged (ISS-9).
-export const relay = new ListReadRelay(RELAY_URL, signer, { fetch: fetchReportingQuota, onRefused: heardRefusal })
+// Plain reads asked together go out as one request: an open spent 74–99 of a person's 300 a minute (SHI-61).
+export const relay = new ListReadRelay(RELAY_URL, signer, { fetch: fetchReportingQuota, onRefused: heardRefusal, mergeReadsMs: MERGE_READS_MS })
 
 /** The switch (ALO-5): the relay's NIP-11 asked once, on the first read that needs it. */
 let fileReads: Promise<RelayFileReads> | undefined

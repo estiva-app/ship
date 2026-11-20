@@ -33,7 +33,7 @@
     "@estiva-app/identity": "^0.3.0",
     "@estiva-app/interop": "^0.108.1",
     "@estiva-app/platform": "^0.11.0",
-    "@estiva-app/protocol": "^0.62.1",
+    "@estiva-app/protocol": "^0.65.1",
     "@estiva-app/ui": "^0.124.0",
     "@tabler/icons-react": "^3.41.1",
     "@tiptap/extension-code-block-lowlight": "^3.31.3",
