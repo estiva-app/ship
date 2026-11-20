@@ -16,7 +16,7 @@
  * checkable rather than hopeful.
  */
 import { blockAnchorOf, contentFormatOf, quoteOf, type ContentFormat, type Quote, type SignedEvent } from '@estiva-app/protocol'
-import { fieldsSetBy, stageTagOf, type Stage } from '@estiva-app/interop'
+import { DELETED_FIELD, fieldsSetBy, stageTagOf, type Stage } from '@estiva-app/interop'
 import { foldThreads, isAbout } from '@estiva-app/conversation'
 import { DEFAULT_ISSUE_STATUS, DEFAULT_PROJECT_STATUS, KIND, issueStage, projectStage } from './kinds'
 import { summaryText } from './summary'
@@ -342,9 +342,6 @@ function changesInTargetFolder(changes: Change[], roots: Map<string, SignedEvent
 
 /** The one-line summary beside a file's title (SPEC §6.12). */
 const SUMMARY_FIELD = 'summary'
-
-/** A file's delete, a field like any other (SPEC §6.5). */
-const DELETED_FIELD = 'deleted'
 
 /**
  * The one value that archives or deletes a file (SPEC §6.5; the manifest's
