@@ -184,6 +184,13 @@ describe('App — the shell around the route', () => {
     expect(within(screen.getByRole('banner')).getByText('Me Myself')).toBeInTheDocument()
   })
 
+  it('an issue opened past the relay’s per-minute limit shows the issue’s loading shape, not a blank page (SHI-61)', () => {
+    goTo(`/issue/${D('14')}`)
+    vi.mocked(useWorkspace).mockReturnValue({ state: null, partial: false, error: null, clock: null, loading: false, busy: true, refresh, wantThreads: () => {}, live: false })
+    render(<App />)
+    expect(document.querySelector('[data-loading="workspace"]')).toHaveAttribute('data-shape', 'issue')
+  })
+
   it('says the clock sentence, not the read error, when a wrong clock is why the read failed (SHI-53)', () => {
     const sentence = "This computer's clock is 20 minutes ahead of the relay's — the relay would refuse anything signed now. Set the clock and try again."
     vi.mocked(useWorkspace).mockReturnValue({ state: STATE, partial: false, error: 'NIP-98 created_at out of range (delta: 1200s)', clock: sentence, loading: false, busy: false, refresh: async () => {}, wantThreads: () => {}, live: false })

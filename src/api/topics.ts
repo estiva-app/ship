@@ -8,18 +8,19 @@ import { useLandedReadState } from './readStateSync'
 import { readMuted } from './useFeedJudges'
 import { nip44 } from './nip44'
 import { relay, signer, timesOption } from './store'
-import { isRateLimited, isRelayBusy } from '@/lib/relayBudget'
+import { isRateLimited } from '@/lib/relayBudget'
 
 /**
- * A relay asking to wait (the person's requests for the minute are spent, or
- * it is busy) is read again once the wait is over, showing loading meanwhile:
- * it is a wait, not a failure. Opening Ship a few times in a minute said
- * "Didn't load" under Topics, and never read again (SHI-61). Any other failure
- * is left to the next open or Try again.
+ * The relay saying the person's requests for the minute are spent is read
+ * again once the wait it names is over, showing loading meanwhile: it is a
+ * wait, not a failure. Opening Ship a few times in a minute said "Didn't load"
+ * under Topics, and never read again (SHI-61). A busy relay is not this: it
+ * was already retried quietly by protocol, and then shows its error, as the
+ * record says. Any other failure is left to the next open or Try again.
  *
  * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-busy-relay-says-it-is-busy.md
  */
-const waitOut = (error: unknown): boolean => isRateLimited(error instanceof Error ? error.message : String(error)) || isRelayBusy(error)
+const waitOut = (error: unknown): boolean => isRateLimited(error instanceof Error ? error.message : String(error))
 
 /**
  * Every topic the reader can read, held per tab (SHIPS-2) — interop's
