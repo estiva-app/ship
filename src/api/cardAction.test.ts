@@ -133,11 +133,21 @@ describe('a change made from a card', () => {
     expect(tags.filter((t) => t[0] === 'stage')).toEqual([['stage', 'status', 'done']])
   })
 
+  // Interop 0.110 (§6.2): a change says the type of the file it changes, right after its id.
+  it('signs the change with the type of the file it changes', async () => {
+    expect(await applyCardAction({ reference: `nostr:${addrToNaddr(ISSUE)}`, actionId: 'set-issue-status', value: 'done' })).toEqual({ ok: true })
+    const tags = publish.mock.calls[0][0].tags
+    expect(tags.slice(0, 3).map((t) => t[0])).toEqual(['a', 'O', 'K'])
+    expect(tags.filter((t) => t[0] === 'K')).toEqual([['K', 'osnova.issue']])
+  })
+
   it('signs nothing whose id is another file’s or named twice, or whose stage is about another field', async () => {
     const id = ISSUE.split(':')[2]
     const rewrites: [string, (tags: string[][]) => string[][]][] = [
       ['another file’s id', (tags) => tags.map((t) => (t[0] === 'O' ? ['O', 'another-file'] : t))],
       ['a second id', (tags) => [...tags, ['O', id]]],
+      ['another file type', (tags) => tags.map((t) => (t[0] === 'K' ? ['K', 'osnova.project'] : t))],
+      ['a second type', (tags) => [...tags, ['K', 'osnova.issue']]],
       ['a stage about another field', (tags) => tags.map((t) => (t[0] === 'stage' ? ['stage', 'assignee', t[2]] : t))],
       ['a second stage', (tags) => [...tags, ['stage', 'status', 'started']]],
     ]

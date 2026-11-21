@@ -146,7 +146,12 @@ for (const notAKey of ['npub1notakey', WHO.toUpperCase()]) {
   }
   check(`  …and a lead that is not a lower-case key is refused (${notAKey.slice(0, 8)}…)`, refused)
 }
-check('  …and the fixed tags keep their order ahead of it, O after a (SPEC §6.2)', assign.tags.slice(0, 5).map((t) => t[0]).join(',') === 'a,O,field,value,h')
+check('  …and the fixed tags keep their order ahead of it, O after a and the type after O (SPEC §6.2)', assign.tags.slice(0, 6).map((t) => t[0]).join(',') === 'a,O,K,field,value,h')
+check('  …an issue’s change says osnova.issue, a project’s osnova.project', tag(statusChange, 'K') === 'osnova.issue' && tag(projectChange, 'K') === 'osnova.project')
+check(
+  '  …and a change to a team itself says no type',
+  buildChange(PK, Date.now(), { target: `39000:${PK}:${CONTENT}`, field: 'archived', value: 'true', folder: CONTENT }).tags.every((t) => t[0] !== 'K'),
+)
 
 // A move names its new parent where a relay indexes it: `A`, never a second `a` (SPEC §7.2, FOL-45).
 const P2 = `30850:${PK}:p2`

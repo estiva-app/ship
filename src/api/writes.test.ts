@@ -487,6 +487,7 @@ describe('Add to topic and Remove go on the wire as an entry on the topic (TOP-5
     expect(entry.tags.filter((t) => t[0] !== 'ts')).toEqual([
       ['a', TOPIC.address],
       ['O', 'topic-1'],
+      ['K', 'osnova.topic'],
       ['field', `lists:${ISSUE.id}`],
       ['value', 'true'],
       ['h', 'topic-folder'],
