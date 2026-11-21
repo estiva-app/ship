@@ -283,7 +283,9 @@ export function parseChanges(event: SignedEvent): Change[] {
   const head = parseChange({ ...event, tags: [...event.tags, ['field', 'set'], ['value', '']] })
   if (!head) return []
   // `head` carries no stage (its value is ''), so each field's is its own.
-  return fieldsSetBy(event).map(({ field, value, format }) => ({ ...head, field, value, format: (format ?? head.format) as ContentFormat, ...stageOn(event, field, value) }))
+  // The format is `head`'s, the event's `content-format` as `contentFormatOf` names it. `fieldsSetBy`
+  // gives the tag's own word (`estiva-blocks-1`), which no page here takes for `blocks` (MOV-1).
+  return fieldsSetBy(event).map(({ field, value }) => ({ ...head, field, value, ...stageOn(event, field, value) }))
 }
 
 /** The tags a root names its Folder with: `h`, or Ship's older `buzz-channel` (SPEC §7.3). */

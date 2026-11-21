@@ -11,9 +11,20 @@
  * Here both reads get the same histories, made up by
  * `@estiva-app/protocol/testing` (projects and issues created, renamed, moved,
  * a status set, assigned, archived, deleted, by several people, many in the
- * same second, some delivered twice, in any order), and must show the same
- * title, status, summary, parent, assignee, archived and deleted for every
- * project and issue.
+ * same second, some delivered twice, in any order; summaries with line breaks,
+ * statuses nobody defined, a project's own statuses, statuses that carry their
+ * stage, descriptions, keys, leads and refs, since MOV-1), and must show the
+ * same of everything Ship shows about a project or an issue: title, status and
+ * its stage, summary, parent, assignee, archived, deleted, description, key (an
+ * issue's is its ref), lead, and for each field which change set it, who made
+ * it and when.
+ *
+ * The shared read is two functions over the same events: `projectEvents`
+ * gives the card (title, status, stage, summary, key, lead, parent, assignee,
+ * archived, deleted) and `filesOf` gives each field's current change and the
+ * text. "When" is compared to the second: Ship's fold keeps a change's second,
+ * and the change's id already says which change of that second it is. The
+ * file's history is not compared yet; the shared read has none (MOV-2).
  *
  * A failure prints the smallest history that breaks it and the seed that
  * replays it: `FC_SEED=<seed> npx vitest run src/nostr/fold.shared-read`.
@@ -23,7 +34,7 @@
 import { describe, expect, test } from 'vitest'
 import fc from 'fast-check'
 import { deliveryArb, historyArb, runSettings } from '@estiva-app/protocol/testing'
-import { projectEvents, type ForeignObject } from '@estiva-app/interop'
+import { BLOCK_DOCUMENT_FORMAT, filesOf, projectEvents, textOf, type FileFields, type ForeignObject } from '@estiva-app/interop'
 import type { SignedEvent } from '@estiva-app/protocol'
 import { ARCHIVED_OR_DELETED, foldFolder, type Issue, type Project } from './fold'
 import { manifestContent } from './manifest'
@@ -48,6 +59,16 @@ interface Seen {
   assignee: string
   archived: boolean
   deleted: boolean
+  description: string
+  /** How the description is written: Ship's `marker`, `blocks` or `unknown`. */
+  descriptionFormat: string
+  /** A project's key; an issue's ref. */
+  key: string
+  lead: string
+  /** What the status means (SPEC §7.4), or '' where neither the change nor a list says. */
+  stage: string
+  /** For each field a change set: that change's id, who made it, and the second it was made. */
+  setBy: Record<string, string>
 }
 
 /**
@@ -77,10 +98,21 @@ function seenByShip(file: Project | Issue): Seen {
     // A project's own `archived`; an issue's is read by `ownArchive` (src/lib/archive.ts) by the same value.
     archived: file.fields.archived?.value === ARCHIVED_OR_DELETED,
     deleted: !!file.deleted,
+    description: file.description,
+    descriptionFormat: file.descriptionFormat,
+    key: (issue ? issue.ref : (file as Project).key) ?? '',
+    lead: issue ? '' : ((file as Project).lead ?? ''),
+    stage: file.stage ?? '',
+    setBy: Object.fromEntries(Object.entries(file.fields).map(([field, set]) => [field, `${set.id} by ${set.by} at ${set.at}`])),
   }
 }
 
-function seenBySharedRead(object: ForeignObject): Seen {
+/** A `content-format` as Ship names it (`contentFormatOf`): none is marker text, the block format is blocks. */
+const formatName = (format: string | undefined) => (!format ? 'marker' : format === BLOCK_DOCUMENT_FORMAT ? 'blocks' : 'unknown')
+
+function seenBySharedRead(object: ForeignObject, file: FileFields | undefined): Seen {
+  const meta = (named: (slot: ForeignObject['meta'][number]) => boolean) => object.meta.find(named)?.value ?? ''
+  const text = file?.fields.description ?? (file ? textOf(file.root) : undefined)
   return {
     title: object.slots.title?.value ?? '',
     status: object.slots.status?.value ?? '',
@@ -89,6 +121,12 @@ function seenBySharedRead(object: ForeignObject): Seen {
     assignee: object.meta.find((slot) => slot.label === 'Assignee')?.value ?? '',
     archived: !!object.archived,
     deleted: !!object.deleted,
+    description: text?.value ?? '',
+    descriptionFormat: formatName(text?.format),
+    key: object.kind === KIND.ISSUE ? meta((slot) => slot.field === 'ref') : meta((slot) => slot.label === 'Key'),
+    lead: object.kind === KIND.ISSUE ? '' : meta((slot) => slot.label === 'Lead'),
+    stage: object.slots.status?.stage ?? '',
+    setBy: Object.fromEntries(Object.entries(file?.fields ?? {}).map(([field, set]) => [field, `${set.id} by ${set.pubkey} at ${Math.floor(set.at / 1000)}`])),
   }
 }
 
@@ -96,16 +134,17 @@ function seenBySharedRead(object: ForeignObject): Seen {
 function bothReads(events: SignedEvent[]): { ship: Record<string, Partial<Seen>>; shared: Record<string, Partial<Seen>> } {
   const folded = foldFolder(events)
   const ship = Object.fromEntries([...folded.projects, ...folded.issues].map((file) => [file.addr, seenByShip(file)]))
+  const files = new Map(filesOf(events, { withText: true }).map((file) => [file.address, file]))
   const shared = Object.fromEntries(
     projectEvents(events, () => resolved)
       .filter((object) => object.kind === KIND.PROJECT || object.kind === KIND.ISSUE)
-      .map((object) => [object.address!, seenBySharedRead(object)]),
+      .map((object) => [object.address!, seenBySharedRead(object, files.get(object.address!))]),
   )
   return { ship: compared(ship), shared: compared(shared) }
 }
 
 describe("Ship's read and the shared read Peek and Leaf use", () => {
-  test('show the same title, status, summary, parent, assignee, archived and deleted for every project and issue', () => {
+  test('show the same of everything Ship shows about a project or an issue: its title, status, stage, summary, parent, assignee, archived, deleted, description, key, lead, and who set each field and when', () => {
     fc.assert(
       fc.property(historyArb().chain((history) => deliveryArb(history.events)), (events) => {
         const { ship, shared } = bothReads(events)
