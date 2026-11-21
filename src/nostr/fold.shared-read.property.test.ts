@@ -23,7 +23,9 @@
  * gives the card (title, status, stage, summary, key, lead, parent, assignee,
  * archived, deleted) and `filesOf` gives each field's current change and the
  * text. "When" is compared to the second: Ship's fold keeps a change's second,
- * and the change's id already says which change of that second it is. The
+ * and the change's id already says which change of that second it is. The id
+ * carries the comparison: where the reads pick different changes, the id, the
+ * person and the time all differ at once, from one wrong winner. The
  * file's history is not compared yet; the shared read has none (MOV-2).
  *
  * A failure prints the smallest history that breaks it and the seed that
