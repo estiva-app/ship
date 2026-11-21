@@ -14,6 +14,7 @@ vi.mock('@/api/blobs', async (original) => ({ ...(await original<typeof import('
 import { ThreadListView } from './ThreadList'
 import type { ThreadData } from '@/components/ConversationThread'
 import type { ThreadListViewProps } from './shared'
+import type { Resolution } from '@/api'
 
 /* jsdom implements neither `getClientRects` nor `getBoundingClientRect` on text nodes, and ProseMirror calls them
    when it scrolls the caret into view. */
@@ -99,6 +100,23 @@ describe('the conversation stays as drawn when the read state lands', () => {
     const reply = await box('Reply…')
     expect(reply).not.toHaveFocus()
 
+    document.querySelectorAll('[data-comment-body]').forEach((card) => fireEvent.mouseEnter(card))
+    fireEvent.click(screen.getAllByRole('button', { name: 'Reply' }).at(-1)!)
+
+    await frame()
+    expect(reply).toHaveFocus()
+  })
+
+  it('does the same for a resolved thread, which opens "Resolved" for itself: no caret as it opens, the caret on the first Reply', async () => {
+    const resolution: Resolution = { id: 'e'.repeat(64), action: 'resolved', by: BOB, at: 1_756_000_300, orderMs: 1_756_000_300_000, message: 'Done', folder: 'f' }
+    const page = render(view({ unread: undefined, resolvedBy: { answered: resolution }, onResolve: vi.fn() }))
+    const start = await box('Start a conversation…')
+    start.focus()
+    page.rerender(view({ unread: { answered: ['reply-1'] }, resolvedBy: { answered: resolution }, onResolve: vi.fn() }))
+
+    const reply = await box('Reply…')
+    expect(reply).not.toHaveFocus()
+    expect(start).toHaveFocus()
     document.querySelectorAll('[data-comment-body]').forEach((card) => fireEvent.mouseEnter(card))
     fireEvent.click(screen.getAllByRole('button', { name: 'Reply' }).at(-1)!)
 
