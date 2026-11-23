@@ -122,7 +122,8 @@ if (Array.isArray(moved)) {
 const unparented = build({ kind: KIND.ISSUE, address: ISSUE, objectAuthor: ME, folder: FOLDER, actionId: 'move-issue', value: '' })
 check(
   'an empty value is “No project”, as Ship’s picker offers',
-  Array.isArray(unparented) && foldFolder([issueRoot, sign(unparented[0], 5)]).issues[0].projectAddr === '',
+  // No project is no parent: every reader asks `!issue.projectAddr`.
+  Array.isArray(unparented) && !foldFolder([issueRoot, sign(unparented[0], 5)]).issues[0].projectAddr,
 )
 const listSlot = (manifestContent().projections[String(KIND.PROJECT)].slots.list as { children?: { movedBy?: string } }).children
 check('the project’s issue list declares the field a move sets', listSlot?.movedBy === 'project', JSON.stringify(listSlot))

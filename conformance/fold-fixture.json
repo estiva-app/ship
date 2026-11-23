@@ -38681,7 +38681,7 @@
         "id": "be7f4bb2ebbc7b05b0d4895f80b909cb34701255e1396f75ca8c3ee728a78f01",
         "author": "4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa",
         "createdAt": 1700000000,
-        "ts": 9007199254740991,
+        "ts": 1700000000000,
         "target": "30851:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:c3b96ada-9de3-40f8-9010-5182ffcecedd",
         "field": "status",
         "value": "todo",
@@ -38710,7 +38710,8 @@
         "value": "4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa",
         "format": "marker",
         "note": "tie a",
-        "folder": "bf9997de-96a6-4932-a2a0-8c01938eb205"
+        "folder": "bf9997de-96a6-4932-a2a0-8c01938eb205",
+        "ts": 1700000001000
       },
       {
         "id": "7ce4e5ab12b0124450d8ef7db3d8c054e910f43d8b853c73b3b448142dba4a99",
@@ -38721,7 +38722,8 @@
         "value": "",
         "format": "marker",
         "note": "tie c",
-        "folder": "bf9997de-96a6-4932-a2a0-8c01938eb205"
+        "folder": "bf9997de-96a6-4932-a2a0-8c01938eb205",
+        "ts": 1700000001000
       },
       {
         "id": "ee01e3773719374bdd2f7ccb1320172a156268eb4b89217989da3f63c7b1b17a",
@@ -38732,13 +38734,14 @@
         "value": "b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46",
         "format": "marker",
         "note": "tie b",
-        "folder": "bf9997de-96a6-4932-a2a0-8c01938eb205"
+        "folder": "bf9997de-96a6-4932-a2a0-8c01938eb205",
+        "ts": 1700000001000
       },
       {
         "id": "0f0abd04af495a70e2fc610fea817ad9721eaa7fb15765a21422ea15a1ef2fdc",
         "author": "4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa",
         "createdAt": 1700000010,
-        "ts": 1700000013000,
+        "ts": 1700000010000,
         "target": "30851:b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46:c3b96ada-9de3-40f8-9010-5182ffcecedd",
         "field": "status",
         "value": "done",
@@ -38755,7 +38758,8 @@
         "value": "cancelled",
         "format": "marker",
         "note": "later by created_at, wins while the window is 1s",
-        "folder": "bf9997de-96a6-4932-a2a0-8c01938eb205"
+        "folder": "bf9997de-96a6-4932-a2a0-8c01938eb205",
+        "ts": 1700000012000
       },
       {
         "id": "e44f5c19f274f78d6a059ccaa6bf7eb2a0962d8277c71792e869076d4f7a359a",
@@ -38766,7 +38770,8 @@
         "value": "FIXTURE-9",
         "format": "marker",
         "note": "a display key assigned after the fact",
-        "folder": "bf9997de-96a6-4932-a2a0-8c01938eb205"
+        "folder": "bf9997de-96a6-4932-a2a0-8c01938eb205",
+        "ts": 1700000020000
       },
       {
         "id": "2342b585a95e7b945498b9f719f7918d7bdc39b6597212dc7e2e0949f36abbde",
@@ -38777,7 +38782,8 @@
         "value": "in_progress",
         "format": "marker",
         "note": "the newest root's Folder, so this counts",
-        "folder": "fixture-folder-moved"
+        "folder": "fixture-folder-moved",
+        "ts": 1700000035000
       },
       {
         "id": "13f99cb0b7f9601f6b4748c4f3762d9f77b1991d3e7769d881d4659f2d0c519f",
@@ -38788,7 +38794,8 @@
         "value": "Read by its first h with a value",
         "format": "marker",
         "note": "an empty h ahead of the real one names nothing",
-        "folder": "bf9997de-96a6-4932-a2a0-8c01938eb205"
+        "folder": "bf9997de-96a6-4932-a2a0-8c01938eb205",
+        "ts": 1700000042000
       },
       {
         "id": "e790ee8690576eb227da4b6e065c40f7e922b2cc39e2727351e7dce0280962e5",
@@ -38799,7 +38806,8 @@
         "value": "done",
         "format": "marker",
         "note": "its root names no Folder, so this counts",
-        "folder": "fixture-folder"
+        "folder": "fixture-folder",
+        "ts": 1700000045000
       },
       {
         "id": "f5b84ddf33c68e0640a816a5cbb626a9f7fa7c650d2376552b244afec6adc3de",
@@ -38810,7 +38818,8 @@
         "value": "4f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa",
         "format": "marker",
         "note": "in the Folder its root names by buzz-channel, so this counts",
-        "folder": "fixture-folder"
+        "folder": "fixture-folder",
+        "ts": 1700000046000
       },
       {
         "id": "bbc28e0a7580ace6584804eecf1522ecaffae1e5f0bccaecb4c0c33724ae18fd",
@@ -38822,7 +38831,8 @@
         "format": "marker",
         "stage": "started",
         "note": "counts as started, shown as blocked",
-        "folder": "fixture-folder"
+        "folder": "fixture-folder",
+        "ts": 1700000051000
       },
       {
         "id": "802b3f94d2e936bec90e3099fef1e5f00b909fe1a6f5f61a091bbb8f2db06704",
@@ -38834,7 +38844,8 @@
         "format": "marker",
         "stage": "done",
         "note": "done, until the next change",
-        "folder": "fixture-folder"
+        "folder": "fixture-folder",
+        "ts": 1700000052000
       },
       {
         "id": "be4e28177baa38b0aaa8362b3d906cae4910785715ee6c83311d86d9a762f904",
@@ -38845,7 +38856,8 @@
         "value": "blocked",
         "format": "marker",
         "note": "says no stage, so none: not the older change’s done",
-        "folder": "fixture-folder"
+        "folder": "fixture-folder",
+        "ts": 1700000053000
       },
       {
         "id": "037129cb7feff204a35bd6b7c6d7ccc75e36c60d66007bfe326bd0991069b9f8",
@@ -38856,7 +38868,8 @@
         "value": "todo",
         "format": "marker",
         "note": "a stage for the title counts for nothing: todo stays open",
-        "folder": "fixture-folder"
+        "folder": "fixture-folder",
+        "ts": 1700000054000
       },
       {
         "id": "1d52bffd37e445bf6c9dfd0bcd8b29e11e837e6610df5713e136dfefca013daf",

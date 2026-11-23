@@ -16,10 +16,10 @@
  * checkable rather than hopeful.
  */
 import { blockAnchorOf, contentFormatOf, quoteOf, type ContentFormat, type Quote, type SignedEvent } from '@estiva-app/protocol'
-import { DELETED_FIELD, fieldsSetBy, stageTagOf, type Stage } from '@estiva-app/interop'
+import { DELETED_FIELD, fieldsSetBy, stageTagOf, type ForeignObject, type Stage } from '@estiva-app/interop'
 import { foldThreads, isAbout } from '@estiva-app/conversation'
-import { DEFAULT_ISSUE_STATUS, DEFAULT_PROJECT_STATUS, KIND, issueStage, projectStage } from './kinds'
-import { summaryText } from './summary'
+import { readFiles } from './files'
+import { KIND } from './kinds'
 
 /** First value of a tag, or undefined. Tags are `[name, value, …]`. */
 function tag(event: SignedEvent, name: string): string | undefined {
@@ -69,28 +69,12 @@ interface Ordered {
 }
 
 /**
- * Does `a` win over `b`?
- *
- * Later effective time wins. On a tie the **higher** event id wins: SPEC §6.3
- * replays oldest-first by id and the last write wins, which is what
- * `@estiva-app/interop`'s change fold and conversation's edit fold do (Miky,
- * 2026-10-02, PER-21). This picked the lower id — NIP-01's rule for replaceable
- * events — until then, so a Ship reader and a manifest reader could fold one
- * object two ways. With millisecond resolution a genuine tie means two people
- * acting in the same millisecond; production has none.
- *
- * The property that matters: this is a total order over events, so every client
- * folds to the same answer without talking to any other client.
+ * Oldest first by SPEC §6.3: effective time, then the lower id, so the last of
+ * two changes in one millisecond is the higher id, as the shared read folds.
  */
-function wins(a: Ordered, b: Ordered): boolean {
-  const [at, bt] = [orderingMs(a), orderingMs(b)]
-  if (at !== bt) return at > bt
-  return a.id > b.id
-}
-
-/** Compare in the same total order `wins` defines, oldest first. */
 function byOrder(a: Ordered, b: Ordered): number {
-  const [at, bt] = [orderingMs(a), orderingMs(b)]
+  const at = orderingMs(a)
+  const bt = orderingMs(b)
   if (at !== bt) return at - bt
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0
 }
@@ -101,7 +85,12 @@ export interface Change {
   /** Whoever acted. Frequently not the object's author — that is the point. */
   author: string
   createdAt: number
-  /** Epoch ms from the `ts` tag, when present and consistent with `created_at`. */
+  /**
+   * Epoch ms the change is ordered by. Parsed from a kind:1851 (`parseChange`),
+   * the `ts` tag when present and consistent with `created_at`, else absent. On
+   * a change the shared read counted (a file's `activity`), always set: its
+   * ordering time, the `ts` where a reader trusts it, else `created_at` in ms.
+   */
   ts?: number
   /** Address of the object changed, `<kind>:<pubkey>:<d>`. */
   target: string
@@ -238,15 +227,56 @@ export interface Issue {
 /** Parse a kind:1851 into a Change, or null if it is not a well-formed one. */
 export function parseChange(event: SignedEvent): Change | null {
   if (event.kind !== KIND.CHANGE) return null
-  const target = tag(event, 'a')
-  const field = tag(event, 'field')
-  const value = tag(event, 'value')
+  // One walk of the tags for everything a change says: each is the first tag
+  // of its name, and the team the first `h` with a value.
+  let target: string | undefined
+  let field: string | undefined
+  let value: string | undefined
+  let ts: string | undefined
+  let folder: string | undefined
+  let about: string | undefined
+  let seen = 0
+  let formatted = false
+  let staged = false
+  for (const t of event.tags) {
+    switch (t[0]) {
+      case 'a':
+        if (!(seen & 1)) target = t[1]
+        seen |= 1
+        break
+      case 'field':
+        if (!(seen & 2)) field = t[1]
+        seen |= 2
+        break
+      case 'value':
+        if (!(seen & 4)) value = t[1]
+        seen |= 4
+        break
+      case 'ts':
+        if (!(seen & 8)) ts = t[1]
+        seen |= 8
+        break
+      case 'O':
+        if (!(seen & 16)) about = t[1]
+        seen |= 16
+        break
+      case 'h':
+        if (folder === undefined && t[1]) folder = t[1]
+        break
+      case 'content-format':
+        formatted = true
+        break
+      case 'stage':
+        staged = true
+        break
+    }
+  }
   // A change that names no object, or no field, sets nothing. Drop it rather
   // than fold a partial: another app wrote this, and the honour system means
   // malformed events do reach us (RFC_UPDATES.md §3).
   if (!target || !field || value === undefined) return null
-  const rawTs = Number.parseInt(tag(event, 'ts') ?? '', 10)
-  return {
+  const rawTs = Number.parseInt(ts ?? '', 10)
+  const change: Change = {
     id: event.id,
     author: event.pubkey,
     createdAt: event.created_at,
@@ -254,12 +284,15 @@ export function parseChange(event: SignedEvent): Change | null {
     target,
     field,
     value,
-    format: contentFormatOf(event),
-    ...stageOn(event, field, value),
+    // Marker text unless it says otherwise; what it says is `contentFormatOf`'s to name.
+    format: formatted ? contentFormatOf(event) : 'marker',
     note: event.content,
-    folder: event.tags.find((t) => t[0] === 'h' && t[1])?.[1],
-    ...(tag(event, 'O') !== undefined ? { about: tag(event, 'O') } : {}),
+    folder,
   }
+  const stage = staged ? stageOn(event, field, value).stage : undefined
+  if (stage) change.stage = stage
+  if (about !== undefined) change.about = about
+  return change
 }
 
 /** The stage a change gives the field it sets, as interop reads it; none on a cleared value. */
@@ -276,6 +309,16 @@ function stageOn(event: SignedEvent, field: string, value: string): { stage?: St
  * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/one-change-may-set-several-fields-taken-whole-or-refused-whole.md
  */
 export function parseChanges(event: SignedEvent): Change[] {
+  // A signed event never changes, and the workspace is folded again on every
+  // live update from the same events: each is parsed once, and its answer goes
+  // when the event does.
+  let held = parsed.get(event)
+  if (!held) parsed.set(event, (held = parseEvent(event)))
+  return held
+}
+const parsed = new WeakMap<SignedEvent, Change[]>()
+
+function parseEvent(event: SignedEvent): Change[] {
   const one = parseChange(event)
   if (one) return [one]
   if (event.kind !== KIND.CHANGE || !event.tags.some((t) => t[0] === 'set')) return []
@@ -288,59 +331,42 @@ export function parseChanges(event: SignedEvent): Change[] {
   return fieldsSetBy(event).map(({ field, value }) => ({ ...head, field, value, ...stageOn(event, field, value) }))
 }
 
-/** The tags a root names its Folder with: `h`, or Ship's older `buzz-channel` (SPEC §7.3). */
-const PLACEMENTS = ['h', 'buzz-channel']
-
 /**
- * Every Folder a root is filed in, or `undefined` when it names none.
- *
- * All of them, both tags, not `projectFolder`'s first: the question here is
- * whether a change's Folder is one the file is in, and a root carrying both
- * tags is in both. Read the same way as interop's `targetFolders`.
+ * The changes the shared read counted toward one file, as Ship's pages hold a
+ * change. Which ones count is the shared read's answer (signed in the file's
+ * team, about this file, setting a field): nothing here decides it again.
+ * A file the shared read hands back unchanged gives the same list back.
  */
-function rootFolders(root: SignedEvent): ReadonlySet<string> | undefined {
-  const folders = new Set(PLACEMENTS.flatMap((name) => root.tags.filter((t) => t[0] === name && t[1]).map((t) => t[1]!)))
-  return folders.size ? folders : undefined
+function changesOf(file: ForeignObject): Change[] {
+  let held = listed.get(file)
+  if (held) return held
+  held = []
+  const lines = file.changes ?? []
+  const target = file.address!
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    const event = line.event
+    const change: Change = {
+      id: event.id,
+      author: event.pubkey,
+      createdAt: event.created_at,
+      // The time the shared read orders it by: its `ts` where a reader trusts it (SPEC §6.2), which is all a `ts` is read for.
+      ts: line.ms,
+      target,
+      field: line.field,
+      value: line.value,
+      format: line.format,
+      note: event.content,
+      folder: line.folder,
+    }
+    if (line.stage) change.stage = line.stage
+    if (line.about !== undefined) change.about = line.about
+    held.push(change)
+  }
+  listed.set(file, held)
+  return held
 }
-
-/**
- * Drop every change signed in a Folder its target is not in (SPEC §6.2).
- *
- * The relay checks a change only against its own `h`, so a member of any
- * Folder can sign a rename, a status, an archive or a move aimed at an issue
- * in a Folder they cannot read, and Ship pools every Folder it reads into one
- * fold. Without this, anyone in both Folders saw that change applied.
- *
- * Two cases cannot be checked and count as before: a target whose root is not
- * in the read (only its address is held), and a root that names no Folder.
- * Checked against the newest root, as `latestPerAddress` picks it. A dropped
- * change leaves the activity feed too: it set nothing, so a line saying it did
- * would be the feed disagreeing with the state.
- *
- * A `summary` takes neither exception (SPEC §6.12): new, so nothing written
- * before the rule depends on it, it counts only where the check can be made.
- * Nor does a `deleted` (SPEC §6.5): a delete is by "anyone who may write in the
- * file's team", and a root that names no team has none, so nothing deletes it
- * — as every manifest reader reads it (TES-2).
- *
- * Also dropped, by the same reasoning: a change whose `O` names another file
- * than its `a` (SPEC §6.2: "a reader ignores one"). It is about neither, and
- * every manifest reader skips it (interop's `foldChanges`); Ship applied it,
- * so a rename aimed by `O` elsewhere showed only in Ship (TES-2). Checked
- * against the held root's id, as interop does, so a target whose root is not
- * in the read counts as before.
- */
-function changesInTargetFolder(changes: Change[], roots: Map<string, SignedEvent>): Change[] {
-  const folders = new Map<string, ReadonlySet<string> | undefined>()
-  for (const [address, root] of roots) folders.set(address, rootFolders(root))
-  return changes.filter((change) => {
-    const root = roots.get(change.target)
-    if (change.about !== undefined && root && change.about !== tag(root, 'd')) return false
-    const held = folders.get(change.target)
-    if (!held) return change.field !== SUMMARY_FIELD && change.field !== DELETED_FIELD
-    return change.folder !== undefined && held.has(change.folder)
-  })
-}
+const listed = new WeakMap<ForeignObject, Change[]>()
 
 /** The one-line summary beside a file's title (SPEC §6.12). */
 const SUMMARY_FIELD = 'summary'
@@ -353,60 +379,6 @@ const SUMMARY_FIELD = 'summary'
  * archived or deleted in Ship alone (TES-2).
  */
 export const ARCHIVED_OR_DELETED = 'true'
-
-/**
- * Keep one event per address.
- *
- * The relay replaces addressable events on ingest, so in practice this sees one
- * version each. It is here because a *query* can still return two — two relays,
- * a replay, a race — and picking arbitrarily would make the UI flicker between
- * versions on reload.
- */
-function latestPerAddress(events: SignedEvent[], kind: number): Map<string, SignedEvent> {
-  const byAddr = new Map<string, SignedEvent>()
-  for (const event of events) {
-    if (event.kind !== kind) continue
-    const d = tag(event, 'd')
-    if (d === undefined) continue // addressable events without `d` are not addressable
-    const address = `${kind}:${event.pubkey}:${d}`
-    const held = byAddr.get(address)
-    // NIP-01's replaceable-event rule, which the relay applies on ingest: later
-    // `created_at`, and on a tie the *lower* id. Not `wins` — that is §6.3's
-    // change order, which breaks a tie the other way (PER-21).
-    if (!held || event.created_at > held.created_at || (event.created_at === held.created_at && event.id < held.id)) {
-      byAddr.set(address, event)
-    }
-  }
-  return byAddr
-}
-
-/**
- * Collapse a change stream to the winning assignment per field, per object.
- *
- * Last write wins *per field*, not per object — two people editing different
- * fields of the same issue never conflict, which is the common case.
- */
-function foldChanges(changes: Change[]): Map<string, FoldedFields> {
-  const byTarget = new Map<string, FoldedFields>()
-  const winners = new Map<string, Change>()
-  for (const change of changes) {
-    // `\0` as the escape, not the byte. The separator has to be something
-    // neither an address nor a field name can contain, and NUL is the right
-    // choice — but writing it literally made this file binary to the tools that
-    // read source: `grep` skipped it and said nothing, and it sat 25 bytes from
-    // the 8000-byte window git scans for NUL, so one deletion above here would
-    // have turned every diff of this file into "Binary files differ".
-    const key = `${change.target}\0${change.field}`
-    const held = winners.get(key)
-    if (!held || wins(change, held)) winners.set(key, change)
-  }
-  for (const change of winners.values()) {
-    const fields = byTarget.get(change.target) ?? {}
-    fields[change.field] = { value: change.value, by: change.author, at: change.createdAt, format: change.format, id: change.id, ...(change.stage ? { stage: change.stage } : {}) }
-    byTarget.set(change.target, fields)
-  }
-  return byTarget
-}
 
 /** One message: either a conversation root, or a reply inside one. */
 export interface Message {
@@ -704,83 +676,6 @@ export interface FolderState {
 }
 
 /**
- * The Folder a project record names, under either wire shape.
- *
- * **Both shapes are read, and both stay readable indefinitely.** REW-11 moves
- * the project record off its channel: `["h", uuid]` becomes
- * `["buzz-channel", uuid]`, so the record stops being filed under a Folder and
- * starts merely *pointing* at one. That is upstream's NIP-MP vocabulary, and
- * RFC 0.3 §4.2 argues it is forced — a record filed under a channel cannot be
- * discovered by anyone the channel does not already admit.
- *
- * There is no migration and there will not be one. A replaceable event can only
- * be rewritten by its own author, and rewriting it would stamp a fresh
- * `created_at` over the original — the relay refuses anything more than roughly
- * ±15 minutes from its own clock, so the real date cannot be preserved. Records
- * written before the change keep `h` forever, and a reader that stops
- * understanding `h` loses them.
- *
- * `h` is checked first because every record in existence today has one, and
- * because a record carrying both is transitional rather than global — it is
- * still filed under a channel, whatever else it says.
- */
-function projectFolder(event: SignedEvent): string | undefined {
-  return tag(event, 'h') ?? tag(event, 'buzz-channel')
-}
-
-/**
- * A project's display name: upstream's `name`, or Ship's original `title`.
- *
- * Independent of the `h`/`buzz-channel` swap and read the same way — the
- * vocabulary changed in the same commit, so a record can carry either, and old
- * records carry `title` forever for the same reason they carry `h`.
- */
-function projectName(event: SignedEvent): string | undefined {
-  return tag(event, 'name') ?? tag(event, 'title')
-}
-
-/**
- * A record's description: a `description` tag, or its `.content`.
- *
- * `.content` is the fallback rather than the other way round, so a record that
- * carries the tag is taken at its word even when something also left content
- * behind. An absent tag and an empty one are deliberately different: a record
- * that says its description is empty is not a record that never said.
- *
- * **Read by an issue as well as a project since `add-issue` grew a description
- * field.** It was `projectDescription` and an issue read only `.content`, which
- * was fine while Ship's own composer was the only thing creating one — it puts
- * the body in `content` (`buildIssue`). A foreign consumer cannot: the runtime
- * writes each declared property to a **tag of its own name**, so an issue filed
- * from Peek's launcher carries `["description", …]` and an empty content. An
- * issue reading only content would have rendered every one of those blank while
- * the description sat on the event, published and correct.
- *
- * **This decides the text, never the format.** `descriptionFormat` comes from
- * the event's `content-format` tag (`contentFormatOf`), and §13.4 forbids
- * inferring a format from the body — so moving the text to a tag does not move
- * the format question with it. Do not make this function answer both.
- */
-function recordDescription(event: SignedEvent): string {
-  return tag(event, 'description') ?? event.content
-}
-
-/**
- * A file's summary (SPEC §6.12): the winning change when there is one, else the
- * root's `summary` tag, as plain text on one line.
- *
- * A change wins even when it is blank — that is how a summary is cleared, and
- * the seed must not show through it. Blank after trimming is no summary at all,
- * so the field is left out rather than drawn as an empty line. Line breaks fold
- * to spaces: a summary is one line wherever it is drawn, never markup.
- */
-function fileSummary(fields: FoldedFields, event: SignedEvent): string | undefined {
-  const raw = fields[SUMMARY_FIELD] ? fields[SUMMARY_FIELD].value : tag(event, 'summary')
-  const text = raw === undefined ? undefined : summaryText(raw)
-  return text || undefined
-}
-
-/**
  * Fold a Folder's raw events into current state.
  *
  * Takes everything the relay returned for one `h` and sorts it out here rather
@@ -798,96 +693,51 @@ export function foldFolder(
    */
   resolveRefs: (body: string) => string[] = () => [],
 ): FolderState {
-  const projectRoots = latestPerAddress(events, KIND.PROJECT)
-  const issueRoots = latestPerAddress(events, KIND.ISSUE)
-  const parsed: Change[] = []
-  for (const event of events) parsed.push(...parseChanges(event))
-  const changes = changesInTargetFolder(parsed, new Map([...projectRoots, ...issueRoots]))
-  // Oldest first, in exactly the total order the fold replays, so the activity
-  // feed can never disagree with the state it produced.
+  // What each project and issue is now comes from the shared read (MOV-3), and
+  // so does which changes counted toward it: the read has walked every change
+  // once already, and the activity feed is those same changes, so it can never
+  // disagree with the state they produced.
+  const { projects, issues, files } = readFiles(events)
+  const held = new Set<string>()
+  // What each change event set, by the event: the feed is listed in the order
+  // the events came, which is already close to §6.3's and makes the sort below
+  // short work. Listed file by file, it took as long to sort as to read.
+  const counted = new Map<SignedEvent, Change | Change[]>()
+  for (const file of files) {
+    held.add(file.address!)
+    const lines = file.changes ?? []
+    const own = changesOf(file)
+    for (let i = 0; i < own.length; i++) {
+      const event = lines[i].event
+      const before = counted.get(event)
+      if (before === undefined) counted.set(event, own[i])
+      else if (Array.isArray(before)) before.push(own[i])
+      else counted.set(event, [before, own[i]])
+    }
+  }
+  const changes: Change[] = []
+  for (const event of events) {
+    if (event.kind !== KIND.CHANGE) continue
+    const own = counted.get(event)
+    if (own !== undefined) {
+      if (Array.isArray(own)) for (const change of own) changes.push(change)
+      else changes.push(own)
+      // The same event object handed in twice was counted twice above, and is listed here once.
+      counted.delete(event)
+      continue
+    }
+    // A change to a file whose record is not in the read (only its address is
+    // held) cannot be checked against its team and counts as before; a summary
+    // and a delete take no such exception (SPEC §6.12, §6.5). One the shared
+    // read left out of a file it did read stays out.
+    const target = tag(event, 'a')
+    if (target === undefined || held.has(target)) continue
+    for (const change of parseChanges(event)) {
+      if (change.field !== SUMMARY_FIELD && change.field !== DELETED_FIELD) changes.push(change)
+    }
+  }
+  // Oldest first, in exactly the total order the fold replays.
   changes.sort(byOrder)
-
-  const folded = foldChanges(changes)
-
-  const projects: Project[] = []
-  for (const [address, event] of projectRoots) {
-    const fields = folded.get(address) ?? {}
-    projects.push({
-      addr: address,
-      id: tag(event, 'd')!,
-      author: event.pubkey,
-      createdAt: event.created_at,
-      // A change may rename an object. The root still holds the author's title;
-      // a change overrides it, because a rename by someone else has nowhere
-      // else to live.
-      // Two wire shapes, read in one pass, and it stays that way — see
-      // `projectFolder` and `projectName` below for why there is no migration.
-      title: fields.title?.value ?? projectName(event) ?? '(untitled project)',
-      description: fields.description?.value ?? recordDescription(event),
-      descriptionFormat: fields.description?.format ?? contentFormatOf(event),
-      summary: fileSummary(fields, event),
-      // The Folder the record names, and only that. A `folder` change is not
-      // read: re-pointing a project is gone (MAN-5).
-      contentFolder: projectFolder(event) ?? '',
-      lead: fields.lead?.value ?? tag(event, 'lead'),
-      // The prefix of its issues' refs (SHI-4, SPEC §6.1): seeded by the root's
-      // tag, overridden by a change, as `lead` is. Absent on every project made
-      // before keys; `projectKeys` in keys.ts derives one for those.
-      key: fields.key?.value ?? tag(event, 'key'),
-      status: fields.status?.value ?? DEFAULT_PROJECT_STATUS,
-      stage: projectStage(fields.status?.value ?? DEFAULT_PROJECT_STATUS, fields.status?.stage),
-      // Any non-empty value means archived; unarchiving writes an empty string
-      // rather than deleting the change, because an append-only stream has no
-      // undo and "set to nothing" is a fact like any other.
-      archived: fields.archived?.value === ARCHIVED_OR_DELETED,
-      ...(fields.deleted?.value === ARCHIVED_OR_DELETED ? { deleted: { by: fields.deleted.by, at: fields.deleted.at } } : {}),
-      rootId: event.id,
-      fields,
-    })
-  }
-
-  const issues: Issue[] = []
-  for (const [address, event] of issueRoots) {
-    const fields = folded.get(address) ?? {}
-    // The spec puts the parent project in an `a` tag, and NIP-22-style comments
-    // would also use `a`. Only a project address can be the parent, so match on
-    // the kind prefix instead of taking the first `a` we see.
-    const parent = tags(event, 'a').find((value) => value.startsWith(`${KIND.PROJECT}:`))
-    issues.push({
-      addr: address,
-      id: tag(event, 'd')!,
-      author: event.pubkey,
-      createdAt: event.created_at,
-      title: fields.title?.value ?? tag(event, 'title') ?? '(untitled issue)',
-      description: fields.description?.value ?? recordDescription(event),
-      descriptionFormat: fields.description?.format ?? contentFormatOf(event),
-      summary: fileSummary(fields, event),
-      folder: tag(event, 'h') ?? '',
-      projectAddr: fields.project?.value ?? parent,
-      /*
-        Folded, seeded from the root tag — the same shape as a project's `lead`
-        above, and `ref` was the one field on an issue that was not.
-
-        It mattered the moment something other than Ship created an issue. A
-        display key is derived from the project's title and a count of its
-        siblings, so only the owning app can compute one; and an owning app
-        cannot rewrite a root it did not sign, because a NIP-33 address is
-        `(kind, pubkey, d)`. Reading the tag alone therefore meant an issue
-        created from another app could never acquire a ref at all — it showed a
-        dash for ever, while its status and assignee arrived normally, because
-        those were already folded.
-
-        Nobody had noticed the asymmetry because Ship created every issue.
-      */
-      ref: fields.ref?.value ?? tag(event, 'ref'),
-      status: fields.status?.value ?? DEFAULT_ISSUE_STATUS,
-      stage: issueStage(fields.status?.value ?? DEFAULT_ISSUE_STATUS, fields.status?.stage),
-      assignee: fields.assignee?.value,
-      ...(fields.deleted?.value === ARCHIVED_OR_DELETED ? { deleted: { by: fields.deleted.by, at: fields.deleted.at } } : {}),
-      rootId: event.id,
-      fields,
-    })
-  }
 
   const messages: Message[] = []
   for (const event of events) {
@@ -895,10 +745,6 @@ export function foldFolder(
     if (message) messages.push(message)
   }
   const conversations = conversationsOf(messages)
-
-  const byNewest = (a: { createdAt: number }, b: { createdAt: number }) => b.createdAt - a.createdAt
-  projects.sort(byNewest)
-  issues.sort(byNewest)
 
   return { projects, issues, activity: changes, conversations }
 }
