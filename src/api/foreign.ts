@@ -638,6 +638,25 @@ export async function readTeamMembers(team: string): Promise<TeamMember[]> {
   return teamMembersOf(team, events)
 }
 
+/** A roster event's team: a `kind:39002` names it in `d`, a stored command in `h`. */
+const rosterTeamOf = (event: SignedEvent) => event.tags.find((tag) => tag[0] === (event.kind === KIND_ROSTER ? 'd' : 'h'))?.[1]
+
+/**
+ * The teams the viewer is in, for the sidebar's Other teams (Katerina, 23 November: "as Peek's Teams column"): every
+ * team's `kind:39002` and the stored commands naming it, in one read, as Peek's teams read asks for them, and
+ * conversation's `teamMembersOf` for each, the rule {@link readTeamMembers} draws a team's page by. **Throws when the
+ * read failed**: a failed read is not "in no team".
+ */
+export async function readTeamsYouAreIn(teams: readonly string[], viewer: string): Promise<ReadonlySet<string>> {
+  if (teams.length === 0) return new Set()
+  const events: SignedEvent[] = await relay.queryAll([
+    { kinds: [KIND_ROSTER], '#d': [...teams] },
+    { kinds: [...ROSTER_COMMANDS], '#h': [...teams], limit: ROSTER_COMMANDS_LIMIT },
+  ] as never)
+  const ofTeam = (team: string) => events.filter((event) => rosterTeamOf(event) === team)
+  return new Set(teams.filter((team) => teamMembersOf(team, ofTeam(team)).some((member) => member.pubkey === viewer)))
+}
+
 /**
  * Who one topic lists, for its page's members pill (TOPI-8): the same rule
  * and read as Explore's count above, so the pill and Explore never disagree,

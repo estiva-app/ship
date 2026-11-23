@@ -89,6 +89,12 @@ export const OnAnIssue: Story = { args: { current: { entry: 'issues', folder: SH
 /** A team's page: its row is lit, as Peek's Teams column lights a team whose page is open. */
 export const OnAFolder: Story = { args: { current: { folderId: SHIP } } }
 
+/** Your teams first; the ones you are not in folded under "Other teams" with their count, as Peek's Teams column (Katerina, 23 November). */
+export const WithOtherTeams: Story = { name: 'With other teams', args: { yours: new Set([SHIP]) } }
+
+/** A team you are not in, its page open: Other teams opens for it, its row lit. */
+export const OnAnOtherTeam: Story = { name: 'On an other team', args: { yours: new Set([SHIP]), current: { folderId: HQ } } }
+
 /**
  * A Folder with no name falls back to its id.
  *

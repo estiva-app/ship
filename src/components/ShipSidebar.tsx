@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { IconListSearch, IconPlus, IconUsers } from '@tabler/icons-react'
-import { KindIcon, NavItem, NavTree, Sidebar as SidebarShell, useRememberedOpen } from '@estiva-app/ui'
+import { CollapsibleSection, KindIcon, NavItem, NavTree, Sidebar as SidebarShell, useRememberedOpen } from '@estiva-app/ui'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { SkeletonList } from '@/components/ui/Skeleton'
 import { TOPICS_SHOWN, type SidebarTopic } from '@/lib/topics'
@@ -110,6 +110,11 @@ export interface ShipSidebarProps {
    * are is unknown — placeholder rows, rather than a list that grows a moment later.
    */
   foldersLoading?: boolean
+  /**
+   * The teams the viewer is in (`useTeamsYouAreIn`): those first, the rest folded under "Other teams", as Peek's Teams
+   * column splits them (Katerina, 23 November). Absent while it is read, or when it could not be: every team in one list.
+   */
+  yours?: ReadonlySet<string>
   className?: string
 }
 
@@ -127,7 +132,7 @@ const TOP = ENTRIES.filter(({ entry }) => entry !== 'topics')
 /** A team entry's row id: the tree's `selected` names one. */
 const rowId = (folder: string, entry: SidebarEntry) => `${folder}/${entry}`
 
-export function ShipSidebar({ openIssues, activeProjects, hrefFor, folders = [], onNewFolder, current, topics, openTopic, openFile, loading = false, foldersLoading = false, className }: ShipSidebarProps) {
+export function ShipSidebar({ openIssues, activeProjects, hrefFor, folders = [], onNewFolder, current, topics, openTopic, openFile, loading = false, foldersLoading = false, yours, className }: ShipSidebarProps) {
   const at = current && 'entry' in current ? current : undefined
   useReportFailure(topics === 'failed' ? 'not-loaded' : undefined)
   // Alphabetical teams, as Peek's column draws them; the relay's order tells the person nothing.
@@ -135,6 +140,11 @@ export function ShipSidebar({ openIssues, activeProjects, hrefFor, folders = [],
     (a.name ?? a.id).localeCompare(b.name ?? b.id, undefined, { sensitivity: 'base' }),
   )
   const pending = folders.length === 0 && foldersLoading
+  const mine = yours ? teams.filter((team) => yours.has(team.id)) : teams
+  const others = yours ? teams.filter((team) => !yours.has(team.id)) : []
+  // The team whose page, or one of whose entries, is open: Other teams opens for it, as a click would.
+  const openTeam = current && 'folderId' in current ? current.folderId : at?.folder
+  const otherOpen = !!openTeam && others.some((team) => team.id === openTeam)
   const counts: Partial<Record<SidebarEntry, { count: number; countLabel: string }>> = loading
     ? {}
     : {
@@ -194,9 +204,17 @@ export function ShipSidebar({ openIssues, activeProjects, hrefFor, folders = [],
         {...(pending ? { groups: null } : {})}
         spaced
       >
-        {teams.map((team) => (
+        {mine.map((team) => (
           <TeamRow key={team.id} team={team} current={current} hrefFor={hrefFor} />
         ))}
+        {others.length > 0 && (
+          // Peek's fold, word and look: the kit's fold as a row among rows, with its count (Katerina, 16 November).
+          <CollapsibleSection look="row" title="Other teams" count={others.length} defaultOpen={otherOpen} {...(otherOpen && openTeam ? { openFor: openTeam } : {})} contentClassName="gap-0.5">
+            {others.map((team) => (
+              <TeamRow key={team.id} team={team} current={current} hrefFor={hrefFor} />
+            ))}
+          </CollapsibleSection>
+        )}
       </NavTree>
     </SidebarShell>
   )

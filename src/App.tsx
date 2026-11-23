@@ -14,6 +14,7 @@ import { ShipSidebar, type SidebarEntry, type SidebarFolder, type SidebarPlace }
 import { placedIn } from '@/lib/placement'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { reloadFolders, topLevelFolders, useFolders } from '@/api/useFolders'
+import { useTeamsYouAreIn } from '@/api/useTeamsYouAreIn'
 import { NewFolderDialog } from '@/components/NewFolderDialog'
 import { FolderPage } from '@/pages/FolderPage'
 import { HandoffPage } from '@/pages/HandoffPage'
@@ -75,6 +76,8 @@ function Shell() {
   const folders = useFolders()
   // The teams: what the sidebar lists, what a new project is filed into (FOL-2).
   const teams = useMemo(() => (folders ? topLevelFolders(folders) : undefined), [folders])
+  // Which of them you are in, for the sidebar's Other teams (Katerina, 23 November, as Peek's Teams column).
+  const yours = useTeamsYouAreIn(useMemo(() => teams?.map((team) => team.id), [teams]))
   // What is archived, and what with (FOL-46): read against every Folder, archived teams included.
   const archives = useMemo(() => (state ? archivesOf(state, folders ?? []) : undefined), [state, folders])
   // Your five newest topics (TOPI-9), each folding to the work it lists once the workspace is read.
@@ -220,6 +223,7 @@ function Shell() {
           onNewFolder={() => setCreatingFolder(true)}
           loading={(!state && loading) || partial}
           foldersLoading={folders === undefined}
+          {...(yours ? { yours } : {})}
         />
       }
     >

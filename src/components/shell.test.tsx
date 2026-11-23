@@ -121,6 +121,28 @@ describe('ShipSidebar', () => {
     expect(document.querySelector('[aria-current]')).toBeNull()
   })
 
+  // Katerina, 23 November: as Peek's Teams column, your teams first and the rest folded under "Other teams".
+  it('lists your teams first and folds the others under Other teams, shut, with their count', async () => {
+    const three = [...teams, { id: 'leaf', name: 'Leaf' }]
+    render(<ShipSidebar topics={[]} openIssues={0} activeProjects={0} hrefFor={hrefFor} folders={three} yours={new Set(['peek'])} />)
+    expect(teamLinks()).toEqual([['Peek', '/app/teams/peek']])
+    const other = screen.getByRole('button', { name: /Other teams/ })
+    expect(other.textContent).toContain('2')
+    expect(other.getAttribute('aria-expanded')).toBe('false')
+    await userEvent.click(other)
+    expect(teamLinks()).toEqual([
+      ['Peek', '/app/teams/peek'],
+      ['Estiva HQ', '/app/teams/hq'],
+      ['Leaf', '/app/teams/leaf'],
+    ])
+  })
+
+  it('opens Other teams for a team in it whose page is open', () => {
+    render(<ShipSidebar topics={[]} openIssues={0} activeProjects={0} hrefFor={hrefFor} folders={teams} yours={new Set(['peek'])} current={{ folderId: 'hq' }} />)
+    expect(screen.getByRole('button', { name: /Other teams/ }).getAttribute('aria-expanded')).toBe('true')
+    expect(screen.getByRole('link', { name: 'Estiva HQ' })).toHaveAttribute('aria-current', 'page')
+  })
+
   it('falls back to the id when a team has no name', () => {
     // A state written by a placement carries no name, and `listFolders` reads
     // the state's name and stops (the Peek team, 2026-09-15).

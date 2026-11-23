@@ -11,7 +11,7 @@ const queryAll = vi.fn()
 vi.mock('./store', () => ({ relay: { query: (filters: unknown[]) => query(filters), queryAll: (filters: unknown[]) => queryAll(filters) }, projectFieldsNow: async () => undefined }))
 
 import { encodeNevent } from '@estiva-app/protocol'
-import { isEventReference, loadQuery, readFolder, readFolders, resolveForeign } from './foreign'
+import { isEventReference, loadQuery, readFolder, readFolders, readTeamsYouAreIn, resolveForeign } from './foreign'
 
 const AUTHOR = 'a'.repeat(64)
 const KIND = 30850
@@ -311,5 +311,25 @@ describe('firstLoad — the sidebar listing reads its changes from the workspace
     expect(await whole).toEqual([change])
     expect(await listed).toEqual([change])
     expect(queryAll).toHaveBeenCalledExactlyOnceWith([{ kinds: [1851] }])
+  })
+})
+
+// Katerina, 23 November: the sidebar folds the teams you are not in under "Other teams", as Peek's Teams column.
+describe('readTeamsYouAreIn', () => {
+  const ME = 'c'.repeat(64)
+  const OTHER = 'd'.repeat(64)
+  const roster = (team: string, people: string[]) => ({ id: team.padEnd(64, '0'), kind: 39002, pubkey: 'e'.repeat(64), created_at: 100, content: '', sig: '', tags: [['d', team], ...people.map((p) => ['p', p])] })
+
+  it('names the teams whose roster lists the viewer, in one read of every team', async () => {
+    queryAll.mockReset()
+    queryAll.mockResolvedValueOnce([roster('hq', [ME, OTHER]), roster('peek', [OTHER])])
+    expect([...(await readTeamsYouAreIn(['hq', 'peek', 'leaf'], ME))]).toEqual(['hq'])
+    expect(queryAll).toHaveBeenCalledTimes(1)
+  })
+
+  it('rejects when the read fails: a failed read is not "in no team"', async () => {
+    queryAll.mockReset()
+    queryAll.mockRejectedValueOnce(new Error('relay down'))
+    await expect(readTeamsYouAreIn(['hq'], ME)).rejects.toThrow('relay down')
   })
 })
