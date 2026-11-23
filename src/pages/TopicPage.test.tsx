@@ -81,6 +81,8 @@ const manifest = (app: string, host: string, kinds: string[]) => {
   return { ...event(unsigned.kind, [['d', app], ...kinds.map((k) => ['k', k]), ['web', `https://${host}/o/<bech32>`, 'naddr'], ...tags]), content }
 }
 const leafDocument = (d: string, title: string) => event(30842, [['d', d], ['title', title], ['h', 'team']])
+/** A file of Peek's own (a bare file, §6.7): what neither Ship nor Leaf draws. */
+const peekFile = (d: string, title: string) => event(30840, [['d', d], ['title', title], ['h', 'team']])
 const projectRoot = (d: string) => event(30850, [['d', d], ['title', d], ['h', 'team']])
 const issueRoot = (d: string) => event(30851, [['d', d], ['title', d], ['h', 'team']])
 const projectAddr = (d: string) => `30850:${OWNER}:${d}`
@@ -282,6 +284,29 @@ describe("A topic's page in Ship", () => {
     fireEvent.click(within(row).getByRole('button', { name: 'Show what is under Widgets spec' }))
     expect(screen.getByRole('link', { name: 'Row widget' })).toBeTruthy()
     vi.useRealTimers()
+  })
+
+  it('lists another app’s file under Files, after Documents, its type under its name, opening its app in a new tab (review of 23 November, A10)', async () => {
+    held.push(manifest('ship', 'ship.estiva.app', ['30850', '30851']), manifest('peek', 'peek.estiva.app', ['30840']), manifest('leaf', 'leaf.estiva.app', ['30842']))
+    held.push(projectRoot('p1'), leafDocument('doc1', 'Testing widgets'), peekFile('f1', 'Launch sketches'))
+    held.push(topic(D, 'Widgets'), lists(D, 'f1'), lists(D, 'p1'), lists(D, 'doc1'))
+    const { state, archives } = ship([{ d: 'p1', status: 'in_progress' }], [])
+    render(<Page d={D} state={state} folders={[]} archives={archives} />)
+
+    const row = await waitFor(() => {
+      const found = page().querySelector<HTMLElement>('[data-work-kind="file"]')
+      expect(found).not.toBeNull()
+      return found!
+    })
+    // Each kind under its heading in the page's order; Files last, counted as the others are.
+    expect(workRows()).toEqual(['Project p1', 'Testing widgets', 'Launch sketches'])
+    expect(within(page()).getByText('Files')).toBeTruthy()
+    const link = within(row).getByRole('link', { name: /Launch sketches/ })
+    expect(link.getAttribute('href')).toMatch(/^https:\/\/peek\.estiva\.app\//)
+    expect(link.getAttribute('target')).toBe('_blank')
+    // Its type in its app's word, as Leaf's rows say it: Peek's file is a "topic" until Peek's manifest says otherwise
+    // (its `fileNoun`; review of 23 November, A9).
+    expect(within(row).getByText('Topic')).toBeTruthy()
   })
 
   it('keeps archived work in a shut Archived fold at the end, and when all of it is archived says so and opens it (A4)', async () => {

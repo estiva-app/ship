@@ -15,10 +15,15 @@ import type { TopicWorkRow as WorkRow } from '@/lib/topics'
 import { linkTo } from '@/router'
 import { useReportFailure } from '@/lib/failureReports'
 
-/** A Leaf document on a topic's page: its title, where it opens, who edited it last and when, and its pages. */
+/**
+ * A Leaf document on a topic's page, or another app's file (A10): its title, where it opens, who edited it last and
+ * when, and a document's pages.
+ */
 export interface TopicDocument {
   address: string
   title: string
+  /** Another app's file: what it is, in its app's words ("Board"), on the line under its name. */
+  type?: string
   href?: string
   /** "Katerina, 2h ago". */
   edited?: string
@@ -59,6 +64,7 @@ export interface TopicPageView {
  * - its summary, then one list per kind under a heading with its count, each kind in the topic's order: **Projects**
  *   (status, lead, progress) and **Issues** (status, assignee, who edited it last), the shared `WorkList`, as a team's
  *   page lists them; no tabs (the status is a column); **Documents** from Leaf, each opening Leaf, folding to its pages;
+ *   **Files**, any other app's, each opening its app, its type under its name, as Leaf's initiative page lists them;
  * - **Archived** last, a fold, shut while anything is not archived;
  * - the topic's conversation in the column beside the page, where a project's or an issue's comments sit.
  * A topic the reader cannot read is the card any file they cannot open gets.
@@ -68,6 +74,8 @@ export interface TopicViewProps {
   topic: TopicPageView | 'loading' | 'failed' | 'unavailable'
   /** `loading` while they are read, `failed` when that read did not land. */
   documents: TopicDocument[] | 'loading' | 'failed'
+  /** Every other app's file it lists, read with the documents (A10): under Files, after them. */
+  files?: TopicDocument[]
   onRetry: () => void
   onRetryDocuments: () => void
   /** Where "Initiatives" in the path goes: Explore initiatives. */
@@ -121,7 +129,10 @@ const documentRow = (document: TopicDocument): WorkListRow => ({
   ...(document.children?.length ? { rows: document.children.map(documentRow) } : {}),
 })
 
-export function TopicView({ topic, documents, onRetry, onRetryDocuments, topicsHref, members, comments, conversation, onCopyLink, peekUrl }: TopicViewProps) {
+/** Another app's file as `WorkList` draws it: a document's row, its type on the line under its name (A10). */
+const fileRow = (file: TopicDocument): WorkListRow => ({ ...documentRow(file), ...(file.type ? { description: file.type } : {}) })
+
+export function TopicView({ topic, documents, files = [], onRetry, onRetryDocuments, topicsHref, members, comments, conversation, onCopyLink, peekUrl }: TopicViewProps) {
   useReportFailure(topic === 'failed' || documents === 'failed' ? 'not-loaded' : undefined)
   if (topic === 'unavailable') return <NoAccessNotice what="initiative" />
   const loaded = typeof topic === 'object' ? topic : undefined
@@ -167,7 +178,7 @@ export function TopicView({ topic, documents, onRetry, onRetryDocuments, topicsH
                 {/* Archived, said once (the header says the name; nothing else repeats it). */}
                 {topic.archive && <ArchivedNotice {...topic.archive} />}
                 {topic.summary && <p className="px-2 text-body-2 text-text-secondary">{topic.summary}</p>}
-                {live === 0 && listed?.length === 0 ? (
+                {live === 0 && listed?.length === 0 && files.length === 0 ? (
                   <EmptyState scope="rows" message={topic.archivedWork.length > 0 ? 'All of its projects and issues are archived.' : 'No projects, issues or documents yet.'} />
                 ) : (
                   <>
@@ -200,6 +211,13 @@ export function TopicView({ topic, documents, onRetry, onRetryDocuments, topicsH
                           <WorkList label={`${topic.title}’s documents`} kind="document" rows={documents.map(documentRow)} />
                         </Section>
                       )
+                    )}
+                    {files.length > 0 && (
+                      // Another app's files, last, in the same columns: each opens its app in a new tab, its type under its
+                      // name, as Leaf's initiative page lists them (review of 23 November, A10).
+                      <Section title="Files" count={files.length}>
+                        <WorkList label={`${topic.title}’s files`} kind="file" rows={files.map(fileRow)} />
+                      </Section>
                     )}
                   </>
                 )}

@@ -210,13 +210,14 @@ export const TopicsFailed: Story = {
 }
 
 /** The page as `Shell` draws it, with the conversation's column shown or hidden from its header. */
-function InitiativeStory({ topic, documents = INITIATIVE_DOCUMENTS }: { topic: TopicViewProps['topic']; documents?: TopicViewProps['documents'] }) {
+function InitiativeStory({ topic, documents = INITIATIVE_DOCUMENTS, files = INITIATIVE_FILES }: { topic: TopicViewProps['topic']; documents?: TopicViewProps['documents']; files?: TopicViewProps['files'] }) {
   const [shown, setShown] = useState(false)
   return (
     <Shell openTopic={SIDEBAR_TOPICS[0].id}>
       <TopicView
         topic={topic}
         documents={documents}
+        files={files}
         onRetry={fn()}
         onRetryDocuments={fn()}
         topicsHref="#/topics"
@@ -239,6 +240,14 @@ const INITIATIVE_DOCUMENTS: TopicViewProps['documents'] = [
     editor: ANA,
     children: [{ address: '30842:a:spec-rows', title: 'Rows and folds', href: 'https://leaf.estiva.app/document/spec-rows', edited: 'Ana, 5h ago', editor: ANA }],
   },
+]
+
+/**
+ * Another app's file it lists (A10): a Peek file, its type in Peek's own word. Peek still publishes "topic" for its
+ * files (review of 23 November, A9), so that is what the line says until Peek republishes it.
+ */
+const INITIATIVE_FILES: TopicViewProps['files'] = [
+  { address: '30840:a:sketches', title: 'Launch sketches', type: 'Topic', href: 'https://peek.estiva.app/topic/launch-sketches', edited: 'Ravi, 1d ago', editor: RAVI },
 ]
 
 /** Now, in seconds, so the stories' When reads the same each day. */
@@ -266,7 +275,8 @@ const INITIATIVE: TopicPageView = {
  * An initiative's page (SHIPS-4; Katerina, 18 November, A4: direction A, "Peek's team-page look"): its name once, in
  * the header's trail, then its team as the one chip and Open into Peek (D4, D5), the conversation's button and the ⋯
  * (Copy link); its summary; Projects and Issues in the kit's list with their facts, no tabs; its Leaf documents, one
- * folding to its page; Archived shut at the end. Its row is lit in the sidebar.
+ * folding to its page; another app's file under Files, its type under its name; Archived shut at the end. Its row is lit
+ * in the sidebar.
  */
 export const Initiative: Story = { render: () => <InitiativeStory topic={INITIATIVE} /> }
 
@@ -279,13 +289,13 @@ export const InitiativeArchived: Story = {
 /** Everything it lists is archived: said in words, and Archived open. */
 export const InitiativeAllArchived: Story = {
   name: 'Initiative: all archived',
-  render: () => <InitiativeStory topic={{ ...INITIATIVE, projects: [], issues: [] }} documents={[]} />,
+  render: () => <InitiativeStory topic={{ ...INITIATIVE, projects: [], issues: [] }} documents={[]} files={[]} />,
 }
 
 /** It lists nothing yet. */
 export const InitiativeEmpty: Story = {
   name: 'Initiative: empty',
-  render: () => <InitiativeStory topic={{ ...INITIATIVE, projects: [], issues: [], archivedWork: [] }} documents={[]} />,
+  render: () => <InitiativeStory topic={{ ...INITIATIVE, projects: [], issues: [], archivedWork: [] }} documents={[]} files={[]} />,
 }
 
 /** The initiative is being read. */
@@ -295,7 +305,7 @@ export const InitiativeLoading: Story = { name: 'Initiative: loading', render: (
 export const InitiativeFailed: Story = { name: 'Initiative: failed', render: () => <InitiativeStory topic="failed" /> }
 
 /** Its Leaf documents did not load: the rest of the page stands, and the Documents heading says so with Try again. */
-export const InitiativeDocumentsFailed: Story = { name: 'Initiative: documents failed', render: () => <InitiativeStory topic={INITIATIVE} documents="failed" /> }
+export const InitiativeDocumentsFailed: Story = { name: 'Initiative: documents failed', render: () => <InitiativeStory topic={INITIATIVE} documents="failed" files={[]} /> }
 
 /** Every issue in the workspace: All / Open / Assigned to me, grouped by status. Forty rows, so the page scrolls — in the frame's bar, not a native one. */
 export const Issues: Story = {

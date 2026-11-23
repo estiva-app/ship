@@ -171,6 +171,9 @@ export function yourTopicsOf(read: TopicsRead, muted?: ReadonlySet<string>): Rea
 /** A Leaf document's kind: what a topic's Documents lists (interop's `LISTED_FILE_KINDS`). */
 export const DOCUMENT_KIND = 30842
 
+/** Ship's own kinds, a project and an issue: one Ship does not hold is not another app's file. */
+const SHIP_KINDS = [30850, 30851]
+
 const dOf = (address: string) => address.split(':')[2] ?? ''
 
 /** The topic a `d` names among these: none when no topic holds it, or two do (§13.1, as the hand-off reads it). */
@@ -221,6 +224,8 @@ export interface TopicPageData {
   archivedWork: TopicWorkRow[]
   /** The Leaf documents it lists, by address, for one read of their titles. */
   documents: string[]
+  /** Every other app's file it lists (neither Ship's nor a Leaf document), by address, read with the documents (A10). */
+  files: string[]
 }
 
 /** Ship's projects and issues, with what their rows say. */
@@ -233,8 +238,11 @@ export interface TopicPageWork {
 
 /**
  * A topic's page (SHIPS-4, the approved story `TopicPage`): what it lists that
- * Ship holds as a project or an issue, projects first, split by archive; and
- * the Leaf documents it lists. Judged by Ship's own fold, as Topics is.
+ * Ship holds as a project or an issue, projects first, split by archive; the
+ * Leaf documents it lists; and any other app's file, as Leaf's initiative page
+ * lists them (review of 23 November, A10). A project or an issue Ship does not
+ * hold (deleted, not read) is none of these. Judged by Ship's own fold, as
+ * Topics is.
  */
 export function topicPageOf(topic: ReadTopic, work: TopicPageWork, archives: Archives): TopicPageData {
   const drawn = topicAsDrawn(topic.address, topic.folder, topic.object)
@@ -242,6 +250,7 @@ export function topicPageOf(topic: ReadTopic, work: TopicPageWork, archives: Arc
   const issues = new Map(work.issues.map((issue) => [issue.addr, issue]))
   const rows: { row: TopicWorkRow; archived: boolean }[] = []
   const documents: string[] = []
+  const files: string[] = []
   for (const { address } of topic.listed) {
     if (!address) continue
     const project = projects.get(address)
@@ -279,6 +288,7 @@ export function topicPageOf(topic: ReadTopic, work: TopicPageWork, archives: Arc
         },
       })
     } else if (address.startsWith(`${DOCUMENT_KIND}:`)) documents.push(address)
+    else if (!SHIP_KINDS.some((kind) => address.startsWith(`${kind}:`))) files.push(address)
   }
   const projectsFirst = (list: TopicWorkRow[]) => [...list.filter((row) => row.kind === 'project'), ...list.filter((row) => row.kind === 'issue')]
   const peekUrl = topicInPeek(topic.object.openUrl, topic.address, drawn.title)
@@ -292,5 +302,6 @@ export function topicPageOf(topic: ReadTopic, work: TopicPageWork, archives: Arc
     live: projectsFirst(rows.filter((item) => !item.archived).map((item) => item.row)),
     archivedWork: projectsFirst(rows.filter((item) => item.archived).map((item) => item.row)),
     documents,
+    files,
   }
 }

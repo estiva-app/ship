@@ -4,8 +4,11 @@ import { Avatar } from '@/components/ui/Avatar'
 import { StatusLabel } from '@/components/ui/StatusLabel'
 import { formatActive } from '@/lib/time'
 
-/** What a row is: an initiative (`topic`, the code's word), a project, an issue or a Leaf document — its kind's icon, and which facts it has. */
-export type WorkKind = 'topic' | 'project' | 'issue' | 'document'
+/**
+ * What a row is: an initiative (`topic`, the code's word), a project, an issue, a Leaf document or another app's file —
+ * its kind's icon, and which facts it has.
+ */
+export type WorkKind = 'topic' | 'project' | 'issue' | 'document' | 'file'
 
 /**
  * One row of a {@link WorkList}. Each fact sits in the same column whatever the kind; one a kind does not have is
@@ -20,7 +23,7 @@ export interface WorkListRow {
   external?: boolean
   /** Rows under it, in the same columns, folding (a document's pages, Katerina 23 November). */
   rows?: WorkListRow[]
-  /** Under the name, one line: an initiative's summary, an issue's project on an initiative's page. */
+  /** Under the name, one line: an initiative's summary, an issue's project on an initiative's page, another app's file's type. */
   description?: string
   /** A project's or an issue's status. */
   status?: { value: string; label: string }

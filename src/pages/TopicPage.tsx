@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FolderSummary, ForeignObject } from '@estiva-app/interop'
-import { archivedLine } from '@estiva-app/ui'
+import { archivedLine, thingKindOf } from '@estiva-app/ui'
 import { me, type DirectoryView, type WorkspaceState } from '@/api'
 import { reloadTopics, rereadTopics, useTopicDocuments, useTopicPlace, useTopics, useYourTopics } from '@/api/topics'
 import { addToTopic, joinTopic, leaveTopic } from '@/api/writes'
@@ -12,7 +12,7 @@ import { projectTabs } from '@/lib/projects'
 import { useTabTitle } from '@/lib/tabTitle'
 import { editedLabel } from '@/lib/time'
 import { isSiblingHost, topicHref } from '@/lib/topicLinks'
-import { topicOfD, topicPageOf } from '@/lib/topics'
+import { DOCUMENT_KIND, topicOfD, topicPageOf } from '@/lib/topics'
 import { href } from '@/router'
 import { TopicView, type TopicDocument, type TopicPageView } from '@/views/TopicView'
 import { act, type Say } from './act'
@@ -20,6 +20,12 @@ import { copyText, pickerPeople } from './ProjectPage'
 import { useTopicConversation } from './topicConversation'
 import { placedIn } from '@/lib/placement'
 
+
+/** What another app's file is, as Leaf's rows say it: its app's own noun for it ("Board"), else its kind. */
+function typeOf(file: ForeignObject): string {
+  const noun = file.noun ?? thingKindOf(file.kind)
+  return noun.charAt(0).toUpperCase() + noun.slice(1)
+}
 
 /**
  * A topic's page in Ship (SHIPS-4): what it lists that Ship holds, from the
@@ -87,7 +93,8 @@ export function TopicPage({
     if (location.pathname !== path) history.replaceState(null, '', `${path}${location.search}${location.hash}`)
   }, [topic, page, sendsOn])
 
-  const documentsKey = page?.documents.join(' ') ?? ''
+  // Its Leaf documents and every other app's file, in one read (A10).
+  const documentsKey = page ? [...page.documents, ...page.files].join(' ') : ''
   const { documents: listed, retry: retryDocuments } = useTopicDocuments(documentsKey)
   const { nameOf, personOf } = directory
   const documents = useMemo((): TopicDocument[] | 'loading' | 'failed' => {
@@ -111,7 +118,30 @@ export function TopicPage({
         },
       ]
     }
-    return listed.flatMap(documentOf).sort((a, b) => (order.get(a.address) ?? 0) - (order.get(b.address) ?? 0))
+    return listed
+      .filter((object) => object.kind === DOCUMENT_KIND)
+      .flatMap(documentOf)
+      .sort((a, b) => (order.get(a.address) ?? 0) - (order.get(b.address) ?? 0))
+  }, [listed, page, nameOf, personOf])
+  // Another app's file, as Leaf's initiative page lists it (review of 23 November, A10): its name, its type on the line
+  // under it, who edited it last and when, opening its app in a new tab. An archived one is left out, as a document is.
+  const files = useMemo((): TopicDocument[] => {
+    if (!page || !Array.isArray(listed)) return []
+    const order = new Map(page.files.map((address, at) => [address, at]))
+    return listed
+      .filter((object): object is ForeignObject & { address: string } => object.kind !== DOCUMENT_KIND && !!object.address && !object.archived)
+      .sort((a, b) => (order.get(a.address) ?? 0) - (order.get(b.address) ?? 0))
+      .map((object) => {
+        const href = safeLink(object.openUrl)
+        return {
+          address: object.address,
+          title: object.slots.title?.value || 'Untitled',
+          type: typeOf(object),
+          ...(href ? { href } : {}),
+          ...(object.changedBy && object.changedAt ? { edited: editedLabel(nameOf(object.changedBy), object.changedAt) } : {}),
+          ...(object.changedBy ? { editor: personOf(object.changedBy) } : {}),
+        }
+      })
   }, [listed, page, nameOf, personOf])
 
   // Projects as the Projects page draws them, in the topic's order (Decided 6 Nov: the order inside each kind).
@@ -184,6 +214,7 @@ export function TopicPage({
       topic={shown}
       onRetryDocuments={retryDocuments}
       documents={documents}
+      files={files}
       topicsHref={href({ name: 'topics' })}
       comments={conversation.comments}
       conversation={
