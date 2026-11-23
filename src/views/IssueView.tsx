@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react'
 import { IconBox } from '@tabler/icons-react'
-import { PageHeader } from '@estiva-app/ui'
+import { PageHeader, TeamChip } from '@estiva-app/ui'
 import { Breadcrumb, type Crumb } from '@/components/ui/Breadcrumb'
 import { ScrollArea } from '@/components/ui/ScrollArea'
-import { linkTo } from '@/router'
+import { href, linkTo } from '@/router'
 import type { ContentFormat, Imeta } from '@estiva-app/protocol'
 import type { Answer, Picks } from '@/components/conversations/shared'
 import type { HistoryEntry } from '@/components/History'
@@ -11,7 +11,6 @@ import type { ActivityItem } from '@/components/Activity'
 import type { ThreadData, UnreadByThread } from '@/components/ConversationThread'
 import { IssueFields, type IssueFieldsProps } from '@/components/PageFields'
 import { PageActions, type PageActionsProps } from '@/components/PageActions'
-import { TeamChip } from '@/components/TeamChip'
 import { OverviewPanel, type OverviewPanelProps } from '@/components/OverviewPanel'
 import { LiveHeader, type LiveHeaderProps } from '@/components/editing/LiveHeader'
 import { ThreadList } from '@/components/conversations/ThreadList'
@@ -142,7 +141,7 @@ export function IssueView({ crumbs, team, title, summary, onSummarize, descripti
     <div data-surface="issue" className="flex min-h-0 flex-1 [contain:size]">
       <div className="flex min-w-0 flex-1 flex-col gap-4">
       {/* The kit's PageHeader (ONE-6, step 4a): the path, when it last changed, who is in it, and the page's own buttons (4b–4d). 48px whatever it holds, so the members pill arriving moves nothing. */}
-      <PageHeader title={<Breadcrumb items={items} />} after={team && <TeamChip id={team.id} name={team.name} />} {...(edited ? { time: edited } : {})} members={members} actions={<PageActions what="issue" comments={{ ...comments, unread: Object.values(stillUnread ?? {}).some((ids) => ids.length > 0) }} overview={overview} {...menu} readOnlyReason={readOnlyReason} lockedReason={lockedReason} />} />
+      <PageHeader title={<Breadcrumb items={items} />} after={team && <TeamChip name={team.name} {...linkTo(href({ name: 'folder', id: team.id }))} />} {...(edited ? { time: edited } : {})} members={members} actions={<PageActions what="issue" comments={{ ...comments, unread: Object.values(stillUnread ?? {}).some((ids) => ids.length > 0) }} overview={overview} {...menu} readOnlyReason={readOnlyReason} lockedReason={lockedReason} />} />
 
       {/* No tab row: with Activity in the Overview, an issue has one page (Katerina, 2 November). */}
       <ScrollArea className="min-h-0 min-w-0 flex-1" contentClassName="flex flex-col gap-6 px-6 pb-5">

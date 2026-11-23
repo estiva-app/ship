@@ -1,18 +1,17 @@
 import type { ReactNode } from 'react'
 import { IconExternalLink } from '@tabler/icons-react'
-import { ArchivedNotice, CollapsibleSection, KindIcon, NoAccessNotice, PageHeader, SectionHeader, WithTooltip, type ArchivedNoticeProps } from '@estiva-app/ui'
+import { ArchivedNotice, CollapsibleSection, KindIcon, NoAccessNotice, PageHeader, SectionHeader, TeamChip, WithTooltip, type ArchivedNoticeProps } from '@estiva-app/ui'
 import { Breadcrumb } from '@/components/ui/Breadcrumb'
 import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { ScrollArea } from '@/components/ui/ScrollArea'
 import { SkeletonList } from '@/components/ui/Skeleton'
 import { PageActions } from '@/components/PageActions'
-import { TeamChip } from '@/components/TeamChip'
 import { WorkList, type WorkListRow } from '@/components/WorkList'
 import type { Person } from '@/api/useDirectory'
 import type { ProjectRowData } from '@/lib/projects'
 import type { TopicWorkRow as WorkRow } from '@/lib/topics'
-import { linkTo } from '@/router'
+import { href, linkTo } from '@/router'
 import { useReportFailure } from '@/lib/failureReports'
 
 /**
@@ -148,7 +147,7 @@ export function TopicView({ topic, documents, files = [], onRetry, onRetryDocume
             loaded && (
               <>
                 {/* The team it belongs to, the one chip after its name, opening the team's page (Katerina, 17 November: one chip; 18 November, D4). */}
-                {loaded.team && loaded.teamId && <TeamChip id={loaded.teamId} name={loaded.team} />}
+                {loaded.team && loaded.teamId && <TeamChip name={loaded.team} {...linkTo(href({ name: 'folder', id: loaded.teamId }))} />}
                 {/* Open into Peek, as Peek's and Leaf's Open into another app (Katerina, 30 October; 18 November, D5): in place of the ⋯'s Open in Peek. */}
                 {peekUrl && (
                   <WithTooltip label="Open in Peek">

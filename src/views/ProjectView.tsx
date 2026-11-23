@@ -2,10 +2,10 @@ import { IconBox, IconLayoutKanban, IconTable } from '@tabler/icons-react'
 import type { ContentFormat, Imeta } from '@estiva-app/protocol'
 import type { Answer, Picks } from '@/components/conversations/shared'
 import type { ReactNode } from 'react'
-import { PageHeader } from '@estiva-app/ui'
+import { PageHeader, TeamChip } from '@estiva-app/ui'
 import { Breadcrumb } from '@/components/ui/Breadcrumb'
 import { ScrollArea } from '@/components/ui/ScrollArea'
-import { linkTo, type ProjectTab } from '@/router'
+import { href, linkTo, type ProjectTab } from '@/router'
 import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Tabs } from '@/components/ui/Tabs'
@@ -18,7 +18,6 @@ import type { IssueRowData } from '@/components/IssueRow'
 import { IssuesTable, type IssuesTableRow } from '@/components/IssuesTable'
 import { ProjectFields, type ProjectFieldsProps } from '@/components/PageFields'
 import { PageActions, type PageActionsProps } from '@/components/PageActions'
-import { TeamChip } from '@/components/TeamChip'
 import { OverviewPanel, type OverviewPanelProps } from '@/components/OverviewPanel'
 import { LiveHeader, type LiveHeaderProps } from '@/components/editing/LiveHeader'
 import { ThreadList } from '@/components/conversations/ThreadList'
@@ -153,7 +152,7 @@ export function ProjectView({ crumbs, team, header, onAddIssue, tab, onTab, view
       {/* The kit's PageHeader (ONE-6, steps 4a and 4b) — see IssueView. The box before the name says it is a project — the sidebar's icon for one (Katerina, 2026-09-09). */}
       <PageHeader
         title={<Breadcrumb items={[{ label: 'Projects', ...linkTo(crumbs.projectsHref) }, { label: crumbs.title, icon: <IconBox size={16} stroke={1.5} /> }]} />}
-        after={team && <TeamChip id={team.id} name={team.name} />}
+        after={team && <TeamChip name={team.name} {...linkTo(href({ name: 'folder', id: team.id }))} />}
         {...(edited ? { time: edited } : {})}
         members={members}
         actions={<PageActions what="project" comments={{ ...comments, unread: Object.values(stillUnread ?? {}).some((ids) => ids.length > 0) }} overview={overview} {...menu} readOnlyReason={readOnlyReason} lockedReason={lockedReason} />}
