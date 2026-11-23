@@ -5,7 +5,8 @@ import { Meta } from '@storybook/addon-docs/blocks'
 # WorkList
 
 Ship's lists on a team's page and an initiative's page: the kit's list, one row
-per initiative, project or issue, and the same four columns for every kind, so
+per initiative, project, issue or Leaf document, and the same four columns for
+every kind, so
 like facts stack in one column down the whole page.
 
 **Seen in** *Views/TeamView*: **Default**, and *Pages/In the shell*:
@@ -15,8 +16,9 @@ like facts stack in one column down the whole page.
 
 - **A team's page**: its Initiatives, its Projects, its Issues, each under its
   heading with its count.
-- **An initiative's page**: its Projects and its Issues, and Archived when it is
-  open.
+- **An initiative's page**: its Projects, its Issues and its Documents, and
+  Archived when it is open. A Leaf document opens Leaf in a new tab and folds to
+  its pages (the kit's row, Katerina 23 November).
 
 ## When not
 
@@ -24,8 +26,6 @@ like facts stack in one column down the whole page.
   list: their own columns and tabs.
 - **Explore initiatives** → the kit's **ListTable** with Team, Members and
   Active, and Join at a row's end.
-- **A Leaf document** on an initiative's page → its own row, which opens Leaf in
-  a new tab and folds to its pages.
 
 ## How
 
@@ -33,15 +33,19 @@ like facts stack in one column down the whole page.
 <WorkList label="Onboarding’s projects" kind="project" rows={projects} now={now} />
 ```
 
-- `kind` is `topic` (an initiative, the code's word), `project` or `issue`: the
-  row's icon, and which facts it has.
+- `kind` is `topic` (an initiative, the code's word), `project`, `issue` or
+  `document`: the row's icon, and which facts it has.
+- A row with `external` opens in a new tab; one with no `href` opens nothing and
+  its name is words; `rows` fold under it, in the same columns.
 
 ## What it owns
 
 - **One column set**: Status · People · Progress · When (Katerina, 18
   November: "relevant items are aligned on initiatives/projects/issues").
 - **People**: an initiative's faces in the kit's read-only members pill, a
-  project's lead, an issue's assignee.
+  project's lead, an issue's assignee, who edited a document last.
 - **Progress**: a project's, as the kit's small ring.
+- **When**: an initiative's Active; a project's, an issue's or a document's last
+  change, who and when: "Ana, 1h ago".
 - **A fact a kind does not have is empty; one not read yet is the kit's dash.**
 - No headings on screen: the heading over the list names it.

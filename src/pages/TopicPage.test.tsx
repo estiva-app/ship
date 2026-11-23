@@ -260,13 +260,15 @@ describe("A topic's page in Ship", () => {
     // the current wording keep it"); its assignee is in the People column.
     expect(within(page().querySelector<HTMLElement>('[data-work-kind="issue"]')!).getByText('bbbbbbbb, 1h ago')).toBeTruthy()
     const row = await waitFor(() => {
-      const found = page().querySelector<HTMLElement>(`[data-topic-document="${SPEC}"]`)
+      const found = page().querySelector<HTMLElement>(`[data-work-kind="document"][data-work="${SPEC}"]`)
       expect(found).not.toBeNull()
       return found!
     })
+    // The shared list's row: who edited it last and when in When, as the issue above it; it opens Leaf in a new tab.
     expect(within(row).getByText('bbbbbbbb, 2h ago')).toBeTruthy()
+    expect(within(row).getByRole('link', { name: 'Widgets spec' }).getAttribute('target')).toBe('_blank')
     expect(screen.queryByRole('link', { name: 'Row widget' })).toBeNull()
-    fireEvent.click(within(row).getByRole('button', { name: 'Show the pages in Widgets spec' }))
+    fireEvent.click(within(row).getByRole('button', { name: 'Show what is under Widgets spec' }))
     expect(screen.getByRole('link', { name: 'Row widget' })).toBeTruthy()
     vi.useRealTimers()
   })

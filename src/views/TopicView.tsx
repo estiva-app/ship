@@ -1,18 +1,15 @@
-import { useState, type ReactNode } from 'react'
-import { IconChevronDown, IconChevronRight, IconExternalLink, IconTarget } from '@tabler/icons-react'
-import { ArchivedNotice, CollapsibleSection, KindIcon, Link, NoAccessNotice, PageHeader, SectionHeader, WithTooltip, type ArchivedNoticeProps } from '@estiva-app/ui'
+import type { ReactNode } from 'react'
+import { IconExternalLink, IconTarget } from '@tabler/icons-react'
+import { ArchivedNotice, CollapsibleSection, KindIcon, NoAccessNotice, PageHeader, SectionHeader, WithTooltip, type ArchivedNoticeProps } from '@estiva-app/ui'
 import { Breadcrumb } from '@/components/ui/Breadcrumb'
 import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
-import { IconButton } from '@/components/ui/IconButton'
 import { ScrollArea } from '@/components/ui/ScrollArea'
 import { SkeletonList } from '@/components/ui/Skeleton'
-import { EditedCaption } from '@/components/EditedCaption'
 import { PageActions } from '@/components/PageActions'
 import { TeamChip } from '@/components/TeamChip'
 import { WorkList, type WorkListRow } from '@/components/WorkList'
 import type { Person } from '@/api/useDirectory'
-import { cn } from '@/lib/cn'
 import type { ProjectRowData } from '@/lib/projects'
 import type { TopicWorkRow as WorkRow } from '@/lib/topics'
 import { linkTo } from '@/router'
@@ -24,6 +21,8 @@ export interface TopicDocument {
   href?: string
   /** "Katerina, 2h ago". */
   edited?: string
+  /** Who edited it last, as a face in the People column, when Ship knows them. */
+  editor?: Person
   /** The pages directly under it; absent or empty: no fold. */
   children?: TopicDocument[]
 }
@@ -108,6 +107,19 @@ const workRow = (row: TopicWork): WorkListRow => ({
   ...(row.editedLabel ? { edited: row.editedLabel } : {}),
 })
 
+/**
+ * A Leaf document as `WorkList` draws it: who edited it last as a face and "Katerina, 2h ago" in When, opening Leaf in a
+ * new tab, its pages folding under it (Katerina, 23 November: the kit's row now does both).
+ */
+const documentRow = (document: TopicDocument): WorkListRow => ({
+  address: document.address,
+  title: document.title,
+  ...(document.href ? { href: document.href, external: true } : {}),
+  ...(document.editor ? { person: document.editor } : {}),
+  ...(document.edited ? { edited: document.edited } : {}),
+  ...(document.children?.length ? { rows: document.children.map(documentRow) } : {}),
+})
+
 export function TopicView({ topic, documents, onRetry, onRetryDocuments, topicsHref, members, comments, conversation, onCopyLink, peekUrl }: TopicViewProps) {
   if (topic === 'unavailable') return <NoAccessNotice what="initiative" />
   const loaded = typeof topic === 'object' ? topic : undefined
@@ -180,14 +192,10 @@ export function TopicView({ topic, documents, onRetry, onRetryDocuments, topicsH
                       </Section>
                     ) : (
                       documents.length > 0 && (
-                        // Today's rows, not the kit's list: a document opens Leaf in a new tab and folds to its pages, and the kit's
-                        // list row does neither yet (a kit gap, asked of Katerina, 18 November).
+                        // The shared list, its columns lined up with Projects and Issues: Leaf opens in a new tab, pages fold under
+                        // their document (the kit's row, Katerina 23 November).
                         <Section title="Documents" count={documents.length}>
-                          <div className="flex flex-col gap-px">
-                            {documents.map((document) => (
-                              <DocumentRow key={document.address} document={document} />
-                            ))}
-                          </div>
+                          <WorkList label={`${topic.title}’s documents`} kind="document" rows={documents.map(documentRow)} />
                         </Section>
                       )
                     )}
@@ -229,42 +237,3 @@ function Section({ title, count, children }: { title: string; count?: number; ch
   )
 }
 
-/**
- * A Leaf document on a topic's page: who edited it last and when, and where it opens. One with pages folds open to
- * them, its arrow in the icon's place (the sidebar's fold, in a page row: new here, approved on the prototype).
- */
-function DocumentRow({ document, depth = 0 }: { document: TopicDocument; depth?: number }) {
-  const [open, setOpen] = useState(false)
-  const pages = document.children ?? []
-  return (
-    <>
-      <div data-topic-document={document.address} className={cn('relative flex h-9 min-w-0 items-center gap-3 rounded-md pr-3 transition-colors hover:bg-bg-hover', depth > 0 ? 'pl-10' : 'pl-3')}>
-        <span className="flex size-4 shrink-0">{pages.length === 0 && <KindIcon kind="file" />}</span>
-        {document.href ? (
-          <Link href={document.href} external variant="plain" cover className="flex min-w-0 flex-1">
-            <span className="min-w-0 flex-1 truncate text-body-2 text-text-primary">{document.title}</span>
-          </Link>
-        ) : (
-          // Nowhere to open it: no "Leaf ↗" that would look like a link.
-          <span className="min-w-0 flex-1 truncate text-body-2 text-text-primary">{document.title}</span>
-        )}
-        {document.edited && <EditedCaption edited={document.edited} />}
-        {document.href && (
-          <span className="flex w-12 items-center justify-end gap-1 text-caption text-text-muted">
-            Leaf
-            <IconExternalLink size={14} stroke={1.5} aria-hidden />
-          </span>
-        )}
-        {/* After the covering link, so it stays its own button; drawn in the icon's place. */}
-        {pages.length > 0 && (
-          <span className={cn('absolute top-1/2 flex -translate-y-1/2', depth > 0 ? 'left-9' : 'left-2')}>
-            <IconButton aria-label={open ? `Fold ${document.title}` : `Show the pages in ${document.title}`} tooltip={open ? 'Fold' : 'Show its pages'} aria-expanded={open} onClick={() => setOpen(!open)}>
-              {open ? <IconChevronDown size={16} stroke={1.5} /> : <IconChevronRight size={16} stroke={1.5} />}
-            </IconButton>
-          </span>
-        )}
-      </div>
-      {open && pages.map((page) => <DocumentRow key={page.address} document={page} depth={depth + 1} />)}
-    </>
-  )
-}

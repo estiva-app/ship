@@ -1,3 +1,4 @@
+import { editedLabel } from '@/lib/time'
 import { useState } from 'react'
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { fn } from 'storybook/test'
@@ -229,13 +230,14 @@ function InitiativeStory({ topic, documents = INITIATIVE_DOCUMENTS }: { topic: T
 }
 
 const INITIATIVE_DOCUMENTS: TopicViewProps['documents'] = [
-  { address: '30842:a:brainstorm', title: 'Navigation brainstorm', href: 'https://leaf.estiva.app/document/brainstorm', edited: 'Mara, 2d ago' },
+  { address: '30842:a:brainstorm', title: 'Navigation brainstorm', href: 'https://leaf.estiva.app/document/brainstorm', edited: 'Mara, 2d ago', editor: MARA },
   {
     address: '30842:a:spec',
     title: 'Sidebar spec',
     href: 'https://leaf.estiva.app/document/spec',
     edited: 'Ana, 5h ago',
-    children: [{ address: '30842:a:spec-rows', title: 'Rows and folds', href: 'https://leaf.estiva.app/document/spec-rows', edited: 'Ana, 5h ago' }],
+    editor: ANA,
+    children: [{ address: '30842:a:spec-rows', title: 'Rows and folds', href: 'https://leaf.estiva.app/document/spec-rows', edited: 'Ana, 5h ago', editor: ANA }],
   },
 ]
 
@@ -248,14 +250,15 @@ const INITIATIVE: TopicPageView = {
   team: 'Product',
   teamId: '0212db6d-bcbf-40d0-890e-f4f056db2f5d',
   archived: false,
-  projects: PROJECT_TABS.all.slice(0, 3).map((project, i) => ({ ...project, changedAt: SECONDS_NOW - (i + 1) * 5 * 3600 })),
+  // Who changed each last and when, in Ship's words (Katerina, 23 November: "if the who edited last is the current wording keep it").
+  projects: PROJECT_TABS.all.slice(0, 3).map((project, i) => ({ ...project, changedAt: SECONDS_NOW - (i + 1) * 5 * 3600, changedLabel: editedLabel(['Ana Duarte', 'Ravi Mehta', 'Mara Sato'][i]!, SECONDS_NOW - (i + 1) * 5 * 3600) })),
   issues: [
-    { address: '30851:a:nav-1', kind: 'issue', title: 'Explore initiatives opens its page', href: '#/issue/nav-1', status: { value: 'in_progress', label: 'In Progress' }, project: 'Relay Migration', edited: { by: 'a', at: SECONDS_NOW - 3600 }, assigneePerson: RAVI },
-    { address: '30851:a:nav-2', kind: 'issue', title: 'The open file lights its team', href: '#/issue/nav-2', status: { value: 'todo', label: 'Todo' }, edited: { by: 'm', at: SECONDS_NOW - 3 * 86400 } },
+    { address: '30851:a:nav-1', kind: 'issue', title: 'Explore initiatives opens its page', href: '#/issue/nav-1', status: { value: 'in_progress', label: 'In Progress' }, project: 'Relay Migration', edited: { by: 'a', at: SECONDS_NOW - 3600 }, editedLabel: editedLabel('Ana Duarte', SECONDS_NOW - 3600), assigneePerson: RAVI },
+    { address: '30851:a:nav-2', kind: 'issue', title: 'The open file lights its team', href: '#/issue/nav-2', status: { value: 'todo', label: 'Todo' }, edited: { by: 'm', at: SECONDS_NOW - 3 * 86400 }, editedLabel: editedLabel('Mara Sato', SECONDS_NOW - 3 * 86400) },
   ],
   archivedWork: [
     { address: '30850:a:old', kind: 'project', title: 'Folders sidebar', href: '#/project/old', status: { value: 'completed', label: 'Completed' }, progress: { done: 6, total: 6 } },
-    { address: '30851:a:old-1', kind: 'issue', title: 'Rename Folders to Teams', href: '#/issue/old-1', status: { value: 'done', label: 'Done' }, edited: { by: 'a', at: SECONDS_NOW - 14 * 86400 } },
+    { address: '30851:a:old-1', kind: 'issue', title: 'Rename Folders to Teams', href: '#/issue/old-1', status: { value: 'done', label: 'Done' }, edited: { by: 'a', at: SECONDS_NOW - 14 * 86400 }, editedLabel: editedLabel('Ana Duarte', SECONDS_NOW - 14 * 86400) },
   ],
 }
 

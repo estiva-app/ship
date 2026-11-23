@@ -1,10 +1,11 @@
+import type { ReactNode } from 'react'
 import { KindIcon, ListTable, ListTableRow, MembersPill, ProgressRing, type AvatarGroupMember, type ListTableColumn } from '@estiva-app/ui'
 import { Avatar } from '@/components/ui/Avatar'
 import { StatusLabel } from '@/components/ui/StatusLabel'
 import { formatActive } from '@/lib/time'
 
-/** What a row is: an initiative (`topic`, the code's word), a project or an issue — its kind's icon, and which facts it has. */
-export type WorkKind = 'topic' | 'project' | 'issue'
+/** What a row is: an initiative (`topic`, the code's word), a project, an issue or a Leaf document — its kind's icon, and which facts it has. */
+export type WorkKind = 'topic' | 'project' | 'issue' | 'document'
 
 /**
  * One row of a {@link WorkList}. Each fact sits in the same column whatever the kind; one a kind does not have is
@@ -13,12 +14,17 @@ export type WorkKind = 'topic' | 'project' | 'issue'
 export interface WorkListRow {
   address: string
   title: string
-  href: string
+  /** Where it opens. Absent: nowhere (a document whose app gave no address) — its name is words, not a link. */
+  href?: string
+  /** Another app's file (a Leaf document): it opens there, in a new tab. */
+  external?: boolean
+  /** Rows under it, in the same columns, folding (a document's pages, Katerina 23 November). */
+  rows?: WorkListRow[]
   /** Under the name, one line: an initiative's summary, an issue's project on an initiative's page. */
   description?: string
   /** A project's or an issue's status. */
   status?: { value: string; label: string }
-  /** A project's lead, an issue's assignee: one face. */
+  /** A project's lead, an issue's assignee, who edited a document last: one face. */
   person?: { name?: string; picture?: string; bot?: boolean }
   /** An initiative's people: up to three faces and how many; `undefined` until read. */
   members?: { faces: AvatarGroupMember[]; count: number }
@@ -27,7 +33,7 @@ export interface WorkListRow {
   /** Unix seconds: when anything last happened in it — an initiative's Active, a project's or an issue's last change. */
   at?: number
   /**
-   * A project's or an issue's last change in Ship's words, who and when: "Ana, 1h ago" (Katerina, 23 November: "if the
+   * A project's, an issue's or a document's last change in Ship's words, who and when: "Ana, 1h ago" (Katerina, 23 November: "if the
    * who edited last is the current wording keep it"). Shown in When in place of the bare time.
    */
   edited?: string
@@ -59,10 +65,11 @@ const NONE = ''
 /**
  * Ship's lists on a team's page and an initiative's page (Katerina, 18 November, D6 and A4): the kit's list, each row its
  * kind's icon and name, then the same four columns for every kind — **Status** (a project's, an issue's), **People** (an
- * initiative's faces in the kit's members pill, a project's lead, an issue's assignee), **Progress** (a project's, as the
- * kit's small ring: "the progress bar can also be using the small progress which is a circle") and **When** (an
- * initiative's Active, a project's or an issue's last change, in Peek's words). A fact a kind does not have is left
- * empty, so every list's columns line up. No headings on screen: the heading over the list names it.
+ * initiative's faces in the kit's members pill, a project's lead, an issue's assignee, who edited a document last),
+ * **Progress** (a project's, as the kit's small ring: "the progress bar can also be using the small progress which is a
+ * circle") and **When** (an initiative's Active; a project's, an issue's or a document's last change, "Ana, 1h ago"). A
+ * fact a kind does not have is left empty, so every list's columns line up. A Leaf document opens in Leaf, in a new
+ * tab, and folds to its pages (the kit's row, 23 November). No headings on screen: the heading over the list names it.
  */
 export function WorkList({ label, kind, rows, now = Date.now() }: { label: string; kind: WorkKind; rows: WorkListRow[]; now?: number }) {
   // A project's or an issue's facts not read yet: the dash in every column its kind has (`undefined` is the kit's dash).
@@ -77,20 +84,23 @@ export function WorkList({ label, kind, rows, now = Date.now() }: { label: strin
   const progress = (row: WorkListRow) => (kind !== 'project' ? NONE : waiting(row) ? undefined : row.progress ? <ProgressRing done={row.progress.done} total={row.progress.total} /> : NONE)
   // An initiative's Active not read yet is the dash, as Explore's; for a project or an issue no time is nothing to say.
   const when = (row: WorkListRow) => (kind !== 'topic' && row.edited ? row.edited : row.at ? formatActive(row.at * 1000, now) : kind === 'topic' || waiting(row) ? undefined : NONE)
+  const draw = (row: WorkListRow): ReactNode => (
+    <ListTableRow
+      key={row.address}
+      data-work={row.address}
+      data-work-kind={kind}
+      {...(row.href ? { href: row.href, external: !!row.external } : {})}
+      label={row.title}
+      {...(row.description ? { description: row.description } : {})}
+      icon={<KindIcon kind={kind === 'document' ? 'file' : kind} />}
+      cells={[status(row), people(row), progress(row), when(row)]}
+    >
+      {row.rows?.length ? row.rows.map(draw) : undefined}
+    </ListTableRow>
+  )
   return (
     <ListTable aria-label={label} columns={COLUMNS} headings={false}>
-      {rows.map((row) => (
-        <ListTableRow
-          key={row.address}
-          data-work={row.address}
-          data-work-kind={kind}
-          href={row.href}
-          label={row.title}
-          {...(row.description ? { description: row.description } : {})}
-          icon={<KindIcon kind={kind} />}
-          cells={[status(row), people(row), progress(row), when(row)]}
-        />
-      ))}
+      {rows.map(draw)}
     </ListTable>
   )
 }

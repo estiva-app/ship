@@ -105,12 +105,13 @@ export function TopicPage({
           title: object.slots.title?.value || 'Untitled document',
           ...(href ? { href } : {}),
           ...(object.changedBy && object.changedAt ? { edited: editedLabel(nameOf(object.changedBy), object.changedAt) } : {}),
+          ...(object.changedBy ? { editor: personOf(object.changedBy) } : {}),
           ...(children.length ? { children } : {}),
         },
       ]
     }
     return listed.flatMap(documentOf).sort((a, b) => (order.get(a.address) ?? 0) - (order.get(b.address) ?? 0))
-  }, [listed, page, nameOf])
+  }, [listed, page, nameOf, personOf])
 
   // Projects as the Projects page draws them, in the topic's order (Decided 6 Nov: the order inside each kind).
   const view = useMemo((): TopicPageView | undefined => {
