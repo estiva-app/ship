@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { IconHash, IconPlus, IconX } from '@tabler/icons-react'
-import { CommandPalette, CommandPaletteSearch, KindIcon, type CommandPaletteRow } from '@estiva-app/ui'
+import { CommandPalette, CommandPaletteSearch, findsByWordStart, KindIcon, type CommandPaletteRow } from '@estiva-app/ui'
 import type { TopicOfFile } from '@/api/foreign'
 import type { TopicChoices } from '@/api/topics'
 import { isKnownSpace, topicHref } from '@/lib/topicLinks'
@@ -99,16 +99,6 @@ export function FileTopics({ topics, busy, onChange, readChoices, choicesNow }: 
   )
 }
 
-/**
- * Every typed word starts a word of the title, in any order: search matches
- * word starts only, everywhere (Miky, 2026-10-19).
- * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/search-matches-every-word-as-a-word-start.md
- */
-function startsWords(title: string, words: readonly string[]): boolean {
-  const own = title.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean)
-  return words.every((word) => own.some((w) => w.startsWith(word)))
-}
-
 /** Another app's page, beside Ship rather than in its place, as every other file of another app opens. */
 function openBeside(event: { preventDefault: () => void }, url: string | undefined) {
   if (!url) return
@@ -144,10 +134,10 @@ function AddToTopic({ listed, readChoices, choicesNow, onPick, onClose }: {
       live = false
     }
   }, [readChoices])
-  const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean)
+  const asked = query.trim()
   const rows = (topics: readonly TopicOfFile[]): CommandPaletteRow[] =>
     topics
-      .filter((topic) => !listed.includes(topic.address) && startsWords(topic.title, words))
+      .filter((topic) => !listed.includes(topic.address) && findsByWordStart(topic.title, asked))
       .map((topic) => ({ id: topic.address, label: topic.title, icon: placeIcon(topic.address, 16), onSelect: () => onPick(topic) }))
   const groups = typeof choices === 'object' ? [{ label: 'Your initiatives', rows: rows(choices.yours) }, { label: 'Other initiatives', rows: rows(choices.others) }].filter((group) => group.rows.length > 0) : []
   return (
@@ -158,7 +148,7 @@ function AddToTopic({ listed, readChoices, choicesNow, onPick, onClose }: {
         placeholder="Find an initiative…"
         groups={groups}
         pending={choices === undefined ? 'Reading initiatives…' : undefined}
-        empty={choices === 'failed' ? 'Initiatives could not be read.' : words.length ? `No initiative is called “${query.trim()}”.` : 'No initiative to add it to.'}
+        empty={choices === 'failed' ? 'Initiatives could not be read.' : asked ? `No initiative is called “${asked}”.` : 'No initiative to add it to.'}
       />
     </CommandPalette>
   )
