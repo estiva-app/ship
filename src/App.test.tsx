@@ -60,7 +60,8 @@ const STAGE: Record<string, 'open' | 'started' | 'done' | 'dropped'> = { todo: '
 // `archived` and the field it is folded from, together, as the fold writes them (FOL-46 reads the field).
 const project = (d: string, title: string, archived = false) => ({
   addr: `30850:x:${d}`, id: d, author: OTHER, createdAt: 1, title, description: '', descriptionFormat: 'marker' as const, contentFolder: 'f', status: 'planned', stage: 'open' as const, archived,
-  fields: (archived ? { archived: { value: 'true', by: OTHER, at: 1, format: 'marker' as const } } : {}) as WorkspaceState['projects'][number]['fields'],
+  // The winning change is the one the tests below put in the activity list, by its id.
+  fields: (archived ? { archived: { value: 'true', by: OTHER, at: 1, format: 'marker' as const, id: 'c'.repeat(64) } } : {}) as WorkspaceState['projects'][number]['fields'],
 })
 const issue = (d: string, projectAddr: string | undefined, status: string) => ({
   addr: `30851:x:${d}`, id: d, author: OTHER, createdAt: 1, title: `issue ${d.slice(-2)}`, description: '', descriptionFormat: 'marker' as const, folder: 'f', projectAddr, status, stage: STAGE[status], fields: {},

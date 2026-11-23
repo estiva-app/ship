@@ -26,7 +26,7 @@ vi.mock('./store', async () => {
 })
 
 const { threadsOn, commentsOn, eventOf } = await import('./index')
-const { foldFolder } = await import('../nostr/fold')
+const { readState } = await import('../nostr/read')
 const { anchorIndex } = await import('../nostr/references')
 
 const ISSUE = '30851:' + 'a'.repeat(64) + ':issue-1'
@@ -94,7 +94,7 @@ describe('a thread whose comment was not read', () => {
     const elsewhere = (id: string, at: number) =>
       signed({ id, kind: 1111, pubkey: PEEK_USER, created_at: at, tags: [['A', OTHER], ['K', '30851'], ['e', COMMENT], ['k', '1111'], ['h', 'f2']] })
     const events = [reply, elsewhere('7'.repeat(64), 61), elsewhere('8'.repeat(64), 62)]
-    const page = commentsOn(foldFolder(events).conversations, ISSUE, anchorIndex(events))
+    const page = commentsOn(readState(events).conversations, ISSUE, anchorIndex(events))
     expect(page.map((c) => [c.root.id, ...c.replies.map((r) => r.id)])).toEqual([[REPLY]])
     // A resolve filed in the other team does not count on this page; this page's team's does.
     const inF2 = signed({ ...assertion('1'.repeat(64), 'resolved', 100, 'Steered.'), tags: [['e', COMMENT], ['t', 'resolution'], ['action', 'resolved'], ['h', 'f2']] })

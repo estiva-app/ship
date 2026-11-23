@@ -32,7 +32,7 @@ vi.mock('@/lib/useRefresh', () => ({ useRefresh: () => {} }))
 
 const { useFeedJudges, resetFeedFactsForTests } = await import('./useFeedJudges')
 const { unreadByThread } = await import('./unreadFeed')
-const { foldFolder } = await import('../nostr/fold')
+const { readState } = await import('../nostr/read')
 
 let n = 0
 /** A comment on the project as Ship publishes one: NIP-22, the project as its root. */
@@ -52,7 +52,7 @@ async function dotsFor(events: SignedEvent[], channel?: string) {
   const { result } = renderHook(() => useFeedJudges(PROJECT, channel))
   await waitFor(() => expect(result.current.file).toBeDefined())
   const judge = result.current.file
-  const { conversations } = foldFolder(events, () => [])
+  const { conversations } = readState(events, () => [])
   return unreadByThread(conversations, {}, () => judge)
 }
 

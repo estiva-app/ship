@@ -22,7 +22,7 @@
 import { buildChange, buildConversationMessage, buildIssue, buildProject } from '../src/nostr/events'
 import { buildManifest, manifestContent } from '../src/nostr/manifest'
 import { KIND } from '../src/nostr/kinds'
-import { foldFolder } from '../src/nostr/fold'
+import { readState } from '../src/nostr/read'
 import { foldAttachments, messageReference } from '@estiva-app/conversation'
 import { addrToNaddr, encodeNpub, toRenderTree } from '@estiva-app/protocol'
 import { directoryFrom, initials, parseProfile } from '../src/nostr/profiles'
@@ -179,7 +179,7 @@ check(
 console.log('\n# folding one project Folder\n')
 
 const sign = <T extends object>(event: T, id: string) => ({ ...event, id, sig: '' }) as never
-const folded = foldFolder([
+const folded = readState([
   sign(project, 'e1'),
   sign(issue, 'e2'),
   sign(statusChange, 'e3'),
@@ -222,7 +222,7 @@ const refChange = buildChange(PK, Date.now(), {
   value: 'PAY-7',
   folder: CONTENT,
 })
-const withLateRef = foldFolder([sign(project, 'r1'), sign(unreffed, 'r2'), sign(refChange, 'r3')])
+const withLateRef = readState([sign(project, 'r1'), sign(unreffed, 'r2'), sign(refChange, 'r3')])
 check('  …and take a ref from the change stream afterwards', withLateRef.issues[0]?.ref === 'PAY-7')
 
 const refOnRoot = buildIssue(PK, Date.now(), {
@@ -232,7 +232,7 @@ const refOnRoot = buildIssue(PK, Date.now(), {
   projectAddr: `30850:${PK}:p1`,
   ref: 'PAY-1',
 })
-const rootOnly = foldFolder([sign(project, 's1'), sign(refOnRoot, 's2')])
+const rootOnly = readState([sign(project, 's1'), sign(refOnRoot, 's2')])
 check('  …while a ref written on the root still reads, as every existing issue does', rootOnly.issues[0]?.ref === 'PAY-1')
 
 // ── The parent is the project `a`, not the first `a` ────────────────────────
@@ -251,14 +251,14 @@ const linksFirst = sign(
   { ...buildIssue(PK, Date.now(), { issueId: 'i4', title: 'Follow the spec', folder: CONTENT }), tags: [['d', 'i4'], ['title', 'Follow the spec'], ['h', CONTENT], ['a', LEAF_DOC], ['a', `30850:${PK}:p1`]] },
   'l2',
 )
-const underProject = foldFolder([sign(project, 'l1'), linksFirst]).issues.find((i) => i.id === 'i4')
+const underProject = readState([sign(project, 'l1'), linksFirst]).issues.find((i) => i.id === 'i4')
 check('an issue whose first `a` names a document still folds under its project', underProject?.projectAddr === `30850:${PK}:p1`, String(underProject?.projectAddr))
 
 const linksAfter = sign(
   { ...buildIssue(PK, Date.now(), { issueId: 'i5', title: 'Then the spec', folder: CONTENT }), tags: [['d', 'i5'], ['title', 'Then the spec'], ['h', CONTENT], ['a', `30850:${PK}:p1`], ['a', LEAF_DOC]] },
   'l3',
 )
-const projectFirst = foldFolder([sign(project, 'l1'), linksAfter]).issues.find((i) => i.id === 'i5')
+const projectFirst = readState([sign(project, 'l1'), linksAfter]).issues.find((i) => i.id === 'i5')
 check('…and one that names its project first and a document after it too', projectFirst?.projectAddr === `30850:${PK}:p1`, String(projectFirst?.projectAddr))
 
 // ── The order two changes to one field are replayed in ──────────────────────
@@ -274,7 +274,7 @@ console.log('\n# two changes to one field, ordered as every reader orders them\n
 const T = 1_790_000_000_000
 const titleTo = (value: string, id: string, atMs: number, createdAt = Math.floor(atMs / 1000)) =>
   sign({ ...buildChange(PK, atMs, { target: `30851:${PK}:i2`, field: 'title', value, folder: CONTENT }), created_at: createdAt }, id)
-const titleOf = (...changes: SignedEvent[]) => foldFolder([sign(project, 'o1'), sign(unreffed, 'o2'), ...changes]).issues[0]?.title
+const titleOf = (...changes: SignedEvent[]) => readState([sign(project, 'o1'), sign(unreffed, 'o2'), ...changes]).issues[0]?.title
 
 check('a same-millisecond tie goes to the higher id', titleOf(titleTo('low', 'a1', T), titleTo('high', 'f9', T)) === 'high')
 check('  …whichever order they arrive in', titleOf(titleTo('high', 'f9', T), titleTo('low', 'a1', T)) === 'high')
@@ -288,7 +288,7 @@ check('  …while a ts inside its own second still orders within it', titleOf(ti
 // Two versions of one *root* are a replaceable event, not a change: NIP-01 and
 // the relay keep the lower id on a created_at tie, and so must the fold.
 const rootTitled = (title: string, id: string) => sign({ ...unreffed, created_at: 1_790_000_000, tags: unreffed.tags.map((t: string[]) => (t[0] === 'title' ? ['title', title] : t)) }, id)
-const rootTie = (...roots: SignedEvent[]) => foldFolder([sign(project, 'o1'), ...roots]).issues[0]?.title
+const rootTie = (...roots: SignedEvent[]) => readState([sign(project, 'o1'), ...roots]).issues[0]?.title
 check('two versions of one root at the same second keep the lower id, as the relay does', rootTie(rootTitled('kept', 'a1'), rootTitled('dropped', 'f9')) === 'kept')
 check('  …whichever order they arrive in', rootTie(rootTitled('dropped', 'f9'), rootTitled('kept', 'a1')) === 'kept')
 
@@ -326,7 +326,7 @@ const globalProject: SignedEvent = sign(
   'g1',
 )
 
-const bothShapes = foldFolder([sign(project, 'e1'), globalProject])
+const bothShapes = readState([sign(project, 'e1'), globalProject])
 const legacy = bothShapes.projects.find((p) => p.id === 'p1')
 const global_ = bothShapes.projects.find((p) => p.id === 'p2')
 
@@ -352,7 +352,7 @@ const transitional = sign(
 )
 check(
   'a record carrying both tags is read as channel-scoped',
-  foldFolder([transitional]).projects[0]?.contentFolder === CONTENT,
+  readState([transitional]).projects[0]?.contentFolder === CONTENT,
 )
 
 // An empty description tag is a statement, not an absence — otherwise clearing
@@ -369,7 +369,7 @@ const clearedDescription = sign(
 )
 check(
   'an empty description tag wins over leftover content',
-  foldFolder([clearedDescription]).projects[0]?.description === '',
+  readState([clearedDescription]).projects[0]?.description === '',
 )
 
 // A change still overrides the record, whichever shape the record is in.
@@ -384,7 +384,7 @@ const globalRename: SignedEvent = sign(
 )
 check(
   'a rename change still beats the record\'s own name tag',
-  foldFolder([globalProject, globalRename]).projects[0]?.title === 'Renamed by someone else',
+  readState([globalProject, globalRename]).projects[0]?.title === 'Renamed by someone else',
 )
 
 // ── NIP-22 comments read alongside kind:9 ───────────────────────────────────
@@ -442,7 +442,7 @@ const legacyComment: SignedEvent = sign(
   'm1',
 )
 
-const convo = foldFolder([sign(issue, 'e2'), legacyComment, nip22Root, nip22Reply])
+const convo = readState([sign(issue, 'e2'), legacyComment, nip22Root, nip22Reply])
 check('a 1111 comment is read at all', convo.conversations.length > 0)
 check('  …it lands under the issue it names', convo.conversations.some((c) => c.about.includes(ISSUE_ADDR)))
 check('  …and so does the old kind:9, in the same workspace',
@@ -457,15 +457,15 @@ check('the comment stays in its Folder', thread?.root.folder === CONTENT)
 // A reply copies its comment's `block` (SPEC §13.6): the comment shows the place, the reply does not show it again.
 const onBlock = sign({ ...nip22Root, tags: [...nip22Root.tags, ['block', 'b1']] }, 'c3')
 const copied = sign({ ...nip22Reply, tags: [['A', ISSUE_ADDR], ['K', '30851'], ['P', PK], ['e', 'c3'], ['k', '1111'], ['block', 'b1'], ['h', CONTENT]] }, 'c4')
-const placed = foldFolder([sign(issue, 'e2'), onBlock, copied]).conversations.find((c) => c.root.id === 'c3')
+const placed = readState([sign(issue, 'e2'), onBlock, copied]).conversations.find((c) => c.root.id === 'c3')
 check('a comment on a block keeps its block', placed?.root.blockId === 'b1')
 check('  …and a reply that copied it carries none of its own', placed?.replies[0]?.id === 'c4' && placed?.replies[0]?.blockId === undefined)
-const orphaned = foldFolder([sign(issue, 'e2'), copied]).conversations.find((c) => c.root.id === 'c4')
+const orphaned = readState([sign(issue, 'e2'), copied]).conversations.find((c) => c.root.id === 'c4')
 check('  …and once the comment is deleted, its reply keeps the thread on its block', orphaned?.root.blockId === 'b1')
 
 // Case is the trap: reading lowercase `a` as the root would put a reply in its
 // own thread, and reading uppercase `E` as the parent would lose the ordering.
-const miscased = foldFolder([nip22Reply])
+const miscased = readState([nip22Reply])
 check('a reply whose root is an address still parses', miscased.conversations.length === 1)
 check('  …with the parent it names, not the root', miscased.conversations[0]?.root.parentId === 'c1')
 
@@ -599,7 +599,7 @@ check('a message that names nothing earns nothing', ['q', 'urgent', 'a'].every((
 // The round trip: the reply folds into the comment's thread, and the comment
 // carries the anchor the reply was built from.
 const topComment = sign(buildConversationMessage(PK, 1_000_000, { folder: CONTENT, body: 'Top', about: ISSUE_ADDR2 }), 'c1')
-const replied = foldFolder([topComment, sign(commentReply, 'r2')]).conversations
+const replied = readState([topComment, sign(commentReply, 'r2')]).conversations
 check('  …folds under the comment', replied.length === 1 && replied[0]?.id === 'c1' && replied[0]?.replies[0]?.id === 'r2')
 check('  …whose root carries the anchor a reply copies', replied[0]?.root.anchor === ISSUE_ADDR2)
 check('a kind:9 carries no anchor, so its thread gets a kind:9 reply', convo.conversations.find((c) => c.root.id === 'm1')?.root.anchor === undefined)
@@ -824,7 +824,7 @@ console.log('\n# a `folder` change no longer re-points a project (MAN-5)\n')
 const repoint = buildChange(PK, Date.now(), { target: `30850:${PK}:p1`, field: 'folder', value: TOPIC, folder: CONTENT })
 check(
   'the project keeps the Folder its record names',
-  foldFolder([sign(project, 'e1'), sign(repoint, 'e5')]).projects[0]?.contentFolder === CONTENT,
+  readState([sign(project, 'e1'), sign(repoint, 'e5')]).projects[0]?.contentFolder === CONTENT,
 )
 
 // ── Profiles ────────────────────────────────────────────────────────────────

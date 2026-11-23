@@ -1,4 +1,4 @@
-import type { Conversation } from '../nostr/fold'
+import type { Conversation } from '../nostr/conversations'
 import type { AnchorIndex } from '../nostr/references'
 
 /** What `ownConversations` needs to know about a project. */

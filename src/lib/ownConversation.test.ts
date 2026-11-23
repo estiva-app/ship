@@ -9,7 +9,7 @@
  * the body.
  */
 import { describe, expect, it } from 'vitest'
-import type { Conversation, Message } from '../nostr/fold'
+import type { Conversation, Message } from '../nostr/conversations'
 import { ownConversations, recordChannel, type ConversationHome } from './ownConversation'
 
 const RECORD = '85db5b59-9e49-4ea1-8e93-3d2a2d78c048'

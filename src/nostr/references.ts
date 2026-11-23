@@ -12,7 +12,7 @@
  * | **a comment** | uppercase `A` at the thread root — the thread *is* about this object | the object's own discussion |
  * | **a mention** | an `a` tag on the root that is not its `A`, or an address in a body | *Mentioned in*, secondary and collapsed |
  *
- * `conversationsAbout` in `fold.ts` returns the union of both, because
+ * `conversationsAbout` in `conversations.ts` returns the union of both, because
  * `Conversation.about` is itself a union: `parseMessage` merges an event's `a`
  * tags with the addresses found in its body, and `foldConversations` then merges
  * that across every message in the thread. Two facts are lost on the way in, and
@@ -21,14 +21,14 @@
  * ## Why it reads the events rather than adding a field to the fold
  *
  * The fold's output is a contract between two repositories.
- * `scripts/conformance.test.ts` compares `foldFolder`'s whole result against a
+ * `scripts/conformance.test.ts` compares `readState`'s whole result against a
  * recorded state, walking the **union of keys** — so one new field on `Message`
  * turns both repos' CI red until a regenerated fixture lands in both at once.
  * That is the correct amount of friction for changing what the fold *means*, and
  * this does not change it: the same events fold to the same state, and this is a
  * second, separate reading of the same input.
  *
- * So `foldFolder` is untouched and this is additive.
+ * So `readState` is untouched and this is additive.
  *
  * ## What counts as an anchor is `@estiva-app/conversation`'s (CON-5)
  *
@@ -41,7 +41,7 @@
  */
 import { anchorsOf, isReply, type Strength } from '@estiva-app/conversation'
 import type { SignedEvent } from '@estiva-app/protocol'
-import { threadOnPage, type Conversation } from './fold'
+import { threadOnPage, type Conversation } from './conversations'
 
 /**
  * Message id → the addresses that message is a **comment on**, by SPEC §6.4.

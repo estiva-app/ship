@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { Issue, Project } from './fold'
+import type { Issue, Project } from './files'
 import { clashes, keyOfRef, keyProblem, nextRef, projectKeys, suggestKey } from './keys'
 
 const project = (d: string, title: string, extra: Partial<Project> = {}) =>

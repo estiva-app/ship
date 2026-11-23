@@ -118,7 +118,7 @@ export function IssuePage({ state, directory, archives, d, say, refresh }: { sta
   const byFields = state.issueTexts !== undefined
   const historyRead = useHistoryFold(byFields ? issue?.addr : undefined)
   const everyChange = historyRead.changes
-  const ownChanges = useMemo(() => (issue && byFields ? withChangesOf(issue.addr, state, everyChange ?? undefined) : state), [issue, byFields, state, everyChange])
+  const ownChanges = useMemo(() => (issue && byFields ? withChangesOf(issue, state, everyChange ?? undefined) : state), [issue, byFields, state, everyChange])
   const history = useMemo(() => (issue ? historyFor(issue.addr, ownChanges, directory) : []), [issue, ownChanges, directory])
   const people = useMemo(() => pickerPeople(state, directory), [state, directory])
   const projects = useMemo(

@@ -25,7 +25,7 @@ Ship action.
 ## So the manifest is the contract
 
 What the agent and Peek show about a project or an issue is what the manifest
-declares, not what `fold.ts` does. A rule the fold applies and the manifest does
+declares, not what Ship's own code does. A rule Ship applies and the manifest does
 not state is a rule only Ship follows — an issue title the slot did not `fold`
 showed every renamed issue by its first title in Peek until ship#231. When the
 fold changes, the manifest changes in the same PR, and is **republished** after
@@ -43,7 +43,7 @@ read the relay back: exactly one `estiva-ship` manifest, under `88ac6aae…`.
 Moving to a new key is a hand edit of `manifest-address.ts`, in its own PR.
 
 **`scripts/conformance.test.ts` runs in both repositories over the same
-`conformance/fold-fixture.json`.** Here it folds the events with `foldFolder`;
+`conformance/fold-fixture.json`.** Here it folds the events with `readState`;
 in `estiva-agent` the same events go through the agent's real read path —
 the recorded manifest and interop — and both must equal the fixture's
 `expected`. A failure there means the manifest and this fold disagree.

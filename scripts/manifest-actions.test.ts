@@ -20,7 +20,7 @@ import {
   type SignedEvent,
   type UnsignedEvent,
 } from '@estiva-app/protocol'
-import { foldFolder } from '../src/nostr/fold'
+import { readState } from '../src/nostr/read'
 import { KIND } from '../src/nostr/kinds'
 import { manifestContent } from '../src/nostr/manifest'
 import { Store } from '../src/nostr/store'
@@ -90,13 +90,13 @@ check('describe-issue builds one event', Array.isArray(describe) && describe.len
 if (Array.isArray(describe)) {
   const [change] = describe
   check('a kind:1851 on `description`, tagged as a block document', change.kind === KIND.CHANGE && tag(change, 'field') === 'description' && tag(change, 'content-format') === BLOCK_DOCUMENT_FORMAT)
-  const folded = foldFolder([issueRoot, sign(change, 2)]).issues[0]
+  const folded = readState([issueRoot, sign(change, 2)]).issues[0]
   check('Ship folds it as the issue’s body', folded.description === document)
 
   sent = []
   await store.setField({ folder: FOLDER, target: ISSUE, field: 'description', value: document, contentFormat: BLOCK_DOCUMENT_FORMAT, note: 'Description' })
   const own = sent[0]
-  const ownFormat = foldFolder([issueRoot, sign(own, 3)]).issues[0].descriptionFormat
+  const ownFormat = readState([issueRoot, sign(own, 3)]).issues[0].descriptionFormat
   check('…as blocks, the format Ship’s own edit folds to', folded.descriptionFormat === ownFormat && ownFormat !== 'marker', `${folded.descriptionFormat} vs ${ownFormat}`)
   const core = (event: { tags: string[][] }) => ['a', 'field', 'value', 'h', 'content-format'].map((name) => `${name}=${tag(event, name)}`).join(' ')
   check('the same five tags Ship’s own setField writes', core(change) === core(own), core(change) === core(own) ? '' : `${core(change)} vs ${core(own)}`)
@@ -116,14 +116,14 @@ console.log('\n# move-issue is the `project` change Ship’s picker writes\n')
 const moved = build({ kind: KIND.ISSUE, address: ISSUE, objectAuthor: ME, folder: FOLDER, actionId: 'move-issue', value: PROJECT_2 })
 check('move-issue builds one kind:1851 on `project`', Array.isArray(moved) && moved.length === 1 && tag(moved[0], 'field') === 'project', typeof moved === 'string' ? moved : '')
 if (Array.isArray(moved)) {
-  check('Ship folds the issue under the project it was moved to', foldFolder([issueRoot, sign(moved[0], 4)]).issues[0].projectAddr === PROJECT_2)
+  check('Ship folds the issue under the project it was moved to', readState([issueRoot, sign(moved[0], 4)]).issues[0].projectAddr === PROJECT_2)
   check('and the change keeps the issue’s Folder: `h` is the issue’s own', tag(moved[0], 'h') === FOLDER)
 }
 const unparented = build({ kind: KIND.ISSUE, address: ISSUE, objectAuthor: ME, folder: FOLDER, actionId: 'move-issue', value: '' })
 check(
   'an empty value is “No project”, as Ship’s picker offers',
   // No project is no parent: every reader asks `!issue.projectAddr`.
-  Array.isArray(unparented) && !foldFolder([issueRoot, sign(unparented[0], 5)]).issues[0].projectAddr,
+  Array.isArray(unparented) && !readState([issueRoot, sign(unparented[0], 5)]).issues[0].projectAddr,
 )
 const listSlot = (manifestContent().projections[String(KIND.PROJECT)].slots.list as { children?: { movedBy?: string } }).children
 check('the project’s issue list declares the field a move sets', listSlot?.movedBy === 'project', JSON.stringify(listSlot))
@@ -163,7 +163,7 @@ if (Array.isArray(created)) {
   const ownId = tag(ownRecord, 'd')!
   const listingShape = (event: { tags: string[][] }, id: string) => event.tags.map((t) => t.join('=')).join(' ').replace(id, '<d>')
   check('the listing is the one createProject publishes', listingShape(listing, 'p9') === listingShape(ownListing, ownId), `${listingShape(listing, 'p9')} vs ${listingShape(ownListing, ownId)}`)
-  const project = foldFolder([sign(record, 6)]).projects[0]
+  const project = readState([sign(record, 6)]).projects[0]
   check('Ship folds the new project’s name, Folder and description', project.title === 'Launch' && project.contentFolder === FOLDER && project.description === 'What launch means', `${project.title} ${project.contentFolder} ${project.description}`)
 }
 const stateless = build({ kind: 39000, address: FOLDER_RECORD, objectAuthor: RELAY, folder: FOLDER, actionId: 'add-project', value: { name: 'Launch' }, newId: 'p9', folderHasState: false })
@@ -181,7 +181,7 @@ check('summarize-issue builds one kind:1851 on `summary`', Array.isArray(summari
 if (Array.isArray(summarized)) {
   const [change] = summarized
   check('plain text: no content-format on the change', tag(change, 'content-format') === undefined)
-  check('Ship folds it as the issue’s summary', foldFolder([issueRoot, sign(change, 20)]).issues[0].summary === 'Totals are off by one cent.')
+  check('Ship folds it as the issue’s summary', readState([issueRoot, sign(change, 20)]).issues[0].summary === 'Totals are off by one cent.')
   sent = []
   await store.setField({ folder: FOLDER, target: ISSUE, field: 'summary', value: 'Totals are off by one cent.', note: 'Summary' })
   const core = (event: { tags: string[][] }) => ['a', 'field', 'value', 'h', 'content-format'].map((name) => `${name}=${tag(event, name)}`).join(' ')
@@ -195,21 +195,21 @@ const seededRoot = sign({ ...issueRoot, tags: [...issueRoot.tags, ['summary', 'A
 // a sentence, not undefined, when the action cannot be built, so no check passes then.
 const summaryAfter = (value: string, i: number): string | undefined => {
   const built = build({ kind: KIND.ISSUE, address: ISSUE, objectAuthor: ME, folder: FOLDER, actionId: 'summarize-issue', value })
-  return Array.isArray(built) ? foldFolder([seededRoot, sign(built[0], i)]).issues[0].summary : `not built: ${built}`
+  return Array.isArray(built) ? readState([seededRoot, sign(built[0], i)]).issues[0].summary : `not built: ${built}`
 }
-check('a root’s summary tag is its seed', foldFolder([seededRoot]).issues[0].summary === 'As filed, in one line')
+check('a root’s summary tag is its seed', readState([seededRoot]).issues[0].summary === 'As filed, in one line')
 check('an empty value clears it, and the seed does not show through', summaryAfter('', 22) === undefined, summaryAfter('', 22))
 check('a value of spaces is no summary either', summaryAfter('  \n ', 23) === undefined)
 check('line breaks fold to spaces: one line wherever it is drawn', summaryAfter('Two\nlines', 24) === 'Two lines')
 const projectRoot = sign({ pubkey: ME, created_at: NOW / 1000 - 100, kind: KIND.PROJECT, tags: [['d', 'p1'], ['name', 'Billing'], ['buzz-channel', FOLDER]], content: '' }, 27)
 check(
   'Ship folds summarize-project over a project that names its Folder by buzz-channel',
-  Array.isArray(projectSummary) && foldFolder([projectRoot, sign(projectSummary[0], 28)]).projects[0].summary === 'Ship the summary everywhere.',
+  Array.isArray(projectSummary) && readState([projectRoot, sign(projectSummary[0], 28)]).projects[0].summary === 'Ship the summary everywhere.',
 )
 const elsewhere = build({ kind: KIND.ISSUE, address: ISSUE, objectAuthor: ME, folder: OTHER, actionId: 'summarize-issue', value: 'From another Folder' })
 check(
   'a summary signed in another Folder is not read (§6.2)',
-  Array.isArray(elsewhere) && foldFolder([seededRoot, sign(elsewhere[0], 25)]).issues[0].summary === 'As filed, in one line',
+  Array.isArray(elsewhere) && readState([seededRoot, sign(elsewhere[0], 25)]).issues[0].summary === 'As filed, in one line',
 )
 
 const filed = build({ kind: KIND.PROJECT, address: PROJECT, objectAuthor: ME, folder: FOLDER, actionId: 'add-issue', value: { title: 'Billing entry', summary: 'Totals are off.' }, newId: 'i7' })
@@ -221,7 +221,7 @@ if (Array.isArray(filed)) {
   // differ; a reader finds every tag by name (SPEC §6.1). Ship's own puts it last.
   const names = (event: { tags: string[][] }) => event.tags.map((t) => t[0]).join(',')
   check('on a `summary` tag, as Ship’s own writes it, last there', tag(filed[0], 'summary') === 'Totals are off.' && tag(sent[0], 'summary') === 'Totals are off.' && names(sent[0]).endsWith(',summary'), `${names(filed[0])} vs ${names(sent[0])}`)
-  check('which Ship folds as the new issue’s summary', foldFolder([sign(filed[0], 26)]).issues[0].summary === 'Totals are off.')
+  check('which Ship folds as the new issue’s summary', readState([sign(filed[0], 26)]).issues[0].summary === 'Totals are off.')
 }
 const launched = build({ kind: 39000, address: FOLDER_RECORD, objectAuthor: RELAY, folder: FOLDER, actionId: 'add-project', value: { name: 'Launch', key: 'LAU', summary: 'What launch means.' }, newId: 'p10', folderHasState: false })
 check('add-project takes a summary', Array.isArray(launched), typeof launched === 'string' ? launched : '')
@@ -243,7 +243,7 @@ check('a blank summary writes no tag', tag(sent[0], 'summary') === undefined)
 console.log('\n# delete-project is setProjectDeleted: one change on `deleted`, `true` or empty to restore (ALO-6)\n')
 
 const PREV = projectRoot.id
-const deletedFolds = (...changes: UnsignedEvent[]) => foldFolder([projectRoot, ...changes.map((change, i) => sign(change, 11 + i))]).projects[0]?.deleted
+const deletedFolds = (...changes: UnsignedEvent[]) => readState([projectRoot, ...changes.map((change, i) => sign(change, 11 + i))]).projects[0]?.deleted
 for (const [value, says] of [['true', 'deletes'], ['', 'restores']] as const) {
   const declared = build({ kind: KIND.PROJECT, address: PROJECT, objectAuthor: ME, folder: FOLDER, actionId: 'delete-project', value, prev: PREV })
   sent = []

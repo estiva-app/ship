@@ -41,8 +41,11 @@ of it is guessable.
 - `kinds.ts` — the three kinds and the status vocabularies. The vocabularies get
   published verbatim in the manifest at build-order step 3
 - `events.ts` — builders for Project (30850), Issue (30851) and Change (1851)
-- `fold.ts` — root + change events → current state. Read the comment on
-  `orderingMs` before touching the ordering rule
+- `read.ts` — a workspace's events → its projects, issues, their changes and
+  the conversations about them, every part by a shared read: `files.ts` maps
+  `@estiva-app/interop`'s read of a file (its fields and its history) onto
+  Ship's `Project` and `Issue`, and `conversations.ts` names
+  `@estiva-app/conversation`'s threads. Ship has no read of its own (MOV-4)
 - `store.ts` — publish and read against the relay. No cache, deliberately.
   `loadAll` is the discovery read described below
 - `profiles.ts` — `kind:0` in, people out. Not Ship's own idea of a user:

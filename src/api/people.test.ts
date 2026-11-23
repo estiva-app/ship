@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { FolderState } from '../nostr/fold'
+import type { FolderState } from '../nostr/read'
 import { peopleIn, short } from './people'
 
 const key = (c: string) => c.repeat(64)

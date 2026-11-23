@@ -12,7 +12,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { renderHook } from '@testing-library/react'
 import { links } from '@/api/linkCards'
 import { foldThreads } from '@estiva-app/conversation'
-import { foldFolder } from '../nostr/fold'
+import { readState } from '../nostr/read'
 import { anchorIndex } from '../nostr/references'
 import { foldWorkspace, type WorkspaceState } from '../nostr/store'
 import type { DirectoryView } from '@/api'
@@ -40,7 +40,7 @@ const onIssue = (id: string) => event(id, [['A', ISSUE], ['a', ISSUE], ['K', '30
 const mention = (id: string) => event(id, [['A', `30851:${'c'.repeat(64)}:elsewhere`], ['a', PROJECT]], `See nostr:${addrToNaddr(PROJECT)}.`)
 
 function workspace(events: SignedEvent[]): WorkspaceState {
-  return { ...foldFolder(events, refs), anchors: anchorIndex(events), edits: {}, attachments: {}, events } as unknown as WorkspaceState
+  return { ...readState(events, refs), anchors: anchorIndex(events), edits: {}, attachments: {}, events } as unknown as WorkspaceState
 }
 
 const directory = {
@@ -229,7 +229,7 @@ describe('what an edit of one message is built from', () => {
 describe('threadFor, for the one conversation’s cards (ONE-6)', () => {
   it('says a thread’s comment was deleted, with every reply kept', () => {
     const reply = event('r1', [['A', ISSUE], ['K', '30851'], ['e', 'gone'], ['k', '1111'], ['h', FOLDER]], 'Still here.')
-    const [conversation] = foldFolder([reply], refs).conversations
+    const [conversation] = readState([reply], refs).conversations
     const thread = threadFor(conversation!, directory)
     expect(thread.rootMissing).toBe(true)
     expect(thread.root.id).toBe('r1')
@@ -241,14 +241,14 @@ describe('threadFor, for the one conversation’s cards (ONE-6)', () => {
     const comment = event(C1, [['A', ISSUE], ['K', '30851'], ['h', FOLDER]], 'Ship it?')
     const reply = event(R1, [['A', ISSUE], ['K', '30851'], ['e', C1], ['k', '1111'], ['h', FOLDER]], 'Yes.')
     const resolve = { ...event('e'.repeat(64), [['e', C1], ['t', 'resolution'], ['action', 'resolved'], ['h', FOLDER]], 'Done.'), kind: 9101 }
-    const thread = threadFor(foldFolder([comment, reply], refs).conversations[0]!, directory)
+    const thread = threadFor(readState([comment, reply], refs).conversations[0]!, directory)
     const events = [thread.root, ...thread.replies].flatMap((m) => m.event ?? [])
     expect(foldThreads([...events, resolve])[0]?.resolution).toMatchObject({ action: 'resolved', message: 'Done.' })
   })
 
   it('keeps the words a comment written on a selection quotes', () => {
     const quoted = event('c1', [['A', ISSUE], ['K', '30851'], ['h', FOLDER], ['quote', 'The board loses', 'its order']], 'This.')
-    const [conversation] = foldFolder([quoted], refs).conversations
+    const [conversation] = readState([quoted], refs).conversations
     expect(threadFor(conversation!, directory).root.quote).toEqual({ start: 'The board loses', end: 'its order' })
   })
 })
