@@ -9,6 +9,7 @@ import { ID_CONFIG, RELAY_URL } from '../config'
 import { relayClockSkew } from './clock'
 import { heldBearer, heldToken, renew } from '../auth/estivaId'
 import { heardRefusal } from '../lib/failureReports'
+import { heardFromRelay, hearingSigner } from '../lib/heardFailures'
 
 /**
  * Who signs, decided once.
@@ -76,18 +77,27 @@ export const signer: Signer =
  * the caller will await and a stream can only be consumed once.
  */
 const fetchReportingQuota: FetchLike = async (url, init) => {
-  const response = await fetch(url, init)
+  let response: Response
+  try {
+    response = await fetch(url, init)
+  } catch (error) {
+    // Never answered: offline, cut, or the page leaving. Said for the failure a screen draws next (34396209).
+    heardFromRelay(error)
+    throw error
+  }
   const body = await response.text()
   if (response.status === 429 || (response.status >= 400 && isRateLimited(body))) {
     noteRateLimited(body)
   }
+  // Why a read failed, for the report of the failure it becomes: the relay's status and prefix, never its sentence.
+  if (response.status >= 400) heardFromRelay(body, response.status)
   return { status: response.status, text: async () => body }
 }
 
 // Every refused write is reported by its reason code, busy answers included (PROD-5).
 // A list read in one request, never paged (ISS-9).
 // Plain reads asked together go out as one request: an open spent 74–99 of a person's 300 a minute (SHI-61).
-export const relay = new ListReadRelay(RELAY_URL, signer, { fetch: fetchReportingQuota, onRefused: heardRefusal, mergeReadsMs: MERGE_READS_MS })
+export const relay = new ListReadRelay(RELAY_URL, hearingSigner(signer), { fetch: fetchReportingQuota, onRefused: heardRefusal, mergeReadsMs: MERGE_READS_MS })
 
 /** The switch (ALO-5): the relay's NIP-11 asked once, on the first read that needs it. */
 let fileReads: Promise<RelayFileReads> | undefined
