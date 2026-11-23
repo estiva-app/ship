@@ -88,7 +88,7 @@ export interface MessageData {
    * Files attached to this message, from its `imeta` tags — CON-12, SHI-1.
    *
    * Read beside the fold (`foldAttachments`) rather than off `Message`, for the
-   * same reason as `editedAt`: `foldFolder` is a two-repo contract and a new
+   * same reason as `editedAt`: `readState` is a two-repo contract and a new
    * field on `Message` turns both repos red. `threadFor` supplies it.
    */
   files?: Imeta[]

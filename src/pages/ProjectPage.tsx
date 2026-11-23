@@ -104,7 +104,7 @@ export function threadFor(
   /*
     Edits, applied here rather than in the fold — CON-4.
 
-    `foldFolder` is a two-repo contract whose conformance test walks the union
+    `readState` is a two-repo contract whose conformance test walks the union
     of keys, so the edit cannot be a field on `Message`; the package folds it
     beside the fold and this is where the two meet. A message with no edit is
     untouched, so the omitted case is exactly today's behaviour.
@@ -130,7 +130,7 @@ export function threadFor(
       id: m.id,
       // Read again by the shared fold with the page's reactions and resolutions (ONE-9).
       event: eventOf(m),
-      // A NIP-22 comment, or a reply to one, carries an `A`; chat does not (fold.ts).
+      // A NIP-22 comment, or a reply to one, carries an `A`; chat does not (conversations.ts).
       kind: m.anchor ? 1111 : 9,
       author: directory.personOf(m.author),
       at: m.createdAt,
@@ -767,7 +767,7 @@ export function ProjectPage({
   const deleted = project.deleted
   // Its History from every change to it once History is open; until then, and for "Edited", the load's current ones.
   // A History read that failed (`null`) shows what the load holds rather than stay pending.
-  const ownChanges = byFields ? withChangesOf(project.addr, state, everyChange ?? undefined) : state
+  const ownChanges = byFields ? withChangesOf(project, state, everyChange ?? undefined) : state
   // Where the load already holds every change (no fields read), History needs no read of its own and stays open.
   const historyFold = byFields
     ? { open: history.open, onOpenChange: history.setOpen, pending: history.open && everyChange === undefined }

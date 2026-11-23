@@ -31,7 +31,7 @@
  */
 import { unreadIn, type StreamJudge } from '@estiva-app/conversation'
 import type { SignedEvent } from '@estiva-app/protocol'
-import type { Conversation, Message } from '../nostr/fold'
+import type { Conversation, Message } from '../nostr/conversations'
 import { KIND } from '../nostr/kinds'
 
 type Judgable = Pick<SignedEvent, 'id' | 'pubkey' | 'kind' | 'created_at' | 'tags' | 'content'>

@@ -43,7 +43,7 @@ read the relay back: exactly one `estiva-ship` manifest, under `88ac6aae…`.
 Moving to a new key is a hand edit of `manifest-address.ts`, in its own PR.
 
 **`scripts/conformance.test.ts` runs in both repositories over the same
-`conformance/fold-fixture.json`.** Here it folds the events with `foldFolder`;
+`conformance/fold-fixture.json`.** Here it folds the events with `readState`;
 in `estiva-agent` the same events go through the agent's real read path —
 the recorded manifest and interop — and both must equal the fixture's
 `expected`. A failure there means the manifest and this fold disagree.

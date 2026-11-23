@@ -15,7 +15,7 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { publicKeyFromSecret, signEvent, type SignedEvent } from '@estiva-app/protocol'
-import { foldFolder } from '../src/nostr/fold'
+import { readState } from '../src/nostr/read'
 import { KIND } from '../src/nostr/kinds'
 
 /**
@@ -172,7 +172,7 @@ const recordedBefore = hashOf(recorded)
 const events = [...recorded, ...ordering, ...folderRule, ...unplaced, ...buzzChannel, ...tagged, ...stages].sort((a, b) =>
   a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
 )
-const expected = foldFolder(events)
+const expected = readState(events)
 const kinds = new Map<number, number>()
 for (const event of events) kinds.set(event.kind, (kinds.get(event.kind) ?? 0) + 1)
 fixture.events = events

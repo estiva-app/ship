@@ -19,7 +19,7 @@ import { archivedAncestorOf } from '@estiva-app/interop'
 import { listsFile } from './placement'
 import { archivedLine as sharedArchivedLine, type ArchiveDialogProps, type ArchivedNoticeProps } from '@estiva-app/ui'
 import { ago } from './time'
-import { ARCHIVED_OR_DELETED } from '../nostr/fold'
+import { ARCHIVED_OR_DELETED } from '../nostr/files'
 
 /** Ship wrote this note on every archive before FOL-46; it is not a resolution. */
 const PLACEHOLDER_NOTE = 'archived'
@@ -37,10 +37,12 @@ export interface ArchiveState {
 
 interface Archivable {
   addr: string
-  fields: Record<string, { value: string; by: string; at: number }>
+  /** Each field's winning change: its `id` names the change in the activity list. */
+  fields: Record<string, { value: string; by: string; at: number; id: string }>
 }
 
 interface ChangeLike {
+  id: string
   target: string
   field: string
   value: string
@@ -61,9 +63,8 @@ export function ownArchive(file: Archivable, activity: readonly ChangeLike[]): A
   const winner = file.fields.archived
   // Only `true`, as the fold and every manifest reader read it (SPEC §6.5, TES-2).
   if (winner?.value !== ARCHIVED_OR_DELETED) return undefined
-  // The activity list is in the order the fold replays, so the last change to
-  // this field is the one that won, and its note is the resolution.
-  const change = activity.findLast((c) => c.target === file.addr && c.field === 'archived')
+  // The change that won, as the shared read counted it (MOV-4): its note is the resolution.
+  const change = activity.findLast((c) => c.id === winner.id && c.target === file.addr && c.field === 'archived')
   const note = change?.note.trim()
   return {
     by: winner.by,

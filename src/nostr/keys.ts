@@ -31,7 +31,7 @@
  * key nobody else can see — and `clashes` is the rule for that: the later
  * claim gives way, and only its own author moves it.
  */
-import type { Issue, Project } from './fold'
+import type { Issue, Project } from './files'
 
 /** A key as SPEC §6.1 defines one. Anything else on the wire is shown, never minted from. */
 export const KEY_PATTERN = /^[A-Z]{3,6}$/

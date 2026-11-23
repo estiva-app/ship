@@ -19,7 +19,7 @@
  *
  *   npx tsx scripts/issue-description.test.ts
  */
-import { foldFolder } from '../src/nostr/fold'
+import { readState } from '../src/nostr/read'
 import { manifestContent, resolveSlotValue, type SlotSource } from '../src/nostr/manifest'
 import { KIND } from '../src/nostr/kinds'
 import { buildActionEvent } from '@estiva-app/interop'
@@ -47,7 +47,7 @@ function issue(opts: { id: string; tags?: string[][]; content?: string }): Signe
   } as SignedEvent
 }
 
-const only = (events: SignedEvent[]) => foldFolder(events).issues[0]
+const only = (events: SignedEvent[]) => readState(events).issues[0]
 
 // ── 1. The declaration ─────────────────────────────────────────────────────
 const manifest = manifestContent()

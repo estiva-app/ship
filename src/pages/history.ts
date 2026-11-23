@@ -4,7 +4,7 @@ import type { HistoryEntry } from '@/components/History'
 import { ISSUE_STATUSES, lookupStatus, type VocabEntry } from '@/nostr/kinds'
 import { ago } from '@/lib/time'
 import type { SignedEvent } from '@estiva-app/protocol'
-import { parseChanges, type Change as FoldChange } from '@/nostr/fold'
+import { historyOfFile, recordOf, type Issue, type Project } from '@/nostr/files'
 
 /**
  * An issue's or a project's slice of the change stream, in words, newest
@@ -29,19 +29,16 @@ import { parseChanges, type Change as FoldChange } from '@/nostr/fold'
  * `state` with the opened project's every change in its activity, from the
  * page's own read of them once History is open (`useFileChanges`), where projects are
  * read by their fields (ALO-5) and the load holds only each field's current
- * change. Oldest first, in the fold's order (SPEC §6.3). Until that read has
- * come back, `state` as it is.
+ * change. That history is the shared read's (`historyOf`, MOV-4), from the
+ * file's first record and every change read for it: the changes Peek, Leaf and
+ * the agent list for it, in the same order. Until that read has come back,
+ * `state` as it is.
  */
-export function withChangesOf(addr: string, state: FolderState, changes: readonly SignedEvent[] | undefined): FolderState {
-  if (!changes) return state
-  // Only changes filed in the file's own Folder, as the fold takes them: one filed elsewhere is not its history. An issue's is the one it was filed in (ISS-4).
-  const folder = state.projects.find((project) => project.addr === addr)?.contentFolder ?? state.issues.find((issue) => issue.addr === addr)?.folder
-  const at = (change: FoldChange) => (change.ts !== undefined && Math.floor(change.ts / 1000) === change.createdAt ? change.ts : change.createdAt * 1000)
-  const own = changes
-    .flatMap(parseChanges)
-    .filter((change) => change.target === addr && !!folder && change.folder === folder)
-    .sort((a, b) => at(a) - at(b) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
-  return { ...state, activity: [...state.activity.filter((change) => change.target !== addr), ...own] }
+export function withChangesOf<S extends FolderState>(file: Project | Issue, state: S, changes: readonly SignedEvent[] | undefined): S {
+  const record = recordOf(file)
+  if (!changes || !record) return state
+  const own = historyOfFile(record, changes).filter((change) => change.target === file.addr)
+  return { ...state, activity: [...state.activity.filter((change) => change.target !== file.addr), ...own] }
 }
 
 export function historyFor(addr: string, state: FolderState, directory: DirectoryView, statuses: VocabEntry[] = ISSUE_STATUSES): HistoryEntry[] {

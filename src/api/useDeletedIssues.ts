@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { Issue } from '../nostr/fold'
+import type { Issue } from '../nostr/files'
 import { issueFieldsNow } from './store'
 import { readDeletedIssues, readIssueByLink } from './writes'
 
