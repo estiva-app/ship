@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { IconBox, IconListDetails, IconListSearch, IconPlus, IconUsers } from '@tabler/icons-react'
+import { IconListSearch, IconPlus, IconUsers } from '@tabler/icons-react'
 import { KindIcon, NavItem, NavTree, Sidebar as SidebarShell, useRememberedOpen } from '@estiva-app/ui'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { SkeletonList } from '@/components/ui/Skeleton'
@@ -117,8 +117,9 @@ const ENTRIES: { entry: SidebarEntry; label: string; icon: ReactNode }[] = [
   // A team's initiatives (Katerina, 18 November: "Initiatives, just like we do in Peek's Teams"); the code still says topics.
   // ◎ from the kit's KindIcon, the one part that names an initiative (review of 23 November, C7), in the row's own ink.
   { entry: 'topics', label: 'Initiatives', icon: <KindIcon kind="topic" tone="inherit" /> },
-  { entry: 'projects', label: 'Projects', icon: <IconBox size={16} stroke={1.5} /> },
-  { entry: 'issues', label: 'Issues', icon: <IconListDetails size={16} stroke={1.5} /> },
+  // A project's and an issue's icons from the same part, as every row that names one draws them.
+  { entry: 'projects', label: 'Projects', icon: <KindIcon kind="project" tone="inherit" /> },
+  { entry: 'issues', label: 'Issues', icon: <KindIcon kind="issue" tone="inherit" /> },
 ]
 /** The top: Projects and Issues. Topics is the section under them now (TOPI-9); a team's fold keeps all three. */
 const TOP = ENTRIES.filter(({ entry }) => entry !== 'topics')
