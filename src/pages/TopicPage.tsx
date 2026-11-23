@@ -1,18 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FolderSummary, ForeignObject } from '@estiva-app/interop'
-import { archivedLine } from '@estiva-app/ui'
+import { archivedLine, thingKindOf } from '@estiva-app/ui'
 import { me, type DirectoryView, type WorkspaceState } from '@/api'
 import { reloadTopics, rereadTopics, useTopicDocuments, useTopicPlace, useTopics, useYourTopics } from '@/api/topics'
 import { addToTopic, joinTopic, leaveTopic } from '@/api/writes'
 import { Members } from '@/components/Members'
 import { ThreadList } from '@/components/conversations/ThreadList'
-import type { Archives } from '@/lib/archive'
+import { archivedNoticeOf, type Archives } from '@/lib/archive'
 import { safeLink } from '@/lib/handoff'
 import { projectTabs } from '@/lib/projects'
 import { useTabTitle } from '@/lib/tabTitle'
-import { ago } from '@/lib/time'
+import { editedLabel } from '@/lib/time'
 import { isSiblingHost, topicHref } from '@/lib/topicLinks'
-import { topicOfD, topicPageOf } from '@/lib/topics'
+import { DOCUMENT_KIND, topicOfD, topicPageOf } from '@/lib/topics'
 import { href } from '@/router'
 import { TopicView, type TopicDocument, type TopicPageView } from '@/views/TopicView'
 import { act, type Say } from './act'
@@ -20,9 +20,11 @@ import { copyText, pickerPeople } from './ProjectPage'
 import { useTopicConversation } from './topicConversation'
 import { placedIn } from '@/lib/placement'
 
-/** "Katerina, 2h ago": who edited a file last, by first name, and when (the prototype's rows, Miky 4 Nov). */
-export function editedLabel(name: string, at: number, now: number = Date.now()): string {
-  return `${name.split(' ')[0]}, ${ago(at, now)}`
+
+/** What another app's file is, as Leaf's rows say it: its app's own noun for it ("Board"), else its kind. */
+function typeOf(file: ForeignObject): string {
+  const noun = file.noun ?? thingKindOf(file.kind)
+  return noun.charAt(0).toUpperCase() + noun.slice(1)
 }
 
 /**
@@ -91,7 +93,8 @@ export function TopicPage({
     if (location.pathname !== path) history.replaceState(null, '', `${path}${location.search}${location.hash}`)
   }, [topic, page, sendsOn])
 
-  const documentsKey = page?.documents.join(' ') ?? ''
+  // Its Leaf documents and every other app's file, in one read (A10).
+  const documentsKey = page ? [...page.documents, ...page.files].join(' ') : ''
   const { documents: listed, retry: retryDocuments } = useTopicDocuments(documentsKey)
   const { nameOf, personOf } = directory
   const documents = useMemo((): TopicDocument[] | 'loading' | 'failed' => {
@@ -110,12 +113,36 @@ export function TopicPage({
           title: object.slots.title?.value || 'Untitled document',
           ...(href ? { href } : {}),
           ...(object.changedBy && object.changedAt ? { edited: editedLabel(nameOf(object.changedBy), object.changedAt) } : {}),
+          ...(object.changedBy ? { editor: personOf(object.changedBy) } : {}),
           ...(children.length ? { children } : {}),
         },
       ]
     }
-    return listed.flatMap(documentOf).sort((a, b) => (order.get(a.address) ?? 0) - (order.get(b.address) ?? 0))
-  }, [listed, page, nameOf])
+    return listed
+      .filter((object) => object.kind === DOCUMENT_KIND)
+      .flatMap(documentOf)
+      .sort((a, b) => (order.get(a.address) ?? 0) - (order.get(b.address) ?? 0))
+  }, [listed, page, nameOf, personOf])
+  // Another app's file, as Leaf's initiative page lists it (review of 23 November, A10): its name, its type on the line
+  // under it, who edited it last and when, opening its app in a new tab. An archived one is left out, as a document is.
+  const files = useMemo((): TopicDocument[] => {
+    if (!page || !Array.isArray(listed)) return []
+    const order = new Map(page.files.map((address, at) => [address, at]))
+    return listed
+      .filter((object): object is ForeignObject & { address: string } => object.kind !== DOCUMENT_KIND && !!object.address && !object.archived)
+      .sort((a, b) => (order.get(a.address) ?? 0) - (order.get(b.address) ?? 0))
+      .map((object) => {
+        const href = safeLink(object.openUrl)
+        return {
+          address: object.address,
+          title: object.slots.title?.value || 'Untitled',
+          type: typeOf(object),
+          ...(href ? { href } : {}),
+          ...(object.changedBy && object.changedAt ? { edited: editedLabel(nameOf(object.changedBy), object.changedAt) } : {}),
+          ...(object.changedBy ? { editor: personOf(object.changedBy) } : {}),
+        }
+      })
+  }, [listed, page, nameOf, personOf])
 
   // Projects as the Projects page draws them, in the topic's order (Decided 6 Nov: the order inside each kind).
   const view = useMemo((): TopicPageView | undefined => {
@@ -127,14 +154,43 @@ export function TopicPage({
       state.issues,
       archives,
       personOf,
-    ).all.sort((a, b) => (order.get(a.addr) ?? 0) - (order.get(b.addr) ?? 0))
-    const issues = page.live
-      .filter((row) => row.kind === 'issue')
-      .map((row) => ({ ...row, ...(row.edited ? { editedLabel: editedLabel(nameOf(row.edited.by), row.edited.at) } : {}) }))
+    )
+      .all.sort((a, b) => (order.get(a.addr) ?? 0) - (order.get(b.addr) ?? 0))
+      // When it last changed, for the page's When column (A4), from the row the topic's read made of it.
+      .map((project) => {
+        const edited = page.live.find((row) => row.address === project.addr)?.edited
+        // Who changed it last and when, in Ship's words ("Ana, 1h ago"): the When column (Katerina, 23 November: keep it).
+        return edited ? { ...project, changedAt: edited.at, changedLabel: editedLabel(nameOf(edited.by), edited.at) } : project
+      })
+    // An issue's row: its assignee's face (the People column, A4); its last change is the row's own `edited`.
+    const withFacts = (row: (typeof page.live)[number]) => ({
+      ...row,
+      ...(row.assignee ? { assigneePerson: personOf(row.assignee) } : {}),
+      // Who edited it last and when, today's words on these rows ("Ana, 1h ago"; Katerina, 23 November: "keep it").
+      ...(row.edited ? { editedLabel: editedLabel(nameOf(row.edited.by), row.edited.at) } : {}),
+    })
+    const issues = page.live.filter((row) => row.kind === 'issue').map(withFacts)
     // The team whose list names it, by address or id; its `h` only when none does: a move leaves the `h` behind (SHI-64).
-    const team = folders ? placedIn({ addr: page.address, folder: page.folder }, folders)[0]?.name : undefined
-    return { title: page.title, ...(page.summary ? { summary: page.summary } : {}), ...(team ? { team } : {}), archived: page.archived, projects, issues, archivedWork: page.archivedWork }
-  }, [page, state, archives, personOf, nameOf, folders])
+    const placed = folders ? placedIn({ addr: page.address, folder: page.folder }, folders)[0] : undefined
+    const team = placed?.name
+    // Archived, said once, in the kit's notice every archived file shows (a3257366): who and when, and, hidden with its
+    // archived team (an initiative's only ancestor), that team. Ship does not unarchive an initiative; Peek does.
+    const archive = topic?.object.archived
+    const notice = archive && {
+      ...archivedNoticeOf({ by: archive.by, at: archive.at, ...(archive.resolution ? { resolution: archive.resolution } : {}) }, nameOf),
+      ...(archive.with ? { withWhat: 'team', ...(team ? { withTitle: team } : {}) } : {}),
+    }
+    return {
+      title: page.title,
+      ...(page.summary ? { summary: page.summary } : {}),
+      ...(placed && team ? { team, teamId: placed.id } : {}),
+      archived: page.archived,
+      ...(notice ? { archive: notice } : {}),
+      projects,
+      issues,
+      archivedWork: page.archivedWork.map(withFacts),
+    }
+  }, [page, topic, state, archives, personOf, nameOf, folders])
 
   const conversation = useTopicConversation(topic && !sendsOn ? { address: topic.address, folder: topic.folder, createdAt: topic.createdAt } : undefined, state, directory, say, refresh)
   const { place, reload: reloadPlace } = useTopicPlace(topic && !sendsOn ? topic : undefined)
@@ -158,6 +214,7 @@ export function TopicPage({
       topic={shown}
       onRetryDocuments={retryDocuments}
       documents={documents}
+      files={files}
       topicsHref={href({ name: 'topics' })}
       comments={conversation.comments}
       conversation={
@@ -184,19 +241,19 @@ export function TopicPage({
                   if (!member) return leaveTopic(topic)
                   const joined = await joinTopic(topic)
                   // Said as Topics says it (TopicsPage): joined, but a mute you kept stays.
-                  if ('stillMuted' in joined) say(`Joined “${view?.title ?? 'this topic'}”, but it is still muted. Join again to unmute it.`, 'error', 'not-saved')
+                  if (joined.ok && joined.stillMuted) say(`Joined “${view?.title ?? 'this initiative'}”, but it is still muted. Join again to unmute it.`, 'error', 'not-saved')
                   return joined.ok ? { ok: true as const } : joined
                 },
                 say,
                 async () => {
                   await Promise.all([reloadPlace(), rereadTopics()])
                 },
-                (reason) => `Nothing changed: “${view?.title ?? 'this topic'}” could not be ${member ? 'joined' : 'left'}. ${reason}`,
+                (reason) => `Nothing changed: “${view?.title ?? 'this initiative'}” could not be ${member ? 'joined' : 'left'}. ${reason}`,
               )
             }
             onAdd={async (pubkeys) => {
               for (const pubkey of pubkeys) {
-                const added = await act('Add member', () => addToTopic(topic, pubkey, place?.events ?? []), say, undefined, (reason) => `Nothing changed: ${nameOf(pubkey)} could not be added to “${view?.title ?? 'this topic'}”. ${reason}`)
+                const added = await act('Add member', () => addToTopic(topic, pubkey, place?.events ?? []), say, undefined, (reason) => `Nothing changed: ${nameOf(pubkey)} could not be added to “${view?.title ?? 'this initiative'}”. ${reason}`)
                 if (!added) {
                   await reloadPlace()
                   return false
@@ -209,7 +266,7 @@ export function TopicPage({
         )
       }
       onCopyLink={() => void copyText(new URL(topic ? topicHref(topic.address, view?.title ?? '') : location.pathname, window.location.origin).href, 'Link copied', 'Copy this link:', say)}
-      {...(page?.peekUrl ? { onOpenInPeek: () => void window.open(page.peekUrl, '_blank', 'noopener') } : {})}
+      {...(page?.peekUrl ? { peekUrl: page.peekUrl } : {})}
       onRetry={() => {
         if (readAgain !== 'failed') return void reloadTopics()
         setReadAgain(undefined)

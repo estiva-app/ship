@@ -1,0 +1,59 @@
+import type { Meta, StoryObj } from '@storybook/react-vite'
+import { fn } from 'storybook/test'
+import { ANA, MARA, RAVI } from '@/fixtures/issues'
+import { editedLabel } from '@/lib/time'
+import { TeamView, type TeamInitiativeRow } from './TeamView'
+
+/**
+ * The team page as Peek draws its own (D6), on the same invented team the old Folder page's story drew, so the two
+ * compare: "Onboarding" holds one initiative, one project, one issue filed in it directly, and
+ * one file of an app nobody wrote, which Ship counts and does not list. Every row with its facts in one column set
+ * (Katerina, 18 November: "keep with the facts … aligned on initiatives/projects/issues"; progress as the small ring).
+ */
+const NOW = Date.now()
+const SECONDS = Math.floor(NOW / 1000)
+const FACES = { a: ANA, r: RAVI, m: MARA }
+const faceOf = (key: string) => FACES[key as keyof typeof FACES] ?? { name: '—' }
+
+const INITIATIVES: TeamInitiativeRow[] = [
+  { address: '30840:a:onboarding', title: 'Onboarding', summary: 'Everything a new team member needs in their first week.', href: '#', members: 5, people: ['a', 'r', 'm'], active: SECONDS - 2 * 86400 },
+]
+
+const meta = {
+  title: 'Views/TeamView',
+  component: TeamView,
+  parameters: { layout: 'fullscreen' },
+  args: {
+    name: 'Onboarding',
+    members: { faces: [ANA, RAVI, MARA], count: 6 },
+    initiatives: INITIATIVES,
+    projects: [
+      // Who edited each last and when, as the app's rows say it (FolderPage's `editedLabel`): "Ana, 5h ago".
+      { address: '30850:a:p', title: 'Payment integration', href: '#', status: { value: 'in_progress', label: 'In Progress' }, person: ANA, progress: { done: 4, total: 9 }, at: SECONDS - 5 * 3600, edited: editedLabel('Ana Duarte', SECONDS - 5 * 3600, NOW) },
+      { address: '30850:a:q', title: 'Welcome emails', href: '#', status: { value: 'planned', label: 'Planned' }, progress: { done: 0, total: 3 }, at: SECONDS - 6 * 86400, edited: editedLabel('Mara Sato', SECONDS - 6 * 86400, NOW) },
+    ],
+    issues: [{ address: '30851:a:i', title: 'Refund webhook retries', href: '#', status: { value: 'in_progress', label: 'In Progress' }, person: RAVI, at: SECONDS - 3 * 3600, edited: editedLabel('Ravi Mehta', SECONDS - 3 * 3600, NOW) }],
+    others: 1,
+    faceOf,
+    now: NOW,
+  },
+  decorators: [(Story) => <div className="flex h-screen flex-col bg-bg-base">{Story()}</div>],
+} satisfies Meta<typeof TeamView>
+
+export default meta
+type Story = StoryObj<typeof meta>
+
+/** The old Folder page's team, now: its initiative, its projects and its issue listed with their facts, lined up in one column set; the other app's file counted. */
+export const Default: Story = {}
+
+/** An owner or admin: the ⋮ holds Rename and Archive… (Peek’s words), where the old page had the editable title and a button. */
+export const ForAnOwner: Story = { args: { onRename: fn(), onArchive: fn() } }
+
+/** Its initiatives still being read: the heading, and a skeleton in their place. */
+export const InitiativesLoading: Story = { args: { initiatives: 'loading' } }
+
+/** Its initiatives did not load: said in words, with Try again. */
+export const InitiativesFailed: Story = { args: { initiatives: 'failed', onRetryInitiatives: fn() } }
+
+/** Nothing in it at all. */
+export const Empty: Story = { args: { initiatives: [], projects: [], issues: [], others: 0 } }

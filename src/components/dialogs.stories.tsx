@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { SIDEBAR_PROJECTS } from '@/fixtures/projects'
+import { NewFolderDialog } from './NewFolderDialog'
 import { NewIssueDialog } from './NewIssueDialog'
 import { NewProjectDialog } from './NewProjectDialog'
 import { suggestKey } from '../nostr/keys'
@@ -105,6 +106,16 @@ export const NewProjectNoTeams: Story = {
   play: async () => {
     await userEvent.type(screen.getByPlaceholderText('New project title'), 'Relay migration')
   },
+}
+
+/** New team, from the sidebar's + (FOL-8): one field, its name. */
+export const NewTeam: Story = {
+  render: () => <NewFolderDialog onClose={fn()} onCreate={fn()} />,
+}
+
+/** The same dialog renaming a team, from its page's ⋮ (D6, Peek's words): filled with its name; Rename waits for a new one. */
+export const RenameTeam: Story = {
+  render: () => <NewFolderDialog rename="Onboarding" onClose={fn()} onCreate={fn()} />,
 }
 
 /** Open each from a button, and close it with Cancel, ✕, the backdrop or Escape. */

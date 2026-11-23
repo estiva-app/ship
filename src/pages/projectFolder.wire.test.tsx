@@ -218,3 +218,39 @@ describe('a project that names no team of its own writes nothing, not even into 
     expect(sent(1111)).toHaveLength(0)
   })
 })
+
+describe("a project's and an issue's header: its team, the one chip after the trail (Katerina, 18 November, D7)", () => {
+  /** The page itself, not the sidebar, whose team headings name the same teams. */
+  const surface = async (name: 'project' | 'issue') => {
+    await waitFor(() => expect(document.querySelector(`[data-surface="${name}"]`)).not.toBeNull())
+    return within(document.querySelector(`[data-surface="${name}"]`) as HTMLElement)
+  }
+
+  it("a project names the team whose listing holds it, not its record's own Folder, and the chip opens that team's page", async () => {
+    goTo(`/project/billing-${D_PROJECT}`)
+    render(<App />)
+    const page = await surface('project')
+    expect((await page.findByRole('link', { name: 'Team' })).getAttribute('href')).toBe(`/app/teams/${TEAM}`)
+    // One chip: its record's own Folder ("Own") is not named.
+    expect(page.queryByRole('link', { name: 'Own' })).toBeNull()
+  })
+
+  it('an issue names the team its project is in, as the sidebar marks it; an issue in no project names none', async () => {
+    const D_ISSUE = 'c1d2e3f4-0000-4000-8000-000000000002'
+    const D_ALONE = 'c1d2e3f4-0000-4000-8000-000000000003'
+    const issue = (id: string, title: string, projectAddr?: string) => ({ addr: `30851:${AUTHOR}:${id}`, id, author: AUTHOR, createdAt: 1, title, description: '', descriptionFormat: 'marker', folder: OWN, ...(projectAddr ? { projectAddr } : {}), ref: 'BIL-1', status: 'todo', fields: {} })
+    vi.mocked(useWorkspace).mockReturnValue({ state: { ...STATE, issues: [issue(D_ISSUE, 'Rounding', PROJECT_ADDR), issue(D_ALONE, 'Alone')] } as unknown as WorkspaceState, partial: false, error: null, clock: null, loading: false, busy: false, refresh, wantThreads: () => {}, live: false })
+    goTo(`/issue/rounding-${D_ISSUE}`)
+    const { unmount } = render(<App />)
+    const page = await surface('issue')
+    expect((await page.findByRole('link', { name: 'Team' })).getAttribute('href')).toBe(`/app/teams/${TEAM}`)
+    unmount()
+
+    goTo(`/issue/alone-${D_ALONE}`)
+    render(<App />)
+    const alone = await surface('issue')
+    await alone.findAllByText('Alone')
+    expect(alone.queryByRole('link', { name: 'Team' })).toBeNull()
+    expect(alone.queryByRole('link', { name: 'Own' })).toBeNull()
+  })
+})

@@ -1,9 +1,9 @@
 import { useState } from 'react'
+import { PageHeader, Panel, Toolbar, ToolbarButton } from '@estiva-app/ui'
 import { IconLayoutGrid, IconList } from '@tabler/icons-react'
 import { DeletedProjectRow, type DeletedProjectRowProps } from '@/components/DeletedProjectRow'
 import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
-import { IconButton } from '@/components/ui/IconButton'
 import { SkeletonList } from '@/components/ui/Skeleton'
 import { Tabs } from '@/components/ui/Tabs'
 import { ProjectCard } from '@/components/ProjectCard'
@@ -55,22 +55,38 @@ export function ProjectsView({ title = 'Projects', lists, tab, onTab, layout, on
   // A tab that is one status says it already; All and Archived mix them.
   const showStatus = tab === 'all' || tab === 'archived'
   return (
-    // `data-surface` and `data-view` are the smoke test's waypoints — see IssuesView.
-    <div data-surface="projects" data-view={layout} className="flex flex-1 flex-col gap-4 px-6 py-5">
-      <div className="flex items-center gap-3">
-        <h1 className="flex-1 text-h3 text-text-primary">{title}</h1>
-        <span className="flex items-center gap-1">
-          <IconButton aria-label="Table" tooltip="Table" pressed={layout === 'table'} onClick={() => onLayout('table')}>
-            <IconList size={16} stroke={1.5} />
-          </IconButton>
-          <IconButton aria-label="Cards" tooltip="Cards" pressed={layout === 'cards'} onClick={() => onLayout('cards')}>
-            <IconLayoutGrid size={16} stroke={1.5} />
-          </IconButton>
-        </span>
-        <Button variant="primary" onClick={onAddProject} disabledReason={addDisabledReason}>
-          Add project
-        </Button>
-      </div>
+    // `data-surface` is the smoke test's waypoint — see IssuesView. The list's name in the page's bar, as Peek's and Leaf's
+    // Explore (Katerina, 18 November: "the title of the page sits in a header … We should unify that"), "Add project" in the bar's button place and the view switch as its actions. A page that
+    // scrolls inside itself, as an issue's: `flex-1 min-h-0 [contain:size]` takes exactly the frame's height, so the
+    // panel's body scrolls and its bar stays. `data-view` is a waypoint too.
+    <div data-surface="projects" data-view={layout} className="flex min-h-0 flex-1 [contain:size]">
+      <div className="flex min-w-0 flex-1 flex-col">
+      <Panel
+        title={title}
+        header={
+          <PageHeader
+            title={title}
+            button={
+              <Button variant="primary" size="small" onClick={onAddProject} disabledReason={addDisabledReason}>
+                Add project
+              </Button>
+            }
+            actions={
+              <Toolbar aria-label="Show projects as" surface={false}>
+                <ToolbarButton aria-label="Table" tooltip="Table" pressed={layout === 'table'} onClick={() => onLayout('table')}>
+                  <IconList size={16} stroke={1.5} />
+                </ToolbarButton>
+                <ToolbarButton aria-label="Cards" tooltip="Cards" pressed={layout === 'cards'} onClick={() => onLayout('cards')}>
+                  <IconLayoutGrid size={16} stroke={1.5} />
+                </ToolbarButton>
+              </Toolbar>
+            }
+          />
+        }
+        bodyClassName="flex flex-col gap-4 px-6 py-5"
+      >
+      {/* The bar's title is words, not a heading: the page's heading, for assistive technology. */}
+      <h1 className="sr-only">{title}</h1>
       <Tabs<ProjectsTab>
         aria-label="Projects by status"
         tabs={PROJECTS_TABS.map((id) => ({ id, label: TABS[id], count: lists[id].length + (id === 'archived' ? deleted.length : 0) }))}
@@ -123,6 +139,8 @@ export function ProjectsView({ title = 'Projects', lists, tab, onTab, layout, on
           ))}
         </div>
       )}
+      </Panel>
+      </div>
     </div>
   )
 }

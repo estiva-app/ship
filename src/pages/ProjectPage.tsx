@@ -711,7 +711,8 @@ export function ProjectPage({
   // The Folder that lists the project, which is not its record's for a project
   // a retired `folder` change once pointed at a team (MAN-5) or one moved since
   // (FOL-7). The record's own Folder until the listings are read.
-  const listedIn = project && teams ? placedIn({ addr: project.addr, folder: project.contentFolder }, teams)[0]?.id : undefined
+  const team = project && teams ? placedIn({ addr: project.addr, folder: project.contentFolder }, teams)[0] : undefined
+  const listedIn = team?.id
   const related = useRelated(listedIn ?? project?.contentFolder, project?.addr)
   const topics = useFileTopics(project?.id)
   const shownRelated = useMemo(() => withoutTopics(related, topics.state), [related, topics.state])
@@ -827,6 +828,8 @@ export function ProjectPage({
           />
         }
         crumbs={{ projectsHref: href({ name: 'projects' }), title: project.title }}
+        // Its team, the one chip after the trail (Katerina, 18 November, D7), named as the sidebar names it.
+        {...(team ? { team: { id: team.id, name: team.name ?? team.id } } : {})}
         header={{
           title: project.title,
           description: project.description,

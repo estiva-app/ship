@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { IdentityMenu } from './IdentityMenu'
 import { ShipSidebar, type SidebarEntry } from './ShipSidebar'
+import { forgetOpenedFromInitiative } from '@/lib/openedFrom'
 import type { SidebarTopic } from '@/lib/topics'
 
 const noop = () => {}
@@ -17,28 +18,30 @@ describe('ShipSidebar', () => {
     { id: 'hq', name: 'Estiva HQ' },
   ]
   const links = () => screen.getAllByRole('link').map((a) => [a.textContent, a.getAttribute('href')])
-  const rowsOf = (container: HTMLElement, id: string) => [...container.querySelectorAll(`[data-nav-group="${id}"] a`)]
 
-  afterEach(() => window.localStorage.clear())
+  afterEach(() => {
+    window.localStorage.clear()
+    forgetOpenedFromInitiative()
+  })
 
-  it('reads Projects, Issues, then Explore topics where the top Topics was, with the counts on Projects and Issues only (TOPI-9)', () => {
-    render(<ShipSidebar topics={[]} onRetryTopics={noop} openIssues={18} activeProjects={5} hrefFor={hrefFor} current={{ entry: 'topics' }} />)
-    expect(links()).toEqual([['Projects5', '/projects'], ['Issues18', '/issues'], ['Explore topics', '/topics']])
+  it('reads Projects, Issues, then Explore initiatives where the top Topics was, with the counts on Projects and Issues only (TOPI-9)', () => {
+    render(<ShipSidebar topics={[]} openIssues={18} activeProjects={5} hrefFor={hrefFor} current={{ entry: 'topics' }} />)
+    expect(links()).toEqual([['Projects5', '/projects'], ['Issues18', '/issues'], ['Explore initiatives', '/topics']])
     expect(screen.getByRole('link', { name: /^Projects/ })).toHaveTextContent('5')
-    expect(screen.getByRole('link', { name: 'Explore topics' })).toHaveAttribute('aria-current', 'page')
-    expect(screen.getByText('You are in no topic yet.')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Explore initiatives' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByText('You’re in no initiatives yet.')).toBeInTheDocument()
     expect(screen.queryByText(/^Home$|^Views$|^Starred$/)).not.toBeInTheDocument()
   })
 
   const topic = (n: number, work: SidebarTopic['work'] = []): SidebarTopic => ({ id: `30840:p:t${n}`, title: `Topic ${n}`, href: `/topic/t${n}`, work })
 
-  it('draws your topics in the order given, each folding to its projects then issues, then Explore topics with no icon', async () => {
+  it('draws your initiatives in the order given, each folding to its projects then issues, then Explore initiatives with Peek’s icon', async () => {
     const work: SidebarTopic['work'] = [
       { id: '30850:p:launch', kind: 'project', title: 'Launch', href: '/project/launch' },
       { id: '30851:p:fix', kind: 'issue', title: 'Fix login', href: '/issue/fix' },
     ]
-    render(<ShipSidebar topics={[topic(2, work), topic(1)]} onRetryTopics={noop} openIssues={0} activeProjects={0} hrefFor={hrefFor} />)
-    expect(links().map(([text]) => text)).toEqual(['Projects', 'Issues', 'Topic 2', 'Topic 1', 'Explore topics'])
+    render(<ShipSidebar topics={[topic(2, work), topic(1)]} openIssues={0} activeProjects={0} hrefFor={hrefFor} />)
+    expect(links().map(([text]) => text)).toEqual(['Projects', 'Issues', 'Topic 2', 'Topic 1', 'Explore initiatives'])
     await userEvent.click(screen.getByRole('button', { name: /Topic 2/ }))
     expect(links().map(([text, to]) => `${text} ${to}`)).toEqual([
       'Projects /projects',
@@ -47,86 +50,140 @@ describe('ShipSidebar', () => {
       'Launch /project/launch',
       'Fix login /issue/fix',
       'Topic 1 /topic/t1',
-      'Explore topics /topics',
+      'Explore initiatives /topics',
     ])
-    expect(screen.getByRole('link', { name: 'Explore topics' }).querySelector('svg')).toBeNull()
+    // Peek's row, icon and all (Katerina, 18 November: "along with the icon we used in Peek").
+    expect(screen.getByRole('link', { name: 'Explore initiatives' }).querySelector('svg')).not.toBeNull()
   })
 
-  it('on a project a topic lists, that topic opens and the project is marked under it', () => {
-    const work: SidebarTopic['work'] = [{ id: '30850:p:launch', kind: 'project', title: 'Launch', href: '/project/launch' }]
-    render(<ShipSidebar topics={[topic(1, work)]} openFile="30850:p:launch" onRetryTopics={noop} openIssues={0} activeProjects={0} hrefFor={hrefFor} />)
-    expect(screen.getByRole('link', { name: 'Launch' })).toHaveAttribute('aria-current', 'page')
+  /** Every link lit as the open page. */
+  const marked = () => [...document.querySelectorAll('a[aria-current="page"]')].map((a) => a.getAttribute('href'))
+  const launch: SidebarTopic['work'] = [{ id: '30850:p:launch', kind: 'project', title: 'Launch', href: '/project/launch' }]
+
+  // Katerina, 23 November: "you have 2 selections in the sidebar". One place is lit, as Peek lights the column you came from.
+  it('on a project clicked under an initiative, it is marked there and nowhere else: its team is neither marked nor opened', async () => {
+    const { rerender } = render(<ShipSidebar topics={[topic(1, launch)]} openIssues={0} activeProjects={1} hrefFor={hrefFor} folders={teams} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Show what is under Topic 1' }))
+    fireEvent.click(screen.getByRole('link', { name: 'Launch' }))
+    rerender(<ShipSidebar topics={[topic(1, launch)]} openFile="30850:p:launch" openIssues={0} activeProjects={1} hrefFor={hrefFor} folders={teams} current={{ entry: 'projects', folder: 'peek' }} />)
+    expect(marked()).toEqual(['/project/launch'])
+    expect(screen.getByRole('button', { name: 'Show what is under Peek' })).toHaveAttribute('aria-expanded', 'false')
   })
 
-  it("on a topic's page its row is marked, not Explore topics", () => {
-    render(<ShipSidebar topics={[topic(1)]} openTopic="30840:p:t1" onRetryTopics={noop} openIssues={0} activeProjects={0} hrefFor={hrefFor} />)
+  it('on a project opened some other way, only its team marks it: the initiative listing it stays shut, its row unmarked', () => {
+    render(<ShipSidebar topics={[topic(1, launch)]} openFile="30850:p:launch" openIssues={0} activeProjects={1} hrefFor={hrefFor} folders={teams} current={{ entry: 'projects', folder: 'peek' }} />)
+    expect(marked()).toEqual(['/app/teams/peek/projects'])
+    expect(screen.getByRole('button', { name: 'Show what is under Topic 1' })).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('a click under an initiative is spent once another page opens: the same project opened again later is marked under its team', () => {
+    const at = { entry: 'projects', folder: 'peek' } as const
+    const { rerender } = render(<ShipSidebar topics={[topic(1, launch)]} openIssues={0} activeProjects={1} hrefFor={hrefFor} folders={teams} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Show what is under Topic 1' }))
+    fireEvent.click(screen.getByRole('link', { name: 'Launch' }))
+    rerender(<ShipSidebar topics={[topic(1, launch)]} openFile="30850:p:launch" openIssues={0} activeProjects={1} hrefFor={hrefFor} folders={teams} current={at} />)
+    rerender(<ShipSidebar topics={[topic(1, launch)]} openIssues={0} activeProjects={1} hrefFor={hrefFor} folders={teams} current={{ folderId: 'hq' }} />)
+    rerender(<ShipSidebar topics={[topic(1, launch)]} openFile="30850:p:launch" openIssues={0} activeProjects={1} hrefFor={hrefFor} folders={teams} current={at} />)
+    expect(marked()).toEqual(['/app/teams/peek/projects'])
+  })
+
+  it("on an initiative's page its row is marked, not Explore initiatives, and its fold stays as it was: only its arrow folds it", () => {
+    render(<ShipSidebar topics={[topic(1, launch)]} openTopic="30840:p:t1" openIssues={0} activeProjects={0} hrefFor={hrefFor} />)
     expect(screen.getByRole('link', { name: 'Topic 1' })).toHaveAttribute('aria-current', 'page')
-    expect(screen.getByRole('link', { name: 'Explore topics' })).not.toHaveAttribute('aria-current')
+    expect(screen.getByRole('link', { name: 'Explore initiatives' })).not.toHaveAttribute('aria-current')
+    expect(screen.getByRole('button', { name: 'Show what is under Topic 1' })).toHaveAttribute('aria-expanded', 'false')
   })
 
-  it("says the topics didn't load, with Try again, and still offers Explore topics", async () => {
-    const onRetryTopics = vi.fn()
-    render(<ShipSidebar topics="failed" onRetryTopics={onRetryTopics} openIssues={0} activeProjects={0} hrefFor={hrefFor} />)
-    await userEvent.click(screen.getByRole('button', { name: 'Try again' }))
-    expect(onRetryTopics).toHaveBeenCalledOnce()
-    expect(screen.getByRole('link', { name: 'Explore topics' })).toBeInTheDocument()
+  it("says the initiatives didn't load in Peek's words, with no button squeezed beside them, and still offers Explore initiatives (review of 23 November, B3)", () => {
+    render(<ShipSidebar topics="failed" openIssues={0} activeProjects={0} hrefFor={hrefFor} />)
+    expect(screen.getByText('Couldn’t load your initiatives. Reload to try again.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull()
+    expect(screen.getByRole('link', { name: 'Explore initiatives' })).toBeInTheDocument()
   })
 
-  it("folds each team, alphabetically and closed, to its own Topics, Projects and Issues, with no count and no catch-all fold", async () => {
-    const { container } = render(<ShipSidebar topics={[]} onRetryTopics={noop} openIssues={3} activeProjects={2} hrefFor={hrefFor} folders={teams} current={{ entry: 'topics' }} />)
-    expect(screen.getAllByRole('button').map((b) => [b.textContent, b.getAttribute('aria-expanded')])).toEqual([
-      ['Estiva HQ', 'false'],
-      ['Peek', 'false'],
+  /** The teams' own rows: a link to each team's page, by its name. */
+  const teamLinks = () => links().filter(([, to]) => /^\/app\/teams\/[^/]+$/.test(to ?? ''))
+  /** Each team's fold, as its arrow says it, and whether it is open. */
+  const folds = () => screen.getAllByRole('button', { name: /what is under/ }).map((b) => [b.getAttribute('aria-label'), b.getAttribute('aria-expanded')])
+
+  it("draws each team as Peek's row, alphabetically and folded, a link to its page that folds to its own Initiatives, Projects and Issues (C1)", async () => {
+    render(<ShipSidebar topics={[]} openIssues={3} activeProjects={2} hrefFor={hrefFor} folders={teams} current={{ entry: 'topics' }} />)
+    expect(teamLinks()).toEqual([
+      ['Estiva HQ', '/app/teams/hq'],
+      ['Peek', '/app/teams/peek'],
     ])
-    await userEvent.click(screen.getByRole('button', { name: 'Estiva HQ' }))
-    expect(rowsOf(container, 'hq').map((a) => [a.textContent, a.getAttribute('href')])).toEqual([
-      ['Topics', '/app/teams/hq/topics'],
+    expect(folds()).toEqual([
+      ['Show what is under Estiva HQ', 'false'],
+      ['Show what is under Peek', 'false'],
+    ])
+    await userEvent.click(screen.getByRole('button', { name: 'Show what is under Estiva HQ' }))
+    expect(links().filter(([, to]) => to?.startsWith('/app/teams/hq/'))).toEqual([
+      ['Initiatives', '/app/teams/hq/topics'],
       ['Projects', '/app/teams/hq/projects'],
       ['Issues', '/app/teams/hq/issues'],
     ])
-    expect(screen.queryByRole('button', { name: 'Not in a Folder' })).not.toBeInTheDocument()
+    // No ↗ on hover any more: the row is the way to the team's page.
+    expect(screen.queryByRole('button', { name: /Open team/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Not in a Folder/ })).not.toBeInTheDocument()
   })
 
-  it("on a project, its team's fold opens and that team's Projects is marked, not the top one, though the fold was closed by hand", () => {
+  it("on a project, its team's row opens and that team's Projects is marked, not the top one, though the fold was closed by hand", () => {
     window.localStorage.setItem('ship.sidebar.folder.peek', 'closed')
-    const { container } = render(<ShipSidebar topics={[]} onRetryTopics={noop} openIssues={0} activeProjects={1} hrefFor={hrefFor} folders={teams} current={{ entry: 'projects', folder: 'peek' }} />)
-    expect(screen.getByRole('button', { name: 'Peek' })).toHaveAttribute('aria-expanded', 'true')
-    expect(screen.getByRole('button', { name: 'Estiva HQ' })).toHaveAttribute('aria-expanded', 'false')
+    const { container } = render(<ShipSidebar topics={[]} openIssues={0} activeProjects={1} hrefFor={hrefFor} folders={teams} current={{ entry: 'projects', folder: 'peek' }} />)
+    expect(folds()).toEqual([
+      ['Show what is under Estiva HQ', 'false'],
+      ['Hide what is under Peek', 'true'],
+    ])
     const marked = [...container.querySelectorAll('a[aria-current="page"]')].map((a) => a.getAttribute('href'))
     expect(marked).toEqual(['/app/teams/peek/projects'])
   })
 
-  it("on an issue in no team, the top Issues is marked and no fold opens", () => {
-    render(<ShipSidebar topics={[]} onRetryTopics={noop} openIssues={1} activeProjects={0} hrefFor={hrefFor} folders={teams} current={{ entry: 'issues' }} />)
+  it("on an issue in no team, the top Issues is marked and no team opens", () => {
+    render(<ShipSidebar topics={[]} openIssues={1} activeProjects={0} hrefFor={hrefFor} folders={teams} current={{ entry: 'issues' }} />)
     expect(screen.getByRole('link', { name: /^Issues/ })).toHaveAttribute('aria-current', 'page')
-    for (const fold of screen.getAllByRole('button')) expect(fold).toHaveAttribute('aria-expanded', 'false')
+    for (const [, expanded] of folds()) expect(expanded).toBe('false')
   })
 
-  it('marks nothing on the Folder page, or on another app’s file', () => {
-    const { rerender } = render(<ShipSidebar topics={[]} onRetryTopics={noop} openIssues={0} activeProjects={0} hrefFor={hrefFor} folders={teams} current={{ folderId: 'peek' }} />)
-    expect(document.querySelector('[aria-current]')).toBeNull()
-    rerender(<ShipSidebar topics={[]} onRetryTopics={noop} openIssues={0} activeProjects={0} hrefFor={hrefFor} folders={teams} />)
+  it("on a team's page its row is marked; on another app's file nothing is", () => {
+    const { rerender } = render(<ShipSidebar topics={[]} openIssues={0} activeProjects={0} hrefFor={hrefFor} folders={teams} current={{ folderId: 'peek' }} />)
+    expect([...document.querySelectorAll('a[aria-current="page"]')].map((a) => a.getAttribute('href'))).toEqual(['/app/teams/peek'])
+    rerender(<ShipSidebar topics={[]} openIssues={0} activeProjects={0} hrefFor={hrefFor} folders={teams} />)
     expect(document.querySelector('[aria-current]')).toBeNull()
   })
 
-  it("the arrow on a team's fold opens the Folder", async () => {
-    const onOpenFolder = vi.fn()
-    render(<ShipSidebar topics={[]} onRetryTopics={noop} openIssues={0} activeProjects={0} hrefFor={hrefFor} folders={teams} onOpenFolder={onOpenFolder} />)
-    await userEvent.click(screen.getAllByRole('button', { name: 'Open team' })[1]!)
-    expect(onOpenFolder).toHaveBeenCalledWith(teams[0])
+  // Katerina, 23 November: as Peek's Teams column, your teams first and the rest folded under "Other teams".
+  it('lists your teams first and folds the others under Other teams, shut, with their count', async () => {
+    const three = [...teams, { id: 'leaf', name: 'Leaf' }]
+    render(<ShipSidebar topics={[]} openIssues={0} activeProjects={0} hrefFor={hrefFor} folders={three} yours={new Set(['peek'])} />)
+    expect(teamLinks()).toEqual([['Peek', '/app/teams/peek']])
+    const other = screen.getByRole('button', { name: /Other teams/ })
+    expect(other.textContent).toContain('2')
+    expect(other.getAttribute('aria-expanded')).toBe('false')
+    await userEvent.click(other)
+    expect(teamLinks()).toEqual([
+      ['Peek', '/app/teams/peek'],
+      ['Estiva HQ', '/app/teams/hq'],
+      ['Leaf', '/app/teams/leaf'],
+    ])
+  })
+
+  it('opens Other teams for a team in it whose page is open', () => {
+    render(<ShipSidebar topics={[]} openIssues={0} activeProjects={0} hrefFor={hrefFor} folders={teams} yours={new Set(['peek'])} current={{ folderId: 'hq' }} />)
+    expect(screen.getByRole('button', { name: /Other teams/ }).getAttribute('aria-expanded')).toBe('true')
+    expect(screen.getByRole('link', { name: 'Estiva HQ' })).toHaveAttribute('aria-current', 'page')
   })
 
   it('falls back to the id when a team has no name', () => {
     // A state written by a placement carries no name, and `listFolders` reads
     // the state's name and stops (the Peek team, 2026-09-15).
-    render(<ShipSidebar topics={[]} onRetryTopics={noop} openIssues={0} activeProjects={0} hrefFor={hrefFor} folders={[{ id: 'f1' }]} />)
-    expect(screen.getByRole('button', { name: 'f1' })).toBeInTheDocument()
+    render(<ShipSidebar topics={[]} openIssues={0} activeProjects={0} hrefFor={hrefFor} folders={[{ id: 'f1' }]} />)
+    expect(screen.getByRole('link', { name: 'f1' })).toHaveAttribute('href', '/app/teams/f1')
   })
 
   it('draws no counts while the workspace is coming, and placeholder rows while the Folders are', () => {
-    const { container } = render(<ShipSidebar topics={[]} onRetryTopics={noop} openIssues={0} activeProjects={0} hrefFor={hrefFor} loading folders={[]} foldersLoading />)
+    const { container } = render(<ShipSidebar topics={[]} openIssues={0} activeProjects={0} hrefFor={hrefFor} loading folders={[]} foldersLoading />)
     // A zero would be a claim (SHI-20).
-    expect(links().map(([text]) => text)).toEqual(['Projects', 'Issues', 'Explore topics'])
+    expect(links().map(([text]) => text)).toEqual(['Projects', 'Issues', 'Explore initiatives'])
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
     expect(container.querySelectorAll('[aria-hidden="true"].animate-skeleton-in')).toHaveLength(1)
   })

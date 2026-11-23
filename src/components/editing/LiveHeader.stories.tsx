@@ -57,7 +57,7 @@ function Header({
   const [by, setBy] = useState<string | null>(null)
   useEffect(() => {
     if (theirs === undefined) return
-    const arrives = setTimeout(() => (setDescription(theirs), setBy('Katerina')), 2000)
+    const arrives = setTimeout(() => (setDescription(theirs), setBy('Ravi Mehta')), 2000)
     return () => clearTimeout(arrives)
   }, [theirs])
   return (

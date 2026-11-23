@@ -459,8 +459,9 @@ describe('Project page — one project from the fold', () => {
     // Replies fold behind the replies button, and it opens them.
     fireEvent.click(main.getByRole('button', { name: /1 reply/ }))
     expect(main.getByText('reply')).toBeInTheDocument()
-    // Changed on purpose (Katerina, 1 November: the page never names its Folder): no Folder line and no link to it.
-    expect(main.queryByRole('link', { name: 'Ship' })).not.toBeInTheDocument()
+    // Changed on purpose twice: no Folder line (Katerina, 1 November); now its team is the one chip after the trail,
+    // opening the team's page (Katerina, 18 November, D7: "OK" to the team chip on Ship's own file pages). Once only.
+    expect(main.getAllByRole('link', { name: 'Ship' })).toHaveLength(1)
     expect(shut(await pageMenuRow(main, 'Archive project'))).toBe(false)
     // No pairing is left (FOL-3).
     expect(screen.queryByRole('menuitem', { name: /Folder link|Pair/ })).not.toBeInTheDocument()

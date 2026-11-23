@@ -52,7 +52,7 @@ import {
 
 /** Chain-walking, from the runtime — one implementation, not one per consumer. */
 export { pickWidget } from '@estiva-app/interop'
-import { KIND_CHANGE, placeFilters, placeListing, type Listed, type ReferenceCandidate } from '@estiva-app/conversation'
+import { KIND_CHANGE, placeFilters, placeListing, teamMembersOf, type Listed, type ReferenceCandidate, type TeamMember } from '@estiva-app/conversation'
 import { relatedTo } from '@/lib/ownKinds'
 import { safeLink } from '@/lib/handoff'
 import { KIND } from '../nostr/kinds'
@@ -527,7 +527,7 @@ export interface TopicOfFile {
 /** A topic as its chip and Add to topic's row draw it. */
 export function topicAsDrawn(address: string, folder: string, object: ForeignObject): TopicOfFile {
   // https only: the link comes from a manifest anyone may publish until WOR-2.
-  return { address, folder, title: object.slots.title?.value || 'Untitled topic', openUrl: safeLink(object.openUrl), archived: isArchived(object) }
+  return { address, folder, title: object.slots.title?.value || 'Untitled initiative', openUrl: safeLink(object.openUrl), archived: isArchived(object) }
 }
 
 /**
@@ -638,17 +638,18 @@ function answersFilter(event: SignedEvent, filter: Record<string, unknown>): boo
 }
 
 /**
- * How many people each topic lists, for Explore's Members (TOPI-9; Miky,
- * 6 Nov: the same columns in every app): conversation's `placeListing`, the
- * rule Peek's people list draws — who chose a level, was added or made it,
- * and its team's members.
+ * Who each topic lists, by key, for Explore's Members (TOPI-9; Miky, 6 Nov:
+ * the same columns in every app): conversation's `placeListing`, the rule
+ * Peek's people list draws — who chose a level, was added or made it, and its
+ * team's members. How many is the list's length; the first three are a row's
+ * faces (Katerina, 18 November, as Peek's `topicMembersAsViewer`).
  * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-place-lists-who-chose-a-level-and-its-teams-members.md
  *
  * One paged read for every topic asked: each topic's `placeFilters` without
  * the viewer's private teams list (a topic's listing never needs it), merged
  * by shape. A failed read rejects: a failed read is not "nobody".
  */
-export async function readTopicMembers(topics: readonly ReadTopic[]): Promise<Map<string, number | undefined>> {
+export async function readTopicMembers(topics: readonly ReadTopic[]): Promise<Map<string, string[] | undefined>> {
   if (topics.length === 0) return new Map()
   const asked = topics.map((topic) => {
     const place = { address: topic.address, team: topic.folder }
@@ -662,15 +663,52 @@ export async function readTopicMembers(topics: readonly ReadTopic[]): Promise<Ma
   })
   const events: SignedEvent[] = await relay.queryAll(mergedFilters(asked.flatMap(({ filters }) => filters ?? [])) as never)
   return new Map(
-    asked.map(({ topic, place, filters }): [string, number | undefined] => {
+    asked.map(({ topic, place, filters }): [string, string[] | undefined] => {
       if (!filters) return [topic.address, undefined]
       const mine = events.filter((event) => filters.some((filter) => answersFilter(event, filter)))
       const roster = mine.filter((event) => event.kind === KIND_ROSTER || ROSTER_COMMANDS.includes(event.kind))
       const listing = mine.filter((event) => event.kind === KIND_FOLDER_STATE || event.kind === KIND_FOLDER_COMMAND)
       const own = mine.filter((event) => !roster.includes(event) && !listing.includes(event))
-      return [topic.address, placeListing(place, { events: own, roster, listing }).length]
+      // Who, by key, in the listing's order: the count is how many, and a row's faces are the first three (as Peek's topicMembersAsViewer).
+      return [topic.address, placeListing(place, { events: own, roster, listing }).map((listed) => listed.pubkey)]
     }),
   )
+}
+
+/** How many stored roster commands one team's read asks for at most, as Peek's team read does. */
+const ROSTER_COMMANDS_LIMIT = 1_000
+
+/**
+ * Who is in a team, for its page's members pill (D6, Katerina 18 November: "a team's page as Peek's"): its current
+ * `kind:39002` and the stored commands naming it, read as Peek reads a team's roster (its `teamsFilters`'s first two),
+ * and conversation's `teamMembersOf` — everyone the list names, in the order they joined; never a follower (§11.8).
+ * One read. **Throws when the read failed**: a failed read is not "nobody".
+ */
+export async function readTeamMembers(team: string): Promise<TeamMember[]> {
+  const events: SignedEvent[] = await relay.queryAll([
+    { kinds: [KIND_ROSTER], '#d': [team] },
+    { kinds: [...ROSTER_COMMANDS], '#h': [team], limit: ROSTER_COMMANDS_LIMIT },
+  ] as never)
+  return teamMembersOf(team, events)
+}
+
+/** A roster event's team: a `kind:39002` names it in `d`, a stored command in `h`. */
+const rosterTeamOf = (event: SignedEvent) => event.tags.find((tag) => tag[0] === (event.kind === KIND_ROSTER ? 'd' : 'h'))?.[1]
+
+/**
+ * The teams the viewer is in, for the sidebar's Other teams (Katerina, 23 November: "as Peek's Teams column"): every
+ * team's `kind:39002` and the stored commands naming it, in one read, as Peek's teams read asks for them, and
+ * conversation's `teamMembersOf` for each, the rule {@link readTeamMembers} draws a team's page by. **Throws when the
+ * read failed**: a failed read is not "in no team".
+ */
+export async function readTeamsYouAreIn(teams: readonly string[], viewer: string): Promise<ReadonlySet<string>> {
+  if (teams.length === 0) return new Set()
+  const events: SignedEvent[] = await relay.queryAll([
+    { kinds: [KIND_ROSTER], '#d': [...teams] },
+    { kinds: [...ROSTER_COMMANDS], '#h': [...teams], limit: ROSTER_COMMANDS_LIMIT },
+  ] as never)
+  const ofTeam = (team: string) => events.filter((event) => rosterTeamOf(event) === team)
+  return new Set(teams.filter((team) => teamMembersOf(team, ofTeam(team)).some((member) => member.pubkey === viewer)))
 }
 
 /**
@@ -796,6 +834,6 @@ function countOf(kind: number, n: number): string {
 const KIND_WORDS: Record<number, [string, string]> = {
   30850: ['project', 'projects'],
   30851: ['issue', 'issues'],
-  30840: ['topic', 'topics'],
+  30840: ['initiative', 'initiatives'],
   39000: ['team', 'teams'],
 }

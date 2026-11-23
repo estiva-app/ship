@@ -17,7 +17,7 @@ import { thingKindOfUri } from './thingKind'
 */
 
 /** What a referenced address is, by its kind, before anything has been read: Peek's words. */
-const REFERENCE_TYPE_WORDS: Record<number, string> = { 30850: 'Project', 30851: 'Issue', 30840: 'Topic', 30842: 'Document' }
+const REFERENCE_TYPE_WORDS: Record<number, string> = { 30850: 'Project', 30851: 'Issue', 30840: 'Initiative', 30842: 'Document' }
 
 /** A reference's type word — what "not available" names it by when nothing more is known. */
 export function referenceTypeWord(uri: string): string | undefined {

@@ -20,6 +20,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { IssueView } from '@/views/IssueView'
 import { go, href } from '../router'
+import { placedIn } from '@/lib/placement'
 import { act, actInField, answerOf, deleteAnswer, sayOnceLeft, type Say } from './act'
 import { editedFor, historyFor, withChangesOf } from './history'
 import { useHistoryFold } from '@/api/useFileChanges'
@@ -36,13 +37,15 @@ import { useReferencePage } from '@/api/references'
  * field edit is one change event to the issue's own Folder, followed by a
  * re-read; a refused one leaves the field as the relay has it.
  */
-export function IssuePage({ state, directory, archives, d, say, refresh }: { state: WorkspaceState; directory: DirectoryView; /** What is archived, and what with — FOL-46. */ archives: Archives; /** The object's `d`, which is all a §7.2 URL carries. */ d: string; say: Say; refresh: (folders?: string[]) => Promise<void> }) {
+export function IssuePage({ state, directory, teams, archives, d, say, refresh }: { state: WorkspaceState; directory: DirectoryView; /** The top-level Folders, for the team its project is in (its header's chip); `undefined` while they are read. */ teams?: readonly { id: string; name?: string; addresses?: readonly string[] }[]; /** What is archived, and what with — FOL-46. */ archives: Archives; /** The object's `d`, which is all a §7.2 URL carries. */ d: string; say: Say; refresh: (folders?: string[]) => Promise<void> }) {
   // A deleted issue leaves the lists and still opens by its link, with who deleted it and Restore (SPEC §6.5).
   const loaded = state.issues.find((candidate) => candidate.id === d) ?? state.deletedIssues?.find((candidate) => candidate.id === d)
   // No load carries a deleted issue's first record, so its link reads it by its `d`.
   const byLink = useIssueByLink(d, !loaded)
   const issue = loaded ?? byLink.issue
   const project = issue?.projectAddr ? state.projects.find((candidate) => candidate.addr === issue.projectAddr) : undefined
+  // Its team is its project's, by the rule the sidebar marks it with (App's teamOf); an issue in no project is in no team.
+  const team = project && teams ? placedIn({ addr: project.addr, folder: project.contentFolder }, teams)[0] : undefined
   /*
     The conversations this page draws, read for it (APP-5): its own Folder's,
     its project's for what `[` offers, and every Folder holding a comment on it
@@ -231,6 +234,8 @@ export function IssuePage({ state, directory, archives, d, say, refresh }: { sta
             })}
           />
         }
+        // Its team, the one chip after the trail (Katerina, 18 November, D7).
+        {...(team ? { team: { id: team.id, name: team.name ?? team.id } } : {})}
         crumbs={{
           issuesHref: href({ name: 'issues' }),
           project: project ? { title: project.title, href: href({ name: 'project', d: project.id, slug: project.title, view: 'table' }) } : undefined,

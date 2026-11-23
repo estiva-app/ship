@@ -18,6 +18,8 @@ export interface TopicRowData {
   team?: string
   /** How many people it lists (record a-place-lists-who-chose-a-level-and-its-teams-members); `undefined` until read. */
   members?: number
+  /** Who it lists, by key, in the listing's order: the first three are its row's faces. Absent until read. */
+  people?: readonly string[]
   /** When anything last happened in it, Unix seconds (the shared rule, TOPI-10); `undefined` until read. */
   active?: number
   archived: boolean
@@ -31,8 +33,8 @@ export type TopicsTab = 'all' | 'yours' | 'others' | 'archived'
 export interface TopicFacts {
   /** Each topic's newest activity (interop's `readTopicActivity`). */
   at?: ReadonlyMap<string, number>
-  /** `undefined` for a topic whose people could not be judged. */
-  members?: ReadonlyMap<string, number | undefined>
+  /** Who each topic lists, by key; `undefined` for a topic whose people could not be judged. */
+  members?: ReadonlyMap<string, readonly string[] | undefined>
   /** A team's name, by its id. */
   teamName?: (id: string) => string | undefined
 }
@@ -70,7 +72,7 @@ export function topicsByTab(read: TopicsRead, facts: TopicFacts = {}, folder?: s
     if (topic.space || (folder && topic.folder !== folder)) continue
     const drawn = topicAsDrawn(topic.address, topic.folder, topic.object)
     const team = facts.teamName?.(topic.folder)
-    const members = facts.members?.get(topic.address)
+    const people = facts.members?.get(topic.address)
     const active = facts.at?.get(topic.address)
     const yours = isYours(topic, drawn.archived, muted)
     const row: TopicRowData = {
@@ -80,7 +82,7 @@ export function topicsByTab(read: TopicsRead, facts: TopicFacts = {}, folder?: s
       ...(topic.object.slots.subtitle?.value ? { summary: topic.object.slots.subtitle.value } : {}),
       href: topicHref(topic.address, drawn.title),
       ...(team ? { team } : {}),
-      ...(members !== undefined ? { members } : {}),
+      ...(people !== undefined ? { members: people.length, people } : {}),
       ...(active ? { active } : {}),
       archived: drawn.archived,
       yours: topic.yours && !muted?.has(topic.address),
@@ -98,6 +100,21 @@ export function topicsByTab(read: TopicsRead, facts: TopicFacts = {}, folder?: s
     lists.yours.sort((a, b) => newest(a.address, b.address))
   }
   return lists
+}
+
+/**
+ * The tabs once you joined these here: each leaves Other initiatives and is in Your initiatives at once, in the order
+ * Your initiatives keeps (newest activity first, with `at`; else A to Z), as Peek's and Leaf's Join move it (Miky, 10 Nov).
+ */
+export function joinedToYours(lists: Record<TopicsTab, TopicRowData[]>, joined: ReadonlySet<string>, at?: ReadonlyMap<string, number>): Record<TopicsTab, TopicRowData[]> {
+  const arriving = lists.others.filter((row) => joined.has(row.address))
+  if (arriving.length === 0) return lists
+  const yours = [...lists.yours, ...arriving]
+  if (at) {
+    const newest = byActivity(at)
+    yours.sort((a, b) => newest(a.address, b.address))
+  } else yours.sort(byTitle)
+  return { ...lists, yours, others: lists.others.filter((row) => !joined.has(row.address)) }
 }
 
 /** The topics yours by {@link isYours}, by address: what the sidebar and Your topics order. */
@@ -154,6 +171,9 @@ export function yourTopicsOf(read: TopicsRead, muted?: ReadonlySet<string>): Rea
 /** A Leaf document's kind: what a topic's Documents lists (interop's `LISTED_FILE_KINDS`). */
 export const DOCUMENT_KIND = 30842
 
+/** Ship's own kinds, a project and an issue: one Ship does not hold is not another app's file. */
+const SHIP_KINDS = [30850, 30851]
+
 const dOf = (address: string) => address.split(':')[2] ?? ''
 
 /** The topic a `d` names among these: none when no topic holds it, or two do (§13.1, as the hand-off reads it). */
@@ -173,8 +193,10 @@ export interface TopicWorkRow {
   progress?: { done: number; total: number }
   /** An issue's project, by title. */
   project?: string
-  /** An issue's last edit: who made its newest change, and when, in seconds (TOPI-8). */
+  /** Its last edit: who made its newest change, and when, in seconds (TOPI-8; a project's too, for the page's When, A4). */
   edited?: { by: string; at: number }
+  /** An issue's assignee, by key: its row's face on the initiative's page (Katerina, 18 November, A4: the Issues list's facts). */
+  assignee?: string
 }
 
 /** Who made a file's newest change and when: its root's author until a field change is newer (TOPI-8). */
@@ -202,19 +224,25 @@ export interface TopicPageData {
   archivedWork: TopicWorkRow[]
   /** The Leaf documents it lists, by address, for one read of their titles. */
   documents: string[]
+  /** Every other app's file it lists (neither Ship's nor a Leaf document), by address, read with the documents (A10). */
+  files: string[]
 }
 
 /** Ship's projects and issues, with what their rows say. */
 export interface TopicPageWork {
-  projects: readonly { addr: string; id: string; title: string; status: string; deleted?: unknown }[]
+  /** `author`, `createdAt` and `fields` give a project row its last change (the page's When, A4). */
+  projects: readonly { addr: string; id: string; title: string; status: string; deleted?: unknown; author?: string; createdAt?: number; fields?: Record<string, { by: string; at: number }> }[]
   /** `author`, `createdAt` and `fields` give an issue row its last edit; the sidebar's fold leaves them out. */
-  issues: readonly { addr: string; id: string; title: string; status: string; stage?: Stage; projectAddr?: string; author?: string; createdAt?: number; fields?: Record<string, { by: string; at: number }> }[]
+  issues: readonly { addr: string; id: string; title: string; status: string; stage?: Stage; projectAddr?: string; assignee?: string; author?: string; createdAt?: number; fields?: Record<string, { by: string; at: number }> }[]
 }
 
 /**
  * A topic's page (SHIPS-4, the approved story `TopicPage`): what it lists that
- * Ship holds as a project or an issue, projects first, split by archive; and
- * the Leaf documents it lists. Judged by Ship's own fold, as Topics is.
+ * Ship holds as a project or an issue, projects first, split by archive; the
+ * Leaf documents it lists; and any other app's file, as Leaf's initiative page
+ * lists them (review of 23 November, A10). A project or an issue Ship does not
+ * hold (deleted, not read) is none of these. Judged by Ship's own fold, as
+ * Topics is.
  */
 export function topicPageOf(topic: ReadTopic, work: TopicPageWork, archives: Archives): TopicPageData {
   const drawn = topicAsDrawn(topic.address, topic.folder, topic.object)
@@ -222,6 +250,7 @@ export function topicPageOf(topic: ReadTopic, work: TopicPageWork, archives: Arc
   const issues = new Map(work.issues.map((issue) => [issue.addr, issue]))
   const rows: { row: TopicWorkRow; archived: boolean }[] = []
   const documents: string[] = []
+  const files: string[] = []
   for (const { address } of topic.listed) {
     if (!address) continue
     const project = projects.get(address)
@@ -240,6 +269,7 @@ export function topicPageOf(topic: ReadTopic, work: TopicPageWork, archives: Arc
           href: href({ name: 'project', d: project.id, slug: project.title, view: 'table' }),
           status: (({ value, label }) => ({ value, label }))(projectStatus(project.status)),
           progress: progressOf(of),
+          ...(project.author && project.createdAt !== undefined ? { edited: lastEditOf({ author: project.author, createdAt: project.createdAt, fields: project.fields ?? {} }) } : {}),
         },
       })
     } else if (issue) {
@@ -253,10 +283,12 @@ export function topicPageOf(topic: ReadTopic, work: TopicPageWork, archives: Arc
           href: href({ name: 'issue', d: issue.id, slug: issue.title }),
           status: { value: issue.status, label: statusLabel(issue.status, ISSUE_STATUSES) },
           ...(parent ? { project: parent.title } : {}),
+          ...(issue.assignee ? { assignee: issue.assignee } : {}),
           ...(issue.author && issue.createdAt !== undefined ? { edited: lastEditOf({ author: issue.author, createdAt: issue.createdAt, fields: issue.fields ?? {} }) } : {}),
         },
       })
     } else if (address.startsWith(`${DOCUMENT_KIND}:`)) documents.push(address)
+    else if (!SHIP_KINDS.some((kind) => address.startsWith(`${kind}:`))) files.push(address)
   }
   const projectsFirst = (list: TopicWorkRow[]) => [...list.filter((row) => row.kind === 'project'), ...list.filter((row) => row.kind === 'issue')]
   const peekUrl = topicInPeek(topic.object.openUrl, topic.address, drawn.title)
@@ -270,5 +302,6 @@ export function topicPageOf(topic: ReadTopic, work: TopicPageWork, archives: Arc
     live: projectsFirst(rows.filter((item) => !item.archived).map((item) => item.row)),
     archivedWork: projectsFirst(rows.filter((item) => item.archived).map((item) => item.row)),
     documents,
+    files,
   }
 }

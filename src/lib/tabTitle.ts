@@ -33,6 +33,8 @@ export function pageTitleOf(route: Route, state: WorkspaceState | null): string 
     case 'folder':
     // A topic names itself from the topics read, which is the page's own (SHIPS-4).
     case 'topic':
+    // Explore initiatives too: a team's is named by the team, which only the page reads.
+    case 'topics':
       return null
     default:
       return undefined

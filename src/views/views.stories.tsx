@@ -1,3 +1,4 @@
+import { editedLabel } from '@/lib/time'
 import { useState } from 'react'
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { fn } from 'storybook/test'
@@ -5,19 +6,22 @@ import { AppShell } from '@/components/AppShell'
 import { IdentityMenu } from '@/components/IdentityMenu'
 import { ShipSidebar, type SidebarEntry } from '@/components/ShipSidebar'
 import { ACTIVITY, PEOPLE, PROJECT_STATUSES, PROJECT_TABS, SIDEBAR_PROJECTS } from '@/fixtures/projects'
-import { ACTIVITY_ITEMS, ANA, ISSUES, ISSUE_STATUSES, THREADS, hrefFor, makeIssues } from '@/fixtures/issues'
+import { ACTIVITY_ITEMS, ANA, ISSUES, ISSUE_STATUSES, MARA, RAVI, THREADS, hrefFor, makeIssues } from '@/fixtures/issues'
 import type { RelatedState } from '@/api/useRelated'
 import { IssueView } from './IssueView'
 import { IssuesView, type IssuesScope } from './IssuesView'
 import { ProjectView } from './ProjectView'
 import { ProjectsView, type ProjectsLayout } from './ProjectsView'
 import { TopicsView } from './TopicsView'
+import { TopicView, type TopicPageView, type TopicViewProps } from './TopicView'
+import { ThreadListView } from '@/components/conversations/ThreadList'
 import type { SidebarTopic, TopicRowData, TopicsTab } from '@/lib/topics'
 import type { ProjectTab, ProjectsTab } from '@/router'
 import { useSideColumn, type Side } from '@/pages/sideColumn'
 import type { Imeta } from '@estiva-app/protocol'
 import { ArchivedNotice } from '@estiva-app/ui'
 import { archivedNoticeOf } from '@/lib/archive'
+import { knowSpacesAmong } from '@/lib/topicLinks'
 import type { TopicOfFile } from '@/api/foreign'
 import { FileTopics } from '@/components/FileTopics'
 
@@ -59,28 +63,28 @@ const RELATED: RelatedState = {
  * on invented data. What wiring (REW-3 step c) does is feed these the fold's
  * data instead of fixtures; the pages do not change.
  */
-/** Your five newest topics, as the sidebar draws them (TOPI-9). */
+/** Your five newest initiatives, as the sidebar draws them (TOPI-9). */
 const SIDEBAR_TOPICS: SidebarTopic[] = [
   {
     id: `30840:${'a'.repeat(64)}:nav`,
     title: 'Cross-app navigation',
     href: '#/topic/nav',
     work: [
-      { id: '30850:a:nav-ship', kind: 'project', title: 'Ship’s Topics navigation', href: '#/project/nav-ship' },
-      { id: '30851:a:nav-1', kind: 'issue', title: 'Explore topics opens Topics', href: '#/issue/nav-1' },
+      { id: '30850:a:nav-ship', kind: 'project', title: 'Ship’s initiatives navigation', href: '#/project/nav-ship' },
+      { id: '30851:a:nav-1', kind: 'issue', title: 'Explore initiatives opens its page', href: '#/issue/nav-1' },
     ],
   },
   { id: `30840:${'a'.repeat(64)}:speed`, title: 'Speed', href: '#/topic/speed', work: [] },
   { id: `30840:${'a'.repeat(64)}:triage`, title: 'Triage', href: '#/topic/triage', work: [] },
 ]
 
-function Shell({ current, children }: { current: SidebarEntry; children: React.ReactNode }) {
+function Shell({ current, openTopic, children }: { current?: SidebarEntry; openTopic?: string; children: React.ReactNode }) {
   return (
     <div className="h-screen">
       <AppShell
         logo="Estiva Ship"
         identity={<IdentityMenu me={ANA} signedIn idBase="https://id.estiva.app" relayUrl="http://localhost:3000" onCopyKey={fn()} onSignOut={fn()} />}
-        nav={<ShipSidebar openIssues={18} activeProjects={SIDEBAR_PROJECTS.length} hrefFor={(entry) => `#/${entry}`} current={{ entry: current }} topics={SIDEBAR_TOPICS} onRetryTopics={fn()} />}
+        nav={<ShipSidebar openIssues={18} activeProjects={SIDEBAR_PROJECTS.length} hrefFor={(entry) => `#/${entry}`} {...(current ? { current: { entry: current } } : {})} {...(openTopic ? { openTopic } : {})} topics={SIDEBAR_TOPICS} />}
       >
         {children}
       </AppShell>
@@ -122,6 +126,11 @@ export const ProjectsEmpty: Story = { render: () => <ProjectsStory lists={{ all:
 
 const HOUR = 3600
 const NOW = Math.floor(Date.now() / 1000)
+/** Who an initiative lists, by key: the row's faces are the first three. */
+const CAST = ['ana', 'ravi', 'mara', 'sam', 'lee', 'kim', 'ola', 'ben', 'eve']
+const FACES: Record<string, { name: string; picture?: string }> = { ana: ANA, ravi: RAVI, mara: MARA }
+/** Faces from the profiles Ship knows; anyone else a dash, as Peek draws them. */
+const faceOf = (key: string) => FACES[key] ?? { name: '—' }
 const topicRow = (d: string, title: string, team: string, members: number, hoursAgo: number, yours: boolean, summary?: string, archived = false): TopicRowData => ({
   address: `30840:${'a'.repeat(64)}:${d}`,
   title,
@@ -129,13 +138,14 @@ const topicRow = (d: string, title: string, team: string, members: number, hours
   href: `https://peek.estiva.app/topic/${d}`,
   team,
   members,
+  people: CAST.slice(0, members),
   active: NOW - hoursAgo * HOUR,
   archived,
   yours,
 })
 // Newest activity first, as the sidebar's five.
 const YOUR_TOPICS = [
-  topicRow('nav', 'Cross-app navigation', 'Product', 4, 0.2, true, 'Teams and topics instead of Folders, in every app.'),
+  topicRow('nav', 'Cross-app navigation', 'Product', 4, 0.2, true, 'Teams and initiatives instead of Folders, in every app.'),
   topicRow('speed', 'Speed', 'Engineering', 3, 5, true, 'Every app opens in under a second on Miky’s workspace.'),
   topicRow('triage', 'Triage', 'Engineering', 2, 30, true),
 ]
@@ -147,53 +157,156 @@ const TOPICS: Record<TopicsTab, TopicRowData[]> = {
   archived: [topicRow('launch', 'Launch week', 'Company', 9, 400, false, undefined, true)],
 }
 
-/** Topics, which the sidebar's Explore topics opens (TOPI-9): a search, All / Your topics / Other topics / Archived opening on yours, newest first; team, members, last active, and Join on a topic you are not in. */
+/** Explore initiatives, which the sidebar's Explore initiatives opens (TOPI-9): a search, All / Your initiatives / Other initiatives / Archived opening on yours, newest first; the kit's list table with team, members' faces, last active, and Join on one you are not in. */
 export const Topics: Story = {
+  name: 'Explore initiatives',
   render: () => {
     const [tab, setTab] = useState<TopicsTab>('yours')
     return (
       <Shell current="topics">
-        <TopicsView title="Topics" lists={TOPICS} tab={tab} onTab={setTab} onRetry={fn()} onJoin={fn()} />
+        <TopicsView title="Explore initiatives" lists={TOPICS} tab={tab} onTab={setTab} onRetry={fn()} onJoin={fn()} faceOf={faceOf} />
       </Shell>
     )
   },
 }
 
-/** Other topics, where Join is. */
+/** Other initiatives, where Join is. */
 export const TopicsOthers: Story = {
+  name: 'Explore initiatives: others',
   render: () => (
     <Shell current="topics">
-      <TopicsView title="Topics" lists={TOPICS} tab="others" onTab={fn()} onRetry={fn()} onJoin={fn()} />
+      <TopicsView title="Explore initiatives" lists={TOPICS} tab="others" onTab={fn()} onRetry={fn()} onJoin={fn()} faceOf={faceOf} />
     </Shell>
   ),
 }
 
 /** A search that finds nothing says so, in the words asked. */
 export const TopicsNoMatch: Story = {
+  name: 'Explore initiatives: no match',
   render: () => (
     <Shell current="topics">
-      <TopicsView title="Topics" lists={TOPICS} tab="all" onTab={fn()} onRetry={fn()} onJoin={fn()} query="zebra" />
+      <TopicsView title="Explore initiatives" lists={TOPICS} tab="all" onTab={fn()} onRetry={fn()} onJoin={fn()} query="zebra" />
     </Shell>
   ),
 }
 
-/** Topics while the read is out: skeleton rows in the list's place. */
+/** Explore initiatives while the read is out: skeleton rows in the list's place. */
 export const TopicsLoading: Story = {
+  name: 'Explore initiatives: loading',
   render: () => (
     <Shell current="topics">
-      <TopicsView title="Topics" lists="loading" tab="yours" onTab={fn()} onRetry={fn()} onJoin={fn()} />
+      <TopicsView title="Explore initiatives" lists="loading" tab="yours" onTab={fn()} onRetry={fn()} onJoin={fn()} />
     </Shell>
   ),
 }
 
-/** The topics read failed: the page says so and offers Try again. */
+/** The initiatives read failed: the page says so and offers Try again. */
 export const TopicsFailed: Story = {
+  name: 'Explore initiatives: failed',
   render: () => (
     <Shell current="topics">
-      <TopicsView title="Topics" lists="failed" tab="yours" onTab={fn()} onRetry={fn()} onJoin={fn()} />
+      <TopicsView title="Explore initiatives" lists="failed" tab="yours" onTab={fn()} onRetry={fn()} onJoin={fn()} />
     </Shell>
   ),
 }
+
+/** The page as `Shell` draws it, with the conversation's column shown or hidden from its header. */
+function InitiativeStory({ topic, documents = INITIATIVE_DOCUMENTS, files = INITIATIVE_FILES }: { topic: TopicViewProps['topic']; documents?: TopicViewProps['documents']; files?: TopicViewProps['files'] }) {
+  const [shown, setShown] = useState(false)
+  return (
+    <Shell openTopic={SIDEBAR_TOPICS[0].id}>
+      <TopicView
+        topic={topic}
+        documents={documents}
+        files={files}
+        onRetry={fn()}
+        onRetryDocuments={fn()}
+        topicsHref="#/topics"
+        comments={{ shown, onShownChange: setShown }}
+        conversation={<ThreadListView threads={THREADS} onStart={fn()} onReply={fn()} />}
+        onCopyLink={fn()}
+        peekUrl="https://peek.estiva.app/topic/cross-app-navigation"
+      />
+    </Shell>
+  )
+}
+
+const INITIATIVE_DOCUMENTS: TopicViewProps['documents'] = [
+  { address: '30842:a:brainstorm', title: 'Navigation brainstorm', href: 'https://leaf.estiva.app/document/brainstorm', edited: 'Mara, 2d ago', editor: MARA },
+  {
+    address: '30842:a:spec',
+    title: 'Sidebar spec',
+    href: 'https://leaf.estiva.app/document/spec',
+    edited: 'Ana, 5h ago',
+    editor: ANA,
+    children: [{ address: '30842:a:spec-rows', title: 'Rows and folds', href: 'https://leaf.estiva.app/document/spec-rows', edited: 'Ana, 5h ago', editor: ANA }],
+  },
+]
+
+/**
+ * Another app's file it lists (A10): a Peek file, its type in Peek's own word. Peek still publishes "topic" for its
+ * files (review of 23 November, A9), so that is what the line says until Peek republishes it.
+ */
+const INITIATIVE_FILES: TopicViewProps['files'] = [
+  { address: '30840:a:sketches', title: 'Launch sketches', type: 'Topic', href: 'https://peek.estiva.app/topic/launch-sketches', edited: 'Ravi, 1d ago', editor: RAVI },
+]
+
+/** Now, in seconds, so the stories' When reads the same each day. */
+const SECONDS_NOW = Math.floor(Date.now() / 1000)
+
+const INITIATIVE: TopicPageView = {
+  title: 'Cross-app navigation',
+  summary: 'Teams and initiatives instead of Folders, in every app.',
+  team: 'Product',
+  teamId: '0212db6d-bcbf-40d0-890e-f4f056db2f5d',
+  archived: false,
+  // Who changed each last and when, in Ship's words (Katerina, 23 November: "if the who edited last is the current wording keep it").
+  projects: PROJECT_TABS.all.slice(0, 3).map((project, i) => ({ ...project, changedAt: SECONDS_NOW - (i + 1) * 5 * 3600, changedLabel: editedLabel(['Ana Duarte', 'Ravi Mehta', 'Mara Sato'][i]!, SECONDS_NOW - (i + 1) * 5 * 3600) })),
+  issues: [
+    { address: '30851:a:nav-1', kind: 'issue', title: 'Explore initiatives opens its page', href: '#/issue/nav-1', status: { value: 'in_progress', label: 'In Progress' }, project: 'Relay Migration', edited: { by: 'a', at: SECONDS_NOW - 3600 }, editedLabel: editedLabel('Ana Duarte', SECONDS_NOW - 3600), assigneePerson: RAVI },
+    { address: '30851:a:nav-2', kind: 'issue', title: 'The open file lights its team', href: '#/issue/nav-2', status: { value: 'todo', label: 'Todo' }, edited: { by: 'm', at: SECONDS_NOW - 3 * 86400 }, editedLabel: editedLabel('Mara Sato', SECONDS_NOW - 3 * 86400) },
+  ],
+  archivedWork: [
+    { address: '30850:a:old', kind: 'project', title: 'Folders sidebar', href: '#/project/old', status: { value: 'completed', label: 'Completed' }, progress: { done: 6, total: 6 } },
+    { address: '30851:a:old-1', kind: 'issue', title: 'Rename Folders to Teams', href: '#/issue/old-1', status: { value: 'done', label: 'Done' }, edited: { by: 'a', at: SECONDS_NOW - 14 * 86400 }, editedLabel: editedLabel('Ana Duarte', SECONDS_NOW - 14 * 86400) },
+  ],
+}
+
+/**
+ * An initiative's page (SHIPS-4; Katerina, 18 November, A4: direction A, "Peek's team-page look"): its name once, in
+ * the header's trail, then its team as the one chip and Open into Peek (D4, D5), the conversation's button and the ⋯
+ * (Copy link); its summary; Projects and Issues in the kit's list with their facts, no tabs; its Leaf documents, one
+ * folding to its page; another app's file under Files, its type under its name; Archived shut at the end. Its row is lit
+ * in the sidebar.
+ */
+export const Initiative: Story = { render: () => <InitiativeStory topic={INITIATIVE} /> }
+
+/** An archived initiative: the kit's notice first, who archived it and when, said once. */
+export const InitiativeArchived: Story = {
+  name: 'Initiative: archived',
+  render: () => <InitiativeStory topic={{ ...INITIATIVE, archived: true, archive: { by: 'Ana Duarte', when: '2d ago', resolution: 'Shipped in every app.' } }} />,
+}
+
+/** Everything it lists is archived: said in words, and Archived open. */
+export const InitiativeAllArchived: Story = {
+  name: 'Initiative: all archived',
+  render: () => <InitiativeStory topic={{ ...INITIATIVE, projects: [], issues: [] }} documents={[]} files={[]} />,
+}
+
+/** It lists nothing yet. */
+export const InitiativeEmpty: Story = {
+  name: 'Initiative: empty',
+  render: () => <InitiativeStory topic={{ ...INITIATIVE, projects: [], issues: [], archivedWork: [] }} documents={[]} files={[]} />,
+}
+
+/** The initiative is being read. */
+export const InitiativeLoading: Story = { name: 'Initiative: loading', render: () => <InitiativeStory topic="loading" documents="loading" /> }
+
+/** The initiative did not load: said, with Try again. */
+export const InitiativeFailed: Story = { name: 'Initiative: failed', render: () => <InitiativeStory topic="failed" /> }
+
+/** Its Leaf documents and other apps' files did not load: the rest of the page stands, and a line says so with Try again. */
+export const InitiativeDocumentsFailed: Story = { name: 'Initiative: documents failed', render: () => <InitiativeStory topic={INITIATIVE} documents="failed" files={[]} /> }
 
 /** Every issue in the workspace: All / Open / Assigned to me, grouped by status. Forty rows, so the page scrolls — in the frame's bar, not a native one. */
 export const Issues: Story = {
@@ -220,10 +333,12 @@ export const IssuesEmpty: Story = {
 }
 
 /** One project, in tabs: Overview (title, its fields, description, Related), Activity (Mentioned in), Issues (table or board). Its comments in the column beside, on every tab; the header's buttons hide it and hold the ⋯. */
-/** FOL-46's notice, as the pages build it: archived by Miky two days ago, with a resolution. */
+/** FOL-46's notice, as the pages build it: archived by Ravi Mehta two days ago, with a resolution. */
 const ARCHIVED_AT = Math.floor(Date.now() / 1000) - 2 * 86400
 
 /** The header's "Edited … ago" (ONE-6, step 4a), as the pages make it: who changed it last, and exactly when under the pointer. */
+/** The team the story's project, and so its issues, are in: the one chip after the trail (Katerina, 18 November, D7). */
+const STORY_TEAM = { id: '7b32200c-e4c0-4216-b79a-8490fc05e0bd', name: 'Estiva HQ' }
 const STORY_EDITED = { label: 'Edited 5m ago', exact: 'Edited by Ana Duarte · Nov 2, 2026, 10:30 AM' }
 const archivedNotice = (withProject?: boolean) => (
   <ArchivedNotice
@@ -234,7 +349,7 @@ const archivedNotice = (withProject?: boolean) => (
         resolution: 'Shipped as interop 0.37.0. The follow-ups are FOL-49 and FOL-50.',
         ...(withProject ? { with: { kind: 'project' as const, addr: '30850:a:rel', title: 'Relay Migration' } } : {}),
       },
-      () => 'Miky',
+      () => 'Ravi Mehta',
     )}
     {...(withProject ? { onOpenParent: fn() } : { onUnarchive: fn() })}
   />
@@ -274,6 +389,7 @@ const projectPage = (startTab: ProjectTab, startView: 'table' | 'board' = 'table
           edited={STORY_EDITED}
           {...(archived ? {} : { onAddIssue: fn() })}
           crumbs={{ projectsHref: '#/projects', title }}
+          team={STORY_TEAM}
           header={{ title, summary, description, descriptionFormat: 'marker', archived, onRename: (v) => (setTitle(v), true), onSummarize: async (v) => (setSummary(v || undefined), true), onDescribe: (v) => (setDescription(v), true) }}
           tab={tab}
           onTab={setTab}
@@ -326,9 +442,11 @@ export const ProjectSignedOut: Story = projectPage('overview', 'table', 'Sign in
 export const ProjectArchived: Story = projectPage('overview', 'table', undefined, true)
 
 /** One issue: its title, fields and description, and beside it its comments or its Overview; the header's buttons show and hide them, and hold the ⋯. */
-const issuePage = (archivedWithProject = false, withSummary = true, newWhileHidden = false, startSide: Side = 'comments'): Story => ({
+const issuePage = (archivedWithProject = false, withSummary = true, newWhileHidden = false, startSide: Side = 'comments', onASpace = false): Story => ({
   render: () => {
     const issue = ISSUES[0]
+    // A team's # topic among the topics that list it: the read of your topics says it is a space (FileTopics' other branch).
+    if (onASpace) knowSpacesAmong([{ address: SPACE.address, space: true }])
     const [status, setStatus] = useState(issue.status)
     const [assignee, setAssignee] = useState('ana')
     const [project, setProject] = useState('rel')
@@ -341,6 +459,7 @@ const issuePage = (archivedWithProject = false, withSummary = true, newWhileHidd
         <IssueView
           edited={STORY_EDITED}
           crumbs={{ issuesHref: '#/issues', project: { title: 'Relay Migration', href: '#/project/30850%3Aa%3Arel' }, ref: issue.ref }}
+          team={STORY_TEAM}
           title={title}
           summary={summary}
           onSummarize={async (v) => (setSummary(v || undefined), true)}
@@ -355,7 +474,7 @@ const issuePage = (archivedWithProject = false, withSummary = true, newWhileHidd
           onReply={fn()}
           activity={ACTIVITY_ITEMS}
           history={ACTIVITY}
-          topics={<StoryTopics start={[topic('w', 'Widgets'), topic('o', 'Old launch', true)]} />}
+          topics={<StoryTopics start={onASpace ? [SPACE, topic('w', 'Widgets')] : [topic('w', 'Widgets'), topic('o', 'Old launch', true)]} />}
           upload={pretendUpload}
           archivedNotice={archivedWithProject && archivedNotice(true)}
           lockedReason={archivedWithProject ? 'Unarchive its project to edit' : undefined}
@@ -389,3 +508,12 @@ export const IssueOverviewPanel: Story = issuePage(false, true, false, 'overview
 export const IssueArchivedWithProject: Story = issuePage(true)
 /** The comments hidden, with a new one among them: the kit's dot on the header's "Show comments" (Katerina, 3 November). */
 export const IssueCommentsHiddenWithNew: Story = issuePage(false, true, true)
+
+/** A team's # topic that lists the issue: a space, opening Peek beside Ship. */
+const SPACE = topic('bugs', 'Bugs')
+
+/**
+ * An issue a team's # topic lists, beside an initiative that lists it (review of 23 November, E4): in its Overview's
+ * Initiatives the # topic keeps its chip, with # beside the initiative's ◎ (Katerina, 23 November), opening Peek.
+ */
+export const IssueOnATopic: Story = { name: 'Issue: listed on a # topic', ...issuePage(false, true, false, 'overview', true) }

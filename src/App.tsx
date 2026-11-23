@@ -14,6 +14,7 @@ import { ShipSidebar, type SidebarEntry, type SidebarFolder, type SidebarPlace }
 import { placedIn } from '@/lib/placement'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { reloadFolders, topLevelFolders, useFolders } from '@/api/useFolders'
+import { useTeamsYouAreIn } from '@/api/useTeamsYouAreIn'
 import { NewFolderDialog } from '@/components/NewFolderDialog'
 import { FolderPage } from '@/pages/FolderPage'
 import { HandoffPage } from '@/pages/HandoffPage'
@@ -75,6 +76,8 @@ function Shell() {
   const folders = useFolders()
   // The teams: what the sidebar lists, what a new project is filed into (FOL-2).
   const teams = useMemo(() => (folders ? topLevelFolders(folders) : undefined), [folders])
+  // Which of them you are in, for the sidebar's Other teams (Katerina, 23 November, as Peek's Teams column).
+  const yours = useTeamsYouAreIn(useMemo(() => teams?.map((team) => team.id), [teams]))
   // What is archived, and what with (FOL-46): read against every Folder, archived teams included.
   const archives = useMemo(() => (state ? archivesOf(state, folders ?? []) : undefined), [state, folders])
   // Your five newest topics (TOPI-9), each folding to the work it lists once the workspace is read.
@@ -217,10 +220,10 @@ function Shell() {
             archives,
           )}
           {...sidebarTopics}
-          onOpenFolder={(folder) => go({ name: 'folder', id: folder.id })}
           onNewFolder={() => setCreatingFolder(true)}
           loading={(!state && loading) || partial}
           foldersLoading={folders === undefined}
+          {...(yours ? { yours } : {})}
         />
       }
     >
@@ -312,7 +315,7 @@ function Page({ route, state, loading, directory, teams, folders, archives, say,
     so it never waits for the workspace, and draws its own rows while its
     files load (UIG-14 C8). The workspace's skeleton used to sit there first.
   */
-  if (route.name === 'folder') return <FolderPage id={route.id} folders={folders} nameOf={directory.nameOf} say={say} />
+  if (route.name === 'folder') return <FolderPage id={route.id} folders={folders} directory={directory} state={state} archives={archives} say={say} />
   // Another app's file is not Ship's fold either: it resolves on its own (PRO-22).
   if (route.name === 'elsewhere') return <HandoffPage word={route.word} fileRef={route.ref} query={route.query} />
   if (!state && loading) return <PageSkeleton shape={SKELETON[route.name] ?? 'rows'} />
@@ -321,7 +324,7 @@ function Page({ route, state, loading, directory, teams, folders, archives, say,
   if ((route.name === 'projects' || route.name === 'issues') && route.folder && !teams) return <PageSkeleton shape={SKELETON[route.name] ?? 'rows'} />
   switch (route.name) {
     case 'topics':
-      return <TopicsPage folders={folders} folder={route.folder} say={say} />
+      return <TopicsPage folders={folders} folder={route.folder} say={say} directory={directory} />
     case 'topic':
       return <TopicPage key={route.d} d={route.d} state={state} folders={folders} archives={archives} directory={directory} say={say} refresh={refresh} />
     case 'projects':
@@ -331,7 +334,7 @@ function Page({ route, state, loading, directory, teams, folders, archives, say,
     case 'project':
       return <ProjectPage state={state} directory={directory} teams={teams} archives={archives} d={route.d} view={route.view} tab={route.tab ?? 'overview'} say={say} refresh={refresh} />
     case 'issue':
-      return <IssuePage state={state} directory={directory} archives={archives} d={route.d} say={say} refresh={refresh} />
+      return <IssuePage state={state} directory={directory} teams={teams} archives={archives} d={route.d} say={say} refresh={refresh} />
     default:
       return <EmptyState icon={<IconLink size={16} stroke={1.5} />} message="Resolving reference…" />
   }
@@ -380,7 +383,8 @@ export function sidebarProps(
           : route.name === 'topics' || route.name === 'projects' || route.name === 'issues'
             ? { entry: route.name, folder: route.folder }
             : undefined
-  // A topic's page lights its own row among your topics (`openTopic`), and a project or an issue its row under each topic listing it.
+  // A topic's page lights its own row among your topics (`openTopic`); a project or an issue is lit under the initiative it was
+  // clicked under, else under its team: the sidebar keeps one place lit (Katerina, 23 November).
   const openFile =
     route.name === 'project' ? projects.find((p) => p.id === route.d)?.addr : route.name === 'issue' ? state?.issues.find((i) => i.id === route.d)?.addr : undefined
   return {

@@ -8,21 +8,18 @@ One project as a row: its name opening its page, its team on the whole
 workspace's list, its status on the tabs that mix statuses, its lead's face and
 its progress. On a phone only the name and the count stay.
 
-**Seen in** *Pages*: the Projects page's table, and a topic's page, where its
-projects sit under the same tabs (TOPI-8).
+**Seen in** *Pages*: the Projects page's table.
 
 ## When
 
 - **The Projects page** (`ProjectsView`): every project of the tab, with
   `showFolder` on the whole workspace's list and `showStatus` on All and
   Archived.
-- **A topic's page** (`TopicView`): the projects the topic lists, in the
-  topic's order, under All / Planned / Active / Completed; `showFolder` off (the
-  page names its team once), `showStatus` on All.
 
 ## When not
 
-- **An issue or an archived row on a topic's page**: `TopicWorkRow`.
+- **An initiative's page or a team's page**: the kit's **ItemList**, with the
+  same facts (Katerina, 18 November, A4 and D6).
 - **A project card with its issues** (a Folder's or a Peek embed): the
   manifest's card, drawn by the reading app.
 

@@ -1,23 +1,21 @@
 import { useState } from 'react'
-import { IconTarget } from '@tabler/icons-react'
-import { SearchInput } from '@estiva-app/ui'
-import { EmptyState } from '@/components/ui/EmptyState'
-import { SkeletonList } from '@/components/ui/Skeleton'
-import { Tabs } from '@/components/ui/Tabs'
-import { TopicRow } from '@/components/TopicRow'
+import { ExploreList, exploreWords, KindIcon, type AvatarGroupMember, type ExploreLists, type ExploreRow } from '@estiva-app/ui'
+import { formatActive } from '@/lib/time'
 import type { TopicRowData, TopicsTab } from '@/lib/topics'
 import { useReportFailure } from '@/lib/failureReports'
 
 /**
- * Ship's Topics, which the sidebar's Explore topics opens (TOPI-9, the
+ * Ship's Explore initiatives, which the sidebar's Explore initiatives opens (TOPI-9, the
  * approved stories on `concept/topics-level-up`): a search beside tabs All,
- * Your topics, Other topics and Archived, each with its count, over every
- * topic you can open, and Join on one you are not in. The lists' order is the
- * caller's: Your topics newest first, the rest A to Z. A Folder's Topics is
- * the same view with its name before the title.
+ * Your initiatives, Other initiatives and Archived, each with its count, over every
+ * initiative you can open, and Join on one you are not in. The lists' order is the
+ * caller's: Your initiatives newest first, the rest A to Z. A team's is the
+ * same view with its name before the title. It is the kit's `ExploreList`, Peek's
+ * Explore initiatives in the kit (Katerina, 18 November: "just like in Peek"; 23
+ * November, Q8); the code still says topics.
  */
 export interface TopicsViewProps {
-  /** "Topics", or "<Folder> · Topics". */
+  /** "Explore initiatives", or "<Team> · Initiatives". */
   title: string
   /** `loading` before the topics read lands, `failed` when it did not. */
   lists: Record<TopicsTab, TopicRowData[]> | 'loading' | 'failed'
@@ -28,75 +26,63 @@ export interface TopicsViewProps {
   onJoin: (address: string) => void
   /** The topics whose Join is on its way. */
   joining?: ReadonlySet<string>
+  /** A person's face by their key, for each row's members pill. Default a dash: the number alone tells. */
+  faceOf?: (pubkey: string) => AvatarGroupMember
+  /** What Active counts back from, in ms: when the page opened. Default the first draw. */
+  now?: number
   /** What the search starts with, for a story. */
   query?: string
 }
 
-const TABS: Record<TopicsTab, string> = { all: 'All', yours: 'Your topics', others: 'Other topics', archived: 'Archived' }
+/** Peek's words for its Explore initiatives, word for word (Katerina, 18 November), from the kit. */
+const WORDS = exploreWords({ one: 'initiative', many: 'initiatives', a: 'an' })
 
-/** What an empty tab says; with no topic shown at all, every open tab says the first. */
-const EMPTY: Record<TopicsTab, string> = {
-  all: 'No topics yet.',
-  yours: 'You are in no topic yet.',
-  others: 'No other topics.',
-  archived: 'No archived topics.',
-}
+/** Nobody Ship can name: a dash, as Peek draws them. */
+const NO_FACE = (): AvatarGroupMember => ({ name: '—' })
 
-/** A topic is found by the start of a word of its title, as search is everywhere (Miky, 19 Oct). */
-export function findsTopic(title: string, query: string): boolean {
-  // Split as the title is, so "q4-pl" finds "Q4-plan".
-  const words = query.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean)
-  const titleWords = title.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean)
-  return words.every((word) => titleWords.some((titleWord) => titleWord.startsWith(word)))
-}
-
-export function TopicsView({ title, lists, tab, onTab, onRetry, onJoin, joining, query: firstQuery = '' }: TopicsViewProps) {
-  const [query, setQuery] = useState(firstQuery)
-  const asked = query.trim()
+export function TopicsView({ title, lists, tab, onTab, onRetry, onJoin, joining, faceOf = NO_FACE, now: givenNow, query }: TopicsViewProps) {
+  // Drawn afresh each time it opens, so "now" is when it opened, as Peek's and Leaf's.
+  const [opened] = useState(() => Date.now())
+  const now = givenNow ?? opened
   useReportFailure(lists === 'failed' ? 'not-loaded' : undefined)
-  const shown = typeof lists === 'string' ? [] : lists[tab].filter((topic) => !asked || findsTopic(topic.title, asked))
+  /**
+   * One initiative, as Peek's Explore draws it: its name and summary, its team, who is in it (up to three faces and the
+   * number), when anything last happened in it, and Join on a live one you are not in. It opens its page here (SHIPS-4),
+   * an archived one read-only.
+   */
+  const row = (topic: TopicRowData): ExploreRow => ({
+    id: topic.address,
+    label: topic.title,
+    href: topic.href,
+    ...(topic.summary ? { description: topic.summary } : {}),
+    ...(topic.team ? { team: topic.team } : {}),
+    ...(topic.members !== undefined ? { members: { faces: (topic.people ?? []).slice(0, 3).map(faceOf), count: topic.members } } : {}),
+    ...(topic.active ? { active: formatActive(topic.active * 1000, now) } : {}),
+    yours: topic.yours,
+    archived: topic.archived,
+  })
+  const explore: ExploreLists = typeof lists === 'string' ? lists : { all: lists.all.map(row), yours: lists.yours.map(row), others: lists.others.map(row), archived: lists.archived.map(row) }
   return (
-    // `data-surface` is the smoke test's waypoint — see IssuesView.
-    <div data-surface="topics" className="flex flex-1 flex-col gap-4 px-6 py-5">
-      <h1 className="text-h3 text-text-primary">{title}</h1>
-      {lists === 'loading' ? (
-        <SkeletonList rows={8} />
-      ) : lists === 'failed' ? (
-        <EmptyState icon={<IconTarget size={16} stroke={1.5} />} scope="page" message="Topics didn’t load." action={{ label: 'Try again', onClick: onRetry }} />
-      ) : (
-        <>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <Tabs<TopicsTab> aria-label="Topics" tabs={(Object.keys(TABS) as TopicsTab[]).map((id) => ({ id, label: TABS[id], count: lists[id].length }))} active={tab} onChange={onTab} />
-            <div className="w-64">
-              <SearchInput placeholder="Find a topic" aria-label="Find a topic" value={query} onChange={(event) => setQuery(event.target.value)} />
-            </div>
-          </div>
-          {shown.length === 0 ? (
-            <EmptyState scope="section" message={asked ? `No topic matches “${asked}”.` : lists.all.length === 0 && tab !== 'archived' ? EMPTY.all : EMPTY[tab]} />
-          ) : (
-            <div className="flex flex-col gap-2">
-              <div className="hidden items-center gap-3 px-3 text-caption text-text-muted sm:flex">
-                <span className="flex-1 pl-7">Name</span>
-                <span className="w-28">Team</span>
-                <span className="w-20">Members</span>
-                <span className="w-24">Active</span>
-                <span className="w-16" />
-              </div>
-              {/* Rows as Ship's issue list draws them: the story's bordered box is no package part. */}
-              <div className="flex flex-col gap-px">
-                {shown.map((topic) => (
-                  <TopicRow
-                    key={topic.address}
-                    topic={topic}
-                    joining={joining?.has(topic.address)}
-                    {...(!topic.yours && !topic.archived ? { onJoin: () => onJoin(topic.address) } : {})}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-        </>
-      )}
+    // `data-surface` is the smoke test's waypoint — see IssuesView. A page that scrolls inside itself, as an issue's:
+    // `flex-1 min-h-0 [contain:size]` takes exactly the frame's height, so the panel's body scrolls and its bar stays.
+    <div data-surface="topics" className="flex min-h-0 flex-1 [contain:size]">
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* The bar's title is words, not a heading: the page's heading, for assistive technology. */}
+        <h1 className="sr-only">{title}</h1>
+        <ExploreList
+          lists={explore}
+          tab={tab}
+          onTab={onTab}
+          onRetry={onRetry}
+          onJoin={(found) => onJoin(found.id)}
+          {...(joining ? { joining } : {})}
+          words={WORDS}
+          title={title}
+          // `inherit`: in a row the row's grey, as every list row's icon; on the page that did not load, the empty state's.
+          icon={<KindIcon kind="topic" tone="inherit" />}
+          {...(query ? { query } : {})}
+        />
+      </div>
     </div>
   )
 }

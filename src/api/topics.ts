@@ -55,7 +55,7 @@ async function topicsFresh(): Promise<TopicsRead> {
   await held.reload(readAllTopics)
   const { value, error } = held.snapshot()
   if (value) return value
-  throw error ?? new Error('Topics could not be read.')
+  throw error ?? new Error('Initiatives could not be read.')
 }
 
 /** Test seam: forget the held topics and choices. */
@@ -441,10 +441,10 @@ function perTopicRead<T>(read: (topics: ReadTopic[]) => Promise<ReadonlyMap<stri
 const activity = perTopicRead<number>(async (topics) => (await readTopicActivity((filters) => relay.query(filters as never), activityTopics(topics), await timesOption())).at)
 
 /**
- * How many people each topic lists (record a-place-lists-who-chose-a-level-and-its-teams-members): Explore's Members.
+ * Who each topic lists, by key (record a-place-lists-who-chose-a-level-and-its-teams-members): Explore's Members, a count and faces.
  * Read once per topic in a tab, not again on return: it reads each topic's whole roster and changes, and a count a minute old orders nothing.
  */
-const members = perTopicRead<number | undefined>((topics) => readTopicMembers(topics), { onReturn: false })
+const members = perTopicRead<string[] | undefined>((topics) => readTopicMembers(topics), { onReturn: false })
 
 export const useTopicActivity = activity.useRead
 export const useTopicMembers = members.useRead

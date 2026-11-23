@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { ShipSidebar, type SidebarFolder } from './ShipSidebar'
+import { forgetOpenedFromInitiative, rememberOpenedFromInitiative } from '@/lib/openedFrom'
 import type { SidebarTopic } from '@/lib/topics'
 
 const SHIP = '7b32200c-e4c0-4216-b79a-8490fc05e0bd'
@@ -11,7 +12,7 @@ const FOLDERS: SidebarFolder[] = [
   { id: HQ, name: 'Estiva HQ', addresses: ['30850:a:des', '30850:a:onb'] },
 ]
 
-/** Your five newest topics, newest activity first, each folding to the projects then issues it lists (TOPI-9). */
+/** Your five newest initiatives, newest activity first, each folding to the projects then issues it lists (TOPI-9). */
 const TOPICS: SidebarTopic[] = [
   {
     id: '30840:a:nav',
@@ -19,7 +20,7 @@ const TOPICS: SidebarTopic[] = [
     href: '#/topic/nav',
     work: [
       { id: '30850:a:rel', kind: 'project', title: 'Release 2', href: '#/project/rel' },
-      { id: '30851:a:1', kind: 'issue', title: 'Explore topics opens Topics', href: '#/issue/1' },
+      { id: '30851:a:1', kind: 'issue', title: 'Explore initiatives opens its page', href: '#/issue/1' },
     ],
   },
   { id: '30840:a:speed', title: 'Speed', href: '#/topic/speed', work: [{ id: '30850:a:pay', kind: 'project', title: 'Payments', href: '#/project/pay' }] },
@@ -36,11 +37,9 @@ const meta = {
     activeProjects: 5,
     hrefFor: (entry, folder) => (folder ? `#/app/teams/${folder}/${entry}` : `#/${entry}`),
     folders: FOLDERS,
-    onOpenFolder: () => {},
     onNewFolder: () => {},
     current: { entry: 'topics' },
     topics: TOPICS,
-    onRetryTopics: () => {},
   },
   parameters: { layout: 'fullscreen' },
   decorators: [
@@ -57,38 +56,61 @@ type Story = StoryObj<typeof meta>
 
 /**
  * Where Ship opens (SHIPS-5, TOPI-9): Projects ("5 active"), Issues ("18 open"),
- * your five newest topics folded, Explore topics (no icon, lit: Ship opens on
- * it), then the teams under a quiet "Teams" label, closed, alphabetically. A
- * team carries **no count** — a Folder holds files from apps Ship does not own,
- * so any number would be Ship's records only.
+ * your five newest initiatives folded, Explore initiatives (Peek's icon, lit:
+ * Ship opens on it), then the teams under a quiet "Teams" label, alphabetically,
+ * each a row like Peek's — the team's icon and name, a link to its page — folded
+ * (C1). A team carries **no count** — a Folder holds files from apps Ship does
+ * not own, so any number would be Ship's records only.
  */
-export const OnTopics: Story = {}
+export const OnTopics: Story = { name: 'On Explore initiatives' }
 
-/** A project a topic lists: that topic opens, the project lit under it, and its team's Projects. */
-export const OnAProjectInATopic: Story = { args: { current: { entry: 'projects', folder: SHIP }, openFile: '30850:a:rel' } }
+/**
+ * A project an initiative lists, opened some other way (its team's list, a link): lit in one place only, its team's
+ * Projects; the initiative stays as it was (Katerina, 23 November: "you have 2 selections in the sidebar").
+ */
+export const OnAProjectInATopic: Story = { name: 'On a project in an initiative', args: { current: { entry: 'projects', folder: SHIP }, openFile: '30850:a:rel' } }
 
-/** A topic's page: its row is lit, not Explore topics. */
-export const OnATopic: Story = { args: { current: undefined, openTopic: '30840:a:speed' } }
+/**
+ * The same project clicked under its initiative: lit there and nowhere else, as Peek lights a row only in the column it
+ * was opened from; its team stays folded and unlit.
+ */
+export const ClickedUnderATopic: Story = {
+  name: 'On a project clicked under its initiative',
+  args: { current: { entry: 'projects', folder: SHIP }, openFile: '30850:a:rel' },
+  beforeEach: () => {
+    rememberOpenedFromInitiative('30840:a:nav', '30850:a:rel')
+    return () => forgetOpenedFromInitiative()
+  },
+}
 
-/** You are in no topic yet: the line says so, and Explore topics is the way in. */
-export const NoTopics: Story = { args: { topics: [] } }
+/** An initiative's page: its row is lit, not Explore initiatives; its fold stays as it was, as Peek's rows (only the arrow folds). */
+export const OnATopic: Story = { name: 'On an initiative', args: { current: undefined, openTopic: '30840:a:speed' } }
 
-/** The topics or their order are being read. */
-export const TopicsLoading: Story = { args: { topics: 'loading' } }
+/** You are in no initiative yet: the line says so, and Explore initiatives is the way in. */
+export const NoTopics: Story = { name: 'No initiatives', args: { topics: [] } }
 
-/** The topics or their order did not load. */
-export const TopicsFailed: Story = { args: { topics: 'failed' } }
+/** The initiatives or their order are being read. */
+export const TopicsLoading: Story = { name: 'Initiatives loading', args: { topics: 'loading' } }
+
+/** The initiatives or their order did not load. */
+export const TopicsFailed: Story = { name: 'Initiatives failed', args: { topics: 'failed' } }
 
 export const OnIssues: Story = { args: { current: { entry: 'issues' } } }
 
-/** A project in Estiva HQ: its fold opens and its Projects is marked, not the top one. */
+/** A project in Estiva HQ: its team's row opens and its Projects is marked, not the top one. */
 export const OnAProject: Story = { args: { current: { entry: 'projects', folder: HQ } } }
 
-/** An issue whose project is in Ship: that fold opens, its Issues marked. */
+/** An issue whose project is in Ship: that team's row opens, its Issues marked. */
 export const OnAnIssue: Story = { args: { current: { entry: 'issues', folder: SHIP } } }
 
-/** The Folder page: nothing is marked; the arrow on a fold's hover is how you get there. */
+/** A team's page: its row is lit, as Peek's Teams column lights a team whose page is open. */
 export const OnAFolder: Story = { args: { current: { folderId: SHIP } } }
+
+/** Your teams first; the ones you are not in folded under "Other teams" with their count, as Peek's Teams column (Katerina, 23 November). */
+export const WithOtherTeams: Story = { name: 'With other teams', args: { yours: new Set([SHIP]) } }
+
+/** A team you are not in, its page open: Other teams opens for it, its row lit. */
+export const OnAnOtherTeam: Story = { name: 'On an other team', args: { yours: new Set([SHIP]), current: { folderId: HQ } } }
 
 /**
  * A Folder with no name falls back to its id.
