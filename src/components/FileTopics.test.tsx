@@ -127,4 +127,14 @@ describe('FileTopics, a project’s or an issue’s Topics in its rail (TOP-5)',
     knowSpaces({ me: 'm', membership: {}, topics: [] } as unknown as TopicsRead)
     open.mockRestore()
   })
+
+  // Katerina, 23 November: a team's # topic stays in a file's Initiatives, with its own #, not an initiative's ◎.
+  it("gives a team's # topic its #, and an initiative its ◎", () => {
+    knowSpaces({ me: 'm', membership: {}, topics: [{ address: DESIGN.address, space: true }] } as unknown as TopicsRead)
+    render(<FileTopics topics={[WIDGETS, DESIGN]} busy={new Set()} onChange={vi.fn()} readChoices={vi.fn()} />)
+    const iconOf = (name: RegExp) => screen.getByRole('link', { name }).querySelector('svg')?.getAttribute('class') ?? ''
+    expect(iconOf(/Design/)).toContain('tabler-icon-hash')
+    expect(iconOf(/Widgets/)).toContain('tabler-icon-target')
+    knowSpaces({ me: 'm', membership: {}, topics: [] } as unknown as TopicsRead)
+  })
 })

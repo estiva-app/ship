@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { IconPlus, IconX } from '@tabler/icons-react'
+import { IconHash, IconPlus, IconX } from '@tabler/icons-react'
 import { CommandPalette, CommandPaletteSearch, KindIcon, type CommandPaletteRow } from '@estiva-app/ui'
 import type { TopicOfFile } from '@/api/foreign'
 import type { TopicChoices } from '@/api/topics'
@@ -12,6 +12,14 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { IconButton } from '@/components/ui/IconButton'
 import { SkeletonBar } from '@/components/ui/Skeleton'
 import { useReportFailure } from '@/lib/failureReports'
+
+/**
+ * Its own icon before each place's name: # for a team's topic, ◎ for an initiative, as Peek draws them (Katerina,
+ * 23 November: a file's # topics stay in its line, each with #). # is drawn as Peek draws it; the kit has no kind for it.
+ */
+function placeIcon(address: string, size: 14 | 16) {
+  return isKnownSpace(address) ? <IconHash size={size} stroke={1.5} aria-hidden /> : <KindIcon kind="topic" size={size} tone="inherit" />
+}
 
 /**
  * **A project's or an issue's topics** (TOP-5; why:
@@ -60,7 +68,7 @@ export function FileTopics({ topics, busy, onChange, readChoices, choicesNow }: 
             <span key={topic.address} className="flex items-center" data-file-topic={topic.address}>
               <Chip
                 label={topic.archived ? `${topic.title} (archived)` : topic.title}
-                leadingIcon={<KindIcon kind="topic" size={14} tone="inherit" />}
+                leadingIcon={placeIcon(topic.address, 14)}
                 {...(isKnownSpace(topic.address) ? { href: topic.openUrl, onClick: (event: { preventDefault: () => void }) => openBeside(event, topic.openUrl) } : linkTo(topicHref(topic.address, topic.title)))}
               />
               {!topic.archived && !busy.has(topic.address) && (
@@ -140,7 +148,7 @@ function AddToTopic({ listed, readChoices, choicesNow, onPick, onClose }: {
   const rows = (topics: readonly TopicOfFile[]): CommandPaletteRow[] =>
     topics
       .filter((topic) => !listed.includes(topic.address) && startsWords(topic.title, words))
-      .map((topic) => ({ id: topic.address, label: topic.title, icon: <KindIcon kind="topic" tone="inherit" />, onSelect: () => onPick(topic) }))
+      .map((topic) => ({ id: topic.address, label: topic.title, icon: placeIcon(topic.address, 16), onSelect: () => onPick(topic) }))
   const groups = typeof choices === 'object' ? [{ label: 'Your initiatives', rows: rows(choices.yours) }, { label: 'Other initiatives', rows: rows(choices.others) }].filter((group) => group.rows.length > 0) : []
   return (
     <CommandPalette open onOpenChange={(open) => !open && onClose()} label="Add to initiative">

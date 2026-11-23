@@ -513,8 +513,7 @@ export const IssueCommentsHiddenWithNew: Story = issuePage(false, true, true)
 const SPACE = topic('bugs', 'Bugs')
 
 /**
- * An issue a team's # topic lists, beside an initiative that lists it (review of 23 November, E4): its Overview's
- * Initiatives line as the app draws it today, the # topic's chip opening Peek. Whether a # topic belongs in this line,
- * and what it wears, waits on Katerina (A1).
+ * An issue a team's # topic lists, beside an initiative that lists it (review of 23 November, E4): in its Overview's
+ * Initiatives the # topic keeps its chip, with # beside the initiative's ◎ (Katerina, 23 November), opening Peek.
  */
 export const IssueOnATopic: Story = { name: 'Issue: listed on a # topic', ...issuePage(false, true, false, 'overview', true) }
