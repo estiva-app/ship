@@ -2,12 +2,11 @@ import { useMemo } from 'react'
 import type { Archives } from '@/lib/archive'
 import { sidebarTopicsOf, topicOfD, yourTopicsOf, type SidebarTopic, type TopicPageWork } from '@/lib/topics'
 import type { Route } from '@/router'
-import { landedAt, reloadTopics, useMuted, useTopicActivity, useTopics, useTopicsOnReturn, useYourTopics } from './topics'
+import { landedAt, useMuted, useTopicActivity, useTopics, useTopicsOnReturn, useYourTopics } from './topics'
 
 /** The sidebar's topics, and where the route is among them. */
 export interface SidebarTopics {
   topics: SidebarTopic[] | 'loading' | 'failed'
-  onRetryTopics: () => void
   /** The open topic's address, when the route is a topic's page. */
   openTopic?: string
 }
@@ -66,11 +65,6 @@ export function useSidebarTopics(work: TopicPageWork | undefined, archives: Arch
   const openTopic = route.name === 'topic' && yours ? topicOfD(yours, route.d)?.address : undefined
   return {
     topics,
-    onRetryTopics: () => {
-      if (!onTopics) lean.retry()
-      else if (read === 'failed') void reloadTopics()
-      else order.retry()
-    },
     ...(openTopic ? { openTopic } : {}),
   }
 }

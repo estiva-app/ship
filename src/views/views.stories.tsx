@@ -83,7 +83,7 @@ function Shell({ current, openTopic, children }: { current?: SidebarEntry; openT
       <AppShell
         logo="Estiva Ship"
         identity={<IdentityMenu me={ANA} signedIn idBase="https://id.estiva.app" relayUrl="http://localhost:3000" onCopyKey={fn()} onSignOut={fn()} />}
-        nav={<ShipSidebar openIssues={18} activeProjects={SIDEBAR_PROJECTS.length} hrefFor={(entry) => `#/${entry}`} {...(current ? { current: { entry: current } } : {})} {...(openTopic ? { openTopic } : {})} topics={SIDEBAR_TOPICS} onRetryTopics={fn()} />}
+        nav={<ShipSidebar openIssues={18} activeProjects={SIDEBAR_PROJECTS.length} hrefFor={(entry) => `#/${entry}`} {...(current ? { current: { entry: current } } : {})} {...(openTopic ? { openTopic } : {})} topics={SIDEBAR_TOPICS} />}
       >
         {children}
       </AppShell>

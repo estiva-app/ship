@@ -21,7 +21,7 @@ describe('ShipSidebar', () => {
   afterEach(() => window.localStorage.clear())
 
   it('reads Projects, Issues, then Explore initiatives where the top Topics was, with the counts on Projects and Issues only (TOPI-9)', () => {
-    render(<ShipSidebar topics={[]} onRetryTopics={noop} openIssues={18} activeProjects={5} hrefFor={hrefFor} current={{ entry: 'topics' }} />)
+    render(<ShipSidebar topics={[]} openIssues={18} activeProjects={5} hrefFor={hrefFor} current={{ entry: 'topics' }} />)
     expect(links()).toEqual([['Projects5', '/projects'], ['Issues18', '/issues'], ['Explore initiatives', '/topics']])
     expect(screen.getByRole('link', { name: /^Projects/ })).toHaveTextContent('5')
     expect(screen.getByRole('link', { name: 'Explore initiatives' })).toHaveAttribute('aria-current', 'page')
@@ -36,7 +36,7 @@ describe('ShipSidebar', () => {
       { id: '30850:p:launch', kind: 'project', title: 'Launch', href: '/project/launch' },
       { id: '30851:p:fix', kind: 'issue', title: 'Fix login', href: '/issue/fix' },
     ]
-    render(<ShipSidebar topics={[topic(2, work), topic(1)]} onRetryTopics={noop} openIssues={0} activeProjects={0} hrefFor={hrefFor} />)
+    render(<ShipSidebar topics={[topic(2, work), topic(1)]} openIssues={0} activeProjects={0} hrefFor={hrefFor} />)
     expect(links().map(([text]) => text)).toEqual(['Projects', 'Issues', 'Topic 2', 'Topic 1', 'Explore initiatives'])
     await userEvent.click(screen.getByRole('button', { name: /Topic 2/ }))
     expect(links().map(([text, to]) => `${text} ${to}`)).toEqual([
@@ -54,22 +54,20 @@ describe('ShipSidebar', () => {
 
   it('on a project a topic lists, that topic opens and the project is marked under it', () => {
     const work: SidebarTopic['work'] = [{ id: '30850:p:launch', kind: 'project', title: 'Launch', href: '/project/launch' }]
-    render(<ShipSidebar topics={[topic(1, work)]} openFile="30850:p:launch" onRetryTopics={noop} openIssues={0} activeProjects={0} hrefFor={hrefFor} />)
+    render(<ShipSidebar topics={[topic(1, work)]} openFile="30850:p:launch" openIssues={0} activeProjects={0} hrefFor={hrefFor} />)
     expect(screen.getByRole('link', { name: 'Launch' })).toHaveAttribute('aria-current', 'page')
   })
 
   it("on an initiative's page its row is marked, not Explore initiatives", () => {
-    render(<ShipSidebar topics={[topic(1)]} openTopic="30840:p:t1" onRetryTopics={noop} openIssues={0} activeProjects={0} hrefFor={hrefFor} />)
+    render(<ShipSidebar topics={[topic(1)]} openTopic="30840:p:t1" openIssues={0} activeProjects={0} hrefFor={hrefFor} />)
     expect(screen.getByRole('link', { name: 'Topic 1' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('link', { name: 'Explore initiatives' })).not.toHaveAttribute('aria-current')
   })
 
-  it("says the initiatives didn't load, in Peek's words, with Try again, and still offers Explore initiatives", async () => {
-    const onRetryTopics = vi.fn()
-    render(<ShipSidebar topics="failed" onRetryTopics={onRetryTopics} openIssues={0} activeProjects={0} hrefFor={hrefFor} />)
-    expect(screen.getByText('Couldn’t load your initiatives.')).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: 'Try again' }))
-    expect(onRetryTopics).toHaveBeenCalledOnce()
+  it("says the initiatives didn't load in Peek's words, with no button squeezed beside them, and still offers Explore initiatives (review of 23 November, B3)", () => {
+    render(<ShipSidebar topics="failed" openIssues={0} activeProjects={0} hrefFor={hrefFor} />)
+    expect(screen.getByText('Couldn’t load your initiatives. Reload to try again.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull()
     expect(screen.getByRole('link', { name: 'Explore initiatives' })).toBeInTheDocument()
   })
 
@@ -79,7 +77,7 @@ describe('ShipSidebar', () => {
   const folds = () => screen.getAllByRole('button', { name: /what is under/ }).map((b) => [b.getAttribute('aria-label'), b.getAttribute('aria-expanded')])
 
   it("draws each team as Peek's row, alphabetically and folded, a link to its page that folds to its own Initiatives, Projects and Issues (C1)", async () => {
-    render(<ShipSidebar topics={[]} onRetryTopics={noop} openIssues={3} activeProjects={2} hrefFor={hrefFor} folders={teams} current={{ entry: 'topics' }} />)
+    render(<ShipSidebar topics={[]} openIssues={3} activeProjects={2} hrefFor={hrefFor} folders={teams} current={{ entry: 'topics' }} />)
     expect(teamLinks()).toEqual([
       ['Estiva HQ', '/app/teams/hq'],
       ['Peek', '/app/teams/peek'],
@@ -101,7 +99,7 @@ describe('ShipSidebar', () => {
 
   it("on a project, its team's row opens and that team's Projects is marked, not the top one, though the fold was closed by hand", () => {
     window.localStorage.setItem('ship.sidebar.folder.peek', 'closed')
-    const { container } = render(<ShipSidebar topics={[]} onRetryTopics={noop} openIssues={0} activeProjects={1} hrefFor={hrefFor} folders={teams} current={{ entry: 'projects', folder: 'peek' }} />)
+    const { container } = render(<ShipSidebar topics={[]} openIssues={0} activeProjects={1} hrefFor={hrefFor} folders={teams} current={{ entry: 'projects', folder: 'peek' }} />)
     expect(folds()).toEqual([
       ['Show what is under Estiva HQ', 'false'],
       ['Hide what is under Peek', 'true'],
@@ -111,27 +109,27 @@ describe('ShipSidebar', () => {
   })
 
   it("on an issue in no team, the top Issues is marked and no team opens", () => {
-    render(<ShipSidebar topics={[]} onRetryTopics={noop} openIssues={1} activeProjects={0} hrefFor={hrefFor} folders={teams} current={{ entry: 'issues' }} />)
+    render(<ShipSidebar topics={[]} openIssues={1} activeProjects={0} hrefFor={hrefFor} folders={teams} current={{ entry: 'issues' }} />)
     expect(screen.getByRole('link', { name: /^Issues/ })).toHaveAttribute('aria-current', 'page')
     for (const [, expanded] of folds()) expect(expanded).toBe('false')
   })
 
   it("on a team's page its row is marked; on another app's file nothing is", () => {
-    const { rerender } = render(<ShipSidebar topics={[]} onRetryTopics={noop} openIssues={0} activeProjects={0} hrefFor={hrefFor} folders={teams} current={{ folderId: 'peek' }} />)
+    const { rerender } = render(<ShipSidebar topics={[]} openIssues={0} activeProjects={0} hrefFor={hrefFor} folders={teams} current={{ folderId: 'peek' }} />)
     expect([...document.querySelectorAll('a[aria-current="page"]')].map((a) => a.getAttribute('href'))).toEqual(['/app/teams/peek'])
-    rerender(<ShipSidebar topics={[]} onRetryTopics={noop} openIssues={0} activeProjects={0} hrefFor={hrefFor} folders={teams} />)
+    rerender(<ShipSidebar topics={[]} openIssues={0} activeProjects={0} hrefFor={hrefFor} folders={teams} />)
     expect(document.querySelector('[aria-current]')).toBeNull()
   })
 
   it('falls back to the id when a team has no name', () => {
     // A state written by a placement carries no name, and `listFolders` reads
     // the state's name and stops (the Peek team, 2026-09-15).
-    render(<ShipSidebar topics={[]} onRetryTopics={noop} openIssues={0} activeProjects={0} hrefFor={hrefFor} folders={[{ id: 'f1' }]} />)
+    render(<ShipSidebar topics={[]} openIssues={0} activeProjects={0} hrefFor={hrefFor} folders={[{ id: 'f1' }]} />)
     expect(screen.getByRole('link', { name: 'f1' })).toHaveAttribute('href', '/app/teams/f1')
   })
 
   it('draws no counts while the workspace is coming, and placeholder rows while the Folders are', () => {
-    const { container } = render(<ShipSidebar topics={[]} onRetryTopics={noop} openIssues={0} activeProjects={0} hrefFor={hrefFor} loading folders={[]} foldersLoading />)
+    const { container } = render(<ShipSidebar topics={[]} openIssues={0} activeProjects={0} hrefFor={hrefFor} loading folders={[]} foldersLoading />)
     // A zero would be a claim (SHI-20).
     expect(links().map(([text]) => text)).toEqual(['Projects', 'Issues', 'Explore initiatives'])
     expect(screen.queryByRole('button')).not.toBeInTheDocument()

@@ -544,7 +544,7 @@ describe("Ship's sidebar: where your five are read from (ALO-17)", () => {
     expect(muteReads()).toBe(1)
   })
 
-  it('on Topics, when the read of every topic fails, your five from the read of yours stay drawn rather than “Couldn’t load your initiatives.”', async () => {
+  it('on Topics, when the read of every topic fails, your five from the read of yours stay drawn rather than “Couldn’t load your initiatives. Reload to try again.”', async () => {
     held.push(shipManifest(), topic('t-1', 'Topic 1'), joined('t-1'), topic('t-2', 'Topic 2'), joined('t-2'))
     const { container, rerender } = render(<Sidebar state={ship([], [])} route={{ name: 'issues' }} />)
     await waitFor(() => expect(linksIn(container)).toEqual(['Topic 2', 'Topic 1']))
@@ -554,7 +554,7 @@ describe("Ship's sidebar: where your five are read from (ALO-17)", () => {
     rerender(<Sidebar state={ship([], [])} route={{ name: 'topics' }} />)
     await waitFor(() => expect(everyTopicReads()).toBeGreaterThan(0))
     await settle()
-    expect(screen.queryByText('Couldn’t load your initiatives.')).toBeNull()
+    expect(screen.queryByText('Couldn’t load your initiatives. Reload to try again.')).toBeNull()
     expect(linksIn(container)).toEqual(['Topic 2', 'Topic 1'])
   })
 
@@ -603,17 +603,12 @@ describe("Ship's sidebar: where your five are read from (ALO-17)", () => {
     }
   })
 
-  it('on Issues, Try again after a failed read reads only your topics again, not every topic', async () => {
+  it('on Issues, a failed read of your topics says Peek’s line, Reload to try again, and reads no topic else (review of 23 November, B3)', async () => {
     down = true
     held.push(shipManifest(), topic('t-1', 'Topic 1'), joined('t-1'), topic('t-2', 'Topic 2'))
     render(<Sidebar state={ship([], [])} route={{ name: 'issues' }} />)
-    await waitFor(() => expect(screen.getByText('Couldn’t load your initiatives.')).toBeTruthy())
-    const failed = rootReads()
-
-    down = false
-    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
-    await waitFor(() => expect(sidebarTopics()).toEqual(['Topic 1']))
-    expect(rootReads()).toBe(failed + 1)
+    await waitFor(() => expect(screen.getByText('Couldn’t load your initiatives. Reload to try again.')).toBeTruthy())
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull()
     expect(everyTopicReads()).toBe(0)
   })
 })
@@ -691,14 +686,4 @@ describe("Ship's sidebar: your five newest topics", () => {
     await waitFor(() => expect(sidebarTopics()).toEqual(['Topic 1', 'Topic 2']))
   })
 
-  it("says the topics didn't load, and Try again reads them", async () => {
-    down = true
-    held.push(shipManifest(), topic('t-1', 'Topic 1'), joined('t-1'))
-    render(<Sidebar state={ship([], [])} />)
-    await waitFor(() => expect(screen.getByText('Couldn’t load your initiatives.')).toBeTruthy())
-
-    down = false
-    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
-    await waitFor(() => expect(sidebarTopics()).toEqual(['Topic 1']))
-  })
 })

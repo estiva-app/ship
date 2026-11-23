@@ -39,7 +39,6 @@ const meta = {
     onNewFolder: () => {},
     current: { entry: 'topics' },
     topics: TOPICS,
-    onRetryTopics: () => {},
   },
   parameters: { layout: 'fullscreen' },
   decorators: [

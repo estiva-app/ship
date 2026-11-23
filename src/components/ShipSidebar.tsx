@@ -99,7 +99,6 @@ export interface ShipSidebarProps {
    * `loading` before the topics and their order land, `failed` when either did not.
    */
   topics: SidebarTopic[] | 'loading' | 'failed'
-  onRetryTopics: () => void
   /** The topic whose page is open, by address: its row is lit and opens. */
   openTopic?: string
   /** The project or issue open, by address: lit under the topic listing it, which opens. */
@@ -126,7 +125,7 @@ const TOP = ENTRIES.filter(({ entry }) => entry !== 'topics')
 /** A team entry's row id: the tree's `selected` names one. */
 const rowId = (folder: string, entry: SidebarEntry) => `${folder}/${entry}`
 
-export function ShipSidebar({ openIssues, activeProjects, hrefFor, folders = [], onNewFolder, current, topics, onRetryTopics, openTopic, openFile, loading = false, foldersLoading = false, className }: ShipSidebarProps) {
+export function ShipSidebar({ openIssues, activeProjects, hrefFor, folders = [], onNewFolder, current, topics, openTopic, openFile, loading = false, foldersLoading = false, className }: ShipSidebarProps) {
   const at = current && 'entry' in current ? current : undefined
   useReportFailure(topics === 'failed' ? 'not-loaded' : undefined)
   // Alphabetical teams, as Peek's column draws them; the relay's order tells the person nothing.
@@ -151,8 +150,10 @@ export function ShipSidebar({ openIssues, activeProjects, hrefFor, folders = [],
         {topics === 'loading' ? (
           <SkeletonList rows={TOPICS_SHOWN} />
         ) : topics === 'failed' ? (
+          // Peek's line, word for word (peek `TopicsColumn`), as Leaf's: no button squeezed beside it in the column, which
+          // broke "Try again" onto two lines (review of 23 November, B3).
           <div className="px-2 py-1">
-            <EmptyState scope="section" message="Couldn’t load your initiatives." action={{ label: 'Try again', onClick: onRetryTopics }} />
+            <EmptyState scope="section" message="Couldn’t load your initiatives. Reload to try again." />
           </div>
         ) : topics.length === 0 ? (
           <div className="px-2 py-1">
