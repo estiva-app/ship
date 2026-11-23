@@ -109,8 +109,15 @@ function Page(props: { d: string; state: FolderState; folders: never[] | { id: s
   return <TopicPage d={props.d} state={state} folders={props.folders as never} archives={props.archives} directory={DIRECTORY} say={() => {}} refresh={async () => {}} />
 }
 const page = () => document.querySelector('[data-surface="topic"]') as HTMLElement
-/** The projects and issues drawn, by name, in the page's order (the shared `WorkList`'s rows). */
-const workRows = () => [...page().querySelectorAll<HTMLElement>('[data-work]')].map((row) => row.querySelector('a > span')?.textContent)
+/** Each kind's list: the kit's `ItemList` under its heading, named "<initiative>’s <kind>s". */
+const LIST_OF: Record<string, RegExp> = { project: /’s projects$/, issue: /’s issues$/, document: /’s documents$/, file: /’s files$/ }
+const listsOnPage = () => [...page().querySelectorAll<HTMLElement>('[role="table"]')]
+/** A list's rows, past its hidden headings, with the rows folded under a row. */
+const rowsIn = (list: HTMLElement) => [...list.querySelectorAll<HTMLElement>('[role="rowgroup"] [role="row"]')]
+/** A kind's rows, in the page's order. */
+const kindRows = (kind: string) => listsOnPage().filter((list) => LIST_OF[kind]!.test(list.getAttribute('aria-label') ?? '')).flatMap(rowsIn)
+/** The projects and issues drawn, by name, in the page's order (the kit's `ItemList` rows). */
+const workRows = () => listsOnPage().flatMap(rowsIn).map((row) => row.querySelector('a > span')?.textContent)
 
 // A failed test leaves no fake clock or spy behind it.
 afterEach(() => {
@@ -167,7 +174,7 @@ describe("A topic's page in Ship", () => {
     // No tabs: a project's status is a column of its row (Katerina, 18 November, A4: direction A).
     expect(screen.queryByRole('tab')).toBeNull()
     // The project first though the topic listed the issue first, with the Projects list's facts.
-    const [project, ...more] = [...page().querySelectorAll<HTMLElement>('[data-work-kind="project"]')]
+    const [project, ...more] = kindRows('project')
     expect(more).toEqual([])
     expect(within(project!).getByRole('link').textContent).toBe('Project p1')
     expect(within(project!).getByText('In Progress')).toBeTruthy()
@@ -175,7 +182,7 @@ describe("A topic's page in Ship", () => {
     // As the kit's small ring and its count (Katerina, 18 November: "the small progress which is a circle").
     expect(within(project!).getByText('1/2')).toBeTruthy()
     // An issue it does not list is not drawn; the one it lists names its project under its name, and its status.
-    const [issue, ...rest] = [...page().querySelectorAll<HTMLElement>('[data-work-kind="issue"]')]
+    const [issue, ...rest] = kindRows('issue')
     expect(rest).toEqual([])
     expect(within(issue!).getByText('Issue i1')).toBeTruthy()
     expect(within(issue!).getByText('Project p1')).toBeTruthy()
@@ -216,9 +223,9 @@ describe("A topic's page in Ship", () => {
     held.push(topic(D, 'Widgets'), lists(D, 'p3'), lists(D, 'p1'), lists(D, 'p2'))
     const { state, archives } = ship([{ d: 'p1', status: 'in_progress' }, { d: 'p2', status: 'planned' }, { d: 'p3', status: 'completed' }], [])
     render(<Page d={D} state={state} folders={[]} archives={archives} />)
-    await waitFor(() => expect(page().querySelectorAll('[data-work-kind="project"]').length).toBe(3))
+    await waitFor(() => expect(kindRows('project').length).toBe(3))
     expect(workRows()).toEqual(['Project p3', 'Project p1', 'Project p2'])
-    const statuses = [...page().querySelectorAll<HTMLElement>('[data-work-kind="project"]')].map((row) => ['Completed', 'In Progress', 'Planned'].find((word) => within(row).queryByText(word)))
+    const statuses = kindRows('project').map((row) => ['Completed', 'In Progress', 'Planned'].find((word) => within(row).queryByText(word)))
     expect(statuses).toEqual(['Completed', 'In Progress', 'Planned'])
     expect(screen.queryByRole('tab')).toBeNull()
   })
@@ -230,7 +237,7 @@ describe("A topic's page in Ship", () => {
     Object.assign((state as unknown as { issues: Record<string, unknown>[] }).issues[0]!, { assignee: OWNER })
     render(<Page d={D} state={state} folders={[]} archives={archives} />)
     const row = await waitFor(() => {
-      const found = page().querySelector<HTMLElement>('[data-work-kind="issue"]')
+      const found = (kindRows('issue')[0] ?? null)
       expect(found).not.toBeNull()
       return found!
     })
@@ -268,12 +275,12 @@ describe("A topic's page in Ship", () => {
     })
     render(<Page d={D} state={state} folders={[]} archives={archives} />)
 
-    await waitFor(() => expect(page().querySelector('[data-work-kind="issue"]')).not.toBeNull())
+    await waitFor(() => expect((kindRows('issue')[0] ?? null)).not.toBeNull())
     // The When column says who edited it last and when, in today's words (Katerina, 23 November: "if the who edited last is
     // the current wording keep it"); its assignee is in the People column.
-    expect(within(page().querySelector<HTMLElement>('[data-work-kind="issue"]')!).getByText('bbbbbbbb, 1h ago')).toBeTruthy()
+    expect(within(kindRows('issue')[0]!).getByText('bbbbbbbb, 1h ago')).toBeTruthy()
     const row = await waitFor(() => {
-      const found = page().querySelector<HTMLElement>(`[data-work-kind="document"][data-work="${SPEC}"]`)
+      const found = (kindRows('document').find((found) => within(found).queryByRole('link', { name: 'Widgets spec' })) ?? null)
       expect(found).not.toBeNull()
       return found!
     })
@@ -294,7 +301,7 @@ describe("A topic's page in Ship", () => {
     render(<Page d={D} state={state} folders={[]} archives={archives} />)
 
     const row = await waitFor(() => {
-      const found = page().querySelector<HTMLElement>('[data-work-kind="file"]')
+      const found = (kindRows('file')[0] ?? null)
       expect(found).not.toBeNull()
       return found!
     })

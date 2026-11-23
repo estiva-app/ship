@@ -1,13 +1,13 @@
 import type { ReactNode } from 'react'
 import { IconExternalLink } from '@tabler/icons-react'
-import { ArchivedNotice, CollapsibleSection, KindIcon, NoAccessNotice, PageHeader, SectionHeader, TeamChip, WithTooltip, type ArchivedNoticeProps } from '@estiva-app/ui'
+import { ArchivedNotice, CollapsibleSection, ItemList, KindIcon, NoAccessNotice, PageHeader, SectionHeader, TeamChip, WithTooltip, type ArchivedNoticeProps } from '@estiva-app/ui'
 import { Breadcrumb } from '@/components/ui/Breadcrumb'
 import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { ScrollArea } from '@/components/ui/ScrollArea'
 import { SkeletonList } from '@/components/ui/Skeleton'
 import { PageActions } from '@/components/PageActions'
-import { WorkList, type WorkListRow } from '@/components/WorkList'
+import { workItems, type WorkItem } from '@/components/workItems'
 import type { Person } from '@/api/useDirectory'
 import type { ProjectRowData } from '@/lib/projects'
 import type { TopicWorkRow as WorkRow } from '@/lib/topics'
@@ -61,7 +61,7 @@ export interface TopicPageView {
  *   conversation's button and the ⋯ (Copy link);
  * - an archived one: the kit's notice first, who archived it and when, as every archived file shows it;
  * - its summary, then one list per kind under a heading with its count, each kind in the topic's order: **Projects**
- *   (status, lead, progress) and **Issues** (status, assignee, who edited it last), the shared `WorkList`, as a team's
+ *   (status, lead, progress) and **Issues** (status, assignee, who edited it last), the kit's `ItemList`, as a team's
  *   page lists them; no tabs (the status is a column); **Documents** from Leaf, each opening Leaf, folding to its pages;
  *   **Files**, any other app's, each opening its app, its type under its name, as Leaf's initiative page lists them;
  * - **Archived** last, a fold, shut while anything is not archived;
@@ -90,8 +90,8 @@ export interface TopicViewProps {
   peekUrl?: string
 }
 
-/** A project as `WorkList` draws it: its status, lead, progress and last change. */
-const projectRow = (project: ProjectRowData & { changedAt?: number; changedLabel?: string }): WorkListRow => ({
+/** A project as the page's list draws it: its status, lead, progress and last change. */
+const projectRow = (project: ProjectRowData & { changedAt?: number; changedLabel?: string }): WorkItem => ({
   address: project.addr,
   title: project.title,
   href: project.href,
@@ -102,8 +102,8 @@ const projectRow = (project: ProjectRowData & { changedAt?: number; changedLabel
   ...(project.changedLabel ? { edited: project.changedLabel } : {}),
 })
 
-/** A project or an issue on the page as `WorkList` draws it: an issue with its project under its name, as its row here named it. */
-const workRow = (row: TopicWork): WorkListRow => ({
+/** A project or an issue on the page as its list draws it: an issue with its project under its name, as its row here named it. */
+const workRow = (row: TopicWork): WorkItem => ({
   address: row.address,
   title: row.title,
   href: row.href,
@@ -116,10 +116,10 @@ const workRow = (row: TopicWork): WorkListRow => ({
 })
 
 /**
- * A Leaf document as `WorkList` draws it: who edited it last as a face and "Katerina, 2h ago" in When, opening Leaf in a
+ * A Leaf document as the page's list draws it: who edited it last as a face and "Katerina, 2h ago" in When, opening Leaf in a
  * new tab, its pages folding under it (Katerina, 23 November: the kit's row now does both).
  */
-const documentRow = (document: TopicDocument): WorkListRow => ({
+const documentRow = (document: TopicDocument): WorkItem => ({
   address: document.address,
   title: document.title,
   ...(document.href ? { href: document.href, external: true } : {}),
@@ -128,8 +128,8 @@ const documentRow = (document: TopicDocument): WorkListRow => ({
   ...(document.children?.length ? { rows: document.children.map(documentRow) } : {}),
 })
 
-/** Another app's file as `WorkList` draws it: a document's row, its type on the line under its name (A10). */
-const fileRow = (file: TopicDocument): WorkListRow => ({ ...documentRow(file), ...(file.type ? { description: file.type } : {}) })
+/** Another app's file as the page's list draws it: a document's row, its type on the line under its name (A10). */
+const fileRow = (file: TopicDocument): WorkItem => ({ ...documentRow(file), ...(file.type ? { description: file.type } : {}) })
 
 export function TopicView({ topic, documents, files = [], onRetry, onRetryDocuments, topicsHref, members, comments, conversation, onCopyLink, peekUrl }: TopicViewProps) {
   useReportFailure(topic === 'failed' || documents === 'failed' ? 'not-loaded' : undefined)
@@ -185,12 +185,12 @@ export function TopicView({ topic, documents, files = [], onRetry, onRetryDocume
                   <>
                     {topic.projects.length > 0 && (
                       <Section title="Projects" count={topic.projects.length}>
-                        <WorkList label={`${topic.title}’s projects`} kind="project" rows={topic.projects.map(projectRow)} />
+                        <ItemList aria-label={`${topic.title}’s projects`} rows={workItems('project', topic.projects.map(projectRow))} />
                       </Section>
                     )}
                     {topic.issues.length > 0 && (
                       <Section title="Issues" count={topic.issues.length}>
-                        <WorkList label={`${topic.title}’s issues`} kind="issue" rows={topic.issues.map(workRow)} />
+                        <ItemList aria-label={`${topic.title}’s issues`} rows={workItems('issue', topic.issues.map(workRow))} />
                       </Section>
                     )}
                     {/* Its documents and other apps' files are one read: while it reads, and when it failed, no heading names
@@ -208,7 +208,7 @@ export function TopicView({ topic, documents, files = [], onRetry, onRetryDocume
                         // The shared list, its columns lined up with Projects and Issues: Leaf opens in a new tab, pages fold under
                         // their document (the kit's row, Katerina 23 November).
                         <Section title="Documents" count={documents.length}>
-                          <WorkList label={`${topic.title}’s documents`} kind="document" rows={documents.map(documentRow)} />
+                          <ItemList aria-label={`${topic.title}’s documents`} rows={workItems('document', documents.map(documentRow))} />
                         </Section>
                       )
                     )}
@@ -216,7 +216,7 @@ export function TopicView({ topic, documents, files = [], onRetry, onRetryDocume
                       // Another app's files, last, in the same columns: each opens its app in a new tab, its type under its
                       // name, as Leaf's initiative page lists them (review of 23 November, A10).
                       <Section title="Files" count={files.length}>
-                        <WorkList label={`${topic.title}’s files`} kind="file" rows={files.map(fileRow)} />
+                        <ItemList aria-label={`${topic.title}’s files`} rows={workItems('file', files.map(fileRow))} />
                       </Section>
                     )}
                   </>
@@ -225,10 +225,10 @@ export function TopicView({ topic, documents, files = [], onRetry, onRetryDocume
                   // A fold of its own at the end: shut while anything is not archived, open when everything is.
                   <CollapsibleSection title="Archived" count={topic.archivedWork.length} defaultOpen={live === 0} contentClassName="flex flex-col gap-2">
                     {topic.archivedWork.some((row) => row.kind === 'project') && (
-                      <WorkList label={`${topic.title}’s archived projects`} kind="project" rows={topic.archivedWork.filter((row) => row.kind === 'project').map(workRow)} />
+                      <ItemList aria-label={`${topic.title}’s archived projects`} rows={workItems('project', topic.archivedWork.filter((row) => row.kind === 'project').map(workRow))} />
                     )}
                     {topic.archivedWork.some((row) => row.kind === 'issue') && (
-                      <WorkList label={`${topic.title}’s archived issues`} kind="issue" rows={topic.archivedWork.filter((row) => row.kind === 'issue').map(workRow)} />
+                      <ItemList aria-label={`${topic.title}’s archived issues`} rows={workItems('issue', topic.archivedWork.filter((row) => row.kind === 'issue').map(workRow))} />
                     )}
                   </CollapsibleSection>
                 )}

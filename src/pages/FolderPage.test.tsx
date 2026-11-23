@@ -79,7 +79,9 @@ const topic = (d: string, title: string, team = 'f1', space = false) => ({
 })
 const topics = (...list: ReturnType<typeof topic>[]) => ({ me: ME, topics: list })
 
-const work = (kind: string) => [...document.querySelectorAll(`[data-work-kind="${kind}"]`)].map((row) => row as HTMLElement)
+/** A kind's rows: the kit's `ItemList` under its heading, named "<team>’s <kind>s", its rows past the hidden headings. */
+const LIST_OF: Record<string, RegExp> = { topic: /’s initiatives$/, project: /’s projects$/, issue: /’s issues$/ }
+const work = (kind: string) => [...document.querySelectorAll<HTMLElement>('[role="table"]')].filter((list) => LIST_OF[kind]!.test(list.getAttribute('aria-label') ?? '')).flatMap((list) => [...list.querySelectorAll<HTMLElement>('[role="rowgroup"] [role="row"]')])
 const titles = (kind: string) => work(kind).map((row) => within(row).getAllByText(/./)[0]!.textContent)
 
 beforeEach(() => {

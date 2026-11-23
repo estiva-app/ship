@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { IconDotsVertical, IconUsers } from '@tabler/icons-react'
-import { Menu, MenuItem, MembersPill, PageHeader, SectionHeader, Toolbar, ToolbarButton, type AvatarGroupMember } from '@estiva-app/ui'
-import { WorkList, type WorkListRow } from '@/components/WorkList'
+import { ItemList, Menu, MenuItem, MembersPill, PageHeader, SectionHeader, Toolbar, ToolbarButton, type AvatarGroupMember } from '@estiva-app/ui'
+import { workItems, type WorkItem } from '@/components/workItems'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { ScrollArea } from '@/components/ui/ScrollArea'
 import { SkeletonList } from '@/components/ui/Skeleton'
@@ -20,8 +20,8 @@ export interface TeamInitiativeRow {
   active?: number
 }
 
-/** One of Ship's own files the team holds, as the shared {@link WorkList} draws it: its status, lead or assignee, progress, last change. */
-export type TeamFileRow = Omit<WorkListRow, 'members' | 'description'>
+/** One of Ship's own files the team holds, as the kit's `ItemList` draws it: its status, lead or assignee, progress, last change. */
+export type TeamFileRow = Omit<WorkItem, 'members' | 'description'>
 
 /**
  * **A team's page in Ship, drawn as Peek's** (Katerina, 18 November, D6: "show me the before and after"): the kit's
@@ -119,18 +119,20 @@ export function TeamView({ name, members, onRename, onArchive, archivedNotice, i
                 <section className="flex flex-col gap-1">
                   <SectionHeader title="Initiatives" count={initiatives.length} hover="none" />
                   {/* The same columns as Projects and Issues below, so its people and its Active stack with theirs. */}
-                  <WorkList
-                    label={`${title}’s initiatives`}
-                    kind="topic"
-                    now={now}
-                    rows={initiatives.map((row) => ({
-                      address: row.address,
-                      title: row.title,
-                      href: row.href,
-                      ...(row.summary ? { description: row.summary } : {}),
-                      ...(row.members !== undefined ? { members: { faces: (row.people ?? []).slice(0, 3).map(faceOf), count: row.members } } : {}),
-                      ...(row.active ? { at: row.active } : {}),
-                    }))}
+                  <ItemList
+                    aria-label={`${title}’s initiatives`}
+                    rows={workItems(
+                      'topic',
+                      initiatives.map((row) => ({
+                        address: row.address,
+                        title: row.title,
+                        href: row.href,
+                        ...(row.summary ? { description: row.summary } : {}),
+                        ...(row.members !== undefined ? { members: { faces: (row.people ?? []).slice(0, 3).map(faceOf), count: row.members } } : {}),
+                        ...(row.active ? { at: row.active } : {}),
+                      })),
+                      now,
+                    )}
                   />
                 </section>
               )
@@ -148,13 +150,13 @@ export function TeamView({ name, members, onRename, onArchive, archivedNotice, i
   )
 }
 
-/** One kind of Ship's own files under its heading with its count: the shared {@link WorkList}, as the initiative page lists them. */
+/** One kind of Ship's own files under its heading with its count: the kit's `ItemList`, as the initiative page lists them. */
 function FileSection({ title, kind, rows, team, now }: { title: string; kind: 'project' | 'issue'; rows: TeamFileRow[]; team: string; now: number }) {
   if (rows.length === 0) return null
   return (
     <section className="flex flex-col gap-1">
       <SectionHeader title={title} count={rows.length} hover="none" />
-      <WorkList label={`${team}’s ${title.toLowerCase()}`} kind={kind} rows={rows} now={now} />
+      <ItemList aria-label={`${team}’s ${title.toLowerCase()}`} rows={workItems(kind, rows, now)} />
     </section>
   )
 }
