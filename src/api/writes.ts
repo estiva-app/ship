@@ -99,36 +99,47 @@ export function setListedInTopic(topic: { address: string; folder: string }, fil
 }
 
 /**
+ * What Join did: joined, at the level that now lights for you; joined while the mute stays (Join again takes it out);
+ * or nothing, with why. Leaf's Join says the same.
+ */
+export type JoinResult = { ok: true; level: 'important' | 'all'; stillMuted?: true } | { ok: false; reason: string }
+
+/**
  * Join an initiative (a topic, in the code) from Explore initiatives or its page's Members (TOPI-9): what Peek's Join
  * on its Explore writes, a `member:<you>` = true change on the initiative (SPEC §11.8), with no level, so it lights at
- * Important, the level of anyone in it who chose none (Katerina, 18 November: "let's make it to important"). Until then
- * Ship wrote `follow:<you>` = `all`. A mute you kept on it is taken out (§11.8 *Muting*), so it is yours in every app.
+ * Important, the level of anyone in it who chose none (Katerina, 18 November: "let's make it to important") — unless
+ * you chose a level before: that level stays, and the result says which, as Leaf's Join does. Until then Ship wrote
+ * `follow:<you>` = `all`. A mute you kept on it is taken out (§11.8 *Muting*), so it is yours in every app.
  * The mute list is read just before and never written over when it cannot be read.
  * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-team-has-members-and-followers-and-a-place-is-followed-at-a-level.md
+ * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-persons-level-on-a-place-is-theirs-alone.md
  */
-export async function joinTopic(topic: ReadTopic): Promise<WriteResult | { ok: true; stillMuted: true }> {
+export async function joinTopic(topic: ReadTopic): Promise<JoinResult> {
   const clock = await clockProblem()
-  if (clock) return refused(clock)
+  if (clock) return { ok: false, reason: clock }
+  // What lights once in: a level you chose before stays (you can only have one and still be outside it while muted);
+  // otherwise the member change's Important.
+  const level = topic.following.in && topic.following.level === 'all' ? 'all' : 'important'
   let followed = false
   try {
     const me = signer.pubkey
     const joined = await store.setMembership({ folder: topic.folder, file: topic.address, person: me, member: true })
-    if (!joined.ok) return refused('The relay did not take it. Try again.')
+    if (!joined.ok) return { ok: false, reason: 'The relay did not take it. Try again.' }
     followed = true
     const events = await relay.query([mutedFilter(me)] as never)
     const newest = [...events].sort((a, b) => b.created_at - a.created_at)[0]
-    if (!newest) return { ok: true }
+    if (!newest) return { ok: true, level }
     const plaintext = await nip44.decrypt(newest.content)
     const list = plaintext === undefined ? undefined : parseMutedBlob(plaintext)
     // Joined, but the mute stays: said as that, not as a failure (Join again takes it out).
-    if (!list) return { ok: true, stillMuted: true }
-    if (!list.keys.includes(topic.address)) return { ok: true }
+    if (!list) return { ok: true, level, stillMuted: true }
+    if (!list.keys.includes(topic.address)) return { ok: true, level }
     const ciphertext = await nip44.encrypt(serializeMutedBlob(list.keys.filter((key) => key !== topic.address), Date.now()))
     const unmuted = await store.publishMuted(ciphertext)
-    return unmuted.ok ? { ok: true } : { ok: true, stillMuted: true }
+    return unmuted.ok ? { ok: true, level } : { ok: true, level, stillMuted: true }
   } catch (error) {
     console.warn('[topics] join:', error)
-    return followed ? { ok: true, stillMuted: true } : refused('Try again.')
+    return followed ? { ok: true, level, stillMuted: true } : { ok: false, reason: 'Try again.' }
   }
 }
 

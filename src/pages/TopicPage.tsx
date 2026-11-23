@@ -210,7 +210,7 @@ export function TopicPage({
                   if (!member) return leaveTopic(topic)
                   const joined = await joinTopic(topic)
                   // Said as Topics says it (TopicsPage): joined, but a mute you kept stays.
-                  if ('stillMuted' in joined) say(`Joined “${view?.title ?? 'this initiative'}”, but it is still muted. Join again to unmute it.`, 'error', 'not-saved')
+                  if (joined.ok && joined.stillMuted) say(`Joined “${view?.title ?? 'this initiative'}”, but it is still muted. Join again to unmute it.`, 'error', 'not-saved')
                   return joined.ok ? { ok: true as const } : joined
                 },
                 say,

@@ -122,6 +122,8 @@ const lists = (d: string, file: string, folder = TEAM) => event(1851, [['a', add
 const archiving = (d: string) => event(1851, [['a', address(d)], ['O', d], ['field', 'archived'], ['value', 'true'], ['h', TEAM]])
 /** A Join, filed in the topic's own Folder: one filed in another is ignored (§6.2). */
 const joined = (d: string, who = ME, folder = TEAM) => event(1851, [['a', address(d)], ['O', d], ['field', `member:${who}`], ['value', 'true'], ['p', who], ['h', folder]], who)
+/** A level you chose on a topic: `follow:<you>` (§11.8 *The level change*), signed by you. */
+const chose = (d: string, level: 'all' | 'important', who = ME) => event(1851, [['a', address(d)], ['O', d], ['field', `follow:${who}`], ['value', level], ['h', TEAM], ['ts', String(Date.now())], ['p', who]], who)
 /** A comment in a topic's conversation (NIP-22, the topic as its root). */
 const commented = (d: string, who = ME) => event(1111, [['A', address(d)], ['K', '30840'], ['a', address(d)], ['k', '30840'], ['h', TEAM]], who)
 /** Your mute list, encrypted to you. */
@@ -321,6 +323,17 @@ describe("Ship's Topics (Explore initiatives)", () => {
     await waitFor(() => expect(titles()).toContain('Muted'))
     expect(within(rowOf('Muted')).queryByRole('button', { name: 'Join' })).toBeNull()
     expect(within(rowOf('Muted')).getByText('2')).toBeTruthy()
+  })
+
+  it('Join says the level that lights for you: Everything when you chose it before and then muted the initiative, as Leaf’s Join says it', async () => {
+    held.push(shipManifest(), mutes(address('t-hush')), topic('t-hush', 'Muted'), joined('t-hush'), chose('t-hush', 'all'))
+    render(page())
+    fireEvent.click(await screen.findByRole('tab', { name: /Other initiatives/ }))
+    await waitFor(() => expect(titles()).toContain('Muted'))
+
+    fireEvent.click(within(rowOf('Muted')).getByRole('button', { name: 'Join' }))
+
+    await waitFor(() => expect(say).toHaveBeenCalledWith('You joined Muted. Notifications: Everything.'))
   })
 
   it('Join that lands while the relay refuses the unmute says you joined but it is still muted, and keeps Join to try again', async () => {

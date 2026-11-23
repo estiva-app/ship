@@ -78,12 +78,13 @@ export function TopicsPage({ folders, folder, say, directory }: { folders: Folde
     const title = topicAsDrawn(topic.address, topic.folder, topic.object).title
     // As Peek's Join says it (useFileControls). Joined while the mute stays: Join stays too, so a second click takes the mute out.
     if (!result.ok) say(`Nothing changed: “${title}” could not be joined. ${result.reason}`, 'error', 'not-joined')
-    else if ('stillMuted' in result) say(`Joined “${title}”, but it is still muted. Join again to unmute it.`, 'error', 'not-saved')
+    else if (result.stillMuted) say(`Joined “${title}”, but it is still muted. Join again to unmute it.`, 'error', 'not-saved')
     else {
       setJoined((now) => new Set(now).add(address))
       // Peek's Join toast, word for word, and like Peek's Explore no Undo (Katerina, 18 November, E1). Join lands at
-      // Important, as Peek's does (her 18 November "let's make it to important"): `joinTopic` writes what Peek's writes.
-      say(`You joined ${title}. Notifications: Important.`)
+      // Important, as Peek's does (her 18 November "let's make it to important"); a level you chose before stays, and
+      // is said as it lights, as Leaf's Join says it: Everything.
+      say(`You joined ${title}. Notifications: ${result.level === 'all' ? 'Everything' : 'Important'}.`)
     }
     // Read the topics again, so the sidebar's five take the joined one too (Miky, 10 Nov), as Leaf's Join does.
     if (result.ok) void rereadTopics()
