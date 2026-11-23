@@ -179,7 +179,9 @@ export function TopicView({ topic, documents, files = [], onRetry, onRetryDocume
                 {topic.archive && <ArchivedNotice {...topic.archive} />}
                 {topic.summary && <p className="px-2 text-body-2 text-text-secondary">{topic.summary}</p>}
                 {live === 0 && listed?.length === 0 && files.length === 0 ? (
-                  <EmptyState scope="rows" message={topic.archivedWork.length > 0 ? 'All of its projects and issues are archived.' : 'No projects, issues or documents yet.'} />
+                  // Peek's own line when it lists nothing (peek `TopicFiles`), and Leaf's when all of it is archived: the same page
+                  // says the same in every app (review of 23 November, B2).
+                  <EmptyState scope="rows" message={topic.archivedWork.length > 0 ? 'Everything it lists is archived.' : 'None yet. An initiative can be only a conversation.'} />
                 ) : (
                   <>
                     {topic.projects.length > 0 && (
@@ -192,17 +194,16 @@ export function TopicView({ topic, documents, files = [], onRetry, onRetryDocume
                         <WorkList label={`${topic.title}’s issues`} kind="issue" rows={topic.issues.map(workRow)} />
                       </Section>
                     )}
+                    {/* Its documents and other apps' files are one read: while it reads, and when it failed, no heading names
+                        one kind of them. */}
                     {documents === 'loading' ? (
-                      <Section title="Documents">
-                        <SkeletonList rows={3} />
-                      </Section>
+                      <SkeletonList rows={3} />
                     ) : documents === 'failed' ? (
-                      <Section title="Documents">
-                        {/* The section-level line (the row-level one draws no button), in a box 8px in, where the headings start: the gate puts the room on the box, not on the part. */}
-                        <div className="px-2">
-                          <EmptyState scope="section" message="Documents didn’t load." action={{ label: 'Try again', onClick: onRetryDocuments }} />
-                        </div>
-                      </Section>
+                      // The section-level line (the row-level one draws no button), in a box 8px in, where the headings start: the
+                      // gate puts the room on the box, not on the part. Leaf's words (review of 23 November, B2).
+                      <div className="px-2">
+                        <EmptyState scope="section" message="What it lists didn’t load." action={{ label: 'Try again', onClick: onRetryDocuments }} />
+                      </div>
                     ) : (
                       documents.length > 0 && (
                         // The shared list, its columns lined up with Projects and Issues: Leaf opens in a new tab, pages fold under

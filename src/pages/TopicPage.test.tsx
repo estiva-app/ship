@@ -202,11 +202,11 @@ describe("A topic's page in Ship", () => {
     expect(titles).toEqual(['Project p2', 'Project p1', 'Issue i2', 'Issue i1'])
   })
 
-  it('says "No projects, issues or documents yet." for a topic listing none, with no Archived link', async () => {
+  it('says Peek’s own line for a topic listing none, with no Archived link (review of 23 November, B2)', async () => {
     held.push(manifest('peek', 'peek.estiva.app', ['30840']), topic(D, 'Empty'))
     const { state, archives } = ship([], [])
     render(<Page d={D} state={state} folders={[]} archives={archives} />)
-    await waitFor(() => expect(within(page()).getByText('No projects, issues or documents yet.')).toBeTruthy())
+    await waitFor(() => expect(within(page()).getByText('None yet. An initiative can be only a conversation.')).toBeTruthy())
     expect(screen.queryByRole('button', { name: /Archived/ })).toBeNull()
   })
 
@@ -324,7 +324,7 @@ describe("A topic's page in Ship", () => {
 
     const all = ship([], [{ d: 'live', status: 'todo', archived: true }, { d: 'gone', status: 'done', archived: true }])
     render(<Page d={D} state={all.state} folders={[]} archives={all.archives} />)
-    await waitFor(() => expect(within(page()).getByText('All of its projects and issues are archived.')).toBeTruthy())
+    await waitFor(() => expect(within(page()).getByText('Everything it lists is archived.')).toBeTruthy())
     expect(screen.getByRole('button', { name: /^Archived/ }).getAttribute('aria-expanded')).toBe('true')
     expect(workRows()).toEqual(['Issue live', 'Issue gone'])
   })
@@ -373,7 +373,7 @@ describe("A topic's page in Ship", () => {
     refuseDocuments = true
     const { state, archives } = ship([], [])
     render(<Page d={D} state={state} folders={[]} archives={archives} />)
-    await waitFor(() => expect(screen.getByText('Documents didn’t load.')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('What it lists didn’t load.')).toBeTruthy())
     refuseDocuments = false
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
     await waitFor(() => expect(screen.getByRole('link', { name: /Testing widgets/ })).toBeTruthy())

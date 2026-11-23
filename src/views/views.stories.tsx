@@ -304,7 +304,7 @@ export const InitiativeLoading: Story = { name: 'Initiative: loading', render: (
 /** The initiative did not load: said, with Try again. */
 export const InitiativeFailed: Story = { name: 'Initiative: failed', render: () => <InitiativeStory topic="failed" /> }
 
-/** Its Leaf documents did not load: the rest of the page stands, and the Documents heading says so with Try again. */
+/** Its Leaf documents and other apps' files did not load: the rest of the page stands, and a line says so with Try again. */
 export const InitiativeDocumentsFailed: Story = { name: 'Initiative: documents failed', render: () => <InitiativeStory topic={INITIATIVE} documents="failed" files={[]} /> }
 
 /** Every issue in the workspace: All / Open / Assigned to me, grouped by status. Forty rows, so the page scrolls — in the frame's bar, not a native one. */
