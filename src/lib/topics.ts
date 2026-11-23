@@ -102,6 +102,21 @@ export function topicsByTab(read: TopicsRead, facts: TopicFacts = {}, folder?: s
   return lists
 }
 
+/**
+ * The tabs once you joined these here: each leaves Other initiatives and is in Your initiatives at once, in the order
+ * Your initiatives keeps (newest activity first, with `at`; else A to Z), as Peek's and Leaf's Join move it (Miky, 10 Nov).
+ */
+export function joinedToYours(lists: Record<TopicsTab, TopicRowData[]>, joined: ReadonlySet<string>, at?: ReadonlyMap<string, number>): Record<TopicsTab, TopicRowData[]> {
+  const arriving = lists.others.filter((row) => joined.has(row.address))
+  if (arriving.length === 0) return lists
+  const yours = [...lists.yours, ...arriving]
+  if (at) {
+    const newest = byActivity(at)
+    yours.sort((a, b) => newest(a.address, b.address))
+  } else yours.sort(byTitle)
+  return { ...lists, yours, others: lists.others.filter((row) => !joined.has(row.address)) }
+}
+
 /** The topics yours by {@link isYours}, by address: what the sidebar and Your topics order. */
 export function yourTopics(read: TopicsRead, muted?: ReadonlySet<string>): string[] {
   return read.topics

@@ -274,7 +274,7 @@ describe("Ship's Topics (Explore initiatives)", () => {
     expect(screen.getByText('No initiative matches “aunch”.')).toBeTruthy()
   })
 
-  it('Join puts you in the initiative with no level, as Peek’s Join does, so it lights at Important, and the row keeps its place with Join gone and one more member', async () => {
+  it('Join puts you in the initiative with no level, as Peek’s Join does, so it lights at Important, and moves its row to Your initiatives at once, Join gone and one more member', async () => {
     held.push(shipManifest(), topic('t-in', 'Mine'), joined('t-in'), topic('t-o', 'Theirs'))
     render(page())
     fireEvent.click(await screen.findByRole('tab', { name: /Other initiatives/ }))
@@ -289,10 +289,13 @@ describe("Ship's Topics (Explore initiatives)", () => {
     expect(sent.tags).toEqual(expect.arrayContaining([['a', address('t-o')], ['field', `member:${ME}`], ['value', 'true'], ['h', TEAM]]))
     // No level chosen: Important is the level of anyone in it who chose none (Katerina, 18 November: "let's make it to important").
     expect(sent.tags.some((t) => t[0] === 'field' && t[1].startsWith('follow:'))).toBe(false)
-    await waitFor(() => expect(within(rowOf('Theirs')).queryByRole('button', { name: 'Join' })).toBeNull())
-    expect(within(rowOf('Theirs')).getByText('2')).toBeTruthy()
-    // Not moved under the pointer: it goes to Your initiatives on the next open.
-    expect(titles()).toEqual(['Theirs'])
+    // Out of Other initiatives at once, into Your initiatives, as Peek's and Leaf's Join move it (Miky, 10 Nov).
+    await waitFor(() => expect(titles()).toEqual([]))
+    expect(screen.getByRole('tab', { name: /Other initiatives/ }).textContent).toContain('0')
+    fireEvent.click(screen.getByRole('tab', { name: /Your initiatives/ }))
+    await waitFor(() => expect(titles()).toEqual(expect.arrayContaining(['Mine', 'Theirs'])))
+    expect(within(rowOf('Theirs')).queryByRole('button', { name: 'Join' })).toBeNull()
+    await waitFor(() => expect(within(rowOf('Theirs')).getByText('2')).toBeTruthy())
     // Peek's Join toast, word for word, and no Undo (Katerina, 18 November, E1).
     expect(say).toHaveBeenCalledExactlyOnceWith('You joined Theirs. Notifications: Important.')
   })
@@ -312,8 +315,11 @@ describe("Ship's Topics (Explore initiatives)", () => {
     expect(unmute.tags).toContainEqual(['d', MUTED_D_TAG])
     const list = JSON.parse(unmute.content.slice('cipher:'.length)) as { keys: string[] }
     expect(list.keys).toEqual([address('t-other')])
-    // You were following it already, muted: still two members, not three.
-    await waitFor(() => expect(within(rowOf('Muted')).queryByRole('button', { name: 'Join' })).toBeNull())
+    // You were following it already, muted: still two members, not three; in Your initiatives now.
+    await waitFor(() => expect(titles()).not.toContain('Muted'))
+    fireEvent.click(screen.getByRole('tab', { name: /Your initiatives/ }))
+    await waitFor(() => expect(titles()).toContain('Muted'))
+    expect(within(rowOf('Muted')).queryByRole('button', { name: 'Join' })).toBeNull()
     expect(within(rowOf('Muted')).getByText('2')).toBeTruthy()
   })
 
