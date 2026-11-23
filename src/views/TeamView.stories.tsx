@@ -44,7 +44,7 @@ type Story = StoryObj<typeof meta>
 /** The old Folder page's team, now: its initiative, its projects and its issue listed with their facts, lined up in one column set; the other app's file counted. */
 export const Default: Story = {}
 
-/** An owner or admin: the ⋮ holds Rename… and Archive team…, where the old page had the editable title and a button. */
+/** An owner or admin: the ⋮ holds Rename and Archive… (Peek’s words), where the old page had the editable title and a button. */
 export const ForAnOwner: Story = { args: { onRename: fn(), onArchive: fn() } }
 
 /** Its initiatives still being read: the heading, and a skeleton in their place. */

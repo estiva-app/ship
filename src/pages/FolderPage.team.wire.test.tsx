@@ -1,6 +1,6 @@
 /**
  * A team's page (D6, Katerina 18 November: "a team's page as Peek's") at the wire: who is in it is read from the relay
- * as Peek reads a team's roster, and Rename… in its ⋮ signs the same rename the page wrote before — a real `Store`
+ * as Peek reads a team's roster, and Rename in its ⋮ signs the same rename the page wrote before — a real `Store`
  * signing against a fake relay, so what is checked is the event the relay is sent.
  */
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
@@ -124,11 +124,11 @@ describe("A team's page reads who is in it, as Peek reads a team's roster", () =
 })
 
 describe("A team's page renames it from its ⋮ (FOL-8, D6)", () => {
-  it('Rename… opens the team rename, filled, and signs the same rename event the page wrote before', async () => {
+  it('Rename opens the team rename, filled, and signs the same rename event the page wrote before', async () => {
     readFolder.mockResolvedValue(team())
     render(<FolderPage id={TEAM} say={say} />)
     fireEvent.click(await screen.findByRole('button', { name: 'More actions' }))
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Rename…' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Rename' }))
     const dialog = await screen.findByRole('dialog', { name: 'Rename team' })
     const field = within(dialog).getByRole('textbox', { name: 'Team name' })
     expect(field).toHaveValue('Onboarding')

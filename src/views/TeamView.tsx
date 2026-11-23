@@ -25,8 +25,8 @@ export type TeamFileRow = Omit<WorkListRow, 'members' | 'description'>
 
 /**
  * **A team's page in Ship, drawn as Peek's** (Katerina, 18 November, D6: "show me the before and after"): the kit's
- * `PageHeader` with the team's icon, its name, who is in it and its ⋮ (Rename… and Archive team… for its owners and
- * admins); then the kit's lists, one per kind, each under a heading with its count — its **Initiatives** as Explore lists
+ * `PageHeader` with the team's icon, its name, who is in it and its ⋮ (Rename and Archive…, Peek's words, for its owners
+ * and admins); then the kit's lists, one per kind, each under a heading with its count — its **Initiatives** as Explore lists
  * them, its **Projects**, and **Issues** filed in it directly. Ship lists its own kinds and the initiatives it shows
  * everywhere; another app's file is counted on the last line, as the old page did (RFC 0.5 §10.7). No # topics: Ship
  * never shows them (Miky, 2–4 Nov).
@@ -84,8 +84,8 @@ export function TeamView({ name, members, onRename, onArchive, archivedNotice, i
                       </ToolbarButton>
                     }
                   >
-                    {onRename && <MenuItem label="Rename…" onClick={onRename} />}
-                    {onArchive && <MenuItem label="Archive team…" onClick={onArchive} />}
+                    {onRename && <MenuItem label="Rename" onClick={onRename} />}
+                    {onArchive && <MenuItem label="Archive…" onClick={onArchive} />}
                   </Menu>
                 </Toolbar>
               ),

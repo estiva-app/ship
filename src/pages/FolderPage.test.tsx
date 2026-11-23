@@ -1,8 +1,7 @@
 /**
  * A team's page (D6, Katerina 18 November: "a team's page as Peek's"; RFC 0.4 §4–5, narrowed by RFC 0.5 §10.7).
  *
- * What it claims: the kit's header — the team's name, who is in it, its ⋮ for owners and admins (Rename…, Archive
- * team…); then its **initiatives** as Explore lists them (never a space, never another team's), its **projects** and
+ * What it claims: the kit's header — the team's name, who is in it, its ⋮ for owners and admins (Rename, Archive…); then its **initiatives** as Explore lists them (never a space, never another team's), its **projects** and
  * **issues** with the facts Ship's own lists show, read from the workspace Ship already holds; and what Ship does not
  * list, counted — a kind nobody here has heard of is "not mine" with no list of kinds in the rule, and a team of only
  * such files never reads as empty. Who is in it, and the rename at the wire, are FolderPage.team.wire.test.
@@ -61,7 +60,7 @@ const folder = (over: Partial<Record<string, unknown>> = {}) => ({
   id: 'f1',
   name: 'Onboarding',
   hasState: true,
-  // The viewer administers it, so it is offered Rename… and Archive team… (MAN-17).
+  // The viewer administers it, so it is offered Rename and Archive… (MAN-17).
   admins: [ME],
   source: 'state',
   files: [file()],
@@ -210,14 +209,14 @@ describe('FolderPage', () => {
     expect(await screen.findByRole('button', { name: 'Unarchive' })).toBeInTheDocument()
     // Archived: nothing more to archive from its ⋮.
     fireEvent.click(screen.getByRole('button', { name: 'More actions' }))
-    expect(screen.queryByRole('menuitem', { name: 'Archive team…' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: 'Archive…' })).not.toBeInTheDocument()
   })
 })
 
 describe('FolderPage renames its team from its ⋮ (FOL-8, D6)', () => {
   const rename = async (to: string) => {
     fireEvent.click(await screen.findByRole('button', { name: 'More actions' }))
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Rename…' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Rename' }))
     const dialog = await screen.findByRole('dialog', { name: 'Rename team' })
     fireEvent.change(within(dialog).getByRole('textbox', { name: 'Team name' }), { target: { value: to } })
     return dialog
@@ -280,11 +279,11 @@ describe('FolderPage offers its ⋮ only to the team’s owners and admins', () 
     expect(screen.queryByRole('button', { name: 'More actions' })).not.toBeInTheDocument()
   })
 
-  it('to an admin: Rename… and Archive team…', async () => {
+  it('to an admin: Rename and Archive…, Peek’s words (review of 23 November, B4)', async () => {
     readFolder.mockResolvedValue(folder({ channel, admins: [ME] }))
     render(<FolderPage id="f1" say={say} />)
     fireEvent.click(await screen.findByRole('button', { name: 'More actions' }))
-    expect(await screen.findByRole('menuitem', { name: 'Rename…' })).toBeInTheDocument()
-    expect(screen.getByRole('menuitem', { name: 'Archive team…' })).toBeInTheDocument()
+    expect(await screen.findByRole('menuitem', { name: 'Rename' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Archive…' })).toBeInTheDocument()
   })
 })
