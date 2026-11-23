@@ -27,6 +27,12 @@ export function rememberOpenedFromInitiative(topic: string, file: string): void 
   tell()
 }
 
+/** A row under an initiative was clicked: a plain click opens its page here, lit there; one for a new tab or window changes nothing here. */
+export function rememberClickUnderInitiative(event: { button: number; metaKey: boolean; ctrlKey: boolean; shiftKey: boolean; altKey: boolean }, topic: string, file: string): void {
+  if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+  rememberOpenedFromInitiative(topic, file)
+}
+
 /** Another page is open, or none: the click is spent, unless it was for this one. */
 export function forgetOpenedFromInitiative(unless?: string): void {
   if (!last || last.file === unless) return

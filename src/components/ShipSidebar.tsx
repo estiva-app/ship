@@ -6,7 +6,7 @@ import { SkeletonList } from '@/components/ui/Skeleton'
 import { TOPICS_SHOWN, type SidebarTopic } from '@/lib/topics'
 import { href } from '@/router'
 import { useReportFailure } from '@/lib/failureReports'
-import { forgetOpenedFromInitiative, rememberOpenedFromInitiative, useOpenedFromInitiative } from '@/lib/openedFrom'
+import { forgetOpenedFromInitiative, rememberClickUnderInitiative, useOpenedFromInitiative } from '@/lib/openedFrom'
 
 /**
  * The sidebar: Projects, Issues, your five newest topics then Explore topics
@@ -209,7 +209,7 @@ export function ShipSidebar({ openIssues, activeProjects, hrefFor, folders = [],
                       href={work.href}
                       icon={<KindIcon kind={work.kind} />}
                       active={litUnder === topic.id && openFile === work.id}
-                      onClick={() => rememberOpenedFromInitiative(topic.id, work.id)}
+                      onClick={(event) => rememberClickUnderInitiative(event, topic.id, work.id)}
                     />
                   ))
                 : undefined}
