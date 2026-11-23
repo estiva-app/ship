@@ -141,6 +141,9 @@ describe('FolderPage', () => {
     const issueRow = work('issue')[0]!
     expect(within(issueRow).getByText('Todo')).toBeInTheDocument()
     expect(issueRow.querySelector('[aria-label="Ana Duarte"]')).not.toBeNull()
+    // When: who changed each last, by first name, and when — Ship's words on an initiative's rows (Katerina, 23 November).
+    expect(within(issueRow).getByText(/^Ana, /)).toBeInTheDocument()
+    expect(within(projectRow).getByText(/^Ana, /)).toBeInTheDocument()
     // Navigation is by kind (§10.7): a kind nobody here has heard of is counted, and the count says where it is listed.
     expect(screen.queryByText('Spring tides')).not.toBeInTheDocument()
     expect(screen.getByText('1 other file, listed in Peek')).toBeInTheDocument()

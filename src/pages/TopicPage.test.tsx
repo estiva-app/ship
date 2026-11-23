@@ -226,7 +226,7 @@ describe("A topic's page in Ship", () => {
     expect(within(row).queryByText('–')).toBeNull()
   })
 
-  it('says when an issue last changed, who edited a document last and when, and folds a document open to its pages (TOPI-8; A4)', async () => {
+  it('says who edited an issue and a document last, and when, and folds a document open to its pages (TOPI-8; A4)', async () => {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date((1_700_000_000 + 3 * 3600) * 1000))
     const KATERINA = 'b'.repeat(64)
@@ -256,8 +256,9 @@ describe("A topic's page in Ship", () => {
     render(<Page d={D} state={state} folders={[]} archives={archives} />)
 
     await waitFor(() => expect(page().querySelector('[data-work-kind="issue"]')).not.toBeNull())
-    // The When column, in Peek's words; who is in its People column (its assignee), not who edited it (A4: one column set).
-    expect(within(page().querySelector<HTMLElement>('[data-work-kind="issue"]')!).getByText('1 hour ago')).toBeTruthy()
+    // The When column says who edited it last and when, in today's words (Katerina, 23 November: "if the who edited last is
+    // the current wording keep it"); its assignee is in the People column.
+    expect(within(page().querySelector<HTMLElement>('[data-work-kind="issue"]')!).getByText('bbbbbbbb, 1h ago')).toBeTruthy()
     const row = await waitFor(() => {
       const found = page().querySelector<HTMLElement>(`[data-topic-document="${SPEC}"]`)
       expect(found).not.toBeNull()

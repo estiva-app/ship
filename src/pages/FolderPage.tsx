@@ -6,6 +6,7 @@ import { reloadTopics, useMuted, useTopicActivity, useTopicMembers, useTopics } 
 import { ArchiveDialog, ArchivedNotice, type AvatarGroupMember } from '@estiva-app/ui'
 import { ARCHIVE_WORDS, archivedNoticeOf, type Archives } from '@/lib/archive'
 import { statusLabel } from '@/lib/issues'
+import { editedLabel } from '@/lib/time'
 import { splitByKind } from '@/lib/ownKinds'
 import { projectTabs } from '@/lib/projects'
 import { lastEditOf, topicsByTab } from '@/lib/topics'
@@ -162,7 +163,7 @@ export function FolderPage({ id, folders, directory, state = null, archives, say
         const edit = project?.author && project.createdAt !== undefined ? lastEditOf({ author: project.author, createdAt: project.createdAt, fields: project.fields ?? {} }) : undefined
         projects.push(
           row
-            ? { address, title: row.title, href: row.href, status: row.status, ...(row.lead ? { person: row.lead } : {}), progress: row.progress, ...(edit ? { at: edit.at } : {}) }
+            ? { address, title: row.title, href: row.href, status: row.status, ...(row.lead ? { person: row.lead } : {}), progress: row.progress, ...(edit ? { at: edit.at, edited: editedLabel(nameOf(edit.by), edit.at) } : {}) }
             : // Before the workspace lands: its name and link now, its facts as the kit's "not read yet" dash.
               { address, title, href: href({ name: 'project', d, slug: title, view: 'table' }), ...(tabs ? {} : { pending: true }) },
         )
@@ -177,7 +178,8 @@ export function FolderPage({ id, folders, directory, state = null, archives, say
                 href: href({ name: 'issue', d: issue.id, slug: issue.title }),
                 status: { value: issue.status, label: statusLabel(issue.status, ISSUE_STATUSES) },
                 ...(issue.assignee && personOf ? { person: personOf(issue.assignee) } : {}),
-                ...(edit ? { at: edit.at } : {}),
+                // Who changed it last and when, in Ship's words ("Ana, 1h ago"), as an initiative's rows say it.
+                ...(edit ? { at: edit.at, edited: editedLabel(nameOf(edit.by), edit.at) } : {}),
               }
             : { address, title, href: href({ name: 'issue', d, slug: title }), ...(state ? {} : { pending: true }) },
         )

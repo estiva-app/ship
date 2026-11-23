@@ -10,7 +10,7 @@ import { archivedNoticeOf, type Archives } from '@/lib/archive'
 import { safeLink } from '@/lib/handoff'
 import { projectTabs } from '@/lib/projects'
 import { useTabTitle } from '@/lib/tabTitle'
-import { ago } from '@/lib/time'
+import { editedLabel } from '@/lib/time'
 import { isSiblingHost, topicHref } from '@/lib/topicLinks'
 import { topicOfD, topicPageOf } from '@/lib/topics'
 import { href } from '@/router'
@@ -19,10 +19,6 @@ import { act, type Say } from './act'
 import { copyText, pickerPeople } from './ProjectPage'
 import { useTopicConversation } from './topicConversation'
 
-/** "Katerina, 2h ago": who edited a file last, by first name, and when (the prototype's rows, Miky 4 Nov). */
-export function editedLabel(name: string, at: number, now: number = Date.now()): string {
-  return `${name.split(' ')[0]}, ${ago(at, now)}`
-}
 
 /**
  * A topic's page in Ship (SHIPS-4): what it lists that Ship holds, from the
@@ -130,13 +126,16 @@ export function TopicPage({
       .all.sort((a, b) => (order.get(a.addr) ?? 0) - (order.get(b.addr) ?? 0))
       // When it last changed, for the page's When column (A4), from the row the topic's read made of it.
       .map((project) => {
-        const at = page.live.find((row) => row.address === project.addr)?.edited?.at
-        return at ? { ...project, changedAt: at } : project
+        const edited = page.live.find((row) => row.address === project.addr)?.edited
+        // Who changed it last and when, in Ship's words ("Ana, 1h ago"): the When column (Katerina, 23 November: keep it).
+        return edited ? { ...project, changedAt: edited.at, changedLabel: editedLabel(nameOf(edited.by), edited.at) } : project
       })
     // An issue's row: its assignee's face (the People column, A4); its last change is the row's own `edited`.
     const withFacts = (row: (typeof page.live)[number]) => ({
       ...row,
       ...(row.assignee ? { assigneePerson: personOf(row.assignee) } : {}),
+      // Who edited it last and when, today's words on these rows ("Ana, 1h ago"; Katerina, 23 November: "keep it").
+      ...(row.edited ? { editedLabel: editedLabel(nameOf(row.edited.by), row.edited.at) } : {}),
     })
     const issues = page.live.filter((row) => row.kind === 'issue').map(withFacts)
     const team = folders?.find((folder) => folder.id === page.folder)?.name

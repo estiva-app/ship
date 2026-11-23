@@ -29,7 +29,7 @@ export interface TopicDocument {
 }
 
 /** A project's or an issue's row on the page, with an issue's assignee as a face. */
-export type TopicWork = WorkRow & { assigneePerson?: Person }
+export type TopicWork = WorkRow & { assigneePerson?: Person; /** "Ana, 1h ago": who edited it last and when. */ editedLabel?: string }
 
 /** What the page draws of a topic: its projects as the Projects page draws them, its issues, and the archived ones. */
 export interface TopicPageView {
@@ -84,7 +84,7 @@ export interface TopicViewProps {
 }
 
 /** A project as `WorkList` draws it: its status, lead, progress and last change. */
-const projectRow = (project: ProjectRowData & { changedAt?: number }): WorkListRow => ({
+const projectRow = (project: ProjectRowData & { changedAt?: number; changedLabel?: string }): WorkListRow => ({
   address: project.addr,
   title: project.title,
   href: project.href,
@@ -92,6 +92,7 @@ const projectRow = (project: ProjectRowData & { changedAt?: number }): WorkListR
   ...(project.lead ? { person: project.lead } : {}),
   progress: project.progress,
   ...(project.changedAt ? { at: project.changedAt } : {}),
+  ...(project.changedLabel ? { edited: project.changedLabel } : {}),
 })
 
 /** A project or an issue on the page as `WorkList` draws it: an issue with its project under its name, as its row here named it. */
@@ -104,6 +105,7 @@ const workRow = (row: TopicWork): WorkListRow => ({
   ...(row.assigneePerson ? { person: row.assigneePerson } : {}),
   ...(row.progress ? { progress: row.progress } : {}),
   ...(row.edited ? { at: row.edited.at } : {}),
+  ...(row.editedLabel ? { edited: row.editedLabel } : {}),
 })
 
 export function TopicView({ topic, documents, onRetry, onRetryDocuments, topicsHref, members, comments, conversation, onCopyLink, peekUrl }: TopicViewProps) {

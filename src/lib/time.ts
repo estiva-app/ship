@@ -47,3 +47,8 @@ export function formatActive(at: number, now: number = Date.now()): string {
   }
   return ''
 }
+
+/** "Katerina, 2h ago": who edited a file last, by first name, and when — Ship's words on an initiative's rows (the prototype's, Miky 4 Nov), kept on every list's When (Katerina, 23 November). */
+export function editedLabel(name: string, at: number, now: number = Date.now()): string {
+  return `${name.split(' ')[0]}, ${ago(at, now)}`
+}

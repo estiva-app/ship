@@ -27,6 +27,11 @@ export interface WorkListRow {
   /** Unix seconds: when anything last happened in it — an initiative's Active, a project's or an issue's last change. */
   at?: number
   /**
+   * A project's or an issue's last change in Ship's words, who and when: "Ana, 1h ago" (Katerina, 23 November: "if the
+   * who edited last is the current wording keep it"). Shown in When in place of the bare time.
+   */
+  edited?: string
+  /**
    * Its facts are not read yet (a team's page drawn before Ship's workspace lands): every fact its kind has is the kit's
    * dash, "not read yet", never the empty cell that says "this kind has none".
    */
@@ -71,7 +76,7 @@ export function WorkList({ label, kind, rows, now = Date.now() }: { label: strin
   }
   const progress = (row: WorkListRow) => (kind !== 'project' ? NONE : waiting(row) ? undefined : row.progress ? <ProgressRing done={row.progress.done} total={row.progress.total} /> : NONE)
   // An initiative's Active not read yet is the dash, as Explore's; for a project or an issue no time is nothing to say.
-  const when = (row: WorkListRow) => (row.at ? formatActive(row.at * 1000, now) : kind === 'topic' || waiting(row) ? undefined : NONE)
+  const when = (row: WorkListRow) => (kind !== 'topic' && row.edited ? row.edited : row.at ? formatActive(row.at * 1000, now) : kind === 'topic' || waiting(row) ? undefined : NONE)
   return (
     <ListTable aria-label={label} columns={COLUMNS} headings={false}>
       {rows.map((row) => (
