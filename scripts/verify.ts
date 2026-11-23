@@ -29,7 +29,8 @@ import { secretKeySigner } from '../src/nostr/signer'
 import { addrToNaddr, toRenderTree } from '@estiva-app/protocol'
 import { linkTagsOf, mentionedInOf } from '@estiva-app/interop'
 import { Store } from '../src/nostr/store'
-import { conversationsAbout, foldFolder } from '../src/nostr/fold'
+import { conversationsAbout } from '../src/nostr/conversations'
+import { readState } from '../src/nostr/read'
 import { KIND } from '../src/nostr/kinds'
 
 const RELAY_URL = process.env.RELAY_URL ?? 'http://localhost:3000'
@@ -138,7 +139,7 @@ async function main() {
   // ── 4. Read back and fold ──────────────────────────────────────────────────
   // Read as Ravi, to prove this is the shared record and not one client's cache.
   const raw = await ravi.store.rawFolders([folder])
-  const state = foldFolder(raw)
+  const state = readState(raw)
 
   console.log(`\nread back ${raw.length} events from the relay\n`)
 
@@ -230,7 +231,7 @@ async function main() {
   await must('Ravi then honestly sets it to done', () =>
     ravi.store.setField({ folder, target: webhook.addr, field: 'status', value: 'done' }),
   )
-  const afterLie = foldFolder(await ravi.store.rawFolders([folder])).issues.find(
+  const afterLie = readState(await ravi.store.rawFolders([folder])).issues.find(
     (issue) => issue.addr === webhook.addr,
   )
   check(
@@ -391,7 +392,7 @@ async function main() {
       archived: true,
     }),
   )
-  const archivedState = foldFolder(await ravi.store.rawFolders([folder]))
+  const archivedState = readState(await ravi.store.rawFolders([folder]))
   const archivedProject = archivedState.projects.find((p) => p.addr === project.addr)
   check('a non-author can archive', archivedProject?.archived === true)
   check(
@@ -404,7 +405,7 @@ async function main() {
   )
   check(
     'archiving is reversible',
-    foldFolder(await ravi.store.rawFolders([folder])).projects.find(
+    readState(await ravi.store.rawFolders([folder])).projects.find(
       (p) => p.addr === project.addr,
     )?.archived === false,
   )

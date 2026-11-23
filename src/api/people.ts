@@ -1,4 +1,4 @@
-import type { FolderState } from '../nostr/fold'
+import type { FolderState } from '../nostr/read'
 
 /**
  * Everyone visible in a workspace snapshot — the directory's fetch list.

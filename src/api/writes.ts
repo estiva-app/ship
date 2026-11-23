@@ -4,7 +4,9 @@ import { MAX_MENTIONED_PEOPLE, boxLinksOf, embedsToEdit, embedsToSend, namedBefo
 import { isSwitchRefusal, linksIn, listedBeneath, MAX_LINKS_ASKED, prevsAfterSwitch, textOf, within, type OwnPlace } from '@estiva-app/interop'
 import type { FileText } from '@estiva-app/conversation'
 import type { DocumentAsks } from '@estiva-app/ui/editor'
-import { foldFolder, type Conversation, type Issue, type Project } from '../nostr/fold'
+import { readState } from '../nostr/read'
+import { type Conversation } from '../nostr/conversations'
+import { type Issue, type Project } from '../nostr/files'
 import type { CreateFileResult } from '@estiva-app/interop'
 import { clashes, explicitKey, keyOfRef, nextRef, projectKeys, suggestKey, takenKeys } from '../nostr/keys'
 import { clockProblem } from './clock'
@@ -49,7 +51,7 @@ import type { ReadTopic } from '@estiva-app/interop'
  * 2026-08-29, when a re-pointed project's content Folder could differ from its
  * record's: a project change published against the content Folder instead
  * of the record's is accepted by the relay, `ok: true`, no reason given. The
- * fold keys changes by target address, so `foldFolder` over the whole
+ * fold keys changes by target address, so `readState` over the whole
  * workspace applies it and the app looks correct — but `loadFolder` and
  * `loadFolders` filter by `#h`, so anything reading the record's own Folder
  * never sees it. The edit exists for one reader and not for another,
@@ -712,7 +714,7 @@ let deletedRead: Promise<Issue[]> | undefined
 /** Every deleted issue this reader can read, folded, with who deleted it (SPEC §6.5): for the Archived tab and numbering. `fresh` reads again. */
 export function readDeletedIssues(fresh = false): Promise<Issue[]> {
   if (fresh || !deletedRead) {
-    const read = store.deletedIssueEvents().then((events) => foldFolder(events).issues.filter((issue) => issue.deleted))
+    const read = store.deletedIssueEvents().then((events) => readState(events).issues.filter((issue) => issue.deleted))
     // A failed read is not kept: the next one tries again.
     read.catch(() => {
       if (deletedRead === read) deletedRead = undefined
@@ -724,7 +726,7 @@ export function readDeletedIssues(fresh = false): Promise<Issue[]> {
 
 /** An issue by the `d` of its link, folded with every change, a deleted one with who deleted it (SPEC §6.5); undefined when there is none this reader can read. */
 export async function readIssueByLink(d: string): Promise<Issue | undefined> {
-  return foldFolder(await store.issueByLink(d)).issues.find((issue) => issue.id === d)
+  return readState(await store.issueByLink(d)).issues.find((issue) => issue.id === d)
 }
 
 /**

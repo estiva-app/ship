@@ -63,7 +63,7 @@ export const KIND = {
    * the same object without either owning the comment kind.
    *
    * Uppercase `A`/`E`/`K`/`P` name the thread root, lowercase the immediate
-   * parent. See `parseNip22Comment` in `fold.ts` — the case is the whole spec.
+   * parent. See `parseNip22Comment` in `conversations.ts` — the case is the whole spec.
    */
   COMMENT: 1111,
   /**
@@ -95,7 +95,7 @@ export const KIND = {
    *
    * An edit never rewrites: `kind:9` and `kind:1111` are non-replaceable, so
    * this is a separate event naming its target and the reader folds the pair.
-   * `edits.ts` holds that fold, deliberately outside `foldFolder` — see its
+   * `edits.ts` holds that fold, deliberately outside `readState` — see its
    * header for why the conformance contract forces it.
    *
    * **Channel-scoped**, unlike a reaction or a deletion: 40003 is in the

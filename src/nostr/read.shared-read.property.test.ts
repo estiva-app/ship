@@ -1,12 +1,13 @@
 /**
- * Ship's own read and the shared read, on made-up histories (TES-2).
+ * What Ship shows and what the shared read gives, on made-up histories (TES-2).
  *
- * Ship folds a project or an issue with `foldFolder`. Peek, Leaf and the agent
- * read the same events through `@estiva-app/interop`'s `projectEvents`, by
- * what Ship's manifest says (`manifestContent()`), so a rule the fold applies
- * and the manifest does not state is a rule only Ship follows. That is how a
- * project renamed in Ship kept its old name in every other app (ship#127) and
- * a renamed issue did too (ship#231).
+ * Ship reads a project or an issue with `readState`, which is the shared read
+ * (`@estiva-app/interop`'s `projectEvents`, by Ship's manifest) named the way
+ * Ship's pages hold it (`files.ts`), since MOV-4; before, Ship had a read of its
+ * own, and a rule it applied and the manifest did not state was a rule only Ship
+ * followed. That is how a project renamed in Ship kept its old name in every
+ * other app (ship#127) and a renamed issue did too (ship#231). What is left to
+ * guard is the naming: a field `files.ts` takes from the wrong slot, or drops.
  *
  * Here both reads get the same histories, made up by
  * `@estiva-app/protocol/testing` (projects and issues created, renamed, moved,
@@ -25,20 +26,22 @@
  * text. "When" is compared to the second: Ship's fold keeps a change's second,
  * and the change's id already says which change of that second it is. The id
  * carries the comparison: where the reads pick different changes, the id, the
- * person and the time all differ at once, from one wrong winner. The
- * file's history is not compared yet; the shared read has none (MOV-2).
+ * person and the time all differ at once, from one wrong winner. The file's
+ * history, every change in order as Ship's History panel lists it, is compared
+ * with the shared history (`historyOf`), since MOV-4.
  *
  * A failure prints the smallest history that breaks it and the seed that
- * replays it: `FC_SEED=<seed> npx vitest run src/nostr/fold.shared-read`.
+ * replays it: `FC_SEED=<seed> npx vitest run src/nostr/read.shared-read`.
  * A difference where both readings could be right is Miky's to decide; his
  * answers are `KEPT` below, and nothing else is.
  */
 import { describe, expect, test } from 'vitest'
 import fc from 'fast-check'
 import { deliveryArb, historyArb, runSettings } from '@estiva-app/protocol/testing'
-import { BLOCK_DOCUMENT_FORMAT, filesOf, projectEvents, textOf, type FileFields, type ForeignObject } from '@estiva-app/interop'
+import { BLOCK_DOCUMENT_FORMAT, filesOf, historyOf, projectEvents, textOf, type FileChange, type FileFields, type ForeignObject } from '@estiva-app/interop'
 import type { SignedEvent } from '@estiva-app/protocol'
-import { ARCHIVED_OR_DELETED, foldFolder, type Issue, type Project } from './fold'
+import { ARCHIVED_OR_DELETED, type Change, type Issue, type Project } from './files'
+import { readState } from './read'
 import { manifestContent } from './manifest'
 import { ISSUE_STATUSES, KIND, PROJECT_STATUSES } from './kinds'
 import { statusLabel } from '../lib/issues'
@@ -71,6 +74,8 @@ interface Seen {
   stage: string
   /** For each field a change set: that change's id, who made it, and the second it was made. */
   setBy: Record<string, string>
+  /** Every change to it, oldest first: its id, the field and value it set, and who made it. */
+  history: string[]
 }
 
 /**
@@ -88,7 +93,9 @@ function compared(seen: Record<string, Seen>): Record<string, Partial<Seen>> {
   )
 }
 
-function seenByShip(file: Project | Issue): Seen {
+const line = (id: string, field: string, value: string, by: string) => `${id} ${field}=${value} by ${by}`
+
+function seenByShip(file: Project | Issue, activity: Change[]): Seen {
   const issue = 'folder' in file ? file : undefined
   return {
     title: file.title,
@@ -106,13 +113,15 @@ function seenByShip(file: Project | Issue): Seen {
     lead: issue ? '' : ((file as Project).lead ?? ''),
     stage: file.stage ?? '',
     setBy: Object.fromEntries(Object.entries(file.fields).map(([field, set]) => [field, `${set.id} by ${set.by} at ${set.at}`])),
+    // As the History panel lists it: the activity's changes to this file, in the activity's order.
+    history: activity.filter((change) => change.target === file.addr).map((change) => line(change.id, change.field, change.value, change.author)),
   }
 }
 
 /** A `content-format` as Ship names it (`contentFormatOf`): none is marker text, the block format is blocks. */
 const formatName = (format: string | undefined) => (!format ? 'marker' : format === BLOCK_DOCUMENT_FORMAT ? 'blocks' : 'unknown')
 
-function seenBySharedRead(object: ForeignObject, file: FileFields | undefined): Seen {
+function seenBySharedRead(object: ForeignObject, file: FileFields | undefined, history: FileChange[]): Seen {
   const meta = (named: (slot: ForeignObject['meta'][number]) => boolean) => object.meta.find(named)?.value ?? ''
   const text = file?.fields.description ?? (file ? textOf(file.root) : undefined)
   return {
@@ -129,24 +138,26 @@ function seenBySharedRead(object: ForeignObject, file: FileFields | undefined): 
     lead: object.kind === KIND.ISSUE ? '' : meta((slot) => slot.label === 'Lead'),
     stage: object.slots.status?.stage ?? '',
     setBy: Object.fromEntries(Object.entries(file?.fields ?? {}).map(([field, set]) => [field, `${set.id} by ${set.pubkey} at ${Math.floor(set.at / 1000)}`])),
+    history: history.filter((change) => change.address === object.address).map((change) => line(change.id, change.field, change.value, change.pubkey)),
   }
 }
 
 /** Every project and issue, by address, as each read shows it. */
 function bothReads(events: SignedEvent[]): { ship: Record<string, Partial<Seen>>; shared: Record<string, Partial<Seen>> } {
-  const folded = foldFolder(events)
-  const ship = Object.fromEntries([...folded.projects, ...folded.issues].map((file) => [file.addr, seenByShip(file)]))
+  const read = readState(events)
+  const ship = Object.fromEntries([...read.projects, ...read.issues].map((file) => [file.addr, seenByShip(file, read.activity)]))
   const files = new Map(filesOf(events, { withText: true }).map((file) => [file.address, file]))
+  const history = historyOf(events)
   const shared = Object.fromEntries(
     projectEvents(events, () => resolved)
       .filter((object) => object.kind === KIND.PROJECT || object.kind === KIND.ISSUE)
-      .map((object) => [object.address!, seenBySharedRead(object, files.get(object.address!))]),
+      .map((object) => [object.address!, seenBySharedRead(object, files.get(object.address!), history)]),
   )
   return { ship: compared(ship), shared: compared(shared) }
 }
 
-describe("Ship's read and the shared read Peek and Leaf use", () => {
-  test('show the same of everything Ship shows about a project or an issue: its title, status, stage, summary, parent, assignee, archived, deleted, description, key, lead, and who set each field and when', () => {
+describe("What Ship shows and the shared read Peek and Leaf use", () => {
+  test('show the same of everything Ship shows about a project or an issue: its title, status, stage, summary, parent, assignee, archived, deleted, description, key, lead, who set each field and when, and its history', () => {
     fc.assert(
       fc.property(historyArb().chain((history) => deliveryArb(history.events)), (events) => {
         const { ship, shared } = bothReads(events)

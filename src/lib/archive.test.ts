@@ -8,14 +8,15 @@ const OTHER_PROJECT = '30850:x:orchard'
 const ISSUE = '30851:x:spring'
 const LONE = '30851:x:lone'
 
-type Fields = Record<string, { value: string; by: string; at: number }>
-const field = (value: string, by = A, at = 10) => ({ value, by, at })
-const change = (target: string, value: string, note = '') => ({ target, field: 'archived', value, note })
+type Fields = Record<string, { value: string; by: string; at: number; id: string }>
+// Each field's winner names its change by id, as the shared read gives it; `w` is the winning one.
+const field = (value: string, by = A, at = 10) => ({ value, by, at, id: 'w' })
+const change = (target: string, value: string, note = '', id = 'w') => ({ id, target, field: 'archived', value, note })
 
 describe('ownArchive — the winning change, and its note as the resolution (FOL-46)', () => {
-  it('reads the winner off the fold and the note off the last change to the field', () => {
+  it('reads the winner off the shared read and the note off the change that won', () => {
     const file = { addr: PROJECT, fields: { archived: field('true', B, 20) } }
-    const activity = [change(PROJECT, 'true', 'first'), change(PROJECT, '', ''), change(PROJECT, 'true', 'Moved to the orchard.')]
+    const activity = [change(PROJECT, 'true', 'first', 'c1'), change(PROJECT, '', '', 'c2'), change(PROJECT, 'true', 'Moved to the orchard.')]
     expect(ownArchive(file, activity)).toEqual({ by: B, at: 20, resolution: 'Moved to the orchard.' })
   })
 

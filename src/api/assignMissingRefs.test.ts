@@ -15,7 +15,7 @@ const { setField } = vi.hoisted(() => ({
 vi.mock('./store', () => ({ store: { setField }, signer: { pubkey: 'a'.repeat(64) }, projectFieldsNow: async () => undefined, issueFieldsNow: async () => undefined }))
 vi.mock('./clock', () => ({ clockProblem: async () => undefined }))
 
-import type { Issue, Project } from '../nostr/fold'
+import type { Issue, Project } from '../nostr/files'
 import { assignMissingRefs, settleClaims } from './writes'
 
 const project = (d: string, title: string, key?: string, createdAt = 1) =>

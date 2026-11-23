@@ -141,7 +141,7 @@ vi.mock('./store', async () => {
 vi.mock('./clock', () => ({ clockProblem: async () => undefined }))
 
 const { assignMissingRefs, createIssue, createProject, deleteIssue, noteFileText, readDeletedIssues, readIssueByLink, setIssueDeleted, setIssueField } = await import('./writes')
-const { foldFolder } = await import('../nostr/fold')
+const { readState } = await import('../nostr/read')
 const { foldWorkspace } = await import('../nostr/store')
 
 const project = { addr: `30850:${PK}:p`, id: 'p', title: 'Payments', key: 'PAY', contentFolder: FOLDER, createdAt: 1, fields: {} } as never
@@ -163,7 +163,7 @@ const change = (d: string, id: string, field: string, value: string, at: number,
 const doc = (...blocks: [string, string][]) => serializeBlockDocument({ type: 'doc', content: blocks.map(([id, text]) => ({ type: 'paragraph', id, content: [{ type: 'text', text }] })) } as never)
 
 /** The issue as a page holding every event so far would show it. */
-const issueNow = (d: string) => foldFolder(held).issues.find((issue) => issue.id === d)!
+const issueNow = (d: string) => readState(held).issues.find((issue) => issue.id === d)!
 
 beforeEach(() => {
   held = []
@@ -251,11 +251,11 @@ describe('a new issue', () => {
     held = [issueRoot('one', 'PAY-1')]
     await readDeletedIssues(true)
     timesReads = 0
-    await createIssue(project, { projects: [project], issues: foldFolder(held).issues }, { title: 'Two', description: '' })
-    await createIssue(project, { projects: [project], issues: foldFolder(held).issues }, { title: 'Three', description: '' })
+    await createIssue(project, { projects: [project], issues: readState(held).issues }, { title: 'Two', description: '' })
+    await createIssue(project, { projects: [project], issues: readState(held).issues }, { title: 'Three', description: '' })
     expect(timesReads).toBe(0)
     // The page heard one deleted while open: it is counted without a read.
-    const two = foldFolder(held).issues.find((issue) => issue.ref === 'PAY-3')!
+    const two = readState(held).issues.find((issue) => issue.ref === 'PAY-3')!
     expect(await deleteIssue(two)).toEqual({ ok: true })
     sent.length = 0
     const gone = foldWorkspace({ events: held, folders: [FOLDER], readAt: {}, threadsAt: {}, mentionsOf: [] } as never)
@@ -321,12 +321,12 @@ describe('deleting an issue', () => {
 describe('numbering an issue another app filed without a ref', () => {
   it("takes the ref someone set since and does not claim again (SPEC §6.1)", async () => {
     held = [issueRoot('i', undefined, 100, OTHER)]
-    const seen = foldFolder(held).issues
+    const seen = readState(held).issues
     beatenBy = { field: 'ref', event: { ...change('i', 'r1', 'ref', 'PAY-9', 120, issueRoot('i', undefined, 100, OTHER).id), tags: [['a', `30851:${OTHER}:i`], ['O', 'i'], ['field', 'ref'], ['value', 'PAY-9'], ['h', FOLDER], ['prev', issueRoot('i', undefined, 100, OTHER).id]] } as SignedEvent }
     const results = await assignMissingRefs(project, { projects: [project], issues: seen })
     expect(results.map((r) => r.ok)).toEqual([false])
     const claims = sent.filter((e) => tagOf(e, 'field') === 'ref')
     expect(claims.map((e) => tagOf(e, 'prev'))).toEqual([issueRoot('i', undefined, 100, OTHER).id])
-    expect(foldFolder(held).issues[0]!.ref).toBe('PAY-9')
+    expect(readState(held).issues[0]!.ref).toBe('PAY-9')
   })
 })

@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import type { SignedEvent } from '@estiva-app/protocol'
-import { foldFolder } from './fold'
+import { readState } from './read'
 
 const ISSUE = '30851:' + 'a'.repeat(64) + ':issue-1'
 const ANA = 'a'.repeat(64)
@@ -19,7 +19,7 @@ const replyTo = (parent: string, id: string, at: number) =>
 
 describe('a thread whose comment was deleted', () => {
   it('says its comment is missing, and keeps every reply in order', () => {
-    const { conversations } = foldFolder([replyTo('gone', 'r2', 20), replyTo('gone', 'r1', 10)])
+    const { conversations } = readState([replyTo('gone', 'r2', 20), replyTo('gone', 'r1', 10)])
     expect(conversations).toHaveLength(1)
     expect(conversations[0]).toMatchObject({ id: 'gone', rootMissing: true })
     // The earliest reply stands in for it, as before, so nothing drawn today moves.
@@ -27,7 +27,7 @@ describe('a thread whose comment was deleted', () => {
   })
 
   it('a thread whose comment is there says nothing of the kind', () => {
-    const { conversations } = foldFolder([comment('c1', 5), replyTo('c1', 'r1', 10)])
+    const { conversations } = readState([comment('c1', 5), replyTo('c1', 'r1', 10)])
     expect(conversations[0]!.root.id).toBe('c1')
     expect(conversations[0]!.rootMissing).toBeUndefined()
   })
@@ -36,7 +36,7 @@ describe('a thread whose comment was deleted', () => {
 // ONE-9: NIP-22 nests a reply to a reply by its lowercase `e` alone, with no `E`, as Peek's thread column writes it.
 describe('a reply to a reply', () => {
   it('is filed in its thread, under the thread’s comment, not as a thread of its own', () => {
-    const { conversations } = foldFolder([comment('c1', 5), replyTo('c1', 'r1', 10), replyTo('r1', 'r2', 20)])
+    const { conversations } = readState([comment('c1', 5), replyTo('c1', 'r1', 10), replyTo('r1', 'r2', 20)])
     expect(conversations).toHaveLength(1)
     expect(conversations[0]!.root.id).toBe('c1')
     expect(conversations[0]!.replies.map((r) => r.id)).toEqual(['r1', 'r2'])
@@ -45,12 +45,12 @@ describe('a reply to a reply', () => {
 
 describe('a comment written on a selection (Leaf, LEAF-7)', () => {
   it('keeps the words it quotes, start and end', () => {
-    const { conversations } = foldFolder([comment('c1', 5, [['quote', 'The board loses', 'its order']])])
+    const { conversations } = readState([comment('c1', 5, [['quote', 'The board loses', 'its order']])])
     expect(conversations[0]!.root.quote).toEqual({ start: 'The board loses', end: 'its order' })
   })
 
   it('one on whole blocks or the whole file quotes nothing', () => {
-    const { conversations } = foldFolder([comment('c1', 5)])
+    const { conversations } = readState([comment('c1', 5)])
     expect(conversations[0]!.root.quote).toBeUndefined()
   })
 })

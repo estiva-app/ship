@@ -27,6 +27,7 @@ vi.mock('@/api/store', () => ({
   relay: { query: (filters: Record<string, unknown>[]) => answer(filters), queryAll: (filters: Record<string, unknown>[]) => answer(filters) },
   signer: { pubkey: 'c'.repeat(64) },
   projectFieldsNow: async () => undefined,
+  topicFieldsNow: async () => undefined,
 }))
 vi.mock('@/api/nip44', () => ({ nip44: { decrypt: async () => undefined } }))
 

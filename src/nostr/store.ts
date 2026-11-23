@@ -8,7 +8,7 @@
  * cache rather than the shared record.
  */
 import type { Embed, FileTimes, Imeta, NostrTag, PartPointer, PublishResult, Relay } from '@estiva-app/protocol'
-import { MAX_FILTERS_PER_QUERY, RELAY_PAGE_CEILING, partsOf } from '@estiva-app/protocol'
+import { MAX_FILTERS_PER_QUERY, RELAY_PAGE_CEILING, TOPIC_TYPE, partsOf } from '@estiva-app/protocol'
 import type { Signer } from './signer'
 import {
   buildCreateChannel,
@@ -28,9 +28,10 @@ import {
   type CommentRef,
 } from './events'
 import { findNaddrs, naddrToAddr, buildReaction, buildResolution, buildEdit, buildDeletion as buildEventDeletion, imetaTag, needsRelayKey, RELAY_KEY_FILTER, type Authored } from '@estiva-app/protocol'
-import { DELETED_FIELD, createFile, finishCreating, fieldsSetBy, listFiles, openFile, writeChange, TEXT_FIELD, type CreateFileArgs, type CreateFileResult, type FileFields, type WriteChangeResult } from '@estiva-app/interop'
+import { DELETED_FIELD, createFile, finishCreating, fieldsSetBy, isSwitchRefusal, listFiles, listsField, openFile, prevsAfterSwitch, writeChange, TEXT_FIELD, type CreateFileArgs, type CreateFileResult, type FileFields, type WriteChangeResult } from '@estiva-app/interop'
 import { createLoadQuery, planArchiveFolder, planCreateFolder, planDeleteFolder, planListInTopic, planMoveFromFolders, planPlaceFile, planRemoveFromTopic, planRenameFolder, planUnlistFile, readMentionedIn, readMoveRefusal, type ListHolder, type FolderRef, type MovableFile, type MoveRefusal } from '@estiva-app/interop'
-import { foldFolder, type FolderState, type Issue } from './fold'
+import { readState, type FolderState } from './read'
+import { type Issue } from './files'
 import { buildMembershipChange, buildMutedEvent, buildPlaceAdd, switchWrites, type Following, type Place, decorationsOf, foldAttachments, foldEdits, foldEmbeds, URGENT_TAG, type Decorations, type EditFold, type QueryFn } from '@estiva-app/conversation'
 import { anchorIndex, type AnchorIndex } from './references'
 import { directoryFrom, type Directory } from './profiles'
@@ -98,7 +99,7 @@ function referencedAddresses(body: string): string[] {
 /**
  * The fold, plus the one thing it deliberately does not record — CON-7.
  *
- * A superset of `FolderState`, never a replacement for it. `foldFolder` is a
+ * A superset of `FolderState`, never a replacement for it. `readState` is a
  * contract between this repository and `estiva-agent`, held to a recorded state
  * by `scripts/conformance.test.ts`, and adding a field to it is a change to
  * what the workspace *means* that has to land in both repos at once. Attachment
@@ -123,7 +124,7 @@ export interface WorkspaceState extends FolderState {
   /**
    * Message id → its current text, where it was edited (CON-4).
    *
-   * Beside the fold rather than inside it. `foldFolder` is a contract with
+   * Beside the fold rather than inside it. `readState` is a contract with
    * `estiva-agent` and its conformance test walks the union of keys, so an
    * `edited` field on `Message` would turn both repos red. The fold is
    * `@estiva-app/conversation`'s (SPEC §6.8, CON-5).
@@ -164,7 +165,7 @@ export interface WorkspaceState extends FolderState {
   /**
    * Every Folder this read actually fetched (PER-3).
    *
-   * Beside the fold, like the three above, and for the same reason: `foldFolder`
+   * Beside the fold, like the three above, and for the same reason: `readState`
    * is a contract with `estiva-agent` whose conformance test walks the union of
    * its keys, so a `folders` field on `FolderState` would turn both repos red.
    *
@@ -194,7 +195,7 @@ export interface WorkspaceState extends FolderState {
 }
 
 /**
- * Fold a set of events, and read off the same set the two things `foldFolder`
+ * Fold a set of events, and read off the same set the two things `readState`
  * deliberately does not carry: tag-vs-body provenance, edits, and attachments.
  */
 /** `WorkspaceState.urgent`: every event's `urgent` tag keys, by event id. An edit carries none (§6.6), so none is read off one. */
@@ -222,7 +223,7 @@ function read(
   folders: string[],
   threads: Required<Pick<WorkspaceState, 'threadsAt' | 'mentionsOf'>> & Pick<WorkspaceState, 'texts' | 'issueTexts' | 'ownOf' | 'liveAt'> = { threadsAt: {}, mentionsOf: [] },
 ): WorkspaceState {
-  const folded = foldFolder(events, referencedAddresses)
+  const folded = readState(events, referencedAddresses)
   return {
     ...threads,
     ...folded,
@@ -1623,10 +1624,43 @@ export class Store {
    * `file` is the listed file's id. The file is not touched: listing grants
    * nothing, so its own editors are not asked.
    */
-  setListedInTopic(args: { topic: ListHolder; file: string; listed: boolean }): Promise<PublishResult> {
+  async setListedInTopic(args: { topic: ListHolder; file: string; listed: boolean }): Promise<PublishResult> {
     const plan = args.listed ? planListInTopic : planRemoveFromTopic
-    const [entry] = plan(this.signer.pubkey, Date.now(), { topic: args.topic, file: args.file })
-    return this.publish(entry)
+    /*
+      Where topics are kept in order (SPEC §6.14, ALL-6): the entry follows the file's current entry on this topic, or
+      the topic's first record for a file never listed, read now, as Peek's. Each file is its own field, so two people
+      adding different files never clash, and an entry crossed by a newer one is written again after it.
+      why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/every-file-type-is-kept-in-order-and-a-delete-only-marks-the-file.md
+      A tab that did not know is told by the relay's refusal, and the entry is written again in order, once, as a card's.
+    */
+    if (!(await this.inOrderTypes()).includes(TOPIC_TYPE)) {
+      const [entry] = plan(this.signer.pubkey, Date.now(), { topic: args.topic, file: args.file })
+      const plain = await this.publish(entry)
+      if (plain.ok || !isSwitchRefusal(plain.reason)) return plain
+    }
+    {
+      const [kind, pubkey, ...d] = args.topic.address.split(':')
+      const pointer = { kind: Number(kind), pubkey: pubkey!, d: d.join(':') }
+      const query = (filters: Record<string, unknown>[]) => this.relay.query(filters as never)
+      const field = listsField(args.file)
+      const prev = (await prevsAfterSwitch(query, pointer, [field]).catch(() => undefined))?.[field]
+      if (!prev) return { ok: false, reason: 'The topic could not be read just now, so nothing was changed. Try again.' }
+      const written = await writeChange({
+        field,
+        value: args.listed ? 'true' : 'false',
+        prev,
+        build: (input) => plan(this.signer.pubkey, input.createdAtMs, { topic: args.topic, file: args.file, prev: input.prev })[0]!,
+        sign: (event) => this.signer.sign(event),
+        publish: async (event) => {
+          const result = await this.relay.publish(event)
+          return { ok: result.ok, reason: result.reason, eventId: event.id }
+        },
+        query,
+        current: async (asked) => (await openFile(query, pointer, { text: false }))?.fields[asked]?.event,
+      }).catch((error: unknown) => ({ ok: false as const, refused: error instanceof Error ? error.message : String(error) }))
+      if (written.ok) return { ok: true }
+      return { ok: false, reason: 'refused' in written ? written.refused : 'The topic changed at the same time. Try again.' }
+    }
   }
 
   /**
@@ -1868,7 +1902,7 @@ export class Store {
     const read = new Set<string>()
     const threadsAt: Record<string, number> = {}
     for (let round = 0; round < 3; round++) {
-      const state = foldFolder(events, referencedAddresses)
+      const state = readState(events, referencedAddresses)
       const issues = opened.kind === 'issue' ? state.issues.filter((issue) => issue.id === opened.d) : []
       const parents = new Set(issues.flatMap((issue) => (issue.projectAddr ? [issue.projectAddr] : [])))
       const projects = state.projects.filter((project) => (opened.kind === 'project' ? project.id === opened.d : parents.has(project.addr)))
@@ -1915,7 +1949,7 @@ export class Store {
     const first = ownFields ? this.fileEvents(ownKind, query, ownFields, own, ownOpened, 'these') : Promise.resolve({ events: [] as SignedEvent[], texts: [] as string[] })
     first.catch(() => undefined)
     for (let round = 0; round < 3; round++) {
-      const state = foldFolder(events, referencedAddresses)
+      const state = readState(events, referencedAddresses)
       const issues = opened.kind === 'issue' ? state.issues.filter((issue) => issue.id === opened.d) : []
       const parents = new Set(issues.flatMap((issue) => (issue.projectAddr ? [issue.projectAddr] : [])))
       const projects = state.projects.filter((project) => (opened.kind === 'project' ? project.id === opened.d : parents.has(project.addr)))
@@ -1935,7 +1969,7 @@ export class Store {
       ])
       events = mergeRead(events, [...inFolders, ...records, ...current])
     }
-    const state = foldFolder(events, referencedAddresses)
+    const state = readState(events, referencedAddresses)
     const rest = events.filter((event) => !isOwn(event))
     const none = { events: [] as SignedEvent[], texts: [] as string[] }
     const [early, projects, issues, conversations] = await Promise.all([
@@ -2190,7 +2224,7 @@ export class Store {
      * on 2026-10-02: 0 of the 24 formerly re-pointed Folders would go unread.
      */
     for (let pass = 0; pass < 4; pass++) {
-      const state = foldFolder(events, referencedAddresses)
+      const state = readState(events, referencedAddresses)
       const wanted = new Set<string>()
       for (const project of state.projects) {
         if (project.contentFolder && !fetched.has(project.contentFolder)) wanted.add(project.contentFolder)
@@ -2326,7 +2360,7 @@ export class Store {
     const query: QueryFn = async (filters) => keep(await this.relay.query(filters as never))
     await readMentionedIn(query, address, { commentKinds: [KIND.COMMENT] })
     const loaded = new Set(known)
-    const outside = foldFolder([...read.values()], referencedAddresses)
+    const outside = readState([...read.values()], referencedAddresses)
       .conversations.filter((conversation) => !loaded.has(conversation.root.folder))
       .sort((a, b) => b.lastAt - a.lastAt)
       .slice(0, MAX_MENTION_THREADS)

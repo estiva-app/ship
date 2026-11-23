@@ -1,6 +1,6 @@
 /**
  * Two repos, one recorded answer. This file folds the fixture with Ship's own
- * `foldFolder`; `estiva-agent`'s `scripts/conformance.test.ts` runs the same
+ * `readState`; `estiva-agent`'s `scripts/conformance.test.ts` runs the same
  * events through the agent's real read path — Ship's published manifest,
  * folded by `@estiva-app/interop` — and both must equal `expected`.
  *
@@ -44,7 +44,7 @@ import { readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
-import { foldFolder } from '../src/nostr/fold'
+import { readState } from '../src/nostr/read'
 import type { SignedEvent } from '@estiva-app/protocol'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -88,7 +88,7 @@ check(
   `${fixture.events.length} events, ${fixture.counts.changes} changes`,
 )
 
-const actual = foldFolder(fixture.events)
+const actual = readState(fixture.events)
 
 /** The first place two structures disagree, as a path a person can go and look at. */
 function firstDifference(a: unknown, b: unknown, path = ''): string | null {
@@ -135,10 +135,17 @@ const actualFolded = JSON.parse(JSON.stringify(actual, function (this: Record<st
 const difference = firstDifference(actualFolded, fixture.expected)
 check('this repo folds the events into the recorded state', difference === null, difference ?? '')
 
-const state = actual as { projects: unknown[]; issues: unknown[]; activity: unknown[]; conversations: unknown[] }
+const state = actual as { projects: { addr: string }[]; issues: { addr: string }[]; activity: { target: string }[]; conversations: unknown[] }
 check('projects', state.projects.length === fixture.counts.projects, `${state.projects.length}`)
 check('issues', state.issues.length === fixture.counts.issues, `${state.issues.length}`)
-check('changes', state.activity.length === fixture.counts.changes, `${state.activity.length}`)
+// The activity lists only changes to a file whose record the read holds, as the shared history does (MOV-2, Miky
+// 21 Nov): 22 of the recorded changes are to files the recording did not hold, and none of them is listed.
+const held = new Set([...state.projects, ...state.issues].map((file) => file.addr))
+check(
+  'changes',
+  state.activity.length === (fixture.expected as { activity: unknown[] }).activity.length &&state.activity.every((change) => held.has(change.target)),
+  `${state.activity.length} of ${fixture.counts.changes}`,
+)
 check('conversations', state.conversations.length === fixture.counts.conversations, `${state.conversations.length}`)
 
 console.log(

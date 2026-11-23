@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest'
 import type { Change, DirectoryView, FolderState } from '@/api'
 import { PROJECT_STATUSES } from '@/nostr/kinds'
 import type { SignedEvent } from '@estiva-app/protocol'
+import { readState } from '@/nostr/read'
 import { editedFor, historyFor, withChangesOf } from './history'
 
 const PROJECT = `30850:${'a'.repeat(64)}:the-project`
@@ -73,9 +74,21 @@ describe("a project's History read by its page, where projects are read by their
   const wire = (id: string, field: string, value: string, h: string): SignedEvent =>
     ({ id: id.padEnd(64, '0'), kind: 1851, pubkey: AUTHOR, created_at: 1_700_000_100, content: '', sig: '0'.repeat(128), tags: [['a', PROJECT], ['field', field], ['value', value], ['h', h]] }) as SignedEvent
 
-  it('leaves out a change to it filed in another Folder, as the fold does', () => {
-    const state = { activity: [], projects: [{ addr: PROJECT, contentFolder: FOLDER }] } as unknown as FolderState
-    const own = withChangesOf(PROJECT, state, [wire('a1', 'title', 'Real', FOLDER), wire('a2', 'title', 'Planted', 'e'.repeat(32))])
+  const root = (kind: number, d: string, tags: string[][] = []): SignedEvent =>
+    ({ id: `root-${d}`.padEnd(64, '0'), kind, pubkey: 'a'.repeat(64), created_at: 1_700_000_000, content: '', sig: '0'.repeat(128), tags: [['d', d], ['title', d], ['h', FOLDER], ...tags] }) as SignedEvent
+
+  it('leaves out a change to it filed in another team, as the shared read does', () => {
+    const state = readState([root(30850, 'the-project')])
+    const own = withChangesOf(state.projects[0]!, state, [wire('a1', 'title', 'Real', FOLDER), wire('a2', 'title', 'Planted', 'e'.repeat(32))])
     expect(historyFor(PROJECT, own, directory, PROJECT_STATUSES).map((entry) => entry.text)).toEqual(['renamed it to "Real"'])
+  })
+
+  it('an issue no list holds, such as a deleted one opened by its link, still shows its every change', () => {
+    const ISSUE = `30851:${'a'.repeat(64)}:gone`
+    const [issue] = readState([root(30851, 'gone')]).issues
+    const onIssue = (id: string, field: string, value: string) => ({ ...wire(id, field, value, FOLDER), tags: [['a', ISSUE], ['field', field], ['value', value], ['h', FOLDER]] }) as SignedEvent
+    // The page's state lists no issue: a deleted one is held apart from the lists (`deletedIssues`).
+    const own = withChangesOf(issue!, { activity: [], projects: [], issues: [], conversations: [] } as FolderState, [onIssue('b1', 'status', 'done'), onIssue('b2', 'deleted', 'true')])
+    expect(historyFor(ISSUE, own, directory).map((entry) => entry.text)).toEqual(['set deleted to true', 'set status to Done'])
   })
 })

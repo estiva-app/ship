@@ -11,6 +11,7 @@ vi.mock('./store', () => ({
   relay: { query: async (filters: Record<string, unknown>[]) => answer(filters), queryAll: async (filters: Record<string, unknown>[]) => answer(filters) },
   signer: { pubkey: 'c'.repeat(64) },
   projectFieldsNow: async () => undefined,
+  topicFieldsNow: async () => undefined,
 }))
 
 import { readFileTopics } from './foreign'

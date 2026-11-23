@@ -92,7 +92,7 @@ import { fileContext, me, READ_DWELL_MS, useDirectory, useWorkspace } from '@/ap
 import { readTopicPlace } from '@/api/foreign'
 import { PUBLISH_DEBOUNCE_MS, resetReadStateForTests } from '@/api/readStateSync'
 import { signedIn } from '@/auth/estivaId'
-import { foldFolder } from '@/nostr/fold'
+import { readState } from '@/nostr/read'
 import { foldEdits } from '@estiva-app/conversation'
 import { store } from '@/api/store'
 import App from '@/App'
@@ -252,7 +252,7 @@ describe('A reaction from the topic page names whose message it is on (ACT-6)', 
   })
   /** The workspace holding one conversation about the topic: its events (message, replies, edits), folded as a read folds them. */
   const holding = (...events: (Signed & { created_at: number })[]) => {
-    const folded = foldFolder(events as never)
+    const folded = readState(events as never)
     return { ...STATE, conversations: folded.conversations, edits: foldEdits(events as never), anchors: { [MESSAGE]: [TOPIC] }, events } as unknown as WorkspaceState
   }
   /** Picks 👍 on the message reading `text`; on a reply, `replyId` says which card. */

@@ -14,8 +14,8 @@
  * Ship's `a` tag, Peek's body-only reference — because the whole claim is that
  * the split falls out of what production already publishes.
  */
-import { foldFolder } from '../src/nostr/fold'
-import { conversationsAbout } from '../src/nostr/fold'
+import { readState } from '../src/nostr/read'
+import { conversationsAbout } from '../src/nostr/conversations'
 import { attachmentOf, commentsOn, commentsOnAny, anchorIndex } from '../src/nostr/references'
 import { findNaddrs, naddrToAddr } from '@estiva-app/protocol'
 import type { SignedEvent } from '@estiva-app/protocol'
@@ -81,7 +81,7 @@ const late = [
 ]
 
 {
-  const state = foldFolder(late, refs)
+  const state = readState(late, refs)
   const anchors = anchorIndex(late)
   const thread = state.conversations.find((c) => c.id === 'm1')!
 
@@ -103,7 +103,7 @@ const late = [
 
 {
   const events = [shipComment('c1', 'Blocked on the Stripe key.')]
-  const state = foldFolder(events, refs)
+  const state = readState(events, refs)
   const anchors = anchorIndex(events)
   const thread = state.conversations.find((c) => c.id === 'c1')!
 
@@ -126,7 +126,7 @@ const late = [
 
 {
   const events = [peekMessage('p1', `Kicking off: ${POINTER}`)]
-  const state = foldFolder(events, refs)
+  const state = readState(events, refs)
   const anchors = anchorIndex(events)
   const thread = state.conversations.find((c) => c.id === 'p1')!
   check(
@@ -142,7 +142,7 @@ const late = [
     peekMessage('r1', 'Unrelated discussion.'),
     event({ id: 'r2', kind: 1111, tags: [['A', ISSUE], ['e', 'r1', '', 'reply']], content: 'see also' }),
   ]
-  const state = foldFolder(events, refs)
+  const state = readState(events, refs)
   const anchors = anchorIndex(events)
   const thread = state.conversations.find((c) => c.about.includes(ISSUE))
   check(
@@ -168,7 +168,7 @@ const late = [
     event({ id: 't2', kind: 1111, tags: [['A', ISSUE], ['e', 't1', '', 'reply'], ['K', '30851'], ['k', '1111']], content: 'Not yet.' }),
     event({ id: 't3', kind: 1111, tags: [['A', ISSUE], ['e', 't2', '', 'reply'], ['K', '30851'], ['k', '1111']], content: 'Asking finance today.' }),
   ]
-  const state = foldFolder(events, refs)
+  const state = readState(events, refs)
   const anchors = anchorIndex(events)
   const thread = state.conversations.find((c) => c.id === 't1')
   const deep = thread?.replies.find((m) => m.id === 't3')
@@ -188,7 +188,7 @@ const late = [
   // The root is missing — deleted, or truncated history. `foldConversations` stands the earliest visible message in
   // for it; a NIP-22 reply carries its thread's object as its `A` (§6.4 Replies), so it says whose comment it was.
   const events = [event({ id: 'orphan', kind: 1111, tags: [['A', ISSUE], ['e', 'gone', '', 'reply'], ['E', 'gone']], content: 'a reply with no parent' })]
-  const state = foldFolder(events, refs)
+  const state = readState(events, refs)
   const anchors = anchorIndex(events)
   const thread = state.conversations[0]
   check(
@@ -201,7 +201,7 @@ const late = [
 {
   // The same, its stand-in answering a reply (`e` ≠ `E`): the `A` it copies still names the issue.
   const events = [event({ id: 'deeper', kind: 1111, tags: [['A', ISSUE], ['e', 'gone-reply', '', 'reply'], ['E', 'gone']], content: 'a reply to a reply, both roots gone' })]
-  const state = foldFolder(events, refs)
+  const state = readState(events, refs)
   const anchors = anchorIndex(events)
   check('  …and when its stand-in answers a reply, not the comment', attachmentOf(state.conversations[0], ISSUE, anchors) === 'comment')
   check('  …which is kept apart, never a comment root of its own', anchors.deeper === undefined)
@@ -210,7 +210,7 @@ const late = [
 {
   // A stand-in that is chat — a kind:9 — names no thread object: still the safe side, a mention.
   const events = [event({ id: 'chat', kind: 9, tags: [['e', 'gone', '', 'reply'], ['a', ISSUE]], content: 'a chat reply naming it' })]
-  const state = foldFolder(events, refs)
+  const state = readState(events, refs)
   const anchors = anchorIndex(events)
   check('  …but a chat stand-in still reads as a mention', attachmentOf(state.conversations[0], ISSUE, anchors) === 'mention')
 }
@@ -219,7 +219,7 @@ const late = [
 
 {
   const events = [peekMessage('n1', 'no references here')]
-  const state = foldFolder(events, refs)
+  const state = readState(events, refs)
   const anchors = anchorIndex(events)
   check('an unreferenced object attaches to nothing', attachmentOf(state.conversations[0], ISSUE, anchors) === null)
 }
@@ -239,7 +239,7 @@ const late = [
     tags: [['A', FILE], ['K', '30840'], ['a', FILE], ['k', '30840'], ['a', ISSUE]],
     content: `Something ${POINTER}`,
   })
-  const state = foldFolder([peekFileComment], (b) => (b.includes(POINTER) ? [ISSUE] : []))
+  const state = readState([peekFileComment], (b) => (b.includes(POINTER) ? [ISSUE] : []))
   const anchors = anchorIndex([peekFileComment])
   const thread = state.conversations.find((c) => c.id === 'pf1')!
   check('a 1111 root is a comment on its `A`', attachmentOf(thread, FILE, anchors) === 'comment')
@@ -258,7 +258,7 @@ const late = [
   const topicMention = event({ id: 'k1', kind: 9, tags: [['a', POINTED_AT]], content: `About ${POINTER}` })
   const legacyComment = event({ id: 'k2', kind: 9, tags: [['a', ISSUE]], content: 'Reopening: the fix did not land.' })
   const events = [topicMention, legacyComment]
-  const state = foldFolder(events, refs)
+  const state = readState(events, refs)
   const anchors = anchorIndex(events)
   const mention = state.conversations.find((c) => c.id === 'k1')!
   const legacy = state.conversations.find((c) => c.id === 'k2')!
@@ -269,7 +269,7 @@ const late = [
 {
   // Malformed: a 1111 with no `A`. Its `a` is read as the `A` rather than dropping the thread.
   const events = [event({ id: 'noA', kind: 1111, tags: [['a', ISSUE]], content: 'no root tag' })]
-  const state = foldFolder(events, refs)
+  const state = readState(events, refs)
   const anchors = anchorIndex(events)
   check('a 1111 with no `A` is a comment on its `a`', attachmentOf(state.conversations[0], ISSUE, anchors) === 'comment')
 }
@@ -287,7 +287,7 @@ const late = [
     peekMessage('s4', 'Unrelated chatter.'),
     peekMessage('s5', `Related: ${POINTER}`, 's4'),
   ]
-  const state = foldFolder(events, refs)
+  const state = readState(events, refs)
   const anchors = anchorIndex(events)
   // The issue `s5` names is one of ours too, or "never a thread that merely mentions one" would pass with nothing to refuse.
   const mine = new Set([ISSUE, OTHER_ISSUE, POINTED_AT])
@@ -326,7 +326,7 @@ const late = [
     event({ id: 'x1', kind: 1111, tags: [['A', UNRELATED], ['a', UNRELATED]], content: `Blocked on ${POINTER}` }),
     event({ id: 'x2', kind: 1111, tags: [['A', OTHER_ISSUE], ['a', OTHER_ISSUE]], content: `Same cause as ${POINTER}` }),
   ]
-  const state = foldFolder(events, refs)
+  const state = readState(events, refs)
   const anchors = anchorIndex(events)
 
   // Ours is the issue the bodies name.

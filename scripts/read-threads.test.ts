@@ -13,7 +13,7 @@
 import { publicKeyFromSecret, signEvent, type Relay, type SignedEvent, type UnsignedEvent } from '@estiva-app/protocol'
 import { Store, foldWorkspace, type ThreadsWanted, type WorkspaceEvents } from '../src/nostr/store'
 import { buildConversationMessage, buildIssue, buildProject, issueAddr, projectAddr } from '../src/nostr/events'
-import { conversationsAbout } from '../src/nostr/fold'
+import { conversationsAbout } from '../src/nostr/conversations'
 import type { Signer } from '../src/nostr/signer'
 import { KIND } from '../src/nostr/kinds'
 

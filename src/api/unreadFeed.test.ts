@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { encodeNpub } from '@estiva-app/protocol'
 import type { StreamJudge } from '@estiva-app/conversation'
-import type { Conversation, Message } from '../nostr/fold'
+import type { Conversation, Message } from '../nostr/conversations'
 import { unreadByThread } from './unreadFeed'
 
 const CHANNEL = 'b7c1e0a4-2f3d-4a86-9c15-8d0e6f2a4b91'
