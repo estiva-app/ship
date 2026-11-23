@@ -86,11 +86,9 @@ export interface Change {
   author: string
   createdAt: number
   /**
-   * Epoch ms. Parsed from a kind:1851 (`parseChange`): the `ts` tag's number as
-   * written, trusted or not; only `orderingMs` decides whether it orders the
-   * change. On a change the shared read counted (a file's `activity`), always
-   * set: its ordering time, the `ts` where a reader trusts it, else `created_at`
-   * in ms. Read it through `orderingMs`, never on its own.
+   * Epoch ms from the `ts` tag, as written, trusted or not: only `orderingMs`
+   * decides whether it orders the change, so read it through that, never on
+   * its own.
    */
   ts?: number
   /** Address of the object changed, `<kind>:<pubkey>:<d>`. */
@@ -351,8 +349,7 @@ function changesOf(file: ForeignObject): Change[] {
       id: event.id,
       author: event.pubkey,
       createdAt: event.created_at,
-      // The time the shared read orders it by: its `ts` where a reader trusts it (SPEC §6.2), which is all a `ts` is read for.
-      ts: line.ms,
+      ts: tsAsWritten(event, line.ms),
       target,
       field: line.field,
       value: line.value,
@@ -368,6 +365,19 @@ function changesOf(file: ForeignObject): Change[] {
   return held
 }
 const listed = new WeakMap<ForeignObject, Change[]>()
+
+/**
+ * A counted change's `ts` as `parseChange` gives it: the tag's number as
+ * written, trusted or not, so every row of the activity list means the same.
+ * The shared read's ordering time (`ms`) is that number wherever a reader
+ * trusts it (SPEC §6.2), which is nearly every change; the tags are read only
+ * when it is not.
+ */
+function tsAsWritten(event: SignedEvent, ms: number): number | undefined {
+  if (ms !== event.created_at * 1000) return ms
+  const raw = Number.parseInt(tag(event, 'ts') ?? '', 10)
+  return Number.isFinite(raw) ? raw : undefined
+}
 
 /** The one-line summary beside a file's title (SPEC §6.12). */
 const SUMMARY_FIELD = 'summary'
