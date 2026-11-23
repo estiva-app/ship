@@ -14,7 +14,7 @@
  * is, the layer has failed and that belongs on PRO-7 rather than being worked
  * around here.
  */
-import { pointerToAddress, referenceToPointer, type SignedEvent } from '@estiva-app/protocol'
+import { changeTypeOf, pointerToAddress, referenceToPointer, type SignedEvent } from '@estiva-app/protocol'
 import {
   buildActionEvents,
   resolveActingManifest,
@@ -331,7 +331,16 @@ export async function parentArchiveOf(reference: string): Promise<ForeignObject[
 const NOT_ON_A_CARD = new Set(['title', 'summary', 'description', 'archived'])
 
 /** The tags a §7.3 change carries: the file and its id, the field, its value, the Folder, the writer's clock, a person it names, and a staged option's stage. */
-const CHANGE_TAGS = new Set(['a', 'O', 'field', 'value', 'h', 'ts', 'p', 'stage'])
+const CHANGE_TAGS = new Set(['a', 'O', 'K', 'field', 'value', 'h', 'ts', 'p', 'stage'])
+
+/** The type `address`'s kind has by name, or `undefined` for a kind with none or a named file (whose type the caller would pass). */
+function baseTypeOf(address: string): string | undefined {
+  try {
+    return changeTypeOf(address)
+  } catch {
+    return undefined
+  }
+}
 
 /** Whether what the runtime built is exactly one `kind:1851` change of `field` on `address`, in `folder`. */
 function isFieldChange(built: readonly { kind: number; tags: string[][] }[], want: { address: string; folder: string; field: string }): boolean {
@@ -342,6 +351,8 @@ function isFieldChange(built: readonly { kind: number; tags: string[][] }[], wan
   // The file's id beside its address (interop 0.73, §6.2): at most one, and the address's own.
   const id = want.address.split(':').slice(2).join(':')
   if (one('O').length > 1 || (one('O').length === 1 && one('O')[0][1] !== id)) return false
+  // The file's type (interop 0.110, §6.2): at most one, and the one its kind has; the relay refuses any other.
+  if (one('K').length > 1 || (one('K').length === 1 && one('K')[0][1] !== baseTypeOf(want.address))) return false
   // A staged option's stage (interop 0.73): at most one, about the field this change sets.
   if (one('stage').length > 1 || (one('stage').length === 1 && one('stage')[0][1] !== want.field)) return false
   return one('a').length === 1 && one('a')[0][1] === want.address && one('h').length === 1 && one('h')[0][1] === want.folder && one('field').length === 1 && one('field')[0][1] === want.field && one('value').length === 1

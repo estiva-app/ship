@@ -7,6 +7,7 @@ import { SkeletonList } from '@/components/ui/Skeleton'
 import { Tabs } from '@/components/ui/Tabs'
 import { formatActive } from '@/lib/time'
 import type { TopicRowData, TopicsTab } from '@/lib/topics'
+import { useReportFailure } from '@/lib/failureReports'
 
 /**
  * Ship's Explore initiatives, which the sidebar's Explore initiatives opens (TOPI-9, the
@@ -74,6 +75,7 @@ export function TopicsView({ title, lists, tab, onTab, onRetry, onJoin, joining,
   const [opened] = useState(() => Date.now())
   const now = givenNow ?? opened
   const asked = query.trim()
+  useReportFailure(lists === 'failed' ? 'not-loaded' : undefined)
   const shown = typeof lists === 'string' ? [] : lists[tab].filter((topic) => !asked || findsTopic(topic.title, asked))
   return (
     // `data-surface` is the smoke test's waypoint — see IssuesView. The list's name in the page's bar, as Peek's and Leaf's

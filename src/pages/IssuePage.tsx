@@ -1,15 +1,19 @@
 import { IconLinkOff } from '@tabler/icons-react'
 import { newestDrawn, useMarkRead, useShownThreads } from '@/lib/useMarkRead'
 import { useNewSince } from '@/lib/useNewSince'
-import { useCallback, useMemo, useState } from 'react'
-import { ArchiveDialog, ArchivedNotice } from '@estiva-app/ui'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { ArchiveDialog, ArchivedNotice, DeletedNotice } from '@estiva-app/ui'
+import type { DocumentAsks } from '@estiva-app/ui/editor'
+import { PageSkeleton } from '@/components/PageSkeleton'
+import { day } from '@/lib/time'
 import { ARCHIVE_WORDS, archivedLine, archivedNoticeOf, lockedReason, ownArchive, type Archives } from '@/lib/archive'
-import { ISSUE_STATUSES, unlistedFirst, addMentioned, archiveIssue, commentsOn, deleteIssue, deleteMessage, editMessage, reply, setIssueField, startConversation, type DirectoryView, type FolderState, type WorkspaceState, threadContext, fileContext, useMergedReadState, useFeedJudges, unreadByThread } from '@/api'
+import { ISSUE_STATUSES, unlistedFirst, addMentioned, archiveIssue, commentsOn, deleteIssue, deleteMessage, editMessage, noteFileText, reply, setIssueDeleted, setIssueField, startConversation, type DirectoryView, type FolderState, type WorkspaceState, threadContext, fileContext, useMergedReadState, useFeedJudges, unreadByThread } from '@/api'
 import { me, useMentionsElsewhere } from '@/api'
 import { MEMBER_FIELD_PREFIX, memberOfField } from '@estiva-app/conversation'
 import { useRelated, withoutTopics } from '@/api/useRelated'
 import { useFileTopics } from '@/api/useFileTopics'
 import { useThreads } from '@/api/useThreads'
+import { useIssueByLink } from '@/api/useDeletedIssues'
 import { Members } from '@/components/Members'
 import { membershipActions } from './membership'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
@@ -18,7 +22,8 @@ import { IssueView } from '@/views/IssueView'
 import { go, href } from '../router'
 import { placedIn } from '@/lib/placement'
 import { act, actInField, answerOf, deleteAnswer, sayOnceLeft, type Say } from './act'
-import { editedFor, historyFor } from './history'
+import { editedFor, historyFor, withChangesOf } from './history'
+import { useHistoryFold } from '@/api/useFileChanges'
 import { useSideColumn } from './sideColumn'
 import { FileTopicsOf } from '@/components/FileTopicsOf'
 import { activityFor, cardEditOf, copyText, folderOfMessage, pickerPeople, reactTo, refreshAfter, resolveAnswer, threadFor, useMentionLinks, withElsewhere } from './ProjectPage'
@@ -33,7 +38,11 @@ import { useReferencePage } from '@/api/references'
  * re-read; a refused one leaves the field as the relay has it.
  */
 export function IssuePage({ state, directory, teams, archives, d, say, refresh }: { state: WorkspaceState; directory: DirectoryView; /** The top-level Folders, for the team its project is in (its header's chip); `undefined` while they are read. */ teams?: readonly { id: string; name?: string; addresses?: readonly string[] }[]; /** What is archived, and what with — FOL-46. */ archives: Archives; /** The object's `d`, which is all a §7.2 URL carries. */ d: string; say: Say; refresh: (folders?: string[]) => Promise<void> }) {
-  const issue = state.issues.find((candidate) => candidate.id === d)
+  // A deleted issue leaves the lists and still opens by its link, with who deleted it and Restore (SPEC §6.5).
+  const loaded = state.issues.find((candidate) => candidate.id === d) ?? state.deletedIssues?.find((candidate) => candidate.id === d)
+  // No load carries a deleted issue's first record, so its link reads it by its `d`.
+  const byLink = useIssueByLink(d, !loaded)
+  const issue = loaded ?? byLink.issue
   const project = issue?.projectAddr ? state.projects.find((candidate) => candidate.addr === issue.projectAddr) : undefined
   // Its team is its project's, by the rule the sidebar marks it with (App's teamOf); an issue in no project is in no team.
   const team = project && teams ? placedIn({ addr: project.addr, folder: project.contentFolder }, teams)[0] : undefined
@@ -103,7 +112,17 @@ export function IssuePage({ state, directory, teams, archives, d, say, refresh }
   )
   // Judged against the frontier this visit opened on, so the divider outlives the page's own marks (99557309).
   const { unread, stillUnread } = useNewSince(issue?.addr, merged, verdictAt)
-  const history = useMemo(() => (issue ? historyFor(issue.addr, state, directory) : []), [issue, state, directory])
+  /*
+    Where issues are read by their fields (ISS-4) the load holds each field's
+    current change only: History is folded, and its every change read when it
+    is opened, as a project's. "Edited" reads the same, so it names the text's
+    last save, which the opened issue's read carries.
+  */
+  const byFields = state.issueTexts !== undefined
+  const historyRead = useHistoryFold(byFields ? issue?.addr : undefined)
+  const everyChange = historyRead.changes
+  const ownChanges = useMemo(() => (issue && byFields ? withChangesOf(issue.addr, state, everyChange ?? undefined) : state), [issue, byFields, state, everyChange])
+  const history = useMemo(() => (issue ? historyFor(issue.addr, ownChanges, directory) : []), [issue, ownChanges, directory])
   const people = useMemo(() => pickerPeople(state, directory), [state, directory])
   const projects = useMemo(
     // No move into an archived project, a new child under it (SPEC §6.5); its own stays listed, and moving out stays offered.
@@ -126,8 +145,13 @@ export function IssuePage({ state, directory, teams, archives, d, say, refresh }
     [project, state, directory],
   )
   useReferencePage({ address: issue?.addr, parent: projectThreads, folder: typeof related === 'object' ? related.all : undefined, readState: merged })
+  // Each text shown is one a save may be edited from (ISS-5): the change it follows, as on a project.
+  useEffect(() => {
+    if (issue) noteFileText(issue)
+  }, [issue])
 
   if (!issue) {
+    if (byLink.reading) return <PageSkeleton shape="issue" />
     return (
       <EmptyState
         icon={<IconLinkOff size={16} stroke={1.5} />}
@@ -141,6 +165,9 @@ export function IssuePage({ state, directory, teams, archives, d, say, refresh }
   // Its own archive, which the ⋯ toggles; and the one shown first, which may be its project's (FOL-46).
   const own = ownArchive(issue, state.activity)
   const archive = archives.ofIssue(issue)
+  const deleted = issue.deleted
+  // A deleted issue reached by its link draws once its every change is held, not by a first title it may have lost (as a project's).
+  if (deleted && loaded && byFields && !state.issueTexts!.includes(issue.addr)) return <PageSkeleton shape="issue" />
   // The notice's Unarchive waits for the answer.
   const unarchive = () =>
     act('Unarchive', () => archiveIssue(issue, false), say, () => refresh([issue.folder])).then((ok) => {
@@ -151,26 +178,47 @@ export function IssuePage({ state, directory, teams, archives, d, say, refresh }
     <>
       <IssueView
         // When it last changed, over the page (ONE-6, step 4a).
-        edited={editedFor(issue.addr, state, directory, { at: issue.createdAt, by: issue.author })}
+        edited={editedFor(issue.addr, ownChanges, directory, { at: issue.createdAt, by: issue.author })}
+        // Folded and read on opening where the load holds only current changes; where it holds every change, open and read already.
+        historyFold={byFields ? { open: historyRead.open, onOpenChange: historyRead.setOpen, pending: historyRead.open && everyChange === undefined } : undefined}
+        // The list read carries no text: the first record's would show, and a save would overwrite the current one from it.
+        textPending={byFields && !state.issueTexts!.includes(issue.addr)}
         comments={side.comments}
         overview={side.overview}
         archivedNotice={
-          archive && (
-            <ArchivedNotice
-              {...archivedNoticeOf(archive, directory.nameOf)}
-              onUnarchive={unarchive}
-              // Opens what is archived: the project, or the team it is archived with.
-              {...(archive.with?.kind === 'folder' && archive.with.id
-                ? { onOpenParent: () => go({ name: 'folder', id: archive.with!.id! }) }
-                : archive.with && project
-                  ? { onOpenParent: () => go({ name: 'project', d: project.id, slug: project.title, view: 'table' }) }
-                  : {})}
+          deleted ? (
+            // A link to a deleted issue still opens it: who deleted it, and Restore, as a project's (SPEC §6.5).
+            <DeletedNotice
+              by={deleted.by === me ? 'You' : directory.nameOf(deleted.by)}
+              when={day(deleted.at)}
+              onRestore={() =>
+                act('Restore', () => setIssueDeleted(issue, false), say, () => refresh([issue.folder])).then((ok) => {
+                  if (!ok) return
+                  say('Issue restored')
+                  // Read by its link, it is read again: restored, it is not deleted any more.
+                  if (!loaded) byLink.reread()
+                })
+              }
             />
+          ) : (
+            archive && (
+              <ArchivedNotice
+                {...archivedNoticeOf(archive, directory.nameOf)}
+                onUnarchive={unarchive}
+                // Opens what is archived: the project, or the team it is archived with.
+                {...(archive.with?.kind === 'folder' && archive.with.id
+                  ? { onOpenParent: () => go({ name: 'folder', id: archive.with!.id! }) }
+                  : archive.with && project
+                    ? { onOpenParent: () => go({ name: 'project', d: project.id, slug: project.title, view: 'table' }) }
+                    : {})}
+              />
+            )
           )
         }
         // Archived, its own fields stay shut until it is unarchived (SHI-36), and it takes no comment or reaction (Decided 2026-10-17).
-        lockedReason={lockedReason(archive)}
-        commentsClosed={archivedLine(archive)}
+        // Deleted, the same until it is restored.
+        lockedReason={deleted ? 'Restore to edit' : lockedReason(archive)}
+        commentsClosed={deleted ? 'This issue is deleted.' : archivedLine(archive)}
         members={
           <Members
             // A new issue is a new dialog: an open one must not carry over to the next page.
@@ -202,9 +250,23 @@ export function IssuePage({ state, directory, teams, archives, d, say, refresh }
         // A refusal is said under the field, with your text still in it — not in a toast (SUM-4).
         onSummarize={(value) => actInField('Summary', () => setIssueField(issue, 'summary', value, 'Summary'), () => refresh([issue.folder]))}
         onCopyBlockLink={(link) => void copyText(link, 'Link copied', 'Copy this link:', say)}
-        onDescribe={(value, contentFormat, left) =>
-          act('Description', () => setIssueField(issue, 'description', value, 'Description', contentFormat), sayOnceLeft(say, issue.title || 'Untitled issue', left), () => refresh([issue.folder]))
-        }
+        onDescribe={async (value, contentFormat, left, from) => {
+          // A block both of you changed asks, nothing saved (§13.3): the editor holds it, with their words, as on a project.
+          let asks: DocumentAsks | undefined
+          const ok = await act(
+            'Description',
+            async () => {
+              const result = await setIssueField(issue, 'description', value, 'Description', contentFormat, from)
+              if ('asks' in result) asks = result.asks
+              return asks ? { ok: true } : result
+            },
+            sayOnceLeft(say, issue.title || 'Untitled issue', left),
+            () => refresh([issue.folder]),
+          )
+          return asks ?? ok
+        }}
+        // Where issues are kept in order, a save is merged with words saved since (ISS-5).
+        merges={byFields}
         // Whoever a save names anew is added to the issue, as the Add button does (WBD-7).
         onMention={(people) => addMentioned({ kind: 'issue', issue }, people, me)}
         // The profile's name only: with none the line says "Someone", as Leaf's does, never a shortened key.
@@ -335,7 +397,7 @@ export function IssuePage({ state, directory, teams, archives, d, say, refresh }
           onConfirm={async () => {
             const result = await deleteIssue(issue)
             if (!result.ok) {
-              say(`Delete rejected — ${result.reason}`, 'error')
+              say(`Delete rejected — ${result.reason}`, 'error', 'not-deleted')
               return false
             }
             say('Issue deleted')
@@ -346,13 +408,22 @@ export function IssuePage({ state, directory, teams, archives, d, say, refresh }
             return true
           }}
         >
-          <p>This publishes a NIP-09 deletion request. Relays may decline it, and copies held elsewhere are unaffected.</p>
-          {conversations.length > 0 && (
-            <p>
-              Its {conversations.length} {conversations.length === 1 ? 'conversation is a separate event and is' : 'conversations are separate events and are'} not deleted — they stay
-              in the team and stop being reachable from here.
-            </p>
+          {byFields ? (
+            // Restorable, as a project's (SPEC §6.5): its number stays its own.
+            <p>It leaves every list and search. Its link still opens it, with Restore.</p>
+          ) : (
+            <p>This publishes a NIP-09 deletion request. Relays may decline it, and copies held elsewhere are unaffected.</p>
           )}
+          {/* Deleting the issue never deletes the discussion, and the dialog says so (SHI-3). */}
+          {conversations.length > 0 &&
+            (byFields ? (
+              <p>Its {conversations.length === 1 ? 'conversation stays' : `${conversations.length} conversations stay`} in the team, and come back with it.</p>
+            ) : (
+              <p>
+                Its {conversations.length} {conversations.length === 1 ? 'conversation is a separate event and is' : 'conversations are separate events and are'} not deleted — they stay
+                in the team and stop being reachable from here.
+              </p>
+            ))}
         </ConfirmDialog>
       )}
     </>

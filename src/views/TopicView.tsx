@@ -13,6 +13,7 @@ import type { Person } from '@/api/useDirectory'
 import type { ProjectRowData } from '@/lib/projects'
 import type { TopicWorkRow as WorkRow } from '@/lib/topics'
 import { linkTo } from '@/router'
+import { useReportFailure } from '@/lib/failureReports'
 
 /** A Leaf document on a topic's page: its title, where it opens, who edited it last and when, and its pages. */
 export interface TopicDocument {
@@ -121,6 +122,7 @@ const documentRow = (document: TopicDocument): WorkListRow => ({
 })
 
 export function TopicView({ topic, documents, onRetry, onRetryDocuments, topicsHref, members, comments, conversation, onCopyLink, peekUrl }: TopicViewProps) {
+  useReportFailure(topic === 'failed' || documents === 'failed' ? 'not-loaded' : undefined)
   if (topic === 'unavailable') return <NoAccessNotice what="initiative" />
   const loaded = typeof topic === 'object' ? topic : undefined
   const listed = documents === 'loading' || documents === 'failed' ? undefined : documents

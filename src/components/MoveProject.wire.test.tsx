@@ -89,13 +89,13 @@ describe('Move to team…', () => {
     const say = await move([A, C, D], [[A, 'Alpha'], [C, 'Gamma'], [D, 'Delta'], [TARGET, 'Target']], 'Target')
     // The third Folder was never sent to: publishing stops at the refusal.
     expect(moves()).toEqual([['move', TARGET, A], ['move', TARGET, C]])
-    expect(say).toHaveBeenCalledWith('Moved to Target, but Gamma still lists it too: one of the teams is archived.', 'error')
+    expect(say).toHaveBeenCalledWith('Moved to Target, but Gamma still lists it too: one of the teams is archived.', 'error', 'not-moved')
   })
 
   it('a second move refused with no reason code and no words Ship knows (a relay before reason codes) asks to move it again', async () => {
     wire.refuse = (index) => (index === 1 ? 'invalid: rate-limited' : undefined)
     const say = await move([A, C], [[A, 'Alpha'], [C, 'Gamma'], [TARGET, 'Target']], 'Target')
-    expect(say).toHaveBeenCalledWith('Moved to Target, but Gamma still lists it too. Try moving it again.', 'error')
+    expect(say).toHaveBeenCalledWith('Moved to Target, but Gamma still lists it too. Try moving it again.', 'error', 'not-moved')
   })
 
   // TEA-9: a reason code Ship says nothing for (one it does not know, or leaves-by-moving) would refuse the same move again, so it never asks to move it again.
@@ -105,14 +105,14 @@ describe('Move to team…', () => {
       wire.refuse = (index) => (index === 1 ? refusal : undefined)
       const say = await move([A, C], [[A, 'Alpha'], [C, 'Gamma'], [TARGET, 'Target']], 'Target')
       expect(moves()).toEqual([['move', TARGET, A], ['move', TARGET, C]])
-      expect(say).toHaveBeenCalledWith('Moved to Target, but Gamma still lists it too.', 'error')
+      expect(say).toHaveBeenCalledWith('Moved to Target, but Gamma still lists it too.', 'error', 'not-moved')
     },
   )
 
   it('a move refused because the Folders changed says so in Ship’s words, and reads the Folders again so Move can succeed', async () => {
     wire.refuse = () => 'invalid: the team a move leaves lists none of its files'
     const say = await move([A], [[A, 'Alpha'], [TARGET, 'Target']], 'Target')
-    expect(say).toHaveBeenCalledWith('Nothing was moved: the teams changed since you opened this. Try again.', 'error')
+    expect(say).toHaveBeenCalledWith('Nothing was moved: the teams changed since you opened this. Try again.', 'error', 'not-moved')
     expect(reloadFolders).toHaveBeenCalled()
   })
 })

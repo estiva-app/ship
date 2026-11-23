@@ -1,6 +1,8 @@
 import { IconLink } from '@tabler/icons-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AppProvider } from '@estiva-app/ui'
+import { AppProvider, ErrorBoundary } from '@estiva-app/ui'
+import { CrashOnPurpose, ScreenSteps, errorReporter } from '@/lib/errorReports'
+import { useReportFailure } from '@/lib/failureReports'
 import { createFolder, me, peopleIn, projectStatus, resolveInbound, settleClaims, useDirectory, useWorkspace, type DirectoryView, type FolderState, type WorkspaceState, installReadStateFlush } from '@/api'
 import { AppShell } from '@/components/AppShell'
 import { Banner } from '@/components/Banner'
@@ -68,6 +70,8 @@ export default function App() {
 function Shell() {
   const route = useRoute()
   const { state, partial, error, clock, loading, busy, refresh, wantThreads } = useWorkspace(openedBy(route))
+  // The two banners drawn here rather than said: the workspace could not be read (PROD-5).
+  useReportFailure(clock || error ? 'not-loaded' : undefined)
   const folders = useFolders()
   // The teams: what the sidebar lists, what a new project is filed into (FOL-2).
   const teams = useMemo(() => (folders ? topLevelFolders(folders) : undefined), [folders])
@@ -102,7 +106,7 @@ function Shell() {
       )
       if (!ok || !id) return false
       // Created and not listed: opened anyway, so the one Folder that exists is the one on screen rather than a retry's second.
-      say(unlisted ? `Created ${name}, but the relay refused to list it, so it is in no sidebar — ${unlisted}` : `Created ${name}`, unlisted ? 'error' : 'ok')
+      say(unlisted ? `Created ${name}, but the relay refused to list it, so it is in no sidebar — ${unlisted}` : `Created ${name}`, unlisted ? 'error' : 'ok', 'not-added')
       go({ name: 'folder', id })
       return true
     },
@@ -209,7 +213,7 @@ function Shell() {
           {...sidebarProps(
             partial ? null : state,
             route,
-            (teams ?? []).map((f) => ({ id: f.id, name: f.name, addresses: f.addresses })),
+            (teams ?? []).map((f) => ({ id: f.id, name: f.name, addresses: f.addresses, ids: f.ids })),
             archives,
           )}
           {...sidebarTopics}
@@ -224,7 +228,16 @@ function Shell() {
         <WorkspacePeopleProvider value={cardPeople}>
           {/* Each page asks for the conversations it draws (APP-5). */}
           <ThreadsContext.Provider value={wantThreads}>
-            <Page route={route} state={partial && !opens(route, state) ? null : state} loading={loading || partial} directory={directory} teams={teams} folders={folders} archives={archives} say={say} refresh={refresh} />
+            <ScreenSteps />
+            {/* A page that crashes shows "Something went wrong … try again" in
+                its place, and the sidebar keeps working (PROD-4). Keyed by the
+                page and what it shows, so opening any other page draws it
+                afresh; a tab or view inside the same page does not. */}
+            <ErrorBoundary key={pageKey(route)}>
+              <CrashOnPurpose />
+              {/* Waiting out the person's minute (busy) is still loading: the page's shape, not a blank page (SHI-61). */}
+              <Page route={route} state={partial && !opens(route, state) ? null : state} loading={loading || busy || partial} directory={directory} teams={teams} folders={folders} archives={archives} say={say} refresh={refresh} />
+            </ErrorBoundary>
           </ThreadsContext.Provider>
         </WorkspacePeopleProvider>
       </MentionPeopleProvider>
@@ -246,6 +259,13 @@ const SKELETON: Partial<Record<Route['name'], PageSkeletonShape>> = {
  * its own page, or a `/o/<naddr>` — Peek's Open link — whose address already
  * names it while `useInbound` resolves it.
  */
+/** Which page is open, as the page boundary's key: the kind of page and the object or team it shows. */
+function pageKey(route: Route): string {
+  const which =
+    'd' in route ? route.d : 'id' in route ? route.id : 'naddr' in route ? route.naddr : 'ref' in route ? route.ref : (route.folder ?? '')
+  return `${route.name}:${which}`
+}
+
 function openedBy(route: Route): Opened | undefined {
   if (route.name === 'project' || route.name === 'issue') return { kind: route.name, d: route.d }
   if (route.name !== 'inbound') return undefined
@@ -383,9 +403,12 @@ export function sidebarProps(
 function useBanner(showToast: (options: ToastOptions) => void) {
   const [banner, setBanner] = useState<{ tone: 'error'; text: string } | null>(null)
   const say = useCallback<Say>(
-    (text, tone = 'ok') => {
+    (text, tone = 'ok', failure) => {
       if (tone === 'ok') showToast({ label: text, type: 'success' })
-      else setBanner({ tone, text })
+      else {
+        setBanner({ tone, text })
+        if (failure !== null) errorReporter.failure(failure ?? 'unnamed')
+      }
     },
     [showToast],
   )
@@ -427,7 +450,7 @@ function useCanonicalPath(route: Route) {
  * right surface, or on the issue list with a reason. `replace`, not `go`:
  * Back should not bounce off a route that immediately redirects again.
  */
-function useInbound(route: Route, say: (text: string, tone?: 'ok' | 'error') => void, clear: () => void) {
+function useInbound(route: Route, say: Say, clear: () => void) {
   /* Bumped to ask a busy relay again. Tied to the link it is for, so another
      link starts at 0 without a reset that would run the read twice. */
   const [attempt, setAttempt] = useState<{ naddr: string; n: number } | null>(null)
@@ -451,14 +474,14 @@ function useInbound(route: Route, say: (text: string, tone?: 'ok' | 'error') => 
           clear()
         }
         if (!found) {
-          say('Could not resolve that reference — you may not have access to its team.', 'error')
+          say('Could not resolve that reference — you may not have access to its team.', 'error', 'not-resolved')
           return replace(HOME)
         }
         // The resolved object's `d` — its uuid — is the tail of the address,
         // and §7.2's grammar carries nothing else.
         const d = identifierFromRef(found.addr)
         if (!d) {
-          say('That reference resolved to something without an identifier.', 'error')
+          say('That reference resolved to something without an identifier.', 'error', 'not-resolved')
           return replace(HOME)
         }
         replace(found.kind === 'project' ? { name: 'project', d, view: 'table' } : { name: 'issue', d })
@@ -472,13 +495,13 @@ function useInbound(route: Route, say: (text: string, tone?: 'ok' | 'error') => 
           issue list with a false reason.
         */
         if (isRelayBusy(reason)) {
-          if (saidBusyFor.current !== naddr) say('Too busy right now — try again shortly.', 'error')
+          if (saidBusyFor.current !== naddr) say('Too busy right now — try again shortly.', 'error', 'not-loaded')
           saidBusyFor.current = naddr
           retry = setTimeout(() => setAttempt({ naddr, n: n + 1 }), INBOUND_BUSY_RETRY_MS)
           return
         }
         if (saidBusyFor.current === naddr) saidBusyFor.current = null
-        say('That reference is not a valid nostr address.', 'error')
+        say('That reference is not a valid nostr address.', 'error', 'link-not-valid')
         replace(HOME)
       })
       .finally(() => {

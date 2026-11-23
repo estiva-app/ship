@@ -1,12 +1,16 @@
-import { Relay, projectFieldsOf, type FetchLike, type RelayFileReads } from '@estiva-app/protocol'
+import { ISSUE_TYPE, MERGE_READS_MS, fileFieldsOf, projectFieldsOf, type FetchLike, type RelayFileReads } from '@estiva-app/protocol'
 import type { TimesFn } from '@estiva-app/interop'
 import { isRateLimited, noteRateLimited } from '@/lib/relayBudget'
 import { estivaIdSigner, localSigner, type Signer } from '../nostr/signer'
 import { Store, type ProjectFields } from '../nostr/store'
-import { optedIn, readFileReads } from './fileReads'
+import { ListReadRelay } from '../nostr/listReadRelay'
+import { issueFieldsOptedIn, optedIn, readFileReads } from './fileReads'
 import { ID_CONFIG, RELAY_URL } from '../config'
 import { relayClockSkew } from './clock'
 import { heldBearer, heldToken, renew } from '../auth/estivaId'
+import { heardRefusal } from '../lib/failureReports'
+import { heardFromRelay, hearingSigner } from '../lib/heardFailures'
+import { answerWithin } from './answerWithin'
 
 /**
  * Who signs, decided once.
@@ -74,15 +78,28 @@ export const signer: Signer =
  * the caller will await and a stream can only be consumed once.
  */
 const fetchReportingQuota: FetchLike = async (url, init) => {
-  const response = await fetch(url, init)
-  const body = await response.text()
+  let response: { status: number; body: string }
+  try {
+    // A read the relay goes silent on ends here, instead of loading for good (SHI-68).
+    response = await answerWithin(url, init)
+  } catch (error) {
+    // Never answered: offline, cut, timed out, or the page leaving. Said for the failure a screen draws next (34396209).
+    heardFromRelay(error)
+    throw error
+  }
+  const { body } = response
   if (response.status === 429 || (response.status >= 400 && isRateLimited(body))) {
     noteRateLimited(body)
   }
+  // Why a read failed, for the report of the failure it becomes: the relay's status and prefix, never its sentence.
+  if (response.status >= 400) heardFromRelay(body, response.status)
   return { status: response.status, text: async () => body }
 }
 
-export const relay = new Relay(RELAY_URL, signer, { fetch: fetchReportingQuota })
+// Every refused write is reported by its reason code, busy answers included (PROD-5).
+// A list read in one request, never paged (ISS-9).
+// Plain reads asked together go out as one request: an open spent 74–99 of a person's 300 a minute (SHI-61).
+export const relay = new ListReadRelay(RELAY_URL, hearingSigner(signer), { fetch: fetchReportingQuota, onRefused: heardRefusal, mergeReadsMs: MERGE_READS_MS })
 
 /** The switch (ALO-5): the relay's NIP-11 asked once, on the first read that needs it. */
 let fileReads: Promise<RelayFileReads> | undefined
@@ -91,6 +108,16 @@ const opted = optedIn()
 const fileReadsNow = (): Promise<RelayFileReads> => (fileReads ??= readFileReads(() => relay.info()))
 export const projectFieldsNow = (): Promise<ProjectFields | undefined> =>
   (projectFields ??= fileReadsNow().then((reads) => projectFieldsOf(reads, opted)))
+
+/**
+ * Issues' own switch (ISS-4): on once the relay keeps issues in order, or for a
+ * tab opened with `?issueFields=on`, apart from projects'. Read once per page,
+ * as the projects' one.
+ */
+let issueFields: Promise<ProjectFields | undefined> | undefined
+const issuesOpted = issueFieldsOptedIn()
+export const issueFieldsNow = (): Promise<ProjectFields | undefined> =>
+  (issueFields ??= fileReadsNow().then((reads) => fileFieldsOf(reads, ISSUE_TYPE, issuesOpted)))
 
 /**
  * The types the relay keeps in order (NIP-11 `files.requires_prev`), for the
@@ -125,7 +152,16 @@ export const timesOption = async (): Promise<{ times?: TimesFn }> =>
 export const projectFieldsAgain = (): Promise<ProjectFields | undefined> => {
   fileReads = undefined
   projectFields = undefined
+  issueFields = undefined
   return projectFieldsNow()
 }
 
-export const store = new Store(relay, signer, relayClockSkew, projectFieldsNow, inOrderTypes)
+/** `projectFieldsAgain` for issues, whose switch the relay makes apart from projects' (ISS-5). */
+export const issueFieldsAgain = (): Promise<ProjectFields | undefined> => {
+  fileReads = undefined
+  projectFields = undefined
+  issueFields = undefined
+  return issueFieldsNow()
+}
+
+export const store = new Store(relay, signer, relayClockSkew, projectFieldsNow, inOrderTypes, issueFieldsNow)

@@ -18,6 +18,7 @@ import { TopicView, type TopicDocument, type TopicPageView } from '@/views/Topic
 import { act, type Say } from './act'
 import { copyText, pickerPeople } from './ProjectPage'
 import { useTopicConversation } from './topicConversation'
+import { placedIn } from '@/lib/placement'
 
 
 /**
@@ -139,7 +140,9 @@ export function TopicPage({
       ...(row.edited ? { editedLabel: editedLabel(nameOf(row.edited.by), row.edited.at) } : {}),
     })
     const issues = page.live.filter((row) => row.kind === 'issue').map(withFacts)
-    const team = folders?.find((folder) => folder.id === page.folder)?.name
+    // The team whose list names it, by address or id; its `h` only when none does: a move leaves the `h` behind (SHI-64).
+    const placed = folders ? placedIn({ addr: page.address, folder: page.folder }, folders)[0] : undefined
+    const team = placed?.name
     // Archived, said once, in the kit's notice every archived file shows (a3257366): who and when, and, hidden with its
     // archived team (an initiative's only ancestor), that team. Ship does not unarchive an initiative; Peek does.
     const archive = topic?.object.archived
@@ -150,7 +153,7 @@ export function TopicPage({
     return {
       title: page.title,
       ...(page.summary ? { summary: page.summary } : {}),
-      ...(team ? { team, teamId: page.folder } : {}),
+      ...(placed && team ? { team, teamId: placed.id } : {}),
       archived: page.archived,
       ...(notice ? { archive: notice } : {}),
       projects,
@@ -207,7 +210,7 @@ export function TopicPage({
                   if (!member) return leaveTopic(topic)
                   const joined = await joinTopic(topic)
                   // Said as Topics says it (TopicsPage): joined, but a mute you kept stays.
-                  if ('stillMuted' in joined) say(`Joined “${view?.title ?? 'this initiative'}”, but it is still muted. Join again to unmute it.`, 'error')
+                  if ('stillMuted' in joined) say(`Joined “${view?.title ?? 'this initiative'}”, but it is still muted. Join again to unmute it.`, 'error', 'not-saved')
                   return joined.ok ? { ok: true as const } : joined
                 },
                 say,

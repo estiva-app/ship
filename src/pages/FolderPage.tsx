@@ -18,6 +18,7 @@ import { SkeletonList } from '@/components/ui/Skeleton'
 import { TeamView, type TeamFileRow, type TeamInitiativeRow } from '@/views/TeamView'
 import { act, type Say } from '@/pages/act'
 import { useTabTitle } from '@/lib/tabTitle'
+import { useReportFailure } from '@/lib/failureReports'
 
 const KIND_PROJECT = 30850
 const KIND_ISSUE = 30851
@@ -66,6 +67,7 @@ export function FolderPage({ id, folders, directory, state = null, archives, say
   const profileOf = directory?.profileOf
   const [contents, setContents] = useState<FolderContents | null>(null)
   const [failed, setFailed] = useState(false)
+  useReportFailure(failed ? 'not-loaded' : undefined)
   const [archiving, setArchiving] = useState<{ hides: string[]; staysVisible: string[] } | null>(null)
   const [renaming, setRenaming] = useState(false)
   // What Active and a last change count back from: when the page opened.
@@ -196,7 +198,7 @@ export function FolderPage({ id, folders, directory, state = null, archives, say
     async (name: string) => {
       if (!contents) return false
       if (!name) {
-        say('A team needs a name.', 'error')
+        say('A team needs a name.', 'error', null)
         return false
       }
       // The channel's name is the title and its only home (SPEC §3.2), so there is nothing to read first.
@@ -208,9 +210,9 @@ export function FolderPage({ id, folders, directory, state = null, archives, say
           if (next.value.id === shown.current) setContents(next.value)
         } else {
           // Accepted, and not read back: without this the title would show the old name as though nothing happened.
-          say(`Renamed to ${name}, but the team could not be read back — reload to see it.`, 'error')
+          say(`Renamed to ${name}, but the team could not be read back — reload to see it.`, 'error', 'not-loaded')
         }
-      })
+      }, undefined, 'not-renamed')
     },
     [contents, say],
   )
@@ -234,13 +236,13 @@ export function FolderPage({ id, folders, directory, state = null, archives, say
     try {
       setArchiving(await folderArchiveImpact(contents.channel, folders))
     } catch (error) {
-      say(`Could not count what archiving would hide — ${error instanceof Error ? error.message : String(error)}`, 'error')
+      say(`Could not count what archiving would hide — ${error instanceof Error ? error.message : String(error)}`, 'error', 'not-loaded')
     }
   }, [contents, folders, say])
   const setArchived = useCallback(
     async (archived: boolean, resolution?: string) => {
       if (!contents?.channel) return false
-      const ok = await act(archived ? 'Archive' : 'Unarchive', () => archiveFolder({ id: contents.id, channel: contents.channel! }, archived, resolution), say, reread)
+      const ok = await act(archived ? 'Archive' : 'Unarchive', () => archiveFolder({ id: contents.id, channel: contents.channel! }, archived, resolution), say, reread, undefined, archived ? 'not-archived' : 'not-restored')
       if (ok) say(archived ? 'Team archived' : 'Team restored')
       return ok
     },

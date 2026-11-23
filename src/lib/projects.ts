@@ -33,7 +33,7 @@ export function projectTabs(
   issues: FolderState['issues'],
   archives: Archives,
   personOf: (pubkey: string) => Person,
-  folders?: readonly { id: string; name?: string; addresses?: readonly string[] }[],
+  folders?: readonly { id: string; name?: string; addresses?: readonly string[]; ids?: readonly string[] }[],
 ): Record<ProjectsTab, ProjectRowData[]> {
   const tabs: Record<ProjectsTab, ProjectRowData[]> = { all: [], planned: [], active: [], completed: [], archived: [] }
   // Each project's issues, read once: one archived with its project is still that project's to count, one archived on its own is not.

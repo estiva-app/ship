@@ -8,15 +8,29 @@ import { useLandedReadState } from './readStateSync'
 import { readMuted } from './useFeedJudges'
 import { nip44 } from './nip44'
 import { relay, signer, timesOption } from './store'
+import { isRateLimited } from '@/lib/relayBudget'
+
+/**
+ * The relay saying the person's requests for the minute are spent is read
+ * again once the wait it names is over, showing loading meanwhile: it is a
+ * wait, not a failure. Opening Ship a few times in a minute said "Didn't load"
+ * under Topics, and never read again (SHI-61). A busy relay is not this: it
+ * was already retried quietly by protocol, and then shows its error, as the
+ * record says. Any other failure is left to the next open or Try again.
+ *
+ * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-busy-relay-says-it-is-busy.md
+ */
+const waitOut = (error: unknown): boolean => isRateLimited(error instanceof Error ? error.message : String(error))
 
 /**
  * Every topic the reader can read, held per tab (SHIPS-2) — interop's
  * `readTopics`, held as the Folder listing is (`useFolders`), so Add to topic
  * opened again draws at once while it reads again, and opens filled once the
- * Topics page has read them (SHIPS-3). Not retried on its own: the next open
- * reads, or Try again, and a failed read never replaces a good one.
+ * Topics page has read them (SHIPS-3). Retried on its own only after a wait
+ * ({@link waitOut}): otherwise the next open reads, or Try again, and a failed
+ * read never replaces a good one.
  */
-const held = createRetryingRead<TopicsRead>({ retryable: () => false })
+const held = createRetryingRead<TopicsRead>({ retryable: waitOut })
 
 /** The order this tab's reads landed in, by the answer each gave (ALO-17): the sidebar draws its five from the latest. */
 const landings = new WeakMap<object, number>()
@@ -95,7 +109,8 @@ export function useTopics(on = true): TopicsState {
   }, [on])
   // Off, it reads nothing but still hands over what the tab holds.
   if (!on) return snapshot.value
-  return snapshot.value ?? (settled && snapshot.error !== undefined ? 'failed' : undefined)
+  // A read waiting out the relay is still on its way, not failed.
+  return snapshot.value ?? (settled && snapshot.error !== undefined && !snapshot.retrying ? 'failed' : undefined)
 }
 
 /**
@@ -103,9 +118,10 @@ export function useTopics(on = true): TopicsState {
  * what the sidebar draws on every page but Topics and a topic's. Read when the
  * first such page opens, and again when you come back to the tab
  * {@link REREAD_AFTER_MS} after the last read, never live, as the five have
- * always moved (Miky, 6 Nov). Not retried on its own: Try again reads.
+ * always moved (Miky, 6 Nov). Retried on its own only after a wait
+ * ({@link waitOut}); otherwise Try again reads.
  */
-const yourRead = createRetryingRead<YourTopicsRead>({ retryable: () => false })
+const yourRead = createRetryingRead<YourTopicsRead>({ retryable: waitOut })
 yourRead.subscribe(() => stampLanding(yourRead.snapshot().value))
 /** When the lean read was last asked for, so a quick look away and back reads nothing. */
 let yoursReadAt = 0
@@ -143,7 +159,8 @@ export function useYourTopics(on: boolean): { read: YourTopicsRead | 'failed' | 
     }
   }, [on])
   // Off, it reads nothing but still hands over what the tab holds.
-  const read = !on ? snapshot.value : (snapshot.value ?? (settled && snapshot.error !== undefined ? ('failed' as const) : undefined))
+  // A read waiting out the relay is still on its way, not failed.
+  const read = !on ? snapshot.value : (snapshot.value ?? (settled && snapshot.error !== undefined && !snapshot.retrying ? ('failed' as const) : undefined))
   return { read, retry: () => void yourRead.reload(readYours) }
 }
 

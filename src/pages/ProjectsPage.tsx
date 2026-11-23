@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react'
+import { useUnfinished } from './creating'
+import { useDeletedIssues } from '@/api/useDeletedIssues'
 import { createProject, keyProblem, me, projectKeys, setProjectDeleted, suggestKey, takenKeys, type DirectoryView, type WorkspaceState } from '@/api'
 import { useThreads } from '@/api/useThreads'
 import { day } from '@/lib/time'
@@ -37,6 +39,7 @@ function storedLayout(): ProjectsLayout {
  */
 export function ProjectsPage({ state, directory, teams, archives, tab, folder, say, refresh }: { state: WorkspaceState; directory: DirectoryView; teams: FolderSummary[] | undefined; archives: Archives; tab: ProjectsTab; folder?: string; say: Say; refresh: () => Promise<void> }) {
   const [adding, setAdding] = useState(false)
+  const unfinished = useUnfinished('Project')
   const [layout, setLayout] = useState<ProjectsLayout>(storedLayout)
   const chooseLayout = (next: ProjectsLayout) => {
     setLayout(next)
@@ -48,10 +51,13 @@ export function ProjectsPage({ state, directory, teams, archives, tab, folder, s
   }
   useReopenHeld(NEW_PROJECT_HOLD, () => setAdding(true))
   // Derived once per read, not per keystroke in the Add project dialog (SHI-4).
+  // A key no ref starts with, deleted issues' included (SPEC §6.1): read while the dialog is open.
+  const gone = useDeletedIssues(adding).deleted
+  const counted = useMemo(() => [...state.issues, ...(gone ?? [])], [state.issues, gone])
   const keys = useMemo(() => {
-    const byProject = projectKeys(state.projects, state.issues)
-    return { byProject, taken: takenKeys(state.projects, state.issues, byProject) }
-  }, [state.projects, state.issues])
+    const byProject = projectKeys(state.projects, counted)
+    return { byProject, taken: takenKeys(state.projects, counted, byProject) }
+  }, [state.projects, counted])
 
   const { lists, deleted } = useMemo(() => {
     // A Folder's Projects lists only the projects in that team (SHIPS-5), by the sidebar's own rule, and names no Folder.
@@ -100,19 +106,19 @@ export function ProjectsPage({ state, directory, teams, archives, tab, folder, s
           teams={teams?.map((team) => ({ id: team.id, name: team.name ?? 'Untitled team', hasState: team.hasState }))}
           team={folder}
           suggestKey={(title) => suggestKey(title, keys.taken)}
-          keyProblem={(key) => keyProblem(key, state.projects, state.issues, keys.byProject)}
+          keyProblem={(key) => keyProblem(key, state.projects, counted, keys.byProject)}
           holdKey={NEW_PROJECT_HOLD}
-          onClose={() => setAdding(false)}
+          onClose={() => {
+            unfinished.forget()
+            setAdding(false)
+          }}
           onCreate={async (draft) => {
-            const result = await createProject(draft)
-            if (!result.ok) {
-              say(`Project rejected — ${result.reason}`, 'error')
-              return false
-            }
+            const result = await createProject(draft, unfinished.held())
+            if (!unfinished.landed(result, say)) return false
             await refresh()
             // A new project is Planned: show it where it now is, not on a tab it is missing from.
             if (tab !== 'all' && tab !== 'planned') go({ name: 'projects', tab: 'planned', folder })
-            if (result.unlisted) say(`Project created, but not listed in its team, so Peek will not show it there — ${result.unlisted}`, 'error')
+            if (result.unlisted) say(`Project created, but not listed in its team, so Peek will not show it there — ${result.unlisted}`, 'error', 'not-added')
             else say('Project created')
             return true
           }}

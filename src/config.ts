@@ -18,6 +18,9 @@ export const ID_CONFIG: { base: string; clientId: string } | null = __ID_BASE__
   ? { base: __ID_BASE__, clientId: __CLIENT_ID__ }
   : null
 
+/** The commit this bundle was built from, for its error reports (PROD-4): Sentry names an error new or back by it. */
+export const RELEASE: string = __RELEASE__
+
 /** The relay as a person would name it in the UI: host and port, no scheme. */
 export function workspaceLabel(relayUrl: string = RELAY_URL): string {
   try {

@@ -146,7 +146,12 @@ for (const notAKey of ['npub1notakey', WHO.toUpperCase()]) {
   }
   check(`  …and a lead that is not a lower-case key is refused (${notAKey.slice(0, 8)}…)`, refused)
 }
-check('  …and the fixed tags keep their order ahead of it, O after a (SPEC §6.2)', assign.tags.slice(0, 5).map((t) => t[0]).join(',') === 'a,O,field,value,h')
+check('  …and the fixed tags keep their order ahead of it, O after a and the type after O (SPEC §6.2)', assign.tags.slice(0, 6).map((t) => t[0]).join(',') === 'a,O,K,field,value,h')
+check('  …an issue’s change says osnova.issue, a project’s osnova.project', tag(statusChange, 'K') === 'osnova.issue' && tag(projectChange, 'K') === 'osnova.project')
+check(
+  '  …and a change to a team itself says no type',
+  buildChange(PK, Date.now(), { target: `39000:${PK}:${CONTENT}`, field: 'archived', value: 'true', folder: CONTENT }).tags.every((t) => t[0] !== 'K'),
+)
 
 // A move names its new parent where a relay indexes it: `A`, never a second `a` (SPEC §7.2, FOL-45).
 const P2 = `30850:${PK}:p2`
@@ -765,7 +770,15 @@ check(
   'archive-project names a vocabulary holding exactly true and empty',
   declared.vocabularies[byId('archive-project')?.input?.enum ?? '']?.map((v) => v.value).sort().join('|') === '|true',
 )
-check('delete-issue emits kind:5 on an issue', byId('delete-issue')?.emits.kind === KIND.DELETION && byId('delete-issue')?.appliesTo === String(KIND.ISSUE))
+// ISS-5: a `deleted` change, as delete-project, since the relay refuses a kind:5 of an issue once issues are kept in order (SPEC §6.5).
+check(
+  'delete-issue sets an issue\'s `deleted` field, never a kind:5',
+  byId('delete-issue')?.emits.kind === KIND.CHANGE && byId('delete-issue')?.emits.field === 'deleted' && byId('delete-issue')?.appliesTo === String(KIND.ISSUE),
+)
+check(
+  'add-project\'s description is the new project\'s text, written as its first change (SPEC §7.3)',
+  (byId('add-project')?.input as { properties?: Record<string, { target?: string }> } | undefined)?.properties?.description?.target === 'content',
+)
 // RFC 0.4 §13.9: the display key is derived by its owner alone.
 check('no action sets `ref`', declared.actions.every((a) => a.emits.field !== 'ref'))
 

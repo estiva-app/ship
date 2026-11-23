@@ -9,6 +9,7 @@ import type { AttachmentIndex, EditIndex } from '@/api'
 import { signedIn } from '@/auth/estivaId'
 import { useReopenHeld } from '@/auth/heldTyping'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useUnfinished } from './creating'
 import {
   ISSUE_STATUSES,
   PROJECT_STATUSES,
@@ -32,7 +33,7 @@ import {
   addMentioned,
   setProjectField,
   setProjectDeleted,
-  noteProjectText,
+  noteFileText,
   startConversation,
   workFolder,
   channelContext,
@@ -54,6 +55,7 @@ import {
 } from '@/api'
 import { useRelated, withoutTopics } from '@/api/useRelated'
 import { useHistoryFold } from '@/api/useFileChanges'
+import { useChangedAt } from '@/api/useChangedAt'
 import { useFileTopics } from '@/api/useFileTopics'
 import { useThreads } from '@/api/useThreads'
 import { editTargetOf, MEMBER_FIELD_PREFIX, refusalReason } from '@estiva-app/conversation'
@@ -222,7 +224,7 @@ export function resolveAnswer(state: FolderState, threadId: string, resolved: bo
   const folder = folderOfMessage(state, threadId)
   if (!folder) return Promise.resolve('That conversation is no longer on this page.')
   return answerOf(() => resolveThread({ folder, threadId, resolved, note })).then((answer) => {
-    if (answer !== true && !resolved) say(`Not reopened: ${refusalReason(answer)}.`, 'error')
+    if (answer !== true && !resolved) say(`Not reopened: ${refusalReason(answer)}.`, 'error', 'not-saved')
     return answer
   })
 }
@@ -555,7 +557,7 @@ export function ProjectPage({
    * Folder's chat (`recordChannel`), and so Related and Move to Folder… know the
    * one it is in (`placedIn`). `undefined` while they are read.
    */
-  teams: readonly { id: string; name?: string; hasState: boolean; addresses?: readonly string[] }[] | undefined
+  teams: readonly { id: string; name?: string; hasState: boolean; addresses?: readonly string[]; ids?: readonly string[] }[] | undefined
   /** The object's `d`, which is all a §7.2 URL carries. */
   d: string
   view: ProjectViewName
@@ -567,6 +569,7 @@ export function ProjectPage({
 }) {
   const project = state.projects.find((candidate) => candidate.id === d)
   const [dialog, setDialog] = useState<'issue' | 'delete' | 'move' | 'archive' | null>(null)
+  const unfinished = useUnfinished('Issue')
   const newIssueHold = project && `new-issue:${project.addr}`
   useReopenHeld(newIssueHold, () => setDialog('issue'))
   const record = recordChannel(project?.contentFolder, teams)
@@ -579,24 +582,35 @@ export function ProjectPage({
   const held = useThreads(state, project ? [project.contentFolder, ...(record ? [record] : [])] : [], project ? [project.addr] : [])
   // Each text shown is one a save may be edited from (ALO-5): the change it follows.
   useEffect(() => {
-    if (project) noteProjectText(project)
+    if (project) noteFileText(project)
   }, [project])
 
-  const issues = useMemo<IssuesTableRow[]>(() => {
-    if (!project) return []
-    // An issue archived on its own is out of the list (FOL-46); one archived
-    // only with this project is the project's, and on its page.
-    return state.issues
-      .filter((issue) => {
-        const archive = archives.ofIssue(issue)
-        return issue.projectAddr === project.addr && (!archive || !!archive.with)
-      })
-      .map((issue) => {
+  // An issue archived on its own is out of the list (FOL-46); one archived
+  // only with this project is the project's, and on its page.
+  const listed = useMemo(
+    () =>
+      project
+        ? state.issues.filter((issue) => {
+            const archive = archives.ofIssue(issue)
+            return issue.projectAddr === project.addr && (!archive || !!archive.with)
+          })
+        : [],
+    [project, state.issues, archives],
+  )
+  // Where issues are read by their fields the load holds no text save (ISS-4): when each last changed comes from the relay.
+  const changedAt = useChangedAt(
+    useMemo(() => listed.map((issue) => issue.addr), [listed]),
+    state.issueTexts !== undefined,
+  )
+  const issues = useMemo<IssuesTableRow[]>(
+    () =>
+      listed.map((issue) => {
         // Who follows an issue is not an update to it (SHI-31): a Join or an Add does not move it up the table.
         const touched = state.activity.filter((change) => change.target === issue.addr && !change.field.startsWith(MEMBER_FIELD_PREFIX)).at(-1)
-        return { ...rowFor(issue, state, directory), openedBy: directory.personOf(issue.author), at: touched?.createdAt ?? issue.createdAt }
-      })
-  }, [project, state, directory, archives])
+        return { ...rowFor(issue, state, directory), openedBy: directory.personOf(issue.author), at: Math.max(touched?.createdAt ?? issue.createdAt, changedAt[issue.addr] ?? 0) }
+      }),
+    [listed, state, directory, changedAt],
+  )
 
   const { events: elsewhere, reread: rereadElsewhere } = useMentionsElsewhere(project?.addr, state)
   const linksAnswered = useMentionLinks(project?.addr, state, elsewhere)
@@ -981,13 +995,13 @@ export function ProjectPage({
           projects={[{ value: project.addr, label: project.title }]}
           project={{ addr: project.addr, title: project.title }}
           holdKey={newIssueHold}
-          onClose={() => setDialog(null)}
+          onClose={() => {
+            unfinished.forget()
+            setDialog(null)
+          }}
           onCreate={async (draft) => {
-            const result = await createIssue(project, state, draft)
-            if (!result.ok) {
-              say(`Issue rejected — ${result.reason}`, 'error')
-              return false
-            }
+            const result = await createIssue(project, state, draft, unfinished.held())
+            if (!unfinished.landed(result, say)) return false
             await refresh([result.folder ?? project.contentFolder])
             say('Issue created')
             return true
@@ -1021,7 +1035,7 @@ export function ProjectPage({
           onConfirm={async () => {
             const result = await deleteProject(project)
             if (!result.ok) {
-              say(`Delete rejected — ${result.reason}`, 'error')
+              say(`Delete rejected — ${result.reason}`, 'error', 'not-deleted')
               return false
             }
             say('Project deleted')

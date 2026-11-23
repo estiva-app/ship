@@ -17,6 +17,8 @@ const wire = vi.hoisted(() => ({
 }))
 const held = wire.held
 let down = false
+/** The relay refuses every read with its quota answer: this person's requests for the minute are spent. */
+let limited = false
 /** Kinds the relay refuses to take. */
 const refuseKinds = new Set<number>()
 /** Every filter the page sent to the relay. */
@@ -38,6 +40,8 @@ const answer = async (filters: Record<string, unknown>[], { paging = false } = {
   if (muteGate && filters.some((f) => (f.kinds as number[] | undefined)?.includes(30078))) await muteGate
   if (paging && everyTopicGate) await everyTopicGate
   if (down || (paging && pagedDown)) throw new Error('relay unreachable')
+  // The relay's own words (buzz api/bridge.rs), as protocol's `Relay.query` throws them.
+  if (limited) throw new Error('query failed: rate-limited: quota exceeded; retry in 3s')
   return held.filter((e) => filters.some((f) => matches(f, e)))
 }
 vi.mock('@/api/store', () => ({
@@ -155,6 +159,7 @@ beforeEach(() => {
   refuseKinds.clear()
   asked.length = 0
   down = false
+  limited = false
   muteGate = undefined
   everyTopicGate = undefined
   paged.length = 0
@@ -321,7 +326,7 @@ describe("Ship's Topics (Explore initiatives)", () => {
 
     fireEvent.click(within(rowOf('Muted')).getByRole('button', { name: 'Join' }))
 
-    await waitFor(() => expect(say).toHaveBeenCalledWith('Joined “Muted”, but it is still muted. Join again to unmute it.', 'error'))
+    await waitFor(() => expect(say).toHaveBeenCalledWith('Joined “Muted”, but it is still muted. Join again to unmute it.', 'error', 'not-saved'))
     expect(wire.sent.map((e) => e.kind)).toEqual([1851])
     expect(within(rowOf('Muted')).getByRole('button', { name: 'Join' })).toBeTruthy()
   })
@@ -554,6 +559,29 @@ describe("Ship's sidebar: where your five are read from (ALO-17)", () => {
     expect(screen.getByRole('heading', { name: 'Topic 2' })).toBeTruthy()
     expect(screen.getByRole('link', { name: /i-1/ })).toBeTruthy()
     release()
+  })
+
+  it('on Issues, a relay asking to wait leaves your topics loading, never “Didn’t load.”, and draws them once the wait is over (SHI-61)', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      limited = true
+      held.push(shipManifest(), topic('t-1', 'Topic 1'), joined('t-1'))
+      render(<Sidebar state={ship([], [])} route={{ name: 'issues' }} />)
+      await waitFor(() => expect(rootReads()).toBe(1))
+      await settle()
+      expect(screen.queryByText('Didn’t load.')).toBeNull()
+
+      // The relay's minute turns over: the read is asked again on its own, with no Try again.
+      limited = false
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(3_000)
+      })
+      await waitFor(() => expect(sidebarTopics()).toEqual(['Topic 1']))
+      expect(rootReads()).toBe(2)
+      expect(screen.queryByText('Didn’t load.')).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('on Issues, Try again after a failed read reads only your topics again, not every topic', async () => {

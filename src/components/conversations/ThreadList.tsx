@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { IconX } from '@tabler/icons-react'
 import type { Imeta } from '@estiva-app/protocol'
-import { ConversationLayout, ConversationPlace, EmptyState, GONE_CLOSED, IconButton, SkeletonList, Thread as KitThread, type ConversationItem } from '@estiva-app/ui'
+import { caretOnOpen, ConversationLayout, ConversationPlace, EmptyState, GONE_CLOSED, IconButton, SkeletonList, Thread as KitThread, type ConversationItem } from '@estiva-app/ui'
 import { cn } from '@/lib/cn'
 import { ago } from '@/lib/time'
 import { appDrafts, draftKeys, type DraftStore } from '@/lib/drafts'
@@ -156,6 +156,20 @@ function ShipThreadComment(props: ShipThreadProps) {
 }
 
 /**
+ * The caret, for the thread the page opens by itself (Leaf's way, its `CommentsColumn`). The kit's layout counts each
+ * time `open` changes once it is drawn, and the box at the open thread's foot takes the caret on each count
+ * (`caretOnOpen`). Drawn `quiet`, in the same drawing as that open, the count the open is about to bring is not passed
+ * on, so the caret stays where the person put it: the box waits for one past it (Reply on the open thread). Drawn
+ * later (the thread waited under a closed "Resolved"), the open is already counted and only what comes after passes.
+ */
+function QuietCaret({ quiet, children }: { quiet: boolean; children: ReactNode }) {
+  const counted = useContext(caretOnOpen)
+  // As it is first drawn, and kept: the list says `quiet` only for the drawing that opens the thread.
+  const [past] = useState(() => counted + (quiet ? 1 : 0))
+  return <caretOnOpen.Provider value={counted > past ? counted : 0}>{children}</caretOnOpen.Provider>
+}
+
+/**
  * A conversation's thread, open under its comment: the replies on the kit's `ReplyCard`, then Ship's reply box, which
  * takes the caret each time the thread opens (the kit's one column). A deleted comment's thread takes no new reply.
  */
@@ -214,10 +228,21 @@ export function ThreadListView(props: ThreadListViewProps) {
   const [openId, setOpenId] = useState<string>()
   // At most one opens by itself: the newest holding a reply that was new when the page opened, once read state is known.
   const [openedByItself, setOpenedByItself] = useState(false)
+  // Drawn before the read state was known: the thread that then opens by itself opens in a layout already on screen,
+  // which would give its box the caret. It is opened quietly instead ({@link QuietCaret}): said only for the drawing
+  // that opens it, so a thread first drawn later (it waited under a closed "Resolved") does not hold back a Reply.
+  const [drawnReading] = useState(unread === undefined)
+  const [quietId, setQuietId] = useState<string>()
+  useEffect(() => {
+    if (quietId !== undefined) setQuietId(undefined)
+  }, [quietId])
   if (unread !== undefined && !openedByItself) {
     setOpenedByItself(true)
     const first = read.find((thread) => thread.replies.some((reply) => unread[thread.id]?.includes(reply.id)))
-    if (first && openId === undefined) setOpenId(first.id)
+    if (first && openId === undefined) {
+      setOpenId(first.id)
+      if (drawnReading) setQuietId(first.id)
+    }
   }
   /*
     The open thread as last read, and where it stood. A comment with no replies leaves the read the moment it is
@@ -244,7 +269,11 @@ export function ThreadListView(props: ThreadListViewProps) {
     return {
       id: thread.id,
       card: <ShipThreadComment {...shared} />,
-      thread: () => <ShipThreadReplies {...shared} />,
+      thread: () => (
+        <QuietCaret quiet={quietId === thread.id}>
+          <ShipThreadReplies {...shared} />
+        </QuietCaret>
+      ),
       // Resolved in Peek or Leaf: closed under "Resolved", at the end (Katerina, 2 November).
       resolved: !!props.resolvedBy?.[thread.id],
       // On a block since removed from the description (§13.6): closed under "On deleted blocks", before "Resolved".
@@ -294,9 +323,8 @@ export function ThreadListView(props: ThreadListViewProps) {
   )
   return (
     <ConversationLayout
-      // Opened by itself before it is drawn, so the thread the page opens does not take the caret from the page: drawn
-      // again once the read state is known (the kit gives the caret only to a thread that opens after it is drawn).
-      key={unread === undefined ? 'reading' : 'read'}
+      // Drawn once and kept: drawn again when the read state landed, it took the comment box, the caret and what was
+      // being typed with it, and closed an edit opened early (SHI-62, SHI-57).
       threads="under"
       items={items}
       open={openId}

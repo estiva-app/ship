@@ -2,6 +2,7 @@ import { EmptyState } from '@estiva-app/ui'
 import type { ForeignObject } from '@/api/foreign'
 import type { RelatedState } from '@/api/useRelated'
 import { ForeignObject as FileRow } from '@/components/ui/ForeignObject'
+import { useReportFailure } from '@/lib/failureReports'
 
 /**
  * The files placed under this project or issue — RFC 0.5 §10.7, *nesting is
@@ -54,6 +55,7 @@ function Item({ object, related }: { object: ForeignObject; related: Exclude<Rel
 }
 
 export function Related({ related }: { related: RelatedState }) {
+  useReportFailure(related === 'failed' ? 'not-loaded' : undefined)
   if (related === 'failed') {
     return (
       <p className="text-body-2 text-text-muted" data-related="failed">

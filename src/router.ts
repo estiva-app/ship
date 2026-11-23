@@ -192,13 +192,26 @@ export const HOME: Route = { name: 'topics' }
  * the uuid off the tail of either shape, which is the same rule §7.2 states for
  * ignoring a slug.
  */
+/**
+ * A path segment decoded, or as written when its escape is malformed: a pasted
+ * `/issue/%` threw out of `parse` and took the page down with it (TES-4). The
+ * router in Peek and Leaf's `decodeRef` keep it the same way.
+ */
+function decodeSegment(segment: string): string {
+  try {
+    return decodeURIComponent(segment)
+  } catch {
+    return segment
+  }
+}
+
 export function parse(location: string): Route {
   // Only an old `#/…` link carries its route in the hash. Any other fragment — a block link's `#block-<id>`
   // (RIC-18) — belongs to the page the path names.
   const at = location.indexOf('#')
   const raw = at !== -1 && location[at + 1] === '/' ? location.slice(at + 1) : at !== -1 ? location.slice(0, at) : location
   const [path, query] = raw.replace(/^\/?/, '').split('?')
-  const parts = path.split('/').filter(Boolean).map(decodeURIComponent)
+  const parts = path.split('/').filter(Boolean).map(decodeSegment)
 
   if (parts[0] === 'o' && parts[1]) return { name: 'inbound', naddr: parts[1] }
   if (parts[0] === 'projects') {
@@ -286,10 +299,54 @@ export function movedRedirect(location: string): string | null {
   return href(parse(beforeHash)) + hash
 }
 
+const openListeners = new Set<() => void>()
+/** True while the app's own `popstate` is dispatched: any other is the browser's back or forward. */
+let announcing = false
+/** The path the last open or `popstate` left the page on. */
+let openPath: string | undefined
+
+const opened = () => {
+  for (const listener of openListeners) listener()
+}
+
+/** Tell the route listeners the address changed: the app's own `popstate`. */
+function announce(): void {
+  announcing = true
+  try {
+    dispatchEvent(new PopStateEvent('popstate'))
+  } finally {
+    announcing = false
+  }
+}
+
+/**
+ * Hear each page opened in place: a click or `go`, and the browser's back and
+ * forward. Only an address with another path, never a `replace` (a redirect)
+ * and never a change of query alone (a tab or a filter on the same page). The
+ * page timer starts here, before the new page draws.
+ */
+export function onOpen(listener: () => void): () => void {
+  if (openPath === undefined) {
+    openPath = location.pathname
+    addEventListener('popstate', () => {
+      if (!announcing && location.pathname !== openPath) opened()
+      openPath = location.pathname
+    })
+  }
+  openListeners.add(listener)
+  return () => openListeners.delete(listener)
+}
+
+function pushAddress(url: string): void {
+  const before = location.pathname
+  history.pushState(null, '', url)
+  if (location.pathname !== before) opened()
+  announce()
+}
+
 /** Navigate, adding a history entry. */
 export function go(route: Route): void {
-  history.pushState(null, '', href(route))
-  dispatchEvent(new PopStateEvent('popstate'))
+  pushAddress(href(route))
 }
 
 /**
@@ -336,8 +393,7 @@ export function linkTo(url: string): {
  * (0.60.0), which already leaves the modified clicks to the browser.
  */
 export function navigateTo(url: string): void {
-  history.pushState(null, '', url)
-  dispatchEvent(new PopStateEvent('popstate'))
+  pushAddress(url)
 }
 
 /**
@@ -349,7 +405,7 @@ export function navigateTo(url: string): void {
  */
 export function replace(route: Route): void {
   history.replaceState(null, '', href(route))
-  dispatchEvent(new PopStateEvent('popstate'))
+  announce()
 }
 
 /**

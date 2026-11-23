@@ -12,6 +12,7 @@ import {
   addr,
   attachmentsInDocument,
   buildMessage,
+  changeTypeTags,
   embedTagsOf,
   imetaTag,
   threadTags,
@@ -286,6 +287,9 @@ export function buildChange(
       // The file it is about, by its id, as a comment names its file (SPEC §6.2).
       // why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-change-is-about-its-file-as-a-comment-is.md
       ['O', args.target.split(':').slice(2).join(':')],
+      // The type of the file it changes, so a read can ask for changes by type (SPEC §6.2); none for a team itself.
+      // why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-change-says-the-type-of-its-file.md
+      ...changeTypeTags(args.target),
       ['field', args.field],
       ['value', args.value],
       ['h', args.folder],

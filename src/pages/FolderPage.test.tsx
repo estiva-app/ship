@@ -244,7 +244,7 @@ describe('FolderPage renames its team from its ⋮ (FOL-8, D6)', () => {
     render(<FolderPage id="f1" say={say} />)
     const dialog = await rename('Onboarding 2')
     fireEvent.click(within(dialog).getByRole('button', { name: 'Rename' }))
-    await waitFor(() => expect(say).toHaveBeenCalledWith('Renamed to Onboarding 2, but the team could not be read back — reload to see it.', 'error'))
+    await waitFor(() => expect(say).toHaveBeenCalledWith('Renamed to Onboarding 2, but the team could not be read back — reload to see it.', 'error', 'not-loaded'))
   })
 
   it('a refusal is said with its reason, the dialog stays open, and nothing is re-read', async () => {
@@ -253,7 +253,7 @@ describe('FolderPage renames its team from its ⋮ (FOL-8, D6)', () => {
     render(<FolderPage id="f1" say={say} />)
     const dialog = await rename('Nope')
     fireEvent.click(within(dialog).getByRole('button', { name: 'Rename' }))
-    await waitFor(() => expect(say).toHaveBeenCalledWith('Rename rejected — restricted: not an admin', 'error'))
+    await waitFor(() => expect(say).toHaveBeenCalledWith('Rename rejected — restricted: not an admin', 'error', 'not-renamed'))
     expect(screen.getByRole('dialog', { name: 'Rename team' })).toBeInTheDocument()
     expect(reloadFolders).not.toHaveBeenCalled()
   })

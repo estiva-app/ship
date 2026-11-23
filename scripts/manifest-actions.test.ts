@@ -122,7 +122,8 @@ if (Array.isArray(moved)) {
 const unparented = build({ kind: KIND.ISSUE, address: ISSUE, objectAuthor: ME, folder: FOLDER, actionId: 'move-issue', value: '' })
 check(
   'an empty value is “No project”, as Ship’s picker offers',
-  Array.isArray(unparented) && foldFolder([issueRoot, sign(unparented[0], 5)]).issues[0].projectAddr === '',
+  // No project is no parent: every reader asks `!issue.projectAddr`.
+  Array.isArray(unparented) && !foldFolder([issueRoot, sign(unparented[0], 5)]).issues[0].projectAddr,
 )
 const listSlot = (manifestContent().projections[String(KIND.PROJECT)].slots.list as { children?: { movedBy?: string } }).children
 check('the project’s issue list declares the field a move sets', listSlot?.movedBy === 'project', JSON.stringify(listSlot))
@@ -147,9 +148,15 @@ if (Array.isArray(created)) {
   sent = []
   await store.createProject({ title: 'Launch', description: 'What launch means', team: { folder: FOLDER, hasState: true } })
   const [ownRecord, ownListing] = sent
+  /*
+    ISS-5: `description` is the new project's text, `target: 'content'`, which
+    SPEC §7.3 has a consumer take out of the root and write as its first
+    change; Ship's own record keeps the tag only until projects are kept in
+    order (`createInOrder`). Either is read as the starting text (`recordDescription`).
+  */
   check(
-    'the description is on a `description` tag with empty content, as buildProject writes it',
-    tag(record, 'description') === 'What launch means' && record.content === '' && tag(ownRecord, 'description') === 'What launch means' && ownRecord.content === '',
+    'the description is the text property, never a `description` tag on a consumer\'s record; Ship\'s, before the switch, keeps the tag',
+    tag(record, 'description') === undefined && record.content === 'What launch means' && tag(ownRecord, 'description') === 'What launch means' && ownRecord.content === '',
   )
   check('the record names its Folder in `buzz-channel` and carries no `h`, as buildProject does', tag(record, 'buzz-channel') === FOLDER && tag(record, 'h') === undefined && tag(ownRecord, 'buzz-channel') === FOLDER && tag(ownRecord, 'h') === undefined)
   check('its name is on `name`, the tag Ship writes', tag(record, 'name') === 'Launch' && tag(ownRecord, 'name') === 'Launch')

@@ -263,10 +263,19 @@ describe('A reaction from the topic page names whose message it is on (ACT-6)', 
     // A reply is drawn once its thread is opened.
     if (replyId) await user.click(await within(column).findByText(/1 reply/))
     await screen.findByText(text)
-    const card = replyId ? (document.querySelector(`[data-reply-id="${replyId}"]`) as HTMLElement) : column
-    ;(replyId ? [card] : column.querySelectorAll('[data-comment-body], [data-reply-id]')).forEach((each) => fireEvent.mouseEnter(each))
-    await user.click(within(card).getByRole('button', { name: 'React' }))
-    await user.click(await screen.findByRole('button', { name: 'Makes sense' }))
+    // The card is found again on each try, and React pressed only while no picker is open: on a loaded CI runner
+    // (ship deploy run 44381099049) the reply's React was pressed and no picker opened, which a press on a card
+    // drawn again between finding it and pressing it would do; never reproduced locally.
+    await waitFor(() => {
+      const column = document.querySelector('[data-comments-column]') as HTMLElement
+      const card = replyId ? (document.querySelector(`[data-reply-id="${replyId}"]`) as HTMLElement) : column
+      if (!screen.queryByRole('button', { name: 'Makes sense' })) {
+        ;(replyId ? [card] : column.querySelectorAll('[data-comment-body], [data-reply-id]')).forEach((each) => fireEvent.mouseEnter(each))
+        fireEvent.click(within(card).getByRole('button', { name: 'React' }))
+      }
+      expect(screen.getByRole('button', { name: 'Makes sense' })).toBeInTheDocument()
+    })
+    await user.click(screen.getByRole('button', { name: 'Makes sense' }))
   }
   async function reactWithThumbsUp(text?: string, replyId?: string) {
     await pickThumbsUp(text, replyId)
