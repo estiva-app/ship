@@ -192,7 +192,7 @@ export function FolderPage({ id, folders, directory, state = null, archives, say
     const shownTopics = Array.isArray(initiatives) ? new Set(initiatives.map((row) => row.address)) : undefined
     const others = foreign.filter((file) => file.kind !== KIND_TOPIC || (shownTopics !== undefined && !(file.address && shownTopics.has(file.address)))).length
     return { projects, issues, others }
-  }, [contents, state, archives, personOf, initiatives])
+  }, [contents, state, archives, personOf, nameOf, initiatives])
 
   const rename = useCallback(
     async (name: string) => {
