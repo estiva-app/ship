@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { IconExternalLink, IconTarget } from '@tabler/icons-react'
+import { IconExternalLink } from '@tabler/icons-react'
 import { ArchivedNotice, CollapsibleSection, KindIcon, NoAccessNotice, PageHeader, SectionHeader, WithTooltip, type ArchivedNoticeProps } from '@estiva-app/ui'
 import { Breadcrumb } from '@/components/ui/Breadcrumb'
 import { Button } from '@/components/ui/Button'
@@ -164,7 +164,7 @@ export function TopicView({ topic, documents, files = [], onRetry, onRetryDocume
           actions={loaded && <PageActions what="topic" comments={comments} archive="none" onArchive={() => {}} onDelete={() => {}} onCopyLink={onCopyLink} />}
         />
         {topic === 'failed' ? (
-          <EmptyState icon={<IconTarget size={16} stroke={1.5} />} scope="page" message="This initiative didn’t load." action={{ label: 'Try again', onClick: onRetry }} />
+          <EmptyState icon={<KindIcon kind="topic" tone="inherit" />} scope="page" message="This initiative didn’t load." action={{ label: 'Try again', onClick: onRetry }} />
         ) : (
           // The page's whole width, 24px in, its parts 24px apart, as Peek's team page and Ship's (A4: "Peek's team-page look").
           <ScrollArea className="min-h-0 min-w-0 flex-1" contentClassName="flex flex-col gap-6 px-6 py-5">

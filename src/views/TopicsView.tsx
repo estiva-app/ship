@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { IconTarget } from '@tabler/icons-react'
 import { KindIcon, ListTable, ListTableRow, MembersPill, Panel, SearchInput, type AvatarGroupMember, type ListTableColumn } from '@estiva-app/ui'
 import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -90,7 +89,7 @@ export function TopicsView({ title, lists, tab, onTab, onRetry, onJoin, joining,
       {lists === 'loading' ? (
         <SkeletonList rows={8} />
       ) : lists === 'failed' ? (
-        <EmptyState icon={<IconTarget size={16} stroke={1.5} />} scope="page" message="Initiatives didn’t load." action={{ label: 'Try again', onClick: onRetry }} />
+        <EmptyState icon={<KindIcon kind="topic" tone="inherit" />} scope="page" message="Initiatives didn’t load." action={{ label: 'Try again', onClick: onRetry }} />
       ) : (
         // 24px between the tabs and the list, as Peek's (Katerina, 16 November: 16 was too tight).
         <div className="flex flex-col gap-6">
