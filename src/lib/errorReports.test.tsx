@@ -79,6 +79,53 @@ describe('Ship error reports', () => {
     expect(screen.getByText(PLANTED_TITLE)).toBeTruthy()
     expect(screen.queryByText(/Something went wrong/)).toBeNull()
   })
+
+  it('says why on the report of a page that did not load: the relay’s wait, then a lapsed sign-in, never their wording', async () => {
+    const { startErrorReports } = await import('./errorReports')
+    const { reportFailureNow } = await import('./failureReports')
+    const { heardFromRelay, hearingSigner } = await import('./heardFailures')
+    const { SignerTokenExpired } = await import('@/nostr/signer')
+    startErrorReports()
+
+    // The relay's answer to a read past the per-minute limit, as the transport sees it.
+    heardFromRelay('{"error":"rate-limited: quota exceeded; retry in 12s"}', 429)
+    reportFailureNow('not-loaded')
+    await flush()
+
+    // Estiva ID refusing to sign because the sign-in ended: the read fails as it did, and the next report says so.
+    const signer = hearingSigner({
+      pubkey: 'f'.repeat(64),
+      kind: 'estiva-id',
+      sign: async () => {
+        throw new SignerTokenExpired()
+      },
+    } as never)
+    await expect(signer.sign({ kind: 27235, tags: [], content: '', created_at: 1 } as never)).rejects.toBeInstanceOf(SignerTokenExpired)
+    reportFailureNow('not-loaded')
+    await flush()
+
+    // Estiva ID's own per-minute limit, reached by a page's read state before the relay's is.
+    const reportsGo = vi.mocked(fetch).getMockImplementation()!
+    vi.mocked(fetch).mockImplementation(async (url, init) =>
+      String(url).endsWith('/nip44/decrypt') ? new Response('Too many encryption requests', { status: 429 }) : reportsGo(url, init),
+    )
+    const { nip44UnlessRefused } = await import('@/api/nip44')
+    await expect(nip44UnlessRefused.decrypt('ciphertext')).rejects.toThrow()
+    reportFailureNow('not-loaded')
+    await flush()
+
+    const reports = requests.map((r) => JSON.parse(r.body))
+    expect(reports.map((r) => [r.how, r.named, r.reason])).toEqual([
+      ['failure', 'not-loaded', 'told-to-wait'],
+      ['failure', 'not-loaded', 'signed-out'],
+      ['failure', 'not-loaded', 'id-told-to-wait'],
+    ])
+    for (const { body } of requests) {
+      expect(body).not.toContain('quota')
+      expect(body).not.toContain('expired')
+      expect(body).not.toContain('encryption')
+    }
+  })
 })
 
 describe('screenOf', () => {

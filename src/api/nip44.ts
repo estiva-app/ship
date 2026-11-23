@@ -14,8 +14,20 @@
 import { ID_CONFIG } from '../config'
 import { currentToken } from '../auth/estivaId'
 import type { Nip44 } from '@estiva-app/conversation'
+import { heardFromId } from '../lib/heardFailures'
 
 async function call(op: 'encrypt' | 'decrypt', body: object): Promise<unknown> {
+  try {
+    return await ask(op, body)
+  } catch (error) {
+    // Why, for the report of the failure a screen draws next (34396209): Estiva ID's own limit above all, which a
+    // page of read state reaches before the relay's. A blob that will never decrypt is no failure, and is not said.
+    if (refusedForNow(error)) heardFromId(error)
+    throw error
+  }
+}
+
+async function ask(op: 'encrypt' | 'decrypt', body: object): Promise<unknown> {
   const token = currentToken()
   if (!ID_CONFIG || !token) throw new Error(`/nip44/${op}: no Estiva ID session`)
   const response = await fetch(`${ID_CONFIG.base.replace(/\/+$/, '')}/nip44/${op}`, {
