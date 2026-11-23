@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { IdentityMenu } from './IdentityMenu'
 import { ShipSidebar, type SidebarEntry } from './ShipSidebar'
+import { forgetOpenedFromInitiative } from '@/lib/openedFrom'
 import type { SidebarTopic } from '@/lib/topics'
 
 const noop = () => {}
@@ -18,7 +19,10 @@ describe('ShipSidebar', () => {
   ]
   const links = () => screen.getAllByRole('link').map((a) => [a.textContent, a.getAttribute('href')])
 
-  afterEach(() => window.localStorage.clear())
+  afterEach(() => {
+    window.localStorage.clear()
+    forgetOpenedFromInitiative()
+  })
 
   it('reads Projects, Issues, then Explore initiatives where the top Topics was, with the counts on Projects and Issues only (TOPI-9)', () => {
     render(<ShipSidebar topics={[]} openIssues={18} activeProjects={5} hrefFor={hrefFor} current={{ entry: 'topics' }} />)
@@ -52,16 +56,42 @@ describe('ShipSidebar', () => {
     expect(screen.getByRole('link', { name: 'Explore initiatives' }).querySelector('svg')).not.toBeNull()
   })
 
-  it('on a project a topic lists, that topic opens and the project is marked under it', () => {
-    const work: SidebarTopic['work'] = [{ id: '30850:p:launch', kind: 'project', title: 'Launch', href: '/project/launch' }]
-    render(<ShipSidebar topics={[topic(1, work)]} openFile="30850:p:launch" openIssues={0} activeProjects={0} hrefFor={hrefFor} />)
-    expect(screen.getByRole('link', { name: 'Launch' })).toHaveAttribute('aria-current', 'page')
+  /** Every link lit as the open page. */
+  const marked = () => [...document.querySelectorAll('a[aria-current="page"]')].map((a) => a.getAttribute('href'))
+  const launch: SidebarTopic['work'] = [{ id: '30850:p:launch', kind: 'project', title: 'Launch', href: '/project/launch' }]
+
+  // Katerina, 23 November: "you have 2 selections in the sidebar". One place is lit, as Peek lights the column you came from.
+  it('on a project clicked under an initiative, it is marked there and nowhere else: its team is neither marked nor opened', async () => {
+    const { rerender } = render(<ShipSidebar topics={[topic(1, launch)]} openIssues={0} activeProjects={1} hrefFor={hrefFor} folders={teams} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Show what is under Topic 1' }))
+    fireEvent.click(screen.getByRole('link', { name: 'Launch' }))
+    rerender(<ShipSidebar topics={[topic(1, launch)]} openFile="30850:p:launch" openIssues={0} activeProjects={1} hrefFor={hrefFor} folders={teams} current={{ entry: 'projects', folder: 'peek' }} />)
+    expect(marked()).toEqual(['/project/launch'])
+    expect(screen.getByRole('button', { name: 'Show what is under Peek' })).toHaveAttribute('aria-expanded', 'false')
   })
 
-  it("on an initiative's page its row is marked, not Explore initiatives", () => {
-    render(<ShipSidebar topics={[topic(1)]} openTopic="30840:p:t1" openIssues={0} activeProjects={0} hrefFor={hrefFor} />)
+  it('on a project opened some other way, only its team marks it: the initiative listing it stays shut, its row unmarked', () => {
+    render(<ShipSidebar topics={[topic(1, launch)]} openFile="30850:p:launch" openIssues={0} activeProjects={1} hrefFor={hrefFor} folders={teams} current={{ entry: 'projects', folder: 'peek' }} />)
+    expect(marked()).toEqual(['/app/teams/peek/projects'])
+    expect(screen.getByRole('button', { name: 'Show what is under Topic 1' })).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('a click under an initiative is spent once another page opens: the same project opened again later is marked under its team', () => {
+    const at = { entry: 'projects', folder: 'peek' } as const
+    const { rerender } = render(<ShipSidebar topics={[topic(1, launch)]} openIssues={0} activeProjects={1} hrefFor={hrefFor} folders={teams} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Show what is under Topic 1' }))
+    fireEvent.click(screen.getByRole('link', { name: 'Launch' }))
+    rerender(<ShipSidebar topics={[topic(1, launch)]} openFile="30850:p:launch" openIssues={0} activeProjects={1} hrefFor={hrefFor} folders={teams} current={at} />)
+    rerender(<ShipSidebar topics={[topic(1, launch)]} openIssues={0} activeProjects={1} hrefFor={hrefFor} folders={teams} current={{ folderId: 'hq' }} />)
+    rerender(<ShipSidebar topics={[topic(1, launch)]} openFile="30850:p:launch" openIssues={0} activeProjects={1} hrefFor={hrefFor} folders={teams} current={at} />)
+    expect(marked()).toEqual(['/app/teams/peek/projects'])
+  })
+
+  it("on an initiative's page its row is marked, not Explore initiatives, and its fold stays as it was: only its arrow folds it", () => {
+    render(<ShipSidebar topics={[topic(1, launch)]} openTopic="30840:p:t1" openIssues={0} activeProjects={0} hrefFor={hrefFor} />)
     expect(screen.getByRole('link', { name: 'Topic 1' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('link', { name: 'Explore initiatives' })).not.toHaveAttribute('aria-current')
+    expect(screen.getByRole('button', { name: 'Show what is under Topic 1' })).toHaveAttribute('aria-expanded', 'false')
   })
 
   it("says the initiatives didn't load in Peek's words, with no button squeezed beside them, and still offers Explore initiatives (review of 23 November, B3)", () => {

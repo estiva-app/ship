@@ -383,7 +383,8 @@ export function sidebarProps(
           : route.name === 'topics' || route.name === 'projects' || route.name === 'issues'
             ? { entry: route.name, folder: route.folder }
             : undefined
-  // A topic's page lights its own row among your topics (`openTopic`), and a project or an issue its row under each topic listing it.
+  // A topic's page lights its own row among your topics (`openTopic`); a project or an issue is lit under the initiative it was
+  // clicked under, else under its team: the sidebar keeps one place lit (Katerina, 23 November).
   const openFile =
     route.name === 'project' ? projects.find((p) => p.id === route.d)?.addr : route.name === 'issue' ? state?.issues.find((i) => i.id === route.d)?.addr : undefined
   return {

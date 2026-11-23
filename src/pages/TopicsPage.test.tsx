@@ -644,14 +644,16 @@ describe("Ship's sidebar: your five newest topics", () => {
     await waitFor(() => expect(sidebarTopics()).toEqual(['Topic 2', 'Topic 1']))
   })
 
-  it("opens a topic's fold when its page is opened later, not only on the first draw", async () => {
+  // Katerina, 23 November: "in peek it doesnt … just expands when you click to the chevron only".
+  it("leaves a topic's fold as it was when its page is opened: its row is lit, and only its arrow folds it", async () => {
     held.push(shipManifest(), projectRoot('p-1'), topic('t-1', 'Topic 1'), joined('t-1'), lists('t-1', 'p-1'))
     const { rerender } = render(<Sidebar state={ship(['p-1'], [])} />)
     await waitFor(() => expect(sidebarTopics()).toEqual(['Topic 1']))
     expect(screen.queryByRole('link', { name: 'p-1' })).toBeNull()
 
     rerender(<Sidebar state={ship(['p-1'], [])} route={{ name: 'topic', d: 't-1' }} />)
-    await waitFor(() => expect(screen.getByRole('link', { name: 'p-1' })).toBeTruthy())
+    await waitFor(() => expect(screen.getByRole('link', { name: 'Topic 1' })).toHaveAttribute('aria-current', 'page'))
+    expect(screen.queryByRole('link', { name: 'p-1' })).toBeNull()
   })
 
   it('folds a topic to its projects, then its issues, in the order it lists them', async () => {

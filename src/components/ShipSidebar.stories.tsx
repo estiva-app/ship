@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { ShipSidebar, type SidebarFolder } from './ShipSidebar'
+import { forgetOpenedFromInitiative, rememberOpenedFromInitiative } from '@/lib/openedFrom'
 import type { SidebarTopic } from '@/lib/topics'
 
 const SHIP = '7b32200c-e4c0-4216-b79a-8490fc05e0bd'
@@ -63,10 +64,26 @@ type Story = StoryObj<typeof meta>
  */
 export const OnTopics: Story = { name: 'On Explore initiatives' }
 
-/** A project an initiative lists: that initiative opens, the project lit under it, and its team's Projects. */
+/**
+ * A project an initiative lists, opened some other way (its team's list, a link): lit in one place only, its team's
+ * Projects; the initiative stays as it was (Katerina, 23 November: "you have 2 selections in the sidebar").
+ */
 export const OnAProjectInATopic: Story = { name: 'On a project in an initiative', args: { current: { entry: 'projects', folder: SHIP }, openFile: '30850:a:rel' } }
 
-/** An initiative's page: its row is lit, not Explore initiatives. */
+/**
+ * The same project clicked under its initiative: lit there and nowhere else, as Peek lights a row only in the column it
+ * was opened from; its team stays folded and unlit.
+ */
+export const ClickedUnderATopic: Story = {
+  name: 'On a project clicked under its initiative',
+  args: { current: { entry: 'projects', folder: SHIP }, openFile: '30850:a:rel' },
+  beforeEach: () => {
+    rememberOpenedFromInitiative('30840:a:nav', '30850:a:rel')
+    return () => forgetOpenedFromInitiative()
+  },
+}
+
+/** An initiative's page: its row is lit, not Explore initiatives; its fold stays as it was, as Peek's rows (only the arrow folds). */
 export const OnATopic: Story = { name: 'On an initiative', args: { current: undefined, openTopic: '30840:a:speed' } }
 
 /** You are in no initiative yet: the line says so, and Explore initiatives is the way in. */

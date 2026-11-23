@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import { IconListSearch, IconPlus, IconUsers } from '@tabler/icons-react'
 import { CollapsibleSection, KindIcon, NavItem, NavTree, Sidebar as SidebarShell, useRememberedOpen } from '@estiva-app/ui'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -6,6 +6,7 @@ import { SkeletonList } from '@/components/ui/Skeleton'
 import { TOPICS_SHOWN, type SidebarTopic } from '@/lib/topics'
 import { href } from '@/router'
 import { useReportFailure } from '@/lib/failureReports'
+import { forgetOpenedFromInitiative, rememberOpenedFromInitiative, useOpenedFromInitiative } from '@/lib/openedFrom'
 
 /**
  * The sidebar: Projects, Issues, your five newest topics then Explore topics
@@ -42,6 +43,13 @@ import { useReportFailure } from '@/lib/failureReports'
  * under the key below; opening a project or an issue opens the team holding
  * it and marks that team's Projects or Issues (Katerina, 30 October: opening a
  * file shows where it lives; the package's tree does it).
+ *
+ * One place is lit at a time (Katerina, 23 November: "you have 2 selections in
+ * the sidebar"): a project or an issue clicked under one of your initiatives is
+ * lit there, and its team stays as it was, as Peek lights a row only in the
+ * column it was opened from; opened any other way, its team's place is lit. A
+ * row folds by its arrow alone: an initiative's own page leaves its fold as it
+ * is, as Peek's rows do.
  *
  * Desktop only: the narrow-screen drawer is parked (ruling A5).
  */
@@ -99,9 +107,9 @@ export interface ShipSidebarProps {
    * `loading` before the topics and their order land, `failed` when either did not.
    */
   topics: SidebarTopic[] | 'loading' | 'failed'
-  /** The topic whose page is open, by address: its row is lit and opens. */
+  /** The topic whose page is open, by address: its row is lit, its fold left as it is. */
   openTopic?: string
-  /** The project or issue open, by address: lit under the topic listing it, which opens. */
+  /** The project or issue open, by address: lit under the initiative it was clicked under, which opens; else under its team. */
   openFile?: string
   /** The first workspace read has not landed, so the counts are unknown rather than zero — SHI-20. */
   loading?: boolean
@@ -133,8 +141,17 @@ const TOP = ENTRIES.filter(({ entry }) => entry !== 'topics')
 const rowId = (folder: string, entry: SidebarEntry) => `${folder}/${entry}`
 
 export function ShipSidebar({ openIssues, activeProjects, hrefFor, folders = [], onNewFolder, current, topics, openTopic, openFile, loading = false, foldersLoading = false, yours, className }: ShipSidebarProps) {
-  const at = current && 'entry' in current ? current : undefined
   useReportFailure(topics === 'failed' ? 'not-loaded' : undefined)
+  const from = useOpenedFromInitiative()
+  // The click is spent once another page opens: the same project opened later some other way is lit under its team.
+  useEffect(() => forgetOpenedFromInitiative(openFile), [openFile])
+  // The initiative whose fold holds the open project or issue, where it was clicked: lit there, and nowhere else.
+  const litUnder =
+    from && openFile === from.file && Array.isArray(topics) && topics.some((topic) => topic.id === from.topic && topic.work.some((work) => work.id === openFile))
+      ? from.topic
+      : undefined
+  const place = litUnder ? undefined : current
+  const at = place && 'entry' in place ? place : undefined
   // Alphabetical teams, as Peek's column draws them; the relay's order tells the person nothing.
   const teams = [...folders].sort((a, b) =>
     (a.name ?? a.id).localeCompare(b.name ?? b.id, undefined, { sensitivity: 'base' }),
@@ -143,7 +160,7 @@ export function ShipSidebar({ openIssues, activeProjects, hrefFor, folders = [],
   const mine = yours ? teams.filter((team) => yours.has(team.id)) : teams
   const others = yours ? teams.filter((team) => !yours.has(team.id)) : []
   // The team whose page, or one of whose entries, is open: Other teams opens for it, as a click would.
-  const openTeam = current && 'folderId' in current ? current.folderId : at?.folder
+  const openTeam = place && 'folderId' in place ? place.folderId : at?.folder
   const otherOpen = !!openTeam && others.some((team) => team.id === openTeam)
   const counts: Partial<Record<SidebarEntry, { count: number; countLabel: string }>> = loading
     ? {}
@@ -179,12 +196,22 @@ export function ShipSidebar({ openIssues, activeProjects, hrefFor, folders = [],
               href={topic.href}
               icon={<KindIcon kind="topic" />}
               active={openTopic === topic.id}
-              // Opens each time its page or one of its files is opened, as a click would; folded by hand, it stays so until then.
-              openFor={openTopic === topic.id ? topic.id : topic.work.some((work) => work.id === openFile) ? openFile : undefined}
+              // Its arrow alone folds it, as Peek's rows: its own page leaves it as it is (Katerina, 23 November). It opens
+              // for a row clicked inside it, folded by hand since or not.
+              openFor={litUnder === topic.id ? openFile : undefined}
               defaultOpen={false}
             >
               {topic.work.length > 0
-                ? topic.work.map((work) => <NavItem key={work.id} label={work.title} href={work.href} icon={<KindIcon kind={work.kind} />} active={openFile === work.id} />)
+                ? topic.work.map((work) => (
+                    <NavItem
+                      key={work.id}
+                      label={work.title}
+                      href={work.href}
+                      icon={<KindIcon kind={work.kind} />}
+                      active={litUnder === topic.id && openFile === work.id}
+                      onClick={() => rememberOpenedFromInitiative(topic.id, work.id)}
+                    />
+                  ))
                 : undefined}
             </NavItem>
           ))
@@ -205,13 +232,13 @@ export function ShipSidebar({ openIssues, activeProjects, hrefFor, folders = [],
         spaced
       >
         {mine.map((team) => (
-          <TeamRow key={team.id} team={team} current={current} hrefFor={hrefFor} />
+          <TeamRow key={team.id} team={team} current={place} hrefFor={hrefFor} />
         ))}
         {others.length > 0 && (
           // Peek's fold, word and look: the kit's fold as a row among rows, with its count (Katerina, 16 November).
           <CollapsibleSection look="row" title="Other teams" count={others.length} defaultOpen={otherOpen} {...(otherOpen && openTeam ? { openFor: openTeam } : {})} contentClassName="gap-0.5">
             {others.map((team) => (
-              <TeamRow key={team.id} team={team} current={current} hrefFor={hrefFor} />
+              <TeamRow key={team.id} team={team} current={place} hrefFor={hrefFor} />
             ))}
           </CollapsibleSection>
         )}
