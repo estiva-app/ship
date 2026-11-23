@@ -53,3 +53,25 @@ it('reports no “didn’t load” from a page that has started to leave, and re
   await flush()
   expect(reports.map((body) => JSON.parse(body).named)).toEqual(['not-loaded'])
 })
+
+it('reports again a while after a leave that never happened, when the browser does not say the page stayed', async () => {
+  vi.useFakeTimers()
+  try {
+    const { startErrorReports } = await import('./errorReports')
+    const { reportFailureNow } = await import('./failureReports')
+    startErrorReports()
+
+    // A link to a mail address: the browser says the page is leaving, and it stays.
+    window.dispatchEvent(new Event('beforeunload'))
+    reportFailureNow('not-loaded')
+    await flush()
+    expect(reports).toEqual([])
+
+    vi.advanceTimersByTime(60_000)
+    reportFailureNow('not-sent')
+    await flush()
+    expect(reports.map((body) => JSON.parse(body).named)).toEqual(['not-sent'])
+  } finally {
+    vi.useRealTimers()
+  }
+})

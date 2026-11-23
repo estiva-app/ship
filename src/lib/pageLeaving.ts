@@ -11,8 +11,12 @@
  * (a cancelled leave, or one brought back by Back) is told so by `pageshow`, or by the clock.
  */
 
-/** How long after a leave that did not happen a failure goes unreported. Longer than a slow page takes to be replaced. */
-export const LEAVE_HOLDS_MS = 30_000
+/**
+ * How long after a leave that did not happen a failure goes unreported: a link the browser gave up on (a mail
+ * address, a download) tells the page it is leaving and never that it stayed. Longer than a page takes to be
+ * replaced, short enough that a real failure soon after is still reported.
+ */
+export const LEAVE_HOLDS_MS = 10_000
 
 let leavingUntil = 0
 let watching = false
