@@ -25,7 +25,7 @@ Ship action.
 ## So the manifest is the contract
 
 What the agent and Peek show about a project or an issue is what the manifest
-declares, not what `fold.ts` does. A rule the fold applies and the manifest does
+declares, not what Ship's own code does. A rule Ship applies and the manifest does
 not state is a rule only Ship follows — an issue title the slot did not `fold`
 showed every renamed issue by its first title in Peek until ship#231. When the
 fold changes, the manifest changes in the same PR, and is **republished** after

@@ -141,7 +141,11 @@ check('issues', state.issues.length === fixture.counts.issues, `${state.issues.l
 // The activity lists only changes to a file whose record the read holds, as the shared history does (MOV-2, Miky
 // 21 Nov): 22 of the recorded changes are to files the recording did not hold, and none of them is listed.
 const held = new Set([...state.projects, ...state.issues].map((file) => file.addr))
-check('changes', state.activity.length === 437 && state.activity.every((change) => held.has(change.target)), `${state.activity.length} of ${fixture.counts.changes}`)
+check(
+  'changes',
+  state.activity.length === (fixture.expected as { activity: unknown[] }).activity.length &&state.activity.every((change) => held.has(change.target)),
+  `${state.activity.length} of ${fixture.counts.changes}`,
+)
 check('conversations', state.conversations.length === fixture.counts.conversations, `${state.conversations.length}`)
 
 console.log(
