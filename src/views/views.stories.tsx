@@ -21,6 +21,7 @@ import { useSideColumn, type Side } from '@/pages/sideColumn'
 import type { Imeta } from '@estiva-app/protocol'
 import { ArchivedNotice } from '@estiva-app/ui'
 import { archivedNoticeOf } from '@/lib/archive'
+import { knowSpacesAmong } from '@/lib/topicLinks'
 import type { TopicOfFile } from '@/api/foreign'
 import { FileTopics } from '@/components/FileTopics'
 
@@ -441,9 +442,11 @@ export const ProjectSignedOut: Story = projectPage('overview', 'table', 'Sign in
 export const ProjectArchived: Story = projectPage('overview', 'table', undefined, true)
 
 /** One issue: its title, fields and description, and beside it its comments or its Overview; the header's buttons show and hide them, and hold the ⋯. */
-const issuePage = (archivedWithProject = false, withSummary = true, newWhileHidden = false, startSide: Side = 'comments'): Story => ({
+const issuePage = (archivedWithProject = false, withSummary = true, newWhileHidden = false, startSide: Side = 'comments', onASpace = false): Story => ({
   render: () => {
     const issue = ISSUES[0]
+    // A team's # topic among the topics that list it: the read of your topics says it is a space (FileTopics' other branch).
+    if (onASpace) knowSpacesAmong([{ address: SPACE.address, space: true }])
     const [status, setStatus] = useState(issue.status)
     const [assignee, setAssignee] = useState('ana')
     const [project, setProject] = useState('rel')
@@ -471,7 +474,7 @@ const issuePage = (archivedWithProject = false, withSummary = true, newWhileHidd
           onReply={fn()}
           activity={ACTIVITY_ITEMS}
           history={ACTIVITY}
-          topics={<StoryTopics start={[topic('w', 'Widgets'), topic('o', 'Old launch', true)]} />}
+          topics={<StoryTopics start={onASpace ? [SPACE, topic('w', 'Widgets')] : [topic('w', 'Widgets'), topic('o', 'Old launch', true)]} />}
           upload={pretendUpload}
           archivedNotice={archivedWithProject && archivedNotice(true)}
           lockedReason={archivedWithProject ? 'Unarchive its project to edit' : undefined}
@@ -505,3 +508,13 @@ export const IssueOverviewPanel: Story = issuePage(false, true, false, 'overview
 export const IssueArchivedWithProject: Story = issuePage(true)
 /** The comments hidden, with a new one among them: the kit's dot on the header's "Show comments" (Katerina, 3 November). */
 export const IssueCommentsHiddenWithNew: Story = issuePage(false, true, true)
+
+/** A team's # topic that lists the issue: a space, opening Peek beside Ship. */
+const SPACE = topic('bugs', 'Bugs')
+
+/**
+ * An issue a team's # topic lists, beside an initiative that lists it (review of 23 November, E4): its Overview's
+ * Initiatives line as the app draws it today, the # topic's chip opening Peek. Whether a # topic belongs in this line,
+ * and what it wears, waits on Katerina (A1).
+ */
+export const IssueOnATopic: Story = { name: 'Issue: listed on a # topic', ...issuePage(false, true, false, 'overview', true) }
