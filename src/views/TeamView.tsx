@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { IconDotsVertical, IconUsers } from '@tabler/icons-react'
-import { ItemList, Menu, MenuItem, MembersPill, PageHeader, SectionHeader, Toolbar, ToolbarButton, type AvatarGroupMember } from '@estiva-app/ui'
+import { ItemList, ListSection, Menu, MenuItem, MembersPill, PageHeader, Toolbar, ToolbarButton, type AvatarGroupMember } from '@estiva-app/ui'
 import { workItems, type WorkItem } from '@/components/workItems'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { ScrollArea } from '@/components/ui/ScrollArea'
@@ -102,22 +102,19 @@ export function TeamView({ name, members, onRename, onArchive, archivedNotice, i
         ) : (
           <>
             {initiatives === 'loading' ? (
-              <section className="flex flex-col gap-1">
-                <SectionHeader title="Initiatives" hover="none" />
+              <ListSection title="Initiatives">
                 <SkeletonList rows={3} />
-              </section>
+              </ListSection>
             ) : initiatives === 'failed' ? (
-              <section className="flex flex-col gap-1">
-                <SectionHeader title="Initiatives" hover="none" />
+              <ListSection title="Initiatives">
                 {/* The section-level line (the row-level one draws no button), in a box 8px in, where the headings start: the gate puts the room on the box, not on the part. */}
                 <div className="px-2">
                   <EmptyState scope="section" message="Its initiatives didn’t load." {...(onRetryInitiatives ? { action: { label: 'Try again', onClick: onRetryInitiatives } } : {})} />
                 </div>
-              </section>
+              </ListSection>
             ) : (
               initiatives.length > 0 && (
-                <section className="flex flex-col gap-1">
-                  <SectionHeader title="Initiatives" count={initiatives.length} hover="none" />
+                <ListSection title="Initiatives" count={initiatives.length}>
                   {/* The same columns as Projects and Issues below, so its people and its Active stack with theirs. */}
                   <ItemList
                     aria-label={`${title}’s initiatives`}
@@ -134,7 +131,7 @@ export function TeamView({ name, members, onRename, onArchive, archivedNotice, i
                       now,
                     )}
                   />
-                </section>
+                </ListSection>
               )
             )}
             <FileSection title="Projects" kind="project" rows={projects} team={title} now={now} />
@@ -154,9 +151,8 @@ export function TeamView({ name, members, onRename, onArchive, archivedNotice, i
 function FileSection({ title, kind, rows, team, now }: { title: string; kind: 'project' | 'issue'; rows: TeamFileRow[]; team: string; now: number }) {
   if (rows.length === 0) return null
   return (
-    <section className="flex flex-col gap-1">
-      <SectionHeader title={title} count={rows.length} hover="none" />
+    <ListSection title={title} count={rows.length}>
       <ItemList aria-label={`${team}’s ${title.toLowerCase()}`} rows={workItems(kind, rows, now)} />
-    </section>
+    </ListSection>
   )
 }

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { IconExternalLink } from '@tabler/icons-react'
-import { ArchivedNotice, CollapsibleSection, ItemList, KindIcon, NoAccessNotice, PageHeader, SectionHeader, TeamChip, WithTooltip, type ArchivedNoticeProps } from '@estiva-app/ui'
+import { ArchivedNotice, CollapsibleSection, ItemList, KindIcon, ListSection, NoAccessNotice, PageHeader, TeamChip, WithTooltip, type ArchivedNoticeProps } from '@estiva-app/ui'
 import { Breadcrumb } from '@/components/ui/Breadcrumb'
 import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -184,14 +184,14 @@ export function TopicView({ topic, documents, files = [], onRetry, onRetryDocume
                 ) : (
                   <>
                     {topic.projects.length > 0 && (
-                      <Section title="Projects" count={topic.projects.length}>
+                      <ListSection title="Projects" count={topic.projects.length}>
                         <ItemList aria-label={`${topic.title}’s projects`} rows={workItems('project', topic.projects.map(projectRow))} />
-                      </Section>
+                      </ListSection>
                     )}
                     {topic.issues.length > 0 && (
-                      <Section title="Issues" count={topic.issues.length}>
+                      <ListSection title="Issues" count={topic.issues.length}>
                         <ItemList aria-label={`${topic.title}’s issues`} rows={workItems('issue', topic.issues.map(workRow))} />
-                      </Section>
+                      </ListSection>
                     )}
                     {/* Its documents and other apps' files are one read: while it reads, and when it failed, no heading names
                         one kind of them. */}
@@ -207,17 +207,17 @@ export function TopicView({ topic, documents, files = [], onRetry, onRetryDocume
                       documents.length > 0 && (
                         // The shared list, its columns lined up with Projects and Issues: Leaf opens in a new tab, pages fold under
                         // their document (the kit's row, Katerina 23 November).
-                        <Section title="Documents" count={documents.length}>
+                        <ListSection title="Documents" count={documents.length}>
                           <ItemList aria-label={`${topic.title}’s documents`} rows={workItems('document', documents.map(documentRow))} />
-                        </Section>
+                        </ListSection>
                       )
                     )}
                     {files.length > 0 && (
                       // Another app's files, last, in the same columns: each opens its app in a new tab, its type under its
                       // name, as Leaf's initiative page lists them (review of 23 November, A10).
-                      <Section title="Files" count={files.length}>
+                      <ListSection title="Files" count={files.length}>
                         <ItemList aria-label={`${topic.title}’s files`} rows={workItems('file', files.map(fileRow))} />
-                      </Section>
+                      </ListSection>
                     )}
                   </>
                 )}
@@ -244,16 +244,6 @@ export function TopicView({ topic, documents, files = [], onRetry, onRetryDocume
         </div>
       )}
     </div>
-  )
-}
-
-/** One kind under its heading with its count: the kit's `SectionHeader`, as a team's page heads its lists. */
-function Section({ title, count, children }: { title: string; count?: number; children: ReactNode }) {
-  return (
-    <section className="flex flex-col gap-1">
-      <SectionHeader title={title} {...(count !== undefined ? { count } : {})} hover="none" />
-      {children}
-    </section>
   )
 }
 
