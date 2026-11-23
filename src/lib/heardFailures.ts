@@ -22,6 +22,15 @@ export function heardFromRelay(error: unknown, status?: number): void {
   }
 }
 
+/** A request to Estiva ID that failed (a signature, a decrypt): its 401 is the sign-in ending, its 429 its own limit. Never throws. */
+export function heardFromId(error: unknown): void {
+  try {
+    heardFailures.heard(failureReasonOf(error, undefined, 'id'))
+  } catch {
+    /* Estiva ID's own error stands */
+  }
+}
+
 /** `signer`, saying why a signature failed (Estiva ID's 401 or its own limit) before the failure goes on as it was. */
 export function hearingSigner(signer: Signer): Signer {
   return {
@@ -31,11 +40,7 @@ export function hearingSigner(signer: Signer): Signer {
       try {
         return await signer.sign(unsigned)
       } catch (error) {
-        try {
-          heardFailures.heard(failureReasonOf(error, undefined, 'id'))
-        } catch {
-          /* the signer's own error stands */
-        }
+        heardFromId(error)
         throw error
       }
     },

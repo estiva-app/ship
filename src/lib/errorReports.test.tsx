@@ -104,14 +104,26 @@ describe('Ship error reports', () => {
     reportFailureNow('not-loaded')
     await flush()
 
+    // Estiva ID's own per-minute limit, reached by a page's read state before the relay's is.
+    const reportsGo = vi.mocked(fetch).getMockImplementation()!
+    vi.mocked(fetch).mockImplementation(async (url, init) =>
+      String(url).endsWith('/nip44/decrypt') ? new Response('Too many encryption requests', { status: 429 }) : reportsGo(url, init),
+    )
+    const { nip44UnlessRefused } = await import('@/api/nip44')
+    await expect(nip44UnlessRefused.decrypt('ciphertext')).rejects.toThrow()
+    reportFailureNow('not-loaded')
+    await flush()
+
     const reports = requests.map((r) => JSON.parse(r.body))
     expect(reports.map((r) => [r.how, r.named, r.reason])).toEqual([
       ['failure', 'not-loaded', 'told-to-wait'],
       ['failure', 'not-loaded', 'signed-out'],
+      ['failure', 'not-loaded', 'id-told-to-wait'],
     ])
     for (const { body } of requests) {
       expect(body).not.toContain('quota')
       expect(body).not.toContain('expired')
+      expect(body).not.toContain('encryption')
     }
   })
 })
