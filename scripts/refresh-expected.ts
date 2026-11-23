@@ -20,7 +20,14 @@ import { foldFolder } from '../src/nostr/fold'
 const path = process.argv[2]
 const fixture = JSON.parse(readFileSync(path, 'utf8'))
 const before = createHash('sha256').update(JSON.stringify(fixture.events)).digest('hex')
-fixture.expected = foldFolder(fixture.events)
+// Recorded as conformance.test.ts compares it: without each field's `id` and a
+// project's `rootId` (ALO-5), which are event ids, not a rule the fold applies.
+// Recording them made a freshly refreshed fixture fail its own test.
+fixture.expected = JSON.parse(JSON.stringify(foldFolder(fixture.events), function (this: Record<string, unknown>, key, value) {
+  if (key === 'rootId' && 'fields' in this) return undefined
+  if (key !== 'fields' || !value || typeof value !== 'object') return value
+  return Object.fromEntries(Object.entries(value as Record<string, Record<string, unknown>>).map(([field, { id: _id, ...folded }]) => [field, folded]))
+}))
 writeFileSync(path, JSON.stringify(fixture, null, 2) + '\n')
 const after = createHash('sha256')
   .update(JSON.stringify(JSON.parse(readFileSync(path, 'utf8')).events))
