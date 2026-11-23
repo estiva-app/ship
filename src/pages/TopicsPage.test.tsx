@@ -147,7 +147,8 @@ function ship(projects: string[], issues: string[]): FolderState {
 
 const TEAMS = [{ id: TEAM, name: 'Product' } as never]
 const tabs = () => screen.getAllByRole('tab').map((tab) => tab.textContent)
-const rows = () => [...document.querySelectorAll('[data-topic]')].map((row) => row as HTMLElement)
+/** Explore's rows: the kit's list, its rows past the hidden headings. */
+const rows = () => [...document.querySelectorAll<HTMLElement>('[data-surface="topics"] [role="rowgroup"] [role="row"]')]
 const titles = () => rows().map((row) => within(row).getAllByText(/./)[0].textContent)
 const rowOf = (title: string) => rows().find((row) => within(row).queryByText(title))!
 const say = vi.fn()
