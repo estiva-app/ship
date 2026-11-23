@@ -293,6 +293,11 @@ describe('the summary on an issue’s and a project’s page (SUM-4)', () => {
     await rewrite(box(), 'A first try.')
     await press(box(), 'Enter')
     await waitFor(() => expect(onSummarize).toHaveBeenCalledWith('A first try.'))
+    // The first save settles before the next is typed, as it does for a person: the box counts it saved only once its
+    // answer is in, and a change typed before that is measured against the older text (it failed under load).
+    await act(async () => {
+      await onSummarize.mock.results.at(-1)?.value
+    })
     await rewrite(box(), SUMMARY)
     await press(box(), 'Enter')
     await waitFor(() => expect(onSummarize).toHaveBeenLastCalledWith(SUMMARY))
