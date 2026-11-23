@@ -28,7 +28,7 @@ import {
   type CommentRef,
 } from './events'
 import { findNaddrs, naddrToAddr, buildReaction, buildResolution, buildEdit, buildDeletion as buildEventDeletion, imetaTag, needsRelayKey, RELAY_KEY_FILTER, type Authored } from '@estiva-app/protocol'
-import { DELETED_FIELD, createFile, finishCreating, fieldsSetBy, listFiles, listsField, openFile, prevsAfterSwitch, writeChange, TEXT_FIELD, type CreateFileArgs, type CreateFileResult, type FileFields, type WriteChangeResult } from '@estiva-app/interop'
+import { DELETED_FIELD, createFile, finishCreating, fieldsSetBy, isSwitchRefusal, listFiles, listsField, openFile, prevsAfterSwitch, writeChange, TEXT_FIELD, type CreateFileArgs, type CreateFileResult, type FileFields, type WriteChangeResult } from '@estiva-app/interop'
 import { createLoadQuery, planArchiveFolder, planCreateFolder, planDeleteFolder, planListInTopic, planMoveFromFolders, planPlaceFile, planRemoveFromTopic, planRenameFolder, planUnlistFile, readMentionedIn, readMoveRefusal, type ListHolder, type FolderRef, type MovableFile, type MoveRefusal } from '@estiva-app/interop'
 import { foldFolder, type FolderState, type Issue } from './fold'
 import { buildMembershipChange, buildMutedEvent, buildPlaceAdd, switchWrites, type Following, type Place, decorationsOf, foldAttachments, foldEdits, foldEmbeds, URGENT_TAG, type Decorations, type EditFold, type QueryFn } from '@estiva-app/conversation'
@@ -1630,8 +1630,14 @@ export class Store {
       the topic's first record for a file never listed, read now, as Peek's. Each file is its own field, so two people
       adding different files never clash, and an entry crossed by a newer one is written again after it.
       why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/every-file-type-is-kept-in-order-and-a-delete-only-marks-the-file.md
+      A tab that did not know is told by the relay's refusal, and the entry is written again in order, once, as a card's.
     */
-    if ((await this.inOrderTypes()).includes(TOPIC_TYPE)) {
+    if (!(await this.inOrderTypes()).includes(TOPIC_TYPE)) {
+      const [entry] = plan(this.signer.pubkey, Date.now(), { topic: args.topic, file: args.file })
+      const plain = await this.publish(entry)
+      if (plain.ok || !isSwitchRefusal(plain.reason)) return plain
+    }
+    {
       const [kind, pubkey, ...d] = args.topic.address.split(':')
       const pointer = { kind: Number(kind), pubkey: pubkey!, d: d.join(':') }
       const query = (filters: Record<string, unknown>[]) => this.relay.query(filters as never)
@@ -1654,8 +1660,6 @@ export class Store {
       if (written.ok) return { ok: true }
       return { ok: false, reason: 'refused' in written ? written.refused : 'The topic changed at the same time. Try again.' }
     }
-    const [entry] = plan(this.signer.pubkey, Date.now(), { topic: args.topic, file: args.file })
-    return this.publish(entry)
   }
 
   /**

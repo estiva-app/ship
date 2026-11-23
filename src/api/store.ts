@@ -130,7 +130,6 @@ export const issueFieldsNow = (): Promise<ProjectFields | undefined> =>
 const topicsOpted = typeOptedIn(TOPIC_TYPE)
 const documentsOpted = typeOptedIn(DOCUMENT_TYPE)
 export const topicFieldsNow = (): Promise<ProjectFields | undefined> => fileReadsNow().then((reads) => fileFieldsOf(reads, TOPIC_TYPE, topicsOpted))
-export const documentFieldsNow = (): Promise<ProjectFields | undefined> => fileReadsNow().then((reads) => fileFieldsOf(reads, DOCUMENT_TYPE, documentsOpted))
 
 /**
  * The types kept in order, for the shared packages' `inOrder`: a comment, a

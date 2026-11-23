@@ -506,15 +506,20 @@ describe('Add to topic and Remove go on the wire as an entry on the topic (TOP-5
       content: '',
       sig: '',
     } as SignedEvent
-    const inOrder = (held: SignedEvent[]) => {
+    /** `known`: whether this tab knows topics are kept in order; `refuseFirst`: the relay refuses the first entry as one with no prev. */
+    const inOrder = (held: SignedEvent[], { known = true, refuseFirst = false } = {}) => {
       const sent: SignedEvent[] = []
       const relay = {
-        publish: async (event: SignedEvent) => (sent.push(event), { ok: true }),
+        publish: async (event: SignedEvent) => {
+          sent.push(event)
+          if (refuseFirst && sent.length === 1) return { ok: false, reason: 'invalid: requires-prev: a topic change names the change it follows in prev; reload the page and save again' }
+          return { ok: true }
+        },
         // The open read: the topic's first record and each field's current change.
         query: async () => [root, ...held],
       } as unknown as Relay
       const signer = { pubkey: PK, sign: async (unsigned: UnsignedEvent) => ({ ...unsigned, id: 'e'.repeat(64), sig: '0'.repeat(128) }) } as unknown as Signer
-      const real = new Store(relay, signer, undefined, undefined, async () => ['osnova.topic'])
+      const real = new Store(relay, signer, undefined, undefined, async () => (known ? ['osnova.topic'] : []))
       s.setListedInTopic.mockImplementation((args: Parameters<Store['setListedInTopic']>[0]) => real.setListedInTopic(args))
       return sent
     }
@@ -531,6 +536,15 @@ describe('Add to topic and Remove go on the wire as an entry on the topic (TOP-5
       const sent = inOrder([])
       expect(await setListedInTopic(TOPIC, ISSUE.id, true)).toEqual({ ok: true })
       expect(sent[0].tags.filter((t) => t[0] === 'prev')).toEqual([['prev', root.id]])
+    })
+
+    it('a tab that did not know writes the entry again in order, once, when the relay says topics are kept in order', async () => {
+      const sent = inOrder([entryNow], { known: false, refuseFirst: true })
+      expect(await setListedInTopic(TOPIC, ISSUE.id, false)).toEqual({ ok: true })
+      expect(sent).toHaveLength(2)
+      expect(sent[0].tags.some((t) => t[0] === 'prev')).toBe(false)
+      expect(sent[1].tags.filter((t) => t[0] === 'prev')).toEqual([['prev', entryNow.id]])
+      expect(sent[1].tags).toContainEqual(['value', 'false'])
     })
   })
 

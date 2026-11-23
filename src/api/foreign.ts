@@ -331,6 +331,9 @@ export async function parentArchiveOf(reference: string): Promise<ForeignObject[
   return file?.archived?.with ? file.archived : undefined
 }
 
+/** What a card's failure calls the file, as Peek's card says it. */
+const FILE_NOUN: Record<number, string> = { 30850: 'project', 30851: 'issue', 30840: 'topic', 30842: 'page' }
+
 /** The fields a card never writes: a file's words, and its archive. */
 const NOT_ON_A_CARD = new Set(['title', 'summary', 'description', 'archived'])
 
@@ -437,7 +440,7 @@ export async function applyCardAction(args: { reference: string; actionId: strin
   }
   const at = { kind: pointer.kind, pubkey: pointer.pubkey, d: pointer.identifier }
   const prev = (await prevsAfterSwitch(query, at, [field]).catch(() => undefined))?.[field]
-  if (!prev) return { ok: false, reason: 'That file could not be read just now, so nothing was changed. Try again.' }
+  if (!prev) return { ok: false, reason: `That ${FILE_NOUN[pointer.kind] ?? 'file'} could not be read just now, so nothing was changed. Reload and try again.` }
   const written = await writeChange({
     field,
     value: args.value,
@@ -635,49 +638,6 @@ function answersFilter(event: SignedEvent, filter: Record<string, unknown>): boo
 }
 
 /**
- * A topic's `placeFilters`, read where topics are kept in order (ALL-6): its first record and every change it ever had
- * become one list read (SPEC §6.13), the record and each field's current change — every person's current `member:`
- * and `follow:` among them, which is all the listing folds from them — and none of its renames, list entries or saves.
- * `list` goes in a request of its own: a relay refuses one mixing list reads with plain ones.
- * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/opening-a-file-reads-its-current-text-not-its-history.md
- */
-function placeReads(place: { address: string; team: string }, filters: Record<string, unknown>[], inOrder: boolean): { plain: Record<string, unknown>[]; list: Record<string, unknown>[] } {
-  if (!inOrder) return { plain: filters, list: [] }
-  const [kind, author, ...d] = place.address.split(':')
-  const own = (filter: Record<string, unknown>) => {
-    const kinds = filter.kinds as number[]
-    const everyChange = kinds.length === 1 && kinds[0] === KIND_CHANGE && Array.isArray(filter['#a']) && !('#p' in filter)
-    const root = kinds.length === 1 && kinds[0] === Number(kind) && Array.isArray(filter['#d'])
-    return everyChange || root
-  }
-  return {
-    plain: filters.filter((filter) => !own(filter)),
-    list: [{ kinds: [Number(kind)], authors: [author], '#d': [d.join(':')], limit: 1, fields: 'newest' }],
-  }
-}
-
-/** Whether `event`, from a place's list read, is that place's: its first record, or a change naming it. */
-function ofPlace(event: SignedEvent, address: string): boolean {
-  if (event.kind === KIND_CHANGE) return event.tags.some((tag) => tag[0] === 'a' && tag[1] === address)
-  return `${event.kind}:${event.pubkey}:${event.tags.find((tag) => tag[0] === 'd')?.[1] ?? ''}` === address
-}
-
-/** List reads for several places, one filter per author with every `d`: each answer's events are sorted out by {@link ofPlace}. */
-function mergedListReads(list: readonly Record<string, unknown>[]): Record<string, unknown>[] {
-  const byAuthor = new Map<string, Record<string, unknown>>()
-  for (const filter of list) {
-    const key = `${(filter.kinds as number[])[0]}:${(filter.authors as string[])[0]}`
-    const held = byAuthor.get(key)
-    if (!held) byAuthor.set(key, { ...filter, '#d': [...(filter['#d'] as string[])] })
-    else {
-      held['#d'] = [...new Set([...(held['#d'] as string[]), ...(filter['#d'] as string[])])]
-      held.limit = (held['#d'] as string[]).length
-    }
-  }
-  return [...byAuthor.values()]
-}
-
-/**
  * How many people each topic lists, for Explore's Members (TOPI-9; Miky,
  * 6 Nov: the same columns in every app): conversation's `placeListing`, the
  * rule Peek's people list draws — who chose a level, was added or made it,
@@ -690,25 +650,21 @@ function mergedListReads(list: readonly Record<string, unknown>[]): Record<strin
  */
 export async function readTopicMembers(topics: readonly ReadTopic[]): Promise<Map<string, number | undefined>> {
   if (topics.length === 0) return new Map()
-  const inOrder = !!(await topicFieldsNow())
   const asked = topics.map((topic) => {
     const place = { address: topic.address, team: topic.folder }
     try {
       const filters = (placeFilters(place, signer.pubkey) as Record<string, unknown>[]).filter((filter) => !(filter.kinds as number[]).includes(KIND_APP_DATA))
-      return { topic, place, filters: placeReads(place, filters, inOrder) }
+      return { topic, place, filters }
     } catch {
       // A topic whose team is no team id cannot be read for its people: it draws no count, and the others still do.
       return { topic, place, filters: undefined }
     }
   })
-  const [events, listed]: SignedEvent[][] = await Promise.all([
-    relay.queryAll(mergedFilters(asked.flatMap(({ filters }) => filters?.plain ?? [])) as never),
-    inOrder ? query(mergedListReads(asked.flatMap(({ filters }) => filters?.list ?? []))) : Promise.resolve([]),
-  ])
+  const events: SignedEvent[] = await relay.queryAll(mergedFilters(asked.flatMap(({ filters }) => filters ?? [])) as never)
   return new Map(
     asked.map(({ topic, place, filters }): [string, number | undefined] => {
       if (!filters) return [topic.address, undefined]
-      const mine = [...events.filter((event) => filters.plain.some((filter) => answersFilter(event, filter))), ...listed.filter((event) => ofPlace(event, topic.address))]
+      const mine = events.filter((event) => filters.some((filter) => answersFilter(event, filter)))
       const roster = mine.filter((event) => event.kind === KIND_ROSTER || ROSTER_COMMANDS.includes(event.kind))
       const listing = mine.filter((event) => event.kind === KIND_FOLDER_STATE || event.kind === KIND_FOLDER_COMMAND)
       const own = mine.filter((event) => !roster.includes(event) && !listing.includes(event))
@@ -727,10 +683,7 @@ export async function readTopicMembers(topics: readonly ReadTopic[]): Promise<Ma
 export async function readTopicPlace(topic: { address: string; folder: string }): Promise<{ listed: Listed[]; events: SignedEvent[] }> {
   const place = { address: topic.address, team: topic.folder }
   const filters = (placeFilters(place, signer.pubkey) as Record<string, unknown>[]).filter((filter) => !(filter.kinds as number[]).includes(KIND_APP_DATA))
-  // Where topics are kept in order, its first record and each field's current change, not every change (ALL-6).
-  const reads = placeReads(place, filters, !!(await topicFieldsNow()))
-  const [plain, listed]: SignedEvent[][] = await Promise.all([relay.queryAll(reads.plain as never), reads.list.length ? query(reads.list) : Promise.resolve([])])
-  const events = [...plain, ...listed]
+  const events: SignedEvent[] = await relay.queryAll(filters as never)
   const roster = events.filter((event) => event.kind === KIND_ROSTER || ROSTER_COMMANDS.includes(event.kind))
   const listing = events.filter((event) => event.kind === KIND_FOLDER_STATE || event.kind === KIND_FOLDER_COMMAND)
   const own = events.filter((event) => !roster.includes(event) && !listing.includes(event))
