@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { fn } from 'storybook/test'
 import { ANA, MARA, RAVI } from '@/fixtures/issues'
+import { editedLabel } from '@/lib/time'
 import { TeamView, type TeamInitiativeRow } from './TeamView'
 
 /**
@@ -27,10 +28,11 @@ const meta = {
     members: { faces: [ANA, RAVI, MARA], count: 6 },
     initiatives: INITIATIVES,
     projects: [
-      { address: '30850:a:p', title: 'Payment integration', href: '#', status: { value: 'in_progress', label: 'In Progress' }, person: ANA, progress: { done: 4, total: 9 }, at: SECONDS - 5 * 3600 },
-      { address: '30850:a:q', title: 'Welcome emails', href: '#', status: { value: 'planned', label: 'Planned' }, progress: { done: 0, total: 3 }, at: SECONDS - 6 * 86400 },
+      // Who edited each last and when, as the app's rows say it (FolderPage's `editedLabel`): "Ana, 5h ago".
+      { address: '30850:a:p', title: 'Payment integration', href: '#', status: { value: 'in_progress', label: 'In Progress' }, person: ANA, progress: { done: 4, total: 9 }, at: SECONDS - 5 * 3600, edited: editedLabel('Ana Duarte', SECONDS - 5 * 3600, NOW) },
+      { address: '30850:a:q', title: 'Welcome emails', href: '#', status: { value: 'planned', label: 'Planned' }, progress: { done: 0, total: 3 }, at: SECONDS - 6 * 86400, edited: editedLabel('Mara Sato', SECONDS - 6 * 86400, NOW) },
     ],
-    issues: [{ address: '30851:a:i', title: 'Refund webhook retries', href: '#', status: { value: 'in_progress', label: 'In Progress' }, person: RAVI, at: SECONDS - 3 * 3600 }],
+    issues: [{ address: '30851:a:i', title: 'Refund webhook retries', href: '#', status: { value: 'in_progress', label: 'In Progress' }, person: RAVI, at: SECONDS - 3 * 3600, edited: editedLabel('Ravi Mehta', SECONDS - 3 * 3600, NOW) }],
     others: 1,
     faceOf,
     now: NOW,
