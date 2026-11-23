@@ -57,17 +57,19 @@ export interface TeamViewProps {
   faceOf?: (pubkey: string) => AvatarGroupMember
   /** What Active counts back from, in ms: when the page opened. */
   now: number
+  /** The team's id, marked on the page with where its list came from, as the old Folder page did: the smoke test finds the page and checks the read by them. */
+  teamId?: string
 }
 
 const NO_FACE = (): AvatarGroupMember => ({ name: '—' })
 
 /** A team's page, as Peek's: its header, then its initiatives, projects and issues in the kit's lists. */
-export function TeamView({ name, members, onRename, onArchive, archivedNotice, initiatives, onRetryInitiatives, projects, issues, others, fromChannel = false, faceOf = NO_FACE, now }: TeamViewProps) {
+export function TeamView({ name, members, onRename, onArchive, archivedNotice, initiatives, onRetryInitiatives, projects, issues, others, fromChannel = false, faceOf = NO_FACE, now, teamId }: TeamViewProps) {
   const title = name ?? 'Untitled team'
   const nothing = Array.isArray(initiatives) && initiatives.length === 0 && projects.length === 0 && issues.length === 0
   return (
-    // `data-surface` is the smoke test's waypoint, as the old Folder page's.
-    <div className="flex h-full min-h-0 flex-col" data-surface="folder">
+    // `data-surface`, `data-folder` and `data-source` are the smoke test's waypoints, as the old Folder page's.
+    <div className="flex h-full min-h-0 flex-col" data-surface="folder" data-folder={teamId} data-source={fromChannel ? 'channel' : 'state'}>
       <PageHeader
         leading={<IconUsers size={16} stroke={1.5} aria-hidden />}
         title={title}

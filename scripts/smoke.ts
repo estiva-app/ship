@@ -46,10 +46,12 @@
 import { createServer } from 'node:http'
 import { readFileSync, mkdirSync } from 'node:fs'
 import { extname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { chromium, type ConsoleMessage, type Page } from 'playwright-core'
 import { addrToNaddr } from '@estiva-app/protocol'
 
-const ROOT = new URL('..', import.meta.url).pathname
+// A path on every system: a URL's pathname is `/K:/…` on Windows, which `join` turns into `K:\K:\…`.
+const ROOT = fileURLToPath(new URL('..', import.meta.url))
 /**
  * Vite writes here, and the image serves exactly this directory at `/`.
  *
@@ -361,10 +363,13 @@ async function main() {
   // ── Lands straight on Topics (SHIPS-5); there is no workspace to choose ───
   await page.waitForSelector('[data-surface="topics"]')
   check('the app opens on Topics with no setup step', page.url().includes('/topics'))
+  const sidebarLinks = (await sidebar().getByRole('link').allInnerTexts()).map((text) => text.replace(/\s*\d+$/, '')).join()
   check(
-    // A new person is in no topic: no topic rows, then Explore topics where the top Topics was (TOPI-9).
-    'the sidebar reads Projects, Issues, Explore topics',
-    (await sidebar().getByRole('link').allInnerTexts()).map((text) => text.replace(/\s*\d+$/, '')).join() === 'Projects,Issues,Explore topics',
+    // A new person is in no initiative: no initiative rows, then Explore initiatives where the top Topics was (TOPI-9),
+    // in Peek's words since Katerina's rename (16 November).
+    'the sidebar reads Projects, Issues, Explore initiatives',
+    sidebarLinks === 'Projects,Issues,Explore initiatives',
+    sidebarLinks,
   )
   await shot(page, '01-topics-empty')
 
@@ -1165,7 +1170,8 @@ async function main() {
   await page.waitForSelector(`[data-folder="${FOLDER_ID}"]`)
   const folderView = page.locator(`[data-folder="${FOLDER_ID}"]`)
   check('the Folder resolves from its relay-maintained state', (await folderView.getAttribute('data-source')) === 'state')
-  const rows = folderView.locator('[data-foreign-object]')
+  // A row of Ship's own is a link to its page, in the kit's `ItemList` since the team page became Peek's (D6).
+  const rows = folderView.locator('a[href^="/project/"], a[href^="/issue/"]')
   /*
     Navigation is by kind (RFC 0.5 §10.7, be4deec): Ship draws its own kinds and
     only counts the rest, because Peek — which lists everything — is where they
@@ -1181,8 +1187,8 @@ async function main() {
   )
   check(
     'the Folder appears in the sidebar',
-    // A team is a collapsible section now, not a link; its header is the button.
-    await sidebar().getByRole('button', { name: 'Onboarding', exact: true }).isVisible(),
+    // A team is Peek's row again, a link to its page (Katerina, 18 November, C1).
+    await sidebar().getByRole('link', { name: 'Onboarding', exact: true }).isVisible(),
   )
   await shot(page, '10-folder-view')
 
@@ -1220,22 +1226,14 @@ async function main() {
   const topicPage = page.locator('[data-surface="topic"]')
   check('a Peek topic link on Ship opens the topic’s page here (SHIPS-4)', await topicPage.isVisible())
   check('  …with the topic’s title', (await topicPage.innerText().catch(() => '')).includes('Who will extract the conversation package'))
-  // Its ⋯ holds "Open in Peek" (TOPI-8), which opens a tab: the URL it opens is caught, not followed.
-  await page.evaluate(() => {
-    ;(window as unknown as { opened?: string }).opened = undefined
-    window.open = ((url?: string | URL) => {
-      ;(window as unknown as { opened?: string }).opened = String(url)
-      return null
-    }) as typeof window.open
-  })
-  await topicPage.getByRole('button', { name: 'More actions' }).click().catch(() => {})
-  await page.getByRole('menuitem', { name: 'Open in Peek' }).click().catch(() => {})
-  const opened = await page.evaluate(() => (window as unknown as { opened?: string }).opened)
+  // Open, after its team chip, opens it in Peek (TOPI-8; in the ⋯'s place since 18 November, D5): a link to a new tab,
+  // read rather than followed.
+  const opened = await topicPage.getByRole('link', { name: 'Open in Peek' }).getAttribute('href', { timeout: 5_000 }).catch(() => null)
   // The same path on Peek's host — only the host changes (Miky, 2026-10-01) — with the topic's current slug.
   check(
-    '  …and its ⋯ "Open in Peek" opens it in Peek',
+    '  …and its Open opens it in Peek',
     opened === `https://peek.estiva.app/topic/who-will-extract-the-conversation-package-${HANDOFF_D}`,
-    opened ?? 'nothing opened',
+    opened ?? 'no Open',
   )
   await shot(page, '10b-topic')
 
@@ -1314,11 +1312,14 @@ async function main() {
   await page.goto(`http://localhost:${PORT}/#/folder/${newFolderId}`)
   await page.waitForSelector(`[data-folder="${newFolderId}"]`)
   const beforeRename = stored.length
-  await page.getByRole('button', { name: 'Edit team name' }).click()
-  const nameField = page.getByRole('textbox', { name: 'Team name' })
+  // A team is renamed from its page's ⋮, in Peek's dialog (D6), no longer by editing its title in place.
+  await page.locator(`[data-folder="${newFolderId}"]`).getByRole('button', { name: 'More actions' }).click()
+  await page.getByRole('menuitem', { name: 'Rename' }).click()
+  const renameDialog = page.getByRole('dialog', { name: 'Rename team' })
+  const nameField = renameDialog.getByRole('textbox', { name: 'Team name' })
   await nameField.fill('Smoke folder renamed')
   await nameField.press('Enter')
-  await nameField.waitFor({ state: 'detached' })
+  await renameDialog.waitFor({ state: 'hidden' })
   const renameWrites = stored.slice(beforeRename).filter((e) => e.kind === 9002 || e.kind === 1852)
   check(
     'renaming it from its title publishes the kind:9002 alone, with the new name',

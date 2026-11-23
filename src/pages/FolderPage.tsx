@@ -269,6 +269,7 @@ export function FolderPage({ id, folders, directory, state = null, archives, say
   return (
     <>
       <TeamView
+        teamId={contents.id}
         {...(contents.name ? { name: contents.name } : {})}
         // Who is in it, once read; while it is read, or when the read failed, no pill: nothing is claimed (absence, not "nobody").
         {...(members ? { members } : {})}
