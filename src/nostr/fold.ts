@@ -86,10 +86,11 @@ export interface Change {
   author: string
   createdAt: number
   /**
-   * Epoch ms the change is ordered by. Parsed from a kind:1851 (`parseChange`),
-   * the `ts` tag when present and consistent with `created_at`, else absent. On
-   * a change the shared read counted (a file's `activity`), always set: its
-   * ordering time, the `ts` where a reader trusts it, else `created_at` in ms.
+   * Epoch ms. Parsed from a kind:1851 (`parseChange`): the `ts` tag's number as
+   * written, trusted or not; only `orderingMs` decides whether it orders the
+   * change. On a change the shared read counted (a file's `activity`), always
+   * set: its ordering time, the `ts` where a reader trusts it, else `created_at`
+   * in ms. Read it through `orderingMs`, never on its own.
    */
   ts?: number
   /** Address of the object changed, `<kind>:<pubkey>:<d>`. */
