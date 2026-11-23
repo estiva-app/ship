@@ -8,7 +8,7 @@
  * cache rather than the shared record.
  */
 import type { Embed, FileTimes, Imeta, NostrTag, PartPointer, PublishResult, Relay } from '@estiva-app/protocol'
-import { MAX_FILTERS_PER_QUERY, RELAY_PAGE_CEILING, partsOf } from '@estiva-app/protocol'
+import { MAX_FILTERS_PER_QUERY, RELAY_PAGE_CEILING, TOPIC_TYPE, partsOf } from '@estiva-app/protocol'
 import type { Signer } from './signer'
 import {
   buildCreateChannel,
@@ -28,7 +28,7 @@ import {
   type CommentRef,
 } from './events'
 import { findNaddrs, naddrToAddr, buildReaction, buildResolution, buildEdit, buildDeletion as buildEventDeletion, imetaTag, needsRelayKey, RELAY_KEY_FILTER, type Authored } from '@estiva-app/protocol'
-import { DELETED_FIELD, createFile, finishCreating, fieldsSetBy, listFiles, openFile, writeChange, TEXT_FIELD, type CreateFileArgs, type CreateFileResult, type FileFields, type WriteChangeResult } from '@estiva-app/interop'
+import { DELETED_FIELD, createFile, finishCreating, fieldsSetBy, listFiles, listsField, openFile, prevsAfterSwitch, writeChange, TEXT_FIELD, type CreateFileArgs, type CreateFileResult, type FileFields, type WriteChangeResult } from '@estiva-app/interop'
 import { createLoadQuery, planArchiveFolder, planCreateFolder, planDeleteFolder, planListInTopic, planMoveFromFolders, planPlaceFile, planRemoveFromTopic, planRenameFolder, planUnlistFile, readMentionedIn, readMoveRefusal, type ListHolder, type FolderRef, type MovableFile, type MoveRefusal } from '@estiva-app/interop'
 import { foldFolder, type FolderState, type Issue } from './fold'
 import { buildMembershipChange, buildMutedEvent, buildPlaceAdd, switchWrites, type Following, type Place, decorationsOf, foldAttachments, foldEdits, foldEmbeds, URGENT_TAG, type Decorations, type EditFold, type QueryFn } from '@estiva-app/conversation'
@@ -1623,8 +1623,37 @@ export class Store {
    * `file` is the listed file's id. The file is not touched: listing grants
    * nothing, so its own editors are not asked.
    */
-  setListedInTopic(args: { topic: ListHolder; file: string; listed: boolean }): Promise<PublishResult> {
+  async setListedInTopic(args: { topic: ListHolder; file: string; listed: boolean }): Promise<PublishResult> {
     const plan = args.listed ? planListInTopic : planRemoveFromTopic
+    /*
+      Where topics are kept in order (SPEC §6.14, ALL-6): the entry follows the file's current entry on this topic, or
+      the topic's first record for a file never listed, read now, as Peek's. Each file is its own field, so two people
+      adding different files never clash, and an entry crossed by a newer one is written again after it.
+      why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/every-file-type-is-kept-in-order-and-a-delete-only-marks-the-file.md
+    */
+    if ((await this.inOrderTypes()).includes(TOPIC_TYPE)) {
+      const [kind, pubkey, ...d] = args.topic.address.split(':')
+      const pointer = { kind: Number(kind), pubkey: pubkey!, d: d.join(':') }
+      const query = (filters: Record<string, unknown>[]) => this.relay.query(filters as never)
+      const field = listsField(args.file)
+      const prev = (await prevsAfterSwitch(query, pointer, [field]).catch(() => undefined))?.[field]
+      if (!prev) return { ok: false, reason: 'The topic could not be read just now, so nothing was changed. Try again.' }
+      const written = await writeChange({
+        field,
+        value: args.listed ? 'true' : 'false',
+        prev,
+        build: (input) => plan(this.signer.pubkey, input.createdAtMs, { topic: args.topic, file: args.file, prev: input.prev })[0]!,
+        sign: (event) => this.signer.sign(event),
+        publish: async (event) => {
+          const result = await this.relay.publish(event)
+          return { ok: result.ok, reason: result.reason, eventId: event.id }
+        },
+        query,
+        current: async (asked) => (await openFile(query, pointer, { text: false }))?.fields[asked]?.event,
+      }).catch((error: unknown) => ({ ok: false as const, refused: error instanceof Error ? error.message : String(error) }))
+      if (written.ok) return { ok: true }
+      return { ok: false, reason: 'refused' in written ? written.refused : 'The topic changed at the same time. Try again.' }
+    }
     const [entry] = plan(this.signer.pubkey, Date.now(), { topic: args.topic, file: args.file })
     return this.publish(entry)
   }

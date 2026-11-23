@@ -37,6 +37,20 @@ export function issueFieldsOptedIn(): boolean {
   }
 }
 
+/**
+ * This tab's opt-in to writing topics (`?topicFields=on|off`) or pages
+ * (`?documentFields=on|off`) in order (ALL-6), as Peek's and Leaf's: the relay
+ * keeps them so for QA-1's team only and announces neither, so a tab learns it
+ * from its link until the switch. Kept for the tab only.
+ */
+export function typeOptedIn(type: string): boolean {
+  try {
+    return typeFieldsOptedIn(type, window.location.search, sessionStorage)
+  } catch {
+    return false
+  }
+}
+
 const NONE: RelayFileReads = { list: false, text: false, times: false, switched: false, inOrder: [], search: [] }
 
 /** The relay's NIP-11, read once per page: a relay makes the switch once, and a reload reads it again. */

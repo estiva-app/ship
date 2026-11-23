@@ -14,7 +14,7 @@
  * is, the layer has failed and that belongs on PRO-7 rather than being worked
  * around here.
  */
-import { changeTypeOf, pointerToAddress, referenceToPointer, type SignedEvent } from '@estiva-app/protocol'
+import { changeTypeOf, pointerToAddress, referenceToPointer, type SignedEvent, type UnsignedEvent } from '@estiva-app/protocol'
 import {
   buildActionEvents,
   resolveActingManifest,
@@ -33,6 +33,10 @@ import {
   fileCandidates,
   folderOf,
   isArchived,
+  isSwitchRefusal,
+  openFile,
+  prevsAfterSwitch,
+  writeChange,
   searchFileReferences,
   readTopics,
   readYourTopics,
@@ -52,7 +56,7 @@ import { KIND_CHANGE, placeFilters, placeListing, type Listed, type ReferenceCan
 import { relatedTo } from '@/lib/ownKinds'
 import { safeLink } from '@/lib/handoff'
 import { KIND } from '../nostr/kinds'
-import { inOrderOption, projectFieldsNow, relay, signer, timesOption } from './store'
+import { inOrderOption, inOrderTypes, projectFieldsNow, relay, signer, timesOption, topicFieldsNow } from './store'
 
 export type { ForeignObject, ResolvedSlot, FolderContents, FolderSummary } from '@estiva-app/interop'
 
@@ -330,8 +334,11 @@ export async function parentArchiveOf(reference: string): Promise<ForeignObject[
 /** The fields a card never writes: a file's words, and its archive. */
 const NOT_ON_A_CARD = new Set(['title', 'summary', 'description', 'archived'])
 
-/** The tags a §7.3 change carries: the file and its id, the field, its value, the Folder, the writer's clock, a person it names, and a staged option's stage. */
-const CHANGE_TAGS = new Set(['a', 'O', 'K', 'field', 'value', 'h', 'ts', 'p', 'stage'])
+/**
+ * The tags a §7.3 change carries: the file and its id, the field, its value, the Folder, the writer's clock, a person it
+ * names, a staged option's stage, and the change it follows where its type is kept in order (§6.2).
+ */
+const CHANGE_TAGS = new Set(['a', 'O', 'K', 'field', 'value', 'h', 'ts', 'p', 'stage', 'prev'])
 
 /** The type `address`'s kind has by name, or `undefined` for a kind with none or a named file (whose type the caller would pass). */
 function baseTypeOf(address: string): string | undefined {
@@ -343,11 +350,14 @@ function baseTypeOf(address: string): string | undefined {
 }
 
 /** Whether what the runtime built is exactly one `kind:1851` change of `field` on `address`, in `folder`. */
-function isFieldChange(built: readonly { kind: number; tags: string[][] }[], want: { address: string; folder: string; field: string }): boolean {
+function isFieldChange(built: readonly { kind: number; tags: string[][] }[], want: { address: string; folder: string; field: string; prev?: string }): boolean {
   if (built.length !== 1 || built[0].kind !== KIND_CHANGE) return false
   const tags = built[0].tags
   const one = (name: string) => tags.filter((t) => t[0] === name)
   if (!tags.every((t) => CHANGE_TAGS.has(t[0]))) return false
+  // The change it follows: exactly the one asked for, or none when none was.
+  const prevs = one('prev')
+  if (want.prev ? prevs.length !== 1 || prevs[0][1] !== want.prev : prevs.length > 0) return false
   // The file's id beside its address (interop 0.73, §6.2): at most one, and the address's own.
   const id = want.address.split(':').slice(2).join(':')
   if (one('O').length > 1 || (one('O').length === 1 && one('O')[0][1] !== id)) return false
@@ -386,18 +396,7 @@ export async function applyCardAction(args: { reference: string; actionId: strin
   if (!file || !folder) return { ok: false, reason: 'That file can’t be read from here.' }
   // A move is the tree's control, and an archived file is read-only (Leaf's `saveCardChoice` refuses the same).
   if (file.archived || declared.emits.field === file.parentField) return { ok: false, reason: 'This can’t be changed from here.' }
-  const built = buildActionEvents({
-    manifest: resolved.manifest,
-    kind: pointer.kind,
-    address,
-    objectAuthor: pointer.pubkey,
-    folder,
-    actionId: args.actionId,
-    value: args.value,
-    pubkey: signer.pubkey,
-    createdAtMs: Date.now(),
-  })
-  if (typeof built === 'string') return { ok: false, reason: built }
+  const field = declared.emits.field
   /*
     The manifest is a stranger's text on a shared relay (anyone may publish a
     31990 and point a 31989 at it), and it names the kind and the tags the
@@ -405,9 +404,55 @@ export async function applyCardAction(args: { reference: string; actionId: strin
     this file, in its Folder — never a handler recommendation, a rename, read
     state or a deletion dressed as a "status".
   */
-  if (!isFieldChange(built, { address, folder, field: declared.emits.field })) return { ok: false, reason: 'This can’t be changed from here.' }
-  const result = await relay.publish(await signer.sign(built[0]))
-  return result.ok ? { ok: true } : { ok: false, reason: result.reason ?? 'The relay refused the change.' }
+  const build = (createdAtMs: number, prev?: string): UnsignedEvent | string => {
+    const built = buildActionEvents({
+      manifest: resolved.manifest,
+      kind: pointer.kind,
+      address,
+      objectAuthor: pointer.pubkey,
+      folder,
+      actionId: args.actionId,
+      value: args.value,
+      ...(prev ? { prev } : {}),
+      pubkey: signer.pubkey,
+      createdAtMs,
+    })
+    if (typeof built === 'string') return built
+    return isFieldChange(built, { address, folder, field, prev }) ? built[0] : 'This can’t be changed from here.'
+  }
+  /*
+    Where the file's type is kept in order (SPEC §6.2) the change names the one it follows: the field's current change
+    as the relay answers it now, or the file's first record for its first. An issue's and a project's card on every team
+    since their switch, a topic's and a page's where theirs is on (ALL-6). A tab that did not know is told by the relay's
+    refusal, and the change is written again in order, once.
+    why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/every-file-type-is-kept-in-order-and-a-delete-only-marks-the-file.md
+  */
+  const type = baseTypeOf(address)
+  if (!type || !(await inOrderTypes()).includes(type)) {
+    const plain = build(Date.now())
+    if (typeof plain === 'string') return { ok: false, reason: plain }
+    const result = await relay.publish(await signer.sign(plain))
+    if (result.ok) return { ok: true }
+    if (!type || !isSwitchRefusal(result.reason)) return { ok: false, reason: result.reason ?? 'The relay refused the change.' }
+  }
+  const at = { kind: pointer.kind, pubkey: pointer.pubkey, d: pointer.identifier }
+  const prev = (await prevsAfterSwitch(query, at, [field]).catch(() => undefined))?.[field]
+  if (!prev) return { ok: false, reason: 'That file could not be read just now, so nothing was changed. Try again.' }
+  const written = await writeChange({
+    field,
+    value: args.value,
+    prev,
+    build: (input) => build(input.createdAtMs, input.prev),
+    sign: (event) => signer.sign(event),
+    publish: async (event) => {
+      const result = await relay.publish(event)
+      return { ok: result.ok, reason: result.reason, eventId: event.id }
+    },
+    query,
+    current: async (asked) => (await openFile(query, at, { text: false }))?.fields[asked]?.event,
+  }).catch((error: unknown) => ({ ok: false as const, refused: error instanceof Error ? error.message : String(error) }))
+  if (written.ok) return { ok: true }
+  return { ok: false, reason: 'refused' in written ? written.refused : 'Someone changed this at the same time. Try again.' }
 }
 
 /**
@@ -510,9 +555,15 @@ export async function readFileTopics(file: string): Promise<TopicOfFile[]> {
  * change on the topic, and reading them all would grow with each (TOPI-5).
  */
 export async function readAllTopics(): Promise<TopicsRead> {
-  const lists = await listRead()
-  // The parents walked to see whether a topic is archived with one are read by the same list read (ALO-17).
-  return readTopics((filters) => relay.queryAll(filters as never), signer.pubkey, { cache: manifests, ...lists, ...(lists.listRead ? { parentsListRead: true } : {}) })
+  const [lists, topics] = await Promise.all([listRead(), topicFieldsNow()])
+  // The parents walked to see whether a topic is archived with one are read by the same list read (ALO-17), and the
+  // topics themselves too where topics are kept in order (ALL-6): each field's current change, not every change.
+  return readTopics((filters) => relay.queryAll(filters as never), signer.pubkey, {
+    cache: manifests,
+    ...lists,
+    ...(lists.listRead ? { parentsListRead: true } : {}),
+    ...(lists.listRead && topics ? { topicsListRead: true } : {}),
+  })
 }
 
 /**
@@ -584,6 +635,49 @@ function answersFilter(event: SignedEvent, filter: Record<string, unknown>): boo
 }
 
 /**
+ * A topic's `placeFilters`, read where topics are kept in order (ALL-6): its first record and every change it ever had
+ * become one list read (SPEC §6.13), the record and each field's current change — every person's current `member:`
+ * and `follow:` among them, which is all the listing folds from them — and none of its renames, list entries or saves.
+ * `list` goes in a request of its own: a relay refuses one mixing list reads with plain ones.
+ * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/opening-a-file-reads-its-current-text-not-its-history.md
+ */
+function placeReads(place: { address: string; team: string }, filters: Record<string, unknown>[], inOrder: boolean): { plain: Record<string, unknown>[]; list: Record<string, unknown>[] } {
+  if (!inOrder) return { plain: filters, list: [] }
+  const [kind, author, ...d] = place.address.split(':')
+  const own = (filter: Record<string, unknown>) => {
+    const kinds = filter.kinds as number[]
+    const everyChange = kinds.length === 1 && kinds[0] === KIND_CHANGE && Array.isArray(filter['#a']) && !('#p' in filter)
+    const root = kinds.length === 1 && kinds[0] === Number(kind) && Array.isArray(filter['#d'])
+    return everyChange || root
+  }
+  return {
+    plain: filters.filter((filter) => !own(filter)),
+    list: [{ kinds: [Number(kind)], authors: [author], '#d': [d.join(':')], limit: 1, fields: 'newest' }],
+  }
+}
+
+/** Whether `event`, from a place's list read, is that place's: its first record, or a change naming it. */
+function ofPlace(event: SignedEvent, address: string): boolean {
+  if (event.kind === KIND_CHANGE) return event.tags.some((tag) => tag[0] === 'a' && tag[1] === address)
+  return `${event.kind}:${event.pubkey}:${event.tags.find((tag) => tag[0] === 'd')?.[1] ?? ''}` === address
+}
+
+/** List reads for several places, one filter per author with every `d`: each answer's events are sorted out by {@link ofPlace}. */
+function mergedListReads(list: readonly Record<string, unknown>[]): Record<string, unknown>[] {
+  const byAuthor = new Map<string, Record<string, unknown>>()
+  for (const filter of list) {
+    const key = `${(filter.kinds as number[])[0]}:${(filter.authors as string[])[0]}`
+    const held = byAuthor.get(key)
+    if (!held) byAuthor.set(key, { ...filter, '#d': [...(filter['#d'] as string[])] })
+    else {
+      held['#d'] = [...new Set([...(held['#d'] as string[]), ...(filter['#d'] as string[])])]
+      held.limit = (held['#d'] as string[]).length
+    }
+  }
+  return [...byAuthor.values()]
+}
+
+/**
  * How many people each topic lists, for Explore's Members (TOPI-9; Miky,
  * 6 Nov: the same columns in every app): conversation's `placeListing`, the
  * rule Peek's people list draws — who chose a level, was added or made it,
@@ -596,21 +690,25 @@ function answersFilter(event: SignedEvent, filter: Record<string, unknown>): boo
  */
 export async function readTopicMembers(topics: readonly ReadTopic[]): Promise<Map<string, number | undefined>> {
   if (topics.length === 0) return new Map()
+  const inOrder = !!(await topicFieldsNow())
   const asked = topics.map((topic) => {
     const place = { address: topic.address, team: topic.folder }
     try {
       const filters = (placeFilters(place, signer.pubkey) as Record<string, unknown>[]).filter((filter) => !(filter.kinds as number[]).includes(KIND_APP_DATA))
-      return { topic, place, filters }
+      return { topic, place, filters: placeReads(place, filters, inOrder) }
     } catch {
       // A topic whose team is no team id cannot be read for its people: it draws no count, and the others still do.
       return { topic, place, filters: undefined }
     }
   })
-  const events: SignedEvent[] = await relay.queryAll(mergedFilters(asked.flatMap(({ filters }) => filters ?? [])) as never)
+  const [events, listed]: SignedEvent[][] = await Promise.all([
+    relay.queryAll(mergedFilters(asked.flatMap(({ filters }) => filters?.plain ?? [])) as never),
+    inOrder ? query(mergedListReads(asked.flatMap(({ filters }) => filters?.list ?? []))) : Promise.resolve([]),
+  ])
   return new Map(
     asked.map(({ topic, place, filters }): [string, number | undefined] => {
       if (!filters) return [topic.address, undefined]
-      const mine = events.filter((event) => filters.some((filter) => answersFilter(event, filter)))
+      const mine = [...events.filter((event) => filters.plain.some((filter) => answersFilter(event, filter))), ...listed.filter((event) => ofPlace(event, topic.address))]
       const roster = mine.filter((event) => event.kind === KIND_ROSTER || ROSTER_COMMANDS.includes(event.kind))
       const listing = mine.filter((event) => event.kind === KIND_FOLDER_STATE || event.kind === KIND_FOLDER_COMMAND)
       const own = mine.filter((event) => !roster.includes(event) && !listing.includes(event))
@@ -629,7 +727,10 @@ export async function readTopicMembers(topics: readonly ReadTopic[]): Promise<Ma
 export async function readTopicPlace(topic: { address: string; folder: string }): Promise<{ listed: Listed[]; events: SignedEvent[] }> {
   const place = { address: topic.address, team: topic.folder }
   const filters = (placeFilters(place, signer.pubkey) as Record<string, unknown>[]).filter((filter) => !(filter.kinds as number[]).includes(KIND_APP_DATA))
-  const events: SignedEvent[] = await relay.queryAll(filters as never)
+  // Where topics are kept in order, its first record and each field's current change, not every change (ALL-6).
+  const reads = placeReads(place, filters, !!(await topicFieldsNow()))
+  const [plain, listed]: SignedEvent[][] = await Promise.all([relay.queryAll(reads.plain as never), reads.list.length ? query(reads.list) : Promise.resolve([])])
+  const events = [...plain, ...listed]
   const roster = events.filter((event) => event.kind === KIND_ROSTER || ROSTER_COMMANDS.includes(event.kind))
   const listing = events.filter((event) => event.kind === KIND_FOLDER_STATE || event.kind === KIND_FOLDER_COMMAND)
   const own = events.filter((event) => !roster.includes(event) && !listing.includes(event))

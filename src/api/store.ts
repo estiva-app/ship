@@ -1,10 +1,10 @@
-import { ISSUE_TYPE, MERGE_READS_MS, fileFieldsOf, projectFieldsOf, type FetchLike, type RelayFileReads } from '@estiva-app/protocol'
+import { DOCUMENT_TYPE, ISSUE_TYPE, MERGE_READS_MS, TOPIC_TYPE, fileFieldsOf, projectFieldsOf, type FetchLike, type RelayFileReads } from '@estiva-app/protocol'
 import type { TimesFn } from '@estiva-app/interop'
 import { isRateLimited, noteRateLimited } from '@/lib/relayBudget'
 import { estivaIdSigner, localSigner, type Signer } from '../nostr/signer'
 import { Store, type ProjectFields } from '../nostr/store'
 import { ListReadRelay } from '../nostr/listReadRelay'
-import { issueFieldsOptedIn, optedIn, readFileReads } from './fileReads'
+import { issueFieldsOptedIn, optedIn, readFileReads, typeOptedIn } from './fileReads'
 import { ID_CONFIG, RELAY_URL } from '../config'
 import { relayClockSkew } from './clock'
 import { heldBearer, heldToken, renew } from '../auth/estivaId'
@@ -120,15 +120,34 @@ export const issueFieldsNow = (): Promise<ProjectFields | undefined> =>
   (issueFields ??= fileReadsNow().then((reads) => fileFieldsOf(reads, ISSUE_TYPE, issuesOpted)))
 
 /**
- * The types the relay keeps in order (NIP-11 `files.requires_prev`), for the
- * shared packages' `inOrder`: a comment, a mention, a card, a listing, a block
- * link or a `[` pick names a file of one by its id as well (ALO-8). Read
- * whether or not this tab opted in, since the relay is what keeps them so —
- * Peek's `inOrderTypes`.
+ * Topics' and pages' own switches (ALL-6): on once the relay keeps the type in
+ * order, or for a tab opened with `?topicFields=on` / `?documentFields=on`,
+ * each apart from the others, as Peek's and Leaf's. Undefined is off: a change
+ * names none it follows, as before.
+ *
+ * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/every-file-type-is-kept-in-order-and-a-delete-only-marks-the-file.md
+ */
+const topicsOpted = typeOptedIn(TOPIC_TYPE)
+const documentsOpted = typeOptedIn(DOCUMENT_TYPE)
+export const topicFieldsNow = (): Promise<ProjectFields | undefined> => fileReadsNow().then((reads) => fileFieldsOf(reads, TOPIC_TYPE, topicsOpted))
+export const documentFieldsNow = (): Promise<ProjectFields | undefined> => fileReadsNow().then((reads) => fileFieldsOf(reads, DOCUMENT_TYPE, documentsOpted))
+
+/**
+ * The types kept in order, for the shared packages' `inOrder`: a comment, a
+ * mention, a card, a listing, a block link or a `[` pick names a file of one
+ * by its id as well (ALO-8), and a change to one names the change it follows.
+ * Those the relay announces (NIP-11 `files.requires_prev`), whether or not
+ * this tab opted in, and each type this tab opted in to, since a relay that
+ * keeps a type in order for one team announces none (ALL-6) — Peek's
+ * `inOrderTypes`.
  *
  * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-file-is-named-by-its-id-in-a-capital-and-small-tag.md
  */
-export const inOrderTypes = (): Promise<readonly string[]> => fileReadsNow().then((reads) => reads.inOrder)
+export const inOrderTypes = async (): Promise<readonly string[]> => {
+  const reads = await fileReadsNow()
+  const opted = [...(fileFieldsOf(reads, TOPIC_TYPE, topicsOpted) ? [TOPIC_TYPE] : []), ...(fileFieldsOf(reads, DOCUMENT_TYPE, documentsOpted) ? [DOCUMENT_TYPE] : [])]
+  return [...new Set([...reads.inOrder, ...opted])]
+}
 
 /** `inOrder` as an option: absent while the relay keeps no type in order, so every write is as before. */
 export const inOrderOption = async (): Promise<{ inOrder?: readonly string[] }> => {

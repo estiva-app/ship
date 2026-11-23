@@ -48,6 +48,7 @@ vi.mock('@/api/store', () => ({
   relay: { query: (filters: Record<string, unknown>[]) => answer(filters), queryAll: (filters: Record<string, unknown>[]) => answer(filters, { paging: true }) },
   signer: { pubkey: 'c'.repeat(64) },
   projectFieldsNow: async () => undefined,
+  topicFieldsNow: async () => undefined,
   // A relay without the times read (NIP-11 `file_list.times`): topicTimes.wire.test.tsx reads the one with it.
   timesOption: async () => ({}),
   store: {
@@ -393,7 +394,8 @@ const sidebarTopics = () =>
     .filter((text) => text?.startsWith('T'))
 
 /** Reads of every topic: the paged asks for topic roots, which only `readAllTopics` makes (ALO-17). */
-const everyTopicReads = () => paged.filter((filters) => filters.some((f) => (f.kinds as number[] | undefined)?.includes(30840))).length
+// A read of every topic: one naming no topic. A topic's own place read asks for its root by `#d`, and is not one.
+const everyTopicReads = () => paged.filter((filters) => filters.some((f) => (f.kinds as number[] | undefined)?.includes(30840) && !f['#d'])).length
 /**
  * Lets every answer the fake relay owes land. No timer runs in these reads (the
  * relay answers on a promise), so there is no clock to advance: each empty turn
