@@ -333,7 +333,7 @@ export const IssuesEmpty: Story = {
 }
 
 /** One project, in tabs: Overview (title, its fields, description, Related), Activity (Mentioned in), Issues (table or board). Its comments in the column beside, on every tab; the header's buttons hide it and hold the ⋯. */
-/** FOL-46's notice, as the pages build it: archived by Miky two days ago, with a resolution. */
+/** FOL-46's notice, as the pages build it: archived by Ravi Mehta two days ago, with a resolution. */
 const ARCHIVED_AT = Math.floor(Date.now() / 1000) - 2 * 86400
 
 /** The header's "Edited … ago" (ONE-6, step 4a), as the pages make it: who changed it last, and exactly when under the pointer. */
@@ -349,7 +349,7 @@ const archivedNotice = (withProject?: boolean) => (
         resolution: 'Shipped as interop 0.37.0. The follow-ups are FOL-49 and FOL-50.',
         ...(withProject ? { with: { kind: 'project' as const, addr: '30850:a:rel', title: 'Relay Migration' } } : {}),
       },
-      () => 'Miky',
+      () => 'Ravi Mehta',
     )}
     {...(withProject ? { onOpenParent: fn() } : { onUnarchive: fn() })}
   />
