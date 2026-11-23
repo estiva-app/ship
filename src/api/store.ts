@@ -78,19 +78,16 @@ export const signer: Signer =
  * the caller will await and a stream can only be consumed once.
  */
 const fetchReportingQuota: FetchLike = async (url, init) => {
-  let response: Response
-  let body: string
+  let response: { status: number; body: string }
   try {
-    // A read the relay never answers ends here, body included, instead of loading for good (SHI-68).
-    ;[response, body] = await answerWithin(url, init, async (within) => {
-      const answered = await fetch(url, within)
-      return [answered, await answered.text()] as const
-    })
+    // A read the relay goes silent on ends here, instead of loading for good (SHI-68).
+    response = await answerWithin(url, init)
   } catch (error) {
     // Never answered: offline, cut, timed out, or the page leaving. Said for the failure a screen draws next (34396209).
     heardFromRelay(error)
     throw error
   }
+  const { body } = response
   if (response.status === 429 || (response.status >= 400 && isRateLimited(body))) {
     noteRateLimited(body)
   }
