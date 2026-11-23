@@ -10,6 +10,7 @@ import { relayClockSkew } from './clock'
 import { heldBearer, heldToken, renew } from '../auth/estivaId'
 import { heardRefusal } from '../lib/failureReports'
 import { heardFromRelay, hearingSigner } from '../lib/heardFailures'
+import { answerWithin } from './answerWithin'
 
 /**
  * Who signs, decided once.
@@ -77,15 +78,16 @@ export const signer: Signer =
  * the caller will await and a stream can only be consumed once.
  */
 const fetchReportingQuota: FetchLike = async (url, init) => {
-  let response: Response
+  let response: { status: number; body: string }
   try {
-    response = await fetch(url, init)
+    // A read the relay goes silent on ends here, instead of loading for good (SHI-68).
+    response = await answerWithin(url, init)
   } catch (error) {
-    // Never answered: offline, cut, or the page leaving. Said for the failure a screen draws next (34396209).
+    // Never answered: offline, cut, timed out, or the page leaving. Said for the failure a screen draws next (34396209).
     heardFromRelay(error)
     throw error
   }
-  const body = await response.text()
+  const { body } = response
   if (response.status === 429 || (response.status >= 400 && isRateLimited(body))) {
     noteRateLimited(body)
   }
