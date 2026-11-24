@@ -16,6 +16,7 @@ import { Box } from './lazyBox'
 import { ShipComment, ShipReply } from './ThreadCards'
 import { messageScope, referenceCaptions, referenceSections } from '@/api/references'
 import { navigateTo } from '@/router'
+import { useOpenThreads } from '@/launcher/openFile'
 
 /**
  * The conversations on a project or an issue, and the ones elsewhere that mention it, both on the kit's cards (ONE-6):
@@ -219,7 +220,7 @@ function ShipThreadReplies(props: ShipThreadProps) {
  * the box is at the column's foot, with the block a comment will be about above it.
  */
 export function ThreadListView(props: ThreadListViewProps) {
-  const { threads: read, onStart, disabledReason, className, unread, nameOf, about, omitted = 0, reactionsCut = false, upload, drafts, anchor, onDropAnchor } = props
+  const { threads: read, onStart, disabledReason, className, unread, nameOf, about, omitted = 0, reactionsCut = false, upload, drafts, anchor, onDropAnchor, drafted = 0 } = props
   const scope = useMemo(() => messageScope(read), [read])
   const references = useCallback((query: string) => referenceSections(scope, query, nameOf), [scope, nameOf])
   const captions = useMemo(() => referenceCaptions(scope, nameOf), [scope, nameOf])
@@ -305,7 +306,7 @@ export function ThreadListView(props: ThreadListViewProps) {
       )}
       <Box
         // A new block to comment on is a new box, which takes the caret; the text typed so far is kept as a draft.
-        key={`${about ?? ''}:${blockId ?? ''}`}
+        key={`${about ?? ''}:${blockId ?? ''}:${drafted}`}
         kind="conversation"
         onSend={(text, files, picks) => onStart(text, files, picks, blockId)}
         references={references}
@@ -403,6 +404,9 @@ export function MentionListView(props: MentionListViewProps) {
 export function ThreadList(props: ConversationsProps & Pick<ThreadListViewProps, 'upload' | 'drafts'>) {
   const { resolved } = useThreadReferences(props.threads)
   const { reactionsBy, omitted, cut, resolvedBy, goneBy, refresh } = useThreadReactions(props.threads)
+  // ⌘K reads the open file's comments as this column holds them, resolved ones marked (KIN-6).
+  const isResolved = useCallback((thread: string) => !!resolvedBy?.[thread], [resolvedBy])
+  useOpenThreads(props.about, props.threads, isResolved)
   const onReact = props.onReact
     ? async (messageId: string, emoji: string, mine?: string) => {
         const answer = await props.onReact!(messageId, emoji, mine)

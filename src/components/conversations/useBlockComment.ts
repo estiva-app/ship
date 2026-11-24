@@ -13,11 +13,20 @@ type Start = (text: string, files: readonly Imeta[], picks?: Picks, blockId?: st
  */
 export function useBlockComment(description: string, format: ContentFormat, onShow: () => void, onStart: Start) {
   const [pending, setPending] = useState<string | null>(null)
+  // Bumped when ⌘K put a draft in the box (KIN-6): the box is drawn anew, holding it.
+  const [drafted, setDrafted] = useState(0)
   const anchor: BlockAnchor | undefined = pending ? resolveBlockAnchor(pending, description, format) : undefined
   return {
     anchor,
+    drafted,
     start: (blockId: string) => {
       setPending(blockId)
+      onShow()
+    },
+    /** ⌘K's Draft a comment: the box shown again holding the draft, on this block when it was empty (null keeps the block it had). */
+    draft: (blockId: string | null) => {
+      if (blockId) setPending(blockId)
+      setDrafted((n) => n + 1)
       onShow()
     },
     drop: () => setPending(null),

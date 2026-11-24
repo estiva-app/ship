@@ -1,5 +1,7 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
+import type { Editor } from '@tiptap/react'
 import { IconBox } from '@tabler/icons-react'
+import { useOpenFile } from '@/launcher/openFile'
 import { PageHeader, TeamChip } from '@estiva-app/ui'
 import { Breadcrumb, type Crumb } from '@/components/ui/Breadcrumb'
 import { ScrollArea } from '@/components/ui/ScrollArea'
@@ -134,6 +136,25 @@ export function IssueView({ crumbs, team, title, summary, onSummarize, descripti
   if (crumbs.ref) items.push({ label: crumbs.ref, mono: true })
   // A block menu's Comment shows the column, with that block above its box (RIC-18).
   const comment = useBlockComment(description, descriptionFormat, () => comments.onShownChange(true), onStartConversation)
+  // What ⌘K asks about while this issue is open (KIN-6): its description as the editor holds it, and its comments.
+  const [editor, setEditor] = useState<Editor | null>(null)
+  useOpenFile(
+    about
+      ? {
+          address: about,
+          kind: 'issue',
+          title,
+          ...(crumbs.project ? { project: { title: crumbs.project.title } } : {}),
+          editor,
+          description,
+          format: descriptionFormat,
+          canComment: !(readOnlyReason ?? commentsClosed),
+          canEdit: !(readOnlyReason ?? lockedReason),
+          showComments: () => comments.onShownChange(true),
+          startDraft: comment.draft,
+        }
+      : null,
+  )
 
   return (
     // `data-surface` is the smoke test's waypoint — see IssuesView. A page that scrolls inside itself: `flex-1 min-h-0
@@ -148,7 +169,7 @@ export function IssueView({ crumbs, team, title, summary, onSummarize, descripti
         {/* Blocks 16px apart (Katerina, 1 November). */}
         <Centred>
           {archivedNotice}
-          <LiveHeader fields={<IssueFields {...fields} readOnlyReason={readOnlyReason} lockedReason={lockedReason} />} title={title} titlePlaceholder="Untitled issue" onRename={onRename} summary={summary} onSummarize={onSummarize} description={description} format={descriptionFormat} onDescribe={onDescribe} merges={merges} textPending={textPending} onMention={onMention} descriptionBy={descriptionBy} nameOf={nameOf} readOnly={!!(readOnlyReason ?? lockedReason)} upload={upload} onCommentOnBlock={readOnlyReason ?? commentsClosed ? undefined : comment.start} onCopyBlockLink={onCopyBlockLink} holdKey={about && `description:${about}`} />
+          <LiveHeader fields={<IssueFields {...fields} readOnlyReason={readOnlyReason} lockedReason={lockedReason} />} title={title} titlePlaceholder="Untitled issue" onRename={onRename} summary={summary} onSummarize={onSummarize} description={description} format={descriptionFormat} onDescribe={onDescribe} merges={merges} textPending={textPending} onMention={onMention} descriptionBy={descriptionBy} nameOf={nameOf} readOnly={!!(readOnlyReason ?? lockedReason)} upload={upload} onCommentOnBlock={readOnlyReason ?? commentsClosed ? undefined : comment.start} onCopyBlockLink={onCopyBlockLink} holdKey={about && `description:${about}`} onDescriptionEditor={setEditor} />
         </Centred>
       </ScrollArea>
       </div>
@@ -162,7 +183,7 @@ export function IssueView({ crumbs, team, title, summary, onSummarize, descripti
       {/* Its comments, the kit's one column, 384px beside the page, the full height of the page (Katerina, 2 November). */}
       {comments.shown && (
         <div className="flex shrink-0 flex-col border-l border-border-default" data-comments-column>
-          <ThreadList threads={threads} loading={conversationsLoading} unread={unread} stillUnread={stillUnread} onThreadShown={onThreadShown} onStart={comment.post} anchor={comment.anchor} onDropAnchor={comment.drop} onReply={onReply} disabledReason={readOnlyReason ?? commentsClosed} nameOf={nameOf} onReact={onReact} onResolve={onResolve} onDeleteMessage={onDeleteMessage} onEditMessage={onEditMessage} about={about} upload={upload} className="min-h-0 flex-1" />
+          <ThreadList threads={threads} loading={conversationsLoading} unread={unread} stillUnread={stillUnread} onThreadShown={onThreadShown} onStart={comment.post} anchor={comment.anchor} onDropAnchor={comment.drop} drafted={comment.drafted} onReply={onReply} disabledReason={readOnlyReason ?? commentsClosed} nameOf={nameOf} onReact={onReact} onResolve={onResolve} onDeleteMessage={onDeleteMessage} onEditMessage={onEditMessage} about={about} upload={upload} className="min-h-0 flex-1" />
         </div>
       )}
     </div>

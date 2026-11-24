@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
+import { useFormHere } from '@/launcher/forms'
 import { useUnfinished } from './creating'
 import { useDeletedIssues } from '@/api/useDeletedIssues'
 import { createProject, keyProblem, me, projectKeys, setProjectDeleted, suggestKey, takenKeys, type DirectoryView, type WorkspaceState } from '@/api'
@@ -39,6 +40,7 @@ function storedLayout(): ProjectsLayout {
  */
 export function ProjectsPage({ state, directory, teams, archives, tab, folder, say, refresh }: { state: WorkspaceState; directory: DirectoryView; teams: FolderSummary[] | undefined; archives: Archives; tab: ProjectsTab; folder?: string; say: Say; refresh: () => Promise<void> }) {
   const [adding, setAdding] = useState(false)
+  const openAdding = useCallback(() => setAdding(true), [])
   const unfinished = useUnfinished('Project')
   const [layout, setLayout] = useState<ProjectsLayout>(storedLayout)
   const chooseLayout = (next: ProjectsLayout) => {
@@ -50,6 +52,8 @@ export function ProjectsPage({ state, directory, teams, archives, tab, folder, s
     }
   }
   useReopenHeld(NEW_PROJECT_HOLD, () => setAdding(true))
+  // ⌘K's New project comes here from any other page, and opens this page's (KIN-6).
+  useFormHere('project', openAdding)
   // Derived once per read, not per keystroke in the Add project dialog (SHI-4).
   // A key no ref starts with, deleted issues' included (SPEC §6.1): read while the dialog is open.
   const gone = useDeletedIssues(adding).deleted

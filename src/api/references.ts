@@ -167,6 +167,16 @@ export function fileSections(query: string): ReferenceSection[] {
   return [{ label: REFERENCE_COPY.files, items: ranked.files.map(itemOf) }]
 }
 
+/** Files from every app for what was typed, ranked as `[` ranks them: ⌘K's file search (KIN-6). Asks the relay once typing pauses. */
+export function fileHits(typed: string): readonly ReferenceCandidate[] {
+  return rankReferences({ messages: [], files: search.hits(typed), query: typed, ownKinds: [KIND.PROJECT, KIND.ISSUE] }).files
+}
+
+/** Told when a search answer lands. */
+export function subscribeFileHits(listener: () => void): () => void {
+  return search.subscribe(listener)
+}
+
 /**
  * The chip an edit or a draft opens a message or file reference as: the
  * caption `[` gave it, from the same scope (SHI-49). One it does not know stays

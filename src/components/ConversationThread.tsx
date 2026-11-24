@@ -247,6 +247,8 @@ export interface ConversationsProps {
    */
   anchor?: BlockAnchor
   onDropAnchor?: () => void
+  /** Bumped when ⌘K put a draft in the new conversation's box (KIN-6): the box is drawn anew, holding it. */
+  drafted?: number
   onReply: (threadId: string, text: string, files: readonly Imeta[], picks?: Picks) => Promise<Answer>
   /** A thread's replies were drawn (`open`) or hidden: drawing them is what reads them, SPEC §11.2 (CON-34). */
   onThreadShown?: (threadId: string, open: boolean) => void

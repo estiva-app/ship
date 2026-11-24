@@ -1,7 +1,10 @@
 import { IconBox, IconLayoutKanban, IconTable } from '@tabler/icons-react'
 import type { ContentFormat, Imeta } from '@estiva-app/protocol'
 import type { Answer, Picks } from '@/components/conversations/shared'
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
+import type { Editor } from '@tiptap/react'
+import { navigateTo } from '@/router'
+import { useOpenFile } from '@/launcher/openFile'
 import { PageHeader, TeamChip } from '@estiva-app/ui'
 import { Breadcrumb } from '@/components/ui/Breadcrumb'
 import { ScrollArea } from '@/components/ui/ScrollArea'
@@ -143,6 +146,33 @@ const TABS: { id: ProjectTab; label: string }[] = [
 export function ProjectView({ crumbs, team, header, onAddIssue, tab, onTab, view, onView, issues, issueStatuses, hrefFor, related, topics, threads, conversationsLoading, mentionsLoading, unread, stillUnread, onThreadShown, onStartConversation, onReply, onCopyBlockLink, activity, activityTruncated, history, historyFold, fields, menu, comments, overview, about, onReact, onResolve, onDeleteMessage, onEditMessage, readOnlyReason, lockedReason, commentsClosed, upload, archivedNotice, members, edited }: ProjectViewProps) {
   // A block menu's Comment shows the column, with that block above its box (RIC-18).
   const comment = useBlockComment(header.description, header.descriptionFormat, () => comments.onShownChange(true), onStartConversation)
+  // What ⌘K asks about while this project is open (KIN-6): its description, its issues one line each, its own comments.
+  const [editor, setEditor] = useState<Editor | null>(null)
+  useOpenFile(
+    about
+      ? {
+          address: about,
+          kind: 'project',
+          title: header.title,
+          project: { title: header.title },
+          editor,
+          description: header.description,
+          format: header.descriptionFormat,
+          issues: issues.map((issue) => ({
+            address: issue.addr,
+            ref: issue.ref,
+            title: issue.title,
+            status: issueStatuses.find((s) => s.value === issue.status)?.label ?? issue.status,
+            who: issue.assignee?.name,
+            open: () => navigateTo(hrefFor(issue)),
+          })),
+          canComment: !(readOnlyReason ?? commentsClosed),
+          canEdit: !(readOnlyReason ?? lockedReason),
+          showComments: () => comments.onShownChange(true),
+          startDraft: comment.draft,
+        }
+      : null,
+  )
   return (
     // `data-surface`, `data-view` and `data-tab` are the smoke test's waypoints — see IssuesView. The Table/Board
     // toggle and the tabs swap content in place on the same route, so without them a test cannot tell "it
@@ -185,7 +215,7 @@ export function ProjectView({ crumbs, team, header, onAddIssue, tab, onTab, view
           // Blocks 16px apart (Katerina, 1 November).
           <Centred>
             {archivedNotice}
-            <LiveHeader fields={<ProjectFields {...fields} readOnlyReason={readOnlyReason} lockedReason={lockedReason} />} title={header.title} titlePlaceholder="Untitled project" onRename={header.onRename} summary={header.summary} onSummarize={header.onSummarize} description={header.description} format={header.descriptionFormat} onDescribe={header.onDescribe} merges={header.merges} textPending={header.textPending} onMention={header.onMention} descriptionBy={header.descriptionBy} nameOf={header.nameOf} readOnly={!!(readOnlyReason ?? lockedReason)} upload={upload} onCommentOnBlock={readOnlyReason ?? commentsClosed ? undefined : comment.start} onCopyBlockLink={onCopyBlockLink} holdKey={about && `description:${about}`} />
+            <LiveHeader fields={<ProjectFields {...fields} readOnlyReason={readOnlyReason} lockedReason={lockedReason} />} title={header.title} titlePlaceholder="Untitled project" onRename={header.onRename} summary={header.summary} onSummarize={header.onSummarize} description={header.description} format={header.descriptionFormat} onDescribe={header.onDescribe} merges={header.merges} textPending={header.textPending} onMention={header.onMention} descriptionBy={header.descriptionBy} nameOf={header.nameOf} readOnly={!!(readOnlyReason ?? lockedReason)} upload={upload} onCommentOnBlock={readOnlyReason ?? commentsClosed ? undefined : comment.start} onCopyBlockLink={onCopyBlockLink} holdKey={about && `description:${about}`} onDescriptionEditor={setEditor} />
           </Centred>
         )}
 
@@ -210,7 +240,7 @@ export function ProjectView({ crumbs, team, header, onAddIssue, tab, onTab, view
       {/* Its comments, the kit's one column, 384px beside the page on both tabs, Issues too (Katerina, 2 November: A). */}
       {comments.shown && (
         <div className="flex shrink-0 flex-col border-l border-border-default" data-comments-column>
-          <ThreadList threads={threads} loading={conversationsLoading} unread={unread} stillUnread={stillUnread} onThreadShown={onThreadShown} onStart={comment.post} anchor={comment.anchor} onDropAnchor={comment.drop} onReply={onReply} disabledReason={readOnlyReason ?? commentsClosed} nameOf={header.nameOf} onReact={onReact} onResolve={onResolve} onDeleteMessage={onDeleteMessage} onEditMessage={onEditMessage} about={about} upload={upload} className="min-h-0 flex-1" />
+          <ThreadList threads={threads} loading={conversationsLoading} unread={unread} stillUnread={stillUnread} onThreadShown={onThreadShown} onStart={comment.post} anchor={comment.anchor} onDropAnchor={comment.drop} drafted={comment.drafted} onReply={onReply} disabledReason={readOnlyReason ?? commentsClosed} nameOf={header.nameOf} onReact={onReact} onResolve={onResolve} onDeleteMessage={onDeleteMessage} onEditMessage={onEditMessage} about={about} upload={upload} className="min-h-0 flex-1" />
         </div>
       )}
     </div>
