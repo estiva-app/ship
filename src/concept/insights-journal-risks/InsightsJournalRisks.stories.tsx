@@ -88,6 +88,10 @@ export const Issue: Story = { render: () => <Shell current="issues"><IssuePage /
 /** Miky, 24 Nov, after Notion's "A new shape for work": an agent claims an issue, works, and writes back where people read. */
 export const IssueClaimedWorking: Story = { render: () => <Shell current="issues"><IssuePage claim="working" /></Shell> }
 export const IssueClaimedWroteBack: Story = { render: () => <Shell current="issues"><IssuePage claim="wrote" /></Shell> }
+/** Once nothing waits on you, the box shrinks to one line of the issue's history; the session stays on AI sessions. */
+export const IssueSessionDone: Story = { render: () => <Shell current="issues"><IssuePage claim="done" /></Shell> }
+/** Every agent run on the project, a person's Claude session and a loop's alike; a loop's page opens from its row. */
+export const ProjectAiSessions: Story = { render: () => <Shell><ProjectPage start="sessions" /></Shell> }
 /** An accepted Decision lists what still says otherwise, each with the change the decision loop proposes. */
 export const ItemDecisionFollowUps: Story = { render: () => <Shell><ItemPage item={item('j2')} below={<DecisionFollowUps />} /></Shell> }
 /** A loop's own page: what it reads, the level a person allows, its instructions with versions, its checks and runs. */

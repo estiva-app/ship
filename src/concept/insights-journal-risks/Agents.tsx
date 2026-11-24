@@ -127,7 +127,8 @@ export function LoopPage() {
   const crumbs = [
     { label: 'Projects', href: '#/projects' },
     { label: PROJECT, href: '#/project/p' },
-    { label: 'Loops', icon: <IconSparkles size={16} stroke={1.5} /> },
+    { label: 'AI sessions', href: '#/project/p/sessions' },
+    { label: 'The decision loop', icon: <IconSparkles size={16} stroke={1.5} /> },
   ]
   const fields = (
     <div className="flex flex-col gap-2">
@@ -194,10 +195,25 @@ export function LoopPage() {
 }
 
 /**
- * An agent's claim on an issue (Miky, 24 Nov: every app's harness claims, works and writes back the same way): one line
- * under the description, working with its session, or what it wrote back where everyone reads it.
+ * An agent's claim on an issue (Miky, 24 Nov: every app's harness claims, works and writes back the same way). The box
+ * shows only while it matters, working or waiting on you; once done it shrinks to one line of the issue's history.
+ * The same session is a row on the project's AI sessions tab.
  */
-export function AgentClaim({ phase }: { phase: 'working' | 'wrote' }) {
+export function AgentClaim({ phase }: { phase: 'working' | 'wrote' | 'done' }) {
+  if (phase === 'done')
+    return (
+      <MetaText tone="muted">
+        <IconTerminal2 size={12} stroke={1.5} className="mr-1 inline" />
+        Claude, started by Miky, wrote back yesterday ·{' '}
+        <Link href="#" variant="quiet" onClick={stay}>
+          ship#612, merged
+        </Link>{' '}
+        ·{' '}
+        <Link href="#" variant="quiet" onClick={stay}>
+          An Update in the Journal
+        </Link>
+      </MetaText>
+    )
   return (
     <Card fill="inset" className="flex flex-col gap-1 px-3 py-2">
       <span className="flex items-center gap-2 text-body-2 text-text-primary">
@@ -231,3 +247,78 @@ export function AgentClaim({ phase }: { phase: 'working' | 'wrote' }) {
     </Card>
   )
 }
+
+/** One run of an agent on this project: a person's Claude session or a loop's, told apart only by who started it. */
+interface Session {
+  id: string
+  loop?: boolean
+  who: string
+  on: string
+  state: 'working' | 'waiting' | 'done'
+  result: string
+  ago: string
+  undo?: boolean
+}
+const SESSIONS: Session[] = [
+  { id: 's1', who: 'Claude, started by Miky', on: 'TEA-12 Ship and Leaf sidebar match Peek', state: 'working', result: 'Working', ago: 'claimed 2h ago' },
+  { id: 's2', loop: true, who: 'The decision loop', on: 'after “Cross-app work is an Initiative; a team room is a Topic”', state: 'waiting', result: '3 changes proposed', ago: '10:12' },
+  { id: 's3', who: 'Claude, started by Miky', on: 'TEA-10 Leaf’s sidebar shows Teams', state: 'waiting', result: 'ship#610 open · an Update · a question for Miky', ago: 'yesterday' },
+  { id: 's4', loop: true, who: 'The dreaming loop', on: 'nightly', state: 'done', result: 'Merged 2 Insights', ago: 'today, 03:00', undo: true },
+  { id: 's5', who: 'Claude, started by Katerina', on: 'no issue', state: 'done', result: 'Checked Universal Navigation against the Journal', ago: '2d ago' },
+  { id: 's6', loop: true, who: 'Leaf’s review loop', on: 'Universal Navigation brainstorm', state: 'done', result: 'Found nothing to change', ago: '6d ago' },
+]
+
+function SessionRow({ s }: { s: Session }) {
+  const [undone, setUndone] = useState(false)
+  const Icon = s.loop ? IconSparkles : IconTerminal2
+  return (
+    <li className="flex items-center gap-3 border-b border-border-subtle px-4 py-3 last:border-b-0">
+      <Icon size={16} stroke={1.5} className="shrink-0 text-text-muted" />
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="flex min-w-0 items-center gap-2">
+          <Link href={s.loop ? LOOP_HREF : '#'} variant="quiet" onClick={stay}>
+            {s.who}
+          </Link>
+          <MetaText tone="muted">· {s.on}</MetaText>
+        </span>
+        <span className="min-w-0 truncate text-body-2 text-text-primary">{undone ? 'Undone: both Insights are back as they were' : s.result}</span>
+      </span>
+      {s.state === 'waiting' && <MetaText tone="muted">Waits on you</MetaText>}
+      {s.state === 'working' && (
+        <Link href="#" variant="quiet" onClick={stay}>
+          Open session
+        </Link>
+      )}
+      {s.undo && !undone && (
+        <Button variant="outlined" size="small" onClick={() => setUndone(true)}>
+          Undo
+        </Button>
+      )}
+      <span className="w-24 shrink-0 text-right">
+        <MetaText tone="muted">{s.ago}</MetaText>
+      </span>
+    </li>
+  )
+}
+
+/**
+ * A project's AI sessions tab (Miky, 24 Nov): every agent run on this project in one list, a person's Claude session
+ * and an automatic loop alike, what each wrote back, and what is working or waits on you first. A loop opens from its
+ * row; there is no Loops section in any app's navigation.
+ */
+export function SessionsTab() {
+  const order = { working: 0, waiting: 1, done: 2 }
+  const rows = [...SESSIONS].sort((a, b) => order[a.state] - order[b.state])
+  return (
+    <Card fill="none" clip>
+      <ul aria-label="AI sessions">
+        {rows.map((s) => (
+          <SessionRow key={s.id} s={s} />
+        ))}
+      </ul>
+    </Card>
+  )
+}
+
+/** Whether something on the AI sessions tab waits on you, for the tab's dot. */
+export const SESSIONS_WAITING = SESSIONS.some((s) => s.state === 'waiting')

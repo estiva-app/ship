@@ -32,13 +32,13 @@ import { ItemContent } from './ItemDetail'
 import { InsightGrid, NewlySuggested, RiskDashboard } from './ShipLists'
 import { BuildPlan, ScopeBoxes, ScopePanel, planRows } from './BuildPlan'
 import { JournalBox } from './JournalBox'
-import { AgentClaim } from './Agents'
+import { AgentClaim, SESSIONS_WAITING, SessionsTab } from './Agents'
 import { SeverityMark, waited } from './ItemKinds'
 import { CommentsColumn, type StoryComment } from './CommentsColumn'
 import { HAND_TYPED, ITEMS, KATERINA, MIKY, PEOPLE, PROJECT, TEAM, byType, decide, type Item } from './fixtures'
 
 const noop = () => {}
-export type ConceptTab = 'overview' | 'issues' | 'insights' | 'journal' | 'risks'
+export type ConceptTab = 'overview' | 'issues' | 'insights' | 'journal' | 'risks' | 'sessions'
 const TAB_TYPE: Record<string, ItemType | undefined> = { insights: 'insight', journal: 'journal', risks: 'risk' }
 
 /** A description as blocks with ids, so a block's menu can mark it and a story can draw its line by id. */
@@ -196,6 +196,7 @@ export function ProjectPage({ start = 'overview', listState = 'ready', me = 'mik
     { id: 'insights', label: 'Insights', unread: counts.insight > 0 },
     { id: 'journal', label: 'Journal', unread: counts.journal > 0 },
     { id: 'risks', label: TYPE_META.risk.tab, unread: counts.risk > 0 },
+    { id: 'sessions', label: 'AI sessions', unread: SESSIONS_WAITING },
   ]
   const [status, setStatus] = useState('in_progress')
   const [lead, setLead] = useState('ravi')
@@ -260,6 +261,7 @@ export function ProjectPage({ start = 'overview', listState = 'ready', me = 'mik
           {tab === 'insights' && <ItemsTab type="insight" all={all} state={listState} onOpen={onOpenItem} openId={open?.id} me={me} />}
           {tab === 'journal' && <ItemsTab type="journal" all={all} state={listState} onOpen={onOpenItem} openId={open?.id} me={me} />}
           {tab === 'risks' && <ItemsTab type="risk" all={all} state={listState} onOpen={onOpenItem} openId={open?.id} me={me} onDecide={onDecide} deciding={deciding} />}
+          {tab === 'sessions' && <SessionsTab />}
         </ScrollArea>
       </div>
       {tab === 'issues' && scopeId && !placed[scopeId] && (
@@ -286,7 +288,7 @@ const PROJECT_COMMENTS: StoryComment[] = [
 ]
 
 /** The issue page: today's header and description, the items about it under the description, its comments beside it. */
-export function IssuePage({ itemsState = 'ready', commentMark = true, claim }: { itemsState?: ListState; commentMark?: boolean; claim?: 'working' | 'wrote' }) {
+export function IssuePage({ itemsState = 'ready', commentMark = true, claim }: { itemsState?: ListState; commentMark?: boolean; claim?: 'working' | 'wrote' | 'done' }) {
   const issueTitle = 'Ship and Leaf sidebar match Peek'
   const about = ITEMS.filter((i) => i.about?.kind === 'issue' && i.about.title === issueTitle)
   const comments: StoryComment[] = [
