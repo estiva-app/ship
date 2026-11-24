@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 */
 const query = vi.fn()
 const queryAll = vi.fn()
-vi.mock('./store', () => ({ relay: { query: (filters: unknown[]) => query(filters), queryAll: (filters: unknown[]) => queryAll(filters) }, projectFieldsNow: async () => undefined }))
+vi.mock('./store', () => ({ relay: { query: (filters: unknown[]) => query(filters), queryAll: (filters: unknown[]) => queryAll(filters) } }))
 
 import { encodeNevent } from '@estiva-app/protocol'
 import { isEventReference, loadQuery, readFolder, readFolders, readTeamsYouAreIn, resolveForeign } from './foreign'
@@ -256,13 +256,14 @@ describe('readFolder and readFolders — one load asks for each change once (APP
     event({ kind: 1851, tags: [['a', SECOND], ['field', 'description'], ['value', 'Text'], ['h', FOLDER]] }),
   ]
 
-  /** How many times the relay was asked for each file's changes. */
+  /** How many times the relay was asked for each file's current fields (the list read, SPEC §6.13), by its address. */
   const changeAsks = () => {
     const counts = new Map<string, number>()
     for (const [filters] of query.mock.calls as [Record<string, unknown>[]][])
       for (const filter of filters)
-        if ((filter.kinds as number[] | undefined)?.includes(1851))
-          for (const value of (filter['#a'] as string[] | undefined) ?? []) counts.set(value, (counts.get(value) ?? 0) + 1)
+        if (filter.fields === 'newest')
+          for (const kind of (filter.kinds as number[] | undefined) ?? [])
+            for (const d of (filter['#d'] as string[] | undefined) ?? []) counts.set(`${kind}:${AUTHOR}:${d}`, (counts.get(`${kind}:${AUTHOR}:${d}`) ?? 0) + 1)
     return counts
   }
 

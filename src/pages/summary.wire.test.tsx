@@ -28,7 +28,8 @@ const { published } = vi.hoisted(() => {
       published.push(event)
       return new Response(JSON.stringify({ accepted: true, event_id: event.id }), { status: 200 })
     }
-    if (init?.method === 'POST' && path.endsWith('/query')) return new Response('[]', { status: 200 })
+    // The times read (SPEC §6.13) answers `{ times }`; every other read nothing.
+    if (init?.method === 'POST' && path.endsWith('/query')) return new Response(String(init.body).includes('"times"') ? '{"times":[]}' : '[]', { status: 200 })
     return new Response('{}', { status: 404 })
   }) as typeof fetch
   return { published }
@@ -59,8 +60,8 @@ import { useDirectory, useWorkspace } from '@/api'
 import App from '@/App'
 
 const STATE: WorkspaceState = {
-  projects: [{ addr: PROJECT_ADDR, id: D_PROJECT, author: AUTHOR, createdAt: 1, title: 'Billing', description: '', descriptionFormat: 'marker', contentFolder: TEAM, key: 'BIL', status: 'planned', archived: false, fields: {} }],
-  issues: [{ addr: ISSUE_ADDR, id: D_ISSUE, author: AUTHOR, createdAt: 1, title: 'Invoice totals', description: '', descriptionFormat: 'marker', folder: TEAM, projectAddr: PROJECT_ADDR, ref: 'BIL-1', status: 'todo', fields: {} }],
+  projects: [{ addr: PROJECT_ADDR, id: D_PROJECT, author: AUTHOR, createdAt: 1, rootId: 'a'.repeat(64), title: 'Billing', description: '', descriptionFormat: 'marker', contentFolder: TEAM, key: 'BIL', status: 'planned', archived: false, fields: {} }],
+  issues: [{ addr: ISSUE_ADDR, id: D_ISSUE, author: AUTHOR, createdAt: 1, rootId: 'b'.repeat(64), title: 'Invoice totals', description: '', descriptionFormat: 'marker', folder: TEAM, projectAddr: PROJECT_ADDR, ref: 'BIL-1', status: 'todo', fields: {} }],
   activity: [],
   conversations: [],
   anchors: {},

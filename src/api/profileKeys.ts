@@ -13,7 +13,7 @@ let asking: Promise<string[] | undefined> | undefined
  * names its person (SPEC §11.8, MUST since ALO-19), so the changes naming one
  * of these are the fold's whole input. One read shared by every page for a
  * minute, and one in flight at a time; `undefined` when the relay did not
- * answer, and the caller then reads every change.
+ * answer, and the caller then shows no members rather than read every change.
  *
  * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-membership-change-names-the-person-it-is-about.md
  */

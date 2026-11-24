@@ -6,13 +6,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
   what is tested is what reaches the relay and what comes back drawn.
 */
 const held: TestEvent[] = []
-const answer = (filters: Record<string, unknown>[]) => held.filter((e) => filters.some((f) => matches(f, e)))
+// The list read (`fields: 'newest'`) answered as the relay does: each topic with its fields' current changes.
+const answer = (filters: Record<string, unknown>[]) => relayAnswer(held, filters, (e, f) => matches(f, e))
 vi.mock('./store', () => ({
   relay: { query: async (filters: Record<string, unknown>[]) => answer(filters), queryAll: async (filters: Record<string, unknown>[]) => answer(filters) },
   signer: { pubkey: 'c'.repeat(64) },
-  projectFieldsNow: async () => undefined,
-  topicFieldsNow: async () => undefined,
 }))
+
+import { relayAnswer } from '@/test/listRead'
 
 import { readFileTopics } from './foreign'
 import { readTopicChoices, resetTopicsForTests, topicChoicesNow } from './topics'

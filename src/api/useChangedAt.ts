@@ -3,7 +3,7 @@ import { MEMBER_FIELD_PREFIX } from '@estiva-app/conversation'
 import { MAX_FILTERS_PER_QUERY } from '@estiva-app/protocol'
 import { KIND } from '../nostr/kinds'
 import { signedIn } from '../auth/estivaId'
-import { timesOption } from './store'
+import { times } from './store'
 
 /** `#d` values per times filter, as the shared readers ask (interop's `VALUES_PER_FILTER`). */
 const PER_FILTER = 100
@@ -27,8 +27,6 @@ export function useChangedAt(issues: readonly string[], on: boolean): Readonly<R
     if (!key || !signedIn()) return
     let live = true
     void (async () => {
-      const { times } = await timesOption()
-      if (!times) return
       const ds = key.split(' ').map((addr) => addr.split(':').slice(2).join(':'))
       const filters: Record<string, unknown>[] = []
       for (let at = 0; at < ds.length; at += PER_FILTER) filters.push({ fields: 'times', kinds: [KIND.ISSUE], '#d': ds.slice(at, at + PER_FILTER) })

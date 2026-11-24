@@ -1,10 +1,10 @@
-import { DOCUMENT_TYPE, ISSUE_TYPE, MERGE_READS_MS, TOPIC_TYPE, fileFieldsOf, projectFieldsOf, type FetchLike, type RelayFileReads } from '@estiva-app/protocol'
+import { MERGE_READS_MS, type FetchLike, type RelayFileReads } from '@estiva-app/protocol'
 import type { TimesFn } from '@estiva-app/interop'
 import { isRateLimited, noteRateLimited } from '@/lib/relayBudget'
 import { estivaIdSigner, localSigner, type Signer } from '../nostr/signer'
-import { Store, type ProjectFields } from '../nostr/store'
+import { Store } from '../nostr/store'
 import { ListReadRelay } from '../nostr/listReadRelay'
-import { issueFieldsOptedIn, optedIn, readFileReads, typeOptedIn } from './fileReads'
+import { readFileReads } from './fileReads'
 import { ID_CONFIG, RELAY_URL } from '../config'
 import { relayClockSkew } from './clock'
 import { heldBearer, heldToken, renew } from '../auth/estivaId'
@@ -101,85 +101,18 @@ const fetchReportingQuota: FetchLike = async (url, init) => {
 // Plain reads asked together go out as one request: an open spent 74–99 of a person's 300 a minute (SHI-61).
 export const relay = new ListReadRelay(RELAY_URL, hearingSigner(signer), { fetch: fetchReportingQuota, onRefused: heardRefusal, mergeReadsMs: MERGE_READS_MS })
 
-/** The switch (ALO-5): the relay's NIP-11 asked once, on the first read that needs it. */
+/** The relay's NIP-11, asked once, on the first read that needs it: which types it searches by their current words. */
 let fileReads: Promise<RelayFileReads> | undefined
-let projectFields: Promise<ProjectFields | undefined> | undefined
-const opted = optedIn()
 const fileReadsNow = (): Promise<RelayFileReads> => (fileReads ??= readFileReads(() => relay.info()))
-export const projectFieldsNow = (): Promise<ProjectFields | undefined> =>
-  (projectFields ??= fileReadsNow().then((reads) => projectFieldsOf(reads, opted)))
+
+/** The types the relay finds by the words of their current fields (`file_search.types`, ALO-6). */
+export const searchedTypes = async (): Promise<readonly string[]> => (await fileReadsNow()).search
 
 /**
- * Issues' own switch (ISS-4): on once the relay keeps issues in order, or for a
- * tab opened with `?issueFields=on`, apart from projects'. Read once per page,
- * as the projects' one.
- */
-let issueFields: Promise<ProjectFields | undefined> | undefined
-const issuesOpted = issueFieldsOptedIn()
-export const issueFieldsNow = (): Promise<ProjectFields | undefined> =>
-  (issueFields ??= fileReadsNow().then((reads) => fileFieldsOf(reads, ISSUE_TYPE, issuesOpted)))
-
-/**
- * Topics' and pages' own switches (ALL-6): on once the relay keeps the type in
- * order, or for a tab opened with `?topicFields=on` / `?documentFields=on`,
- * each apart from the others, as Peek's and Leaf's. Undefined is off: a change
- * names none it follows, as before.
- *
- * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/every-file-type-is-kept-in-order-and-a-delete-only-marks-the-file.md
- */
-const topicsOpted = typeOptedIn(TOPIC_TYPE)
-const documentsOpted = typeOptedIn(DOCUMENT_TYPE)
-export const topicFieldsNow = (): Promise<ProjectFields | undefined> => fileReadsNow().then((reads) => fileFieldsOf(reads, TOPIC_TYPE, topicsOpted))
-
-/**
- * The types kept in order, for the shared packages' `inOrder`: a comment, a
- * mention, a card, a listing, a block link or a `[` pick names a file of one
- * by its id as well (ALO-8), and a change to one names the change it follows.
- * Those the relay announces (NIP-11 `files.requires_prev`), whether or not
- * this tab opted in, and each type this tab opted in to, since a relay that
- * keeps a type in order for one team announces none (ALL-6) — Peek's
- * `inOrderTypes`.
- *
- * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-file-is-named-by-its-id-in-a-capital-and-small-tag.md
- */
-export const inOrderTypes = async (): Promise<readonly string[]> => {
-  const reads = await fileReadsNow()
-  const opted = [...(fileFieldsOf(reads, TOPIC_TYPE, topicsOpted) ? [TOPIC_TYPE] : []), ...(fileFieldsOf(reads, DOCUMENT_TYPE, documentsOpted) ? [DOCUMENT_TYPE] : [])]
-  return [...new Set([...reads.inOrder, ...opted])]
-}
-
-/** `inOrder` as an option: absent while the relay keeps no type in order, so every write is as before. */
-export const inOrderOption = async (): Promise<{ inOrder?: readonly string[] }> => {
-  const inOrder = await inOrderTypes()
-  return inOrder.length > 0 ? { inOrder } : {}
-}
-
-/**
- * The relay's times read (NIP-11 `file_list.times`) as interop's `times` option: absent while the relay does not offer it, so a topic's files are read as before.
+ * The relay's times read (SPEC §6.13): when each file and its changes were written, never the changes.
  *
  * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-relay-may-answer-when-a-file-changed-without-the-change.md
  */
-export const timesOption = async (): Promise<{ times?: TimesFn }> =>
-  (await fileReadsNow()).times ? { times: (filters) => relay.queryTimes(filters as never) } : {}
+export const times: TimesFn = (filters) => relay.queryTimes(filters as never)
 
-/**
- * The relay refused a change for naming no `prev`: it has made the switch
- * since this tab read its NIP-11 (ALO-8). Read it again, so every later read
- * and write in this tab is switched too, and names projects by their ids.
- */
-export const projectFieldsAgain = (): Promise<ProjectFields | undefined> => {
-  fileReads = undefined
-  projectFields = undefined
-  issueFields = undefined
-  return projectFieldsNow()
-}
-
-/** `projectFieldsAgain` for issues, whose switch the relay makes apart from projects' (ISS-5). */
-export const issueFieldsAgain = (): Promise<ProjectFields | undefined> => {
-  fileReads = undefined
-  projectFields = undefined
-  issueFields = undefined
-  return issueFieldsNow()
-}
-
-export const store = new Store(relay, signer, relayClockSkew, projectFieldsNow, inOrderTypes, issueFieldsNow)
+export const store = new Store(relay, signer, relayClockSkew)

@@ -1,3 +1,4 @@
+import { relayAnswer, timesAnswer } from '@/test/listRead'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MUTED_D_TAG, serializeMutedBlob } from '@estiva-app/conversation'
@@ -42,15 +43,14 @@ const answer = async (filters: Record<string, unknown>[], { paging = false } = {
   if (down || (paging && pagedDown)) throw new Error('relay unreachable')
   // The relay's own words (buzz api/bridge.rs), as protocol's `Relay.query` throws them.
   if (limited) throw new Error('query failed: rate-limited: quota exceeded; retry in 3s')
-  return held.filter((e) => filters.some((f) => matches(f, e)))
+  // The list read (`fields: 'newest'`) answered as the relay does: each file with its fields' current changes.
+  return relayAnswer(held, filters, (e, f) => matches(f, e))
 }
 vi.mock('@/api/store', () => ({
   relay: { query: (filters: Record<string, unknown>[]) => answer(filters), queryAll: (filters: Record<string, unknown>[]) => answer(filters, { paging: true }) },
   signer: { pubkey: 'c'.repeat(64) },
-  projectFieldsNow: async () => undefined,
-  topicFieldsNow: async () => undefined,
-  // A relay without the times read (NIP-11 `file_list.times`): topicTimes.wire.test.tsx reads the one with it.
-  timesOption: async () => ({}),
+  // The times read (SPEC §6.13): when each listed file and each change aimed at it was written.
+  times: async (filters: Record<string, unknown>[]) => timesAnswer(held as never, filters),
   store: {
     setMembership: (args: unknown) => wire.store.setMembership(args),
     publishMuted: (ciphertext: string) => wire.store.publishMuted(ciphertext),

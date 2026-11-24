@@ -10,6 +10,7 @@
  * conversation is not held does not start reading it; and `loadAll`, which
  * scripts and checks use, still reads every Folder's.
  */
+import { relayAnswer, timesAnswer } from '../src/test/listRead'
 import { publicKeyFromSecret, signEvent, type Relay, type SignedEvent, type UnsignedEvent } from '@estiva-app/protocol'
 import { Store, foldWorkspace, type ThreadsWanted, type WorkspaceEvents } from '../src/nostr/store'
 import { buildConversationMessage, buildIssue, buildProject, issueAddr, projectAddr } from '../src/nostr/events'
@@ -68,6 +69,13 @@ const relay = {
   async queryAll(filters: Record<string, unknown>[]) {
     asked.push(filters)
     return held.filter((event) => filters.some((filter) => matches(event, filter)))
+  },
+  async query(filters: Record<string, unknown>[]) {
+    asked.push(filters)
+    return relayAnswer(held, filters, matches)
+  },
+  async queryTimes(filters: Record<string, unknown>[]) {
+    return timesAnswer(held, filters)
   },
 } as unknown as Relay
 

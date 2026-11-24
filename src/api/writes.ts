@@ -1,7 +1,7 @@
 import type { Embed, Imeta, NostrTag, PublishResult } from '@estiva-app/protocol'
 import { BLOCK_DOCUMENT_FORMAT, serializeBlockDocument, textAsksOf, toRenderTree } from '@estiva-app/protocol'
 import { MAX_MENTIONED_PEOPLE, boxLinksOf, embedsToEdit, embedsToSend, namedBefore, withoutCard } from '@estiva-app/conversation'
-import { isSwitchRefusal, linksIn, listedBeneath, MAX_LINKS_ASKED, prevsAfterSwitch, textOf, within, type OwnPlace } from '@estiva-app/interop'
+import { linksIn, listedBeneath, MAX_LINKS_ASKED, textOf, within, type OwnPlace } from '@estiva-app/interop'
 import type { FileText } from '@estiva-app/conversation'
 import type { DocumentAsks } from '@estiva-app/ui/editor'
 import { readState } from '../nostr/read'
@@ -16,7 +16,7 @@ import { linkResolverFor } from '../lib/linksNamingCards'
 import { isRelayBusy } from '../lib/relayBudget'
 import { listsFile } from '../lib/placement'
 import { SignerTokenExpired } from '../nostr/signer'
-import { inOrderOption, issueFieldsAgain, issueFieldsNow, projectFieldsAgain, projectFieldsNow, relay, signer, store } from './store'
+import { relay, signer, store } from './store'
 import { nip44 } from './nip44'
 import { mutedFilter, parseMutedBlob, serializeMutedBlob, type Following } from '@estiva-app/conversation'
 import type { SignedEvent } from '@estiva-app/protocol'
@@ -188,9 +188,8 @@ export async function createProject(draft: { title: string; description: string;
   if (clock) return { ok: false, reason: clock }
   try {
     if (unfinished) return await finish(unfinished, draft, draft.team.folder, 'team')
-    // Filed in its team's Folder by `h` where projects are kept in order (SPEC §6.13, D5), as Leaf and the agent file theirs.
-    const filedIn = !!(await projectFieldsNow())
-    const { result, placed, addr, created } = await store.createProject({ title: draft.title, description: draft.description, summary: draft.summary, key: draft.key, team: draft.team, filedIn })
+    // Filed in its team's Folder by `h` (SPEC §6.13, D5), as Leaf and the agent file theirs.
+    const { result, placed, addr, created } = await store.createProject({ title: draft.title, description: draft.description, summary: draft.summary, key: draft.key, team: draft.team, filedIn: true })
     if (result.ok) claimedHere.add(addr)
     if (!result.ok) return { ok: false, reason: result.reason ?? 'no reason given' }
     if (created && !created.ok) return createdOf(created, draft.team.folder, draft.title, draft.team.folder)
@@ -247,15 +246,15 @@ export type FieldWriteResult = WriteResult | { ok: false; reason: string; asks: 
  * from. `tries: 1` stops at the first refusal, for a change that must not be
  * set again over someone's newer one (an automatic ref claim, §6.1).
  */
-async function writeInOrder(file: OrderedFile, field: string, value: string, note: string, contentFormat?: string, from?: FileText, afterSwitch?: { prev: string; base?: { value: string; format?: string } }, tries?: number): Promise<FieldWriteResult> {
+async function writeInOrder(file: OrderedFile, field: string, value: string, note: string, contentFormat?: string, from?: FileText, tries?: number): Promise<FieldWriteResult> {
   const clock = await clockProblem()
   if (clock) return refused(clock)
   const text = field === 'description'
-  const edited = afterSwitch?.base?.value ?? (from && (typeof from.content === 'string' ? from.content : serializeBlockDocument(from.content)))
-  const prev = afterSwitch?.prev ?? (text && edited !== undefined ? textChanges.get(file.addr)?.get(edited) : (file.fields[field]?.id ?? file.rootId))
+  const edited = from && (typeof from.content === 'string' ? from.content : serializeBlockDocument(from.content))
+  const prev = text && edited !== undefined ? textChanges.get(file.addr)?.get(edited) : (file.fields[field]?.id ?? file.rootId)
   if (!prev) return refused(text ? 'someone changed it while you were editing. Copy your text, then reload' : 'reload the page and try again')
   try {
-    const result = await store.writeField({ folder: file.folder, target: file.addr, field, value, note, contentFormat, prev, base: afterSwitch?.base, tries })
+    const result = await store.writeField({ folder: file.folder, target: file.addr, field, value, note, contentFormat, prev, tries })
     if (result.ok) {
       if (text) {
         const saved = 'event' in result ? result.event : result.mergedOnto
@@ -266,7 +265,7 @@ async function writeInOrder(file: OrderedFile, field: string, value: string, not
     if ('refused' in result) return refused(result.refused)
     const theirs = textOf(result.theirs)
     noteText(file.addr, theirs?.value ?? '', result.theirs.id)
-    const base = afterSwitch?.base ?? { value: edited ?? '', ...(from?.format ? { format: from.format } : {}) }
+    const base = { value: edited ?? '', ...(from?.format ? { format: from.format } : {}) }
     return { ok: false, reason: 'asks', asks: textAsksOf(base, theirs ?? { value: '' }, { value, ...(contentFormat ? { format: contentFormat } : {}) }, result.asks) }
   } catch (error) {
     return refused(error instanceof Error ? error.message : String(error))
@@ -275,59 +274,8 @@ async function writeInOrder(file: OrderedFile, field: string, value: string, not
 
 /** One field of a project record: title, description, status, lead. The record's own Folder. */
 export async function setProjectField(project: Project, field: 'title' | 'description' | 'summary' | 'status' | 'lead' | 'key', value: string, note: string, contentFormat?: string, from?: FileText): Promise<FieldWriteResult> {
-  if (await projectFieldsNow()) return writeInOrder(asOrdered(project), field, value, note, field === 'description' ? contentFormat : undefined, from)
-  /*
-    A description is a rich text field (SPEC §13) and goes on the wire as a
-    block document; every other field is a scalar and goes as it arrived.
-
-    **The document arrives already built** (RIC-14). It used to be converted
-    here from the textarea's marker text, which is also where block ids were
-    carried across an edit — by matching the new text against the old
-    document. The editor holds the ids on the blocks themselves now, so they
-    survive a reorder, which that matching could not manage: it followed
-    position, and an anchored comment silently moved with it.
-
-    The tag travels with the body rather than being inferred from it, because
-    §13.4 says a body's format is on the event and is never guessed.
-  */
-  const body = field === 'description' ? { value, contentFormat } : { value, contentFormat: undefined }
-  return switchedIfRefused(project, { field, value, note, contentFormat: body.contentFormat, from }, () => store.setField({ folder: project.contentFolder, target: project.addr, field, ...body, note }))
-}
-
-/**
- * A project or issue change written the old way, with no `prev`, by a tab that
- * read the relay's NIP-11 before it made the switch (ALO-8; issues ISS-5).
- * Refused for that, the tab reads NIP-11 again and, now switched, writes the
- * change again in order: after the field's current change, and the text
- * merged onto words saved since it loaded. Once: a second refusal, or no
- * switch, is shown as any refusal is. The person sees nothing when it saves
- * (Miky, 9 Nov).
- * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-file-is-its-fields-each-kept-in-order-by-the-relay.md
- */
-async function switchedIfRefused(
-  file: Project | Issue,
-  change: { field: string; value: string; note: string; contentFormat?: string; from?: FileText },
-  write: () => Promise<PublishResult>,
-): Promise<FieldWriteResult> {
-  const result = await publish(write)
-  if (result.ok || !isSwitchRefusal(result.reason)) return result
-  try {
-    const project = asOrdered(file)
-    if (!(await ('contentFolder' in file ? projectFieldsAgain() : issueFieldsAgain()))) return result
-    const [kind, pubkey, ...d] = project.addr.split(':')
-    const prev = (await prevsAfterSwitch((filters) => relay.query(filters as never), { kind: Number(kind), pubkey: pubkey!, d: d.join(':') }, [change.field]))?.[change.field]
-    if (!prev) return result
-    const { from } = change
-    const base =
-      change.field !== 'description'
-        ? undefined
-        : from
-          ? { value: typeof from.content === 'string' ? from.content : serializeBlockDocument(from.content), ...(from.format ? { format: from.format } : {}) }
-          : { value: project.description, ...(project.descriptionFormat === 'blocks' ? { format: BLOCK_DOCUMENT_FORMAT } : {}) }
-    return await writeInOrder(project, change.field, change.value, change.note, change.contentFormat, from, { prev, base })
-  } catch {
-    return result
-  }
+  // A description goes as the block document the editor built, its format beside it (SPEC §13.4, RIC-14).
+  return writeInOrder(asOrdered(project), field, value, note, field === 'description' ? contentFormat : undefined, from)
 }
 
 /**
@@ -336,10 +284,7 @@ async function switchedIfRefused(
  * first when it is opened (FOL-46).
  */
 export async function archiveProject(project: Project, archived: boolean, resolution?: string): Promise<WriteResult> {
-  if (await projectFieldsNow()) return writeInOrder(asOrdered(project), 'archived', archived ? 'true' : '', archived ? (resolution ?? '') : '')
-  return switchedIfRefused(project, { field: 'archived', value: archived ? 'true' : '', note: archived ? (resolution ?? '') : '' }, () =>
-    store.archiveProject({ recordFolder: project.contentFolder, project: project.addr, archived, resolution }),
-  )
+  return writeInOrder(asOrdered(project), 'archived', archived ? 'true' : '', archived ? (resolution ?? '') : '')
 }
 
 /**
@@ -369,10 +314,7 @@ export async function setIssueDeleted(issue: Issue, deleted: boolean): Promise<W
 
 /** Archive one issue, or restore it — the project's rule, one level down (FOL-46). */
 export async function archiveIssue(issue: Issue, archived: boolean, resolution?: string): Promise<WriteResult> {
-  if (await issueFieldsNow()) return writeInOrder(asOrdered(issue), 'archived', archived ? 'true' : '', archived ? (resolution ?? '') : '')
-  return switchedIfRefused(issue, { field: 'archived', value: archived ? 'true' : '', note: archived ? (resolution ?? '') : '' }, () =>
-    store.archiveIssue({ folder: issue.folder, issue: issue.addr, archived, resolution }),
-  )
+  return writeInOrder(asOrdered(issue), 'archived', archived ? 'true' : '', archived ? (resolution ?? '') : '')
 }
 
 /**
@@ -537,21 +479,15 @@ export async function renameFolder(folder: { id: string }, name: string): Promis
 }
 
 /**
- * Delete an issue. Where issues are kept in order it is `setIssueDeleted`, a
- * change anyone who may edit it makes and Restore undoes (SPEC §6.5). Before
- * that, the old contract, as `deleteProject`'s: a NIP-09 request, adjudicated
- * by the relay; a tab that read NIP-11 before the switch is refused that
- * (`delete-by-field`), reads it again and deletes by the field.
+ * Delete an issue: `setIssueDeleted`, a change anyone who may edit it makes
+ * and Restore undoes (SPEC §6.5).
  *
  * The conversations about it are separate events in the same Folder and are
  * not touched — SHI-3 is explicit that "delete the issue" must not read as
  * "delete the discussion", so the dialog says so.
  */
 export async function deleteIssue(issue: Issue): Promise<WriteResult> {
-  if (await issueFieldsNow()) return setIssueDeleted(issue, true)
-  const result = await publish(() => store.deleteIssue({ folder: issue.folder, issue: issue.addr }))
-  if (result.ok || !result.reason.includes('delete-by-field')) return result
-  return (await issueFieldsAgain()) ? setIssueDeleted(issue, true) : result
+  return setIssueDeleted(issue, true)
 }
 
 // ── Issues ──────────────────────────────────────────────────────────────────
@@ -621,20 +557,13 @@ export async function createIssue(project: Project, visible: Visible, draft: { t
     // Create again after the text did not land: the rest is sent, never a second first record (SPEC §6.1).
     if (unfinished) return { ...(await finish(unfinished, draft, project.addr, 'project')), folder: unfinished.folder }
     const folder = workFolder(project)
-    const inOrder = !!(await issueFieldsNow())
-    // Where issues are kept in order a deleted issue keeps its number, so a new one never takes it (SPEC §6.1).
-    const numbering = inOrder ? await withDeleted(visible) : withHeldDeleted(visible)
+    // A deleted issue keeps its number, so a new one never takes it (SPEC §6.1).
+    const numbering = await withDeleted(visible)
     const key = await keyFor(project, numbering)
     const issue = { folder, title: draft.title, description: draft.description, summary: draft.summary, projectAddr: project.addr, ref: nextRef(key, numbering.issues.map((one) => one.ref)) }
-    if (inOrder) {
-      const created = await store.createIssueInOrder(issue)
-      if (created.ok || created.created) claimedHere.add(created.address)
-      return { ...createdOf(created, folder, draft.title, project.addr), folder }
-    }
-    const { result, addr } = await store.createIssue(issue)
-    if (!result.ok) return { ok: false, reason: result.reason ?? 'no reason given' }
-    claimedHere.add(addr)
-    return { ok: true, addr, folder }
+    const created = await store.createIssueInOrder(issue)
+    if (created.ok || created.created) claimedHere.add(created.address)
+    return { ...createdOf(created, folder, draft.title, project.addr), folder }
   } catch (error) {
     return { ok: false, reason: error instanceof Error ? error.message : String(error) }
   }
@@ -693,16 +622,6 @@ async function withDeleted(visible: Visible): Promise<Visible> {
 }
 
 /**
- * What numbering counts before issues are kept in order: every issue it can
- * see and the deleted ones its load holds, which before the switch is every
- * one (the whole read carries them), so a hidden issue's number is not given
- * again.
- */
-function withHeldDeleted(visible: Visible): Visible {
-  return { projects: visible.projects, issues: [...visible.issues, ...(visible.deletedIssues ?? [])] }
-}
-
-/**
  * The deleted issues, read once per tab. The read is every issue's times
  * (about 700 KB on a workspace of 1,000 issues, 19 Nov), too much to pay on
  * every new issue or every project page that numbers one. Numbering adds the
@@ -736,11 +655,7 @@ export async function readIssueByLink(d: string): Promise<Issue | undefined> {
  * both land, the later of one field stands, and a text merges or asks.
  */
 export async function setIssueField(issue: Issue, field: 'title' | 'description' | 'summary' | 'status' | 'assignee' | 'project' | 'ref', value: string, note: string, contentFormat?: string, from?: FileText): Promise<FieldWriteResult> {
-  if (await issueFieldsNow()) return writeInOrder(asOrdered(issue), field, value, note, field === 'description' ? contentFormat : undefined, from)
-  // The description arrives as a built document with its own tag — see
-  // `setProjectField`.
-  const body = field === 'description' ? { value, contentFormat } : { value, contentFormat: undefined }
-  return switchedIfRefused(issue, { field, value, note, contentFormat: body.contentFormat, from }, () => store.setField({ folder: issue.folder, target: issue.addr, field, ...body, note }))
+  return writeInOrder(asOrdered(issue), field, value, note, field === 'description' ? contentFormat : undefined, from)
 }
 
 /**
@@ -749,8 +664,7 @@ export async function setIssueField(issue: Issue, field: 'title' | 'description'
  * ref since, it takes theirs and never claims again (SPEC §6.1).
  */
 async function claimRef(issue: Issue, ref: string, note: string): Promise<WriteResult> {
-  if (await issueFieldsNow()) return writeInOrder(asOrdered(issue), 'ref', ref, note, undefined, undefined, undefined, 1)
-  return setIssueField(issue, 'ref', ref, note)
+  return writeInOrder(asOrdered(issue), 'ref', ref, note, undefined, undefined, 1)
 }
 
 // ── Conversations ───────────────────────────────────────────────────────────
@@ -776,7 +690,7 @@ function cardToSend(body: string, here: string | undefined): Embed[] {
  */
 async function tagsEarnedBy(body: string, own: OwnPlace, edit = false): Promise<NostrTag[]> {
   // A file of a type the relay keeps in order is named by its id too: an `o` beside its `a`, a `part` by its id (ALO-8).
-  return links.tagsFor(toRenderTree(body, 'marker'), own, { edit, ...(await inOrderOption()) })
+  return links.tagsFor(toRenderTree(body, 'marker'), own, { edit })
 }
 
 /**
@@ -875,9 +789,9 @@ export async function assignMissingRefs(project: Project, visible: Visible): Pro
   const missing = mine.filter((issue) => !issue.ref).sort((a, b) => a.createdAt - b.createdAt)
   if (missing.length === 0) return []
   // Deleted issues count where issues are kept in order (SPEC §6.1); a read that fails numbers nothing.
-  let numbering = withHeldDeleted(visible)
+  let numbering: Visible
   try {
-    if (await issueFieldsNow()) numbering = await withDeleted(visible)
+    numbering = await withDeleted(visible)
   } catch (error) {
     return [refused(error instanceof Error ? error.message : String(error))]
   }
@@ -926,7 +840,7 @@ export async function settleClaims(visible: Visible): Promise<WriteResult[]> {
     if (losing.length === 0) return results
     // The next free number counts deleted issues too, read only when a claim has to move (SPEC §6.1).
     // A read that fails moves nothing yet: the claim is tried again on the next refresh, not marked as moved.
-    const numbering = (await issueFieldsNow()) ? await withDeleted(visible).catch(() => undefined) : withHeldDeleted(visible)
+    const numbering = await withDeleted(visible).catch(() => undefined)
     if (!numbering) return results
     const assigned = numbering.issues.map((issue) => issue.ref)
     for (const issue of losing.filter((one) => once(one.addr, one.ref ?? ''))) {

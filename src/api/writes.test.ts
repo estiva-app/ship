@@ -13,13 +13,9 @@ vi.mock('./store', () => ({
     editMessage: vi.fn(),
     setListedInTopic: vi.fn(),
     writeField: vi.fn(),
+    createIssueInOrder: vi.fn(),
+    deletedIssueEvents: vi.fn(),
   },
-  // Off unless a test turns it on: the relay keeps no order (ALO-5).
-  projectFieldsNow: vi.fn(async () => undefined),
-  issueFieldsNow: vi.fn(async () => undefined),
-  issueFieldsAgain: vi.fn(async () => undefined),
-  // No type kept in order unless a test says so: a file is named by its address alone (ALO-8).
-  inOrderOption: vi.fn(async () => ({})),
 }))
 vi.mock('./clock', () => ({ clockProblem: vi.fn() }))
 vi.mock('./foreign', () => ({ readFolderListing: vi.fn(), loadQuery: () => async () => [] }))
@@ -34,9 +30,9 @@ import { SignerTokenExpired, type Signer } from '../nostr/signer'
 
 const s = store as unknown as Record<string, ReturnType<typeof vi.fn>>
 const PK = 'ab'.repeat(32)
-const PROJECT = { addr: `30850:${PK}:1`, id: '1', author: PK, createdAt: 1, title: 'Relay Migration', description: '', descriptionFormat: 'marker' as const, contentFolder: 'content-folder', key: 'REL', status: 'planned', archived: false, fields: {} }
+const PROJECT = { addr: `30850:${PK}:1`, id: '1', author: PK, createdAt: 1, title: 'Relay Migration', description: '', descriptionFormat: 'marker' as const, contentFolder: 'content-folder', key: 'REL', status: 'planned', archived: false, fields: {}, rootId: 'r'.repeat(64) }
 const TEAM = { folder: '3167adea-877f-43c4-96fb-517a2b2d5d24', hasState: true }
-const ISSUE = { addr: `30851:${PK}:2`, id: '2', author: PK, createdAt: 1, title: 'I', description: '', descriptionFormat: 'marker' as const, folder: 'issue-folder', projectAddr: PROJECT.addr, ref: 'REL-2', status: 'todo', fields: {} }
+const ISSUE = { addr: `30851:${PK}:2`, id: '2', author: PK, createdAt: 1, title: 'I', description: '', descriptionFormat: 'marker' as const, folder: 'issue-folder', projectAddr: PROJECT.addr, ref: 'REL-2', status: 'todo', fields: {}, rootId: 'r'.repeat(64) }
 
 beforeEach(() => {
   vi.mocked(clockProblem).mockResolvedValue(null)
@@ -58,41 +54,36 @@ describe('the clock is checked before anything is signed', () => {
 
 describe('accepted is authoritative — only ok is read', () => {
   it('a rejection the relay answered with 200 is a failure with its reason', async () => {
-    s.setField.mockResolvedValue({ ok: false, reason: 'not a channel member' })
+    s.writeField.mockResolvedValue({ ok: false, refused: 'not a channel member' })
     expect(await setIssueField(ISSUE, 'status', 'done', 'Status → done')).toEqual({ ok: false, reason: 'not a channel member' })
   })
 
   it('a thrown request is a failure with its message, never a success', async () => {
-    s.setField.mockRejectedValue(new Error('network down'))
+    s.writeField.mockRejectedValue(new Error('network down'))
     expect(await setIssueField(ISSUE, 'assignee', 'k', 'Assign')).toEqual({ ok: false, reason: 'network down' })
-  })
-
-  it('a duplicate the relay already held is fine', async () => {
-    s.setField.mockResolvedValue({ ok: true, duplicate: true })
-    expect(await setIssueField(ISSUE, 'status', 'done', 'x')).toEqual({ ok: true })
   })
 })
 
 describe('which Folder each write goes to', () => {
-  it("an issue's field change goes to the issue's own Folder", async () => {
-    s.setField.mockResolvedValue({ ok: true })
+  it("an issue's field change goes to the issue's own Folder, after the change it follows", async () => {
+    s.writeField.mockResolvedValue({ ok: true, id: 'c'.repeat(64) })
     await setIssueField(ISSUE, 'status', 'in_progress', 'Status → in_progress')
-    expect(s.setField).toHaveBeenCalledWith({ folder: 'issue-folder', target: ISSUE.addr, field: 'status', value: 'in_progress', note: 'Status → in_progress' })
+    expect(s.writeField).toHaveBeenCalledWith(expect.objectContaining({ folder: 'issue-folder', target: ISSUE.addr, field: 'status', value: 'in_progress', note: 'Status → in_progress', prev: ISSUE.rootId }))
   })
 
   it("a project's record change and archive go to the Folder the record names", async () => {
-    s.setField.mockResolvedValue({ ok: true })
-    s.archiveProject.mockResolvedValue({ ok: true })
+    s.writeField.mockResolvedValue({ ok: true, id: 'c'.repeat(64) })
     await setProjectField(PROJECT, 'lead', 'k', 'Assign project')
-    expect(s.setField).toHaveBeenCalledWith({ folder: 'content-folder', target: PROJECT.addr, field: 'lead', value: 'k', note: 'Assign project' })
+    expect(s.writeField).toHaveBeenLastCalledWith(expect.objectContaining({ folder: 'content-folder', target: PROJECT.addr, field: 'lead', value: 'k', note: 'Assign project', prev: PROJECT.rootId }))
     await archiveProject(PROJECT, true)
-    expect(s.archiveProject).toHaveBeenCalledWith({ recordFolder: 'content-folder', project: PROJECT.addr, archived: true })
+    expect(s.writeField).toHaveBeenLastCalledWith(expect.objectContaining({ folder: 'content-folder', target: PROJECT.addr, field: 'archived', value: 'true' }))
   })
 
-  it("a new issue goes to the project's content Folder with the next ref among what is visible", async () => {
-    s.createIssue.mockResolvedValue({ result: { ok: true }, addr: '30851:me:new', id: 'new' })
-    const result = await createIssue(PROJECT, { projects: [PROJECT], issues: [ISSUE, { ...ISSUE, ref: 'REL-7' }, { ...ISSUE, ref: 'DES-9' }] }, { title: 'New', description: 'd' })
-    expect(s.createIssue).toHaveBeenCalledWith({ folder: 'content-folder', title: 'New', description: 'd', projectAddr: PROJECT.addr, ref: 'REL-8' })
+  it("a new issue goes to the project's content Folder with the next ref among what is visible, deleted ones counted", async () => {
+    s.deletedIssueEvents.mockResolvedValue([])
+    s.createIssueInOrder.mockResolvedValue({ ok: true, address: '30851:me:new' })
+    const result = await createIssue(PROJECT, { projects: [PROJECT], issues: [ISSUE, { ...ISSUE, ref: 'REL-7' }, { ...ISSUE, ref: 'DES-9' }], deletedIssues: [{ ...ISSUE, addr: `30851:${PK}:gone`, ref: 'REL-9' }] }, { title: 'New', description: 'd' })
+    expect(s.createIssueInOrder).toHaveBeenCalledWith(expect.objectContaining({ folder: 'content-folder', title: 'New', description: 'd', projectAddr: PROJECT.addr, ref: 'REL-10' }))
     expect(result).toEqual({ ok: true, addr: '30851:me:new', folder: 'content-folder' })
   })
 
@@ -279,7 +270,7 @@ describe('creating a project', () => {
   it('a project is created in the team it names', async () => {
     s.createProject.mockResolvedValue({ result: { ok: true }, placed: { ok: true }, addr: 'a', id: 'i', folder: TEAM.folder })
     expect(await createProject({ title: 'X', description: '', key: 'XXX', team: TEAM })).toEqual({ ok: true, addr: 'a' })
-    expect(s.createProject).toHaveBeenCalledWith({ title: 'X', description: '', key: 'XXX', team: TEAM, filedIn: false })
+    expect(s.createProject).toHaveBeenCalledWith({ title: 'X', description: '', key: 'XXX', team: TEAM, filedIn: true })
   })
 
   it('a refused record is no project', async () => {
@@ -468,9 +459,11 @@ describe('createFolder and renameFolder say what the relay did (FOL-8)', () => {
 
 describe('Add to topic and Remove go on the wire as an entry on the topic (TOP-5)', () => {
   const TOPIC = { address: `30840:${'f'.repeat(64)}:topic-1`, folder: 'topic-folder' }
+  const ROOT = { id: '1'.repeat(64), pubkey: 'f'.repeat(64), created_at: 1_700_000_000, kind: 30840, tags: [['d', 'topic-1'], ['h', 'topic-folder']], content: '', sig: '' } as SignedEvent
   const signed = () => {
     const sent: SignedEvent[] = []
-    const relay = { publish: async (event: SignedEvent) => (sent.push(event), { ok: true }) } as unknown as Relay
+    // The open read answers the topic's first record: a file never listed follows it.
+    const relay = { publish: async (event: SignedEvent) => (sent.push(event), { ok: true }), query: async () => [ROOT] } as unknown as Relay
     const signer = { pubkey: PK, sign: async (unsigned: UnsignedEvent) => ({ ...unsigned, id: 'e'.repeat(64), sig: '0'.repeat(128) }) } as unknown as Signer
     const real = new Store(relay, signer)
     s.setListedInTopic.mockImplementation((args: Parameters<Store['setListedInTopic']>[0]) => real.setListedInTopic(args))
@@ -491,11 +484,12 @@ describe('Add to topic and Remove go on the wire as an entry on the topic (TOP-5
       ['field', `lists:${ISSUE.id}`],
       ['value', 'true'],
       ['h', 'topic-folder'],
+      ['prev', ROOT.id],
       ['o', ISSUE.id],
     ])
   })
 
-  describe('where topics are kept in order (ALL-6)', () => {
+  describe('a topic entry, kept in order (ALL-6)', () => {
     const root = { id: '1'.repeat(64), pubkey: 'f'.repeat(64), created_at: 1_700_000_000, kind: 30840, tags: [['d', 'topic-1'], ['h', 'topic-folder']], content: '', sig: '' } as SignedEvent
     const entryNow = {
       id: '2'.repeat(64),
@@ -506,20 +500,18 @@ describe('Add to topic and Remove go on the wire as an entry on the topic (TOP-5
       content: '',
       sig: '',
     } as SignedEvent
-    /** `known`: whether this tab knows topics are kept in order; `refuseFirst`: the relay refuses the first entry as one with no prev. */
-    const inOrder = (held: SignedEvent[], { known = true, refuseFirst = false } = {}) => {
+    const inOrder = (held: SignedEvent[]) => {
       const sent: SignedEvent[] = []
       const relay = {
         publish: async (event: SignedEvent) => {
           sent.push(event)
-          if (refuseFirst && sent.length === 1) return { ok: false, reason: 'invalid: requires-prev: a topic change names the change it follows in prev; reload the page and save again' }
           return { ok: true }
         },
         // The open read: the topic's first record and each field's current change.
         query: async () => [root, ...held],
       } as unknown as Relay
       const signer = { pubkey: PK, sign: async (unsigned: UnsignedEvent) => ({ ...unsigned, id: 'e'.repeat(64), sig: '0'.repeat(128) }) } as unknown as Signer
-      const real = new Store(relay, signer, undefined, undefined, async () => (known ? ['osnova.topic'] : []))
+      const real = new Store(relay, signer)
       s.setListedInTopic.mockImplementation((args: Parameters<Store['setListedInTopic']>[0]) => real.setListedInTopic(args))
       return sent
     }
@@ -536,15 +528,6 @@ describe('Add to topic and Remove go on the wire as an entry on the topic (TOP-5
       const sent = inOrder([])
       expect(await setListedInTopic(TOPIC, ISSUE.id, true)).toEqual({ ok: true })
       expect(sent[0].tags.filter((t) => t[0] === 'prev')).toEqual([['prev', root.id]])
-    })
-
-    it('a tab that did not know writes the entry again in order, once, when the relay says topics are kept in order', async () => {
-      const sent = inOrder([entryNow], { known: false, refuseFirst: true })
-      expect(await setListedInTopic(TOPIC, ISSUE.id, false)).toEqual({ ok: true })
-      expect(sent).toHaveLength(2)
-      expect(sent[0].tags.some((t) => t[0] === 'prev')).toBe(false)
-      expect(sent[1].tags.filter((t) => t[0] === 'prev')).toEqual([['prev', entryNow.id]])
-      expect(sent[1].tags).toContainEqual(['value', 'false'])
     })
   })
 

@@ -14,6 +14,7 @@ import { buildChange, buildDeletion, buildIssue, buildProject, issueAddr, projec
 import type { Signer } from '../src/nostr/signer'
 import { KIND } from '../src/nostr/kinds'
 import { createLoadQuery, type QueryFn } from '@estiva-app/interop'
+import { relayAnswer, timesAnswer } from '../src/test/listRead'
 
 let failures = 0
 function check(label: string, condition: boolean, detail = '') {
@@ -64,6 +65,15 @@ const relay = {
     asked.push(filters)
     return held.filter((event) => filters.some((filter) => matches(event, filter)))
   },
+  // The list read of every issue, and the times and id reads of a file in no list (§6.13).
+  async query(filters: Record<string, unknown>[]) {
+    asked.push(filters)
+    return relayAnswer(held, filters, matches)
+  },
+  async queryTimes(filters: Record<string, unknown>[]) {
+    asked.push(filters)
+    return timesAnswer(held, filters)
+  },
 } as unknown as Relay
 
 const store = new Store(relay, { pubkey: ME } as unknown as Signer)
@@ -73,15 +83,11 @@ const statusOf = (state: ReturnType<typeof foldWorkspace>, title: string) =>
 const read = createLoadQuery(relay.queryAll.bind(relay) as QueryFn, { paged: true })
 const full = await store.loadAllEvents(read)
 const changeReads = asked.flat().filter((filter) => (filter.kinds as number[]).includes(KIND.CHANGE))
-check('a load reads changes once, as the whole kind', changeReads.length === 1 && Object.keys(changeReads[0]).join() === 'kinds', JSON.stringify(changeReads))
-check('beside discovery, then both Folders', asked.length === 3 && asked[2].length === 2, JSON.stringify(asked))
+check('a load reads no change by kind or by #a: each file is its list read (ALL-8)', changeReads.length === 0, JSON.stringify(changeReads))
+check('then both Folders, in one read', JSON.stringify(asked.at(-1)?.map((f) => f['#h']).sort()) === JSON.stringify([[A], [B]].sort()), JSON.stringify(asked.at(-1)))
 check("B's issue has its status from that read", statusOf(foldWorkspace(full), 'B one') === 'done', statusOf(foldWorkspace(full), 'B one'))
 asked = []
-const listed = await read([{ kinds: [KIND.CHANGE], '#a': [issueAddr(ME, 'b1')], limit: 1000 }])
-check("a listing's change read in the same load is answered from it", asked.length === 0 && listed.length === 1, JSON.stringify(asked))
-asked = []
 await store.loadAllEvents()
-check('loadAll reads discovery, then both Folders', asked.length === 3, `${asked.length} queries`)
 // When each Folder's conversation was read (APP-5) is the clock's; which Folders, the fold's.
 const threadFolders = ({ threadsAt, ...state }: WorkspaceState) => JSON.stringify({ ...state, threadsAt: Object.keys(threadsAt ?? {}).sort() })
 check('loadAll is the fold of loadAllEvents', threadFolders(await store.loadAll()) === threadFolders(foldWorkspace(full)))
@@ -152,6 +158,8 @@ const liveRelay = {
     asked.push(filters)
     return held.filter((event) => filters.some((filter) => matches(event, filter)))
   },
+  query: relay.query,
+  queryTimes: relay.queryTimes,
   async publish(event: SignedEvent) {
     published.push(event)
     if (event.kind === 5) {
@@ -189,9 +197,10 @@ const third = await live.reloadFolders(second, [A])
 check('a replaced record keeps only its newest version', third.events.filter(a3).length === 1, `${third.events.filter(a3).length} versions`)
 check('and shows it', foldWorkspace(third).issues.some((issue) => issue.title === 'A three, again'))
 
-// A deletion this tab made: the relay never returns the issue again, and a re-read since a time cannot say so.
-await live.deleteIssue({ folder: A, issue: issueAddr(ME, 'a2') })
-check('the deletion reaches the relay', published.some((e) => e.kind === 5 && e.tags.some((t) => t[0] === 'a' && t[1] === issueAddr(ME, 'a2'))))
+// This tab deletes an issue: its `deleted` change (SPEC §6.5), which the re-read since a time brings back.
+const sentBefore = published.length
+await live.setField({ folder: A, target: issueAddr(ME, 'a2'), field: 'deleted', value: 'true', note: 'Delete' })
+held.push(...published.slice(sentBefore))
 const fourth = foldWorkspace(await live.reloadFolders(third, [A]))
 check('an issue this tab deleted is gone after the re-read', !fourth.issues.some((issue) => issue.title === 'A two'))
 check('and the others stay', fourth.issues.some((issue) => issue.title === 'A one') && fourth.issues.some((issue) => issue.title === 'A three, again'))

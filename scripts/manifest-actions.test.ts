@@ -58,6 +58,10 @@ const relay = {
     sent.push(event)
     return { ok: true } as PublishResult
   },
+  // The open read setField makes for the change its write follows (§6.13): the issue as filed, never changed.
+  async query(filters: { kinds?: number[]; '#d'?: string[] }[]): Promise<SignedEvent[]> {
+    return filters.some((f) => f.kinds?.includes(KIND.ISSUE) && f['#d']?.includes('i1')) ? [issueRoot] : []
+  },
 } as unknown as Relay
 const signer = { pubkey: ME, sign: async (unsigned: UnsignedEvent) => ({ ...unsigned, id: 'x', sig: 'y' }) } as unknown as Signer
 const store = new Store(relay, signer)
@@ -132,6 +136,8 @@ check('the project’s issue list declares the field a move sets', listSlot?.mov
 console.log('\n# add-project is createProject: the record, then its listing\n')
 
 const FOLDER_RECORD = `39000:${RELAY}:${FOLDER}`
+/** A new project's id as every app mints one, a v4 uuid: a Folder lists it by that id (`o`, SPEC §3.3). */
+const NEW_ID = '22222222-2222-4222-8222-222222222222'
 const created = build({
   kind: 39000,
   address: FOLDER_RECORD,
@@ -139,7 +145,7 @@ const created = build({
   folder: FOLDER,
   actionId: 'add-project',
   value: { name: 'Launch', description: 'What launch means' },
-  newId: 'p9',
+  newId: NEW_ID,
   folderHasState: true,
 })
 check('into a Folder with state: the record, then one kind:1852', Array.isArray(created) && created.map((e) => e.kind).join() === `${KIND.PROJECT},1852`, typeof created === 'string' ? created : '')
@@ -162,7 +168,7 @@ if (Array.isArray(created)) {
   check('its name is on `name`, the tag Ship writes', tag(record, 'name') === 'Launch' && tag(ownRecord, 'name') === 'Launch')
   const ownId = tag(ownRecord, 'd')!
   const listingShape = (event: { tags: string[][] }, id: string) => event.tags.map((t) => t.join('=')).join(' ').replace(id, '<d>')
-  check('the listing is the one createProject publishes', listingShape(listing, 'p9') === listingShape(ownListing, ownId), `${listingShape(listing, 'p9')} vs ${listingShape(ownListing, ownId)}`)
+  check('the listing is the one createProject publishes', listingShape(listing, NEW_ID) === listingShape(ownListing, ownId), `${listingShape(listing, NEW_ID)} vs ${listingShape(ownListing, ownId)}`)
   const project = readState([sign(record, 6)]).projects[0]
   check('Ship folds the new project’s name, Folder and description', project.title === 'Launch' && project.contentFolder === FOLDER && project.description === 'What launch means', `${project.title} ${project.contentFolder} ${project.description}`)
 }

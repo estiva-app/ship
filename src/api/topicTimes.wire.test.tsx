@@ -9,6 +9,7 @@
  *
  * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-relay-may-answer-when-a-file-changed-without-the-change.md
  */
+import { relayAnswer } from '@/test/listRead'
 import { renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { FileTimes, SignedEvent, UnsignedEvent } from '@estiva-app/protocol'
@@ -22,8 +23,6 @@ const PROJECT = `30850:${OWNER}:p`
 let held: SignedEvent[] = []
 /** Every filter the tab sent to `/query`. */
 let asked: Record<string, unknown>[] = []
-/** The relay's NIP-11 offers the times read. */
-let offersTimes = false
 let count = 0
 
 const tagOf = (event: SignedEvent, name: string) => event.tags.find((t) => t[0] === name)?.[1]
@@ -54,14 +53,14 @@ function times(filters: Record<string, unknown>[]): FileTimes[] {
 function answer(filters: Record<string, unknown>[]): unknown {
   asked.push(...filters)
   if (filters.some((f) => f.fields === 'times')) return { times: times(filters) }
-  const found = held.filter((event) => filters.some((f) => matches(f, event))).sort((x, y) => y.created_at - x.created_at)
-  return found
+  // The list read (`fields: 'newest'`) answered as the relay does: each file with its fields' current changes.
+  return relayAnswer(held, filters, (event, f) => matches(f, event)).sort((x, y) => y.created_at - x.created_at)
 }
 
 /** The relay as Ship's `Relay` reaches it: NIP-11 by GET, `/query` by POST. */
 const fakeFetch = async (url: string, init?: { method?: string; body?: string }) => {
   const json = (body: unknown) => ({ status: 200, headers: { get: () => null }, text: async () => JSON.stringify(body) })
-  if (!init?.method || init.method === 'GET') return json({ file_list: { newest: true, text: true, ...(offersTimes ? { times: true } : {}) } })
+  if (!init?.method || init.method === 'GET') return json({ file_list: { newest: true, text: true, times: true } })
   if (url.endsWith('/query')) return json(answer(JSON.parse(init.body ?? 'null')))
   throw new Error(`unexpected ${url}`)
 }
@@ -104,14 +103,12 @@ const changesAsked = () => asked.filter((f) => (f.kinds as number[] | undefined)
 
 beforeEach(() => {
   asked = []
-  offersTimes = false
   workspace()
   vi.stubGlobal('fetch', fakeFetch)
 })
 
 describe("Ship's sidebar: your topics' activity by the relay's times read", () => {
-  it('where the relay offers the times read, learns when a listed project changed from the times read, never reading its changes', async () => {
-    offersTimes = true
+  it('learns when a listed project changed from the times read, never reading its changes', async () => {
     const { foreign } = await freshTab()
     const read = await foreign.readSidebarTopics(async () => undefined)
 
@@ -119,15 +116,6 @@ describe("Ship's sidebar: your topics' activity by the relay's times read", () =
     expect(read.at.get(TOPIC)).toBe(MOVED_AT)
     expect(timesAsked()).toContainEqual({ fields: 'times', kinds: [30850], '#d': ['p'] })
     expect(changesAsked()).toEqual([])
-  })
-
-  it('where the relay does not, reads the listed project’s changes as before, and finds the same time', async () => {
-    const { foreign } = await freshTab()
-    const read = await foreign.readSidebarTopics(async () => undefined)
-
-    expect(read.at.get(TOPIC)).toBe(MOVED_AT)
-    expect(timesAsked()).toEqual([])
-    expect(changesAsked().length).toBeGreaterThan(0)
   })
 })
 
@@ -141,16 +129,9 @@ describe("Explore topics' Last active by the relay's times read", () => {
     return result.current.values!.get(TOPIC)
   }
 
-  it('where the relay offers the times read, learns when a listed project changed from the times read, never reading its changes', async () => {
-    offersTimes = true
+  it('learns when a listed project changed from the times read, never reading its changes', async () => {
     expect(await lastActive()).toBe(MOVED_AT)
     expect(timesAsked()).toContainEqual({ fields: 'times', kinds: [30850], '#d': ['p'] })
     expect(changesAsked()).toEqual([])
-  })
-
-  it('where the relay does not, reads the listed project’s changes as before, and finds the same time', async () => {
-    expect(await lastActive()).toBe(MOVED_AT)
-    expect(timesAsked()).toEqual([])
-    expect(changesAsked().length).toBeGreaterThan(0)
   })
 })

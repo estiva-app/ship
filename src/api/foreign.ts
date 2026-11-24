@@ -29,13 +29,10 @@ import {
   resolveForeignEvent,
   resolveForeignObject,
   resolveForeignRoots,
-  resolveForeignObjects,
   fileCandidates,
   folderOf,
   isArchived,
-  isSwitchRefusal,
   openFile,
-  prevsAfterSwitch,
   writeChange,
   searchFileReferences,
   readTopics,
@@ -56,7 +53,8 @@ import { KIND_CHANGE, placeFilters, placeListing, teamMembersOf, type Listed, ty
 import { relatedTo } from '@/lib/ownKinds'
 import { safeLink } from '@/lib/handoff'
 import { KIND } from '../nostr/kinds'
-import { inOrderOption, inOrderTypes, projectFieldsNow, relay, signer, timesOption, topicFieldsNow } from './store'
+import { DOCUMENT_TYPE, ISSUE_TYPE, PROJECT_TYPE, TOPIC_TYPE } from '@estiva-app/protocol'
+import { relay, searchedTypes, signer, times } from './store'
 import { profileKeys } from './profileKeys'
 
 export type { ForeignObject, ResolvedSlot, FolderContents, FolderSummary } from '@estiva-app/interop'
@@ -291,14 +289,11 @@ function pubkeysOf(object: ForeignObject): string[] {
  */
 async function readCards(references: readonly string[]): Promise<Map<string, Promise<ForeignObject | null>>> {
   const answers = new Map<string, Promise<ForeignObject | null>>()
-  const read = await listRead().catch(() => ({}) as { listRead?: true })
-  const addressed = read.listRead
-    ? references.flatMap((reference) => {
-        const address = addressOfReference(reference)
-        return address ? [[reference, address] as const] : []
-      })
-    : []
-  // Without the list read, or for a reference that names no address, each its full read, as before.
+  const addressed = references.flatMap((reference) => {
+    const address = addressOfReference(reference)
+    return address ? [[reference, address] as const] : []
+  })
+  // A reference that names no address, each its full read.
   for (const reference of references) if (!addressed.some(([r]) => r === reference)) answers.set(reference, readFull(reference))
   if (!addressed.length) return answers
   const listed = readListed(addressed.map(([, address]) => address))
@@ -314,7 +309,7 @@ async function readCards(references: readonly string[]): Promise<Map<string, Pro
 
 /** Files by the list read, with the people they name; a failed people read leaves names to the next tick. */
 async function readListed(addresses: readonly string[]): Promise<Map<string | undefined, ForeignObject>> {
-  const objects = await resolveForeignRoots(addresses, query, manifests, { listRead: true, children: true })
+  const objects = await resolveForeignRoots(addresses, query, manifests, { children: true })
   const keys = [...new Set(objects.flatMap((object) => [object, ...(object.children ?? [])].flatMap(pubkeysOf)))]
   const people = keys.length ? await profiles.viaRelay(query)(keys).catch(() => ({})) : {}
   return new Map(
@@ -425,22 +420,13 @@ export async function applyCardAction(args: { reference: string; actionId: strin
     return isFieldChange(built, { address, folder, field, prev }) ? built[0] : 'This can’t be changed from here.'
   }
   /*
-    Where the file's type is kept in order (SPEC §6.2) the change names the one it follows: the field's current change
-    as the relay answers it now, or the file's first record for its first. An issue's and a project's card on every team
-    since their switch, a topic's and a page's where theirs is on (ALL-6). A tab that did not know is told by the relay's
-    refusal, and the change is written again in order, once.
-    why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/every-file-type-is-kept-in-order-and-a-delete-only-marks-the-file.md
+    Every file type is kept in order (SPEC §6.2): the change names the one it follows, the field's current change as
+    the relay answers it now, or the file's first record for its first.
+    why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/the-old-way-goes-once-miky-has-looked.md
   */
-  const type = baseTypeOf(address)
-  if (!type || !(await inOrderTypes()).includes(type)) {
-    const plain = build(Date.now())
-    if (typeof plain === 'string') return { ok: false, reason: plain }
-    const result = await relay.publish(await signer.sign(plain))
-    if (result.ok) return { ok: true }
-    if (!type || !isSwitchRefusal(result.reason)) return { ok: false, reason: result.reason ?? 'The relay refused the change.' }
-  }
   const at = { kind: pointer.kind, pubkey: pointer.pubkey, d: pointer.identifier }
-  const prev = (await prevsAfterSwitch(query, at, [field]).catch(() => undefined))?.[field]
+  const opened = await openFile(query, at, { text: false }).catch(() => undefined)
+  const prev = opened ? (opened.fields[field]?.id ?? opened.root.id) : undefined
   if (!prev) return { ok: false, reason: `That ${FILE_NOUN[pointer.kind] ?? 'file'} could not be read just now, so nothing was changed. Reload and try again.` }
   const written = await writeChange({
     field,
@@ -477,16 +463,7 @@ export async function applyCardAction(args: { reference: string; actionId: strin
  * has heard of still arrives through the widget chain like everything else.
  */
 export async function readFolder(id: string, read: QueryFn = loadQuery()): Promise<FolderContents> {
-  return resolveFolderContents(id, read, profiles.viaRelay(query), manifests, await listRead())
-}
-
-/**
- * Where projects are read by their fields (ALO-5), a Folder's files are too:
- * each as its first record and its fields' current changes, not every change
- * ever made to it (§6.13). No row here draws a text, and a deleted file is left out.
- */
-async function listRead(): Promise<{ listRead?: true }> {
-  return (await projectFieldsNow()) ? { listRead: true } : {}
+  return resolveFolderContents(id, read, profiles.viaRelay(query), manifests)
 }
 
 /**
@@ -496,21 +473,25 @@ async function listRead(): Promise<{ listRead?: true }> {
  * under an archived project, moves with it (SHI-37).
  */
 export async function readFolderListing(id: string, read: QueryFn = loadQuery()): Promise<FolderContents['files']> {
-  return (await resolveFolderContents(id, read, async () => ({}), manifests, { includeArchived: true, ...(await listRead()) })).files
+  return (await resolveFolderContents(id, read, async () => ({}), manifests, { includeArchived: true })).files
 }
 
 /**
  * `[`'s search tier (PEE-21): the files whose current title or ref holds
  * `text`, as this identity can read them. Rejects on a refused read, which
- * `referenceSearch` answers as no hits for a while. Where the relay finds
- * projects by their words (ALO-5), they are found by their current summary,
- * key and text too, through the list read (§6.13).
+ * `referenceSearch` answers as no hits for a while. Every file is read by the
+ * list read; the types the relay finds by their words (`file_search.types`,
+ * ALO-6) are found by their current summary, key and text too (§6.13).
+ * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/search-finds-a-file-by-the-words-of-its-current-fields.md
  */
 export async function searchFiles(text: string): Promise<ReferenceCandidate[]> {
-  const fields = await projectFieldsNow()
-  const byFields = fields?.search ? { kinds: [KIND.PROJECT], query: (filters: Record<string, unknown>[]) => relay.queryWithMatches(filters as never) } : undefined
-  return searchFileReferences(text, query, { cache: manifests, ...(fields ? { listRead: true } : {}), ...(byFields ? { byFields } : {}), ...(await inOrderOption()) })
+  const kinds = (await searchedTypes()).flatMap((type) => (type in KIND_OF_TYPE ? [KIND_OF_TYPE[type]!] : []))
+  const byFields = kinds.length ? { kinds, query: (filters: Record<string, unknown>[]) => relay.queryWithMatches(filters as never) } : undefined
+  return searchFileReferences(text, query, { cache: manifests, ...(byFields ? { byFields } : {}) })
 }
+
+/** The kind each type the relay may search is written as (TYPES.md). */
+const KIND_OF_TYPE: Readonly<Record<string, number>> = { [PROJECT_TYPE]: KIND.PROJECT, [ISSUE_TYPE]: KIND.ISSUE, [TOPIC_TYPE]: 30840, [DOCUMENT_TYPE]: 30842 }
 
 /** A topic as the Topics line draws it and a list entry names it (TOP-5). */
 export interface TopicOfFile {
@@ -538,10 +519,10 @@ export function topicAsDrawn(address: string, folder: string, object: ForeignObj
  * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-topic-keeps-its-own-list-of-files.md
  */
 export async function readFileTopics(file: string): Promise<TopicOfFile[]> {
-  const [listing, read] = await Promise.all([topicsOfFile(query, file), listRead()])
+  const listing = await topicsOfFile(query, file)
   if (listing.length === 0) return []
   const roots = new Map(listing.map((topic) => [topic.address, topic.root]))
-  const objects = await resolveForeignRoots([...roots.keys()], query, manifests, { archivedWith: true, ...read })
+  const objects = await resolveForeignRoots([...roots.keys()], query, manifests, { archivedWith: true })
   return objects
     .flatMap((object) => {
       const root = object.address ? roots.get(object.address) : undefined
@@ -554,20 +535,12 @@ export async function readFileTopics(file: string): Promise<TopicOfFile[]> {
 /**
  * Every topic the reader can read, with its list, its archive and whether it
  * is theirs (SHIPS-2): interop's one read, which Add to topic and the Topics
- * page draw from. Paged, as a read of every topic must be. Each list by the
- * list read where the relay offers it: every move or look someone sets is a
- * change on the topic, and reading them all would grow with each (TOPI-5).
+ * page draw from. Paged, as a read of every topic must be. The topics, their
+ * lists and the parents walked for an archive are read by the list read: each
+ * field's current change, never every move or look someone set (TOPI-5, ALL-6).
  */
 export async function readAllTopics(): Promise<TopicsRead> {
-  const [lists, topics] = await Promise.all([listRead(), topicFieldsNow()])
-  // The parents walked to see whether a topic is archived with one are read by the same list read (ALO-17), and the
-  // topics themselves too where topics are kept in order (ALL-6): each field's current change, not every change.
-  return readTopics((filters) => relay.queryAll(filters as never), signer.pubkey, {
-    cache: manifests,
-    ...lists,
-    ...(lists.listRead ? { parentsListRead: true } : {}),
-    ...(lists.listRead && topics ? { topicsListRead: true } : {}),
-  })
+  return readTopics((filters) => relay.queryAll(filters as never), signer.pubkey, { cache: manifests })
 }
 
 /**
@@ -579,24 +552,20 @@ export async function readAllTopics(): Promise<TopicsRead> {
  * to one goes to Peek on every page; the sidebar leaves them out itself.
  */
 export async function readSidebarTopics(decrypt: (ciphertext: string) => Promise<string | undefined>): Promise<YourTopicsRead> {
-  return readYourTopics(query, signer.pubkey, { cache: manifests, decrypt, spaces: true, ...(await listRead()), ...(await timesOption()) })
+  return readYourTopics(query, signer.pubkey, { cache: manifests, decrypt, spaces: true, times })
 }
 
 /**
  * The Leaf documents a topic lists: what each is called now, where it opens,
  * who changed it last and when, and the pages directly under it (SHIPS-4,
- * TOPI-8). Where the relay has the list read, one read for all of them and
- * their pages, by their fields' current changes and never their text; without
- * it, each document's full read, as before. People are named by Ship's own
+ * TOPI-8). One read for all of them and their pages, by their fields'
+ * current changes and never their text. People are named by Ship's own
  * directory, so none are looked up here. One the reader cannot read is not
  * returned.
  */
 export async function readTopicDocuments(addresses: readonly string[]): Promise<ForeignObject[]> {
   if (addresses.length === 0) return []
-  const read = await listRead()
-  if (read.listRead) return resolveForeignRoots(addresses, query, manifests, { archivedWith: true, listRead: true, children: true })
-  const objects = await resolveForeignObjects(addresses, query, async () => ({}), manifests, { archivedWith: true })
-  return Object.values(objects).filter((object): object is ForeignObject => !!object && !object.unreachable)
+  return resolveForeignRoots(addresses, query, manifests, { archivedWith: true, children: true })
 }
 
 const KIND_ROSTER = 39002
@@ -653,6 +622,7 @@ function answersFilter(event: SignedEvent, filter: Record<string, unknown>): boo
 export async function readTopicMembers(topics: readonly ReadTopic[]): Promise<Map<string, string[] | undefined>> {
   if (topics.length === 0) return new Map()
   const people = await profileKeys()
+  if (!people) throw new Error('The people could not be read just now.')
   const asked = topics.map((topic) => {
     const place = { address: topic.address, team: topic.folder }
     try {
@@ -722,7 +692,9 @@ export async function readTeamsYouAreIn(teams: readonly string[], viewer: string
  */
 export async function readTopicPlace(topic: { address: string; folder: string }): Promise<{ listed: Listed[]; events: SignedEvent[] }> {
   const place = { address: topic.address, team: topic.folder }
-  const filters = (placeFilters(place, signer.pubkey, await profileKeys()) as Record<string, unknown>[]).filter((filter) => !(filter.kinds as number[]).includes(KIND_APP_DATA))
+  const people = await profileKeys()
+  if (!people) throw new Error('The people could not be read just now.')
+  const filters = (placeFilters(place, signer.pubkey, people) as Record<string, unknown>[]).filter((filter) => !(filter.kinds as number[]).includes(KIND_APP_DATA))
   const events: SignedEvent[] = await relay.queryAll(filters as never)
   const roster = events.filter((event) => event.kind === KIND_ROSTER || ROSTER_COMMANDS.includes(event.kind))
   const listing = events.filter((event) => event.kind === KIND_FOLDER_STATE || event.kind === KIND_FOLDER_COMMAND)
@@ -740,11 +712,10 @@ export async function fileCandidatesOf(
   files: readonly ForeignObject[] | { addresses: readonly string[]; at: ReadonlyMap<string, number> },
   tier: number,
 ): Promise<ReferenceCandidate[]> {
-  // A project the relay keeps in order is picked as its id link (ALO-8, SPEC §13.1): interop's `pickedFileUri`.
-  const [read, inOrder] = await Promise.all([listRead(), inOrderOption()])
-  if (!('addresses' in files)) return fileCandidates(files, tier, query, { cache: manifests, ...read, ...inOrder })
-  const objects = await resolveForeignRoots(files.addresses, query, manifests, read)
-  return fileCandidates(objects, tier, query, { cache: manifests, at: files.at, ...read, ...inOrder })
+  // A file is picked as its id link (ALO-8, SPEC §13.1): interop's `pickedFileUri`.
+  if (!('addresses' in files)) return fileCandidates(files, tier, query, { cache: manifests })
+  const objects = await resolveForeignRoots(files.addresses, query, manifests)
+  return fileCandidates(objects, tier, query, { cache: manifests, at: files.at })
 }
 
 /** The foreign files placed under one of Ship's objects, with their conversation counts. */
@@ -805,7 +776,7 @@ export async function readRelated(folder: string, address: string): Promise<Rela
 
 /** Every Folder this identity can see, for the sidebar. */
 export async function readFolders(read: QueryFn = loadQuery()): Promise<FolderSummary[]> {
-  return listFolders(read, await listRead())
+  return listFolders(read)
 }
 
 /**

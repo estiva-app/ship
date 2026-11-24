@@ -12,17 +12,18 @@ type SetFieldArgs = { folder: string; target: string; field: string; value: stri
 const { setField } = vi.hoisted(() => ({
   setField: vi.fn(async (_args: { folder: string; target: string; field: string; value: string; note?: string }) => ({ ok: true })),
 }))
-vi.mock('./store', () => ({ store: { setField }, signer: { pubkey: 'a'.repeat(64) }, projectFieldsNow: async () => undefined, issueFieldsNow: async () => undefined }))
+// Every field is written after the change it follows (`writeField`, SPEC §6.2); the deleted issues are read once, none here.
+vi.mock('./store', () => ({ store: { writeField: setField, deletedIssueEvents: async () => [] }, signer: { pubkey: 'a'.repeat(64) } }))
 vi.mock('./clock', () => ({ clockProblem: async () => undefined }))
 
 import type { Issue, Project } from '../nostr/files'
 import { assignMissingRefs, settleClaims } from './writes'
 
 const project = (d: string, title: string, key?: string, createdAt = 1) =>
-  ({ addr: `30850:a:${d}`, title, key, contentFolder: 'f', createdAt, fields: {} } as unknown as Project)
+  ({ addr: `30850:a:${d}`, title, key, contentFolder: 'f', createdAt, fields: {}, rootId: `r-${d}` } as unknown as Project)
 const payments = project('p1', 'Payment integration', 'PAY')
 const issue = (d: string, ref?: string, createdAt = 1, projectAddr = payments.addr) =>
-  ({ addr: `30851:a:${d}`, folder: 'f', ref, createdAt, projectAddr, fields: {} } as unknown as Issue)
+  ({ addr: `30851:a:${d}`, folder: 'f', ref, createdAt, projectAddr, fields: {}, rootId: `r-${d}` } as unknown as Issue)
 const visible = (issues: Issue[], projects: Project[] = [payments]) => ({ projects, issues })
 
 const valuesWritten = (field = 'ref') =>
@@ -53,7 +54,7 @@ describe('assignMissingRefs — Ship numbers what Ship can number', () => {
     expect(targets).toEqual(['30851:a:early', '30851:a:late'])
   })
 
-  it('skips a number a deleted issue holds, before issues are kept in order too', async () => {
+  it('skips a number a deleted issue holds', async () => {
     // A `deleted` change hides an issue from every list; its number stays its own (SPEC §6.1).
     setField.mockClear()
     await assignMissingRefs(payments, { ...visible([issue('a', 'PAY-1'), issue('new', undefined, 3)]), deletedIssues: [issue('gone', 'PAY-2', 2)] })

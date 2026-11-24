@@ -15,8 +15,6 @@ const PK = 'b38fd2687b17bbde2e8079577cba601936acfe1b731d2d2ba7cdef29a063db46'
 const wire = vi.hoisted(() => ({
   store: undefined as unknown as Record<'postMessage' | 'editMessage', (args: unknown) => unknown>,
   sent: [] as { kind: number; tags: string[][]; content: string }[],
-  /** The types the relay says it keeps in order (NIP-11 `files.requires_prev`): none until a test switches it. */
-  inOrder: [] as string[],
 }))
 // The writes hand their calls to a real `Store` (below), whose relay keeps what it was sent.
 vi.mock('./store', () => ({
@@ -24,7 +22,6 @@ vi.mock('./store', () => ({
     postMessage: (args: unknown) => wire.store.postMessage(args),
     editMessage: (args: unknown) => wire.store.editMessage(args),
   },
-  inOrderOption: async () => (wire.inOrder.length ? { inOrder: wire.inOrder } : {}),
   relay: {
     // Every `d` asked about is one issue by one author, as the relay would answer it.
     // A `d` asked about as a project (ALO-8's id link) is one project by the same author.
@@ -54,10 +51,9 @@ const values = (event: { tags: string[][] }, name: string) => event.tags.filter(
 beforeEach(() => {
   vi.useFakeTimers()
   wire.sent = []
-  wire.inOrder = []
   const relay = { publish: async (event: SignedEvent) => (wire.sent.push(event), { ok: true }) } as unknown as Relay
   const signer = { pubkey: PK, sign: async (unsigned: UnsignedEvent) => ({ ...unsigned, id: 'e'.repeat(64), sig: '0'.repeat(128) }) } as unknown as Signer
-  wire.store = new Store(relay, signer, undefined, undefined, async () => wire.inOrder) as unknown as typeof wire.store
+  wire.store = new Store(relay, signer) as unknown as typeof wire.store
 })
 
 afterEach(() => {
@@ -83,13 +79,12 @@ describe('a comment sent from Ship tags what its words link', () => {
   })
 })
 
-// ALO-8: from the switch a project is named by its id as well, in every app (decided 2026-11-06). Ship wrote none.
-describe('once the relay keeps projects in order, a comment from Ship names a project by its id too', () => {
+// ALO-8: a file is named by its id as well, in every app (decided 2026-11-06; every type since ALL-8). Ship wrote none.
+describe('a comment from Ship names a file by its id too', () => {
   const PROJECT = `30850:${PK}:${d(8)}`
   const projectLink = `nostr:${encodeNaddr({ kind: 30850, pubkey: PK, identifier: d(7), relays: [] })}`
 
   it('a comment on a project carries O and o with its id beside A and a', async () => {
-    wire.inOrder = ['osnova.project']
     expect(await startConversation({ folder: FOLDER, about: PROJECT, body: 'Looks right.' })).toEqual({ ok: true })
     const comment = wire.sent.at(-1)!
     expect(values(comment, 'A')).toEqual([PROJECT])
@@ -97,35 +92,28 @@ describe('once the relay keeps projects in order, a comment from Ship names a pr
     expect(values(comment, 'o')).toEqual([d(8)])
   })
 
-  it('a project its words link gets an o beside its a, and an issue, not kept in order, gets none', async () => {
-    wire.inOrder = ['osnova.project']
+  it('a project and an issue its words link each get an o beside their a', async () => {
     await startConversation({ folder: FOLDER, about: ISSUE, body: `see ${projectLink} and ${issueAt(3)}` })
     const comment = wire.sent.at(-1)!
     expect(values(comment, 'a')).toEqual([ISSUE, `30850:${PK}:${d(7)}`, `30851:${PK}:${d(3)}`])
-    expect(values(comment, 'o')).toEqual([d(7)])
+    expect(values(comment, 'o')).toEqual(expect.arrayContaining([d(7), d(3)]))
   })
 
   it('a project picked from [ (its Ship link by id, no title) earns its a and o', async () => {
-    wire.inOrder = ['osnova.project']
     await startConversation({ folder: FOLDER, about: ISSUE, body: `see https://ship.estiva.app/project/${d(6)}` })
     const comment = wire.sent.at(-1)!
     expect(values(comment, 'a')).toEqual([ISSUE, `30850:${PK}:${d(6)}`])
-    expect(values(comment, 'o')).toEqual([d(6)])
+    // The issue it is on is named by its id too.
+    expect(values(comment, 'o')).toEqual([d(9), d(6)])
   })
 
   it('an edit keeps the o of a project its new words link', async () => {
-    wire.inOrder = ['osnova.project']
     await editMessage(FOLDER, 'c'.repeat(64), `now ${projectLink}`, { before: 'no links yet', here: ISSUE, own: { file: ISSUE }, files: [] })
     const edit = wire.sent.at(-1)!
     expect(edit.kind).toBe(40003)
     expect(values(edit, 'o')).toEqual([d(7)])
   })
 
-  it('before the switch the same comment names the project by its address alone', async () => {
-    await startConversation({ folder: FOLDER, about: PROJECT, body: `see ${projectLink}` })
-    const comment = wire.sent.at(-1)!
-    expect(comment.tags.filter((t) => t[0] === 'O' || t[0] === 'o')).toEqual([])
-  })
 })
 
 describe('an edit says what the message links now', () => {

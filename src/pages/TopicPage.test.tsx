@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { FolderState } from '@/api'
+import { relayAnswer, timesAnswer } from '@/test/listRead'
 /** What each of Ship's statuses means, as the fold puts it beside the status (EAC-3). */
 const STAGE: Record<string, string> = { planned: 'open', todo: 'open', in_progress: 'started', completed: 'done', done: 'done', cancelled: 'dropped' }
 const issueStage = (status: string) => STAGE[status]
@@ -21,13 +22,13 @@ const answer = async (filters: Record<string, unknown>[]) => {
   asked.push(...filters)
   if (down) throw new Error('relay unreachable')
   if (refuseDocuments && filters.some((f) => (f.kinds as number[] | undefined)?.includes(30842))) throw new Error('rate limited')
-  return held.filter((e) => filters.some((f) => matches(f, e)))
+  // The list read (`fields: 'newest'`) answered as the relay does: each file with its fields' current changes.
+  return relayAnswer(held, filters, (e, f) => matches(f, e))
 }
 vi.mock('@/api/store', () => ({
   relay: { query: (filters: Record<string, unknown>[]) => answer(filters), queryAll: (filters: Record<string, unknown>[]) => answer(filters) },
   signer: { pubkey: 'c'.repeat(64) },
-  projectFieldsNow: async () => undefined,
-  topicFieldsNow: async () => undefined,
+  times: async (filters: Record<string, unknown>[]) => timesAnswer(held as never, filters),
 }))
 vi.mock('@/api/nip44', () => ({ nip44: { decrypt: async () => undefined } }))
 

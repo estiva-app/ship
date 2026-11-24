@@ -29,7 +29,8 @@ const { published } = vi.hoisted(() => {
       published.push(event)
       return new Response(JSON.stringify({ accepted: true, event_id: event.id }), { status: 200 })
     }
-    if (init?.method === 'POST' && path.endsWith('/query')) return new Response('[]', { status: 200 })
+    // The times read (SPEC §6.13) answers `{ times }`; every other read nothing.
+    if (init?.method === 'POST' && path.endsWith('/query')) return new Response(String(init.body).includes('"times"') ? '{"times":[]}' : '[]', { status: 200 })
     return new Response('{}', { status: 404 })
   }) as typeof fetch
   return { published }

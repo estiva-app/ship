@@ -9,6 +9,7 @@
  * with the changes in it, and reads no other Folder — so an issue's status and
  * its project's name are there, and the rest of the workspace is not.
  */
+import { relayAnswer, timesAnswer } from '../src/test/listRead'
 import { publicKeyFromSecret, signEvent, type Relay, type SignedEvent, type UnsignedEvent } from '@estiva-app/protocol'
 import { Store, foldWorkspace } from '../src/nostr/store'
 import { buildChange, buildIssue, buildProject, issueAddr, projectAddr } from '../src/nostr/events'
@@ -69,7 +70,10 @@ const relay = {
   async query(filters: Record<string, unknown>[]) {
     asked.push(filters)
     single.push(filters)
-    return answer(filters)
+    return relayAnswer(held, filters)
+  },
+  async queryTimes(filters: Record<string, unknown>[]) {
+    return timesAnswer(held, filters)
   },
 } as unknown as Relay
 
@@ -82,8 +86,8 @@ check('an opened project is there, found by its d', projectState.projects.map((p
 check('with the issues in its own Folder, and their status', projectState.issues.find((issue) => issue.title === 'A one')?.status === 'done', JSON.stringify(projectState.issues))
 check("and nothing from another Folder: its issue filed elsewhere comes with the whole read", projectState.issues.length === 1, JSON.stringify(projectState.issues.map((i) => i.title)))
 check('it asked only its own Folder', foldersAsked().join() === A, JSON.stringify(asked))
-check('in two round trips', asked.length === 2, `${asked.length}`)
-check('its record by d in one request, not paged', single.length === 1 && single[0][0]['#d']?.toString() === 'pa' && typeof single[0][0].limit === 'number', JSON.stringify(single))
+check('reads no change by kind or by #a: the project by its fields with its text, its issues by theirs (ALL-8)', asked.flat().every((f) => !(f.kinds as number[] | undefined)?.includes(1851)), JSON.stringify(asked))
+check('its record by d in one request, not paged', single[0]?.[0]?.['#d']?.toString() === 'pa' && typeof single[0][0].limit === 'number', JSON.stringify(single))
 check('and is kept as read nowhere, so no re-read starts from it', Object.keys(project.readAt).length === 0)
 
 asked = []

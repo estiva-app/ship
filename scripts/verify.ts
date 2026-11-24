@@ -382,9 +382,8 @@ async function main() {
   )
 
   // ── 8. Archive and delete ─────────────────────────────────────────────────
-  // Two operations with different reach, and the difference is the point.
-  // Archiving is a change event, so anyone in the Folder can do it and it can
-  // be undone. Deleting is NIP-09, author-scoped, and irreversible.
+  // Both are changes anyone in the Folder can make and undo: archive hides a
+  // project from the lists, delete takes it out of every list and search.
   await must('Ravi archives Ana\'s project', () =>
     ravi.store.archiveProject({
       recordFolder: folder,
@@ -410,26 +409,16 @@ async function main() {
     )?.archived === false,
   )
 
-  // NIP-09 is scoped to the pubkey that signed the original. Ravi asking for
-  // Ana's project to go away must not work, or "delete" would be an attack.
-  await ravi.store.deleteProject({ recordFolder: folder, project: project.addr, folders: [{ folder, hasState: false }] })
-  const afterRavi = await ravi.store.rawFolders([folder])
-  check(
-    'a non-author CANNOT delete somebody else\'s project',
-    afterRavi.some((e) => e.kind === KIND.PROJECT),
-  )
-
-  await must('Ana deletes her own project', async () =>
-    (await ana.store.deleteProject({ recordFolder: folder, project: project.addr, folders: [{ folder, hasState: false }] })).result,
-  )
+  // A delete is the `deleted` field (SPEC §6.5): a change anyone in the Folder may make, and Restore undoes, so it is
+  // no attack. The record, its changes and its issues all stay; the project leaves every list.
+  await must('Ravi deletes Ana\'s project', () => ravi.store.setField({ folder, target: project.addr, field: 'deleted', value: 'true', note: 'Delete' }))
+  const deletedProject = readState(await ravi.store.rawFolders([folder])).projects.find((p) => p.addr === project.addr)
+  check('a non-author can delete, and it is attributed to him', deletedProject?.deleted?.by === ravi.identity.pubkey)
+  await must('Ana restores it', () => ana.store.setField({ folder, target: project.addr, field: 'deleted', value: '', note: 'Restore' }))
   const afterAna = await ana.store.rawFolders([folder])
+  check('deleting is reversible', readState(afterAna).projects.find((p) => p.addr === project.addr)?.deleted === undefined)
   check(
-    'the author\'s deletion is honoured',
-    !afterAna.some((e) => e.kind === KIND.PROJECT),
-    `${afterAna.filter((e) => e.kind === KIND.PROJECT).length} project event(s) left`,
-  )
-  check(
-    '  …but the issues are separate events and survive',
+    '  …and the issues were never touched',
     afterAna.filter((e) => e.kind === KIND.ISSUE).length === 2,
     `${afterAna.filter((e) => e.kind === KIND.ISSUE).length} issue(s) still in the Folder`,
   )
