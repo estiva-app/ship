@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { Issue } from '../nostr/files'
-import { issueFieldsNow } from './store'
 import { readDeletedIssues, readIssueByLink } from './writes'
 
 /**
@@ -17,9 +16,7 @@ export function useIssueByLink(d: string, missing: boolean): { issue: Issue | un
     let live = true
     void (async () => {
       // A read that does not answer leaves the page saying it cannot find the issue, as before.
-      const issue = await issueFieldsNow()
-        .then((switched) => (switched ? readIssueByLink(d) : undefined))
-        .catch(() => undefined)
+      const issue = await readIssueByLink(d).catch(() => undefined)
       if (live) setFound({ d, round, issue })
     })()
     return () => {
@@ -50,7 +47,7 @@ export function useDeletedIssues(active: boolean, fresh = false): { deleted: Iss
     let live = true
     void (async () => {
       try {
-        const issues = (await issueFieldsNow()) ? await readDeletedIssues(fresh || round > 0) : []
+        const issues = await readDeletedIssues(fresh || round > 0)
         if (live) {
           setDeleted(issues)
           setFailed(false)

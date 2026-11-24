@@ -71,9 +71,8 @@ const relay = {
 }
 const signer = { pubkey: PK, sign: async () => { throw new Error('nothing is signed here') } }
 
-/** A Store as the app builds one: projects by their fields, issues by theirs when `issues` is on. */
-const storeWith = (issues: boolean) =>
-  new Store(relay as never, signer as never, async () => 0, async () => ({ text: true }), async () => [], async () => (issues ? { text: true } : undefined))
+/** A Store as the app builds one: every file by its fields. */
+const storeWith = () => new Store(relay as never, signer as never, async () => 0)
 
 const project = (d: string, team = TEAM): SignedEvent =>
   ({ id: `p-${d}`.padEnd(64, '0'), kind: 30850, pubkey: PK, created_at: 50, content: '', sig: '0'.repeat(128), tags: [['d', d], ['name', d], ['h', team]] }) as SignedEvent
@@ -93,12 +92,12 @@ beforeEach(() => {
   ids = 0
 })
 
-describe('a cold load with the issues switch on', () => {
+describe('a cold load', () => {
   it('reads each issue as it is now — status, assignee, ref and a moved one under its new project — and none of its old changes', async () => {
     held.push(issue('one', 'alpha'), change('one', 'status', 'in_progress', 110), change('one', 'status', 'done', 120), change('one', 'assignee', 'cd'.repeat(32), 130), change('one', 'ref', 'ALP-1', 131))
     held.push(issue('two', 'alpha'), change('two', 'project', `30850:${PK}:beta`, 140))
 
-    const state = foldWorkspace(await storeWith(true).loadAllEvents())
+    const state = foldWorkspace(await storeWith().loadAllEvents())
 
     const one = state.issues.find((candidate) => candidate.id === 'one')!
     expect(one.status).toBe('done')
@@ -114,7 +113,7 @@ describe('a cold load with the issues switch on', () => {
     held.push(issue('one', 'alpha'), change('one', 'description', 'Second text', 110), change('one', 'status', 'todo', 111))
     const weigh = async () => {
       asked = []
-      const events = (await storeWith(true).loadAllEvents()).events
+      const events = (await storeWith().loadAllEvents()).events
       return { bytes: JSON.stringify(events).length, requests: asked.length }
     }
     const before = await weigh()
@@ -127,7 +126,7 @@ describe('a cold load with the issues switch on', () => {
   it('lists every issue past the relay’s 1000 first records a read', async () => {
     for (let n = 0; n < 1005; n++) held.push(issue(`i${n}`, 'alpha', 1000 + n))
 
-    const state = foldWorkspace(await storeWith(true).loadAllEvents())
+    const state = foldWorkspace(await storeWith().loadAllEvents())
 
     expect(state.issues.length).toBe(1005)
   })
@@ -136,7 +135,7 @@ describe('a cold load with the issues switch on', () => {
     held.push(issue('kept', 'alpha'), change('kept', 'status', 'in_progress', 110))
     held.push(issue('gone', 'alpha'), change('gone', 'status', 'in_progress', 110), change('gone', 'deleted', 'true', 120))
 
-    const state = foldWorkspace(await storeWith(true).loadAllEvents())
+    const state = foldWorkspace(await storeWith().loadAllEvents())
 
     expect(state.issues.map((one) => one.id)).toEqual(['kept'])
     expect(state.issues[0]!.status).toBe('in_progress')
@@ -147,7 +146,7 @@ describe('a cold load with the issues switch on', () => {
     // Five deleted inside the second page of 1000 first records, which the relay answers with 995.
     for (let n = 1000; n < 1005; n++) held.push(change(`i${n}`, 'deleted', 'true', 5000))
 
-    const state = foldWorkspace(await storeWith(true).loadAllEvents())
+    const state = foldWorkspace(await storeWith().loadAllEvents())
 
     expect(state.issues.length).toBe(2495)
   })
@@ -156,25 +155,16 @@ describe('a cold load with the issues switch on', () => {
     held.push(issue('older', 'alpha', 500))
     for (let n = 0; n < 1001; n++) held.push(issue(`same${n}`, 'alpha', 2000))
 
-    await expect(storeWith(true).loadAllEvents()).rejects.toThrow(/share created_at/)
+    await expect(storeWith().loadAllEvents()).rejects.toThrow(/share created_at/)
   })
 
-  it('reads every change of every issue with the switch off, as before', async () => {
-    held.push(issue('one', 'alpha'), change('one', 'status', 'done', 120))
-
-    const state = foldWorkspace(await storeWith(false).loadAllEvents())
-
-    expect(state.issues[0]!.status).toBe('done')
-    expect(everyIssueChange().length).toBeGreaterThan(0)
-    expect(state.issueTexts).toBeUndefined()
-  })
 })
 
-describe('opening an issue with the issues switch on', () => {
+describe('opening an issue', () => {
   it('reads its current values and its newest text, not its changes', async () => {
     held.push(issue('one', 'alpha'), change('one', 'description', 'Old save', 110), change('one', 'description', 'Newest text', 120), change('one', 'status', 'done', 121))
 
-    const state = foldWorkspace(await storeWith(true).loadOpened({ kind: 'issue', d: 'one' }))
+    const state = foldWorkspace(await storeWith().loadOpened({ kind: 'issue', d: 'one' }))
 
     const one = state.issues.find((candidate) => candidate.id === 'one')!
     expect(one.description).toBe('Newest text')
@@ -186,7 +176,7 @@ describe('opening an issue with the issues switch on', () => {
   it('asks for it by its fields once, with its text, not once more without (ISS-9)', async () => {
     held.push(issue('one', 'alpha'), change('one', 'description', 'Newest text', 120), change('one', 'status', 'done', 121))
 
-    const state = foldWorkspace(await storeWith(true).loadOpened({ kind: 'issue', d: 'one' }))
+    const state = foldWorkspace(await storeWith().loadOpened({ kind: 'issue', d: 'one' }))
 
     const byFields = asked.flat().filter((f) => f.fields === 'newest' && (f['#d'] as string[] | undefined)?.includes('one'))
     expect(byFields).toEqual([expect.objectContaining({ text: true })])
@@ -195,7 +185,7 @@ describe('opening an issue with the issues switch on', () => {
 
   it('reads its newest text when reached by navigating, and keeps reading it on each whole load', async () => {
     held.push(issue('one', 'alpha'), change('one', 'description', 'Newest text', 120))
-    const store = storeWith(true)
+    const store = storeWith()
     const loaded = await store.loadAllEvents()
 
     const opened = await store.readThreads(loaded, { folders: [], about: [`30851:${PK}:one`] })
@@ -211,7 +201,7 @@ describe('opening an issue with the issues switch on', () => {
   it('finds a moved issue’s project from its newest change and reads that project’s team', async () => {
     held.push(issue('one', 'alpha'), change('one', 'project', `30850:${PK}:beta`, 140))
 
-    const state = foldWorkspace(await storeWith(true).loadOpened({ kind: 'issue', d: 'one' }))
+    const state = foldWorkspace(await storeWith().loadOpened({ kind: 'issue', d: 'one' }))
 
     expect(state.issues[0]!.projectAddr).toBe(`30850:${PK}:beta`)
     expect(state.folders).toContain(OTHER)

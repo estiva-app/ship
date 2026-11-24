@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 /*
   ALO-5: `[`'s search and the reads of files by address, at the wire — the
-  filters Ship sends with the switch on and off, through a relay held in memory
+  filters Ship sends, through a relay held in memory
   that answers §6.13's list read (each root with its fields' changes) and its
   search (the files whose current words start with what was typed, and which).
 */
@@ -18,7 +18,8 @@ interface TestEvent {
 
 const held: TestEvent[] = []
 const asked: Record<string, unknown>[][] = []
-let fields: { text: boolean; search?: true } | undefined
+/** The types the relay finds by the words of their current fields (NIP-11 `file_search.types`). */
+let searched: string[] = []
 
 const tagOf = (e: TestEvent, name: string) => e.tags.find((t) => t[0] === name)?.[1]
 const addrOf = (e: TestEvent) => `${e.kind}:${e.pubkey}:${tagOf(e, 'd')}`
@@ -76,11 +77,8 @@ vi.mock('./store', () => ({
     queryWithMatches: async (filters: Record<string, unknown>[]) => answer(filters),
   },
   signer: { pubkey: 'c'.repeat(64) },
-  projectFieldsNow: async () => fields,
-  inOrderOption: async () => (inOrder.length ? { inOrder } : {}),
+  searchedTypes: async () => searched,
 }))
-/** The types the relay says it keeps in order (NIP-11 `files.requires_prev`). */
-let inOrder: string[] = []
 
 const { fileCandidatesOf, readTopicDocuments, searchFiles } = await import('./foreign')
 const { buildManifest } = await import('../nostr/manifest')
@@ -94,63 +92,50 @@ const PROJECT = `30850:${OWNER}:p1`
 beforeEach(() => {
   held.length = 0
   asked.length = 0
-  inOrder = []
+  searched = []
   const unsigned = buildManifest(OWNER, Date.now())
   held.push(event(unsigned.kind, unsigned.tags, unsigned.content), project('p1', 'Launch plan', 'First block.\nThird block mentions quoxalbit'))
 })
 
 describe("[ finds a project by a word of its text, where the relay finds projects by their words", () => {
   it('asks the relay to search projects by their current fields, and shows the words around the hit', async () => {
-    fields = { text: true, search: true }
+    searched = ['osnova.project']
     const rows = await searchFiles('quox')
     expect(asked.flat()).toContainEqual({ kinds: [30850], search: 'quox', limit: 20, fields: 'newest' })
     expect(rows.map((row) => [row.id, row.title, row.summary])).toEqual([[PROJECT, 'Launch plan', '…First block. Third block mentions quoxalbit']])
   })
 
-  it('with the switch on but no project search announced, searches by title alone and does not find it', async () => {
-    fields = { text: true }
+  it('with no project search announced, searches by title alone and does not find it', async () => {
     expect(await searchFiles('quox')).toEqual([])
     expect(asked.flat().some((f) => f.search !== undefined && f.fields === 'newest')).toBe(false)
   })
 
-  it('with the switch off, searches by title alone, as before', async () => {
-    fields = undefined
-    expect((await searchFiles('laun')).map((row) => row.id)).toEqual([PROJECT])
-    expect(asked.flat().some((f) => f.fields !== undefined)).toBe(false)
-  })
 })
 
-// ALO-8 (decided 2026-11-06): from the switch a project picked from `[` is saved as its id link, as in Leaf and Peek.
-describe('[ saves a picked project as its id link once the relay keeps projects in order', () => {
+// ALO-8 (decided 2026-11-06): a project picked from `[` is saved as its id link, as in Leaf and Peek.
+describe('[ saves a picked project as its id link', () => {
   const ID = '5f0c1f2e-3a4b-4c5d-8e6f-7a8b9c0d1e2f'
   const KEPT = `30850:${OWNER}:${ID}`
 
   beforeEach(() => {
     held.push(project(ID, 'Quarterly plan', 'Body.'))
-    fields = { text: true, search: true }
+    searched = ['osnova.project']
   })
 
   it('a recently read project is offered as its Ship link by id, not a nostr: reference', async () => {
-    inOrder = ['osnova.project']
     const rows = await fileCandidatesOf({ addresses: [KEPT], at: new Map() }, 2)
     expect(rows.map((row) => row.uri)).toEqual([`https://ship.estiva.app/project/${ID}`])
   })
 
   it('a project found by typing is offered the same way', async () => {
-    inOrder = ['osnova.project']
     const rows = await searchFiles('quarter')
     expect(rows.map((row) => row.uri)).toEqual([`https://ship.estiva.app/project/${ID}`])
   })
 
-  it('before the relay keeps projects in order, the same pick is a nostr: reference, as before', async () => {
-    const rows = await fileCandidatesOf({ addresses: [KEPT], at: new Map() }, 2)
-    expect(rows.map((row) => row.uri.startsWith('nostr:naddr1'))).toEqual([true])
-  })
 })
 
-describe('a file read by its address: by the list read where the switch is on', () => {
+describe('a file read by its address: by the list read', () => {
   it("a topic's document is read as its fields' current changes, not every change by #a", async () => {
-    fields = { text: true }
     await readTopicDocuments([PROJECT])
     expect(asked.flat().some((f) => f.fields === 'newest')).toBe(true)
     // Its children are listed by `#a` too, but by the list read: no plain read of what names it.
@@ -158,32 +143,21 @@ describe('a file read by its address: by the list read where the switch is on', 
   })
 
   it("[ rows for recently read files are read the same way, and named by what they are called now", async () => {
-    fields = { text: true }
     held.push(event(1851, [['a', PROJECT], ['O', 'p1'], ['field', 'title'], ['value', 'Launch v2'], ['h', 'team']]))
     const rows = await fileCandidatesOf({ addresses: [PROJECT], at: new Map() }, 2)
     expect(rows.map((row) => row.title)).toEqual(['Launch v2'])
     expect(asked.flat().some((f) => (f['#a'] as string[] | undefined)?.includes(PROJECT))).toBe(false)
   })
 
-  it("an issue's row is read the same way and named by its current title, as with the switch off", async () => {
+  it("an issue's row is read the same way and named by its current title", async () => {
     const ISSUE = `30851:${OWNER}:i1`
     held.push(
       event(30851, [['d', 'i1'], ['title', 'Old name'], ['h', 'team'], ['a', PROJECT], ['ref', 'LAU-1']]),
       event(1851, [['a', ISSUE], ['O', 'i1'], ['field', 'title'], ['value', 'New name'], ['h', 'team']]),
     )
-    const rows = async () => (await fileCandidatesOf({ addresses: [ISSUE], at: new Map() }, 2)).map((row) => row.title)
-    fields = undefined
-    const off = await rows()
-    asked.length = 0
-    fields = { text: true }
-    expect(await rows()).toEqual(off)
-    expect(off).toEqual(['New name'])
+    const rows = (await fileCandidatesOf({ addresses: [ISSUE], at: new Map() }, 2)).map((row) => row.title)
+    expect(rows).toEqual(['New name'])
     expect(asked.flat().some((f) => (f['#a'] as string[] | undefined)?.includes(ISSUE))).toBe(false)
   })
 
-  it('with the switch off, reads every change by #a, as before', async () => {
-    fields = undefined
-    await readTopicDocuments([PROJECT])
-    expect(asked.flat().some((f) => (f['#a'] as string[] | undefined)?.includes(PROJECT))).toBe(true)
-  })
 })

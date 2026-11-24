@@ -5,10 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
   as in `foreign.test.ts`: `./store` is mocked, and what reaches the relay is counted.
 */
 const query = vi.fn()
-const switched = vi.fn<() => Promise<unknown>>()
 vi.mock('./store', () => ({
   relay: { query: (filters: unknown[]) => query(filters), queryAll: (filters: unknown[]) => query(filters) },
-  projectFieldsNow: () => switched(),
 }))
 
 import { REFRESH_MS } from '@/lib/useRefresh'
@@ -87,7 +85,6 @@ beforeEach(() => {
   clock += 10 * REFRESH_MS
   vi.useFakeTimers({ now: clock })
   query.mockReset().mockImplementation(answer)
-  switched.mockReset().mockResolvedValue({ at: 1 })
 })
 
 afterEach(() => {
@@ -147,18 +144,6 @@ describe('resolveForeign — a card reads its file as it is now, once for every 
     expect(await Promise.all(answers)).toEqual(['failed', 'The second project'])
   })
 
-  it('fails a card whose own read fails alone, never the cards read beside it', async () => {
-    // Without the list read each file is read on its own, and the relay turns one of them away.
-    switched.mockResolvedValue(undefined)
-    query.mockImplementation(async (filters: Record<string, unknown>[]) => {
-      if (filters.some((f) => (f['#d'] as string[] | undefined)?.includes('p1'))) throw new Error('429')
-      return answer(filters)
-    })
-    const answers = [FIRST, SECOND].map((reference) => resolveForeign(reference).then((o) => o?.slots.title?.value, () => 'failed'))
-    await vi.advanceTimersByTimeAsync(0)
-    expect(await Promise.all(answers)).toEqual(['failed', 'The second project'])
-  })
-
   it('answers nothing for a file the list read leaves out, as the full read did', async () => {
     const [gone] = await ask(`${KIND}:${AUTHOR}:deleted-one`)
     expect(gone).toBeNull()
@@ -204,12 +189,4 @@ describe('resolveForeign — a card reads its file as it is now, once for every 
     }
   })
 
-  it('reads each file in full where the relay has no list read yet', async () => {
-    switched.mockResolvedValue(undefined)
-    const [a] = await ask(FIRST)
-    expect(a?.slots.title?.value).toBe('The first project')
-    // The full read's own root filter, and no list read the relay would refuse.
-    expect(fileFilters()).toEqual([expect.objectContaining({ '#d': ['p1'], limit: 1 })])
-    expect(fileFilters().some((f) => 'fields' in f)).toBe(false)
-  })
 })

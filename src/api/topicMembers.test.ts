@@ -38,11 +38,6 @@ relaySlot.answer = answer
 vi.mock('./store', () => ({
   relay: { query: (f: Record<string, unknown>[]) => relaySlot.answer!(f), queryAll: (f: Record<string, unknown>[]) => relaySlot.answer!(f) },
   signer: { pubkey: 'a'.repeat(64) },
-  inOrderOption: async () => undefined,
-  inOrderTypes: async () => [],
-  projectFieldsNow: async () => undefined,
-  timesOption: async () => undefined,
-  topicFieldsNow: async () => undefined,
 }))
 
 const { readTopicMembers, readTopicPlace } = await import('./foreign')
@@ -71,15 +66,16 @@ describe("a topic's people are read from the changes naming someone (18d151fb)",
     expect(events).not.toContain(listed)
   })
 
-  it("when the profiles cannot be read, Explore's Members still lists who joined, from every change of the topic", async () => {
+  it("when the profiles cannot be read, Explore's Members and the members pill reject rather than say nobody joined", async () => {
+    // A topic's people are read by the changes naming each person with a profile (conversation 0.47): without them there is no read.
     relaySlot.answer = async (filters) => {
       if (filters.some((f) => (f.kinds as number[]).includes(0))) throw new Error('429')
       return answer(filters)
     }
     try {
-      const members = await readTopicMembers([topic])
-      expect(members.get(TOPIC)).toContain(KATERINA)
-      for (const f of changesAsked()) expect(f['#p']).toBeUndefined()
+      await expect(readTopicMembers([topic])).rejects.toThrow()
+      await expect(readTopicPlace(topic)).rejects.toThrow()
+      expect(changesAsked()).toEqual([])
     } finally {
       relaySlot.answer = answer
     }

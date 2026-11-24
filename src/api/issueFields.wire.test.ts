@@ -125,18 +125,7 @@ vi.mock('./store', async () => {
       return verdict
     },
   }
-  const on = async () => ({ text: true })
-  const inOrderOption = async () => ({ inOrder: ['osnova.project', 'osnova.issue'] })
-  return {
-    relay,
-    signer,
-    projectFieldsNow: on,
-    projectFieldsAgain: on,
-    issueFieldsNow: on,
-    issueFieldsAgain: on,
-    inOrderOption,
-    store: new Store(relay as never, signer as never, async () => 0, on, async () => ['osnova.project', 'osnova.issue'], on),
-  }
+  return { relay, signer, store: new Store(relay as never, signer as never, async () => 0) }
 })
 vi.mock('./clock', () => ({ clockProblem: async () => undefined }))
 
@@ -172,7 +161,7 @@ beforeEach(() => {
   beatenBy = undefined
 })
 
-describe('an issue field, with the issues switch on', () => {
+describe('an issue field', () => {
   it("follows the field's current change, so a status set from an old copy is never written blind", async () => {
     const status = change('i', 'c1', 'status', 'todo', 110, issueRoot('i').id)
     held = [issueRoot('i'), status]

@@ -30,7 +30,8 @@ const relay = vi.hoisted(() => {
       relay.published.push(event)
       return new Response(JSON.stringify({ accepted: true, event_id: event.id }), { status: 200 })
     }
-    if (init?.method === 'POST' && path.endsWith('/query')) return new Response('[]', { status: 200 })
+    // The times read (SPEC §6.13) answers `{ times }`; every other read nothing.
+    if (init?.method === 'POST' && path.endsWith('/query')) return new Response(String(init.body).includes('"times"') ? '{"times":[]}' : '[]', { status: 200 })
     return new Response('{}', { status: 404 })
   }) as typeof fetch
   return relay
@@ -65,8 +66,8 @@ import App from '@/App'
 const stateWith = (text: string, by = AUTHOR, format: 'marker' | 'blocks' = 'marker'): WorkspaceState => {
   const fields = { description: { value: text, by, at: 2, format } }
   return {
-    projects: [{ addr: PROJECT_ADDR, id: D_PROJECT, author: AUTHOR, createdAt: 1, title: 'Billing', description: text, descriptionFormat: format, contentFolder: TEAM, key: 'BIL', status: 'planned', archived: false, fields }],
-    issues: [{ addr: ISSUE_ADDR, id: D_ISSUE, author: AUTHOR, createdAt: 1, title: 'Invoice totals', description: text, descriptionFormat: format, folder: TEAM, projectAddr: PROJECT_ADDR, ref: 'BIL-1', status: 'todo', fields }],
+    projects: [{ addr: PROJECT_ADDR, id: D_PROJECT, author: AUTHOR, createdAt: 1, rootId: 'a'.repeat(64), title: 'Billing', description: text, descriptionFormat: format, contentFolder: TEAM, key: 'BIL', status: 'planned', archived: false, fields }],
+    issues: [{ addr: ISSUE_ADDR, id: D_ISSUE, author: AUTHOR, createdAt: 1, rootId: 'b'.repeat(64), title: 'Invoice totals', description: text, descriptionFormat: format, folder: TEAM, projectAddr: PROJECT_ADDR, ref: 'BIL-1', status: 'todo', fields }],
     activity: [],
     conversations: [],
     anchors: {},

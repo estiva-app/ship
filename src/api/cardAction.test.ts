@@ -48,8 +48,6 @@ const projectRoot = signed({ pubkey: SHIP, created_at: 1_700_000_050, kind: 3085
 const archiving = (address: string) => signed({ pubkey: SHIP, created_at: 1_700_000_200, kind: 1851, tags: [['a', address], ['field', 'archived'], ['value', 'true'], ['h', FOLDER]], content: '' }, '3')
 let changes: SignedEvent[] = []
 
-/** The types this tab knows are kept in order (`store`'s `inOrderTypes`). */
-const inOrder = { types: [] as string[] }
 vi.mock('./store', () => ({
   relay: {
     query: async (filters: { kinds?: number[]; fields?: string }[]) => {
@@ -61,7 +59,6 @@ vi.mock('./store', () => ({
     },
     publish: (event: SignedEvent) => publish(event),
   },
-  inOrderTypes: async () => inOrder.types,
   signer: { pubkey: READER, sign: async (event: Omit<SignedEvent, 'id' | 'sig'>) => ({ ...event, id: 'f'.repeat(64), sig: '' }) },
 }))
 
@@ -74,7 +71,6 @@ beforeEach(() => {
   manifest = shipManifest
   changes = []
   runtime.rewrite = undefined
-  inOrder.types = []
 })
 
 describe('a change made from a card', () => {
@@ -179,7 +175,6 @@ describe('a change made from a card, where the file’s type is kept in order (A
   )
 
   it('names the field’s current change as the one it follows', async () => {
-    inOrder.types = ['osnova.issue']
     changes = [status]
     expect(await applyCardAction({ reference: `nostr:${addrToNaddr(ISSUE)}`, actionId: 'set-issue-status', value: 'done' })).toEqual({ ok: true })
     expect(publish).toHaveBeenCalledTimes(1)
@@ -189,22 +184,11 @@ describe('a change made from a card, where the file’s type is kept in order (A
   })
 
   it('names the file’s first record for a field never set', async () => {
-    inOrder.types = ['osnova.issue']
     expect(await applyCardAction({ reference: `nostr:${addrToNaddr(ISSUE)}`, actionId: 'set-issue-status', value: 'done' })).toEqual({ ok: true })
     expect(publish.mock.calls[0][0].tags.filter((t) => t[0] === 'prev')).toEqual([['prev', root.id]])
   })
 
-  it('writes it again in order, once, when the relay says the type is kept in order and the tab did not know', async () => {
-    changes = [status]
-    publish.mockResolvedValueOnce({ ok: false, reason: 'invalid: requires-prev: an issue change names the change it follows in prev; ' })
-    expect(await applyCardAction({ reference: `nostr:${addrToNaddr(ISSUE)}`, actionId: 'set-issue-status', value: 'done' })).toEqual({ ok: true })
-    expect(publish).toHaveBeenCalledTimes(2)
-    expect(publish.mock.calls[0][0].tags.some((t) => t[0] === 'prev')).toBe(false)
-    expect(publish.mock.calls[1][0].tags.filter((t) => t[0] === 'prev')).toEqual([['prev', status.id]])
-  })
-
   it('signs nothing whose `prev` is not the change it read', async () => {
-    inOrder.types = ['osnova.issue']
     changes = [status]
     runtime.rewrite = (tags) => [...tags.filter((t) => t[0] !== 'prev'), ['prev', 'e'.repeat(64)]]
     expect(await applyCardAction({ reference: `nostr:${addrToNaddr(ISSUE)}`, actionId: 'set-issue-status', value: 'done' })).toMatchObject({ ok: false })

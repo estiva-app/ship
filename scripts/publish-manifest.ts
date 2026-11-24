@@ -518,7 +518,8 @@ async function main() {
   */
   const removed: boolean[] = []
   for (const addr of [issue.addr, project.addr]) {
-    const { result } = await store.deleteProject({ recordFolder: folder, project: addr, reason: 'manifest verification fixture', folders: [{ folder, hasState: false }] })
+    // A delete is the `deleted` field (SPEC §6.5), anyone in the Folder's to make and Restore's to undo.
+    const result = await store.setField({ folder, target: addr, field: 'deleted', value: 'true', note: 'manifest verification fixture' })
     removed.push(result.ok)
   }
   for (const e of raw.filter((x) => x.kind === KIND.CHANGE && x.pubkey === identity.pubkey)) {

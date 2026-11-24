@@ -1,59 +1,17 @@
-import { ISSUE_TYPE, fieldsOptedIn, relayFileReadsOf, typeFieldsOptedIn, type RelayFileReads } from '@estiva-app/protocol'
+import { relayFileReadsOf, type RelayFileReads } from '@estiva-app/protocol'
 
 /*
-  Ship's switch for projects (ALO-5, SPEC §6.13) is protocol's `projectFieldsOf`,
-  the one rule Ship, Leaf and Peek switch by (ALO-6): on when the relay announces
-  it keeps projects in order, or this tab opted in with `?fields=on` on the QA
-  Folders the relay already fences, and only where the relay offers the list
-  read and the opened file's text with it.
+  How Ship reads and writes files: one way (SPEC §6.13, ALL-8). Every relay
+  keeps every file type in order and answers the list, open and times reads, so
+  nothing here switches: the relay's NIP-11 says only which types it finds by
+  the words of their current fields (`file_search.types`).
 
-  why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-file-is-its-fields-each-kept-in-order-by-the-relay.md
+  why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/the-old-way-goes-once-miky-has-looked.md
 */
 
-const OPT_IN_KEY = 'ship.projectFields'
+const NONE: RelayFileReads = { search: [] }
 
-/**
- * This tab's opt-in, taken from `?fields=on|off` when the page opens and kept
- * for the tab only: nothing narrows it to the QA Folders, so a link carrying it
- * must not switch a browser for good.
- */
-export function optedIn(): boolean {
-  try {
-    return fieldsOptedIn(window.location.search, sessionStorage, OPT_IN_KEY)
-  } catch {
-    return false
-  }
-}
-
-/**
- * This tab's opt-in to reading issues by their fields (ISS-4): `?issueFields=on|off`,
- * kept for the tab only as the projects' one, and apart from it.
- */
-export function issueFieldsOptedIn(): boolean {
-  try {
-    return typeFieldsOptedIn(ISSUE_TYPE, window.location.search, sessionStorage)
-  } catch {
-    return false
-  }
-}
-
-/**
- * This tab's opt-in to writing topics (`?topicFields=on|off`) or pages
- * (`?documentFields=on|off`) in order (ALL-6), as Peek's and Leaf's: the relay
- * keeps them so for QA-1's team only and announces neither, so a tab learns it
- * from its link until the switch. Kept for the tab only.
- */
-export function typeOptedIn(type: string): boolean {
-  try {
-    return typeFieldsOptedIn(type, window.location.search, sessionStorage)
-  } catch {
-    return false
-  }
-}
-
-const NONE: RelayFileReads = { list: false, text: false, times: false, switched: false, inOrder: [], search: [] }
-
-/** The relay's NIP-11, read once per page: a relay makes the switch once, and a reload reads it again. */
+/** The relay's NIP-11, read once per page; nothing searched when it cannot be read. */
 export function readFileReads(info: () => Promise<unknown>): Promise<RelayFileReads> {
   return info().then(relayFileReadsOf, () => NONE)
 }

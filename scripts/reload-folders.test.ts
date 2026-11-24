@@ -189,9 +189,8 @@ const third = await live.reloadFolders(second, [A])
 check('a replaced record keeps only its newest version', third.events.filter(a3).length === 1, `${third.events.filter(a3).length} versions`)
 check('and shows it', foldWorkspace(third).issues.some((issue) => issue.title === 'A three, again'))
 
-// A deletion this tab made: the relay never returns the issue again, and a re-read since a time cannot say so.
-await live.deleteIssue({ folder: A, issue: issueAddr(ME, 'a2') })
-check('the deletion reaches the relay', published.some((e) => e.kind === 5 && e.tags.some((t) => t[0] === 'a' && t[1] === issueAddr(ME, 'a2'))))
+// An issue deleted for good before the switch (a kind:5): the relay never returns it again, and a re-read since a time cannot say so.
+held = held.filter((e) => !(e.kind === issueA1.kind && e.tags.some((t) => t[0] === 'd' && t[1] === 'a2')))
 const fourth = foldWorkspace(await live.reloadFolders(third, [A]))
 check('an issue this tab deleted is gone after the re-read', !fourth.issues.some((issue) => issue.title === 'A two'))
 check('and the others stay', fourth.issues.some((issue) => issue.title === 'A one') && fourth.issues.some((issue) => issue.title === 'A three, again'))
