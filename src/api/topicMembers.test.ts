@@ -70,4 +70,18 @@ describe("a topic's people are read from the changes naming someone (18d151fb)",
     expect(events).not.toContain(rename)
     expect(events).not.toContain(listed)
   })
+
+  it("when the profiles cannot be read, Explore's Members still lists who joined, from every change of the topic", async () => {
+    relaySlot.answer = async (filters) => {
+      if (filters.some((f) => (f.kinds as number[]).includes(0))) throw new Error('429')
+      return answer(filters)
+    }
+    try {
+      const members = await readTopicMembers([topic])
+      expect(members.get(TOPIC)).toContain(KATERINA)
+      for (const f of changesAsked()) expect(f['#p']).toBeUndefined()
+    } finally {
+      relaySlot.answer = answer
+    }
+  })
 })
