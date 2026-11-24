@@ -198,10 +198,18 @@ export function ShipLauncher({ people, say, ...box }: KeptLauncherBox<LauncherCo
         label: 'Add issue',
         // Said only where this page's form takes it there: an archived project's issue goes to the Issues page's form.
         ...(open?.project && formHere('issue') ? { description: `In ${open.project.title}` } : {}),
+        // What the on-device guess reads, never drawn: the wording probed in Edge on 24 Nov (KIN-7).
+        guessAs: 'Add a new issue, bug or ticket',
         icon: <IconPlus size={16} stroke={1.5} />,
         run: () => askForm('issue', () => go({ name: 'issues' })),
       },
-      { id: 'new-project', label: 'New project', icon: <IconPlus size={16} stroke={1.5} />, run: () => askForm('project', () => go({ name: 'projects' })) },
+      {
+        id: 'new-project',
+        label: 'New project',
+        guessAs: 'Create a new project',
+        icon: <IconPlus size={16} stroke={1.5} />,
+        run: () => askForm('project', () => go({ name: 'projects' })),
+      },
     ],
     answerActions,
     useReportFailure,
