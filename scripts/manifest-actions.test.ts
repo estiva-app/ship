@@ -58,6 +58,10 @@ const relay = {
     sent.push(event)
     return { ok: true } as PublishResult
   },
+  // The open read setField makes for the change its write follows (§6.13): the issue as filed, never changed.
+  async query(filters: { kinds?: number[]; '#d'?: string[] }[]): Promise<SignedEvent[]> {
+    return filters.some((f) => f.kinds?.includes(KIND.ISSUE) && f['#d']?.includes('i1')) ? [issueRoot] : []
+  },
 } as unknown as Relay
 const signer = { pubkey: ME, sign: async (unsigned: UnsignedEvent) => ({ ...unsigned, id: 'x', sig: 'y' }) } as unknown as Signer
 const store = new Store(relay, signer)

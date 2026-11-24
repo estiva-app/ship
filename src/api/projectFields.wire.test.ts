@@ -63,6 +63,24 @@ function answer(filters: Record<string, unknown>[]): SignedEvent[] {
   return [...out]
 }
 
+/** The times read (§6.13): each file the filter names, deleted ones included, with each field's current change and the field it sets, never its value. */
+function times(filters: Record<string, unknown>[]) {
+  asked.push(filters)
+  return filters.flatMap((f) =>
+    held
+      .filter((event) => event.kind !== 1851 && (f.kinds as number[]).includes(event.kind) && (!f['#d'] || (f['#d'] as string[]).includes(dOf(event) ?? '')))
+      .map((root) => {
+        const newest = new Map<string, SignedEvent>()
+        for (const event of held) {
+          if (event.kind !== 1851 || tagOf(event, 'a') !== addrOf(root)) continue
+          const before = newest.get(tagOf(event, 'field')!)
+          if (!before || event.created_at > before.created_at) newest.set(tagOf(event, 'field')!, event)
+        }
+        return { a: addrOf(root), created_at: root.created_at, h: FOLDER, changes: [...newest].map(([field, event]) => ({ id: event.id, created_at: event.created_at, fields: [field] })) }
+      }),
+  )
+}
+
 const sent: SignedEvent[] = []
 
 vi.mock('./store', async () => {
@@ -73,6 +91,7 @@ vi.mock('./store', async () => {
   }
   const relay = {
     query: async (filters: Record<string, unknown>[]) => answer(filters),
+    queryTimes: async (filters: Record<string, unknown>[]) => times(filters),
     queryAll: async (filters: Record<string, unknown>[]) => {
       paged.push(filters)
       if (folderRead && filters.some((f) => f['#h'])) await folderRead()
@@ -194,6 +213,13 @@ describe('the load', () => {
     expect(p.description).toBe('Current words')
     expect(state.texts).toEqual([`30850:${PK}:p`])
   })
+
+  it('shows its current text from the read that opens it, with no later load', async () => {
+    held = [root('p'), change('p', 'd1', 'description', 'Current words', 110), root('q')]
+    const opened = await store.loadOpened({ kind: 'project', d: 'p' })
+    expect(foldWorkspace(opened).projects.find((candidate) => candidate.id === 'p')?.description).toBe('Current words')
+    expect(opened.texts).toContain(`30850:${PK}:p`)
+  })
 })
 
 describe('opening a project by its link', () => {
@@ -255,19 +281,23 @@ describe('opening a project by its link', () => {
 describe('a deleted project in the load', () => {
   const edits = (d: string, n: number) => Array.from({ length: n }, (_, i) => change(d, `${d}-e${i}`, 'title', `Title ${i}`, 110 + i))
 
-  it('reads its newest change only, however often it was edited, and shows it deleted by whom', async () => {
+  it('reads its delete only, by the times read and its id, however often it was edited, and shows it deleted by whom', async () => {
     held = [root('gone'), ...edits('gone', 50), change('gone', 'gone-x', 'deleted', 'true', 300)]
     const events = await store.loadAllEvents()
     const its = events.events.filter((event) => event.kind === 1851 && tagOf(event, 'a') === `30850:${PK}:gone`)
     expect(its.map((event) => event.id)).toEqual(['gone-x'.padEnd(64, '0')])
     expect(foldWorkspace(events).projects.find((candidate) => candidate.id === 'gone')!.deleted).toEqual({ by: PK, at: 300 })
+    // No read of its changes by `#a`: the times read names the delete, and it is read by its id.
+    expect(asked.flat().filter((f) => f['#a'])).toEqual([])
+    expect(asked.flat()).toContainEqual({ ids: ['gone-x'.padEnd(64, '0')] })
   })
 
-  it('reads it whole when a change written after the delete hides it, and it stays deleted', async () => {
+  it('reads its delete only when a change written after the delete is newer, and it stays deleted by whom', async () => {
     held = [root('stale'), change('stale', 'stale-x', 'deleted', 'true', 120), change('stale', 'stale-s', 'status', 'planned', 130)]
-    const { project: p } = await project('stale')
-    expect(p.deleted).toEqual({ by: PK, at: 120 })
-    expect(p.status).toBe('planned')
+    const events = await store.loadAllEvents()
+    const its = events.events.filter((event) => event.kind === 1851 && tagOf(event, 'a') === `30850:${PK}:stale`)
+    expect(its.map((event) => event.id)).toEqual(['stale-x'.padEnd(64, '0')])
+    expect(foldWorkspace(events).projects.find((candidate) => candidate.id === 'stale')!.deleted).toEqual({ by: PK, at: 120 })
   })
 
   /** Each change to `d` a whole load reads. */

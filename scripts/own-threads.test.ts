@@ -12,6 +12,7 @@
  * asks only for what is new; and a screen that draws the team's conversation
  * still reads it whole.
  */
+import { relayAnswer, timesAnswer } from '../src/test/listRead'
 import { buildEdit, publicKeyFromSecret, signEvent, type Relay, type SignedEvent, type UnsignedEvent } from '@estiva-app/protocol'
 import { Store, foldWorkspace, type WorkspaceEvents } from '../src/nostr/store'
 import { buildConversationMessage } from '../src/nostr/events'
@@ -73,6 +74,13 @@ const relay = {
   async queryAll(filters: Record<string, unknown>[]) {
     asked.push(filters)
     return held.filter((event) => !(removed && event.tags.some((t) => t[0] === 'h' && t[1] === TEAM)) && filters.some((filter) => matches(event, filter)))
+  },
+  async query(filters: Record<string, unknown>[]) {
+    asked.push(filters)
+    return relayAnswer(held, filters, (event, filter) => !(removed && event.tags.some((t) => t[0] === 'h' && t[1] === TEAM)) && matches(event, filter))
+  },
+  async queryTimes(filters: Record<string, unknown>[]) {
+    return timesAnswer(held, filters)
   },
 } as unknown as Relay
 

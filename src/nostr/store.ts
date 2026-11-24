@@ -26,7 +26,7 @@ import {
   type CommentRef,
 } from './events'
 import { findNaddrs, naddrToAddr, buildReaction, buildResolution, buildEdit, buildDeletion as buildEventDeletion, imetaTag, needsRelayKey, RELAY_KEY_FILTER, type Authored } from '@estiva-app/protocol'
-import { DELETED_FIELD, createFile, finishCreating, fieldsSetBy, listFiles, listsField, openFile, writeChange, TEXT_FIELD, type CreateFileArgs, type CreateFileResult, type FileFields, type WriteChangeResult } from '@estiva-app/interop'
+import { DELETED_FIELD, createFile, finishCreating, listFiles, listsField, openFile, writeChange, TEXT_FIELD, type CreateFileArgs, type CreateFileResult, type FileFields, type WriteChangeResult } from '@estiva-app/interop'
 import { createLoadQuery, planArchiveFolder, planCreateFolder, planDeleteFolder, planListInTopic, planMoveFromFolders, planPlaceFile, planRemoveFromTopic, planRenameFolder, readMentionedIn, readMoveRefusal, type ListHolder, type FolderRef, type MovableFile, type MoveRefusal } from '@estiva-app/interop'
 import { readState, type FolderState } from './read'
 import { type Issue } from './files'
@@ -514,12 +514,12 @@ export class Store {
    * The current fields of the projects `addrs` names, read by the list read —
    * and for each one in `opened`, its current text as well (§6.13: one text,
    * however long its history). A deleted project is in no read by its fields,
-   * `#d` included (§6.13), but stays readable by its id. Only its newest change
-   * is read by `#a`: its `deleted` change and who signed it, for the Archived
-   * view's deleted filter and count. Every change of it is read where it is
-   * shown — its page (`opened`) here, the Archived tab by `openTexts` — or when
-   * its newest change is not the delete. On production 4 Nov every change of the
-   * 19 deleted was 138 KB of each cold load, one throwaway's 121 changes 86 KB.
+   * `#d` included (§6.13), but stays readable by its id. Only its `deleted`
+   * change is read, found by the times read and read by its id
+   * (`currentDeletes`): who signed it, for the Archived view's deleted filter
+   * and count. Every change of it is read only where it is shown — its page
+   * (`opened`) here, the Archived tab by `openTexts`. On production 24 Nov the
+   * old way was 77 one-change reads and every change of 4 projects (281).
    *
    * Issues the same way once they switch (ISS-4), `kind` saying which. A whole
    * load's issues come already `listed` (`listEvery`): their roots are the
@@ -563,16 +563,40 @@ export class Store {
     const rest = unlisted.filter((addr) => !opened.has(addr))
     // Read whole this once, not kept: its page, while it shows, asks for it again by `readThreads`.
     for (const addr of shown) opened.delete(addr)
-    const [whole, newest] = await Promise.all([this.changesOf(read, shown), this.newestChanges(rest)])
-    // A change written after the delete (a stale tab's) hides it: that one is read whole, as before.
-    const deletedNow = new Set(newest.filter((change) => fieldsSetBy(change).some((set) => set.field === DELETED_FIELD && !!set.value)).flatMap((change) => change.tags.filter((t) => t[0] === 'a').map((t) => t[1]!)))
-    const unsure = rest.filter((addr) => !deletedNow.has(addr))
-    const strays = await this.changesOf(read, unsure)
+    const [whole, current] = await Promise.all([this.changesOf(read, shown), this.currentDeletes(kind, rest)])
     return {
-      events: [...(listedAlready ? [] : listed), ...texts.flatMap((file) => (file ? [file] : []))].flatMap((file) => file.events).concat(whole, newest, strays),
-      // Every change of a deleted one read whole is held, its text with them.
-      texts: [...shown, ...unsure, ...withText],
+      events: [...(listedAlready ? [] : listed), ...texts.flatMap((file) => (file ? [file] : []))].flatMap((file) => file.events).concat(whole, current.events),
+      // Every change of a deleted one read whole is held, its text with them; so is every current change of one in no list though not deleted.
+      texts: [...shown, ...current.whole, ...withText],
     }
+  }
+
+  /**
+   * The change that deletes each of `addrs` — files in no list read (§6.13) —
+   * by the times read and one read by id: its `deleted` change and who signed
+   * it, for the Archived view, never every change it ever had. One the times
+   * read answers with no `deleted` change is in no list though not deleted:
+   * each of its current changes is read by id, and it is `whole`. One the times
+   * read does not answer adds nothing.
+   */
+  private async currentDeletes(kind: number, addrs: readonly string[]): Promise<{ events: SignedEvent[]; whole: string[] }> {
+    if (!addrs.length) return { events: [], whole: [] }
+    const ds = [...new Set(addrs.map((addr) => addr.split(':').slice(2).join(':')))]
+    const filters = chunk(ds, ISSUES_PER_FILTER).map((part) => ({ fields: 'times', kinds: [kind], '#d': part }))
+    const rows = (await Promise.all(chunk(filters, MAX_FILTERS_PER_QUERY).map((part) => this.relay.queryTimes(part as never)))).flat()
+    const wanted = new Set(addrs)
+    const ids: string[] = []
+    const whole: string[] = []
+    for (const row of rows) {
+      if (!wanted.has(row.a)) continue
+      const deletes = row.changes.filter((change) => change.fields.includes(DELETED_FIELD))
+      if (!deletes.length) whole.push(row.a)
+      ids.push(...(deletes.length ? deletes : row.changes).map((change) => change.id))
+    }
+    const unique = [...new Set(ids)]
+    if (!unique.length) return { events: [], whole }
+    const events = (await Promise.all(chunk(unique, IDS_PER_FILTER).map((part) => this.relay.query([{ ids: part }] as never)))).flat()
+    return { events, whole }
   }
 
   /**
@@ -610,14 +634,6 @@ export class Store {
       until = oldest
     }
     return files
-  }
-
-  /** The newest change to each of `addrs`, by `#a`, one filter each: `limit` is per filter, which the paged read does not keep. */
-  private async newestChanges(addrs: readonly string[]): Promise<SignedEvent[]> {
-    const filters = addrs.map((addr) => ({ kinds: [KIND.CHANGE], '#a': [addr], limit: 1 }))
-    const reads: Promise<SignedEvent[]>[] = []
-    for (let at = 0; at < filters.length; at += MAX_FILTERS_PER_QUERY) reads.push(this.relay.query(filters.slice(at, at + MAX_FILTERS_PER_QUERY) as never))
-    return (await Promise.all(reads)).flat()
   }
 
   /**
