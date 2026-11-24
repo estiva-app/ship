@@ -20,7 +20,8 @@ let asking: Promise<string[] | undefined> | undefined
 export function profileKeys(): Promise<string[] | undefined> {
   if (held && Date.now() - held.at < HELD_MS) return Promise.resolve(held.keys)
   asking ??= Promise.resolve()
-    .then(() => relay.query([{ kinds: [0], limit: 500 }] as never))
+    // Paged to the end: a key left off this list is left out of every members count.
+    .then(() => relay.queryAll([{ kinds: [0] }]))
     .then((events) => {
       const keys = [...new Set((events as SignedEvent[]).map((e) => e.pubkey))].sort()
       held = { at: Date.now(), keys }

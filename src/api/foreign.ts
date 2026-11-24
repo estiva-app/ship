@@ -57,6 +57,7 @@ import { relatedTo } from '@/lib/ownKinds'
 import { safeLink } from '@/lib/handoff'
 import { KIND } from '../nostr/kinds'
 import { inOrderOption, inOrderTypes, projectFieldsNow, relay, signer, timesOption, topicFieldsNow } from './store'
+import { profileKeys } from './profileKeys'
 
 export type { ForeignObject, ResolvedSlot, FolderContents, FolderSummary } from '@estiva-app/interop'
 
@@ -651,10 +652,11 @@ function answersFilter(event: SignedEvent, filter: Record<string, unknown>): boo
  */
 export async function readTopicMembers(topics: readonly ReadTopic[]): Promise<Map<string, string[] | undefined>> {
   if (topics.length === 0) return new Map()
+  const people = await profileKeys()
   const asked = topics.map((topic) => {
     const place = { address: topic.address, team: topic.folder }
     try {
-      const filters = (placeFilters(place, signer.pubkey) as Record<string, unknown>[]).filter((filter) => !(filter.kinds as number[]).includes(KIND_APP_DATA))
+      const filters = (placeFilters(place, signer.pubkey, people) as Record<string, unknown>[]).filter((filter) => !(filter.kinds as number[]).includes(KIND_APP_DATA))
       return { topic, place, filters }
     } catch {
       // A topic whose team is no team id cannot be read for its people: it draws no count, and the others still do.
@@ -720,7 +722,7 @@ export async function readTeamsYouAreIn(teams: readonly string[], viewer: string
  */
 export async function readTopicPlace(topic: { address: string; folder: string }): Promise<{ listed: Listed[]; events: SignedEvent[] }> {
   const place = { address: topic.address, team: topic.folder }
-  const filters = (placeFilters(place, signer.pubkey) as Record<string, unknown>[]).filter((filter) => !(filter.kinds as number[]).includes(KIND_APP_DATA))
+  const filters = (placeFilters(place, signer.pubkey, await profileKeys()) as Record<string, unknown>[]).filter((filter) => !(filter.kinds as number[]).includes(KIND_APP_DATA))
   const events: SignedEvent[] = await relay.queryAll(filters as never)
   const roster = events.filter((event) => event.kind === KIND_ROSTER || ROSTER_COMMANDS.includes(event.kind))
   const listing = events.filter((event) => event.kind === KIND_FOLDER_STATE || event.kind === KIND_FOLDER_COMMAND)
