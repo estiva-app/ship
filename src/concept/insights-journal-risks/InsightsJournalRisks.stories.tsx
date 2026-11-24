@@ -7,6 +7,7 @@ import { SIDEBAR_PROJECTS } from '@/fixtures/projects'
 
 import { InitiativePage, IssuePage, ItemPage, ProjectPage, TeamPage } from './Pages'
 import { INITIATIVES } from './lens'
+import { DecisionFollowUps, LoopPage } from './Agents'
 import { HAND_TYPED, ITEMS } from './fixtures'
 
 /**
@@ -84,6 +85,13 @@ export const ProjectComments: Story = { render: () => <Shell><ProjectPage start=
 
 /** An issue: the items about it under the description; Katerina's comment marked as a Decision in her name (blue line). Mark as… in each comment's and each block's ⋯. */
 export const Issue: Story = { render: () => <Shell current="issues"><IssuePage /></Shell> }
+/** Miky, 24 Nov, after Notion's "A new shape for work": an agent claims an issue, works, and writes back where people read. */
+export const IssueClaimedWorking: Story = { render: () => <Shell current="issues"><IssuePage claim="working" /></Shell> }
+export const IssueClaimedWroteBack: Story = { render: () => <Shell current="issues"><IssuePage claim="wrote" /></Shell> }
+/** An accepted Decision lists what still says otherwise, each with the change the decision loop proposes. */
+export const ItemDecisionFollowUps: Story = { render: () => <Shell><ItemPage item={item('j2')} below={<DecisionFollowUps />} /></Shell> }
+/** A loop's own page: what it reads, the level a person allows, its instructions with versions, its checks and runs. */
+export const DecisionLoopPage: Story = { render: () => <Shell><LoopPage /></Shell> }
 /** An issue whose comment's Decision was Rejected: no line on the comment any more. */
 export const IssueMarkRejected: Story = { render: () => <Shell current="issues"><IssuePage commentMark={false} itemsState="empty" /></Shell> }
 /** An issue's items loading. */

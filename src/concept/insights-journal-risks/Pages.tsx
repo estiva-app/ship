@@ -32,6 +32,7 @@ import { ItemContent } from './ItemDetail'
 import { InsightGrid, NewlySuggested, RiskDashboard } from './ShipLists'
 import { BuildPlan, ScopeBoxes, ScopePanel, planRows } from './BuildPlan'
 import { JournalBox } from './JournalBox'
+import { AgentClaim } from './Agents'
 import { SeverityMark, waited } from './ItemKinds'
 import { CommentsColumn, type StoryComment } from './CommentsColumn'
 import { HAND_TYPED, ITEMS, KATERINA, MIKY, PEOPLE, PROJECT, TEAM, byType, decide, type Item } from './fixtures'
@@ -285,7 +286,7 @@ const PROJECT_COMMENTS: StoryComment[] = [
 ]
 
 /** The issue page: today's header and description, the items about it under the description, its comments beside it. */
-export function IssuePage({ itemsState = 'ready', commentMark = true }: { itemsState?: ListState; commentMark?: boolean }) {
+export function IssuePage({ itemsState = 'ready', commentMark = true, claim }: { itemsState?: ListState; commentMark?: boolean; claim?: 'working' | 'wrote' }) {
   const issueTitle = 'Ship and Leaf sidebar match Peek'
   const about = ITEMS.filter((i) => i.about?.kind === 'issue' && i.about.title === issueTitle)
   const comments: StoryComment[] = [
@@ -320,6 +321,7 @@ export function IssuePage({ itemsState = 'ready', commentMark = true }: { itemsS
                 onCommentOnBlock={noop}
               />
             </MarkableBlocks>
+            {claim && <AgentClaim phase={claim} />}
             {/* The items about this issue: every app that opens a file shows its items (record #450). */}
             <section className="flex flex-col gap-2" aria-label="About this issue">
               <SectionHeader title="About this issue" count={about.length} />
@@ -345,7 +347,7 @@ export function IssuePage({ itemsState = 'ready', commentMark = true }: { itemsS
 }
 
 /** An item's own page, shaped like an issue's: title, summary, its fields, its source as marked, details, comments. */
-export function ItemPage({ item, me = 'miky', state = 'ready' }: { item: Item; me?: string; state?: 'ready' | 'loading' | 'error' | 'no-access' }) {
+export function ItemPage({ item, me = 'miky', state = 'ready', below }: { item: Item; me?: string; state?: 'ready' | 'loading' | 'error' | 'no-access'; below?: ReactNode }) {
   const crumbs = [
     { label: 'Projects', href: '#/projects' },
     { label: PROJECT, href: '#/project/p' },
@@ -384,6 +386,7 @@ export function ItemPage({ item, me = 'miky', state = 'ready' }: { item: Item; m
               format="marker"
               onDescribe={() => true}
             />
+            {below}
           </Centred>
         </ScrollArea>
       </div>
