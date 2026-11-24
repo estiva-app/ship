@@ -28,6 +28,11 @@ import { useSideColumn } from './sideColumn'
 import { FileTopicsOf } from '@/components/FileTopicsOf'
 import { activityFor, cardEditOf, copyText, folderOfMessage, pickerPeople, reactTo, refreshAfter, resolveAnswer, threadFor, useMentionLinks, withElsewhere } from './ProjectPage'
 import { useReferencePage } from '@/api/references'
+import { createIssue } from '@/api'
+import { NewIssueDialog } from '@/components/NewIssueDialog'
+import { useFormHere } from '@/launcher/forms'
+import { useReopenHeld } from '@/auth/heldTyping'
+import { useUnfinished } from './creating'
 
 /**
  * One issue from the fold, as the old app's issueView: the trail (its
@@ -44,6 +49,13 @@ export function IssuePage({ state, directory, teams, archives, d, say, refresh }
   const byLink = useIssueByLink(d, !loaded)
   const issue = loaded ?? byLink.issue
   const project = issue?.projectAddr ? state.projects.find((candidate) => candidate.addr === issue.projectAddr) : undefined
+  // ⌘K's Add issue on an issue (KIN-6): a new issue in this one's project, as the project page's Add issue makes it.
+  const [addingIssue, setAddingIssue] = useState(false)
+  const newIssue = useUnfinished('Issue')
+  const takesIssues = !!project && !project.deleted && !archives.ofProject(project.addr)
+  useFormHere('issue', useMemo(() => (takesIssues ? () => setAddingIssue(true) : undefined), [takesIssues]))
+  // Back from a passkey trip, the form opens again here holding what was typed (AUT-4), as on the project page.
+  useReopenHeld(project && takesIssues ? `new-issue:${project.addr}` : undefined, () => setAddingIssue(true))
   // Its team is its project's, by the rule the sidebar marks it with (App's teamOf); an issue in no project is in no team.
   const team = project && teams ? placedIn({ addr: project.addr, folder: project.contentFolder }, teams)[0] : undefined
   /*
@@ -425,6 +437,24 @@ export function IssuePage({ state, directory, teams, archives, d, say, refresh }
               </p>
             ))}
         </ConfirmDialog>
+      )}
+      {addingIssue && project && (
+        <NewIssueDialog
+          projects={[{ value: project.addr, label: project.title }]}
+          project={{ addr: project.addr, title: project.title }}
+          holdKey={`new-issue:${project.addr}`}
+          onClose={() => {
+            newIssue.forget()
+            setAddingIssue(false)
+          }}
+          onCreate={async (draft) => {
+            const result = await createIssue(project, state, draft, newIssue.held())
+            if (!newIssue.landed(result, say)) return false
+            await refresh([result.folder ?? project.contentFolder])
+            say('Issue created')
+            return true
+          }}
+        />
       )}
     </>
   )

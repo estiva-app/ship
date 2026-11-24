@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useFormHere } from '@/launcher/forms'
 import { useUnfinished } from './creating'
 import { ISSUE_STATUSES, conversationsAbout, createIssue, me, setIssueDeleted, type DirectoryView, type FolderState, type WorkspaceState } from '@/api'
 import { useDeletedIssues } from '@/api/useDeletedIssues'
@@ -60,8 +61,11 @@ export function IssuesPage({ state, directory, teams, archives, folder, say, ref
   // Opens on your own work (Miky, 2 November).
   const [scope, setScope] = useState<IssuesScope>('mine')
   const [adding, setAdding] = useState(false)
+  const openAdding = useCallback(() => setAdding(true), [])
   const unfinished = useUnfinished('Issue')
   useReopenHeld(NEW_ISSUE_HOLD, () => setAdding(true))
+  // ⌘K's Add issue with no project open comes here, and opens this page's (KIN-6).
+  useFormHere('issue', openAdding)
   // A Folder's Issues are the issues of the projects in it (SHIPS-5), and its Add issue offers only those projects.
   const projects = useMemo(() => (folder ? projectsIn(state.projects, teams ?? [], folder) : state.projects), [state, folder, teams])
   const { live, archivedIssues } = useMemo(() => {

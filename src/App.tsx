@@ -1,5 +1,9 @@
 import { IconLink } from '@tabler/icons-react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useKeptLauncher } from '@estiva-app/launcher'
+import { captureOpenFile } from '@/launcher/openFile'
+
+const ShipLauncher = lazy(() => import('@/launcher/ShipLauncher').then((m) => ({ default: m.ShipLauncher })))
 import { AppProvider, ErrorBoundary } from '@estiva-app/ui'
 import { CrashOnPurpose, ScreenSteps, errorReporter } from '@/lib/errorReports'
 import { useReportFailure } from '@/lib/failureReports'
@@ -148,6 +152,19 @@ function Shell() {
 
   const [navOpen, setNavOpen] = useSidebarFold()
 
+  // ⌘K (KIN-6): one box for the whole app, about the issue or project open when it was opened, hidden rather than
+  // thrown away while it holds a sentence or an answer; the top bar's search opens it and carries its dot. The box's
+  // code loads on its first opening, so a cold open of Ship carries only the search.
+  const launcherPeople = useMemo(
+    () => mentionable.flatMap((p) => (p.pubkey ? [{ id: p.pubkey, name: p.name, ...(personOf(p.pubkey).picture ? { avatarSrc: personOf(p.pubkey).picture } : {}) }] : [])),
+    [mentionable, personOf],
+  )
+  const kept = useKeptLauncher(captureOpenFile, (box) => (
+    <Suspense fallback={null}>
+      <ShipLauncher {...box} people={launcherPeople} say={(text) => say(text, 'error', null)} />
+    </Suspense>
+  ))
+
   const copyKey = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(me)
@@ -160,6 +177,9 @@ function Shell() {
   return (
     <AppShell
       logo="Estiva Ship"
+      onSearch={kept.toggle}
+      searchPlaceholder="Search Ship..."
+      {...(kept.searchStatus ? { searchStatus: kept.searchStatus, searchStatusLabel: kept.searchStatusLabel } : {})}
       navOpen={navOpen}
       onNavOpenChange={setNavOpen}
       identity={
@@ -246,6 +266,7 @@ function Shell() {
         </WorkspacePeopleProvider>
       </MentionPeopleProvider>
       {creatingFolder && <NewFolderDialog onCreate={newFolder} onClose={() => setCreatingFolder(false)} />}
+      {kept.launcher}
     </AppShell>
   )
 }

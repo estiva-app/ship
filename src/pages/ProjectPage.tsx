@@ -10,6 +10,7 @@ import { signedIn } from '@/auth/estivaId'
 import { useReopenHeld } from '@/auth/heldTyping'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useUnfinished } from './creating'
+import { useFormHere } from '@/launcher/forms'
 import {
   ISSUE_STATUSES,
   PROJECT_STATUSES,
@@ -572,6 +573,9 @@ export function ProjectPage({
   const unfinished = useUnfinished('Issue')
   const newIssueHold = project && `new-issue:${project.addr}`
   useReopenHeld(newIssueHold, () => setDialog('issue'))
+  // ⌘K's Add issue here (KIN-6): this project's own Add issue, while it takes one (not archived, not deleted).
+  const takesIssues = !!project && !project.deleted && !archives.ofProject(project.addr)
+  useFormHere('issue', useMemo(() => (takesIssues ? () => setDialog('issue') : undefined), [takesIssues]))
   const record = recordChannel(project?.contentFolder, teams)
   /*
     The conversations this page draws, read for it (APP-5): its own Folders,

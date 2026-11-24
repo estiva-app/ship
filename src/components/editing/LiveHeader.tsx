@@ -59,6 +59,8 @@ export interface LiveHeaderProps {
   onCopyBlockLink?: (link: string) => void
   /** Where the description's unsaved text is held when the sign-in ends (AUT-4). */
   holdKey?: string
+  /** The description's editor once it has arrived, or null when it goes: what ⌘K reads and inserts an answer into (KIN-6). */
+  onDescriptionEditor?: (editor: Editor | null) => void
   /** The file's fields, between the summary and the description (ONE-6, step 4b): drawn once, outside the swaps, so the editors arriving neither moves nor redraws them. */
   fields?: ReactNode
 }
@@ -154,6 +156,10 @@ export function LiveHeader(props: LiveHeaderProps) {
   const [missing, dismiss] = useLinkedBlock(description, format, readOnly)
   // The description's editor once it has arrived: Enter in the title or the summary goes on into it.
   const [body, setBody] = useState<Editor | null>(null)
+  const { onDescriptionEditor } = props
+  useEffect(() => {
+    onDescriptionEditor?.(body)
+  }, [body, onDescriptionEditor])
 
   return (
     // 16px between title and description (Katerina, 29 September: "a bit more" than the 8px pages had), and the
