@@ -108,6 +108,7 @@ describe("[ finds a project by a word of its text, where the relay finds project
   it('with no project search announced, searches by title alone and does not find it', async () => {
     expect(await searchFiles('quox')).toEqual([])
     expect(asked.flat().some((f) => f.search !== undefined && f.fields === 'newest')).toBe(false)
+    expect((await searchFiles('laun')).map((row) => row.id)).toEqual([PROJECT])
   })
 
 })

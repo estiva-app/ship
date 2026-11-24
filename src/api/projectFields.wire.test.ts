@@ -278,6 +278,15 @@ describe('opening a project by its link', () => {
   })
 })
 
+describe("a script's setField", () => {
+  it("names the text's current change as the one a new text follows, not the first record", async () => {
+    held = [root('p'), change('p', 'd1', 'description', 'Old words', 110)]
+    expect(await store.setField({ folder: FOLDER, target: `30850:${PK}:p`, field: 'description', value: 'New words', note: 'Description' })).toEqual({ ok: true })
+    expect(sent).toHaveLength(1)
+    expect(tagOf(sent[0]!, 'prev')).toBe('d1'.padEnd(64, '0'))
+  })
+})
+
 describe('a deleted project in the load', () => {
   const edits = (d: string, n: number) => Array.from({ length: n }, (_, i) => change(d, `${d}-e${i}`, 'title', `Title ${i}`, 110 + i))
 

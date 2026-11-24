@@ -1378,7 +1378,7 @@ export class Store {
     */
     const [kind, pubkey, ...d] = args.target.split(':')
     if (!FILE_KINDS_IN_ORDER.includes(Number(kind))) return this.publish(buildChange(this.signer.pubkey, Date.now(), args))
-    const opened = await openFile((filters) => this.relay.query(filters as never), { kind: Number(kind), pubkey: pubkey!, d: d.join(':') }, { text: false }).catch(() => undefined)
+    const opened = await openFile((filters) => this.relay.query(filters as never), { kind: Number(kind), pubkey: pubkey!, d: d.join(':') }, { text: args.field === TEXT_FIELD }).catch(() => undefined)
     if (!opened) return { ok: false, reason: 'The file could not be read just now, so nothing was changed. Try again.' }
     const written = await this.writeField({ ...args, prev: opened.fields[args.field]?.id ?? opened.root.id })
     if (written.ok) return { ok: true }
