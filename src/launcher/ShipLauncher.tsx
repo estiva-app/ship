@@ -24,7 +24,7 @@ import { useReportFailure } from '@/lib/failureReports'
 import { linkStateOf } from '@/lib/linked'
 import { isSiblingHost, isTopicAddress, topicHref } from '@/lib/topicLinks'
 import { go, navigateTo, useRoute } from '@/router'
-import { askForm } from './forms'
+import { askForm, formHere } from './forms'
 import { blockOfPart, cursorBlockAtOpen, draftComment, insertIntoDescription, openFileNow, PASSAGE, showPart } from './openFile'
 
 /*
@@ -37,7 +37,7 @@ const WORDS: LauncherWords = {
   anywhere: 'Anywhere in Ship',
   inOpen: 'In this issue or project',
   search: 'Search Ship',
-  searchOrAsk: 'Search, or ask about what is open',
+  searchOrAsk: 'Search Ship',
   openGroup: 'Open here',
   nothingOpen: 'Open an issue or project to ask about it.',
   nothingYet: 'Nothing has been written here yet.',
@@ -45,6 +45,10 @@ const WORDS: LauncherWords = {
   downloadModel: 'Download the on-device model to ask about issues and projects',
   part: { one: 'part', many: 'parts' },
 }
+
+/** The words for what is open, as the approved story says them: "In this issue", "ask about this project" (as Leaf's "this page"). */
+const wordsFor = (kind: 'issue' | 'project' | undefined): LauncherWords =>
+  kind ? { ...WORDS, inOpen: `In this ${kind}`, searchOrAsk: `Search, or ask about this ${kind}` } : WORDS
 
 // Ship as the host, without the package's own Create issue form: ⌘K's Add issue opens Ship's (Done when, KIN-6).
 const APPS = launcherApps('ship')
@@ -127,7 +131,7 @@ function answerActions(answer: LauncherAnswer): LauncherAnswerAction[] {
           {
             id: 'comment',
             label: 'Draft a comment',
-            description: block ? 'On the passage it cites first. It will not send: edit it first.' : `On the whole ${open.kind}. It will not send: edit it first.`,
+            description: 'It will not send. Edit it first.',
             icon: <IconMessagePlus size={16} stroke={1.5} />,
             run: () => draftComment(answer.text, block),
           },
@@ -138,7 +142,13 @@ function answerActions(answer: LauncherAnswer): LauncherAnswerAction[] {
           {
             id: 'insert',
             label: 'Insert into the description',
-            description: cursor ? 'Where your cursor was.' : after ? 'Under the passage it cites first.' : 'At the end of the description.',
+            description: cursor
+              ? 'Where your cursor was.'
+              : passage
+                ? 'Under the passage it cites first.'
+                : after
+                  ? 'Under the passage its first comment is on.'
+                  : 'At the end of the description.',
             icon: <IconCornerDownLeft size={16} stroke={1.5} />,
             run: () => insertIntoDescription(answer.text, after),
           },
@@ -162,7 +172,7 @@ export function ShipLauncher({ people, say, ...box }: KeptLauncherBox<LauncherCo
   const host: LauncherHost = {
     apps: APPS,
     mark: () => null,
-    words: WORDS,
+    words: wordsFor(open?.kind),
     path: { pathname: window.location.pathname, search: window.location.search },
     navigate: navigateTo,
     // A person opens in Peek beside Ship; where there is none to find (a preview, localhost), no person is offered.
@@ -186,7 +196,8 @@ export function ShipLauncher({ people, say, ...box }: KeptLauncherBox<LauncherCo
       {
         id: 'add-issue',
         label: 'Add issue',
-        ...(open?.project ? { description: `In ${open.project.title}` } : {}),
+        // Said only where this page's form takes it there: an archived project's issue goes to the Issues page's form.
+        ...(open?.project && formHere('issue') ? { description: `In ${open.project.title}` } : {}),
         icon: <IconPlus size={16} stroke={1.5} />,
         run: () => askForm('issue', () => go({ name: 'issues' })),
       },

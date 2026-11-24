@@ -166,6 +166,7 @@ export function ProjectView({ crumbs, team, header, onAddIssue, tab, onTab, view
             who: issue.assignee?.name,
             open: () => navigateTo(hrefFor(issue)),
           })),
+          threads,
           canComment: !(readOnlyReason ?? commentsClosed),
           canEdit: !(readOnlyReason ?? lockedReason),
           showComments: () => comments.onShownChange(true),

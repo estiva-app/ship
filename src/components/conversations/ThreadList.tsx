@@ -404,9 +404,9 @@ export function MentionListView(props: MentionListViewProps) {
 export function ThreadList(props: ConversationsProps & Pick<ThreadListViewProps, 'upload' | 'drafts'>) {
   const { resolved } = useThreadReferences(props.threads)
   const { reactionsBy, omitted, cut, resolvedBy, goneBy, refresh } = useThreadReactions(props.threads)
-  // ⌘K reads the open file's comments as this column holds them, resolved ones marked (KIN-6).
+  // ⌘K marks the open file's resolved threads as this column knows them (KIN-6).
   const isResolved = useCallback((thread: string) => !!resolvedBy?.[thread], [resolvedBy])
-  useOpenThreads(props.about, props.threads, isResolved)
+  useOpenThreads(props.about, isResolved)
   const onReact = props.onReact
     ? async (messageId: string, emoji: string, mine?: string) => {
         const answer = await props.onReact!(messageId, emoji, mine)

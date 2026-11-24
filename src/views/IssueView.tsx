@@ -148,6 +148,7 @@ export function IssueView({ crumbs, team, title, summary, onSummarize, descripti
           editor,
           description,
           format: descriptionFormat,
+          threads,
           canComment: !(readOnlyReason ?? commentsClosed),
           canEdit: !(readOnlyReason ?? lockedReason),
           showComments: () => comments.onShownChange(true),

@@ -10,6 +10,9 @@ export type ShipForm = 'issue' | 'project'
 
 const here = new Map<ShipForm, () => void>()
 let asked: ShipForm | null = null
+let askedAt = 0
+/** How long an ask waits for its page: a page that never arrived (a sign-in on the way) does not open the form later, unasked. */
+const ASK_WAITS_MS = 15_000
 
 /** A page that can open this form now: while it is drawn, ⌘K's action opens it here. */
 export function useFormHere(form: ShipForm, open: (() => void) | undefined): void {
@@ -19,7 +22,7 @@ export function useFormHere(form: ShipForm, open: (() => void) | undefined): voi
     // Asked from another page: this is where the box sent the person, and the form opens as the page arrives.
     if (asked === form) {
       asked = null
-      open()
+      if (Date.now() - askedAt < ASK_WAITS_MS) open()
     }
     return () => {
       if (here.get(form) === open) here.delete(form)
@@ -32,6 +35,7 @@ export function askForm(form: ShipForm, elsewhere: () => void): void {
   const open = here.get(form)
   if (open) return open()
   asked = form
+  askedAt = Date.now()
   elsewhere()
 }
 

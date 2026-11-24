@@ -576,7 +576,7 @@ export function ProjectPage({
   // ⌘K's Add issue here (KIN-6): this project's own Add issue, while it takes one (not archived, not deleted).
   const takesIssues = !!project && !project.deleted && !archives.ofProject(project.addr)
   useFormHere('issue', useMemo(() => (takesIssues ? () => setDialog('issue') : undefined), [takesIssues]))
-  const record =recordChannel(project?.contentFolder, teams)
+  const record = recordChannel(project?.contentFolder, teams)
   /*
     The conversations this page draws, read for it (APP-5): its own Folders,
     and every Folder holding a comment on it or a mention of it, for its

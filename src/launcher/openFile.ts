@@ -48,10 +48,13 @@ export interface OpenFile extends OpenFileActions {
   format: ContentFormat
   /** A project's issues, in the order its page lists them. */
   issues?: readonly OpenIssueLine[]
+  /** Its comments as the page reads them, whether the comments column is shown or hidden. */
+  threads: readonly ThreadData[]
 }
 
 let file: OpenFile | null = null
-let threads: { address: string; list: readonly ThreadData[]; resolved: (thread: string) => boolean } | null = null
+/** Which threads are resolved, as the comments column knows it while it is shown (hidden: none is marked). */
+let resolutions: { address: string; resolved: (thread: string) => boolean } | null = null
 /** Each comment the box was last handed: the block it was written on (none: the whole file). */
 const comments = new Map<string, string | null>()
 /** Each issue line the box was last handed, by its part id. */
@@ -59,27 +62,35 @@ const issueLines = new Map<string, OpenIssueLine>()
 /** The block the cursor was in when the box was opened from the description you were writing in. */
 let cursorBlock: string | null = null
 
-/** The issue or project page puts itself here while it is drawn. */
+/**
+ * The issue or project page puts itself here while it is drawn: registered once per address, and the fields brought up
+ * to date after each render without leaving and coming back.
+ */
 export function useOpenFile(open: OpenFile | null): void {
+  const address = open?.address
+  useEffect(() => {
+    if (open && file?.address === open.address) file = open
+  })
   useEffect(() => {
     if (!open) return
     file = open
     return () => {
-      if (file === open) file = null
+      if (file?.address === open.address) file = null
     }
-  }, [open])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- registered per address; the effect above keeps the fields current
+  }, [address])
 }
 
-/** The comments column puts the file's threads here as they are read, with which of them are resolved. */
-export function useOpenThreads(address: string | undefined, list: readonly ThreadData[], resolved: (thread: string) => boolean): void {
+/** The comments column says which of the file's threads are resolved, while it is shown. */
+export function useOpenThreads(address: string | undefined, resolved: (thread: string) => boolean): void {
   useEffect(() => {
     if (!address) return
-    const held = { address, list, resolved }
-    threads = held
+    const held = { address, resolved }
+    resolutions = held
     return () => {
-      if (threads === held) threads = null
+      if (resolutions === held) resolutions = null
     }
-  }, [address, list, resolved])
+  }, [address, resolved])
 }
 
 /** The description's blocks as the editor holds them: id and words, in order; a list's items and a table's cells each one. */
@@ -138,13 +149,16 @@ export function captureOpenFile(): LauncherContext {
     const id = `issue-${i}`
     issueLines.set(id, issue)
     const name = [issue.ref, issue.title || 'Untitled issue'].filter(Boolean).join(' ')
-    return { id, author: '', timestamp: '', where: ISSUE_LINE, body: `${name} — ${issue.status}, ${issue.who ? `assigned to ${issue.who}` : 'assigned to nobody'}` }
+    // The source row reads as the story draws it ("REL-1 · In Progress · Ana Duarte"); the model reads the whole line.
+    const where = [issue.ref, issue.status, issue.who].filter(Boolean).join(' · ') || ISSUE_LINE
+    return { id, author: '', timestamp: '', where, body: `${name} — ${issue.status}, ${issue.who ? `assigned to ${issue.who}` : 'assigned to nobody'}` }
   })
-  const said: LauncherMessage[] = (threads?.address === file.address ? threads.list : []).flatMap((thread) => {
+  const isResolved = resolutions?.address === file.address ? resolutions.resolved : () => false
+  const said: LauncherMessage[] = file.threads.flatMap((thread) => {
     const block = blockOf(thread.root.anchor)
     const on = block ? textOf.get(block) : undefined
     const where = on ? `Comment on “${short(on)}”` : `Comment on the whole ${file!.kind}`
-    const resolved = threads!.resolved(thread.id)
+    const resolved = isResolved(thread.id)
     // A thread whose comment is gone stands on its earliest reply (`rootMissing`), which is still a reply.
     return [thread.root, ...thread.replies].flatMap((item): LauncherMessage[] => {
       if (!item.body.trim()) return []

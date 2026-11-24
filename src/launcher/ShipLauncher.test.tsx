@@ -166,6 +166,13 @@ describe("Ship's ⌘K, about the open issue (KIN-6)", () => {
     expect(told).toContain('I will fix it tomorrow.')
   })
 
+  it('still reads every comment when the comments column is hidden', async () => {
+    await ask(issueView({ comments: { shown: false, onShownChange: vi.fn() } }), 'who is fixing the board order?', 'Ana is fixing it tomorrow [2].', 'Draft a comment')
+    const told = model.told.join('\n')
+    expect(told).toContain('It re-reads the team and the archived one lands last.')
+    expect(told).toContain('I will fix it tomorrow.')
+  })
+
   it('drafts the answer as a new comment in the comment box, unsent', async () => {
     const start = vi.fn()
     await ask(issueView({ onStartConversation: start }), 'who is fixing the board order?', 'Ana is fixing it tomorrow.', 'Draft a comment')
@@ -299,8 +306,8 @@ describe('where a file opens from ⌘K (KIN-6)', () => {
 
 describe('what an ask reads (KIN-6)', () => {
   function Open({ resolved }: { resolved: string[] }) {
-    useOpenFile({ address: ISSUE, kind: 'issue', title: 'Board', editor: null, description: 'Columns come back wrong.', format: 'marker', canComment: true, canEdit: true, showComments: () => {}, startDraft: () => {} })
-    useOpenThreads(ISSUE, [ON_CAUSE, WHO], (id) => resolved.includes(id))
+    useOpenFile({ address: ISSUE, kind: 'issue', title: 'Board', editor: null, description: 'Columns come back wrong.', format: 'marker', threads: [ON_CAUSE, WHO], canComment: true, canEdit: true, showComments: () => {}, startDraft: () => {} })
+    useOpenThreads(ISSUE, (id: string) => resolved.includes(id))
     return null
   }
 

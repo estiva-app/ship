@@ -31,6 +31,7 @@ import { useReferencePage } from '@/api/references'
 import { createIssue } from '@/api'
 import { NewIssueDialog } from '@/components/NewIssueDialog'
 import { useFormHere } from '@/launcher/forms'
+import { useReopenHeld } from '@/auth/heldTyping'
 import { useUnfinished } from './creating'
 
 /**
@@ -53,6 +54,8 @@ export function IssuePage({ state, directory, teams, archives, d, say, refresh }
   const newIssue = useUnfinished('Issue')
   const takesIssues = !!project && !project.deleted && !archives.ofProject(project.addr)
   useFormHere('issue', useMemo(() => (takesIssues ? () => setAddingIssue(true) : undefined), [takesIssues]))
+  // Back from a passkey trip, the form opens again here holding what was typed (AUT-4), as on the project page.
+  useReopenHeld(project && takesIssues ? `new-issue:${project.addr}` : undefined, () => setAddingIssue(true))
   // Its team is its project's, by the rule the sidebar marks it with (App's teamOf); an issue in no project is in no team.
   const team = project && teams ? placedIn({ addr: project.addr, folder: project.contentFolder }, teams)[0] : undefined
   /*
