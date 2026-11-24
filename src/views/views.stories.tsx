@@ -1,5 +1,6 @@
 import { editedLabel } from '@/lib/time'
-import { useState } from 'react'
+import { useContext, useState } from 'react'
+import { ShellSearch } from '@/concept/shellSearch'
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { fn } from 'storybook/test'
 import { AppShell } from '@/components/AppShell'
@@ -79,9 +80,12 @@ const SIDEBAR_TOPICS: SidebarTopic[] = [
 ]
 
 function Shell({ current, openTopic, children }: { current?: SidebarEntry; openTopic?: string; children: React.ReactNode }) {
+  // KIN-6 concept: the search in the top bar, when a ⌘K story hands one in.
+  const search = useContext(ShellSearch)
   return (
     <div className="h-screen">
       <AppShell
+        {...search}
         logo="Estiva Ship"
         identity={<IdentityMenu me={ANA} signedIn idBase="https://id.estiva.app" relayUrl="http://localhost:3000" onCopyKey={fn()} onSignOut={fn()} />}
         nav={<ShipSidebar openIssues={18} activeProjects={SIDEBAR_PROJECTS.length} hrefFor={(entry) => `#/${entry}`} {...(current ? { current: { entry: current } } : {})} {...(openTopic ? { openTopic } : {})} topics={SIDEBAR_TOPICS} />}
