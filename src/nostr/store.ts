@@ -27,7 +27,7 @@ import {
 } from './events'
 import { findNaddrs, naddrToAddr, buildReaction, buildResolution, buildEdit, buildDeletion as buildEventDeletion, imetaTag, needsRelayKey, RELAY_KEY_FILTER, type Authored } from '@estiva-app/protocol'
 import { DELETED_FIELD, createFile, finishCreating, listFiles, listsField, openFile, writeChange, TEXT_FIELD, type CreateFileArgs, type CreateFileResult, type FileFields, type WriteChangeResult } from '@estiva-app/interop'
-import { createLoadQuery, planArchiveFolder, planCreateFolder, planDeleteFolder, planListInTopic, planMoveFromFolders, planPlaceFile, planRemoveFromTopic, planRenameFolder, readMentionedIn, readMoveRefusal, type ListHolder, type FolderRef, type MovableFile, type MoveRefusal } from '@estiva-app/interop'
+import { createLoadQuery, withTimes, type TimesFn, planArchiveFolder, planCreateFolder, planDeleteFolder, planListInTopic, planMoveFromFolders, planPlaceFile, planRemoveFromTopic, planRenameFolder, readMentionedIn, readMoveRefusal, type ListHolder, type FolderRef, type MovableFile, type MoveRefusal } from '@estiva-app/interop'
 import { readState, type FolderState } from './read'
 import { type Issue } from './files'
 import { buildMembershipChange, buildMutedEvent, buildPlaceAdd, switchWrites, type Following, type Place, decorationsOf, foldAttachments, foldEdits, foldEmbeds, URGENT_TAG, type Decorations, type EditFold, type QueryFn } from '@estiva-app/conversation'
@@ -493,7 +493,11 @@ export class Store {
   /** What this tab deleted, which a re-read since a time cannot learn — see `reloadFolders`. */
   private readonly deleted = new Deletions()
   /** Every filter paged to its end, outside any load: a re-read must see what changed since one. */
-  private readonly queryAll: QueryFn = (filters) => this.relay.queryAll(filters as never)
+  // The same reader's times read rides on every query handed to interop: a file the list read leaves out, a deleted one,
+  // is read by its current changes and still says who deleted it, never by every change it ever had (aa0ddf0c).
+  private readonly times: TimesFn = (filters) => this.relay.queryTimes(filters as never)
+  private readonly read: QueryFn = withTimes((filters) => this.relay.query(filters as never), this.times)
+  private readonly queryAll: QueryFn = withTimes((filters) => this.relay.queryAll(filters as never), this.times)
 
   constructor(
     private readonly relay: Relay,
@@ -607,7 +611,7 @@ export class Store {
    * length, which the changes make longer than any page.
    */
   private async listEvery(kind: number): Promise<FileFields[]> {
-    const query: QueryFn = (filters) => this.relay.query(filters as never)
+    const query: QueryFn = this.read
     const files: FileFields[] = []
     const seen = new Set<string>()
     let until: number | undefined
@@ -665,7 +669,7 @@ export class Store {
     const wanted = addrs.filter(unheld)
     const whole = changes.filter((addr) => unheld(addr) && !wanted.includes(addr))
     if (!held || !(wanted.length || whole.length)) return { events: [], texts: [] }
-    const query: QueryFn = (filters) => this.relay.query(filters as never)
+    const query: QueryFn = this.read
     const files = await Promise.all(
       wanted.map((addr) => {
         const [, pubkey, ...d] = addr.split(':')
@@ -1177,7 +1181,7 @@ export class Store {
    * absent from the next read rather than something to reconcile.
    */
   decorationsFor(targets: readonly { id: string; at: number }[]): Promise<Decorations> {
-    const query: QueryFn = (filters) => this.relay.query(filters as never)
+    const query: QueryFn = this.read
     return decorationsOf(targets, query)
   }
 
@@ -1378,7 +1382,7 @@ export class Store {
     */
     const [kind, pubkey, ...d] = args.target.split(':')
     if (!FILE_KINDS_IN_ORDER.includes(Number(kind))) return this.publish(buildChange(this.signer.pubkey, Date.now(), args))
-    const opened = await openFile((filters) => this.relay.query(filters as never), { kind: Number(kind), pubkey: pubkey!, d: d.join(':') }, { text: args.field === TEXT_FIELD }).catch(() => undefined)
+    const opened = await openFile(this.read, { kind: Number(kind), pubkey: pubkey!, d: d.join(':') }, { text: args.field === TEXT_FIELD }).catch(() => undefined)
     if (!opened) return { ok: false, reason: 'The file could not be read just now, so nothing was changed. Try again.' }
     const written = await this.writeField({ ...args, prev: opened.fields[args.field]?.id ?? opened.root.id })
     if (written.ok) return { ok: true }
@@ -1429,7 +1433,7 @@ export class Store {
         const result = await this.relay.publish(event)
         return { ok: result.ok, reason: result.reason, eventId: event.id }
       },
-      query: (filters) => this.relay.query(filters as never),
+      query: this.read,
       current: this.currentOf(args.target),
     })
   }
@@ -1441,7 +1445,7 @@ export class Store {
   private currentOf(target: string): (field: string) => Promise<SignedEvent | undefined> {
     const [kind, pubkey, ...d] = target.split(':')
     return async (field) =>
-      (await openFile((filters) => this.relay.query(filters as never), { kind: Number(kind), pubkey: pubkey!, d: d.join(':') }, { text: field === TEXT_FIELD }))?.fields[field]?.event
+      (await openFile(this.read, { kind: Number(kind), pubkey: pubkey!, d: d.join(':') }, { text: field === TEXT_FIELD }))?.fields[field]?.event
   }
 
   /**
@@ -1474,7 +1478,7 @@ export class Store {
         const result = await this.relay.publish(event)
         return { ok: result.ok, reason: result.reason, eventId: event.id }
       },
-      query: (filters) => this.relay.query(filters as never),
+      query: this.read,
       current: this.currentOf(target),
     }
   }
@@ -1550,7 +1554,7 @@ export class Store {
     {
       const [kind, pubkey, ...d] = args.topic.address.split(':')
       const pointer = { kind: Number(kind), pubkey: pubkey!, d: d.join(':') }
-      const query = (filters: Record<string, unknown>[]) => this.relay.query(filters as never)
+      const query = this.read
       const field = listsField(args.file)
       const opened = await openFile(query, pointer, { text: false }).catch(() => undefined)
       const prev = opened ? (opened.fields[field]?.id ?? opened.root.id) : undefined
@@ -1788,7 +1792,7 @@ export class Store {
     const threadsAt: Record<string, number> = {}
     // Each Folder's conversation is paged as every Folder read is; its projects and issues come at once, so their changes need not wait for it.
     const talk: Promise<SignedEvent[]>[] = []
-    const query: QueryFn = (filters) => this.relay.query(filters as never)
+    const query: QueryFn = this.read
     // An opened file's fields and text need only its record, so they are read beside its Folder, not after it — where its kind is read by its fields.
     const ownKind = opened.kind === 'project' ? KIND.PROJECT : KIND.ISSUE
     const ownOpened = opened.kind === 'project' ? this.openedProjects : this.openedIssues
@@ -1941,7 +1945,7 @@ export class Store {
 
   /** A query for one load (`createLoadQuery`, paged): see `loadAllEvents`. */
   private loadQuery(): QueryFn {
-    return createLoadQuery((filters) => this.relay.queryAll(filters as never), { paged: true })
+    return createLoadQuery(this.queryAll, { paged: true })
   }
 
   /**
@@ -2200,7 +2204,7 @@ export class Store {
       for (const event of events) read.set(event.id, event)
       return events
     }
-    const query: QueryFn = async (filters) => keep(await this.relay.query(filters as never))
+    const query: QueryFn = withTimes(async (filters) => keep(await this.relay.query(filters as never)), this.times)
     await readMentionedIn(query, address, { commentKinds: [KIND.COMMENT] })
     const loaded = new Set(known)
     const outside = readState([...read.values()], referencedAddresses)

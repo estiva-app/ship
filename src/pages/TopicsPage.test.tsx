@@ -222,6 +222,18 @@ describe("Ship's Topics (Explore initiatives)", () => {
     await waitFor(() => expect(within(rowOf('Others’ topic')).getByText('1')).toBeTruthy())
   })
 
+  it('puts a topic under Archived when the project above it was archived and then deleted, found by the times read', async () => {
+    const above = (field: string) => event(1851, [['a', projectAddr('p-gone')], ['O', 'p-gone'], ['field', field], ['value', 'true'], ['h', TEAM]])
+    held.push(shipManifest(), projectRoot('p-gone'), above('archived'), above('deleted'))
+    held.push({ ...topic('t-under', 'Under the gone project'), tags: [...topic('t-under', '').tags.filter((t) => t[0] !== 'title'), ['title', 'Under the gone project'], ['a', projectAddr('p-gone')]] })
+    held.push(topic('t-live', 'Live'), joined('t-live'))
+    render(page())
+
+    await waitFor(() => expect(tabs()).toContain('Archived1'))
+    fireEvent.click(screen.getByRole('tab', { name: /Archived/ }))
+    expect(titles()).toEqual(['Under the gone project'])
+  })
+
   it('leaves out a space, and puts a topic archived in Peek under Archived, with no Join', async () => {
     held.push(shipManifest(), issueRoot('i-live'))
     held.push(topic('t-space', 'Bugs'), joined('t-space'), lists('t-space', 'i-live'), spaceMark('t-space'))

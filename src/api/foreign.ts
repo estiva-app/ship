@@ -21,6 +21,7 @@ import {
   conversationCountsOf,
   archiveImpact,
   createLoadQuery,
+  withTimes,
   createPeopleCache,
   createProjectionCache,
   listFolders,
@@ -70,9 +71,14 @@ export type { ForeignObject, ResolvedSlot, FolderContents, FolderSummary } from 
  * Each event once: the relay answers every filter on its own, so a file two filters match comes back twice — an
  * issue asked by its own card and as its project's (ALO-23) — and the project's card would list it twice.
  */
-const query = async (filters: Record<string, unknown>[]): Promise<SignedEvent[]> => [
-  ...new Map((await relay.query(filters as never)).map((event) => [event.id, event])).values(),
-]
+const query = withTimes(
+  async (filters: Record<string, unknown>[]): Promise<SignedEvent[]> => [
+    ...new Map((await relay.query(filters as never)).map((event) => [event.id, event])).values(),
+  ],
+  // The same reader's times read: a file the list read leaves out, a deleted one, is read by its current changes and
+  // still says who deleted it, never by every change it ever had (aa0ddf0c).
+  (filters) => times(filters),
+)
 
 /**
  * One load of Folder reads (APP-2): a Folder listing and the Folders' contents
@@ -104,7 +110,7 @@ let workspaceTook: () => void = () => undefined
 const workspaceStarted = new Promise<void>((resolve) => (workspaceTook = resolve))
 export function firstLoad(reader: 'workspace' | 'listing'): QueryFn | undefined {
   if (!firstLoadFor.delete(reader)) return undefined
-  const read = (firstLoadQuery ??= createLoadQuery((filters) => relay.queryAll(filters as never), { paged: true }))
+  const read = (firstLoadQuery ??= createLoadQuery(withTimes((filters) => relay.queryAll(filters as never), (filters) => times(filters)), { paged: true }))
   if (!firstLoadFor.size) firstLoadQuery = undefined
   if (reader === 'workspace') {
     workspaceTook()
@@ -143,6 +149,11 @@ export function firstLoad(reader: 'workspace' | 'listing'): QueryFn | undefined 
  * re-read on every tick, which is what keeps the widget live.
  */
 const manifests = createProjectionCache()
+
+/** Forgets the tab's manifests, for a test that publishes its own: the cache keeps a whole sweep (interop 0.118). */
+export function forgetManifestsForTests(): void {
+  manifests.clear()
+}
 
 /**
  * Who the people in a foreign object are, remembered for this tab (SHA-16).
@@ -540,7 +551,8 @@ export async function readFileTopics(file: string): Promise<TopicOfFile[]> {
  * field's current change, never every move or look someone set (TOPI-5, ALL-6).
  */
 export async function readAllTopics(): Promise<TopicsRead> {
-  return readTopics((filters) => relay.queryAll(filters as never), signer.pubkey, { cache: manifests })
+  // The parents walked for an archive include a deleted one, read by the times read (aa0ddf0c).
+  return readTopics(withTimes((filters) => relay.queryAll(filters as never), (filters) => times(filters)), signer.pubkey, { cache: manifests })
 }
 
 /**
