@@ -12,15 +12,14 @@
  * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/an-edit-says-what-the-message-links-now.md
  */
 import { useEffect, useSyncExternalStore } from 'react'
-import { linkReader, withTimes } from '@estiva-app/interop'
+import { linkReader } from '@estiva-app/interop'
 import { referenceOfLink } from '@estiva-app/protocol'
 import { writtenLinkOf, type ReferenceLink } from '@/lib/referenceLink'
 import { declaredManifests } from './handoff'
-import { relay, times } from './store'
+import { relay } from './store'
 
 /** Ship's one link reader: reads as the signed-in viewer, from the manifests read once per tab. */
-// With the times read, a link to a deleted file still says who deleted it (aa0ddf0c).
-export const links = linkReader({ query: withTimes((filters) => relay.query(filters as never), (filters) => times(filters)), manifests: () => declaredManifests() })
+export const links = linkReader({ query: (filters) => relay.query(filters as never), manifests: () => declaredManifests() })
 
 /** What a link names, from what has come back: undefined until it has, and for nothing. A `LinkResolver`. */
 export const knownLinkValue = links.known

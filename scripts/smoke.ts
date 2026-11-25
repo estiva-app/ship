@@ -48,7 +48,8 @@ import { readFileSync, mkdirSync } from 'node:fs'
 import { extname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium, type ConsoleMessage, type Page } from 'playwright-core'
-import { addrToNaddr } from '@estiva-app/protocol'
+import { addrToNaddr, type SignedEvent } from '@estiva-app/protocol'
+import { listAnswer, timesAnswer } from '../src/test/listRead'
 
 // A path on every system: a URL's pathname is `/K:/…` on Windows, which `join` turns into `K:\K:\…`.
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
@@ -119,6 +120,8 @@ function matches(event: Event, filter: Record<string, unknown>): boolean {
   if (kinds && !kinds.includes(event.kind)) return false
   const authors = filter.authors as string[] | undefined
   if (authors && !authors.includes(event.pubkey)) return false
+  const ids = filter.ids as string[] | undefined
+  if (ids && !ids.includes(event.id)) return false
   for (const [key, want] of Object.entries(filter)) {
     if (!key.startsWith('#')) continue
     const name = key.slice(1)
@@ -262,7 +265,15 @@ async function main() {
       */
       queryCalls.push(filters.length)
       const live = stored.filter((event) => !deleted.has(event.id))
+      /*
+        The file reads every relay answers since ALL-8 (SPEC §6.13): the times read, an object of rows, and the list
+        and open reads (`"fields": "newest"`), each file with its fields' current changes and a deleted one left out.
+      */
+      if (filters.length && filters.every((filter) => filter.fields === 'times')) {
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ times: timesAnswer(live as SignedEvent[], filters) }) })
+      }
       const hits = filters.flatMap((filter) => {
+        if (filter.fields === 'newest') return listAnswer(live, filter, (event, f) => matches(event, f))
         const eligible = live
           .filter((event) => matches(event, filter))
           .sort((a, b) => b.created_at - a.created_at)
@@ -404,19 +415,19 @@ async function main() {
   const project = stored.find((e) => e.kind === 30850)
   check('no kind:9007 — a project gets no Folder of its own (FOL-2)', !stored.some((e) => e.kind === 9007))
   check(
-    'the project record points at its team, and is not filed under it',
-    // REW-11 made the record global: `buzz-channel` names the Folder, and there
-    // is deliberately no `h`. Asserting the absence too, because a record that
-    // carried both would fold correctly and still be the old shape.
-    !!project && tagValue(project, 'buzz-channel') === TEAM_ID,
-    `buzz-channel=${tagValue(project!, 'buzz-channel')?.slice(0, 8)}`,
+    'the project record is filed in its team by `h`, where the relay keeps projects in order',
+    // ALL-8: every file type is kept in order, so a project is filed in its team's Folder by `h`, as an issue is.
+    // Asserting the old `buzz-channel` is gone too: a record carrying both would fold and still be the old shape.
+    !!project && tagValue(project, 'h') === TEAM_ID,
+    `h=${tagValue(project!, 'h')?.slice(0, 8)}`,
   )
-  check('  …with no `h` of its own', !!project && tagValue(project, 'h') === undefined)
+  check('  …with no `buzz-channel`', !!project && tagValue(project, 'buzz-channel') === undefined)
   const listing = stored.find((e) => e.kind === 1852)
   check(
-    '  …and a kind:1852 lists it in the team, so Peek places it',
+    '  …and a kind:1852 lists it in the team, by its id (SPEC §3.3), so Peek places it',
     !!project && !!listing && tagValue(listing, 'h') === TEAM_ID && tagValue(listing, 'op') === 'add' &&
-      tagValue(listing, 'a') === `30850:${project.pubkey}:${tagValue(project, 'd')}`,
+      tagValue(listing, 'o') === tagValue(project, 'd'),
+    JSON.stringify(listing?.tags),
   )
   await shot(page, '02-projects')
 
@@ -443,7 +454,7 @@ async function main() {
   const issue = stored.find((e) => e.kind === 30851)
   check(
     'the issue landed in the Folder the project points at',
-    !!issue && !!project && tagValue(issue, 'h') === tagValue(project, 'buzz-channel'),
+    !!issue && !!project && tagValue(issue, 'h') === tagValue(project, 'h'),
   )
   check('the issue names its parent project', !!issue && !!tagValue(issue!, 'a'))
   await shot(page, '03-project-overview')
@@ -527,7 +538,8 @@ async function main() {
 
   // Leaving the field saves it; Escape leaves and keeps the text (Notion's Esc, Katerina 29 September).
   await editor.press('Escape')
-  await until(() => stored.some((e) => e.kind === 1851 && tagValue(e, 'field') === 'description'))
+  const issueAddress = issue ? `30851:${issue.pubkey}:${tagValue(issue, 'd')}` : ''
+  await until(() => stored.some((e) => e.kind === 1851 && tagValue(e, 'field') === 'description' && tagValue(e, 'a') === issueAddress))
   const leftBox = await editor.boundingBox()
   check(
     'the field is the same size writing and after it is left — the report itself',
@@ -535,7 +547,8 @@ async function main() {
     `writing ${Math.round(editingBox?.height ?? 0)}px, left ${Math.round(leftBox?.height ?? 0)}px`,
   )
 
-  const described = stored.filter((e) => e.kind === 1851).find((e) => tagValue(e, 'field') === 'description')
+  // The issue's description as just written: the project's own text is its first change too (SPEC §6.1).
+  const described = stored.filter((e) => e.kind === 1851 && tagValue(e, 'field') === 'description' && tagValue(e, 'a') === issueAddress).at(-1)
   check('the description was published as a block document', !!described)
   check(
     '  …declaring its format on the event, never in the body',
@@ -555,9 +568,11 @@ async function main() {
   // The fields are a row on the page (ONE-6, step 4b); Mentioned in and History are the Overview's (step 4d).
   await pick('Status', 'In Progress')
   await showOverview()
-  // History's rows are the panel's only list items: Activity's mentions are the kit's cards.
-  const history = overviewColumn()
-  await history.locator('li').first().waitFor()
+  // History is folded on every visit and read only once opened, and only for an Estiva ID session (ALO-19): this run
+  // signs with its own key, so it checks the fold opens, and the change itself on the wire below.
+  const historyToggle = overviewColumn().getByRole('button', { name: 'History' })
+  await historyToggle.click()
+  check('History opens from the Overview', (await historyToggle.getAttribute('aria-expanded')) === 'true')
   const change = stored.find((e) => e.kind === 1851)
   check('a kind:1851 change was published, not an edit', !!change)
   check(
@@ -872,10 +887,10 @@ async function main() {
     move for a reason that has nothing to do with the change being published.
   */
   await showOverview()
-  const historyRows = await history.locator('li').count()
-  // The page's fields stay on screen beside the Overview, so the change shows up in History as it is made.
+  // The page's fields stay on screen beside the Overview; History draws only for an Estiva ID session, so the
+  // change is awaited on the wire.
   await pick('Assignee', 1)
-  await history.locator('li').nth(historyRows).waitFor()
+  await until(() => stored.some((e) => e.kind === 1851 && tagValue(e, 'field') === 'assignee'))
   check(
     'assigning publishes a second change',
     stored.filter((e) => e.kind === 1851 && tagValue(e, 'field') === 'assignee').length === 1,
@@ -1277,7 +1292,8 @@ async function main() {
   const moveWrites = stored.slice(beforeMove).filter((e) => e.kind === 1852 || e.kind === 1851)
   check(
     '"Move to team…" publishes one move into the new team, naming the one it leaves, and no kind:1851',
-    moveWrites.map((e) => `${e.kind} ${tagValue(e, 'op')} ${tagValue(e, 'h')?.slice(0, 8)} ${tagValue(e, 'from')?.slice(0, 8)} ${tagValue(e, 'a') === projectAddr}`).join(' | ') ===
+    // It names the project by its id (`o`, SPEC §3.3), as the team's listing does.
+    moveWrites.map((e) => `${e.kind} ${tagValue(e, 'op')} ${tagValue(e, 'h')?.slice(0, 8)} ${tagValue(e, 'from')?.slice(0, 8)} ${tagValue(e, 'o') === projectAddr.split(':')[2]}`).join(' | ') ===
       `1852 move ${TEAM_ID.slice(0, 8)} ${FOLDER_ID.slice(0, 8)} true`,
     moveWrites.map((e) => `${e.kind} ${tagValue(e, 'op')} ${tagValue(e, 'h')?.slice(0, 8)} from ${tagValue(e, 'from')?.slice(0, 8)}`).join(' | ') || 'nothing published',
   )

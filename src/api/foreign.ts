@@ -551,7 +551,8 @@ export async function readFileTopics(file: string): Promise<TopicOfFile[]> {
  * field's current change, never every move or look someone set (TOPI-5, ALL-6).
  */
 export async function readAllTopics(): Promise<TopicsRead> {
-  return readTopics((filters) => relay.queryAll(filters as never), signer.pubkey, { cache: manifests })
+  // The parents walked for an archive include a deleted one, read by the times read (aa0ddf0c).
+  return readTopics(withTimes((filters) => relay.queryAll(filters as never), (filters) => times(filters)), signer.pubkey, { cache: manifests })
 }
 
 /**
