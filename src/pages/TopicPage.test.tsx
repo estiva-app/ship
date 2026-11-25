@@ -34,6 +34,7 @@ vi.mock('@/api/nip44', () => ({ nip44: { decrypt: async () => undefined } }))
 
 import { TopicPage } from './TopicPage'
 import { prefetchTopics, resetTopicsForTests } from '@/api/topics'
+import { forgetManifestsForTests } from '@/api/foreign'
 import { archivesOf } from '@/lib/archive'
 import { buildManifest } from '@/nostr/manifest'
 
@@ -133,6 +134,8 @@ beforeEach(() => {
   down = false
   refuseDocuments = false
   resetTopicsForTests()
+  // Each test publishes its own manifests; one a test before it read must not answer for them.
+  forgetManifestsForTests()
   history.replaceState(null, '', `/topic/${D}`)
 })
 
