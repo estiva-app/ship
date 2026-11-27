@@ -21,6 +21,7 @@ import { fileHits, subscribeFileHits } from '@/api/references'
 import { useForeignObjects } from '@/api/useForeignObjects'
 import { referenceOfValue } from '@/components/conversations/shared'
 import { useReportFailure } from '@/lib/failureReports'
+import { dOf } from '@/lib/fileLinks'
 import { linkStateOf } from '@/lib/linked'
 import { isSiblingHost, isTopicAddress, topicHref } from '@/lib/topicLinks'
 import { go, navigateTo, useRoute } from '@/router'
@@ -57,7 +58,6 @@ const APPS = launcherApps('ship')
 const IDLE = { state: { kind: 'idle' } as const, hits: [] as LauncherFileHit[] }
 
 const kindOf = (address: string) => Number(address.split(':')[0])
-const dOf = (address: string) => address.split(':').slice(2).join(':')
 
 /** What `[` finds, as the box's file search: files from every app by the words of their fields. */
 function useShipFileSearch(query: string): ReturnType<LauncherHost['useFileSearch']> {

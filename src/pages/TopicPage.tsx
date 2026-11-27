@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FolderSummary, ForeignObject } from '@estiva-app/interop'
 import { archivedLine, thingKindOf } from '@estiva-app/ui'
 import { me, type DirectoryView, type WorkspaceState } from '@/api'
+import { useLinkWords } from '@/api/fileLinks'
 import { reloadTopics, rereadTopics, useTopicDocuments, useTopicPlace, useTopics, useYourTopics } from '@/api/topics'
 import { addToTopic, joinTopic, leaveTopic } from '@/api/writes'
 import { Members } from '@/components/Members'
@@ -16,7 +17,7 @@ import { DOCUMENT_KIND, topicOfD, topicPageOf } from '@/lib/topics'
 import { href } from '@/router'
 import { TopicView, type TopicDocument, type TopicPageView } from '@/views/TopicView'
 import { act, type Say } from './act'
-import { copyText, pickerPeople } from './ProjectPage'
+import { copyFileLink, copyText, pickerPeople } from './ProjectPage'
 import { useTopicConversation } from './topicConversation'
 import { placedIn } from '@/lib/placement'
 
@@ -79,19 +80,23 @@ export function TopicPage({
     )
   }, [held, topic])
 
-  const page = useMemo(() => (topic ? topicPageOf(topic, state, archives) : undefined), [topic, state, archives])
+  // The words Open in Peek's link is written with (LIN-4); until they are read it is the topic's `/o/` address.
+  const words = useLinkWords()
+  const page = useMemo(() => (topic ? topicPageOf(topic, state, archives, words ?? undefined) : undefined), [topic, state, archives, words])
   // A space goes on to Peek by itself only on a host beside Ship's; anywhere else its page is drawn, with the link.
   const sendsOn = !!topic?.space && !!page?.peekUrl && isSiblingHost(page.peekUrl, location.hostname)
 
   useEffect(() => {
     if (!topic || !page) return
+    // A space waits for the words, so it is sent on to its short link rather than its `/o/` one.
+    if (topic.space && words === null) return
     if (sendsOn) {
       window.location.replace(page.peekUrl!)
       return
     }
     const path = topicHref(topic.address, page.title)
     if (location.pathname !== path) history.replaceState(null, '', `${path}${location.search}${location.hash}`)
-  }, [topic, page, sendsOn])
+  }, [topic, page, sendsOn, words])
 
   // Its Leaf documents and every other app's file, in one read (A10).
   const documentsKey = page ? [...page.documents, ...page.files].join(' ') : ''
@@ -265,7 +270,9 @@ export function TopicPage({
           />
         )
       }
-      onCopyLink={() => void copyText(new URL(topic ? topicHref(topic.address, view?.title ?? '') : location.pathname, window.location.origin).href, 'Link copied', 'Copy this link:', say)}
+      onCopyLink={() =>
+        void (topic ? copyFileLink(topic.address, view?.title, say) : copyText(new URL(location.pathname, window.location.origin).href, 'Link copied', 'Copy this link:', say))
+      }
       {...(page?.peekUrl ? { peekUrl: page.peekUrl } : {})}
       onRetry={() => {
         if (readAgain !== 'failed') return void reloadTopics()

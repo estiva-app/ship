@@ -1,5 +1,6 @@
-import { KIND_BARE_FILE, objectRef, type ReadTopic, type TopicsRead } from '@estiva-app/interop'
+import { fileUrlOf, KIND_BARE_FILE, type FileLinkWords, type ReadTopic, type TopicsRead } from '@estiva-app/interop'
 import { href } from '@/router'
+import { dOf } from './fileLinks'
 import { safeLink } from './handoff'
 
 /**
@@ -8,8 +9,6 @@ import { safeLink } from './handoff'
  * can ask without reading the relay.
  * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-link-opens-in-the-app-you-are-in-when-it-has-a-page-made-for-that-kind.md
  */
-
-const dOf = (address: string) => address.split(':')[2] ?? ''
 
 /** A topic's page here, slug and all. */
 export function topicHref(address: string, title?: string): string {
@@ -23,12 +22,14 @@ export function isTopicAddress(address: string | undefined): address is string {
 
 /**
  * The topic on Peek: the same path on the host its manifest's link names, as
- * §7.7 has a person move between apps by changing the host. Absent when Peek's
- * manifest gave no `https:` link.
+ * §7.7 has a person move between apps by changing the host, written by the
+ * shared writer with the words held now (`linkWords`; `/o/<naddr>` before
+ * they are read, which Peek opens too). Absent when Peek's manifest gave no
+ * `https:` link.
  */
-export function topicInPeek(openUrl: string | undefined, address: string, title: string): string | undefined {
+export function topicInPeek(openUrl: string | undefined, address: string, title: string, words: FileLinkWords): string | undefined {
   const link = safeLink(openUrl)
-  return link ? `${new URL(link).origin}/topic/${objectRef(dOf(address), title)}` : undefined
+  return (link && fileUrlOf(address, words, new URL(link).origin, title)) || undefined
 }
 
 /**

@@ -2,6 +2,7 @@ import { writtenOpenerOf, type ForeignObject } from '@estiva-app/interop'
 import { KIND } from '../nostr/kinds'
 import { isOwnKind } from './ownKinds'
 import { href, parse } from '@/router'
+import { dOf } from './fileLinks'
 import { safeLink } from './handoff'
 import { isKnownSpace, isTopicAddress, topicHref } from './topicLinks'
 
@@ -33,7 +34,7 @@ export type ReferenceLink =
 export function referenceLink(object: ForeignObject | null | undefined): ReferenceLink | null {
   if (!object || object.unreachable) return null
   if (isOwnKind(object.kind) && object.address) {
-    const d = object.address.split(':')[2]
+    const d = dOf(object.address)
     const title = object.slots.title
     const slug = title && !title.isPubkey ? title.value : undefined
     return {

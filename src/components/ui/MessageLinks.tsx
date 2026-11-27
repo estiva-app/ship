@@ -10,6 +10,7 @@ import { useParentArchive } from '@/api/useParentArchive'
 import { useWorkspacePeople } from '@/components/editing/mentionables'
 import { cardShapes } from '@/lib/cardShapes'
 import { hrefOf, linkedKindOf, linkStateOf, notAvailable } from '@/lib/linked'
+import { dOf } from '@/lib/fileLinks'
 import { isOwnKind } from '@/lib/ownKinds'
 import { writtenLink } from '@/api/linkCards'
 import { noteCardAvailability, rememberedUnavailable } from '@/lib/unavailableCards'
@@ -92,7 +93,7 @@ function isAbsent(uri: string, object: ForeignObject | null | undefined): boolea
 /** Where a file's comment count opens: a Ship file's page, its comments beside it (ONE-6), anyone else's file in its own app. */
 export function conversationHref(object: ForeignObject): string {
   if (!isOwnKind(object.kind) || !object.address) return hrefOf(object)
-  const d = object.address.split(':').slice(2).join(':')
+  const d = dOf(object.address)
   const title = object.slots.title
   const slug = title && !title.isPubkey ? title.value : undefined
   return object.kind === KIND.PROJECT ? href({ name: 'project', d, slug, view: 'table' }) : href({ name: 'issue', d, slug })

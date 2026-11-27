@@ -1,9 +1,10 @@
-import { byActivity, type ReadTopic, type TopicsRead } from '@estiva-app/interop'
+import { byActivity, type FileLinkWords, type ReadTopic, type TopicsRead } from '@estiva-app/interop'
 import { topicAsDrawn } from '@/api/foreign'
 import { ISSUE_STATUSES, progressOf, projectStatus, type Stage } from '@/nostr/kinds'
 import { href } from '@/router'
 import type { Archives } from './archive'
 import { statusLabel } from './issues'
+import { dOf } from './fileLinks'
 import { topicHref, topicInPeek } from './topicLinks'
 
 /** One row on Ship's Topics, which is Explore topics (TOPI-9): the same columns in every app. */
@@ -174,8 +175,6 @@ export const DOCUMENT_KIND = 30842
 /** Ship's own kinds, a project and an issue: one Ship does not hold is not another app's file. */
 const SHIP_KINDS = [30850, 30851]
 
-const dOf = (address: string) => address.split(':')[2] ?? ''
-
 /** The topic a `d` names among these: none when no topic holds it, or two do (§13.1, as the hand-off reads it). */
 export function topicOfD(topics: readonly ReadTopic[], d: string): ReadTopic | undefined {
   const held = topics.filter((topic) => dOf(topic.address) === d)
@@ -244,7 +243,7 @@ export interface TopicPageWork {
  * hold (deleted, not read) is none of these. Judged by Ship's own fold, as
  * Topics is.
  */
-export function topicPageOf(topic: ReadTopic, work: TopicPageWork, archives: Archives): TopicPageData {
+export function topicPageOf(topic: ReadTopic, work: TopicPageWork, archives: Archives, words: FileLinkWords = { byKind: {} }): TopicPageData {
   const drawn = topicAsDrawn(topic.address, topic.folder, topic.object)
   const projects = new Map(work.projects.filter((project) => !project.deleted).map((project) => [project.addr, project]))
   const issues = new Map(work.issues.map((issue) => [issue.addr, issue]))
@@ -291,7 +290,7 @@ export function topicPageOf(topic: ReadTopic, work: TopicPageWork, archives: Arc
     else if (!SHIP_KINDS.some((kind) => address.startsWith(`${kind}:`))) files.push(address)
   }
   const projectsFirst = (list: TopicWorkRow[]) => [...list.filter((row) => row.kind === 'project'), ...list.filter((row) => row.kind === 'issue')]
-  const peekUrl = topicInPeek(topic.object.openUrl, topic.address, drawn.title)
+  const peekUrl = topicInPeek(topic.object.openUrl, topic.address, drawn.title, words)
   return {
     address: topic.address,
     title: drawn.title,

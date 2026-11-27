@@ -26,7 +26,7 @@ import { editedFor, historyFor, withChangesOf } from './history'
 import { useHistoryFold } from '@/api/useFileChanges'
 import { useSideColumn } from './sideColumn'
 import { FileTopicsOf } from '@/components/FileTopicsOf'
-import { activityFor, cardEditOf, copyText, folderOfMessage, pickerPeople, reactTo, refreshAfter, resolveAnswer, threadFor, useMentionLinks, withElsewhere } from './ProjectPage'
+import { activityFor, cardEditOf, copyFileLink, copyText, folderOfMessage, pickerPeople, reactTo, refreshAfter, resolveAnswer, threadFor, useMentionLinks, withElsewhere } from './ProjectPage'
 import { useReferencePage } from '@/api/references'
 import { createIssue } from '@/api'
 import { NewIssueDialog } from '@/components/NewIssueDialog'
@@ -382,8 +382,7 @@ export function IssuePage({ state, directory, teams, archives, d, say, refresh }
           archive: own ? 'own' : archive ? 'with' : 'none',
           onArchive: () => (own ? unarchive() : setArchiving(true)),
           onDelete: () => setConfirmingDelete(true),
-          // The page's own address, without the open tab: the short link (`href` leaves the defaults out).
-          onCopyLink: () => void copyText(new URL(href({ name: 'issue', d: issue.id, slug: issue.title }), window.location.origin).href, 'Link copied', 'Copy this link:', say),
+          onCopyLink: () => void copyFileLink(issue.addr, issue.title, say),
         }}
       />
       {archiving && (

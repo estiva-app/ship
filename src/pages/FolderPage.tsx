@@ -5,6 +5,7 @@ import { folderArchiveImpact, loadQuery, readFolder, readTeamMembers, type Folde
 import { reloadTopics, useMuted, useTopicActivity, useTopicMembers, useTopics } from '@/api/topics'
 import { ArchiveDialog, ArchivedNotice, type AvatarGroupMember } from '@estiva-app/ui'
 import { ARCHIVE_WORDS, archivedNoticeOf, type Archives } from '@/lib/archive'
+import { dOf } from '@/lib/fileLinks'
 import { statusLabel } from '@/lib/issues'
 import { editedLabel } from '@/lib/time'
 import { splitByKind } from '@/lib/ownKinds'
@@ -157,7 +158,7 @@ export function FolderPage({ id, folders, directory, state = null, archives, say
     for (const file of own) {
       const address = file.address
       if (!address) continue
-      const d = address.split(':')[2] ?? ''
+      const d = dOf(address)
       const title = file.slots.title?.value || 'Untitled'
       if (file.kind === KIND_PROJECT) {
         const row = projectRows.get(address)
