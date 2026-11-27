@@ -26,7 +26,10 @@ const object = (address: string, title: string, over: Partial<Data> = {}): Data 
   ({ ref: address, address, eventId: 'e'.repeat(64), kind: Number(address.split(':')[0]), widget: 'card', appName: 'Peek', slots: { title: { value: title } }, meta: [], comments: [], actions: [], viaRecommendation: true, ...over }) as unknown as Data
 
 const OPENS = 'https://peek.estiva.app/o/'
-const FILES = [object(`30840:${PK}:topic`, 'Weekly notes', { noun: 'topic', openUrl: `${OPENS}30840:${PK}:topic` }), object(`30850:${PK}:project`, 'Launch', { noun: 'project', openUrl: `${OPENS}30850:${PK}:project` })]
+/** File ids, as every file has (LIN-1). */
+const TOPIC_D = '5e0a1c2d-3b4f-4a6e-9c7d-8e9f0a1b2c3d'
+const PROJECT_D = '5e0a1c2d-3b4f-4a6e-9c7d-8e9f0a1b2c3e'
+const FILES = [object(`30840:${PK}:${TOPIC_D}`, 'Weekly notes', { noun: 'topic', openUrl: `${OPENS}30840:${PK}:${TOPIC_D}` }), object(`30850:${PK}:${PROJECT_D}`, 'Launch', { noun: 'project', openUrl: `${OPENS}30850:${PK}:${PROJECT_D}` })]
 
 vi.mock(import('@/api/foreign'), async (importOriginal) => ({
   ...(await importOriginal()),

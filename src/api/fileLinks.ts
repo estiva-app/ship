@@ -1,7 +1,6 @@
-import { useEffect, useSyncExternalStore } from 'react'
 import { fileUrlOf, type FileLinkWords } from '@estiva-app/interop'
 import { linkWordsOf } from '@/lib/fileLinks'
-import { declaredManifests } from './handoff'
+import { declaredManifests, forgetDeclaredManifestsForTests } from './handoff'
 
 /**
  * The words Ship hands a file's link out with (LIN-4), read once off the
@@ -10,42 +9,40 @@ import { declaredManifests } from './handoff'
  * read fails, a link is the file's `/o/<naddr>`: every app opens it.
  */
 const NONE: FileLinkWords = { byKind: {} }
-/** The words once a read has answered; null until then. A failed read answers with none. */
+/** The words once a read has answered with manifests; null until then, and after a failed or empty read. */
 let words: FileLinkWords | null = null
 let loading: Promise<FileLinkWords> | null = null
-const listeners = new Set<() => void>()
 
-function settle(next: FileLinkWords): FileLinkWords {
-  words = next
-  for (const listener of listeners) listener()
-  return next
-}
-
-/** Read the words, once; a failed read is forgotten so the next link asks again. */
+/**
+ * Read the words, once. A failed read, or an empty one (a relay always holds
+ * Ship's own manifest, so none means it did not really answer, as
+ * `declaredManifests` reads it), is forgotten, so the next link asks again.
+ */
 export function loadLinkWords(): Promise<FileLinkWords> {
   loading ??= declaredManifests().then(
-    (manifests) => settle(linkWordsOf(manifests)),
+    (manifests) => {
+      if (manifests.length > 0) return (words = linkWordsOf(manifests))
+      loading = null
+      return NONE
+    },
     () => {
       loading = null
-      return settle(words ?? NONE)
+      return NONE
     },
   )
   return loading
 }
 
-/**
- * The words for a link drawn in render: null until the first read answers, so a
- * page that sends the reader on can wait for the short link. Asks for them.
- */
-export function useLinkWords(): FileLinkWords | null {
-  useEffect(() => void loadLinkWords(), [])
-  return useSyncExternalStore(
-    (listener) => {
-      listeners.add(listener)
-      return () => listeners.delete(listener)
-    },
-    () => words,
-  )
+/** The words held now, or null before a read has answered: Copy link writes at once when they are held. */
+export function heldLinkWords(): FileLinkWords | null {
+  return words
+}
+
+/** Forget the words and the manifests they came from, for a test that starts from a relay of its own. */
+export function forgetLinkWordsForTests(): void {
+  words = null
+  loading = null
+  forgetDeclaredManifestsForTests()
 }
 
 /**
@@ -53,5 +50,5 @@ export function useLinkWords(): FileLinkWords | null {
  * same on every app's host, or null for a `d` no file can have.
  */
 export async function fileUrl(address: string, title?: string, origin = window.location.origin): Promise<string | null> {
-  return fileUrlOf(address, await loadLinkWords(), origin, title)
+  return fileUrlOf(address, words ?? (await loadLinkWords()), origin, title)
 }

@@ -35,6 +35,7 @@ vi.mock('@/api/nip44', () => ({ nip44: { decrypt: async () => undefined } }))
 import { TopicPage } from './TopicPage'
 import { prefetchTopics, resetTopicsForTests } from '@/api/topics'
 import { forgetManifestsForTests } from '@/api/foreign'
+import { forgetLinkWordsForTests } from '@/api/fileLinks'
 import { archivesOf } from '@/lib/archive'
 import { buildManifest } from '@/nostr/manifest'
 
@@ -72,11 +73,7 @@ const spaceMark = (d: string) => event(30890, [['d', 'team'], ['a', address(d), 
 /** An app's manifest on `host`, declaring `kinds`, as Ship's is built; Peek's draws every file's conversation, so it opens topics. */
 const manifest = (app: string, host: string, kinds: string[]) => {
   const unsigned = buildManifest(OWNER, Date.now())
-  // Peek declares its topic page, the word a topic's link is written with (LIN-4), and none of Ship's.
-  const tags =
-    app === 'peek'
-      ? [['urls', `https://${host}/topic/<slug>-<d>`, '30840']]
-      : unsigned.tags.filter((t) => t[0] !== 'k' && t[0] !== 'd' && t[0] !== 'web')
+  const tags = unsigned.tags.filter((t) => t[0] !== 'k' && t[0] !== 'd' && t[0] !== 'web')
   const own = JSON.parse(unsigned.content) as { projections: Record<string, unknown>; records: Record<string, unknown> }
   const content =
     app === 'peek'
@@ -133,6 +130,8 @@ afterEach(() => {
 })
 
 beforeEach(() => {
+  // Each test's manifests are its own: the link words are read again from them.
+  forgetLinkWordsForTests()
   held.length = 0
   asked.length = 0
   down = false
@@ -178,7 +177,7 @@ describe("A topic's page in Ship", () => {
     // another app (D5); the conversation is in the column beside the page.
     expect(screen.queryByRole('link', { name: /Conversation in Peek/ })).toBeNull()
     const open = screen.getByRole('link', { name: 'Open in Peek' })
-    expect(open.getAttribute('href')).toBe(`https://peek.estiva.app/topic/widgets-${D}`)
+    expect(open.getAttribute('href')).toMatch(/^https:\/\/peek\.estiva\.app\/o\/naddr1/)
     expect(open.getAttribute('target')).toBe('_blank')
     expect(open.textContent).toBe('Open')
     fireEvent.click(screen.getByRole('button', { name: 'More actions' }))
@@ -414,7 +413,7 @@ describe("A topic's page in Ship", () => {
     held.push(manifest('peek', 'peek.estiva.app', ['30840']), topic(D, 'Bugs'), spaceMark(D))
     const { state, archives } = ship([], [])
     render(<Page d={D} state={state} folders={[]} archives={archives} />)
-    await waitFor(() => expect(replace).toHaveBeenCalledWith(`https://peek.estiva.app/topic/bugs-${D}`))
+    await waitFor(() => expect(replace).toHaveBeenCalledWith(expect.stringMatching(/^https:\/\/peek\.estiva\.app\/o\/naddr1/)))
     expect(screen.queryByRole('heading', { name: 'Bugs' })).toBeNull()
     vi.unstubAllGlobals()
   })

@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FolderSummary, ForeignObject } from '@estiva-app/interop'
 import { archivedLine, thingKindOf } from '@estiva-app/ui'
 import { me, type DirectoryView, type WorkspaceState } from '@/api'
-import { useLinkWords } from '@/api/fileLinks'
 import { reloadTopics, rereadTopics, useTopicDocuments, useTopicPlace, useTopics, useYourTopics } from '@/api/topics'
 import { addToTopic, joinTopic, leaveTopic } from '@/api/writes'
 import { Members } from '@/components/Members'
@@ -80,23 +79,19 @@ export function TopicPage({
     )
   }, [held, topic])
 
-  // The words Open in Peek's link is written with (LIN-4); until they are read it is the topic's `/o/` address.
-  const words = useLinkWords()
-  const page = useMemo(() => (topic ? topicPageOf(topic, state, archives, words ?? undefined) : undefined), [topic, state, archives, words])
+  const page = useMemo(() => (topic ? topicPageOf(topic, state, archives) : undefined), [topic, state, archives])
   // A space goes on to Peek by itself only on a host beside Ship's; anywhere else its page is drawn, with the link.
   const sendsOn = !!topic?.space && !!page?.peekUrl && isSiblingHost(page.peekUrl, location.hostname)
 
   useEffect(() => {
     if (!topic || !page) return
-    // A space waits for the words, so it is sent on to its short link rather than its `/o/` one.
-    if (topic.space && words === null) return
     if (sendsOn) {
       window.location.replace(page.peekUrl!)
       return
     }
     const path = topicHref(topic.address, page.title)
     if (location.pathname !== path) history.replaceState(null, '', `${path}${location.search}${location.hash}`)
-  }, [topic, page, sendsOn, words])
+  }, [topic, page, sendsOn])
 
   // Its Leaf documents and every other app's file, in one read (A10).
   const documentsKey = page ? [...page.documents, ...page.files].join(' ') : ''

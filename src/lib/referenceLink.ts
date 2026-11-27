@@ -2,7 +2,7 @@ import { writtenOpenerOf, type ForeignObject } from '@estiva-app/interop'
 import { KIND } from '../nostr/kinds'
 import { isOwnKind } from './ownKinds'
 import { href, parse } from '@/router'
-import { dOf } from './fileLinks'
+import { fileIdOfAddress } from './fileLinks'
 import { safeLink } from './handoff'
 import { isKnownSpace, isTopicAddress, topicHref } from './topicLinks'
 
@@ -34,7 +34,9 @@ export type ReferenceLink =
 export function referenceLink(object: ForeignObject | null | undefined): ReferenceLink | null {
   if (!object || object.unreachable) return null
   if (isOwnKind(object.kind) && object.address) {
-    const d = dOf(object.address)
+    // An id no file can have names no page (LIN-4): a label, not a link to Ship's home.
+    const d = fileIdOfAddress(object.address)
+    if (!d) return null
     const title = object.slots.title
     const slug = title && !title.isPubkey ? title.value : undefined
     return {

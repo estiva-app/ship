@@ -2,8 +2,8 @@ import { newestDrawn, useMarkRead, useShownThreads } from '@/lib/useMarkRead'
 import { useNewSince } from '@/lib/useNewSince'
 import { ownConversations, recordChannel } from '@/lib/ownConversation'
 import { resolveBlockAnchor, toRenderTree, type ContentFormat, type Embed, type LinkResolver, type PartPointer, type SignedEvent } from '@estiva-app/protocol'
-import { linksIn, mentionedInOf } from '@estiva-app/interop'
-import { fileUrl } from '@/api/fileLinks'
+import { fileUrlOf, linksIn, mentionedInOf } from '@estiva-app/interop'
+import { fileUrl, heldLinkWords } from '@/api/fileLinks'
 import { knownLinkValue, links, useAskLinks } from '@/api/linkCards'
 import { MAX_LINKS_PER_MESSAGE } from '@/lib/linksNamingCards'
 import type { AttachmentIndex, EditIndex } from '@/api'
@@ -525,7 +525,10 @@ export function pickerPeople(state: FolderState, directory: DirectoryView): Work
  * file can have (the relay refuses one) has none, and says so.
  */
 export async function copyFileLink(address: string, title: string | undefined, say: Say) {
-  const url = await fileUrl(address, title)
+  // Written in the click itself when the words are held (App reads them once the workspace is drawn): a browser may
+  // refuse a clipboard write that waits on the network after the click.
+  const held = heldLinkWords()
+  const url = held ? fileUrlOf(address, held, window.location.origin, title) : await fileUrl(address, title)
   if (url) return copyText(url, 'Link copied', 'Copy this link:', say)
   say('This file has no link.', 'error')
 }

@@ -1,4 +1,4 @@
-import { fileUrlOf, KIND_BARE_FILE, type FileLinkWords, type ReadTopic, type TopicsRead } from '@estiva-app/interop'
+import { fileUrlOf, KIND_BARE_FILE, type ReadTopic, type TopicsRead } from '@estiva-app/interop'
 import { href } from '@/router'
 import { dOf } from './fileLinks'
 import { safeLink } from './handoff'
@@ -22,14 +22,16 @@ export function isTopicAddress(address: string | undefined): address is string {
 
 /**
  * The topic on Peek: the same path on the host its manifest's link names, as
- * §7.7 has a person move between apps by changing the host, written by the
- * shared writer with the words held now (`linkWords`; `/o/<naddr>` before
- * they are read, which Peek opens too). Absent when Peek's manifest gave no
- * `https:` link.
+ * §7.7 has a person move between apps by changing the host. Written by the
+ * shared writer as the topic's `/o/<naddr>`, which every app answers and Peek
+ * moves to the topic's short link: on another app's host Ship cannot know which
+ * root paths are that app's own pages, and any member can publish a newer
+ * manifest giving the topic one of them as its word (LIN-4 security review).
+ * Absent when Peek's manifest gave no `https:` link, or for an id no file can have.
  */
-export function topicInPeek(openUrl: string | undefined, address: string, title: string, words: FileLinkWords): string | undefined {
+export function topicInPeek(openUrl: string | undefined, address: string): string | undefined {
   const link = safeLink(openUrl)
-  return (link && fileUrlOf(address, words, new URL(link).origin, title)) || undefined
+  return (link && fileUrlOf(address, { byKind: {} }, new URL(link).origin)) || undefined
 }
 
 /**

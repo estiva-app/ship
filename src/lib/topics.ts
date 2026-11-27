@@ -1,4 +1,4 @@
-import { byActivity, type FileLinkWords, type ReadTopic, type TopicsRead } from '@estiva-app/interop'
+import { byActivity, type ReadTopic, type TopicsRead } from '@estiva-app/interop'
 import { topicAsDrawn } from '@/api/foreign'
 import { ISSUE_STATUSES, progressOf, projectStatus, type Stage } from '@/nostr/kinds'
 import { href } from '@/router'
@@ -243,7 +243,7 @@ export interface TopicPageWork {
  * hold (deleted, not read) is none of these. Judged by Ship's own fold, as
  * Topics is.
  */
-export function topicPageOf(topic: ReadTopic, work: TopicPageWork, archives: Archives, words: FileLinkWords = { byKind: {} }): TopicPageData {
+export function topicPageOf(topic: ReadTopic, work: TopicPageWork, archives: Archives): TopicPageData {
   const drawn = topicAsDrawn(topic.address, topic.folder, topic.object)
   const projects = new Map(work.projects.filter((project) => !project.deleted).map((project) => [project.addr, project]))
   const issues = new Map(work.issues.map((issue) => [issue.addr, issue]))
@@ -290,7 +290,7 @@ export function topicPageOf(topic: ReadTopic, work: TopicPageWork, archives: Arc
     else if (!SHIP_KINDS.some((kind) => address.startsWith(`${kind}:`))) files.push(address)
   }
   const projectsFirst = (list: TopicWorkRow[]) => [...list.filter((row) => row.kind === 'project'), ...list.filter((row) => row.kind === 'issue')]
-  const peekUrl = topicInPeek(topic.object.openUrl, topic.address, drawn.title, words)
+  const peekUrl = topicInPeek(topic.object.openUrl, topic.address)
   return {
     address: topic.address,
     title: drawn.title,

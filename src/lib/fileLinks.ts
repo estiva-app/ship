@@ -29,10 +29,11 @@ export const SHIP_PAGE_WORDS: FileLinkWords = {
 
 /**
  * The root paths that are Ship's own pages and not a file's word: the
- * listings, a team's pages (`/app/…`, and the older `/folder/…`) and the
- * `naddr` form.
+ * listings, a team's pages (`/app/…`, and the older `/folder/…`), the `naddr`
+ * form, and `assets`, which the server answers from disk and never hands to
+ * the app (`deploy/nginx.conf`), so a link there is a 404.
  */
-export const SHIP_ROOT_PATHS: readonly string[] = ['app', 'o', 'projects', 'issues', 'topics', 'folder']
+export const SHIP_ROOT_PATHS: readonly string[] = ['app', 'o', 'projects', 'issues', 'topics', 'folder', 'assets']
 
 /** `<kind>:<pubkey>:<d>`, the `d` whole: it is any text on the wire, colons included; a pubkey holds none. */
 const ADDRESS = /^(\d+):([^:]*):([^]*)$/

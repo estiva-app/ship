@@ -57,6 +57,11 @@ export function declaredManifests(): Promise<SignedEvent[]> {
   return manifests
 }
 
+/** Forget the manifests read, for a test that starts from a relay of its own. */
+export function forgetDeclaredManifestsForTests(): void {
+  manifests = null
+}
+
 export async function resolveHandoff(word: string, ref: string, query?: string): Promise<Handoff> {
   const all = await declaredManifests()
   const lookup = lookupFor(word, ref, all)
