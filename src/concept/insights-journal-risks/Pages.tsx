@@ -168,7 +168,7 @@ function ItemsTab({ type, all = ITEMS, state, onOpen, openId, me, onDecide, deci
 }
 
 /** The project page: today's header and tab row, three more tabs; an item opens beside its list. */
-export function ProjectPage({ start = 'overview', listState = 'ready', me = 'miky', open: open0, side: side0 = 'none', decided, deciding }: { start?: ConceptTab; listState?: ListState; me?: string; open?: string; side?: 'comments' | 'overview' | 'none'; decided?: string; deciding?: string }) {
+export function ProjectPage({ start = 'overview', listState = 'ready', me = 'miky', open: open0, side: side0 = 'none', decided, deciding, panel = 'groups' }: { start?: ConceptTab; listState?: ListState; me?: string; open?: string; side?: 'comments' | 'overview' | 'none'; decided?: string; deciding?: string; panel?: 'groups' | 'tabs' }) {
   const [tab, setTab] = useState<ConceptTab>(start)
   // Issues in two views (Miky, 18 Nov): the List, by milestone, and today's Board. The List replaced the Dashboard
   // and the Table, once the Dashboard became a list.
@@ -267,7 +267,7 @@ export function ProjectPage({ start = 'overview', listState = 'ready', me = 'mik
       {tab === 'issues' && scopeId && !placed[scopeId] && (
         <ScopePanel key={scopeId} id={scopeId} onPlace={(to) => place(scopeId, to)} onClose={() => setScopeId(undefined)} />
       )}
-      {open && (tab === 'overview' || open.type === TAB_TYPE[tab]) && <ItemPanel item={open} me={me} here={PROJECT} onClose={() => (setOpen(undefined), setDecidingId(undefined))} deciding={open.id === decidingId} onDecide={(c, why) => onDecide(open, c, why)} />}
+      {open && (tab === 'overview' || open.type === TAB_TYPE[tab]) && <ItemPanel item={open} me={me} here={PROJECT} layout={panel}onClose={() => (setOpen(undefined), setDecidingId(undefined))} deciding={open.id === decidingId} onDecide={(c, why) => onDecide(open, c, why)} />}
       {side.overview.shown && (
         <div className="flex shrink-0 flex-col border-l border-border-default">
           <OverviewPanel activity={ACTIVITY_ITEMS} history={ACTIVITY} />
@@ -398,8 +398,8 @@ export function ItemPage({ item, me = 'miky', state = 'ready', below }: { item: 
 }
 
 /** The team page — today's Projects page for one team — with the team's own lists beside Projects. */
-export function TeamPage({ start = 'insights', open }: { start?: 'projects' | ConceptTab; open?: string }) {
-  return <GatheredPage crumbs={[{ label: 'Teams', href: '#/teams' }, { label: TEAM, icon: <IconUsers size={16} stroke={1.5} /> }]} items={[...ITEMS, ...ELSEWHERE]} start={start} openId={open} />
+export function TeamPage({ start = 'insights', open, panel }: { start?: 'projects' | ConceptTab; open?: string; panel?: 'groups' | 'tabs' }) {
+  return <GatheredPage crumbs={[{ label: 'Teams', href: '#/teams' }, { label: TEAM, icon: <IconUsers size={16} stroke={1.5} /> }]} items={[...ITEMS, ...ELSEWHERE]} start={start} openId={open} panel={panel} />
 }
 
 /**
@@ -437,7 +437,7 @@ export function InitiativePage({ id = 'ini1', start = 'insights' }: { id?: strin
  * A page that gathers items from many places, a team's or an Initiative's: Projects, then its Insights, Journal and
  * Risks, each item with a chip saying where it lives (the issue, the project, the Initiative, or the team's own).
  */
-function GatheredPage({ crumbs, items, start, projects, openId }: { crumbs: { label: string; href?: string; icon?: ReactNode }[]; items: Item[]; start: 'projects' | ConceptTab; projects?: ReactNode; openId?: string }) {
+function GatheredPage({ crumbs, items, start, projects, openId, panel }: { crumbs: { label: string; href?: string; icon?: ReactNode }[]; items: Item[]; start: 'projects' | ConceptTab; projects?: ReactNode; openId?: string; panel?: 'groups' | 'tabs' }) {
   const [tab, setTab] = useState<string>(start)
   const [open, setOpen] = useState<Item | undefined>(() => items.find((i) => i.id === openId))
   const onOpen = (i: Item) => setOpen((o) => (o?.id === i.id ? undefined : i))
@@ -466,7 +466,7 @@ function GatheredPage({ crumbs, items, start, projects, openId }: { crumbs: { la
             {tab === 'risks' && <ItemsTab type="risk" all={items} state="ready" onOpen={onOpen} openId={open?.id} />}
           </ScrollArea>
         </div>
-        {open && open.type === TAB_TYPE[tab] && <ItemPanel item={open} onClose={() => setOpen(undefined)} />}
+        {open && open.type === TAB_TYPE[tab] && <ItemPanel item={open} layout={panel} onClose={() => setOpen(undefined)} />}
       </div>
     </ShowWhere.Provider>
   )
