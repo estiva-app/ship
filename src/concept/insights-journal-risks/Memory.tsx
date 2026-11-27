@@ -7,8 +7,8 @@
  * New here: nothing.
  */
 import { createContext, useContext, useState, type ReactNode } from 'react'
-import { IconArchive, IconArrowsExchange, IconBox, IconExternalLink, IconHistory, IconHourglass, IconLink, IconLock, IconQuote, IconReceipt, IconSparkles, IconUsers } from '@tabler/icons-react'
-import { Avatar, Button, Card, CollapsibleSection, IconButton, Link, LinkRow, MetaText, MoveDialog, QuotedLine, SectionHeader, type Linked, type MovePlace } from '@estiva-app/ui'
+import { IconArchive, IconArrowsExchange, IconBox, IconHistory, IconHourglass, IconLink, IconLock, IconQuote, IconReceipt, IconSparkles, IconUsers } from '@tabler/icons-react'
+import { Avatar, Button, Card, CollapsibleSection, IconButton, Link, LinkRow, MetaText, MoveDialog, QuotedLine, SectionHeader, type Linked, type LinkedKind, type MovePlace } from '@estiva-app/ui'
 import { AcceptReject } from './ItemParts'
 import { PROJECT, TEAM, type Item, type Source } from './fixtures'
 
@@ -25,21 +25,22 @@ const personAccepted = (item: Item) => item.status !== 'proposed' && item.status
  * Where an item was used (Miky, 19 Nov: "memory shows where it was used"): each answer, summary or loop run that read
  * it into what it did, newest first, so a person sees why the AI said what it said and can fix the memory behind it.
  */
-export interface Use { by: string; what: string; where: string; days: number }
+/** `kind` and `noun` say what the AI wrote with it, so its row draws as any linked file does: a message, a page, an issue. */
+export interface Use { by: string; what: string; where: string; days: number; kind?: LinkedKind; noun?: string }
 export function usesOf(item: Item): Use[] {
-  if (item.id.startsWith('peek-') || item.layer === 'personal') return item.layer === 'personal' ? [{ by: 'Claude', what: 'Question to Miky about who reads a topic', where: 'Claude Code', days: 2 }] : []
+  if (item.id.startsWith('peek-') || item.layer === 'personal') return item.layer === 'personal' ? [{ by: 'Claude', what: 'Who reads a topic', noun: 'Question', where: 'Claude Code', days: 2 }] : []
   if (item.status === 'proposed')
-    return item.category === 'Customer' ? [{ by: 'Claude', what: 'Answer to Katerina about the sidebar', where: 'Peek · Design', days: 2 }] : []
-  if (item.source?.app === 'PostHog' || item.source?.app === 'Intercom') return [{ by: 'Claude', what: 'Answer to Miky about activation', where: 'Peek · Direct messages', days: 1 }]
+    return item.category === 'Customer' ? [{ by: 'Claude', what: 'Why the sidebar shows no team', noun: 'Answer', where: 'Peek · Design', days: 2 }] : []
+  if (item.source?.app === 'PostHog' || item.source?.app === 'Intercom') return [{ by: 'Claude', what: 'Activation this month', noun: 'Answer', where: 'Peek · Direct messages', days: 1 }]
   if (item.type === 'journal')
     return [
-      { by: 'Claude', what: 'Plan for Teams in Ship', where: 'Ship · Teams stage', days: 3 },
-      { by: 'Leaf’s review loop', what: 'Checked Universal Navigation against it', where: 'Leaf · Estiva HQ', days: 6 },
+      { by: 'Claude', what: 'Teams in Ship', noun: 'Plan', kind: 'page', where: 'Leaf · Teams stage', days: 3 },
+      { by: 'Leaf’s review loop', what: 'Universal Navigation', noun: 'Review', kind: 'page', where: 'Leaf · Estiva HQ', days: 6 },
     ]
-  if (item.type === 'risk') return [{ by: 'Claude', what: 'Friday summary', where: 'Peek · Friday Meetings', days: 0 }]
+  if (item.type === 'risk') return [{ by: 'Claude', what: 'Friday summary', noun: 'Summary', where: 'Peek · Friday Meetings', days: 0 }]
   return [
-    { by: 'Claude', what: 'Friday summary', where: 'Peek · Friday Meetings', days: 1 },
-    { by: 'Ship’s triage loop', what: 'Filed “Sidebar folders collapse” under it', where: 'Ship · Bugs', days: 4 },
+    { by: 'Claude', what: 'Friday summary', noun: 'Summary', where: 'Peek · Friday Meetings', days: 1 },
+    { by: 'Ship’s triage loop', what: 'Sidebar folders collapse', noun: 'Filed under it', kind: 'issue', where: 'Ship · Bugs', days: 4 },
   ]
 }
 const ago = (days: number) => (days === 0 ? 'today' : days === 1 ? 'yesterday' : `${days}d ago`)
@@ -197,41 +198,60 @@ export function NeedsYou({ item }: { item: Item }) {
  * One source as it read when it was marked (record #448), checked before the item is used: whose, where and when; the
  * words as marked, which say so when they were edited since (with "See it now") or deleted. Opens in its app.
  */
+/**
+ * One entry of History, the one shape every entry takes (Miky, 27 Nov: "one coherent list"): a face (a loop's sparkle),
+ * "who did what · when" on the first line, a muted second line (why, or where the source is, which opens it), then
+ * what it holds and its one action under it.
+ */
+function Entry({ who, bot, did, when, meta, metaHref, struck, children, action }: { who: string; bot?: boolean; did: string; when?: string; meta?: string; metaHref?: boolean; struck?: boolean; children?: ReactNode; action?: ReactNode }) {
+  return (
+    <li className="flex items-start gap-2">
+      <span className="mt-0.5 flex w-5 shrink-0 justify-center text-text-muted">{bot ? <IconSparkles size={16} stroke={1.5} /> : <Avatar name={who} size={20} />}</span>
+      <span className="flex min-w-0 flex-1 flex-col gap-1">
+        <span className="flex min-w-0 flex-col">
+          <span className={struck ? 'text-body-2 text-text-muted line-through' : 'text-body-2 text-text-primary'}>
+            {who} {did}
+            {when && <span className="text-text-muted">{` · ${when}`}</span>}
+          </span>
+          {meta &&
+            (metaHref ? (
+              <span className="min-w-0 truncate">
+                <Link href="#" variant="quiet" onClick={stay}>
+                  <MetaText tone="muted">{meta}</MetaText>
+                </Link>
+              </span>
+            ) : (
+              <MetaText tone="muted">{meta}</MetaText>
+            ))}
+        </span>
+        {children}
+        {action && <span>{action}</span>}
+      </span>
+    </li>
+  )
+}
+
 function SourceRow({ source }: { source: Source }) {
   const [now, setNow] = useState(false)
   const state = source.gone ? 'gone' : source.now && !now ? 'reworded' : 'here'
   return (
-    <li className="flex items-start gap-2">
-      <span className="mt-0.5 flex shrink-0">
-        <Avatar name={source.author.name} size={20} />
-      </span>
-      <span className="flex min-w-0 flex-1 flex-col gap-1">
-        <span className="flex min-w-0 flex-col">
-          <span className="truncate text-body-2 text-text-primary">
-            {source.author.name} wrote the source
-            {source.when && <span className="text-text-muted">{` · ${source.when}`}</span>}
-          </span>
-          <span className="min-w-0 truncate">
-            <MetaText tone="muted">
-              {source.what.charAt(0).toUpperCase() + source.what.slice(1)} in {source.app} · {source.place}
-            </MetaText>
-          </span>
-        </span>
-        <QuotedLine words={now && source.now ? source.now : source.quote} state={state} />
-        {source.now && !source.gone && (
-          <span>
-            <Button size="small" variant="muted" onClick={() => setNow((v) => !v)}>
-              {now ? 'Show as marked' : 'See it now'}
-            </Button>
-          </span>
-        )}
-      </span>
-      {!source.gone && (
-        <IconButton variant="muted" tooltip={`Open in ${source.app}`} aria-label={`Open in ${source.app}`} onClick={() => {}}>
-          <IconExternalLink size={16} stroke={1.5} />
-        </IconButton>
-      )}
-    </li>
+    <Entry
+      who={source.author.name}
+      did="wrote the source"
+      when={source.when}
+      meta={`${source.what.charAt(0).toUpperCase() + source.what.slice(1)} in ${source.app} · ${source.place}`}
+      metaHref={!source.gone}
+      action={
+        source.now &&
+        !source.gone && (
+          <Button size="small" variant="muted" onClick={() => setNow((v) => !v)}>
+            {now ? 'Show as marked' : 'See it now'}
+          </Button>
+        )
+      }
+    >
+      <QuotedLine words={now && source.now ? source.now : source.quote} state={state} />
+    </Entry>
   )
 }
 
@@ -244,22 +264,19 @@ export function Uses({ item, here }: { item: Item; here?: string }) {
   const uses = usesOf(item)
   const [kept, setKept] = useState(false)
   const left = kept ? FADE_DAYS : fadesIn(item)
-  // Each AI session or loop run that read it as a source, with the sparkle the app gives AI work.
+  // Each AI session or loop run that read it as a source, drawn as the same row as the file above it (Miky, 27 Nov:
+  // "should look similar"): what it wrote, by whom as a robot face, where and when.
   const list = uses.length > 0 && (
-    <ul aria-label="AI sessions that used it" className="flex flex-col gap-2">
+    <ul aria-label="AI sessions that used it" className="flex flex-col gap-1.5">
       {uses.map((u) => (
-        <li key={u.what} className="flex items-start gap-2">
-          <span className="mt-0.5 flex w-4 shrink-0 justify-center text-text-muted">
-            <IconSparkles size={14} stroke={1.5} />
-          </span>
-          <span className="flex min-w-0 flex-col">
-            <Link href="#" variant="quiet" onClick={stay}>
-              {u.what}
-            </Link>
-            <MetaText tone="muted">
-              {u.by} · {u.where} · {ago(u.days)}
-            </MetaText>
-          </span>
+        <li key={u.what} className="mr-8">
+          <LinkRow
+            link={{
+              state: 'ready',
+              linked: { id: u.what, kind: u.kind ?? 'message', noun: u.noun, title: u.what, href: '#', subtitle: u.where, authors: [{ name: u.by, bot: true }], updated: ago(u.days) },
+            }}
+            preview
+          />
         </li>
       ))}
     </ul>
@@ -315,22 +332,22 @@ export function historyOf(item: Item): Event[] {
 
 function HistoryRow({ event }: { event: Event }) {
   const [undone, setUndone] = useState(false)
-  const loop = /loop/i.test(event.by)
   return (
-    <li className="flex items-start gap-2">
-      <span className="mt-0.5 flex w-4 shrink-0 justify-center text-text-muted">{loop ? <IconSparkles size={14} stroke={1.5} /> : <Avatar name={event.by} size={16} />}</span>
-      <span className="flex min-w-0 flex-1 flex-col">
-        <span className={undone ? 'text-body-2 text-text-muted line-through' : 'text-body-2 text-text-primary'}>
-          {event.by} {event.what}
-        </span>
-        <MetaText tone="muted">{[event.why, event.trust, event.ago].filter(Boolean).join(' · ')}</MetaText>
-      </span>
-      {event.undo && (
-        <Button size="small" variant="muted" onClick={() => setUndone((v) => !v)}>
-          {undone ? 'Redo' : 'Undo'}
-        </Button>
-      )}
-    </li>
+    <Entry
+      who={event.by}
+      bot={/loop/i.test(event.by)}
+      did={event.what}
+      when={event.ago}
+      meta={[event.why, event.trust].filter(Boolean).join(' · ') || undefined}
+      struck={undone}
+      action={
+        event.undo && (
+          <Button size="small" variant="muted" onClick={() => setUndone((v) => !v)}>
+            {undone ? 'Redo' : 'Undo'}
+          </Button>
+        )
+      }
+    />
   )
 }
 
