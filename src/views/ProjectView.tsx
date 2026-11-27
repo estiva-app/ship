@@ -154,6 +154,7 @@ export function ProjectView({ crumbs, team, header, onAddIssue, tab, onTab, view
           address: about,
           kind: 'project',
           title: header.title,
+          ...(team ? { team: team.id } : {}),
           project: { title: header.title },
           editor,
           description: header.description,

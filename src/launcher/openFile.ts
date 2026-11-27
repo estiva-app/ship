@@ -42,6 +42,8 @@ export interface OpenFile extends OpenFileActions {
   title: string
   /** The project an issue is in, or the project itself: where Add issue puts a new one. */
   project?: { title: string }
+  /** The team it is in, by id: where ⌘K's New document starts (KIN-9). Absent: in no team, or not read yet. */
+  team?: string
   editor: Editor | null
   /** The description as stored: what is read when there is no editor (an archived file, or before it arrives). */
   description: string

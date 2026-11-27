@@ -145,6 +145,7 @@ export function IssueView({ crumbs, team, title, summary, onSummarize, descripti
           kind: 'issue',
           title,
           ...(crumbs.project ? { project: { title: crumbs.project.title } } : {}),
+          ...(team ? { team: team.id } : {}),
           editor,
           description,
           format: descriptionFormat,
