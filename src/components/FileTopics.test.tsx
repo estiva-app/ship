@@ -13,7 +13,9 @@ const topic = (d: string, title: string, extra: Partial<TopicOfFile> = {}): Topi
   archived: false,
   ...extra,
 })
-const WIDGETS = topic('w', 'Widgets')
+/** A topic's id, as every file has (LIN-1): its row links to it. */
+const W = '7d1e4f2a-3b5c-4d6e-8f70-1a2b3c4d5e6f'
+const WIDGETS = topic(W, 'Widgets')
 const OLD = topic('o', 'Old', { archived: true })
 const DESIGN = topic('d', 'Design')
 const ROADMAP = topic('r', 'Roadmap')
@@ -21,7 +23,7 @@ const ROADMAP = topic('r', 'Roadmap')
 describe('FileTopics, a project’s or an issue’s Topics in its rail (TOP-5)', () => {
   it('names each topic that lists it, opening the topic’s page in Ship (SHIPS-4)', () => {
     render(<FileTopics topics={[WIDGETS]} busy={new Set()} onChange={vi.fn()} readChoices={vi.fn()} />)
-    expect(screen.getByRole('link', { name: /Widgets/ }).getAttribute('href')).toBe('/topic/widgets-w')
+    expect(screen.getByRole('link', { name: /Widgets/ }).getAttribute('href')).toBe(`/topic/widgets-${W}`)
   })
 
   it('says None when no topic lists it, and still offers Add to initiative', () => {
@@ -120,7 +122,7 @@ describe('FileTopics, a project’s or an issue’s Topics in its rail (TOP-5)',
     knowSpaces({ me: 'm', membership: {}, topics: [{ address: DESIGN.address, space: true }] } as unknown as TopicsRead)
     render(<FileTopics topics={[WIDGETS, DESIGN]} busy={new Set()} onChange={vi.fn()} readChoices={vi.fn()} />)
     fireEvent.click(screen.getByRole('link', { name: /Widgets/ }))
-    expect(location.pathname).toBe('/topic/widgets-w')
+    expect(location.pathname).toBe(`/topic/widgets-${W}`)
     expect(open).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('link', { name: /Design/ }))
     expect(open).toHaveBeenCalledWith('https://peek.estiva.app/topic/d', '_blank', 'noopener,noreferrer')

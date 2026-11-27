@@ -1,5 +1,6 @@
-import { KIND_BARE_FILE, objectRef, type ReadTopic, type TopicsRead } from '@estiva-app/interop'
+import { KIND_BARE_FILE, type ReadTopic, type TopicsRead } from '@estiva-app/interop'
 import { href } from '@/router'
+import { dOf, pagePathOf } from './fileLinks'
 import { safeLink } from './handoff'
 
 /**
@@ -8,8 +9,6 @@ import { safeLink } from './handoff'
  * can ask without reading the relay.
  * why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-link-opens-in-the-app-you-are-in-when-it-has-a-page-made-for-that-kind.md
  */
-
-const dOf = (address: string) => address.split(':')[2] ?? ''
 
 /** A topic's page here, slug and all. */
 export function topicHref(address: string, title?: string): string {
@@ -23,12 +22,18 @@ export function isTopicAddress(address: string | undefined): address is string {
 
 /**
  * The topic on Peek: the same path on the host its manifest's link names, as
- * §7.7 has a person move between apps by changing the host. Absent when Peek's
- * manifest gave no `https:` link.
+ * §7.7 has a person move between apps by changing the host: only the host
+ * changes (Miky, 2026-10-01). The path is Ship's own page path, from the shared
+ * writer with Ship's page words, never a word off the manifests: on another
+ * app's host Ship cannot know which root paths are that app's own pages, and any
+ * member can publish a newer manifest giving the topic one of them (LIN-4
+ * security review). Absent when Peek's manifest gave no `https:` link, or for an
+ * id no file can have.
  */
 export function topicInPeek(openUrl: string | undefined, address: string, title: string): string | undefined {
   const link = safeLink(openUrl)
-  return link ? `${new URL(link).origin}/topic/${objectRef(dOf(address), title)}` : undefined
+  const path = pagePathOf(KIND_BARE_FILE, dOf(address), title)
+  return link && path ? `${new URL(link).origin}${path}` : undefined
 }
 
 /**

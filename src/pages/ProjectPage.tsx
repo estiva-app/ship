@@ -2,7 +2,8 @@ import { newestDrawn, useMarkRead, useShownThreads } from '@/lib/useMarkRead'
 import { useNewSince } from '@/lib/useNewSince'
 import { ownConversations, recordChannel } from '@/lib/ownConversation'
 import { resolveBlockAnchor, toRenderTree, type ContentFormat, type Embed, type LinkResolver, type PartPointer, type SignedEvent } from '@estiva-app/protocol'
-import { linksIn, mentionedInOf } from '@estiva-app/interop'
+import { fileUrlOf, linksIn, mentionedInOf } from '@estiva-app/interop'
+import { fileUrl, heldLinkWords } from '@/api/fileLinks'
 import { knownLinkValue, links, useAskLinks } from '@/api/linkCards'
 import { MAX_LINKS_PER_MESSAGE } from '@/lib/linksNamingCards'
 import type { AttachmentIndex, EditIndex } from '@/api'
@@ -518,6 +519,20 @@ export function pickerPeople(state: FolderState, directory: DirectoryView): Work
     .sort((a, b) => a.name.localeCompare(b.name))
 }
 
+/**
+ * A file's Copy link (LIN-4): the shared writer's link, `/<word>/<slug>-<d>` on
+ * this host, which opens the same file on every app's host. A file whose id no
+ * file can have (the relay refuses one) has none, and says so.
+ */
+export async function copyFileLink(address: string, title: string | undefined, say: Say) {
+  // Written in the click itself when the words are held (App reads them once the workspace is drawn): a browser may
+  // refuse a clipboard write that waits on the network after the click.
+  const held = heldLinkWords()
+  const url = held ? fileUrlOf(address, held, window.location.origin, title) : await fileUrl(address, title)
+  if (url) return copyText(url, 'Link copied', 'Copy this link:', say)
+  say('This file has no link.', 'error')
+}
+
 /** Put text on the clipboard, or show it when the clipboard is not available — the old app's fallback. */
 export async function copyText(text: string, done: string, prompt: string, say: Say) {
   try {
@@ -994,8 +1009,8 @@ export function ProjectPage({
           archive: own ? 'own' : archive ? 'with' : 'none',
           onArchive: () => (own ? unarchive() : setDialog('archive')),
           onDelete: () => setDialog('delete'),
-          // The page's own address, without the open tab or the board: the short link (`href` leaves the defaults out).
-          onCopyLink: () => void copyText(new URL(href({ name: 'project', d: project.id, slug: project.title, view: 'table' }), window.location.origin).href, 'Link copied', 'Copy this link:', say),
+          // The file's link, without the open tab or the board.
+          onCopyLink: () => void copyFileLink(project.addr, project.title, say),
         }}
       />
 

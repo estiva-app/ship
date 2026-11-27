@@ -16,7 +16,7 @@ import { DOCUMENT_KIND, topicOfD, topicPageOf } from '@/lib/topics'
 import { href } from '@/router'
 import { TopicView, type TopicDocument, type TopicPageView } from '@/views/TopicView'
 import { act, type Say } from './act'
-import { copyText, pickerPeople } from './ProjectPage'
+import { copyFileLink, copyText, pickerPeople } from './ProjectPage'
 import { useTopicConversation } from './topicConversation'
 import { placedIn } from '@/lib/placement'
 
@@ -265,7 +265,9 @@ export function TopicPage({
           />
         )
       }
-      onCopyLink={() => void copyText(new URL(topic ? topicHref(topic.address, view?.title ?? '') : location.pathname, window.location.origin).href, 'Link copied', 'Copy this link:', say)}
+      onCopyLink={() =>
+        void (topic ? copyFileLink(topic.address, view?.title, say) : copyText(new URL(location.pathname, window.location.origin).href, 'Link copied', 'Copy this link:', say))
+      }
       {...(page?.peekUrl ? { peekUrl: page.peekUrl } : {})}
       onRetry={() => {
         if (readAgain !== 'failed') return void reloadTopics()

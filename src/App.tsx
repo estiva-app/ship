@@ -34,7 +34,9 @@ import { useSidebarTopics } from '@/api/useSidebarTopics'
 import { isTopicAddress } from '@/lib/topicLinks'
 import { ID_CONFIG, RELAY_URL } from './config'
 import { beginSignIn, beginSignOut, signInAvailable, signedIn } from './auth/estivaId'
-import { identifierFromRef, type FolderSummary } from '@estiva-app/interop'
+import { type FolderSummary } from '@estiva-app/interop'
+import { loadLinkWords } from '@/api/fileLinks'
+import { fileIdOfAddress } from '@/lib/fileLinks'
 import { naddrToAddr } from '@estiva-app/protocol'
 import type { Opened } from '@/api/useWorkspace'
 import { ThreadsContext } from '@/api/useThreads'
@@ -149,6 +151,12 @@ function Shell() {
       if (results.length) void refresh()
     })
   }, [state, partial, refresh])
+
+  // The words a file's link is handed out with (LIN-4), read once the workspace is drawn, so a cold open does not
+  // wait on them and Copy link rarely does.
+  useEffect(() => {
+    if (state && !partial) void loadLinkWords()
+  }, [state, partial])
 
   const [navOpen, setNavOpen] = useSidebarFold()
 
@@ -296,7 +304,7 @@ function openedBy(route: Route): Opened | undefined {
   if (route.name !== 'inbound') return undefined
   try {
     const addr = naddrToAddr(route.naddr)
-    const d = identifierFromRef(addr)
+    const d = fileIdOfAddress(addr)
     if (d && addr.startsWith('30850:')) return { kind: 'project', d }
     if (d && addr.startsWith('30851:')) return { kind: 'issue', d }
   } catch {
@@ -503,9 +511,8 @@ function useInbound(route: Route, say: Say, clear: () => void) {
           say('Could not resolve that reference — you may not have access to its team.', 'error', 'not-resolved')
           return replace(HOME)
         }
-        // The resolved object's `d` — its uuid — is the tail of the address,
-        // and §7.2's grammar carries nothing else.
-        const d = identifierFromRef(found.addr)
+        // The resolved object's `d`, whole: an id a file can have, or no page (LIN-4).
+        const d = fileIdOfAddress(found.addr)
         if (!d) {
           say('That reference resolved to something without an identifier.', 'error', 'not-resolved')
           return replace(HOME)
@@ -545,7 +552,7 @@ function useInbound(route: Route, say: Say, clear: () => void) {
 function topicOfNaddr(naddr: string): string | undefined {
   try {
     const addr = naddrToAddr(naddr)
-    return isTopicAddress(addr) ? (identifierFromRef(addr) ?? undefined) : undefined
+    return isTopicAddress(addr) ? (fileIdOfAddress(addr) ?? undefined) : undefined
   } catch {
     return undefined
   }

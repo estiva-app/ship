@@ -35,6 +35,7 @@ vi.mock('@/api/nip44', () => ({ nip44: { decrypt: async () => undefined } }))
 import { TopicPage } from './TopicPage'
 import { prefetchTopics, resetTopicsForTests } from '@/api/topics'
 import { forgetManifestsForTests } from '@/api/foreign'
+import { forgetLinkWordsForTests } from '@/api/fileLinks'
 import { archivesOf } from '@/lib/archive'
 import { buildManifest } from '@/nostr/manifest'
 
@@ -129,6 +130,8 @@ afterEach(() => {
 })
 
 beforeEach(() => {
+  // Each test's manifests are its own: the link words are read again from them.
+  forgetLinkWordsForTests()
   held.length = 0
   asked.length = 0
   down = false
@@ -151,13 +154,16 @@ describe("A topic's page in Ship", () => {
     expect(within(page()).queryByText('Started here')).toBeNull()
   })
 
+  /** File ids, as every file has (LIN-1): a project's and an issue's row link to them. */
+  const P1 = '0b6e2a51-7c3d-4f8e-9a1b-2c3d4e5f6a71'
+  const I1 = '0b6e2a51-7c3d-4f8e-9a1b-2c3d4e5f6a72'
   it('draws its title, team and summary, its projects as the Projects page does, its issues with their status, its Leaf documents opening Leaf; its team as the one chip and Open into Peek after its name, its ⋯ only Copy link (TOPI-8; D4, D5)', async () => {
     held.push(manifest('ship', 'ship.estiva.app', ['30850', '30851']), manifest('peek', 'peek.estiva.app', ['30840']), manifest('leaf', 'leaf.estiva.app', ['30842']))
-    held.push(projectRoot('p1'), issueRoot('i1'), leafDocument('doc1', 'Testing widgets'))
-    held.push(topic(D, 'Widgets', { summary: 'Small live cards' }), lists(D, 'i1'), lists(D, 'p1'), lists(D, 'doc1'))
+    held.push(projectRoot(P1), issueRoot(I1), leafDocument('doc1', 'Testing widgets'))
+    held.push(topic(D, 'Widgets', { summary: 'Small live cards' }), lists(D, I1), lists(D, P1), lists(D, 'doc1'))
     const { state, archives } = ship(
-      [{ d: 'p1', status: 'in_progress' }],
-      [{ d: 'i1', status: 'todo', project: 'p1' }, { d: 'i2', status: 'done' }, { d: 'i3', status: 'done', project: 'p1' }, { d: 'i4', status: 'cancelled', project: 'p1' }],
+      [{ d: P1, status: 'in_progress' }],
+      [{ d: I1, status: 'todo', project: P1 }, { d: 'i2', status: 'done' }, { d: 'i3', status: 'done', project: P1 }, { d: 'i4', status: 'cancelled', project: P1 }],
     )
     render(<Page d={D} state={state} folders={[{ id: 'team', name: 'HQ' } as never]} archives={archives} />)
 
@@ -181,7 +187,7 @@ describe("A topic's page in Ship", () => {
     // The project first though the topic listed the issue first, with the Projects list's facts.
     const [project, ...more] = kindRows('project')
     expect(more).toEqual([])
-    expect(within(project!).getByRole('link').textContent).toBe('Project p1')
+    expect(within(project!).getByRole('link').textContent).toBe(`Project ${P1}`)
     expect(within(project!).getByText('In Progress')).toBeTruthy()
     // Done of all but the cancelled one, so a finished project reads full (Miky, 3 Nov, SHIPS-7).
     // As the kit's small ring and its count (Katerina, 18 November: "the small progress which is a circle").
@@ -189,11 +195,11 @@ describe("A topic's page in Ship", () => {
     // An issue it does not list is not drawn; the one it lists names its project under its name, and its status.
     const [issue, ...rest] = kindRows('issue')
     expect(rest).toEqual([])
-    expect(within(issue!).getByText('Issue i1')).toBeTruthy()
-    expect(within(issue!).getByText('Project p1')).toBeTruthy()
+    expect(within(issue!).getByText(`Issue ${I1}`)).toBeTruthy()
+    expect(within(issue!).getByText(`Project ${P1}`)).toBeTruthy()
     expect(within(issue!).getByText('Todo')).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'Project p1' }).getAttribute('href')).toBe('/project/project-p1-p1')
-    expect(screen.getByRole('link', { name: /^Issue i1/ }).getAttribute('href')).toBe('/issue/issue-i1-i1')
+    expect(screen.getByRole('link', { name: `Project ${P1}` }).getAttribute('href')).toBe(`/project/project-${P1}-${P1}`)
+    expect(screen.getByRole('link', { name: new RegExp(`^Issue ${I1}`) }).getAttribute('href')).toBe(`/issue/issue-${I1}-${I1}`)
     await waitFor(() => expect(screen.getByRole('link', { name: /Testing widgets/ }).getAttribute('href')).toMatch(/^https:\/\/leaf\.estiva\.app\//))
     // The address bar gets the topic's slug.
     expect(location.pathname).toBe(`/topic/widgets-${D}`)

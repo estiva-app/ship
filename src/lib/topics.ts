@@ -4,6 +4,7 @@ import { ISSUE_STATUSES, progressOf, projectStatus, type Stage } from '@/nostr/k
 import { href } from '@/router'
 import type { Archives } from './archive'
 import { statusLabel } from './issues'
+import { dOf } from './fileLinks'
 import { topicHref, topicInPeek } from './topicLinks'
 
 /** One row on Ship's Topics, which is Explore topics (TOPI-9): the same columns in every app. */
@@ -173,8 +174,6 @@ export const DOCUMENT_KIND = 30842
 
 /** Ship's own kinds, a project and an issue: one Ship does not hold is not another app's file. */
 const SHIP_KINDS = [30850, 30851]
-
-const dOf = (address: string) => address.split(':')[2] ?? ''
 
 /** The topic a `d` names among these: none when no topic holds it, or two do (§13.1, as the hand-off reads it). */
 export function topicOfD(topics: readonly ReadTopic[], d: string): ReadTopic | undefined {

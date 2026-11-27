@@ -15,7 +15,8 @@ import { describe, expect, test } from 'vitest'
 import fc from 'fast-check'
 import { runSettings } from '@estiva-app/protocol/testing'
 import { objectRef } from '@estiva-app/interop'
-import { href, parse, PROJECTS_TABS, type Route } from './router'
+import { isFileId } from '@estiva-app/protocol'
+import { HOME, href, parse, PROJECTS_TABS, type Route } from './router'
 
 const settings = runSettings(1000)
 
@@ -26,7 +27,8 @@ const titleArb = fc.oneof(
   fc.tuple(fc.string({ maxLength: 10 }), fc.uuid()).map(([a, u]) => `${a} ${u}`),
 )
 const slugArb = fc.option(titleArb, { nil: undefined })
-const dArb = fc.uuid()
+/** A file's id: a random (version 4) lowercase uuid, the only one a file can have (LIN-1). */
+const dArb = fc.uuid({ version: 4 })
 const folderArb = fc.option(fc.uuid(), { nil: undefined })
 
 /** Each route Ship writes, with what parsing its address must give back: the slug is decoration and is dropped. */
@@ -86,6 +88,36 @@ describe("Ship's page addresses", () => {
         expect(parse(`/document/${ref}`)).toEqual({ name: 'elsewhere', word: 'document', ref })
         // Ship's own issue address on any host reads the same: only the path is read.
         expect(parse(`/issue/${ref}#block-p1`)).toEqual({ name: 'issue', d })
+      }),
+      settings,
+    )
+  })
+
+  test('an id no file can have gets no file path, and never one that reads back as another file (LIN-4)', () => {
+    // Made-up ids: any text, a uuid in capitals or of another version, and an id with a colon or a uuid at its tail —
+    // which the old reader took for that uuid's file.
+    const oddArb = fc.oneof(
+      fc.string({ maxLength: 40 }),
+      fc.uuid().map((u) => u.toUpperCase()),
+      fc.uuid({ version: 1 }),
+      fc.tuple(fc.string({ maxLength: 10 }), fc.uuid({ version: 4 })).map(([a, u]) => `${a}:${u}`),
+      fc.tuple(fc.string({ minLength: 1, maxLength: 10 }), fc.uuid({ version: 4 })).map(([a, u]) => `${a}-${u}`),
+    )
+    fc.assert(
+      fc.property(oddArb.filter((d) => !isFileId(d)), slugArb, fc.constantFrom('issue', 'project', 'topic' as const), (d, slug, name) => {
+        const route: Route = name === 'project' ? { name, d, slug, view: 'table' } : { name, d, slug }
+        expect(parse(href(route))).toEqual(HOME)
+      }),
+      settings,
+    )
+  })
+
+  test('a pasted file path whose id is not a file id opens no file (LIN-4)', () => {
+    fc.assert(
+      fc.property(fc.constantFrom('issue', 'project', 'topic'), fc.uuid({ version: 4 }), (word, u) => {
+        // A uuid in capitals is read lowercased; one of another version names no file.
+        expect(parse(`/${word}/${u.toUpperCase()}`)).toMatchObject({ name: word, d: u })
+        expect(parse(`/${word}/${u.slice(0, 14)}1${u.slice(15)}`)).toEqual(HOME)
       }),
       settings,
     )

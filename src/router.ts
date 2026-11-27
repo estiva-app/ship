@@ -60,7 +60,10 @@
  * once (`movedRedirect`), the way an old hash link is.
  */
 import { useEffect, useState } from 'react'
-import { identifierFromRef, objectRef } from '@estiva-app/interop'
+import { identifierFromRef, KIND_BARE_FILE } from '@estiva-app/interop'
+import { isFileId } from '@estiva-app/protocol'
+import { pagePathOf, SHIP_PAGE_WORDS, SHIP_ROOT_PATHS } from './lib/fileLinks'
+import { KIND } from './nostr/kinds'
 
 export type Route =
   /** With `folder`, only the issues of the projects in that Folder (SHIPS-5). */
@@ -102,7 +105,18 @@ export type Route =
  * somebody's file, and goes to the hand-off. `folder` is here because the old
  * Folder path still opens the Folder page; it is not a word Ship serves.
  */
-const OWN_SEGMENTS = new Set(['app', 'o', 'project', 'projects', 'issue', 'issues', 'folder', 'topics', 'topic'])
+const OWN_SEGMENTS = new Set([...SHIP_ROOT_PATHS, ...Object.values(SHIP_PAGE_WORDS.byKind)])
+
+/**
+ * The file a page path's ref names, or null: its trailing uuid, and only when
+ * that is an id a file can have (a random lowercase uuid, LIN-1). A ref read
+ * through a system that upper-cased it still resolves, as `identifierFromRef`
+ * lowercases.
+ */
+function fileIdOf(ref: string): string | null {
+  const d = identifierFromRef(ref)
+  return d && isFileId(d) ? d : null
+}
 
 /**
  * How a project's issues are shown.
@@ -139,7 +153,12 @@ function projectsTab(query: string | undefined): ProjectsTab | undefined {
 const PROJECT_VIEWS: ProjectView[] = ['table', 'board']
 const DEFAULT_PROJECT_VIEW: ProjectView = 'table'
 
-/** Build the path for a route — RFC 0.5 §7.2. */
+/**
+ * Build the path for a route — RFC 0.5 §7.2. A project's, an issue's and a
+ * topic's path is the shared writer's (`pagePathOf`, LIN-4). A `d` no file can
+ * have names no page (the relay refuses such a file), so its route's path is
+ * Ship's home: never a file path that reads back as nothing, or as another file.
+ */
 export function href(route: Route): string {
   switch (route.name) {
     case 'issues':
@@ -149,7 +168,8 @@ export function href(route: Route): string {
       return route.tab && route.tab !== 'active' ? `${base}?tab=${route.tab}` : base
     }
     case 'project': {
-      const base = `/project/${objectRef(route.d, route.slug)}`
+      const base = pagePathOf(KIND.PROJECT, route.d, route.slug)
+      if (base === null) return href(HOME)
       // The defaults are left out — a shared link should be the short one unless
       // the sender meant a specific tab or toggle.
       const query = new URLSearchParams()
@@ -159,13 +179,13 @@ export function href(route: Route): string {
       return q ? `${base}?${q}` : base
     }
     case 'issue':
-      return `/issue/${objectRef(route.d, route.slug)}`
+      return pagePathOf(KIND.ISSUE, route.d, route.slug) ?? href(HOME)
     case 'folder':
       return `/app/teams/${route.id}`
     case 'topics':
       return route.folder ? `/app/teams/${route.folder}/topics` : '/topics'
     case 'topic':
-      return `/topic/${objectRef(route.d, route.slug)}`
+      return pagePathOf(KIND_BARE_FILE, route.d, route.slug) ?? href(HOME)
     case 'inbound':
       return `/o/${route.naddr}`
     case 'elsewhere':
@@ -219,7 +239,7 @@ export function parse(location: string): Route {
     return tab ? { name: 'projects', tab } : { name: 'projects' }
   }
   if (parts[0] === 'project' && parts[1]) {
-    const d = identifierFromRef(parts[1])
+    const d = fileIdOf(parts[1])
     if (d) {
       const params = new URLSearchParams(query ?? '')
       const requested = params.get('view')
@@ -237,7 +257,7 @@ export function parse(location: string): Route {
   // A link to one message in a topic names what Ship's page does not show: it is Peek's, handed off as written
   // (record a-link-opens-in-the-app-you-are-in-when-it-has-a-page-made-for-that-kind).
   if (parts[0] === 'topic' && parts[1] && parts.length === 2) {
-    const d = identifierFromRef(parts[1])
+    const d = fileIdOf(parts[1])
     if (d && !new URLSearchParams(query ?? '').has('thread')) return { name: 'topic', d }
     if (d) return { name: 'elsewhere', word: parts[0], ref: parts[1], query }
   }
@@ -257,7 +277,7 @@ export function parse(location: string): Route {
     return query ? { name: 'elsewhere', word: parts[0], ref: parts[1], query } : { name: 'elsewhere', word: parts[0], ref: parts[1] }
   }
   if (parts[0] === 'issue' && parts[1]) {
-    const d = identifierFromRef(parts[1])
+    const d = fileIdOf(parts[1])
     if (d) return { name: 'issue', d }
   }
   if (parts[0] === 'issues') return { name: 'issues' }
