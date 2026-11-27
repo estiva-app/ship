@@ -7,10 +7,10 @@
  */
 import { useState } from 'react'
 import { IconExternalLink, IconSparkles } from '@tabler/icons-react'
-import { Button, Card, Link, LinkPickers, MetaText, Property, Select } from '@estiva-app/ui'
+import { AvatarGroup, Button, Card, Link, LinkPickers, LinkRow, MetaText, Property, Select } from '@estiva-app/ui'
 import { STATUSES, type Status } from './MarkAs'
 import { AcceptReject, ItemTag, JournalExtras, acceptedStatus } from './ItemParts'
-import { DecideDialog, InsightVisual, QuestionOptions, SeverityMark, needs, waited } from './ItemKinds'
+import { DecideDialog, InsightVisual, SeverityMark, needs, waited } from './ItemKinds'
 import { Group, ItemTrail, Marked, NeedsYou, Readers, Replaced, comesUp } from './Memory'
 import { CATEGORIES, SEVERITIES, PEOPLE, type Item } from './fixtures'
 
@@ -100,10 +100,12 @@ export function ItemFields({ item, me = 'miky' }: { item: Item; me?: string }) {
 }
 
 /**
- * A Question's phase and next step, as its box's footer says it (Miky, 16 Nov), with Decide for its decider. Once
+ * An open Question, as one group (Miky, 27 Nov: "weirdly squeezed in"): where it stands and its next step, with Decide
+ * for its decider; the brief its options were researched in, to read whole before deciding, as Claude hands Miky a
+ * brief page; then each option at the panel's whole width, with what leans to it on a line under its words. Once
  * decided, the Decision it ended in.
  */
-function QuestionPhase({ item, me, onDecide, deciding = false }: { item: Item; me: string; onDecide?: (choice: number, why: string) => void; deciding?: boolean }) {
+function QuestionGroup({ item, me, onDecide, deciding = false }: { item: Item; me: string; onDecide?: (choice: number, why: string) => void; deciding?: boolean }) {
   const [open, setOpen] = useState(deciding)
   if (item.decidedIn)
     return (
@@ -114,21 +116,61 @@ function QuestionPhase({ item, me, onDecide, deciding = false }: { item: Item; m
         </Link>
       </Card>
     )
+  const letters = 'ABCDEF'
+  const by = item.optionsBy
   return (
-    <Card fill="inset" className="flex items-center justify-between gap-3 px-3 py-2">
-      <span className="text-body-2 font-medium text-text-primary">{needs(item, me)}</span>
-      {item.step === 'decide' && item.decider?.key === me && (
-        <Button variant="primary" size="small" onClick={() => setOpen(true)}>
-          Decide
-        </Button>
-      )}
-      {(item.step ?? 'raised') === 'raised' && (
-        <Button variant="outlined" size="small" leadingIcon={<IconSparkles size={14} stroke={1.5} />} onClick={() => undefined}>
-          Research options
-        </Button>
-      )}
+    <Group title="Options" trailing={by && item.options ? `by ${by.name}` : undefined}>
+      <div className="flex flex-col gap-3">
+        <span className="flex items-center justify-between gap-3">
+          <span className="text-body-2 text-text-secondary">{needs(item, me)}</span>
+          {item.step === 'decide' && item.decider?.key === me && (
+            <Button variant="primary" size="small" onClick={() => setOpen(true)}>
+              Decide
+            </Button>
+          )}
+          {(item.step ?? 'raised') === 'raised' && (
+            <Button variant="outlined" size="small" leadingIcon={<IconSparkles size={14} stroke={1.5} />} onClick={() => undefined}>
+              Research options
+            </Button>
+          )}
+        </span>
+        {item.brief && (
+          <LinkRow
+            link={{ state: 'ready', linked: { id: item.brief.title, kind: 'page', noun: 'Brief', title: item.brief.title, href: '#', subtitle: `${by?.name ?? 'Claude'} · ${item.brief.at}`, ...(by ? { authors: [{ name: by.name, bot: by.bot }] } : {}) } }}
+            preview
+          />
+        )}
+        {item.options ? (
+          <ol className="flex flex-col gap-3" aria-label="Options">
+            {item.options.map((o, n) => (
+              <li key={o.label} className="flex gap-2 text-body-2">
+                <span className="w-4 shrink-0 font-medium text-text-muted">{letters[n]}</span>
+                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span className="font-medium text-text-primary">{o.label}</span>
+                  <span className="text-text-secondary">{o.gist}</span>
+                  {(o.lean || o.addedBy || (o.favouredBy?.length ?? 0) > 0) && (
+                    <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      {o.lean && <span className="text-caption text-accent-primary">Leaning</span>}
+                      {o.favouredBy && o.favouredBy.length > 0 && (
+                        <span className="flex items-center gap-1">
+                          <AvatarGroup members={o.favouredBy.map((p) => ({ name: p.name, bot: p.bot }))} size={16} />
+                          {/* Its adder alone favouring it says "added by" once, not their name twice. */}
+                          {!(o.addedBy && o.favouredBy.every((p) => p.name === o.addedBy?.name)) && <MetaText tone="muted">{o.favouredBy.map((p) => p.name).join(' and ')}</MetaText>}
+                        </span>
+                      )}
+                      {o.addedBy && <MetaText tone="muted">added by {o.addedBy.name}</MetaText>}
+                    </span>
+                  )}
+                </span>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <MetaText tone="muted">No options yet.</MetaText>
+        )}
+      </div>
       {open && <DecideDialog item={item} onDecide={(c, why) => onDecide?.(c, why)} onClose={() => setOpen(false)} />}
-    </Card>
+    </Group>
   )
 }
 
@@ -167,7 +209,6 @@ export function ItemContent({ item, me = 'miky', words = true, onDecide, decidin
   const quote = item.visual?.kind === 'quote'
   return (
     <div className="flex flex-col gap-3">
-      {item.word === 'Question' && item.status !== 'proposed' && <QuestionPhase item={item} me={me} onDecide={onDecide} deciding={deciding} />}
       {item.word === 'Blocker' && item.status !== 'proposed' && <BlockerWait item={item} />}
       {item.visual && (
         <Card fill="inset" className="flex flex-col p-3">
@@ -177,15 +218,7 @@ export function ItemContent({ item, me = 'miky', words = true, onDecide, decidin
       {words && item.summary && !quote && !(item.word === 'Update' && item.details) && <span className="text-body-2 text-text-primary">{item.summary}</span>}
       {words && item.details && <span className="whitespace-pre-line text-body-2 text-text-secondary">{item.details}</span>}
       <JournalExtras item={item} />
-      {item.word === 'Question' &&
-        (item.options ? (
-          <div className="flex flex-col gap-2">
-            <span className="text-caption font-medium text-text-primary">Options{item.optionsBy ? ` · researched by ${item.optionsBy.name}` : ''}</span>
-            <QuestionOptions options={item.options} full />
-          </div>
-        ) : (
-          <MetaText tone="muted">No options yet.</MetaText>
-        ))}
+      {item.word === 'Question' && item.status !== 'proposed' && <QuestionGroup item={item} me={me} onDecide={onDecide} deciding={deciding} />}
       {/* A tool's insight: its chart or quote is the source, so a link to it, not a copy as marked. */}
       {tool && item.source && (
         <MetaText tone="muted">

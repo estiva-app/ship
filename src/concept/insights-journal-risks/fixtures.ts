@@ -109,6 +109,8 @@ export interface Item {
   /** An open Question: its options as researched (by Claude, say), and the talk about them so far. */
   options?: { label: string; gist: string; lean?: boolean; favouredBy?: Person[]; addedBy?: Person; decision?: string }[]
   optionsBy?: Person
+  /** The page the options were researched in, to read whole before deciding (Miky, 27 Nov: as Claude hands him a brief). */
+  brief?: { title: string; at: string }
   /** Where an open question is (Miky, 16 Nov): raised, its options researched, in review, ready to decide. */
   step?: QuestionStep
   /** Who decides it: the Decision it ends in inherits them. */
@@ -349,6 +351,7 @@ export const ITEMS: Item[] = [
       { label: 'Talk by space, files by team', gist: 'Conversations follow the space, files keep their team’s readers.', favouredBy: [KATERINA], addedBy: KATERINA },
     ],
     optionsBy: CLAUDE,
+    brief: { title: 'Who leads, who reads', at: '28 Oct' },
     step: 'review',
     decider: MIKY,
     discussion: { people: [MIKY, KATERINA, CLAUDE], replies: 12, last: '2 Nov' },
@@ -400,6 +403,7 @@ export const ITEMS: Item[] = [
       { label: 'It stays folded', gist: 'Marks show only inside the thread until someone sends it up.' },
     ],
     optionsBy: CLAUDE,
+    brief: { title: 'Does a marked reply bring its thread?', at: '16 Nov' },
     step: 'options',
     decider: MIKY,
     source: { app: 'Ship', what: 'comment', place: PROJECT, author: CLAUDE, quote: 'Does marking a reply bring its thread into the topic’s feed?' },
@@ -415,6 +419,7 @@ export const ITEMS: Item[] = [
       { label: 'Each company’s own', gist: 'Ship ships defaults; another app may not show them.', favouredBy: [KATERINA], decision: 'An insight’s category is each company’s own' },
     ],
     optionsBy: CLAUDE,
+    brief: { title: 'Whose categories are they?', at: '16 Nov' },
     step: 'decide',
     decider: MIKY,
     discussion: { people: [CLAUDE, KATERINA], replies: 4, last: 'today' },
