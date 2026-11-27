@@ -366,7 +366,8 @@ export function sidebarProps(
     openIssues,
     activeProjects,
     hrefFor: (entry: SidebarEntry, folder?: string) =>
-      href({ name: entry, folder }),
+      // CONCEPT (insights-journal-risks): the Desk is drawn only in Storybook; the app has no route for it yet.
+      href({ name: entry === 'desk' ? 'projects' : entry, folder }),
     folders,
     current,
     ...(openFile ? { openFile } : {}),

@@ -249,7 +249,7 @@ export function AgentClaim({ phase }: { phase: 'working' | 'wrote' | 'done' }) {
 }
 
 /** One run of an agent on this project: a person's Claude session or a loop's, told apart only by who started it. */
-interface Session {
+export interface Session {
   id: string
   loop?: boolean
   who: string
@@ -259,7 +259,7 @@ interface Session {
   ago: string
   undo?: boolean
 }
-const SESSIONS: Session[] = [
+export const SESSIONS: Session[] = [
   { id: 's1', who: 'Claude, started by Miky', on: 'TEA-12 Ship and Leaf sidebar match Peek', state: 'working', result: 'Working', ago: 'claimed 2h ago' },
   { id: 's2', loop: true, who: 'The decision loop', on: 'after “Cross-app work is an Initiative; a team room is a Topic”', state: 'waiting', result: '3 changes proposed', ago: '10:12' },
   { id: 's3', who: 'Claude, started by Miky', on: 'TEA-10 Leaf’s sidebar shows Teams', state: 'waiting', result: 'ship#610 open · an Update · a question for Miky', ago: 'yesterday' },

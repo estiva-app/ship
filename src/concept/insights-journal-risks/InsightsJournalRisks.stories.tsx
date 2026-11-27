@@ -8,6 +8,7 @@ import { SIDEBAR_PROJECTS } from '@/fixtures/projects'
 import { InitiativePage, IssuePage, ItemPage, ProjectPage, TeamPage } from './Pages'
 import { INITIATIVES } from './lens'
 import { DecisionFollowUps, LoopPage } from './Agents'
+import { DeskPage } from './Desk'
 import { HAND_TYPED, ITEMS, PERSONAL } from './fixtures'
 
 /**
@@ -28,7 +29,7 @@ function Shell({ current = 'projects', initiative, children }: { current?: Sideb
       <AppShell
         logo="Estiva Ship"
         identity={<IdentityMenu me={{ name: 'Miky' }} signedIn idBase="https://id.estiva.app" relayUrl="http://localhost:3000" onCopyKey={fn()} onSignOut={fn()} />}
-        nav={<ShipSidebar openIssues={18} activeProjects={SIDEBAR_PROJECTS.length} hrefFor={(entry) => `#/${entry}`} current={{ entry: current }} topics={SIDEBAR_INITIATIVES} naming="initiatives" openTopic={initiative} onRetryTopics={fn()} />}
+        nav={<ShipSidebar openIssues={18} activeProjects={SIDEBAR_PROJECTS.length} hrefFor={(entry) => `#/${entry}`} current={{ entry: current }} topics={SIDEBAR_INITIATIVES} naming="initiatives" desk openTopic={initiative} onRetryTopics={fn()} />}
       >
         {children}
       </AppShell>
@@ -132,6 +133,12 @@ export const ItemChangedByLoop: Story = {
 export const ItemTypedByHand: Story ={ render: () => <Shell><ItemPage item={HAND_TYPED} /></Shell> }
 /** Personal memory: only Miky and his own Claude read it (record a-loop-reads-only-shared-memory-…). */
 export const ItemPersonal: Story = { render: () => <Shell><ItemPage item={PERSONAL} /></Shell> }
+/** The Desk (Miky, 27 Nov, option B): what needs you, the first as a decision card, and every project at a glance. */
+export const Desk: Story = { render: () => <Shell current="desk"><DeskPage /></Shell> }
+/** The Desk narrowed to one project. */
+export const DeskOneProject: Story = { render: () => <Shell current="desk"><DeskPage filter="Teams and Topics navigation" /></Shell> }
+/** The Desk with a blocker open beside it, as on its project. */
+export const DeskItemOpen: Story = { render: () => <Shell current="desk"><DeskPage open="r6" /></Shell> }
 /** Two sources, one in a direct message: only the two of them read it, and the line says which source narrowed it. */
 export const ProjectInsightTwoSources: Story = { render: () => <Shell><ProjectPage start="insights" open="i1" /></Shell> }
 /** An accepted Question whose only source was deleted: it stays, and the project's loop proposes Outdated. */

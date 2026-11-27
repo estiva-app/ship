@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { IconArrowUpRight, IconBox, IconListDetails, IconPlus, IconTarget } from '@tabler/icons-react'
+import { IconArrowUpRight, IconBox, IconListDetails, IconNote, IconPlus, IconTarget } from '@tabler/icons-react'
 import { KindIcon, NavItem, NavTree, Sidebar as SidebarShell, type NavTreeGroup } from '@estiva-app/ui'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { SkeletonList } from '@/components/ui/Skeleton'
@@ -46,7 +46,7 @@ import { linkTo } from '@/router'
 const STORAGE_KEY = 'ship.sidebar.folder'
 
 /** The three pages, at the top and in every team. */
-export type SidebarEntry = 'topics' | 'projects' | 'issues'
+export type SidebarEntry = 'desk' | 'topics' | 'projects' | 'issues'
 
 /** A top-level Folder — a team — as the sidebar needs it. */
 export interface SidebarFolder {
@@ -99,6 +99,8 @@ export interface ShipSidebarProps {
   onRetryTopics: () => void
   /** CONCEPT (Insights, Journal and Risks, Miky 18 Nov): the section's word, today's Topics or Initiatives. */
   naming?: "topics" | "initiatives"
+  /** CONCEPT (insights-journal-risks): draw the Desk first. Only the concept's stories turn it on; the app has no Desk yet. */
+  desk?: boolean
   /** The topic whose page is open, by address: its row is lit and opens. */
   openTopic?: string
   /** The project or issue open, by address: lit under the topic listing it, which opens. */
@@ -118,13 +120,16 @@ const ENTRIES: { entry: SidebarEntry; label: string; icon: ReactNode }[] = [
   { entry: 'projects', label: 'Projects', icon: <IconBox size={16} stroke={1.5} /> },
   { entry: 'issues', label: 'Issues', icon: <IconListDetails size={16} stroke={1.5} /> },
 ]
-/** The top: Projects and Issues. Topics is the section under them now (TOPI-9); a team's fold keeps all three. */
-const TOP = ENTRIES.filter(({ entry }) => entry !== 'topics')
+/**
+ * The top: the Desk, then Projects and Issues. Topics is the section under them now (TOPI-9); a team's fold keeps all
+ * three. CONCEPT (insights-journal-risks): the Desk, with Peek's Desk icon, is yours alone, so no team folds one.
+ */
+const TOP = [{ entry: 'desk' as const, label: 'Desk', icon: <IconNote size={16} stroke={1.5} /> }, ...ENTRIES.filter(({ entry }) => entry !== 'topics')]
 
 /** A team entry's row id: the tree's `selected` names one. */
 const rowId = (folder: string, entry: SidebarEntry) => `${folder}/${entry}`
 
-export function ShipSidebar({ openIssues, activeProjects, hrefFor, folders = [], onOpenFolder, onNewFolder, current, topics, onRetryTopics, naming = "topics", openTopic, openFile, loading = false, foldersLoading = false, className }: ShipSidebarProps) {
+export function ShipSidebar({ openIssues, activeProjects, hrefFor, folders = [], onOpenFolder, onNewFolder, current, topics, onRetryTopics, naming = "topics", desk = false, openTopic, openFile, loading = false, foldersLoading = false, className }: ShipSidebarProps) {
   const at = current && 'entry' in current ? current : undefined
   // Alphabetical teams, as Peek's column draws them; the relay's order tells the person nothing.
   const teams = [...folders].sort((a, b) =>
@@ -155,7 +160,7 @@ export function ShipSidebar({ openIssues, activeProjects, hrefFor, folders = [],
       }
   return (
     <SidebarShell className={className}>
-      {TOP.map(({ entry, label, icon }) => (
+      {TOP.filter(({ entry }) => desk || entry !== 'desk').map(({ entry, label, icon }) => (
         <NavItem key={entry} label={label} href={hrefFor(entry)} icon={icon} {...counts[entry]} active={!!at && !at.folder && at.entry === entry} />
       ))}
       {/* Your five newest topics, each folding to what Ship opens of it; then the way to every topic. */}
