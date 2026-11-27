@@ -8,7 +8,7 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { Editor } from '@tiptap/react'
-import { blockIds, descriptionTextToBlockDocument, serializeBlockDocument } from '@estiva-app/protocol'
+import { blockIds, descriptionTextToBlockDocument, naddrToAddr, serializeBlockDocument } from '@estiva-app/protocol'
 import { AppShell, ToastProvider } from '@estiva-app/ui'
 import { useKeptLauncher } from '@estiva-app/launcher'
 import type { ReferenceCandidate } from '@estiva-app/conversation'
@@ -16,11 +16,19 @@ import { stubLayout } from '@/test/inlineText'
 import type { ThreadData } from '@/components/ConversationThread'
 
 /* The relay's search, and a file's manifest link, as the relay would answer them. */
-const relay = vi.hoisted(() => ({ hits: [] as ReferenceCandidate[], openUrl: undefined as string | undefined }))
+/* And what Leaf declares on a team, with the teams you are in (KIN-9); the make itself is `applyCreation`'s, tested in creation.test.ts. */
+const relay = vi.hoisted(() => ({
+  hits: [] as ReferenceCandidate[],
+  openUrl: undefined as string | undefined,
+  onTeam: null as unknown,
+  made: [] as unknown[],
+}))
 vi.mock('@/api/foreign', async (original) => ({
   ...(await original<typeof import('@/api/foreign')>()),
   searchFiles: vi.fn(async () => relay.hits),
   resolveForeign: vi.fn(async (address: string) => ({ address, openUrl: relay.openUrl })),
+  creatableUnder: vi.fn(async (kind: number) => (kind === 39000 ? relay.onTeam : null)),
+  applyCreation: vi.fn(async (args: unknown) => (relay.made.push(args), { ok: true })),
 }))
 
 import { IssueView, type IssueViewProps } from '@/views/IssueView'
@@ -51,6 +59,8 @@ afterEach(() => {
   model.told = []
   relay.hits = []
   relay.openUrl = undefined
+  relay.onTeam = null
+  relay.made = []
   localStorage.clear()
 })
 
@@ -263,6 +273,42 @@ describe("Ship's ⌘K, Add issue and New project (KIN-6)", () => {
     const open = vi.fn()
     render(<HoldsAddIssue open={open} />)
     expect(open).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe("Ship's ⌘K, New document (KIN-9)", () => {
+  const LEAF = '31990:9b0ff001e909e0c6eb9165b81118b0c580db2584c87e1c794a2ec9339f7541ec:estiva-leaf'
+  const OPS = `39000:${'d'.repeat(64)}:ops`
+
+  it("offers Leaf's New document, starting in the open issue's team, and makes it there", async () => {
+    const teams = [
+      { address: `39000:${'d'.repeat(64)}:design`, title: 'Design' },
+      { address: OPS, title: 'Ops' },
+    ]
+    // Leaf's add-document as Ship reads it off a team: declared by Leaf's manifest.
+    const action = {
+      id: 'add-document',
+      label: 'New document',
+      control: 'form',
+      fields: [{ name: 'title', type: 'string', required: true }],
+      declaredBy: { address: LEAF },
+    }
+    relay.onTeam = { actions: [action], parents: teams, parentsFor: { 'add-document': teams } }
+    render(<Frame>{issueView({ team: { id: 'ops', name: 'Ops' } })}</Frame>)
+    await openBox()
+    fireEvent.change(field()!, { target: { value: 'new document' } })
+    const row = await waitFor(() => {
+      const found = option('New document')
+      expect(found?.textContent ?? 'no New document row').toContain('Leaf')
+      return found!
+    })
+    act(() => void fireEvent.click(row))
+    const title = await waitFor(() => screen.getByRole('textbox', { name: /title/i }) as HTMLInputElement)
+    fireEvent.change(title, { target: { value: 'Launch plan' } })
+    fireEvent.click(document.querySelector<HTMLButtonElement>('[role="dialog"] button[type="submit"]')!)
+    await waitFor(() => expect(relay.made).toHaveLength(1))
+    expect(relay.made[0]).toMatchObject({ actionId: 'add-document', declaredBy: LEAF, value: { title: 'Launch plan' } })
+    expect(naddrToAddr((relay.made[0] as { naddr: string }).naddr)).toBe(OPS)
   })
 })
 
