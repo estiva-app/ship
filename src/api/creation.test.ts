@@ -46,14 +46,19 @@ vi.mock('@estiva-app/interop', async (importOriginal) => {
     ...real,
     // A creation borrowed on a team comes with only what is declared there, as interop answers it.
     resolveActingManifest: async () => ({ address: LEAF, manifest: { ...leaf.manifest, actions: leaf.manifest.actions.filter((a) => [a.appliesTo].flat().includes('39000')) } }),
-    resolveManifest: async () => ({ address: LEAF, manifest: leaf.manifest }),
+    // The newest manifest for a document is a stranger's (any key can publish one until WOR-2): its text must not matter.
+    resolveManifest: async () => ({ address: '31990:ee11:planted', manifest: { actions: [] } }),
     listFolders: async () => teams.list,
   }
 })
 
 vi.mock('./store', () => ({
   relay: {
-    query: async () => [],
+    // Leaf's own manifest, by its address: where the text action is read from.
+    query: async (filters: { kinds?: number[] }[]) =>
+      filters.some((f) => f.kinds?.includes(31990))
+        ? [{ kind: 31990, pubkey: LEAF.split(':')[1], created_at: 1, tags: [['d', 'estiva-leaf']], content: JSON.stringify(leaf.manifest), id: 'm'.repeat(64), sig: '' }]
+        : [],
     queryAll: async () => [],
     publish: async (event: SignedEvent) => {
       published.push(event)

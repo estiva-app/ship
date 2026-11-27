@@ -21,7 +21,6 @@ import {
   buildActionEvents,
   createFile,
   KIND_CHANNEL_METADATA,
-  resolveManifest,
   TEXT_FIELD,
   resolveActingManifest,
   conversationCountsOf,
@@ -926,10 +925,20 @@ export async function applyCreation(args: LauncherApply): Promise<LauncherApplie
   let textManifest = resolved.manifest
   let textAction = textOf(textManifest)
   if (text && !textAction) {
-    const owner = await resolveManifest({ kind, pubkey, identifier: newId, relays: [] }, query, manifests).catch(() => null)
-    if (owner && owner.address === resolved.address) {
-      textManifest = owner.manifest
-      textAction = textOf(textManifest)
+    // The declaring manifest whole, read by its own address: the newest manifest for the kind could be any key's until
+    // WOR-2, and one planted there must not stop the text (KIN-9 security review).
+    const [, author, d] = resolved.address.split(':')
+    const events = await query([{ kinds: [31990], authors: [author], '#d': [d] }]).catch(() => [] as SignedEvent[])
+    const newest = events.filter((e) => e.pubkey === author).sort((a, b) => b.created_at - a.created_at)[0]
+    let whole: typeof resolved.manifest | null = null
+    try {
+      whole = newest ? (JSON.parse(newest.content) as typeof resolved.manifest) : null
+    } catch {
+      /* not a manifest: no text action */
+    }
+    if (whole) {
+      textManifest = whole
+      textAction = textOf(whole)
     }
   }
   if (text && !textAction) return refuse('Its app does not take this text from Ship yet, so nothing was made.')
