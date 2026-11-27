@@ -7,7 +7,7 @@
  * - the team page (today's Projects page for one team) gets the team's own lists.
  */
 import { useMemo, useState, type ReactNode } from 'react'
-import { IconBox, IconChevronDown, IconCircleDot, IconLayoutKanban, IconList, IconPlus, IconTarget, IconUsers } from '@tabler/icons-react'
+import { IconBox, IconChevronDown, IconCircleDot, IconLayoutKanban, IconList, IconLock, IconPlus, IconTarget, IconUsers } from '@tabler/icons-react'
 import { Board } from '@/components/Board'
 import { serializeBlockDocument } from '@estiva-app/protocol'
 import { Button, Card, EmptyState, IconButton, Link, LinkPickers, Menu, MenuItem, MetaText, NoAccessNotice, PageHeader, SectionHeader, Select, SkeletonList, Tabs } from '@estiva-app/ui'
@@ -267,7 +267,7 @@ export function ProjectPage({ start = 'overview', listState = 'ready', me = 'mik
       {tab === 'issues' && scopeId && !placed[scopeId] && (
         <ScopePanel key={scopeId} id={scopeId} onPlace={(to) => place(scopeId, to)} onClose={() => setScopeId(undefined)} />
       )}
-      {open && (tab === 'overview' || open.type === TAB_TYPE[tab]) && <ItemPanel item={open} me={me} onClose={() => (setOpen(undefined), setDecidingId(undefined))} deciding={open.id === decidingId} onDecide={(c, why) => onDecide(open, c, why)} />}
+      {open && (tab === 'overview' || open.type === TAB_TYPE[tab]) && <ItemPanel item={open} me={me} here={PROJECT} onClose={() => (setOpen(undefined), setDecidingId(undefined))} deciding={open.id === decidingId} onDecide={(c, why) => onDecide(open, c, why)} />}
       {side.overview.shown && (
         <div className="flex shrink-0 flex-col border-l border-border-default">
           <OverviewPanel activity={ACTIVITY_ITEMS} history={ACTIVITY} />
@@ -350,11 +350,9 @@ export function IssuePage({ itemsState = 'ready', commentMark = true, claim }: {
 
 /** An item's own page, shaped like an issue's: title, summary, its fields, its source as marked, details, comments. */
 export function ItemPage({ item, me = 'miky', state = 'ready', below }: { item: Item; me?: string; state?: 'ready' | 'loading' | 'error' | 'no-access'; below?: ReactNode }) {
-  const crumbs = [
-    { label: 'Projects', href: '#/projects' },
-    { label: PROJECT, href: '#/project/p' },
-    { label: TYPE_META[item.type].tab, icon: <span className={TYPE_META[item.type].text}>{TYPE_META[item.type].icon(16)}</span> },
-  ]
+  const kind = { label: TYPE_META[item.type].tab, icon: <span className={TYPE_META[item.type].text}>{TYPE_META[item.type].icon(16)}</span> }
+  // Personal memory lives in no project: only you and your own agent read it.
+  const crumbs = item.layer === 'personal' ? [{ label: 'Personal', icon: <IconLock size={16} stroke={1.5} /> }, kind] : [{ label: 'Projects', href: '#/projects' }, { label: PROJECT, href: '#/project/p' }, kind]
   const header = <PageHeader title={<Breadcrumb items={crumbs} />} actions={<PageActions what="issue" archive="none" onArchive={noop} onDelete={noop} onCopyLink={noop} />} />
   if (state !== 'ready')
     return (
@@ -400,8 +398,8 @@ export function ItemPage({ item, me = 'miky', state = 'ready', below }: { item: 
 }
 
 /** The team page — today's Projects page for one team — with the team's own lists beside Projects. */
-export function TeamPage({ start = 'insights' }: { start?: 'projects' | ConceptTab }) {
-  return <GatheredPage crumbs={[{ label: 'Teams', href: '#/teams' }, { label: TEAM, icon: <IconUsers size={16} stroke={1.5} /> }]} items={[...ITEMS, ...ELSEWHERE]} start={start} />
+export function TeamPage({ start = 'insights', open }: { start?: 'projects' | ConceptTab; open?: string }) {
+  return <GatheredPage crumbs={[{ label: 'Teams', href: '#/teams' }, { label: TEAM, icon: <IconUsers size={16} stroke={1.5} /> }]} items={[...ITEMS, ...ELSEWHERE]} start={start} openId={open} />
 }
 
 /**
@@ -439,9 +437,9 @@ export function InitiativePage({ id = 'ini1', start = 'insights' }: { id?: strin
  * A page that gathers items from many places, a team's or an Initiative's: Projects, then its Insights, Journal and
  * Risks, each item with a chip saying where it lives (the issue, the project, the Initiative, or the team's own).
  */
-function GatheredPage({ crumbs, items, start, projects }: { crumbs: { label: string; href?: string; icon?: ReactNode }[]; items: Item[]; start: 'projects' | ConceptTab; projects?: ReactNode }) {
+function GatheredPage({ crumbs, items, start, projects, openId }: { crumbs: { label: string; href?: string; icon?: ReactNode }[]; items: Item[]; start: 'projects' | ConceptTab; projects?: ReactNode; openId?: string }) {
   const [tab, setTab] = useState<string>(start)
-  const [open, setOpen] = useState<Item>()
+  const [open, setOpen] = useState<Item | undefined>(() => items.find((i) => i.id === openId))
   const onOpen = (i: Item) => setOpen((o) => (o?.id === i.id ? undefined : i))
   const fresh = (t: ItemType) => items.some((i) => i.type === t && i.isNew)
   return (

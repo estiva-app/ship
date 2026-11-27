@@ -33,6 +33,10 @@ export interface Source {
   now?: string
   /** The source was deleted. */
   gone?: boolean
+  /** When it was written. */
+  when?: string
+  /** Who reads where it lives, when fewer than the item's team: the item is then read only by them (record #448). */
+  readers?: string
 }
 
 /** An Insight's category: the company's own field, on top of the core fields (record, 16 Nov). Estiva's four. */
@@ -86,6 +90,17 @@ export interface Item {
   /** A loop's change to it, told to whoever added it, who can review and undo it (Miky, 19 Nov). */
   changed?: { by: string; what: string; why: string; ago: string }
   source?: Source
+  /** Its other sources (record an-item-goes-with-its-last-source-unless-a-person-accepted-it): each read as marked. */
+  sources?: Source[]
+  /** Personal memory, read only by you and your own agent; absent, the shared memory of its team (record a-loop-reads-only-shared-memory-…). */
+  layer?: 'personal'
+  /** When it is worth bringing into an agent's work (27 Nov brainstorm): written by the loop that marked it, edited by anyone. */
+  mattersWhen?: string
+  /** What happened to it after it was added, newest first: who, at what trust, what and why; `undo` while it can be taken back. */
+  history?: { by: string; trust?: 'Proposes' | 'Acts, with Undo'; what: string; why?: string; ago: string; undo?: boolean }[]
+  /** The entry that replaced this one, and the one this replaced: linked both ways (27 Nov brainstorm). */
+  supersededBy?: string
+  replaces?: string
   /** New since your last visit. */
   isNew?: boolean
   /** A Blocker: who has to act, and what stops until they do. */
@@ -153,7 +168,10 @@ export const ITEMS: Item[] = [
     title: 'Nothing on the left says where an open file belongs',
     summary: 'Katerina opened a file and could not tell which team or topic it was in: nothing on the left was selected.',
     markedBy: MIKY,
-    source: { app: 'Peek', what: 'message', place: 'Universal Navigation', author: KATERINA, quote: 'I can’t find where the file belongs to. Nothing is selected on the left panel.' },
+    source: { app: 'Peek', what: 'message', place: 'Universal Navigation', author: KATERINA, quote: 'I can’t find where the file belongs to. Nothing is selected on the left panel.', when: '13 Nov' },
+    // Imagined: a second source in a direct message, to draw readers narrowed by a source.
+    sources: [{ app: 'Peek', what: 'message', place: 'Direct messages', author: KATERINA, quote: 'Same in Leaf: I opened a page from a link and nothing on the left told me where I was.', when: '14 Nov', readers: 'Miky and Katerina' }],
+    mattersWhen: 'Someone changes the sidebar in Ship or Leaf',
   },
   {
     id: 'i2', type: 'insight', word: 'Insight', category: 'Customer', status: 'proposed', at: '10 Nov', day: '2026-11-10', team: TEAM, about: onProject, isNew: true,
@@ -167,7 +185,8 @@ export const ITEMS: Item[] = [
     title: 'Being a member of many Ship issues is an annoyance',
     summary: 'There are at least three types of topics.',
     markedBy: MIKY,
-    source: { app: 'Peek', what: 'message', place: 'Friday Meetings', author: MIKY, quote: 'Meeting notes … we discussed the annoyance caused by being member of many Ship issues… we see at least 3 types of topics. Anything I missed?', now: 'Meeting notes … we discussed the annoyance caused by being member of many Ship issues… we see at least 3 types of topics (people, work, places). Anything I missed?' },
+    source: { app: 'Peek', what: 'message', place: 'Friday Meetings', author: MIKY, quote: 'Meeting notes … we discussed the annoyance caused by being member of many Ship issues… we see at least 3 types of topics. Anything I missed?', now: 'Meeting notes … we discussed the annoyance caused by being member of many Ship issues… we see at least 3 types of topics (people, work, places). Anything I missed?', when: '9 Oct' },
+    mattersWhen: 'Someone plans who is told about an issue, or how topics are grouped',
   },
   {
     id: 'i4', type: 'insight', word: 'Insight', category: 'Product', status: 'accepted', at: '18 Aug', day: '2026-08-18', team: TEAM, about: onProject, acceptedBy: MIKY,
@@ -181,7 +200,8 @@ export const ITEMS: Item[] = [
     title: 'An “All topics” switch helps people find a place',
     summary: 'Nobody should have to know which team a topic is in. Main and All replaced the switch.',
     markedBy: MIKY,
-    source: { app: 'Leaf', what: 'block', place: 'Navigation notes', author: KATERINA, quote: 'An “All topics” switch, so nobody has to know which team a topic is in.' },
+    source: { app: 'Leaf', what: 'block', place: 'Navigation notes', author: KATERINA, quote: 'An “All topics” switch, so nobody has to know which team a topic is in.', when: '8 Sep' },
+    history: [{ by: 'The dreaming loop', trust: 'Acts, with Undo', what: 'marked it Outdated', why: 'Main and All replaced the switch on 10 Nov', ago: '10 Nov', undo: true }],
   },
   {
     id: 'i6', type: 'insight', word: 'Insight', category: 'Technical', status: 'accepted', at: '13 Oct', day: '2026-10-13', team: TEAM, about: onProject, acceptedBy: MIKY,
@@ -264,7 +284,8 @@ export const ITEMS: Item[] = [
     summary: 'Work that spans apps is an Initiative, a team’s room is a Topic, and People become DMs. Katerina judges the names on the prototype.',
     artifact: { title: 'Navigation brainstorm', caption: 'Today, in one picture: a team holds chat, spaces and topics; each app shows its own sidebar', image: navigationToday },
     markedBy: MIKY, decidedBy: MIKY,
-    source: { app: 'Leaf', what: 'block', place: 'Universal Navigation brainstorm', author: MIKY, quote: 'Cross-app work = Initiatives, team rooms = Topics, People → DMs.' },
+    source: { app: 'Leaf', what: 'block', place: 'Universal Navigation brainstorm', author: MIKY, quote: 'Cross-app work = Initiatives, team rooms = Topics, People → DMs.', when: '13 Nov' },
+    mattersWhen: 'Someone names or places cross-app work or a team’s room',
   },
   {
     id: 'j3', type: 'journal', word: 'Update', status: 'accepted', at: '10 Nov', day: '2026-11-10', team: TEAM, about: onProject, acceptedBy: MIKY,
@@ -272,6 +293,7 @@ export const ITEMS: Item[] = [
     summary: 'In Peek, the level you set on a topic is what you see.',
     details: 'Topics: Main and All is done, in Peek only: the level you set on a topic is what you see of it.\n\nNext: the Activity indicator on each topic and team, ahead of sending a thread up and highlights. What is new in Ship and Leaf waits; it needs more thinking.',
     artifact: { title: 'Main, All, Activity', caption: 'A Peek topic’s Main, as shipped', image: mainShot },
+    replaces: 'One search with an “All topics” switch',
     markedBy: MIKY,
   },
   {
@@ -294,7 +316,9 @@ export const ITEMS: Item[] = [
     title: 'One search with an “All topics” switch',
     summary: 'One search box, with a switch to look in every topic. Replaced by Main and All.',
     markedBy: MIKY, decidedBy: MIKY,
-    source: { app: 'Peek', what: 'message', place: 'Universal Navigation', author: MIKY, quote: 'that’s good call' },
+    source: { app: 'Peek', what: 'message', place: 'Universal Navigation', author: MIKY, quote: 'that’s good call', when: '8 Sep' },
+    supersededBy: 'Topics: Main and All shipped in Peek',
+    history: [{ by: 'Miky', what: 'marked it Superseded', why: 'Main and All replaced the switch', ago: '10 Nov', undo: true }],
   },
   // Risks
   {
@@ -328,7 +352,8 @@ export const ITEMS: Item[] = [
     step: 'review',
     decider: MIKY,
     discussion: { people: [MIKY, KATERINA, CLAUDE], replies: 12, last: '2 Nov' },
-    source: { app: 'Leaf', what: 'block', place: 'Who leads, who reads', author: MIKY, quote: 'Who leads a topic, and who can read it, once Folders are gone from the sidebar?', gone: true },
+    source: { app: 'Leaf', what: 'block', place: 'Who leads, who reads', author: MIKY, quote: 'Who leads a topic, and who can read it, once Folders are gone from the sidebar?', gone: true, when: '28 Oct' },
+    mattersWhen: 'Someone decides who can read a topic or a team',
   },
   {
     id: 'r4', type: 'risk', word: 'Concern', severity: 'Medium', status: 'resolved', at: '4 Nov', day: '2026-11-04', team: TEAM, about: onProject, acceptedBy: MIKY,
@@ -404,4 +429,18 @@ export const HAND_TYPED: Item = {
   title: 'A new feature often makes the next speed round necessary',
   summary: 'Recognise it at once: each build issue carries a Load cost line.',
   markedBy: MIKY,
+}
+
+/**
+ * Personal memory (record a-loop-reads-only-shared-memory-and-your-own-agent-writes-as-you): read by Miky and his own
+ * Claude only. The finding is real (14 Oct: every reversed call had come as wire detail); its source, a private note
+ * in Leaf, is imagined.
+ */
+export const PERSONAL: Item = {
+  id: 'p1', type: 'insight', word: 'Insight', category: 'Process', status: 'accepted', at: '14 Oct', day: '2026-10-14', team: TEAM, acceptedBy: MIKY, layer: 'personal',
+  title: 'I decide protocol calls badly when they come as wire detail',
+  summary: 'Every call I reversed had been asked in kinds and tags. Ask me in product words, with a picture.',
+  markedBy: CLAUDE,
+  source: { app: 'Leaf', what: 'block', place: 'My notes', author: MIKY, quote: 'Every reversal this week came from how the question was framed, not from the answer.', when: '14 Oct' },
+  mattersWhen: 'My Claude asks me a protocol question',
 }

@@ -6,122 +6,16 @@
  * unchanged into Leaf.
  */
 import { useState } from 'react'
-import { IconArchive, IconExternalLink, IconHourglass, IconSparkles, IconTarget, IconUsers } from '@tabler/icons-react'
+import { IconExternalLink, IconSparkles } from '@tabler/icons-react'
 import { Button, Card, Link, LinkPickers, MetaText, Select } from '@estiva-app/ui'
 import { STATUSES, type Status } from './MarkAs'
-import { AcceptReject, ItemTag, JournalExtras, SourceAsMarked, acceptedStatus } from './ItemParts'
+import { AcceptReject, ItemTag, JournalExtras, acceptedStatus } from './ItemParts'
 import { DecideDialog, InsightVisual, QuestionOptions, SeverityMark, needs, waited } from './ItemKinds'
+import { ItemFacts, ItemTrail, NeedsYou } from './Memory'
 import { CATEGORIES, SEVERITIES, PEOPLE, type Item } from './fixtures'
-import { initiativesOf } from './lens'
 
 /** An Insight sent by another tool on the protocol: its chart or quote is the source, live. */
 export const fromTool = (item: Item) => item.source?.app === 'PostHog' || item.source?.app === 'Intercom'
-
-/**
- * Where an item was used (Miky, 19 Nov: "memory shows where it was used"): each answer, summary or loop run that read
- * it into what it did, newest first, so a person sees why the AI said what it said and can fix the memory behind it.
- */
-export interface Use { by: string; what: string; where: string; days: number }
-export function usesOf(item: Item): Use[] {
-  if (item.id.startsWith('peek-')) return []
-  if (item.status === 'proposed')
-    return item.category === 'Customer' ? [{ by: 'Claude', what: 'Answer to Katerina about the sidebar', where: 'Peek · Design', days: 2 }] : []
-  if (fromTool(item)) return [{ by: 'Claude', what: 'Answer to Miky about activation', where: 'Peek · Direct messages', days: 1 }]
-  if (item.type === 'journal')
-    return [
-      { by: 'Claude', what: 'Plan for Teams in Ship', where: 'Ship · Teams stage', days: 3 },
-      { by: 'Leaf’s review loop', what: 'Checked Universal Navigation against it', where: 'Leaf · Estiva HQ', days: 6 },
-    ]
-  if (item.type === 'risk') return [{ by: 'Claude', what: 'Friday summary', where: 'Peek · Friday Meetings', days: 0 }]
-  return [
-    { by: 'Claude', what: 'Friday summary', where: 'Peek · Friday Meetings', days: 1 },
-    { by: 'Ship’s triage loop', what: 'Filed “Sidebar folders collapse” under it', where: 'Ship · Bugs', days: 4 },
-  ]
-}
-const ago = (days: number) => (days === 0 ? 'today' : `${days}d ago`)
-
-/**
- * Proposed items fade (Miky, 19 Nov, as Linear archives what nobody touches): one nobody used or added for this long is
- * archived, out of every list and of what agents read, and anyone can restore it. Accepted items never fade; a person
- * or a dreaming loop marks them Outdated.
- */
-export const FADE_DAYS = 30
-const daysSince = (day: string) => Math.floor((Date.parse('2026-11-19') - Date.parse(day)) / 86_400_000)
-const fadesIn = (item: Item) => FADE_DAYS - Math.min(daysSince(item.day), ...usesOf(item).map((u) => u.days))
-
-/**
- * A loop's change to the item (Miky, 19 Nov: a loop may change an Accepted item, and someone is told to review it):
- * who changed it, what and why, with Undo. Whoever added the item gets an Activity line that opens it here.
- */
-function LoopChange({ change }: { change: NonNullable<Item['changed']> }) {
-  const [undone, setUndone] = useState(false)
-  if (undone) return <MetaText tone="muted">Undone: it is back as it was.</MetaText>
-  return (
-    <Card fill="inset" className="flex items-center justify-between gap-3 px-3 py-2">
-      <span className="flex min-w-0 flex-col">
-        <span className="text-body-2 text-text-primary">
-          <IconSparkles size={14} stroke={1.5} className="mr-1 inline" />
-          {change.by} {change.what}
-        </span>
-        <span className="text-caption text-text-muted">{`${change.why} · ${change.ago}`}</span>
-      </span>
-      <Button variant="outlined" size="small" onClick={() => setUndone(true)}>
-        Undo
-      </Button>
-    </Card>
-  )
-}
-
-/** A Proposed item's fading: how long it has left, or, once archived, that it was and a way back. */
-function Fading({ item }: { item: Item }) {
-  const [restored, setRestored] = useState(false)
-  const left = restored ? FADE_DAYS : fadesIn(item)
-  if (left > 0)
-    return (
-      <MetaText tone="muted">
-        <IconHourglass size={12} stroke={1.5} className="mr-1 inline" />
-        Fades in {left} days unless used or added
-      </MetaText>
-    )
-  return (
-    <Card fill="inset" className="flex items-center justify-between gap-3 px-3 py-2">
-      <span className="flex min-w-0 flex-col">
-        <span className="text-body-2 text-text-primary">
-          <IconArchive size={14} stroke={1.5} className="mr-1 inline" />
-          Archived {-left} days ago
-        </span>
-        <span className="text-caption text-text-muted">{`Nobody used or added it in ${FADE_DAYS} days, so agents no longer read it.`}</span>
-      </span>
-      <Button variant="outlined" size="small" onClick={() => setRestored(true)}>
-        Restore
-      </Button>
-    </Card>
-  )
-}
-
-/** The item's receipts, under its content: every use, each a link to where it happened. */
-export function ItemUses({ item }: { item: Item }) {
-  const uses = usesOf(item)
-  return (
-    <div className="flex flex-col gap-1">
-      <span className="text-caption font-medium text-text-primary">Used{uses.length ? ` · ${uses.length}` : ''}</span>
-      {uses.length ? (
-        uses.map((u) => (
-          <span key={u.what} className="flex min-w-0 flex-col">
-            <Link href="#" variant="quiet">
-              {u.what}
-            </Link>
-            <MetaText tone="muted">
-              {u.by} · {u.where} · {ago(u.days)}
-            </MetaText>
-          </span>
-        ))
-      ) : (
-        <MetaText tone="muted">Not used yet</MetaText>
-      )}
-    </div>
-  )
-}
 
 /** What the detail is, as the list labels it: the word or category with its icon, and a risk's severity icon before it. */
 export function ItemIdentity({ item }: { item: Item }) {
@@ -170,42 +64,10 @@ export function ItemFields({ item, me = 'miky' }: { item: Item; me?: string }) {
           </span>
         )}
       </div>
-      {/* Two short lines, never one long one: where it lives, then who added it. */}
-      <div className="flex min-w-0 flex-col">
-        <span className="min-w-0 truncate">
-          <MetaText tone="muted">
-            <IconUsers size={12} stroke={1.5} className="mr-1 inline" />
-            {item.team} · {item.about ? item.about.title : 'the team’s own'}
-          </MetaText>
-        </span>
-        {/* Initiatives are lenses (Miky, 18 Nov): the item shows in each that lists its project; it lives in none. */}
-        {initiativesOf(item).length > 0 && (
-          <span className="min-w-0 truncate">
-            <MetaText tone="muted">
-              <IconTarget size={12} stroke={1.5} className="mr-1 inline" />
-              Shows in {initiativesOf(item).map((n) => n.title).join(', ')}
-            </MetaText>
-          </span>
-        )}
-        <span className="min-w-0 truncate">
-          <MetaText tone="muted">
-            Suggested by {item.markedBy.name}, {item.at}
-            {item.acceptedBy && status !== 'proposed' ? ` · added by ${item.acceptedBy.name}` : ''}
-          </MetaText>
-        </span>
-        {/* Why the AI marked it, in its own words: the black box opened (Miky, 19 Nov). */}
-        {item.why && (
-          <span className="min-w-0">
-            <MetaText tone="muted">
-              <IconSparkles size={12} stroke={1.5} className="mr-1 inline" />
-              {item.why}
-            </MetaText>
-          </span>
-        )}
-      </div>
-      {item.changed && <LoopChange change={item.changed} />}
+      {/* Who reads it and when it comes up; who marked it, why, and what happened since are its History (27 Nov). */}
+      <ItemFacts item={item} />
       {waitingOn && <MetaText tone="muted">Waiting for {waitingOn} to add it</MetaText>}
-      {status === 'proposed' && <Fading item={item} />}
+      <NeedsYou item={item} />
     </div>
   )
 }
@@ -262,7 +124,7 @@ function BlockerWait({ item }: { item: Item }) {
  * The item's own content under its fields, kind by kind, as its list shows it. `words`: draw the summary and details
  * here (the side panel); the item page leaves them to its header and description.
  */
-export function ItemContent({ item, me = 'miky', words = true, onDecide, deciding }: { item: Item; me?: string; words?: boolean; onDecide?: (choice: number, why: string) => void; deciding?: boolean }) {
+export function ItemContent({ item, me = 'miky', words = true, onDecide, deciding, here }: { item: Item; me?: string; words?: boolean; onDecide?: (choice: number, why: string) => void; deciding?: boolean; here?: string }) {
   const tool = fromTool(item)
   const quote = item.visual?.kind === 'quote'
   return (
@@ -287,7 +149,7 @@ export function ItemContent({ item, me = 'miky', words = true, onDecide, decidin
           <MetaText tone="muted">No options yet.</MetaText>
         ))}
       {/* A tool's insight: its chart or quote is the source, so a link to it, not a copy as marked. */}
-      {tool && item.source ? (
+      {tool && item.source && (
         <MetaText tone="muted">
           <span className="inline-flex items-center gap-1">
             {item.source.app} · {item.source.place}
@@ -295,10 +157,8 @@ export function ItemContent({ item, me = 'miky', words = true, onDecide, decidin
             <IconExternalLink size={12} stroke={1.5} />
           </span>
         </MetaText>
-      ) : item.decision ? null : (
-        <SourceAsMarked source={item.source} />
       )}
-      <ItemUses item={item} />
+      <ItemTrail item={item} here={here} />
     </div>
   )
 }

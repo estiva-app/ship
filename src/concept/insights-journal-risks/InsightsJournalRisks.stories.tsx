@@ -8,7 +8,7 @@ import { SIDEBAR_PROJECTS } from '@/fixtures/projects'
 import { InitiativePage, IssuePage, ItemPage, ProjectPage, TeamPage } from './Pages'
 import { INITIATIVES } from './lens'
 import { DecisionFollowUps, LoopPage } from './Agents'
-import { HAND_TYPED, ITEMS } from './fixtures'
+import { HAND_TYPED, ITEMS, PERSONAL } from './fixtures'
 
 /**
  * CONCEPT — Insights, Journal and Risks in Ship (prototype issue 009bc509). Drawn on today's shell and pages; the
@@ -130,6 +130,16 @@ export const ItemChangedByLoop: Story = {
 }
 
 export const ItemTypedByHand: Story ={ render: () => <Shell><ItemPage item={HAND_TYPED} /></Shell> }
+/** Personal memory: only Miky and his own Claude read it (record a-loop-reads-only-shared-memory-…). */
+export const ItemPersonal: Story = { render: () => <Shell><ItemPage item={PERSONAL} /></Shell> }
+/** Two sources, one in a direct message: only the two of them read it, and the line says which source narrowed it. */
+export const ProjectInsightTwoSources: Story = { render: () => <Shell><ProjectPage start="insights" open="i1" /></Shell> }
+/** An accepted Question whose only source was deleted: it stays, and the project's loop proposes Outdated. */
+export const ProjectQuestionNoSourceLeft: Story = { render: () => <Shell><ProjectPage start="risks" open="r3" /></Shell> }
+/** Seen from the team: the issue it is about shows as its card, and Change files it by hand. */
+export const TeamInsightAboutAnIssue: Story = { render: () => <Shell current="projects"><TeamPage start="insights" open="i1" /></Shell> }
+/** A replaced Decision: "Replaced by" links the entry that replaced it, and its history can undo it. */
+export const ProjectDecisionReplacedOpen: Story = { render: () => <Shell><ProjectPage start="journal" open="j6" /></Shell> }
 /** An item's page loading. */
 export const ItemLoading: Story = { render: () => <Shell><ItemPage item={item('i1')} state="loading" /></Shell> }
 /** An item's page that failed to load. */
