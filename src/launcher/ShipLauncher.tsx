@@ -13,11 +13,13 @@ import {
   type LauncherPerson,
   type LauncherWords,
 } from '@estiva-app/launcher'
-import { KIND as WIRE } from '@estiva-app/protocol'
+import { encodeNpub, KIND as WIRE } from '@estiva-app/protocol'
 import { LinkCard, thingKindOf } from '@estiva-app/ui'
 import { KIND } from '@/nostr/kinds'
-import { resolveForeign } from '@/api/foreign'
-import { fileHits, subscribeFileHits } from '@/api/references'
+import { applyCreation, creatableUnder, resolveForeign, shipMaySign } from '@/api/foreign'
+import { fileHits, fileSections, REFERENCE_COPY, subscribeFileHits, subscribeReferences } from '@/api/references'
+import { DescriptionLink } from '@/components/editing/descriptionLinks'
+import { useMentionPeople } from '@/components/editing/mentionables'
 import { useForeignObjects } from '@/api/useForeignObjects'
 import { referenceOfValue } from '@/components/conversations/shared'
 import { useReportFailure } from '@/lib/failureReports'
@@ -157,18 +159,29 @@ function answerActions(answer: LauncherAnswer): LauncherAnswerAction[] {
   ]
 }
 
-const NO_FORM: LauncherHost['form'] = {
-  // Ship opens no package form: its Add issue and New project are its own dialogs.
-  references: {} as LauncherHost['form']['references'],
-  mentions: {} as LauncherHost['form']['mentions'],
-  referenceView: () => null,
-  personField: () => null,
+/** `[` in a form's text: what a description's `[` offers. */
+const FORM_REFERENCES: LauncherHost['form']['references'] = { sections: fileSections, subscribe: subscribeReferences, ariaLabel: REFERENCE_COPY.files, sectionLabel: REFERENCE_COPY.files }
+
+/**
+ * What the box's form needs of Ship, for another app's creation (KIN-9: Leaf's New document): `[` and `@` in its text
+ * as a description has them, and a link drawn as a description draws it. Ship's own Add issue and New project are its
+ * dialogs. The form asks for no person, so there is no picker.
+ */
+function useShipForm(): LauncherHost['form'] {
+  const people = useMentionPeople()
+  return {
+    references: FORM_REFERENCES,
+    mentions: { people: () => people, uriOf: (person) => (person.pubkey ? `nostr:${encodeNpub(person.pubkey)}` : null) },
+    referenceView: DescriptionLink,
+    personField: () => null,
+  }
 }
 
 /** Ship's ⌘K box, held by the frame (`useKeptLauncher`). */
 export function ShipLauncher({ people, say, ...box }: KeptLauncherBox<LauncherContext> & { people: readonly LauncherPerson[]; say: (text: string) => void }) {
   const route = useRoute()
   const open = openFileNow()
+  const form = useShipForm()
   const host: LauncherHost = {
     apps: APPS,
     mark: () => null,
@@ -186,12 +199,15 @@ export function ShipLauncher({ people, say, ...box }: KeptLauncherBox<LauncherCo
     },
     useFileSearch: useShipFileSearch,
     plain: (body) => body,
-    manifests: { creatableUnder: async () => null, applyAction: async () => ({ ok: false, reason: 'Ship does not do this.' }), resolveObject: async () => null },
+    // Another app's creation on a team, made in Ship (KIN-9): Leaf's New document.
+    manifests: { creatableUnder, applyAction: applyCreation, resolveObject: async () => null },
     model: onDeviceModel,
     showSource: showPart,
-    form: NO_FORM,
-    // Ship signs its projects and issues (Estiva ID's allowed kinds for Ship), never another app's file.
-    maySign: (kind) => kind === KIND.PROJECT || kind === KIND.ISSUE,
+    form,
+    // Ship signs its projects and issues, and a Leaf document its ⌘K makes (Estiva ID's allowed kinds for Ship).
+    maySign: shipMaySign,
+    // A New document starts in the team of the issue or project you are on.
+    currentFolder: () => open?.team,
     ownActions: [
       {
         id: 'add-issue',

@@ -15,8 +15,13 @@
  * around here.
  */
 import { changeTypeOf, pointerToAddress, referenceToPointer, type SignedEvent, type UnsignedEvent } from '@estiva-app/protocol'
+import type { CreatableKindRead, LauncherApplied, LauncherApply } from '@estiva-app/launcher'
+import type { AddressPointer } from '@estiva-app/protocol'
 import {
   buildActionEvents,
+  createFile,
+  KIND_CHANNEL_METADATA,
+  TEXT_FIELD,
   resolveActingManifest,
   conversationCountsOf,
   archiveImpact,
@@ -25,6 +30,7 @@ import {
   createPeopleCache,
   createProjectionCache,
   listFolders,
+  topLevelFolders,
   nestingOf,
   resolveFolderContents,
   resolveForeignEvent,
@@ -821,4 +827,175 @@ const KIND_WORDS: Record<number, [string, string]> = {
   30851: ['issue', 'issues'],
   30840: ['initiative', 'initiatives'],
   39000: ['team', 'teams'],
+}
+
+/*
+  KIN-9 — Ship's ⌘K makes another app's file in Ship by following the action that app's manifest declares, as Peek's
+  and Leaf's ⌘K do: Leaf's New document, signed by the person in Ship, in a team, and the page stays.
+  why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/an-app-makes-another-apps-file-in-place-from-its-declared-action.md
+
+  The steps are Leaf's `src/launcher/creations.ts` (KIN-11), on Ship's reads and signer, so the events are the ones
+  Leaf's own New document writes. Ship's own Add issue and Add project stay its forms (`ownActions`); this is only for
+  another app's file.
+*/
+
+/** A Leaf document: the other app's file Ship may make (Estiva ID's allowed kinds for Ship, KIN-9). */
+export const LEAF_DOCUMENT = 30842
+
+/** A change to a file's field (SPEC §6.2): the only kind a new file's text goes out as. */
+const FILE_CHANGE = 1851
+
+/** Whether Ship may sign an event of this kind from its ⌘K: its own project and issue, and a Leaf document (KIN-9). */
+export function shipMaySign(kind: number): boolean {
+  return kind === KIND.PROJECT || kind === KIND.ISSUE || kind === LEAF_DOCUMENT
+}
+
+/**
+ * What another app declares can be made on a team, with the teams you are in as the choices of where: Ship's ⌘K reads
+ * only a team, since Ship's own creations are its forms. Null when there is none to read.
+ */
+export async function creatableUnder(parentKind: number): Promise<CreatableKindRead | null> {
+  if (parentKind !== KIND_CHANNEL_METADATA) return null
+  // Teams only, as Ship's sidebar and New project list them: never a Peek topic, a file's own channel or an archived team.
+  const [roots, folders] = await Promise.all([query([{ kinds: [parentKind], limit: 1 }]), readFolders().then(topLevelFolders)])
+  const [root] = roots
+  const identifier = root?.tags.find((t) => t[0] === 'd')?.[1]
+  if (!root || !identifier) return null
+  // A team's record is the relay's (NIP-29), so every team's address is the relay's key and the team's id.
+  const object = await resolveForeignObject(pointerToAddress({ kind: root.kind, pubkey: root.pubkey, identifier, relays: [] }), query, async () => ({}), 0, manifests).catch(() => null)
+  const borrowed = (object?.actions ?? []).filter((a) => a.control === 'form' && a.declaredBy)
+  if (borrowed.length === 0) return null
+  const teams = folders.map((folder) => ({ address: `${KIND_CHANNEL_METADATA}:${root.pubkey}:${folder.id}`, title: folder.name ?? folder.id }))
+  return { actions: borrowed, parents: teams, parentsFor: Object.fromEntries(borrowed.map((a) => [a.id, teams])) }
+}
+
+const refuse = (reason: string): LauncherApplied => ({ ok: false, reason })
+
+/**
+ * Make what another app's declared creation makes, in the team the person chose (`naddr`), signed by them in Ship: the
+ * file, its text as its first change, then the team command that lists it (SPEC §6.1, §7.3). Anything but a creation
+ * of a kind Ship may sign is refused.
+ */
+export async function applyCreation(args: LauncherApply): Promise<LauncherApplied> {
+  const pubkey = signer.pubkey
+  if (!pubkey) return refuse('Sign in to create it.')
+  if (typeof args.value === 'string') return refuse('Ship does not do this.')
+  let pointer: AddressPointer
+  try {
+    pointer = referenceToPointer(args.naddr) as AddressPointer
+  } catch {
+    return refuse('That team could not be found. Pick it again.')
+  }
+  if (pointer.kind !== KIND_CHANNEL_METADATA) return refuse('Ship does not do this.')
+  const address = pointerToAddress(pointer)
+
+  // The declaring manifest, as interop answers it only where resolving the team would have offered the action (MAN-8).
+  const resolved = await resolveActingManifest(pointer, args.declaredBy, query, manifests).catch(() => null)
+  if (!resolved) return refuse('That app no longer offers this here.')
+  const declared = resolved.manifest.actions?.find((action) => action.id === args.actionId)
+  if (!declared || declared.input?.type !== 'object' || !declared.input.properties) return refuse('Ship does not do this.')
+  const kind = declared.emits.kind
+  if (kind === KIND.PROJECT || kind === KIND.ISSUE || !shipMaySign(kind)) return refuse('Ship cannot make this.')
+
+  const folder = pointer.identifier
+  const team = (await readFolders().then(topLevelFolders).catch(() => null))?.find((f) => f.id === folder)
+  if (!team) return refuse('That team is not one you are in, so nothing was made.')
+
+  const value = Object.fromEntries(Object.entries(args.value).map(([k, v]) => [k, v === '@me' ? pubkey : v]))
+  // A new file needs an identifier, and the runtime invents none: a `d` is a uuid (RFC 0.4 §4.3).
+  const newId = crypto.randomUUID()
+  const common = {
+    manifest: resolved.manifest,
+    kind: pointer.kind,
+    address,
+    objectAuthor: pointer.pubkey,
+    folder,
+    actionId: args.actionId,
+    newId,
+    pubkey,
+    ...(declared.emits.listed === true ? { folderHasState: team.hasState } : {}),
+  }
+
+  // A new file's text is its first change, after the record (SPEC §7.3), written as the file's own app declares its
+  // text, and only from the app that offered the creation.
+  // why: https://github.com/estiva-app/estiva-docs/blob/main/decisions/a-new-files-text-is-its-first-change.md
+  const { [TEXT_FIELD]: text = '', ...rest } = value
+  const textOf = (manifest: typeof resolved.manifest) =>
+    manifest.actions?.find(
+      (candidate) => candidate.emits.field === TEXT_FIELD && candidate.emits.kind === FILE_CHANGE && [candidate.appliesTo].flat().includes(String(kind)),
+    )
+  let textManifest = resolved.manifest
+  let textAction = textOf(textManifest)
+  if (text && !textAction) {
+    // The declaring manifest whole, read by its own address: the newest manifest for the kind could be any key's until
+    // WOR-2, and one planted there must not stop the text (KIN-9 security review).
+    const [, author, d] = resolved.address.split(':')
+    const events = await query([{ kinds: [31990], authors: [author], '#d': [d] }]).catch(() => [] as SignedEvent[])
+    const newest = events.filter((e) => e.pubkey === author).sort((a, b) => b.created_at - a.created_at)[0]
+    let whole: typeof resolved.manifest | null = null
+    try {
+      whole = newest ? (JSON.parse(newest.content) as typeof resolved.manifest) : null
+    } catch {
+      /* not a manifest: no text action */
+    }
+    if (whole) {
+      textManifest = whole
+      textAction = textOf(whole)
+    }
+  }
+  if (text && !textAction) return refuse('Its app does not take this text from Ship yet, so nothing was made.')
+  const built = buildActionEvents({ ...common, value: rest, createdAtMs: Date.now() })
+  if (typeof built === 'string') return refuse(built)
+  const [record, ...commands] = built as UnsignedEvent[]
+  const file = { kind, pubkey, d: newId }
+  let rootOut = false
+  const publishSigned = async (event: SignedEvent) => {
+    const result = await relay.publish(event)
+    if (result.ok && event.kind === kind) rootOut = true
+    return { ok: result.ok, reason: result.reason, eventId: event.id }
+  }
+  const made = await createFile({
+    root: record,
+    ...(text ? { text: { value: text, ...(args.contentFormat ? { format: args.contentFormat } : {}) } } : {}),
+    build: (input) => {
+      const one = buildActionEvents({
+        ...common,
+        manifest: textManifest,
+        kind,
+        address: `${kind}:${pubkey}:${newId}`,
+        objectAuthor: pubkey,
+        actionId: textAction!.id,
+        newId: undefined,
+        folderHasState: undefined,
+        value: input.value,
+        contentFormat: input.format,
+        prev: input.prev,
+        createdAtMs: input.createdAtMs,
+      })
+      if (typeof one === 'string') return one
+      // Built by the action's id, so the event is checked too: Ship signs only a file change as the text.
+      return one[0].kind === FILE_CHANGE ? (one[0] as UnsignedEvent) : 'Its app does not take this text from Ship yet.'
+    },
+    sign: (event) => signer.sign(event),
+    publish: publishSigned,
+    query,
+    current: async (field) => (await openFile(query, file, { text: field === TEXT_FIELD }).catch(() => undefined))?.fields[field]?.event,
+  }).catch((error: unknown) => ({
+    ok: false as const,
+    // A throw after the record went out (signing the text, say) still made the file: never "not created", or a second
+    // Create makes a second one.
+    created: rootOut,
+    refused: error instanceof Error ? error.message : String(error),
+  }))
+  if (!made.ok && !made.created) return refuse(made.refused)
+  const created = `${kind}:${pubkey}:${newId}`
+  // The team commands in order, stopping at the first refusal or throw: the file exists by then, and only its listing is behind.
+  for (const command of commands) {
+    const followed = await signer
+      .sign(command)
+      .then((signed) => relay.publish(signed))
+      .catch((error: unknown) => ({ ok: false, reason: error instanceof Error ? error.message : String(error) }))
+    if (!followed.ok) return { ok: true, created, ...(made.ok ? {} : { textNotSaved: true }), incomplete: followed.reason ?? 'The team did not list it.' }
+  }
+  return made.ok ? { ok: true, created } : { ok: true, created, textNotSaved: true }
 }
