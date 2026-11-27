@@ -137,6 +137,8 @@ export const ItemPersonal: Story = { render: () => <Shell><ItemPage item={PERSON
 export const Desk: Story = { render: () => <Shell current="desk"><DeskPage /></Shell> }
 /** The second Desk, as a feed (Miky, 27 Nov: like Linear's Pulse): each project a mini dashboard of its highlights. */
 export const DeskFeed: Story = { render: () => <Shell current="desk"><DeskPage variant="feed" /></Shell> }
+/** The feed grouped by project instead of by Initiative. */
+export const DeskFeedByProject: Story = { render: () => <Shell current="desk"><DeskPage variant="feed" groupBy="project" /></Shell> }
 /** The Desk narrowed to one project. */
 export const DeskOneProject: Story = { render: () => <Shell current="desk"><DeskPage filter="Teams and Topics navigation" /></Shell> }
 /** The Desk with a blocker open beside it, as on its project. */

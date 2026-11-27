@@ -12,8 +12,8 @@
  * Drawn from the kit's PageHeader, Select, Card, SectionHeader, LinkRow, Button and Link; nothing new.
  */
 import { useState, type ReactNode } from 'react'
-import { IconBox, IconNote, IconSparkles, IconTerminal2 } from '@tabler/icons-react'
-import { AvatarGroup, Button, Card, Link, LinkRow, MetaText, PageHeader, SectionHeader, Select, type Linked } from '@estiva-app/ui'
+import { IconBox, IconNote, IconSparkles, IconTarget, IconTerminal2 } from '@tabler/icons-react'
+import { AvatarGroup, Button, Card, Link, LinkRow, MetaText, PageHeader, SectionHeader, Select, Tabs, type Linked } from '@estiva-app/ui'
 import { ScrollArea } from '@/components/ui/ScrollArea'
 import { TYPE_META, wordIcon } from './MarkAs'
 import { ENDED } from './ItemParts'
@@ -21,7 +21,7 @@ import { SeverityMark, needs, waited } from './ItemKinds'
 import { ItemPanel } from './ItemPanel'
 import { noSourceLeft } from './Memory'
 import { SESSIONS } from './Agents'
-import { ELSEWHERE, projectOf } from './lens'
+import { ELSEWHERE, INITIATIVES, projectOf } from './lens'
 import { ITEMS, PROJECT, decide, type Item } from './fixtures'
 
 const stay = (e: { preventDefault: () => void }) => e.preventDefault()
@@ -210,16 +210,17 @@ function NeedRow({ row, onOpen, bare = false }: { row: Row; onOpen: (i: Item) =>
   )
 }
 
-/** A project's highlights, counted: what both Desk variants draw of it. */
-function statsOf(project: string, all: Item[]) {
-  const mine = all.filter((i) => (projectOf(i) ?? '') === project && i.status !== 'rejected')
+/** Highlights counted, for one project or several (an Initiative's, with `items` its own list): what both Desks draw. */
+function statsOf(project: string | string[], all: Item[], items?: Item[]) {
+  const projects = Array.isArray(project) ? project : [project]
+  const mine = items ?? all.filter((i) => projects.includes(projectOf(i) ?? '') && i.status !== 'rejected')
   const ofType = (t: Item['type']) => mine.filter((i) => i.type === t)
   const fresh = (t: Item['type']) => ofType(t).filter((i) => i.isNew).length
   const insights = ofType('insight')
   const journal = ofType('journal').filter((i) => i.status !== 'proposed')
   const risks = ofType('risk').filter((i) => !ENDED.includes(i.status) && i.status !== 'proposed')
   const blockers = risks.filter((i) => i.word === 'Blocker').length
-  const sessions = project === PROJECT ? SESSIONS : []
+  const sessions = projects.includes(PROJECT) ? SESSIONS : []
   const working = sessions.filter((s) => s.state === 'working').length
   const waiting = sessions.filter((s) => s.state === 'waiting').length
   return {
@@ -301,43 +302,60 @@ function Tile({ icon, label, count, sub }: { icon: ReactNode; label: string; cou
  * with all the highlights", as Linear's Pulse but richer): the project's row and who was active in it; what waits on
  * you there; its four counts; then what happened, newest first, each highlight with its words.
  */
-function ProjectInFeed({ project, all, needs, onOpen }: { project: Linked; all: Item[]; needs: Row[]; onOpen: (i: Item) => void }) {
-  const s = statsOf(project.title, all)
-  const recent = [...s.mine]
+/** What one feed item gathers: a project, or an Initiative and the projects it lists (a lens: a project shows in each). */
+interface FeedGroup {
+  id: string
+  title: string
+  icon: ReactNode
+  href: string
+  projects: Linked[]
+  /** An Initiative: its own items (about the Initiative itself) count too. */
+  initiative?: string
+}
+
+const latestOf = (g: FeedGroup, all: Item[]) => itemsOf(g, all).reduce((d, i) => (i.day > d ? i.day : d), '')
+const itemsOf = (g: FeedGroup, all: Item[]) =>
+  all.filter((i) => i.status !== 'rejected' && (g.projects.some((p) => p.title === projectOf(i)) || (g.initiative !== undefined && i.about?.kind === 'initiative' && i.about.title === g.initiative)))
+
+function ProjectInFeed({ group, all, onOpen }: { group: FeedGroup; all: Item[]; onOpen: (i: Item) => void }) {
+  const mine = itemsOf(group, all)
+  const s = statsOf(group.projects.map((p) => p.title), all, mine)
+  const recent = [...mine]
     .filter((i) => i.status !== 'proposed' || i.isNew)
     .sort((a, b) => b.day.localeCompare(a.day))
-    .slice(0, 4)
-  const fresh = s.mine.filter((i) => i.isNew).length
+    .slice(0, group.initiative ? 5 : 4)
+  const fresh = mine.filter((i) => i.isNew).length
   const people = [...new Map(recent.map((i) => [i.markedBy.name, i.markedBy])).values()]
+  const one = group.projects.length === 1 && !group.initiative ? group.projects[0] : undefined
   return (
-    <article aria-label={project.title} className="flex flex-col gap-3">
+    <article aria-label={group.title} className="flex flex-col gap-3">
       <Card fill="none" className="flex flex-col gap-3 px-1 py-3">
-        {/* The feed item's heading: the project across the card, then what is new in it and who was active. */}
+        {/* The feed item's heading: the project or Initiative across the card, then what is new in it and who was active. */}
         <span className="flex flex-col gap-0.5 px-3">
           <span className="flex items-center gap-2">
-            <span className="flex text-text-muted">
-              <IconBox size={16} stroke={1.5} />
-            </span>
-            <Link href={project.href} variant="quiet" onClick={stay}>
-              <span className="text-h3 text-text-primary">{project.title}</span>
+            <span className="flex text-text-muted">{group.icon}</span>
+            <Link href={group.href} variant="quiet" onClick={stay}>
+              <span className="text-h3 text-text-primary">{group.title}</span>
             </Link>
             <span className="flex-1" />
             {people.length > 0 && <AvatarGroup members={people.map((p) => ({ name: p.name, bot: p.bot }))} size={16} />}
           </span>
           <MetaText tone="muted">
-            {[project.done && `${project.done.done} of ${project.done.total} issues done`, fresh ? `${fresh} new since your last visit` : 'Nothing new', `last ${(recent[0]?.at ?? 'a while ago').replace(/^Today$/, 'today')}`].filter(Boolean).join(' · ')}
+            {[
+              one?.done ? `${one.done.done} of ${one.done.total} issues done` : !one && `${group.projects.length} project${group.projects.length === 1 ? '' : 's'}`,
+              fresh ? `${fresh} new since your last visit` : 'Nothing new',
+              `last ${(recent[0]?.at ?? 'a while ago').replace(/^Today$/, 'today')}`,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
           </MetaText>
         </span>
-        {needs.length > 0 && (
-          <span className="flex flex-col gap-1.5 px-3">
-            <span className="text-caption font-medium text-text-primary">Waiting on you · {needs.length}</span>
-            <Card fill="none" clip attention={needs.some((r) => r.kind === 'item' && r.item.word === 'Blocker') ? 'warning' : undefined}>
-              <ul aria-label={`Needs you in ${project.title}`}>
-                {needs.map((r) => (
-                  <NeedRow key={r.kind === 'item' ? r.item.id : r.id} row={r} onOpen={onOpen} bare />
-                ))}
-              </ul>
-            </Card>
+        {/* An Initiative's projects, each as its row, so where the work is stays one click away. */}
+        {!one && group.projects.length > 0 && (
+          <span className="grid grid-cols-2 gap-2 px-3">
+            {group.projects.map((p) => (
+              <LinkRow key={p.id} link={{ state: 'ready', linked: p }} preview />
+            ))}
           </span>
         )}
         <span className="grid grid-cols-4 gap-2 px-3">
@@ -352,7 +370,7 @@ function ProjectInFeed({ project, all, needs, onOpen }: { project: Linked; all: 
           />
         </span>
         {recent.length > 0 && (
-          <ul aria-label={`What happened in ${project.title}`} className="flex flex-col gap-3 px-3 pt-1">
+          <ul aria-label={`What happened in ${group.title}`} className="flex flex-col gap-3 px-3 pt-1">
             {recent.map((i) => (
               <li key={i.id} className="relative flex gap-3">
                 <span className={`mt-0.5 flex w-4 shrink-0 justify-center ${TYPE_META[i.type].text}`}>
@@ -364,8 +382,9 @@ function ProjectInFeed({ project, all, needs, onOpen }: { project: Linked; all: 
                   </Link>
                   {i.summary && <span className="line-clamp-2 text-body-2 text-text-secondary">{i.summary}</span>}
                   <MetaText tone="muted">
-                    {i.status === 'proposed' ? `Suggested ${i.word}` : i.word} · {i.markedBy.name} · {i.at}
-                    {i.isNew ? ' · new' : ''}
+                    {[i.status === 'proposed' ? `Suggested ${i.word}` : i.word, !one && (projectOf(i) ?? (i.about?.kind === 'initiative' ? 'The Initiative' : undefined)), i.markedBy.name, i.at, i.isNew && 'new']
+                      .filter(Boolean)
+                      .join(' · ')}
                   </MetaText>
                 </span>
               </li>
@@ -378,27 +397,32 @@ function ProjectInFeed({ project, all, needs, onOpen }: { project: Linked; all: 
 }
 
 /**
- * The second Desk (Miky, 27 Nov: "more works as feed, something like Linear has Pulse"): one column, the project with
- * the newest highlight first, each as its mini dashboard. What needs you sits inside its project, not in a list apart.
+ * The second Desk (Miky, 27 Nov: "more works as feed, something like Linear has Pulse"; then "it could be per
+ * Initiative"): one column, the group with the newest highlight first, each as its mini dashboard. By Initiative, a
+ * project shows in every Initiative that lists it (record: an Initiative is a lens).
  */
-function DeskFeed({ items, filter, onOpen }: { items: Item[]; filter: string; onOpen: (i: Item) => void }) {
-  const needs = needsYou(items)
-  const latest = (p: Linked) => statsOf(p.title, items).mine.reduce((d, i) => (i.day > d ? i.day : d), '')
-  const projects = PROJECTS.filter((p) => !filter || p.title === filter).sort((a, b) => latest(b).localeCompare(latest(a)))
+function DeskFeed({ items, filter, groupBy, onOpen }: { items: Item[]; filter: string; groupBy: 'initiative' | 'project'; onOpen: (i: Item) => void }) {
+  const projectsIn = (titles: string[]) => PROJECTS.filter((p) => titles.includes(p.title) && (!filter || p.title === filter))
+  const groups: FeedGroup[] =
+    groupBy === 'initiative'
+      ? INITIATIVES.map((n) => ({ id: n.id, title: n.title, icon: <IconTarget size={16} stroke={1.5} />, href: `#/initiative/${n.id}`, projects: projectsIn(n.projects), initiative: filter ? undefined : n.title }))
+      : PROJECTS.filter((p) => !filter || p.title === filter).map((p) => ({ id: p.id, title: p.title, icon: <IconBox size={16} stroke={1.5} />, href: p.href, projects: [p] }))
+  const shown = groups.filter((g) => itemsOf(g, items).length > 0).sort((a, b) => latestOf(b, items).localeCompare(latestOf(a, items)))
   return (
-    <div className="mx-auto flex w-full max-w-[760px] flex-col gap-6">
-      {projects.map((p) => (
-        <ProjectInFeed key={p.id} project={p} all={items} needs={needs.filter((r) => r.project === p.title)} onOpen={onOpen} />
+    <>
+      {shown.map((g) => (
+        <ProjectInFeed key={g.id} group={g} all={items} onOpen={onOpen} />
       ))}
-    </div>
+    </>
   )
 }
 
 /** The Desk. `open` starts with an item in the side panel; `filter` with one project picked; `variant` the feed. */
-export function DeskPage({ open: open0, filter: filter0 = '', variant = 'inbox' }: { open?: string; filter?: string; variant?: 'inbox' | 'feed' }) {
+export function DeskPage({ open: open0, filter: filter0 = '', variant = 'inbox', groupBy: groupBy0 = 'initiative' }: { open?: string; filter?: string; variant?: 'inbox' | 'feed'; groupBy?: 'initiative' | 'project' }) {
   const [items, setItems] = useState<Item[]>([...ITEMS, ...ELSEWHERE])
   const [filter, setFilter] = useState(filter0)
   const [later, setLater] = useState<string[]>([])
+  const [groupBy, setGroupBy] = useState<'initiative' | 'project'>(groupBy0)
   const [decided, setDecided] = useState<{ title: string; chosen: string }>()
   const [open, setOpen] = useState<Item | undefined>(() => items.find((i) => i.id === open0))
   const inFilter = (project?: string) => !filter || project === filter
@@ -414,6 +438,34 @@ export function DeskPage({ open: open0, filter: filter0 = '', variant = 'inbox' 
     })
     setItems((xs) => decide(xs, item.id, choice, ''))
   }
+  // What waits on you, the same in both Desks: the first question to decide as its card, the rest as rows.
+  const needsSection = (title: string) => (
+    <section aria-label={title} className="flex flex-col gap-3">
+      <SectionHeader title={title} count={all.length} />
+      {decided && (
+        <Card fill="inset" className="flex items-center justify-between gap-3 px-4 py-2.5">
+          <MetaText tone="muted">
+            Decided {decided.chosen} on “{decided.title}”. It is in the Journal.
+          </MetaText>
+          <Button variant="muted" size="small" onClick={() => setDecided(undefined)}>
+            Undo
+          </Button>
+        </Card>
+      )}
+      {first && <DecisionCard item={first.item} project={first.project} onDecide={(c) => onDecide(first.item, c)} onLater={() => setLater((l) => [...l, first.item.id])} onOpen={() => setOpen(first.item)} />}
+      {rows.length > 0 ? (
+        <Card fill="none" clip>
+          <ul aria-label="Also waiting on you">
+            {rows.map((r) => (
+              <NeedRow key={r.kind === 'item' ? r.item.id : r.id} row={r} onOpen={setOpen} />
+            ))}
+          </ul>
+        </Card>
+      ) : (
+        !first && <MetaText tone="muted">Nothing waits for you.</MetaText>
+      )}
+    </section>
+  )
   return (
     <div className="flex min-h-0 flex-1">
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
@@ -438,44 +490,29 @@ export function DeskPage({ open: open0, filter: filter0 = '', variant = 'inbox' 
         />
         {variant === 'feed' ? (
           <ScrollArea className="min-h-0 min-w-0 flex-1" contentClassName="flex flex-col px-6 pb-6 pt-2">
-            <DeskFeed items={items} filter={filter} onOpen={setOpen} />
+            {/* What waits on you, once, across everything (Miky chose it on top of the feed, 27 Nov); then the feed. */}
+            <div className="mx-auto flex w-full max-w-[760px] flex-col gap-6">
+              {needsSection('Waiting on you')}
+              <section aria-label="Feed" className="flex flex-col gap-3">
+                <span className="flex items-center justify-between gap-3">
+                  <SectionHeader title="What happened" hover="none" />
+                  <Tabs
+                    tabs={[
+                      { id: 'initiative', label: 'By Initiative', unread: false },
+                      { id: 'project', label: 'By project', unread: false },
+                    ]}
+                    active={groupBy}
+                    onChange={(t) => setGroupBy(t as 'initiative' | 'project')}
+                  />
+                </span>
+                <DeskFeed items={items} filter={filter} groupBy={groupBy} onOpen={setOpen} />
+              </section>
+            </div>
           </ScrollArea>
         ) : (
           <ScrollArea className="min-h-0 min-w-0 flex-1" contentClassName="flex gap-6 px-6 pb-6 pt-2">
             <div className="flex min-w-0 flex-1 flex-col gap-6">
-              <section aria-label="Needs you" className="flex flex-col gap-3">
-                <SectionHeader title="Needs you" count={all.length} />
-                {decided && (
-                  <Card fill="inset" className="flex items-center justify-between gap-3 px-4 py-2.5">
-                    <MetaText tone="muted">
-                      Decided {decided.chosen} on “{decided.title}”. It is in the Journal.
-                    </MetaText>
-                    <Button variant="muted" size="small" onClick={() => setDecided(undefined)}>
-                      Undo
-                    </Button>
-                  </Card>
-                )}
-                {first && (
-                  <DecisionCard
-                    item={first.item}
-                    project={first.project}
-                    onDecide={(c) => onDecide(first.item, c)}
-                    onLater={() => setLater((l) => [...l, first.item.id])}
-                    onOpen={() => setOpen(first.item)}
-                  />
-                )}
-                {rows.length > 0 ? (
-                  <Card fill="none" clip>
-                    <ul aria-label="Also waiting on you">
-                      {rows.map((r) => (
-                        <NeedRow key={r.kind === 'item' ? r.item.id : r.id} row={r} onOpen={setOpen} />
-                      ))}
-                    </ul>
-                  </Card>
-                ) : (
-                  !first && <MetaText tone="muted">Nothing waits for you.</MetaText>
-                )}
-              </section>
+              {needsSection('Needs you')}
               {fresh.length > 0 && (
                 <section aria-label="New since your last visit" className="flex flex-col gap-2">
                   <SectionHeader title="New since your last visit" count={fresh.length} />
