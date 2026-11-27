@@ -7,11 +7,11 @@
  */
 import { useState } from 'react'
 import { IconExternalLink, IconSparkles } from '@tabler/icons-react'
-import { Button, Card, Link, LinkPickers, MetaText, Select } from '@estiva-app/ui'
+import { Button, Card, Link, LinkPickers, MetaText, Property, Select } from '@estiva-app/ui'
 import { STATUSES, type Status } from './MarkAs'
 import { AcceptReject, ItemTag, JournalExtras, acceptedStatus } from './ItemParts'
 import { DecideDialog, InsightVisual, QuestionOptions, SeverityMark, needs, waited } from './ItemKinds'
-import { ItemFacts, ItemTrail, NeedsYou } from './Memory'
+import { Group, ItemTrail, Marked, NeedsYou, Readers, Replaced, comesUp } from './Memory'
 import { CATEGORIES, SEVERITIES, PEOPLE, type Item } from './fixtures'
 
 /** An Insight sent by another tool on the protocol: its chart or quote is the source, live. */
@@ -40,34 +40,61 @@ export function ItemFields({ item, me = 'miky' }: { item: Item; me?: string }) {
   const [severity, setSeverity] = useState<string>(item.severity ?? '')
   const people = PEOPLE.map((p) => ({ value: p.key, label: p.name }))
   const waitingOn = status === 'proposed' && item.decidedBy && item.decidedBy.key !== me ? item.decidedBy.name : undefined
+  const when = comesUp(item)
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <LinkPickers
-          status={{ value: status, options: STATUSES[item.type], onChange: (v) => setStatus(v as Status) }}
-          {...(person ? { owner: { value: who, options: people, onChange: setWho }, ownerLabel: person.label } : {})}
-        />
-        {item.type === 'insight' && (
-          <span className="w-32">
-            <Select size="small" ariaLabel="Category" placeholder="Category" value={category} onChange={setCategory} options={CATEGORIES.map((c) => ({ value: c, label: c }))} />
-          </span>
-        )}
-        {item.type === 'risk' && item.word !== 'Blocker' && (
-          <span className="w-32">
-            <Select size="small" ariaLabel="Severity" placeholder="Severity" value={severity} onChange={setSeverity} options={SEVERITIES.map((s) => ({ value: s, label: s }))} />
-          </span>
-        )}
-        {/* Whoever may answer a suggested item gets the button here too, not only in the list (review, 17 Nov). */}
-        {status === 'proposed' && !waitingOn && (
-          <span className="ml-auto">
-            <AcceptReject onAnswer={(yes) => setStatus(yes ? acceptedStatus(item) : 'rejected')} />
-          </span>
-        )}
-      </div>
-      {/* Who reads it and when it comes up; who marked it, why, and what happened since are its History (27 Nov). */}
-      <ItemFacts item={item} />
+      {/* What waits on you first: a suggestion to answer (review, 17 Nov), a loop's change, a lost source. */}
+      {status === 'proposed' && !waitingOn && (
+        <Card fill="inset" className="flex items-center justify-between gap-3 px-3 py-2">
+          <span className="text-body-2 text-text-primary">Waiting for your answer</span>
+          <AcceptReject onAnswer={(yes) => setStatus(yes ? acceptedStatus(item) : 'rejected')} />
+        </Card>
+      )}
       {waitingOn && <MetaText tone="muted">Waiting for {waitingOn} to add it</MetaText>}
       <NeedsYou item={item} />
+      {/* Its properties in one card, a label column and a value column, as Linear's sidebar (Miky, 27 Nov). */}
+      <Group title="Properties">
+        <div className="flex flex-col gap-2">
+          <Property label="Status">
+            <LinkPickers status={{ value: status, options: STATUSES[item.type], onChange: (v) => setStatus(v as Status) }} />
+          </Property>
+          {person && (
+            <Property label={person.label}>
+              <LinkPickers owner={{ value: who, options: people, onChange: setWho }} />
+            </Property>
+          )}
+          {item.type === 'insight' && (
+            <Property label="Category">
+              <span className="block w-36">
+                <Select size="small" ariaLabel="Category" placeholder="Category" value={category} onChange={setCategory} options={CATEGORIES.map((c) => ({ value: c, label: c }))} />
+              </span>
+            </Property>
+          )}
+          {item.type === 'risk' && item.word !== 'Blocker' && (
+            <Property label="Severity">
+              <span className="block w-36">
+                <Select size="small" ariaLabel="Severity" placeholder="Severity" value={severity} onChange={setSeverity} options={SEVERITIES.map((s) => ({ value: s, label: s }))} />
+              </span>
+            </Property>
+          )}
+          <Property label="Readers">
+            <Readers item={item} />
+          </Property>
+          <Property label="Marked">
+            <Marked item={item} />
+          </Property>
+          {when && (
+            <Property label="Comes up">
+              <span className="text-body-2 text-text-primary">{when}</span>
+            </Property>
+          )}
+          {(item.supersededBy || item.replaces) && (
+            <Property label={item.supersededBy ? 'Replaced' : 'Replaces'}>
+              <Replaced item={item} />
+            </Property>
+          )}
+        </div>
+      </Group>
     </div>
   )
 }
@@ -117,6 +144,17 @@ function BlockerWait({ item }: { item: Item }) {
       )}
       {item.waitingOn && <span className="text-body-2 text-text-muted">Waiting {waited(item.day)}</span>}
     </Card>
+  )
+}
+
+/** Its summary and details, under the title: an Update's whole text; a customer quote's words are its picture. */
+export function ItemWords({ item }: { item: Item }) {
+  const quote = item.visual?.kind === 'quote'
+  return (
+    <>
+      {item.summary && !quote && !(item.word === 'Update' && item.details) && <span className="text-body-2 text-text-primary">{item.summary}</span>}
+      {item.details && <span className="whitespace-pre-line text-body-2 text-text-secondary">{item.details}</span>}
+    </>
   )
 }
 

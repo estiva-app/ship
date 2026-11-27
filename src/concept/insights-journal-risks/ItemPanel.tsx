@@ -7,7 +7,7 @@ import { IconX } from '@tabler/icons-react'
 import { IconButton, Panel } from '@estiva-app/ui'
 import { ScrollArea } from '@/components/ui/ScrollArea'
 import { CommentsColumn, type StoryComment } from './CommentsColumn'
-import { ItemContent, ItemFields, ItemIdentity, fromTool } from './ItemDetail'
+import { ItemContent, ItemFields, ItemIdentity, ItemWords, fromTool } from './ItemDetail'
 import { CLAUDE, KATERINA, MIKY, TEAM, type Item } from './fixtures'
 
 export { ItemFields } from './ItemDetail'
@@ -40,9 +40,12 @@ export function ItemPanel({ item, me = 'miky', here, onClose, onDecide, deciding
       >
         <div className="flex min-h-0 flex-1 flex-col">
           <ScrollArea className="max-h-[65%] shrink-0" contentClassName="flex flex-col gap-3 px-4 pb-4">
-            <span className="text-h3 text-text-primary">{item.title}</span>
+            <span className="flex flex-col gap-1">
+              <span className="text-h3 text-text-primary">{item.title}</span>
+              <ItemWords item={item} />
+            </span>
             <ItemFields key={item.id} item={item} me={me} />
-            <ItemContent key={`${item.id}-${item.status}`} item={item} me={me} here={here} onDecide={onDecide} deciding={deciding} />
+            <ItemContent key={`${item.id}-${item.status}`} item={item} me={me} here={here} words={false} onDecide={onDecide} deciding={deciding} />
           </ScrollArea>
           <div className="flex min-h-0 flex-1 flex-col border-t border-border-default">
             <CommentsColumn team={TEAM} about={item.title} comments={commentsOn(item)} />

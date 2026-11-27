@@ -58,60 +58,70 @@ const fadesIn = (item: Item) => FADE_DAYS - Math.min(daysSince(item.day), ...use
  * as-you): a place's shared memory, or your personal memory. When a source narrowed its readers (the most restricted
  * access among its sources, record #448), a second line says which.
  */
-export function ReadersLine({ item }: { item: Item }) {
-  if (item.layer === 'personal')
-    return (
-      <MetaText tone="muted">
-        <IconLock size={12} stroke={1.5} className="mr-1 inline" />
-        Personal · only you and your Claude read it
-      </MetaText>
-    )
+export function Readers({ item }: { item: Item }) {
+  const value = (icon: ReactNode, words: string) => (
+    <span className="flex min-w-0 items-center gap-1.5 text-body-2 text-text-primary">
+      <span className="flex shrink-0 text-text-muted">{icon}</span>
+      <span className="truncate">{words}</span>
+    </span>
+  )
+  if (item.layer === 'personal') return value(<IconLock size={14} stroke={1.5} />, 'Only you and your Claude')
   const narrow = sourcesOf(item).find((s) => s.readers)
   if (narrow)
     return (
       <span className="flex min-w-0 flex-col">
-        <span className="text-caption text-text-primary">
-          <IconLock size={12} stroke={1.5} className="mr-1 inline" />
-          Only {narrow.readers} read it
-        </span>
-        <MetaText tone="muted">
-          Because {narrow.author.name}’s {narrow.what} in {narrow.place} is a source
-        </MetaText>
+        {value(<IconLock size={14} stroke={1.5} />, `Only ${narrow.readers}`)}
+        <MetaText tone="muted">{`A source is in ${narrow.place}`}</MetaText>
       </span>
     )
+  return value(<IconUsers size={14} stroke={1.5} />, `Everyone in ${item.team}`)
+}
+
+/** Who marked it and when, and who added it when that was someone else: the first line of its History, kept in view. */
+export function Marked({ item }: { item: Item }) {
+  const by = item.acceptedBy && item.status !== 'proposed' && item.acceptedBy.key !== item.markedBy.key ? ` · added by ${item.acceptedBy.name}` : ''
   return (
-    <span className="min-w-0 truncate">
-      <MetaText tone="muted">
-        <IconUsers size={12} stroke={1.5} className="mr-1 inline" />
-        Shared with everyone in {item.team}
-      </MetaText>
+    <span className="flex min-w-0 items-center gap-1.5 text-body-2 text-text-primary">
+      <Avatar name={item.markedBy.name} size={16} {...(item.markedBy.bot ? { bot: true } : {})} />
+      <span className="truncate">
+        {item.markedBy.name}
+        <span className="text-text-muted">{` · ${sourcesOf(item)[0]?.when ?? item.at}${by}`}</span>
+      </span>
     </span>
   )
 }
 
-/**
- * The quiet lines under the fields: who reads it, when it comes up (it is loaded by relevance, 27 Nov), and the entry
- * that replaced it or that it replaced, linked both ways.
- */
-export function ItemFacts({ item }: { item: Item }) {
+/** When it comes up (it is loaded by relevance, 27 Nov), in the loop's words, as a value. */
+export const comesUp = (item: Item) => (item.mattersWhen ? `When ${lower(item.mattersWhen)}` : undefined)
+
+/** The entry that replaced it, or that it replaced, linked both ways. */
+export function Replaced({ item }: { item: Item }) {
   return (
-    <div className="flex min-w-0 flex-col gap-0.5">
-      <ReadersLine item={item} />
-      {item.mattersWhen && (
-        <span className="text-caption text-text-muted">
-          <IconSparkles size={12} stroke={1.5} className="mr-1 inline" />
-          Comes up when {lower(item.mattersWhen)}
-        </span>
+    <Link href="#" variant="quiet" onClick={stay}>
+      {item.supersededBy ?? item.replaces}
+    </Link>
+  )
+}
+
+/**
+ * One group of the item's detail, as Linear's sidebar groups (Miky, 27 Nov: "clean and well structured"): a card with a
+ * plain header, its count or state at the right, its one action, and its rows. `fold` folds it behind the header.
+ */
+export function Group({ title, trailing, action, fold, open, children }: { title: string; trailing?: string; action?: { tooltip: string; icon: ReactNode; onClick: () => void }; fold?: boolean; open?: boolean; children?: ReactNode }) {
+  const right = trailing ? <MetaText tone="muted">{trailing}</MetaText> : undefined
+  return (
+    <Card fill="none" className="flex flex-col px-1 py-1">
+      {fold ? (
+        <CollapsibleSection title={title} defaultOpen={open ?? false} trailing={right} contentClassName="px-2 pb-2 pt-1">
+          {children}
+        </CollapsibleSection>
+      ) : (
+        <>
+          <SectionHeader title={title} trailing={right} hover="none" showActions="always" {...(action ? { actions: [action] } : {})} />
+          {children && <div className="px-2 pb-2 pt-1">{children}</div>}
+        </>
       )}
-      {(item.supersededBy || item.replaces) && (
-        <span className="text-caption text-text-muted">
-          {item.supersededBy ? 'Replaced by ' : 'Replaces '}
-          <Link href="#" variant="quiet" onClick={stay}>
-            {item.supersededBy ?? item.replaces}
-          </Link>
-        </span>
-      )}
-    </div>
+    </Card>
   )
 }
 
@@ -216,16 +226,15 @@ function SourceRow({ source }: { source: Source }) {
 export function Sources({ item }: { item: Item }) {
   // A tool's insight shows its live chart or quote above instead; a Decision that answered a Question shows the question.
   const list = sourcesOf(item).filter((s) => s.app !== 'PostHog' && s.app !== 'Intercom')
-  if (!list.length) return item.decision || sourcesOf(item).length ? null : <MetaText tone="muted">Typed by hand, with no source.</MetaText>
+  if (!list.length) return item.decision || sourcesOf(item).length ? null : <Group title="Sources" trailing="Typed by hand" />
   return (
-    <section aria-label="Sources" className="flex flex-col gap-2">
-      <SectionHeader title={list.length > 1 ? 'Sources' : 'Source'} icon={<IconQuote size={16} stroke={1.5} />} {...(list.length > 1 ? { count: list.length } : {})} hover="none" />
-      <ul className="flex flex-col gap-3">
+    <Group title={list.length > 1 ? 'Sources' : 'Source'} trailing={list.length > 1 ? String(list.length) : undefined}>
+      <ul aria-label="Sources" className="flex flex-col gap-3">
         {list.map((s) => (
           <SourceRow key={`${s.place}-${s.quote}`} source={s} />
         ))}
       </ul>
-    </section>
+    </Group>
   )
 }
 
@@ -237,26 +246,23 @@ export function Uses({ item }: { item: Item }) {
   const uses = usesOf(item)
   const [kept, setKept] = useState(false)
   const left = kept ? FADE_DAYS : fadesIn(item)
-  return (
-    <div className="flex flex-col gap-1">
-      {uses.length ? (
-        <CollapsibleSection title="Used in" icon={<IconReceipt size={16} stroke={1.5} />} defaultOpen={false} trailing={<MetaText tone="muted">{`${uses.length} · last ${ago(uses[0].days)}`}</MetaText>}>
-          <ul className="flex flex-col gap-1.5">
-            {uses.map((u) => (
-              <li key={u.what} className="flex min-w-0 flex-col">
-                <Link href="#" variant="quiet" onClick={stay}>
-                  {u.what}
-                </Link>
-                <MetaText tone="muted">
-                  {u.by} · {u.where} · {ago(u.days)}
-                </MetaText>
-              </li>
-            ))}
-          </ul>
-        </CollapsibleSection>
-      ) : (
-        <SectionHeader title="Used in" icon={<IconReceipt size={16} stroke={1.5} />} trailing={<MetaText tone="muted">Not yet</MetaText>} hover="none" />
-      )}
+  const list = uses.length > 0 && (
+    <ul className="flex flex-col gap-1.5">
+      {uses.map((u) => (
+        <li key={u.what} className="flex min-w-0 flex-col">
+          <Link href="#" variant="quiet" onClick={stay}>
+            {u.what}
+          </Link>
+          <MetaText tone="muted">
+            {u.by} · {u.where} · {ago(u.days)}
+          </MetaText>
+        </li>
+      ))}
+    </ul>
+  )
+  // A suggestion's fading is the thing to see, so its group stays open; an added item's receipts fold.
+  const fading = item.status === 'proposed' && (
+    <>
       {item.status === 'proposed' &&
         (left > 0 ? (
           <span className="flex items-center justify-between gap-3">
@@ -277,7 +283,22 @@ export function Uses({ item }: { item: Item }) {
             </Button>
           </Waiting>
         ))}
-    </div>
+    </>
+  )
+  const trailing = uses.length ? `${uses.length} · last ${ago(uses[0].days)}` : 'Not yet'
+  if (fading)
+    return (
+      <Group title="Used in" trailing={trailing}>
+        <div className="flex flex-col gap-2">
+          {list}
+          {fading}
+        </div>
+      </Group>
+    )
+  return (
+    <Group title="Used in" trailing={trailing} fold={!!list}>
+      {list || undefined}
+    </Group>
   )
 }
 
@@ -322,13 +343,13 @@ function HistoryRow({ event }: { event: Event }) {
 export function History({ item }: { item: Item }) {
   const events = historyOf(item)
   return (
-    <CollapsibleSection title="History" icon={<IconHistory size={16} stroke={1.5} />} defaultOpen={events.some((e) => e.undo)} trailing={<MetaText tone="muted">{String(events.length)}</MetaText>}>
+    <Group title="History" trailing={String(events.length)} fold open={events.some((e) => e.undo)}>
       <ul className="flex flex-col gap-2">
         {events.map((e) => (
           <HistoryRow key={`${e.by}-${e.what}`} event={e} />
         ))}
       </ul>
-    </CollapsibleSection>
+    </Group>
   )
 }
 
@@ -369,17 +390,13 @@ export function FiledUnder({ item, here }: { item: Item; here?: string }) {
   const [byHand, setByHand] = useState(false)
   const file = FILES[about] ?? (about ? { id: about, kind: 'issue' as const, title: about, href: '#', subtitle: TEAM } : undefined)
   return (
-    <section aria-label="About" className="flex flex-col gap-2">
-      <SectionHeader
-        title="About"
-        icon={<IconLink size={16} stroke={1.5} />}
-        trailing={<MetaText tone="muted">{!file ? 'Nothing yet' : about === here ? 'This project' : ''}</MetaText>}
-        actions={[{ icon: <IconArrowsExchange size={16} stroke={1.5} />, tooltip: 'File under…', onClick: () => setMoving(true) }]}
-        showActions="always"
-        hover="none"
-      />
-      {file && about !== here && <LinkCard link={{ state: 'ready', linked: file }} readOnly />}
-      {byHand && <MetaText tone="muted">Filed by you. The loop that files items learns from it.</MetaText>}
+    <Group title="About" trailing={!file ? 'Nothing yet' : about === here ? 'This project' : undefined} action={{ icon: <IconArrowsExchange size={16} stroke={1.5} />, tooltip: 'File under…', onClick: () => setMoving(true) }}>
+      {(file && about !== here) || byHand ? (
+        <div className="flex flex-col gap-2">
+          {file && about !== here && <LinkCard link={{ state: 'ready', linked: file }} readOnly bare />}
+          {byHand && <MetaText tone="muted">Filed by you. The loop that files items learns from it.</MetaText>}
+        </div>
+      ) : undefined}
       {moving && (
         <MoveDialog
           heading="File under"
@@ -396,20 +413,18 @@ export function FiledUnder({ item, here }: { item: Item; here?: string }) {
           onClose={() => setMoving(false)}
         />
       )}
-    </section>
+    </Group>
   )
 }
 
-/** The trail under the item's content: what it is about, its sources, whether it is useful, and its history. */
+/** The groups under the item's content: what it is about, its sources, whether it is useful, and its history. */
 export function ItemTrail({ item, here }: { item: Item; here?: string }) {
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-2">
       <FiledUnder item={item} here={here} />
       <Sources item={item} />
-      <div className="flex flex-col gap-2">
-        <Uses item={item} />
-        <History item={item} />
-      </div>
+      <Uses item={item} />
+      <History item={item} />
     </div>
   )
 }
