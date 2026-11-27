@@ -290,7 +290,7 @@ export function topicPageOf(topic: ReadTopic, work: TopicPageWork, archives: Arc
     else if (!SHIP_KINDS.some((kind) => address.startsWith(`${kind}:`))) files.push(address)
   }
   const projectsFirst = (list: TopicWorkRow[]) => [...list.filter((row) => row.kind === 'project'), ...list.filter((row) => row.kind === 'issue')]
-  const peekUrl = topicInPeek(topic.object.openUrl, topic.address)
+  const peekUrl = topicInPeek(topic.object.openUrl, topic.address, drawn.title)
   return {
     address: topic.address,
     title: drawn.title,

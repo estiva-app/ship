@@ -57,11 +57,10 @@ describe("Ship's Copy link", () => {
     for (const d of ['PROJ-1', D.toUpperCase(), `note-${D}`, `a:${D}`]) expect(fileUrlOf(`30851:${SHIP_KEY}:${d}`, words, HOST)).toBeNull()
   })
 
-  test("a topic's Open in Peek is its /o/ link on Peek's host, which no manifest's word can move to a page of Peek's", () => {
-    // Ship cannot know Peek's own pages (`/message/`, `/folders/`…), so the link on Peek's host names the file itself.
-    const url = topicInPeek('https://peek.estiva.app/o/<bech32>', `30840:${SHIP_KEY}:${D}`)
-    expect(url).toMatch(/^https:\/\/peek\.estiva\.app\/o\/naddr1/)
-    expect(topicInPeek('https://peek.estiva.app/o/<bech32>', `30840:${SHIP_KEY}:x-${D}`)).toBeUndefined()
+  test("a topic's Open in Peek is its path here on Peek's host, and an id no file can have gets none", () => {
+    // Only the host changes; no manifest's word is read, so none can move it to one of Peek's own pages.
+    expect(topicInPeek('https://peek.estiva.app/o/<bech32>', `30840:${SHIP_KEY}:${D}`, 'Plans')).toBe(`https://peek.estiva.app/topic/plans-${D}`)
+    expect(topicInPeek('https://peek.estiva.app/o/<bech32>', `30840:${SHIP_KEY}:x-${D}`, 'Plans')).toBeUndefined()
   })
 
   test("an address's id is read whole, colons included", () => {

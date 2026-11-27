@@ -177,7 +177,7 @@ describe("A topic's page in Ship", () => {
     // another app (D5); the conversation is in the column beside the page.
     expect(screen.queryByRole('link', { name: /Conversation in Peek/ })).toBeNull()
     const open = screen.getByRole('link', { name: 'Open in Peek' })
-    expect(open.getAttribute('href')).toMatch(/^https:\/\/peek\.estiva\.app\/o\/naddr1/)
+    expect(open.getAttribute('href')).toBe(`https://peek.estiva.app/topic/widgets-${D}`)
     expect(open.getAttribute('target')).toBe('_blank')
     expect(open.textContent).toBe('Open')
     fireEvent.click(screen.getByRole('button', { name: 'More actions' }))
@@ -413,7 +413,7 @@ describe("A topic's page in Ship", () => {
     held.push(manifest('peek', 'peek.estiva.app', ['30840']), topic(D, 'Bugs'), spaceMark(D))
     const { state, archives } = ship([], [])
     render(<Page d={D} state={state} folders={[]} archives={archives} />)
-    await waitFor(() => expect(replace).toHaveBeenCalledWith(expect.stringMatching(/^https:\/\/peek\.estiva\.app\/o\/naddr1/)))
+    await waitFor(() => expect(replace).toHaveBeenCalledWith(`https://peek.estiva.app/topic/bugs-${D}`))
     expect(screen.queryByRole('heading', { name: 'Bugs' })).toBeNull()
     vi.unstubAllGlobals()
   })
