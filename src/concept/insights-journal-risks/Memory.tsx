@@ -114,7 +114,8 @@ export const GroupLook = createContext<'card' | 'plain' | 'bare'>('card')
 export function Group({ title, trailing, action, fold, open, children }: { title: string; trailing?: string; action?: { tooltip: string; icon: ReactNode; onClick: () => void }; fold?: boolean; open?: boolean; children?: ReactNode }) {
   const look = useContext(GroupLook)
   const right = trailing ? <MetaText tone="muted">{trailing}</MetaText> : undefined
-  // In a tab: no card and no fold; a tab of its own (Used in, History) drops the header, which the tab already says.
+  // In a tab: no card and no fold; a tab of its own (Used in, History) drops its header, which the tab already says;
+  // the panel puts its one action on the tab row.
   if (look === 'bare') return <>{children}</>
   if (look === 'plain')
     return (
@@ -260,16 +261,23 @@ function SourceRow({ source }: { source: Source }) {
  * Whether it is useful: its receipts, folded, with how many and when last; on a Proposed item, how long until it fades
  * and "Still useful", which starts the time again. Once faded, that it was, and Restore.
  */
-export function Uses({ item, here }: { item: Item; here?: string }) {
+/** Files it under a project or issue by hand: Used in's one action, in its header or on the tab row. */
+export const fileUnder = (onClick: () => void) => ({ tooltip: 'File under…', icon: <IconArrowsExchange size={16} stroke={1.5} />, onClick })
+
+export function Uses({ item, here, moving: shown, onMoving }: { item: Item; here?: string; moving?: boolean; onMoving?: (v: boolean) => void }) {
   const uses = usesOf(item)
   const [kept, setKept] = useState(false)
+  const [own, setOwn] = useState(false)
+  // The tabbed panel holds it when it draws the action on its tab row.
+  const moving = shown ?? own
+  const setMoving = onMoving ?? setOwn
   const left = kept ? FADE_DAYS : fadesIn(item)
   // Each AI session or loop run that read it as a source, drawn as the same row as the file above it (Miky, 27 Nov:
   // "should look similar"): what it wrote, by whom as a robot face, where and when.
   const list = uses.length > 0 && (
     <ul aria-label="AI sessions that used it" className="flex flex-col gap-1.5">
       {uses.map((u) => (
-        <li key={u.what} className="mr-8">
+        <li key={u.what}>
           <LinkRow
             link={{
               state: 'ready',
@@ -307,9 +315,13 @@ export function Uses({ item, here }: { item: Item; here?: string }) {
     </>
   )
   return (
-    <Group title="Used in" trailing={uses.length ? `last ${ago(uses[0].days)}` : undefined}>
+    <Group
+      title="Used in"
+      trailing={uses.length ? `last ${ago(uses[0].days)}` : undefined}
+      action={fileUnder(() => setMoving(true))}
+    >
       <div className="flex flex-col gap-3">
-        <Filing item={item} here={here} />
+        <Filing item={item} here={here} moving={moving} setMoving={setMoving} />
         {list}
         {fading}
       </div>
@@ -404,35 +416,24 @@ const PLACES: MovePlace[] = [
  * issue as the kit's link card, or one line when it is the page you are on. ⇄ files it yourself with the kit's Move
  * dialog; loops usually file it, and a person filing it by hand is the strongest lesson they get.
  */
-function Filing({ item, here }: { item: Item; here?: string }) {
+function Filing({ item, here, moving, setMoving }: { item: Item; here?: string; moving: boolean; setMoving: (v: boolean) => void }) {
   const [about, setAbout] = useState(item.about?.title ?? '')
-  const [moving, setMoving] = useState(false)
   const [byHand, setByHand] = useState(false)
   const found = FILES[about] ?? (about ? { id: about, kind: 'issue' as const, title: about, href: '#', subtitle: TEAM } : undefined)
   // The page you are on says so in its row, instead of a second line.
   const file = found && about === here ? { ...found, subtitle: 'This project' } : found
-  const change = (
-    <IconButton variant="muted" tooltip="File under…" aria-label="File under…" onClick={() => setMoving(true)}>
-      <IconArrowsExchange size={16} stroke={1.5} />
-    </IconButton>
-  )
   return (
     <div className="flex flex-col gap-1">
-      {/* The kit's row widget, as a list draws a file (Miky, 27 Nov); hovering it shows its card. */}
+      {/* The kit's row widget, as a list draws a file (Miky, 27 Nov); hovering it shows its card. Filing it by hand is
+          the group's own action, in its header (Miky, 27 Nov), so the row takes the whole width. */}
       {file ? (
-        <div className="flex items-center gap-1">
-          <div className="min-w-0 flex-1">
-            <LinkRow link={{ state: 'ready', linked: file }} preview />
-          </div>
-          {change}
-        </div>
+        <LinkRow link={{ state: 'ready', linked: file }} preview />
       ) : (
         <div className="flex items-center gap-2">
           <span className="flex w-4 shrink-0 justify-center text-text-muted">
             <IconBox size={14} stroke={1.5} />
           </span>
           <span className="min-w-0 flex-1 text-body-2 text-text-muted">Not filed under a project or issue</span>
-          {change}
         </div>
       )}
       {byHand && <MetaText tone="muted">Filed by you. The loop that files items learns from it.</MetaText>}

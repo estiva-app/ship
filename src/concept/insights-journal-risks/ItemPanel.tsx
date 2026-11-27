@@ -6,7 +6,7 @@
 import { useState } from 'react'
 import { IconX } from '@tabler/icons-react'
 import { IconButton, Panel, Tabs } from '@estiva-app/ui'
-import { GroupLook, History, Uses, historyOf } from './Memory'
+import { GroupLook, History, Uses, fileUnder, historyOf } from './Memory'
 import { ScrollArea } from '@/components/ui/ScrollArea'
 import { CommentsColumn, type StoryComment } from './CommentsColumn'
 import { ItemContent, ItemFields, ItemIdentity, ItemWords, fromTool } from './ItemDetail'
@@ -35,6 +35,8 @@ export const commentsOn = (item: Item): StoryComment[] => {
  */
 function TabbedItemPanel({ item, me, here, onClose, onDecide, deciding }: { item: Item; me: string; here?: string; onClose: () => void; onDecide?: (choice: number, why: string) => void; deciding?: boolean }) {
   const [tab, setTab] = useState('used')
+  const [moving, setMoving] = useState(false)
+  const file = fileUnder(() => setMoving(true))
   const comments = commentsOn(item)
   const tabs = [
     { id: 'used', label: 'Used in', unread: false },
@@ -61,8 +63,14 @@ function TabbedItemPanel({ item, me, here, onClose, onDecide, deciding }: { item
             <ItemFields key={item.id} item={item} me={me} />
             <ItemContent key={`${item.id}-${item.status}`} item={item} me={me} here={here} words={false} trail={false} onDecide={onDecide} deciding={deciding} />
           </ScrollArea>
-          <div className="flex shrink-0 items-center border-y border-border-default px-3 py-1.5">
+          <div className="flex shrink-0 items-center justify-between border-y border-border-default px-3 py-1.5">
             <Tabs tabs={tabs} active={tab} onChange={setTab} />
+            {/* Used in's one action, on the same line as its name (Miky, 27 Nov), as the grouped panel's header has it. */}
+            {tab === 'used' && (
+              <IconButton variant="muted" tooltip={file.tooltip} aria-label={file.tooltip} onClick={file.onClick}>
+                {file.icon}
+              </IconButton>
+            )}
           </div>
           {tab === 'comments' ? (
             <div className="flex min-h-0 flex-1 flex-col">
@@ -72,7 +80,7 @@ function TabbedItemPanel({ item, me, here, onClose, onDecide, deciding }: { item
             <ScrollArea className="min-h-0 flex-1" contentClassName="flex flex-col gap-3 px-4 py-3">
               {/* Each tab holds one group, without its card or header: the tab already says what it is. */}
               <GroupLook.Provider value="bare">
-                {tab === 'used' && <Uses item={item} here={here} />}
+                {tab === 'used' && <Uses item={item} here={here} moving={moving} onMoving={setMoving} />}
                 {tab === 'history' && <History item={item} />}
               </GroupLook.Provider>
             </ScrollArea>
