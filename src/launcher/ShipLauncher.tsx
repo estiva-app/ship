@@ -54,9 +54,10 @@ const wordsFor = (kind: 'issue' | 'project' | undefined): LauncherWords =>
   kind ? { ...WORDS, inOpen: `In this ${kind}`, searchOrAsk: `Search, or ask about this ${kind}` } : WORDS
 
 // Ship as the host, without the package's own Create issue form: ⌘K's Add issue opens Ship's (Done when, KIN-6).
-// And Leaf, for the New document its manifest declares on a team (KIN-9).
+// And each app with an action Ship may sign, as Leaf's box lists them: Leaf, for the New document its manifest declares
+// on a team (KIN-9).
 const APPS = launcherApps('ship')
-  .filter((app) => app.isHost || app.id === 'leaf')
+  .filter((app) => app.isHost || app.actions.some((action) => typeof action.emits?.kind === 'number' && shipMaySign(action.emits.kind)))
   .map((app) => (app.isHost ? { ...app, actions: [] } : app))
 const IDLE = { state: { kind: 'idle' } as const, hits: [] as LauncherFileHit[] }
 

@@ -280,7 +280,10 @@ describe("Ship's ⌘K, New document (KIN-9)", () => {
   const LEAF = '31990:9b0ff001e909e0c6eb9165b81118b0c580db2584c87e1c794a2ec9339f7541ec:estiva-leaf'
   const OPS = `39000:${'d'.repeat(64)}:ops`
 
-  it("offers Leaf's New document, starting in the open issue's team, and makes it there", async () => {
+  it.each([
+    ['issue', () => issueView({ team: { id: 'ops', name: 'Ops' } })],
+    ['project', () => projectView({ team: { id: 'ops', name: 'Ops' } })],
+  ])("offers Leaf's New document on an open %s, starting in its team, and makes it there", async (_, page) => {
     const teams = [
       { address: `39000:${'d'.repeat(64)}:design`, title: 'Design' },
       { address: OPS, title: 'Ops' },
@@ -294,7 +297,7 @@ describe("Ship's ⌘K, New document (KIN-9)", () => {
       declaredBy: { address: LEAF },
     }
     relay.onTeam = { actions: [action], parents: teams, parentsFor: { 'add-document': teams } }
-    render(<Frame>{issueView({ team: { id: 'ops', name: 'Ops' } })}</Frame>)
+    render(<Frame>{page()}</Frame>)
     await openBox()
     fireEvent.change(field()!, { target: { value: 'new document' } })
     const row = await waitFor(() => {
