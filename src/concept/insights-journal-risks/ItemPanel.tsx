@@ -6,7 +6,7 @@
 import { useState } from 'react'
 import { IconX } from '@tabler/icons-react'
 import { IconButton, Panel, Tabs } from '@estiva-app/ui'
-import { GroupLook, History, Sources, Uses, historyOf, sourcesOf } from './Memory'
+import { GroupLook, History, Uses, historyOf } from './Memory'
 import { ScrollArea } from '@/components/ui/ScrollArea'
 import { CommentsColumn, type StoryComment } from './CommentsColumn'
 import { ItemContent, ItemFields, ItemIdentity, ItemWords, fromTool } from './ItemDetail'
@@ -31,15 +31,13 @@ export const commentsOn = (item: Item): StoryComment[] => {
 /**
  * The alternative with fewer sections (Miky, 27 Nov: "lots of section"): the item and its Properties stay in view, and
  * everything else is one tab at a time under them: Used in (the file it is applied to, then the AI sessions that read
- * it), its Sources, its Comments (with the box), and its History.
+ * it), its Comments (with the box), and its History, which starts with its sources as they were written.
  */
 function TabbedItemPanel({ item, me, here, onClose, onDecide, deciding }: { item: Item; me: string; here?: string; onClose: () => void; onDecide?: (choice: number, why: string) => void; deciding?: boolean }) {
   const [tab, setTab] = useState('used')
   const comments = commentsOn(item)
-  const sources = sourcesOf(item).length
   const tabs = [
     { id: 'used', label: 'Used in', unread: false },
-    { id: 'sources', label: sources > 1 ? `Sources ${sources}` : 'Source', unread: false },
     { id: 'comments', label: comments.length ? `Comments ${comments.length}` : 'Comments', unread: false },
     // Something in it can still be undone: the dot says so.
     { id: 'history', label: 'History', unread: historyOf(item).some((e) => e.undo) },
@@ -75,7 +73,6 @@ function TabbedItemPanel({ item, me, here, onClose, onDecide, deciding }: { item
               {/* Each tab holds one group, without its card or header: the tab already says what it is. */}
               <GroupLook.Provider value="bare">
                 {tab === 'used' && <Uses item={item} here={here} />}
-                {tab === 'sources' && <Sources item={item} />}
                 {tab === 'history' && <History item={item} />}
               </GroupLook.Provider>
             </ScrollArea>

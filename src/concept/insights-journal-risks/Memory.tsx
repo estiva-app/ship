@@ -3,12 +3,12 @@
  * when it comes up, what it came from and whether that changed, where it was used, and what happened to it since.
  * Only what is new or needs the person is open; the rest is one line or folded.
  * Reuses: the kit's QuotedLine (the words a mark is on, as a comment's), CollapsibleSection, SectionLabel, Card,
- * Button, IconButton, Avatar, MetaText, Link; LinkCard for what it is about, and MoveDialog to file it by hand.
+ * Button, IconButton, Avatar, MetaText, Link; LinkRow for the file it is used in, and MoveDialog to file it by hand.
  * New here: nothing.
  */
 import { createContext, useContext, useState, type ReactNode } from 'react'
 import { IconArchive, IconArrowsExchange, IconBox, IconExternalLink, IconHistory, IconHourglass, IconLink, IconLock, IconQuote, IconReceipt, IconSparkles, IconUsers } from '@tabler/icons-react'
-import { Avatar, Button, Card, CollapsibleSection, IconButton, Link, LinkCard, MetaText, MoveDialog, QuotedLine, SectionHeader, type Linked, type MovePlace } from '@estiva-app/ui'
+import { Avatar, Button, Card, CollapsibleSection, IconButton, Link, LinkRow, MetaText, MoveDialog, QuotedLine, SectionHeader, type Linked, type MovePlace } from '@estiva-app/ui'
 import { AcceptReject } from './ItemParts'
 import { PROJECT, TEAM, type Item, type Source } from './fixtures'
 
@@ -208,12 +208,12 @@ function SourceRow({ source }: { source: Source }) {
       <span className="flex min-w-0 flex-1 flex-col gap-1">
         <span className="flex min-w-0 flex-col">
           <span className="truncate text-body-2 text-text-primary">
-            {source.author.name}’s {source.what}
+            {source.author.name} wrote the source
             {source.when && <span className="text-text-muted">{` · ${source.when}`}</span>}
           </span>
           <span className="min-w-0 truncate">
             <MetaText tone="muted">
-              in {source.app} · {source.place}
+              {source.what.charAt(0).toUpperCase() + source.what.slice(1)} in {source.app} · {source.place}
             </MetaText>
           </span>
         </span>
@@ -235,21 +235,6 @@ function SourceRow({ source }: { source: Source }) {
   )
 }
 
-/** The item's sources, one or more; none for one typed by hand. */
-export function Sources({ item }: { item: Item }) {
-  // A tool's insight shows its live chart or quote above instead; a Decision that answered a Question shows the question.
-  const list = sourcesOf(item).filter((s) => s.app !== 'PostHog' && s.app !== 'Intercom')
-  if (!list.length) return item.decision || sourcesOf(item).length ? null : <Group title="Sources" trailing="Typed by hand" />
-  return (
-    <Group title={list.length > 1 ? 'Sources' : 'Source'} trailing={list.length > 1 ? String(list.length) : undefined}>
-      <ul aria-label="Sources" className="flex flex-col gap-3">
-        {list.map((s) => (
-          <SourceRow key={`${s.place}-${s.quote}`} source={s} />
-        ))}
-      </ul>
-    </Group>
-  )
-}
 
 /**
  * Whether it is useful: its receipts, folded, with how many and when last; on a Proposed item, how long until it fades
@@ -320,7 +305,7 @@ interface Event { by: string; trust?: string; what: string; why?: string; ago: s
 export function historyOf(item: Item): Event[] {
   const events: Event[] = [...(item.history ?? [])]
   if (item.changed) events.unshift({ by: item.changed.by, trust: 'Acts, with Undo', what: item.changed.what, why: item.changed.why, ago: item.changed.ago })
-  const marked = { by: item.markedBy.name, what: item.markedBy.bot ? 'suggested it' : 'marked it', why: item.why, ago: sourcesOf(item)[0]?.when ?? item.at }
+  const marked = { by: item.markedBy.name, what: !sourcesOf(item).length ? 'wrote it by hand, with no source' : item.markedBy.bot ? 'suggested it' : 'marked it', why: item.why, ago: sourcesOf(item)[0]?.when ?? item.at }
   const added = item.acceptedBy && item.status !== 'proposed' ? { by: item.acceptedBy.name, what: item.type === 'insight' ? 'added it' : 'accepted it', ago: item.at } : undefined
   // One line when the same person marked and added it: a second says nothing new.
   if (added && added.by === marked.by && !item.markedBy.bot) events.push({ ...marked, what: `marked and ${added.what.replace(' it', '')} it` })
@@ -355,11 +340,16 @@ function HistoryRow({ event }: { event: Event }) {
  */
 export function History({ item }: { item: Item }) {
   const events = historyOf(item)
+  // Its sources are where its history starts (Miky, 27 Nov): each written before it was marked, oldest last.
+  const sources = sourcesOf(item).filter((s) => s.app !== 'PostHog' && s.app !== 'Intercom')
   return (
-    <Group title="History" trailing={String(events.length)} fold open={events.some((e) => e.undo)}>
-      <ul className="flex flex-col gap-2">
+    <Group title="History" trailing={String(events.length + sources.length)}>
+      <ul className="flex flex-col gap-3">
         {events.map((e) => (
           <HistoryRow key={`${e.by}-${e.what}`} event={e} />
+        ))}
+        {[...sources].reverse().map((s) => (
+          <SourceRow key={`${s.place}-${s.quote}`} source={s} />
         ))}
       </ul>
     </Group>
@@ -401,7 +391,9 @@ function Filing({ item, here }: { item: Item; here?: string }) {
   const [about, setAbout] = useState(item.about?.title ?? '')
   const [moving, setMoving] = useState(false)
   const [byHand, setByHand] = useState(false)
-  const file = FILES[about] ?? (about ? { id: about, kind: 'issue' as const, title: about, href: '#', subtitle: TEAM } : undefined)
+  const found = FILES[about] ?? (about ? { id: about, kind: 'issue' as const, title: about, href: '#', subtitle: TEAM } : undefined)
+  // The page you are on says so in its row, instead of a second line.
+  const file = found && about === here ? { ...found, subtitle: 'This project' } : found
   const change = (
     <IconButton variant="muted" tooltip="File under…" aria-label="File under…" onClick={() => setMoving(true)}>
       <IconArrowsExchange size={16} stroke={1.5} />
@@ -409,10 +401,11 @@ function Filing({ item, here }: { item: Item; here?: string }) {
   )
   return (
     <div className="flex flex-col gap-1">
-      {file && about !== here ? (
-        <div className="flex items-start gap-1">
+      {/* The kit's row widget, as a list draws a file (Miky, 27 Nov); hovering it shows its card. */}
+      {file ? (
+        <div className="flex items-center gap-1">
           <div className="min-w-0 flex-1">
-            <LinkCard link={{ state: 'ready', linked: file }} readOnly />
+            <LinkRow link={{ state: 'ready', linked: file }} preview />
           </div>
           {change}
         </div>
@@ -421,7 +414,7 @@ function Filing({ item, here }: { item: Item; here?: string }) {
           <span className="flex w-4 shrink-0 justify-center text-text-muted">
             <IconBox size={14} stroke={1.5} />
           </span>
-          <span className="min-w-0 flex-1 text-body-2 text-text-primary">{file ? 'This project' : 'Not filed under a project or issue'}</span>
+          <span className="min-w-0 flex-1 text-body-2 text-text-muted">Not filed under a project or issue</span>
           {change}
         </div>
       )}
@@ -451,7 +444,6 @@ export function ItemTrail({ item, here }: { item: Item; here?: string }) {
   return (
     <div className="flex flex-col gap-2">
       <Uses item={item} here={here} />
-      <Sources item={item} />
       <History item={item} />
     </div>
   )
