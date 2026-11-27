@@ -30,6 +30,7 @@ import {
   createPeopleCache,
   createProjectionCache,
   listFolders,
+  topLevelFolders,
   nestingOf,
   resolveFolderContents,
   resolveForeignEvent,
@@ -855,7 +856,8 @@ export function shipMaySign(kind: number): boolean {
  */
 export async function creatableUnder(parentKind: number): Promise<CreatableKindRead | null> {
   if (parentKind !== KIND_CHANNEL_METADATA) return null
-  const [roots, folders] = await Promise.all([query([{ kinds: [parentKind], limit: 1 }]), readFolders()])
+  // Teams only, as Ship's sidebar and New project list them: never a Peek topic, a file's own channel or an archived team.
+  const [roots, folders] = await Promise.all([query([{ kinds: [parentKind], limit: 1 }]), readFolders().then(topLevelFolders)])
   const [root] = roots
   const identifier = root?.tags.find((t) => t[0] === 'd')?.[1]
   if (!root || !identifier) return null
@@ -896,7 +898,7 @@ export async function applyCreation(args: LauncherApply): Promise<LauncherApplie
   if (kind === KIND.PROJECT || kind === KIND.ISSUE || !shipMaySign(kind)) return refuse('Ship cannot make this.')
 
   const folder = pointer.identifier
-  const team = (await readFolders().catch(() => null))?.find((f) => f.id === folder)
+  const team = (await readFolders().then(topLevelFolders).catch(() => null))?.find((f) => f.id === folder)
   if (!team) return refuse('That team is not one you are in, so nothing was made.')
 
   const value = Object.fromEntries(Object.entries(args.value).map(([k, v]) => [k, v === '@me' ? pubkey : v]))
@@ -946,8 +948,10 @@ export async function applyCreation(args: LauncherApply): Promise<LauncherApplie
   if (typeof built === 'string') return refuse(built)
   const [record, ...commands] = built as UnsignedEvent[]
   const file = { kind, pubkey, d: newId }
+  let rootOut = false
   const publishSigned = async (event: SignedEvent) => {
     const result = await relay.publish(event)
+    if (result.ok && event.kind === kind) rootOut = true
     return { ok: result.ok, reason: result.reason, eventId: event.id }
   }
   const made = await createFile({
@@ -976,12 +980,21 @@ export async function applyCreation(args: LauncherApply): Promise<LauncherApplie
     publish: publishSigned,
     query,
     current: async (field) => (await openFile(query, file, { text: field === TEXT_FIELD }).catch(() => undefined))?.fields[field]?.event,
-  }).catch((error: unknown) => ({ ok: false as const, created: false as const, refused: error instanceof Error ? error.message : String(error) }))
+  }).catch((error: unknown) => ({
+    ok: false as const,
+    // A throw after the record went out (signing the text, say) still made the file: never "not created", or a second
+    // Create makes a second one.
+    created: rootOut,
+    refused: error instanceof Error ? error.message : String(error),
+  }))
   if (!made.ok && !made.created) return refuse(made.refused)
   const created = `${kind}:${pubkey}:${newId}`
-  // The team commands in order, stopping at the first refusal: the file exists by then, and only its listing is behind.
+  // The team commands in order, stopping at the first refusal or throw: the file exists by then, and only its listing is behind.
   for (const command of commands) {
-    const followed = await relay.publish(await signer.sign(command))
+    const followed = await signer
+      .sign(command)
+      .then((signed) => relay.publish(signed))
+      .catch((error: unknown) => ({ ok: false, reason: error instanceof Error ? error.message : String(error) }))
     if (!followed.ok) return { ok: true, created, ...(made.ok ? {} : { textNotSaved: true }), incomplete: followed.reason ?? 'The team did not list it.' }
   }
   return made.ok ? { ok: true, created } : { ok: true, created, textNotSaved: true }

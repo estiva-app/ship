@@ -7,7 +7,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { addrToNaddr, type SignedEvent } from '@estiva-app/protocol'
 
-const { READER, RELAY, TEAM, LEAF, published, teams, leaf } = vi.hoisted(() => {
+const { READER, RELAY, TEAM, LEAF, published, teams, leaf, signing } = vi.hoisted(() => {
   const LEAF = '31990:9b0ff001e909e0c6eb9165b81118b0c580db2584c87e1c794a2ec9339f7541ec:estiva-leaf'
   /* Leaf's add-document and describe, as its manifest declares them (leaf src/manifest.ts). */
   const manifest = {
@@ -35,7 +35,8 @@ const { READER, RELAY, TEAM, LEAF, published, teams, leaf } = vi.hoisted(() => {
     TEAM: '05bebd5b-b699-4bd4-af50-f5377df0fd67',
     LEAF,
     published: [] as SignedEvent[],
-    teams: { list: [] as { id: string; name?: string; hasState: boolean }[] },
+    teams: { list: [] as { id: string; name?: string; hasState: boolean; listedIn?: string[]; archived?: { by: string; at: number } }[] },
+    signing: { refuse: 0 },
     leaf: { manifest },
   }
 })
@@ -49,6 +50,8 @@ vi.mock('@estiva-app/interop', async (importOriginal) => {
     // The newest manifest for a document is a stranger's (any key can publish one until WOR-2): its text must not matter.
     resolveManifest: async () => ({ address: '31990:ee11:planted', manifest: { actions: [] } }),
     listFolders: async () => teams.list,
+    // What a team offers: Leaf's New document, by Leaf's manifest.
+    resolveForeignObject: async () => ({ actions: [{ id: 'add-document', label: 'New document', control: 'form', declaredBy: { address: LEAF } }] }),
   }
 })
 
@@ -58,7 +61,9 @@ vi.mock('./store', () => ({
     query: async (filters: { kinds?: number[] }[]) =>
       filters.some((f) => f.kinds?.includes(31990))
         ? [{ kind: 31990, pubkey: LEAF.split(':')[1], created_at: 1, tags: [['d', 'estiva-leaf']], content: JSON.stringify(leaf.manifest), id: 'm'.repeat(64), sig: '' }]
-        : [],
+        : filters.some((f) => f.kinds?.includes(39000))
+          ? [{ kind: 39000, pubkey: RELAY, created_at: 1, tags: [['d', TEAM]], content: '', id: 't'.repeat(64), sig: '' }]
+          : [],
     queryAll: async () => [],
     publish: async (event: SignedEvent) => {
       published.push(event)
@@ -67,17 +72,44 @@ vi.mock('./store', () => ({
   },
   times: async () => [],
   searchedTypes: () => [],
-  signer: { pubkey: READER, sign: async (event: Omit<SignedEvent, 'id' | 'sig'>) => ({ ...event, id: String(published.length + 1).padStart(64, '0'), sig: '' }) },
+  signer: {
+    pubkey: READER,
+    sign: async (event: Omit<SignedEvent, 'id' | 'sig'>) => {
+      // Estiva ID refusing one kind at /sign, as an expired token or a ceiling does.
+      if (event.kind === signing.refuse) throw new Error('/sign refused this kind')
+      return { ...event, id: String(published.length + 1).padStart(64, '0'), sig: '' }
+    },
+  },
 }))
 
-import { applyCreation } from './foreign'
+import { applyCreation, creatableUnder } from './foreign'
 
 const tag = (event: SignedEvent, name: string) => event.tags.find((t) => t[0] === name)?.[1]
 const inOps = addrToNaddr(`39000:${RELAY}:${TEAM}`)
 
 beforeEach(() => {
   published.length = 0
-  teams.list = [{ id: TEAM, name: 'Ops', hasState: true }]
+  signing.refuse = 0
+  // What the listing really holds: a team, a Peek topic listed in it, and an archived team.
+  teams.list = [
+    { id: TEAM, name: 'Ops', hasState: true },
+    { id: 'topic-launch', name: 'Launch chat', hasState: true, listedIn: [TEAM] },
+    { id: 'old-team', name: 'Old', hasState: true, archived: { by: READER, at: 1 } },
+  ]
+})
+
+describe("Ship's ⌘K: where a Leaf document can go (KIN-9)", () => {
+  it('offers New document in the teams only: never a Peek topic or an archived team', async () => {
+    const read = await creatableUnder(39000)
+    expect(read?.actions.map((a) => a.id)).toEqual(['add-document'])
+    expect(read?.parentsFor?.['add-document']?.map((p) => p.title)).toEqual(['Ops'])
+  })
+
+  it('makes nothing in a Peek topic, though the person can read it', async () => {
+    const result = await applyCreation({ naddr: addrToNaddr(`39000:${RELAY}:topic-launch`), actionId: 'add-document', declaredBy: LEAF, value: { title: 'Launch decisions' } })
+    expect(result).toEqual({ ok: false, reason: 'That team is not one you are in, so nothing was made.' })
+    expect(published).toEqual([])
+  })
 })
 
 describe("Ship's ⌘K makes a Leaf document by Leaf's declared New document (KIN-9)", () => {
@@ -108,6 +140,25 @@ describe("Ship's ⌘K makes a Leaf document by Leaf's declared New document (KIN
 
     expect(result).toEqual({ ok: false, reason: 'That team is not one you are in, so nothing was made.' })
     expect(published).toEqual([])
+  })
+
+  it('signs no kind Ship may not sign, whatever a manifest declares', async () => {
+    const declared = leaf.manifest.actions[0]
+    leaf.manifest.actions[0] = { ...declared, emits: { kind: 1, placement: 'h', listed: true } } as typeof declared
+    try {
+      const result = await applyCreation({ naddr: inOps, actionId: 'add-document', declaredBy: LEAF, value: { title: 'A note' } })
+      expect(result).toEqual({ ok: false, reason: 'Ship cannot make this.' })
+      expect(published).toEqual([])
+    } finally {
+      leaf.manifest.actions[0] = declared
+    }
+  })
+
+  it('says the document was made when only the team listing fails after it, so Create is not pressed twice', async () => {
+    signing.refuse = 1852
+    const result = await applyCreation({ naddr: inOps, actionId: 'add-document', declaredBy: LEAF, value: { title: 'Launch decisions', description: 'We launch on 3 December.' } })
+    expect(published.map((e) => e.kind)).toEqual([30842, 1851])
+    expect(result).toMatchObject({ ok: true, created: `30842:${READER}:${tag(published[0], 'd')}`, incomplete: '/sign refused this kind' })
   })
 
   it("signs no Ship project or issue this way: those are Ship's own forms", async () => {
