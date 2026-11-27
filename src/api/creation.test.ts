@@ -107,7 +107,7 @@ describe("Ship's ⌘K makes a Leaf document by Leaf's declared New document (KIN
 
   it("signs no Ship project or issue this way: those are Ship's own forms", async () => {
     const declared = leaf.manifest.actions[0]
-    leaf.manifest.actions[0] = { ...declared, emits: { kind: 30851, placement: 'h', listed: true } }
+    leaf.manifest.actions[0] = { ...declared, emits: { kind: 30851, placement: 'h', listed: true } } as typeof declared
     try {
       const result = await applyCreation({ naddr: inOps, actionId: 'add-document', declaredBy: LEAF, value: { title: 'Not an issue' } })
       expect(result).toEqual({ ok: false, reason: 'Ship cannot make this.' })
