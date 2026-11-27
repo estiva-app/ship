@@ -6,7 +6,7 @@
  * Button, IconButton, Avatar, MetaText, Link; LinkRow for the file it is used in, and MoveDialog to file it by hand.
  * New here: nothing.
  */
-import { createContext, useContext, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { IconArchive, IconArrowsExchange, IconBox, IconHistory, IconHourglass, IconLink, IconLock, IconQuote, IconReceipt, IconSparkles, IconUsers } from '@tabler/icons-react'
 import { Avatar, Button, Card, CollapsibleSection, IconButton, Link, LinkRow, MetaText, MoveDialog, QuotedLine, SectionHeader, type Linked, type LinkedKind, type MovePlace } from '@estiva-app/ui'
 import { AcceptReject } from './ItemParts'
@@ -104,26 +104,12 @@ export function Replaced({ item }: { item: Item }) {
   )
 }
 
-/** How a Group draws: a card (the grouped panel), plain under a tab, or bare as a tab's whole content. */
-export const GroupLook = createContext<'card' | 'plain' | 'bare'>('card')
-
 /**
  * One group of the item's detail, as Linear's sidebar groups (Miky, 27 Nov: "clean and well structured"): a card with a
  * plain header, its count or state at the right, its one action, and its rows. `fold` folds it behind the header.
  */
 export function Group({ title, trailing, action, fold, open, children }: { title: string; trailing?: string; action?: { tooltip: string; icon: ReactNode; onClick: () => void }; fold?: boolean; open?: boolean; children?: ReactNode }) {
-  const look = useContext(GroupLook)
   const right = trailing ? <MetaText tone="muted">{trailing}</MetaText> : undefined
-  // In a tab: no card and no fold; a tab of its own (Used in, History) drops its header, which the tab already says;
-  // the panel puts its one action on the tab row.
-  if (look === 'bare') return <>{children}</>
-  if (look === 'plain')
-    return (
-      <div className="flex flex-col">
-        <SectionHeader title={title} trailing={right} hover="none" showActions="always" {...(action ? { actions: [action] } : {})} />
-        {children && <div className="px-2 pb-2 pt-1">{children}</div>}
-      </div>
-    )
   return (
     <Card fill="none" className="flex flex-col px-1 py-1">
       {fold ? (
@@ -261,16 +247,10 @@ function SourceRow({ source }: { source: Source }) {
  * Whether it is useful: its receipts, folded, with how many and when last; on a Proposed item, how long until it fades
  * and "Still useful", which starts the time again. Once faded, that it was, and Restore.
  */
-/** Files it under a project or issue by hand: Used in's one action, in its header or on the tab row. */
-export const fileUnder = (onClick: () => void) => ({ tooltip: 'File under…', icon: <IconArrowsExchange size={16} stroke={1.5} />, onClick })
-
-export function Uses({ item, here, moving: shown, onMoving }: { item: Item; here?: string; moving?: boolean; onMoving?: (v: boolean) => void }) {
+export function Uses({ item, here }: { item: Item; here?: string }) {
   const uses = usesOf(item)
   const [kept, setKept] = useState(false)
-  const [own, setOwn] = useState(false)
-  // The tabbed panel holds it when it draws the action on its tab row.
-  const moving = shown ?? own
-  const setMoving = onMoving ?? setOwn
+  const [moving, setMoving] = useState(false)
   const left = kept ? FADE_DAYS : fadesIn(item)
   // Each AI session or loop run that read it as a source, drawn as the same row as the file above it (Miky, 27 Nov:
   // "should look similar"): what it wrote, by whom as a robot face, where and when.
@@ -318,7 +298,8 @@ export function Uses({ item, here, moving: shown, onMoving }: { item: Item; here
     <Group
       title="Used in"
       trailing={uses.length ? `last ${ago(uses[0].days)}` : undefined}
-      action={fileUnder(() => setMoving(true))}
+      // Filing it by hand is the group's one action, on Used in's own line (Miky, 27 Nov), so every row below takes the whole width.
+      action={{ tooltip: 'File under…', icon: <IconArrowsExchange size={16} stroke={1.5} />, onClick: () => setMoving(true) }}
     >
       <div className="flex flex-col gap-3">
         <Filing item={item} here={here} moving={moving} setMoving={setMoving} />

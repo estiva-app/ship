@@ -162,7 +162,7 @@ export function ItemWords({ item }: { item: Item }) {
  * The item's own content under its fields, kind by kind, as its list shows it. `words`: draw the summary and details
  * here (the side panel); the item page leaves them to its header and description.
  */
-export function ItemContent({ item, me = 'miky', words = true, onDecide, deciding, here, trail = true }: { item: Item; me?: string; words?: boolean; onDecide?: (choice: number, why: string) => void; deciding?: boolean; here?: string; trail?: boolean }) {
+export function ItemContent({ item, me = 'miky', words = true, onDecide, deciding, here }: { item: Item; me?: string; words?: boolean; onDecide?: (choice: number, why: string) => void; deciding?: boolean; here?: string }) {
   const tool = fromTool(item)
   const quote = item.visual?.kind === 'quote'
   return (
@@ -196,7 +196,7 @@ export function ItemContent({ item, me = 'miky', words = true, onDecide, decidin
           </span>
         </MetaText>
       )}
-      {trail && <ItemTrail item={item} here={here} />}
+      <ItemTrail item={item} here={here} />
     </div>
   )
 }

@@ -136,12 +136,8 @@ export const ItemPersonal: Story = { render: () => <Shell><ItemPage item={PERSON
 export const ProjectInsightTwoSources: Story = { render: () => <Shell><ProjectPage start="insights" open="i1" /></Shell> }
 /** An accepted Question whose only source was deleted: it stays, and the project's loop proposes Outdated. */
 export const ProjectQuestionNoSourceLeft: Story = { render: () => <Shell><ProjectPage start="risks" open="r3" /></Shell> }
-/** Seen from the team: the issue it is about shows as its card, and Change files it by hand. */
+/** Seen from the team: the issue it is about shows as its row, and ⇄ in Used in files it by hand. */
 export const TeamInsightAboutAnIssue: Story = { render: () => <Shell current="projects"><TeamPage start="insights" open="i1" /></Shell> }
-/** The alternative in tabs (Miky, 27 Nov: "lots of section"): item and Properties in view; Context, Comments, Used, History one at a time. */
-export const TabsTeamInsightAboutAnIssue: Story = { render: () => <Shell current="projects"><TeamPage start="insights" open="i1" panel="tabs" /></Shell> }
-export const TabsProjectInsightOpen: Story = { render: () => <Shell><ProjectPage start="insights" open="i3" panel="tabs" /></Shell> }
-export const TabsProjectQuestionNoSourceLeft: Story = { render: () => <Shell><ProjectPage start="risks" open="r3" panel="tabs" /></Shell> }
 /** A replaced Decision: "Replaced by" links the entry that replaced it, and its history can undo it. */
 export const ProjectDecisionReplacedOpen: Story = { render: () => <Shell><ProjectPage start="journal" open="j6" /></Shell> }
 /** An item's page loading. */

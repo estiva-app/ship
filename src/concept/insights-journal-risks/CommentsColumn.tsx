@@ -19,7 +19,7 @@ export interface StoryComment {
   privateSource?: boolean
 }
 
-export function CommentsColumn({ comments, team, about, startMenuOn, bare = false }: { comments: StoryComment[]; team: string; about?: string; startMenuOn?: string; bare?: boolean }) {
+export function CommentsColumn({ comments, team, about, startMenuOn }: { comments: StoryComment[]; team: string; about?: string; startMenuOn?: string }) {
   const [marks, setMarks] = useState<Record<string, Mark | undefined>>(() => Object.fromEntries(comments.map((c) => [c.id, c.mark])))
   const [notice, setNotice] = useState<{ word: MarkWord; id: string; title: string }>()
   const mark = (c: StoryComment, word: MarkWord) => {
@@ -53,7 +53,7 @@ export function CommentsColumn({ comments, team, about, startMenuOn, bare = fals
   return (
     <div className="flex w-[384px] min-h-0 flex-1 flex-col" data-start-menu={startMenuOn}>
       {/* Ship's own comment box under the comments (Miky, 27 Nov: so it is clear you can comment right there). */}
-      <ConversationLayout threads="under" items={items} {...(bare ? {} : { title: 'Comments' })} box={<ConversationBox kind="conversation" onSend={async () => true} />} />
+      <ConversationLayout threads="under" items={items} title="Comments" box={<ConversationBox kind="conversation" onSend={async () => true} />} />
       {notice && <MarkedNotice word={notice.word} team={team} about={about} title={notice.title} onTitle={(t) => retitle(notice.id, t)} onClose={() => setNotice(undefined)} />}
     </div>
   )
